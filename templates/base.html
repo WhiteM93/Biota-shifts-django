@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Biota shifts Django</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #0f1115; color: #eaf0ff; }
+    .nav { display: flex; gap: 12px; padding: 14px 18px; background: #1a2130; }
+    .nav a { color: #7c8cff; text-decoration: none; font-weight: 600; }
+    .container { padding: 16px 18px; }
+    table { border-collapse: collapse; width: 100%; background: #151b27; }
+    th, td { border: 1px solid #2b3650; padding: 8px; font-size: 13px; }
+    th { background: #202a3c; text-align: left; }
+    input, select { width: 100%; box-sizing: border-box; background: #101520; color: #eaf0ff; border: 1px solid #33415f; border-radius: 4px; padding: 6px; }
+    .btn { background: #7c8cff; color: #fff; border: 0; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+    .muted { color: #9bb0d8; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/">Главная</a>
+    <a href="/regulations/">Регламенты</a>
+    <a href="/admin/">Admin</a>
+  </div>
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

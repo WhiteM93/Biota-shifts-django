@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Регламенты</h2>
+<p class="muted">Дата планирования: {{ plan_date }}</p>
+
+<form method="post">
+  {% csrf_token %}
+  {{ formset.management_form }}
+  <table>
+    <thead>
+      <tr>
+        <th>Код</th>
+        <th>Сотрудник</th>
+        <th>Отдел</th>
+        <th>Должность</th>
+        <th>Смена</th>
+        <th>Завтрак с</th>
+        <th>Завтрак по</th>
+        <th>Обед с</th>
+        <th>Обед по</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for form in formset %}
+      <tr>
+        {{ form.id }}
+        <td>{{ form.employee_code }}</td>
+        <td>{{ form.employee_name }}</td>
+        <td>{{ form.department }}</td>
+        <td>{{ form.position }}</td>
+        <td>{{ form.shift }}</td>
+        <td>{{ form.breakfast_start }}</td>
+        <td>{{ form.breakfast_end }}</td>
+        <td>{{ form.lunch_start }}</td>
+        <td>{{ form.lunch_end }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p style="margin-top: 12px;">
+    <button class="btn" type="submit">Сохранить</button>
+  </p>
+</form>
+{% endblock %}
