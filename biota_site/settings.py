@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -25,7 +26,7 @@ SECRET_KEY = "django-insecure-&j#7pt+-7u0y)n&ihg(og#(x-3^yn^ax449c7e_d!r4&cbxbsx
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 
 
 # Application definition
@@ -63,6 +64,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "shifts.context_processors.biota_session",
             ],
         },
     },
@@ -123,3 +125,19 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/"
+
+# Те же переменные, что и у Streamlit-приложения (PostgreSQL Biota, пароль admin и т.д.)
+BIOTA_DB_HOST = os.getenv("BIOTA_DB_HOST", "localhost")
+BIOTA_DB_PORT = os.getenv("BIOTA_DB_PORT", "5432")
+BIOTA_DB_NAME = os.getenv("BIOTA_DB_NAME", "biota_db")
+BIOTA_DB_USER = os.getenv("BIOTA_DB_USER", "biota_user")
+BIOTA_DB_PASSWORD = os.getenv("BIOTA_DB_PASSWORD", "")
+BIOTA_DB_CONNECT_TIMEOUT = os.getenv("BIOTA_DB_CONNECT_TIMEOUT", "15")
+BIOTA_ADMIN_USERNAME = os.getenv("BIOTA_ADMIN_USERNAME", "admin")
+BIOTA_ADMIN_PASSWORD = os.getenv("BIOTA_ADMIN_PASSWORD", "")
+BIOTA_AUTH_COOKIE_SECRET = os.getenv("BIOTA_AUTH_COOKIE_SECRET", "")
+BIOTA_USERS_STORE = os.getenv("BIOTA_USERS_STORE", "")
+BIOTA_SCHEDULE_DIR = os.getenv("BIOTA_SCHEDULE_DIR", "")

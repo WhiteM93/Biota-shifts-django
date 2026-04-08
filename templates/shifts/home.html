@@ -1,10 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Biota shifts — перенос на Django</h2>
-<p class="muted">Новый проект создан. Следующий шаг: перенос разделов График, Часы по дням, СКУД и PDF/Excel-экспорта.</p>
-<ul>
-  <li>Регламенты: <a href="/regulations/">открыть страницу</a></li>
-  <li>Админка: <a href="/admin/">/admin/</a></li>
-</ul>
+<h2>Главная</h2>
+<p class="muted">Вы вошли как <strong>{{ username }}</strong>.</p>
+<p>Сотрудников в выборке (с учётом прав): <strong>{{ emp_count }}</strong></p>
+<p class="muted">Каталог приложения: <code>{{ app_dir }}</code> — положите сюда <code>.env</code> с <code>BIOTA_DB_*</code>, как в Streamlit.</p>
+<form method="post" action="{% url 'refresh_cache' %}">
+  {% csrf_token %}
+  <button class="btn" type="submit">Обновить кэш данных из БД</button>
+</form>
 {% endblock %}

@@ -3,9 +3,12 @@ from datetime import date, timedelta
 from django.forms import modelformset_factory
 from django.shortcuts import redirect, render
 
+from shifts.auth_utils import biota_login_required
+
 from .models import RegulationPlan
 
 
+@biota_login_required
 def regulation_page(request):
     plan_date = request.GET.get("date") or (date.today() + timedelta(days=1)).isoformat()
     qs = RegulationPlan.objects.filter(plan_date=plan_date).order_by("employee_name")
