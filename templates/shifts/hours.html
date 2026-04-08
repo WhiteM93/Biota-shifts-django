@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Часы по дням</h2>
+<p class="muted">{{ month_name|capfirst }} {{ year }} — в ячейках факт часов из Biota; <strong>{{ no_punch }}</strong> — нет отметок; звёздочка <strong>{{ suffix_out }}</strong> — часы вне графика.</p>
+
+<form method="get" action="" class="period-form hours-filters">
+  <div class="filter-row">
+    <label>Год
+      <select name="year">
+        {% for yy in year_options %}
+        <option value="{{ yy }}" {% if yy == year %}selected{% endif %}>{{ yy }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Месяц
+      <select name="month">
+        {% for mm, mlab in month_choices %}
+        <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="btn">Показать</button>
+  </div>
+  <div class="filter-row filter-checkboxes">
+    <span class="filter-label">Отдел:</span>
+    {% for d in all_deps %}
+    <label class="chk"><input type="checkbox" name="dep" value="{{ d }}" {% if d in sel_deps %}checked{% endif %}> {{ d }}</label>
+    {% endfor %}
+  </div>
+  <div class="filter-row filter-checkboxes">
+    <span class="filter-label">Должность:</span>
+    {% for p in all_pos %}
+    <label class="chk"><input type="checkbox" name="pos" value="{{ p }}" {% if p in sel_pos %}checked{% endif %}> {{ p }}</label>
+    {% endfor %}
+  </div>
+  <p class="muted" style="margin:8px 0 0 0;">Фильтры применяются вместе с периодом (кнопка «Показать»).</p>
+</form>
+
+{% if error_message %}
+<p style="color:#ffb8b8;">{{ error_message }}</p>
+{% endif %}
+
+{% if table_rows %}
+<p style="margin:12px 0;">
+  <a class="btn" href="{% url 'hours_excel' %}?{{ query_string }}">Скачать Excel</a>
+  <a class="btn" href="{% url 'hours_pdf' %}?{{ query_string }}" style="margin-left:8px;">Скачать PDF</a>
+</p>
+
+<div class="schedule-wrap hours-wrap">
+  <table class="schedule-table hours-table">
+    <thead>
+      <tr>
+        <th>Сотрудник</th>
+        {% for d, lab in day_headers %}
+        <th title="день {{ d }}">{{ lab }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in table_rows %}
+      <tr>
+        <td class="emp-cell">{{ row.name }}</td>
+        {% for cell in row.cells %}
+        <td class="hours-cell {% if cell == no_punch %}cell-nopunch{% elif suffix_out in cell %}cell-outside{% endif %}">{{ cell }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<style>
+.period-form select { width: auto; min-width: 120px; display: inline-block; margin-right: 10px; }
+.filter-row { margin-bottom: 10px; flex-wrap: wrap; align-items: center; gap: 8px; }
+.filter-checkboxes { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
+.filter-label { color: #9bb0d8; font-weight: 600; margin-right: 6px; }
+.chk { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.chk input { width: auto; margin: 0; }
+.schedule-wrap { overflow-x: auto; max-width: 100%; border: 1px solid #2b3650; border-radius: 8px; padding: 8px; margin-top: 8px; }
+.schedule-table { min-width: max-content; font-size: 12px; }
+.schedule-table th, .schedule-table td { border: 1px solid #2b3650; padding: 4px 2px; text-align: center; }
+.emp-cell { text-align: left !important; white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.hours-cell { font-variant-numeric: tabular-nums; max-width: 56px; }
+.cell-nopunch { color: #6b7a99; }
+.cell-outside { color: #c9d4f0; }
+</style>
+{% endblock %}

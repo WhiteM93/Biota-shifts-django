@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Личный кабинет</h2>
+
+{% if is_admin %}
+<p class="muted">Роль: <strong>администратор</strong>. Логин: <code>{{ admin_username }}</code></p>
+<p class="muted">Пароль учётки задаётся в окружении / секретах (<code>BIOTA_ADMIN_PASSWORD</code>), как в Streamlit.</p>
+
+<form method="post" action="">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="admin_display_name">
+  <h3>Имя для отображения</h3>
+  <p class="muted">Сохраняется в сессии до выхода (как в Streamlit).</p>
+  <p><label>Имя <input type="text" name="admin_display_name" value="{{ admin_display_name }}" maxlength="200" style="max-width:360px;"></label></p>
+  <p><button type="submit" class="btn">Сохранить имя</button></p>
+</form>
+
+<hr style="border-color:#2b3650;margin:28px 0;">
+
+<h3>Права пользователей</h3>
+<p class="muted">Новые аккаунты по умолчанию без доступа к сотрудникам, пока не назначены права.</p>
+{% if not priv_users %}
+<p class="muted">Пока нет зарегистрированных пользователей (файл пользователей пуст).</p>
+{% else %}
+<form method="get" action="" class="cab-pick">
+  <p>
+    <label>Выбор пользователя (только просмотр текущих прав)
+      <select name="priv_user" onchange="this.form.submit()">
+        {% for u in priv_users %}
+        <option value="{{ u }}" {% if u == priv_selected %}selected{% endif %}>{{ u }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </p>
+</form>
+
+<form method="post" action="">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="admin_privileges">
+  <input type="hidden" name="priv_user" value="{{ priv_selected }}">
+  <p>
+    <label>Видимость сотрудников
+      <select name="priv_scope">
+        {% for val, lab in scope_choices %}
+        <option value="{{ val }}" {% if val == priv_scope_current %}selected{% endif %}>{{ lab }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </p>
+  <p class="muted">При ограничении по цеху или участку выберите один или несколько пунктов (Ctrl+щелчок).</p>
+  {% if dep_opts %}
+  <p>
+    <label>Цехи (отделы)<br>
+      <select name="priv_dep" multiple size="8" class="cab-multi">
+        {% for d in dep_opts %}
+        <option value="{{ d }}" {% if d in priv_dep_selected %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </p>
+  {% else %}
+  <p class="muted">Нет цехов в справочнике.</p>
+  {% endif %}
+  {% if area_opts %}
+  <p>
+    <label>Участки<br>
+      <select name="priv_area" multiple size="8" class="cab-multi">
+        {% for a in area_opts %}
+        <option value="{{ a }}" {% if a in priv_area_selected %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </p>
+  {% else %}
+  <p class="muted">Нет участков в справочнике.</p>
+  {% endif %}
+  <p><button type="submit" class="btn">Сохранить права</button></p>
+</form>
+{% endif %}
+
+<style>
+.cab-multi { min-height: 140px; width: 100%; max-width: 520px; }
+</style>
+
+{% else %}
+
+{% if profile_missing %}
+<p style="color:#ffb8b8;">Данные профиля не найдены.</p>
+{% else %}
+<p class="muted">Роль: <strong>пользователь</strong>. Логин: <code>{{ profile_login }}</code></p>
+<p class="muted">Регистрация: {{ profile_created }}</p>
+<p><strong>Доступ:</strong> {{ profile_access }}</p>
+
+<form method="post" action="">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="profile">
+  <h3>Профиль</h3>
+  <p><label>Отображаемое имя <input type="text" name="display_name" value="{{ profile_display_name }}" maxlength="200"></label></p>
+  <p><label>Email <input type="email" name="email" value="{{ profile_email }}" maxlength="200"></label></p>
+  <p><button type="submit" class="btn">Сохранить профиль</button></p>
+</form>
+
+<form method="post" action="">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="password">
+  <h3>Смена пароля</h3>
+  <p><label>Текущий пароль <input type="password" name="password_old" autocomplete="current-password"></label></p>
+  <p><label>Новый пароль <input type="password" name="password_new" autocomplete="new-password"></label></p>
+  <p><label>Новый пароль ещё раз <input type="password" name="password_new2" autocomplete="new-password"></label></p>
+  <p><button type="submit" class="btn">Сменить пароль</button></p>
+</form>
+{% endif %}
+
+{% endif %}
+{% endblock %}

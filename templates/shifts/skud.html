@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>СКУД</h2>
+<p class="muted">Отдел, участок, должность — режим «по списку» или «все»; период и сотрудник — как в Streamlit. Табель и отметки <code>iclock_transaction</code>, МСК.</p>
+
+<form method="get" action="" class="skud-form" id="skud-main-form">
+  <input type="hidden" name="tab" value="{{ active_tab }}">
+
+  <h3>Фильтры</h3>
+  <div class="mode-row">
+    <span class="mode-label">Отдел:</span>
+    <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if fmeta.dep_mode_pick %}checked{% endif %}> по списку</label>
+    <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not fmeta.dep_mode_pick %}checked{% endif %}> все отделы</label>
+  </div>
+  <div class="filter-checkboxes">{% for d in all_deps %}
+    <label class="chk"><input type="checkbox" name="dep" value="{{ d }}" {% if d in fmeta.sel_deps %}checked{% endif %}> {{ d }}</label>
+  {% endfor %}</div>
+
+  <div class="mode-row">
+    <span class="mode-label">Участок:</span>
+    <label class="inline"><input type="radio" name="area_mode" value="pick" {% if fmeta.area_mode_pick %}checked{% endif %}> по списку</label>
+    <label class="inline"><input type="radio" name="area_mode" value="all" {% if not fmeta.area_mode_pick %}checked{% endif %}> все участки</label>
+  </div>
+  <div class="filter-checkboxes">{% for a in fmeta.areas_all %}
+    <label class="chk"><input type="checkbox" name="area" value="{{ a }}" {% if a in fmeta.sel_areas %}checked{% endif %}> {{ a }}</label>
+  {% empty %}
+    <span class="muted">(нет выделенных участков в данных)</span>
+  {% endfor %}</div>
+
+  <div class="mode-row">
+    <span class="mode-label">Должность:</span>
+    <label class="inline"><input type="radio" name="pos_mode" value="pick" {% if fmeta.pos_mode_pick %}checked{% endif %}> по списку</label>
+    <label class="inline"><input type="radio" name="pos_mode" value="all" {% if not fmeta.pos_mode_pick %}checked{% endif %}> все должности</label>
+  </div>
+  <div class="filter-checkboxes">{% for p in fmeta.positions_all %}
+    <label class="chk"><input type="checkbox" name="pos" value="{{ p }}" {% if p in fmeta.sel_positions %}checked{% endif %}> {{ p }}</label>
+  {% endfor %}</div>
+
+  <h3>Сотрудник и период</h3>
+  <p>
+    <label>Поиск <input type="search" name="q" value="{{ search_q }}" placeholder="Фамилия, имя, код…" style="max-width:320px;"></label>
+  </p>
+  <p>
+    <label>Сотрудник
+      <select name="emp">
+        {% for code, lab in emp_options %}
+        <option value="{{ code }}" {% if code == selected_emp %}selected{% endif %}>{{ lab }} ({{ code }})</option>
+        {% empty %}
+        <option value="">—</option>
+        {% endfor %}
+      </select>
+    </label>
+  </p>
+  <p class="period-row">
+    <label>Год
+      <select name="year">{% for y in year_options %}
+        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}</select>
+    </label>
+    <label>Месяц
+      <select name="month">{% for mm, mlab in month_choices %}
+        <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
+      {% endfor %}</select>
+    </label>
+    <button type="submit" class="btn">Показать</button>
+  </p>
+</form>
+
+{% if error_message %}
+<p class="err-banner">{{ error_message }}</p>
+{% endif %}
+
+{% if selected_emp %}
+<p class="muted"><strong>Сотрудник:</strong> {{ employee_display_name }} &nbsp;|&nbsp; <strong>Период:</strong> {{ start_date }} — {{ end_date }}</p>
+
+<div class="skud-tabs">
+  <a class="tab {% if active_tab == 'stats' %}active{% endif %}" href="?{{ qs_stats }}">Статистика</a>
+  <a class="tab {% if active_tab == 'otmetki' %}active{% endif %}" href="?{{ qs_ot }}">Отметки</a>
+</div>
+
+{% if active_tab == 'otmetki' %}
+<p>Отметок за месяц: <strong>{{ punch_count }}</strong></p>
+{% if punch_rows %}
+<div class="table-wrap">
+  <table class="data-grid">
+    <thead><tr>{% for c in punch_columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for row in punch_rows %}
+      <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p><a class="btn" href="{% url 'skud_punches_csv' %}?{{ query_string }}">Скачать отметки CSV</a></p>
+{% else %}
+<p class="muted">Нет отметок за выбранный период.</p>
+{% endif %}
+
+{% else %}
+<div class="dl-row">
+  <a class="btn" href="{% url 'skud_stats_excel' %}?{{ query_string }}">Статистика Excel</a>
+  <a class="btn" href="{% url 'skud_stats_csv' %}?{{ query_string }}">Статистика CSV</a>
+  <a class="btn" href="{% url 'skud_stats_pdf' %}?{{ query_string }}">Статистика PDF</a>
+</div>
+{% if stats_rows %}
+<div class="table-wrap">
+  <table class="data-grid">
+    <thead><tr>{% for c in stats_columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for row in stats_rows %}
+      <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="muted">Нет строк статистики.</p>
+{% endif %}
+{% endif %}
+
+{% endif %}
+
+<style>
+.skud-form h3 { margin-top: 18px; font-size: 1rem; color: #9bb0d8; }
+.mode-row { margin: 8px 0 4px 0; }
+.mode-label { color: #9bb0d8; font-weight: 600; margin-right: 8px; }
+.inline { margin-right: 14px; font-size: 13px; }
+.filter-checkboxes { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 12px; align-items: baseline; }
+.chk { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.chk input { width: auto; margin: 0; }
+.period-row select { width: auto; min-width: 100px; display: inline-block; margin-right: 10px; }
+.err-banner { color: #ffb8b8; padding: 10px 0; }
+.skud-tabs { display: flex; gap: 8px; margin: 16px 0; }
+.skud-tabs .tab { padding: 8px 14px; border-radius: 6px; background: #202a3c; color: #7c8cff; text-decoration: none; font-weight: 600; }
+.skud-tabs .tab.active { background: #7c8cff; color: #fff; }
+.table-wrap { overflow-x: auto; border: 1px solid #2b3650; border-radius: 8px; padding: 8px; margin-top: 10px; }
+.data-grid { min-width: max-content; font-size: 12px; }
+.data-grid th, .data-grid td { border: 1px solid #2b3650; padding: 4px 6px; text-align: left; }
+.dl-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.dl-row .btn { text-decoration: none; display: inline-block; }
+</style>
+{% endblock %}

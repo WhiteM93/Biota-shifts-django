@@ -26,6 +26,3 @@ class RegulationPlan(models.Model):
 
     def __str__(self) -> str:
         return f"{self.plan_date} | {self.employee_name} ({self.employee_code})"
-from django.db import models
-
-# Create your models here.

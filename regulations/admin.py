@@ -17,6 +17,3 @@ class RegulationPlanAdmin(admin.ModelAdmin):
     )
     list_filter = ("plan_date", "shift", "department")
     search_fields = ("employee_code", "employee_name")
-from django.contrib import admin
-
-# Register your models here.

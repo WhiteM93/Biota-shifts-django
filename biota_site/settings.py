@@ -13,8 +13,20 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
+from biota_shifts.env_manual import load_env_file
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+_env_path = BASE_DIR / ".env"
+load_env_file(_env_path)
+try:
+    from dotenv import load_dotenv
+
+    # override=True: значения из .env перекрывают устаревший BIOTA_* в окружении ОС/IDE
+    load_dotenv(_env_path, override=True)
+except ImportError:
+    pass
 
 
 # Quick-start development settings - unsuitable for production

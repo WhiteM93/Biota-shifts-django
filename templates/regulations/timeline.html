@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<h2>Регламент питания</h2>
+<p class="muted" style="max-width: 48rem; line-height: 1.45;">
+  Шкала <strong>08:00–20:00</strong>: подписи времени — каждые <strong>30 минут</strong>, линии сетки на дорожке — каждые <strong>10 минут</strong>; блоки с шагом <strong>5 минут</strong>.
+  Синие — завтрак, зелёные — обед. Красная полоса — 5‑минутные интервалы, где <strong>одновременно</strong> (завтрак или обед) больше людей, чем порог слева. Данные в SQLite (не в Biota).
+</p>
+
+<div class="reg-toolbar">
+  <form method="get" action="{% url 'regulations_page' %}" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+    <label>Дата
+      <input type="date" name="date" value="{{ plan_date }}" required>
+    </label>
+    <button type="submit" class="btn">Показать</button>
+    <span class="muted">{{ plan_date_display }}</span>
+    {% if biota_ok and emp_count is not None %}
+    <span class="muted">· в справочнике: {{ emp_count }} чел.</span>
+    {% endif %}
+  </form>
+  <form method="post" action="{% url 'regulations_page' %}?date={{ plan_date }}" style="display:inline;">
+    {% csrf_token %}
+    <input type="hidden" name="plan_date" value="{{ plan_date }}">
+    <button type="submit" name="action" value="from_catalog" class="btn"
+      {% if not biota_ok %}disabled title="Нет связи со справочником Biota"{% endif %}>Заполнить из Biota</button>
+  </form>
+  <button type="button" class="btn" id="reg-save" style="margin-left:auto;">Сохранить на сервер</button>
+  <span id="reg-save-status" class="muted" style="min-width:120px;"></span>
+</div>
+
+{% if not rows %}
+<p class="muted">Нет строк на эту дату — нажмите «Заполнить из Biota» или добавьте записи в <a href="/admin/regulations/regulationplan/">админке</a>.</p>
+{% endif %}
+
+<script id="reg-initial-json" type="application/json">{{ rows_json|safe }}</script>
+
+<div id="reg-timeline-root" class="reg-shell{% if not rows %} reg-shell--empty{% endif %}">
+  <div class="reg-header-row">
+    <div class="reg-corner"></div>
+    <div class="reg-hours-scroll">
+      <div class="reg-hours" aria-hidden="true">
+        {% for s in scale_slots_30 %}
+        <span class="{% if s.strong %}reg-h-hour{% endif %}">{{ s.label }}</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="reg-ovl-row">
+    <div class="reg-name reg-name--ovl reg-name--ovl-controls">
+      <span class="reg-ovl-caption">Перегруз</span>
+      <label class="reg-ovl-limit-label" title="Подсветка красным, если в интервале одновременно больше стольких человек">
+        &gt;
+        <input type="number" class="reg-ovl-input" id="reg-ovl-limit" name="ovl_limit" min="1" max="999" value="10" />
+        чел.
+      </label>
+    </div>
+    <div class="reg-track reg-track--ovl" id="reg-ovl-track"></div>
+  </div>
+
+  {% for r in rows %}
+  <div class="reg-emp-row">
+    <div class="reg-name" title="{{ r.employee_code }}">{{ r.employee_name }}</div>
+    <div class="reg-track" data-id="{{ r.id }}">
+      <div class="reg-block reg-block--bf"
+        data-kind="bf"
+        data-start-hm="{{ r.breakfast_start }}"
+        data-end-hm="{{ r.breakfast_end }}"
+        title="Завтрак">
+        <span class="reg-block__edge reg-block__edge--left" aria-hidden="true"></span>
+        <span class="reg-block__edge reg-block__edge--right" aria-hidden="true"></span>
+        <span class="reg-block__start">{{ r.breakfast_start }}</span>
+        <span class="reg-block__end">{{ r.breakfast_end }}</span>
+      </div>
+      <div class="reg-block reg-block--ln"
+        data-kind="ln"
+        data-start-hm="{{ r.lunch_start }}"
+        data-end-hm="{{ r.lunch_end }}"
+        title="Обед">
+        <span class="reg-block__edge reg-block__edge--left" aria-hidden="true"></span>
+        <span class="reg-block__edge reg-block__edge--right" aria-hidden="true"></span>
+        <span class="reg-block__start">{{ r.lunch_start }}</span>
+        <span class="reg-block__end">{{ r.lunch_end }}</span>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<style>
+  .reg-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .reg-shell { margin-top: 8px; user-select: none; }
+  .reg-header-row, .reg-ovl-row, .reg-emp-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 220px) 1fr;
+    gap: 8px 12px;
+    align-items: stretch;
+  }
+  .reg-corner { min-height: 24px; }
+  .reg-hours-scroll {
+    overflow-x: auto;
+    width: 100%;
+    padding-bottom: 2px;
+  }
+  .reg-hours {
+    display: grid;
+    grid-template-columns: repeat(24, minmax(28px, 1fr));
+    align-items: end;
+    gap: 0;
+    font-size: 11px;
+    color: #8a9bb8;
+    padding: 0 0 4px 0;
+    min-width: min(100%, 820px);
+    line-height: 1.2;
+    border-right: 2px solid #5a6d9a;
+  }
+  .reg-hours span { text-align: center; border-left: 1px solid #2f3d5c; padding-left: 2px; }
+  .reg-hours span:first-child { border-left: none; }
+  .reg-hours .reg-h-hour { color: #d8e4ff; font-weight: 700; font-size: 12px; border-left-color: #4a5c82; }
+  .reg-name {
+    font-size: 13px;
+    padding: 8px 6px;
+    border-bottom: 1px solid #2b3650;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .reg-name--ovl { color: #ff8a8a; font-weight: 600; }
+  .reg-name--ovl-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    line-height: 1.35;
+  }
+  .reg-ovl-caption { font-size: 13px; }
+  .reg-ovl-limit-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #e8b8b8;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .reg-ovl-input {
+    width: 52px;
+    padding: 4px 6px;
+    font-size: 13px;
+    background: #101520;
+    color: #eaf0ff;
+    border: 1px solid #4a5c82;
+    border-radius: 4px;
+  }
+  .reg-ovl-input:focus {
+    outline: none;
+    border-color: #7c8cff;
+  }
+  .reg-track {
+    position: relative;
+    height: 38px;
+    border-bottom: 1px solid #2b3650;
+    min-width: min(100%, 820px);
+    border-radius: 4px;
+    border-right: 2px solid #5a6d9a;
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        transparent 0,
+        transparent calc(100% / 12 - 2px),
+        rgba(200, 210, 240, 0.22) calc(100% / 12 - 2px),
+        rgba(200, 210, 240, 0.22) calc(100% / 12 - 1px),
+        transparent calc(100% / 12 - 1px),
+        transparent calc(100% / 12)
+      ),
+      repeating-linear-gradient(
+        90deg,
+        #121722 0,
+        #121722 calc(100% / 72 - 1px),
+        #2e3a52 calc(100% / 72 - 1px),
+        #2e3a52 calc(100% / 72)
+      );
+  }
+  .reg-track--ovl {
+    height: 28px;
+    background: #151a24;
+  }
+  .reg-ovl-seg {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    background: rgba(180, 40, 40, 0.62);
+    border-radius: 0;
+    pointer-events: auto;
+    box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.45), inset 1px 0 0 rgba(255, 255, 255, 0.12);
+    z-index: 2;
+  }
+  .reg-ovl-seg__lab {
+    font-size: clamp(7px, 1.1vw, 9px);
+    line-height: 1.05;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    text-align: center;
+    padding: 0 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    pointer-events: none;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.95), 0 1px 2px rgba(0, 0, 0, 0.8);
+  }
+  .reg-block {
+    position: absolute;
+    top: 5px;
+    height: 28px;
+    border-radius: 14px;
+    font-size: 10px;
+    line-height: 1;
+    color: #fff;
+    cursor: grab;
+    box-sizing: border-box;
+    padding: 0 14px;
+    overflow: hidden;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.35);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+  }
+  .reg-block__edge {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    z-index: 4;
+    transition: background 0.12s ease, box-shadow 0.12s ease;
+    pointer-events: auto;
+  }
+  .reg-block__edge--left {
+    left: 0;
+    border-radius: 14px 0 0 14px;
+    cursor: ew-resize;
+  }
+  .reg-block__edge--right {
+    right: 0;
+    border-radius: 0 14px 14px 0;
+    cursor: ew-resize;
+  }
+  .reg-block__edge--left:hover,
+  .reg-block__edge--right:hover {
+    background: rgba(255, 255, 255, 0.42);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+  }
+  .reg-block__start,
+  .reg-block__end {
+    position: relative;
+    z-index: 5;
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .reg-block__start { text-align: left; }
+  .reg-block__end { text-align: right; }
+  .reg-block:active { cursor: grabbing; }
+  .reg-block:active .reg-block__edge { cursor: ew-resize; }
+  .reg-block--bf { background: linear-gradient(180deg, #4f7dff, #3558cf); }
+  .reg-block--ln { background: linear-gradient(180deg, #42c77a, #238a52); }
+</style>
+
+<script src="{% static 'regulations/timeline.js' %}"></script>
+<script>
+  (function () {
+    function getCookie(name) {
+      var v = document.cookie.match("(^|;) ?" + name + "=([^;]*)(;|$)");
+      return v ? decodeURIComponent(v[2]) : null;
+    }
+    var el = document.getElementById("reg-initial-json");
+    var rows = [];
+    if (el) {
+      try { rows = JSON.parse(el.textContent || "[]"); } catch (e) { rows = []; }
+    }
+    if (window.initRegTimeline) {
+      window.initRegTimeline({ rows: rows });
+    }
+    var saveBtn = document.getElementById("reg-save");
+    var st = document.getElementById("reg-save-status");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", function () {
+        st.textContent = "…";
+        window.saveRegTimeline("{% url 'regulations_api_save' %}", "{{ plan_date }}", getCookie)
+          .then(function (d) {
+            st.textContent = "Сохранено (" + (d.updated || 0) + ")";
+            st.style.color = "#b8f5c8";
+          })
+          .catch(function (e) {
+            st.textContent = "Ошибка: " + (e && e.message ? e.message : e);
+            st.style.color = "#ffb8b8";
+          });
+      });
+    }
+  })();
+</script>
+{% endblock %}

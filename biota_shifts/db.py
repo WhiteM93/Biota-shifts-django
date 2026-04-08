@@ -318,63 +318,6 @@ def load_shifts_hours_batch(
     )
 
 
-def _fmt_hours_cell(wh) -> str:
-    """Часы из Biota (дробное число часов) → компактно «H:MM» для ячейки."""
-    if wh is None or pd.isna(wh):
-        return ""
-    try:
-        h = float(wh)
-    except (TypeError, ValueError):
-        return ""
-    im = int(round(h * 60))
-    return f"{im // 60:d}:{im % 60:02d}"
-
-
-def _has_positive_biota_hours(wh) -> bool:
-    if wh is None or pd.isna(wh):
-        return False
-    try:
-        return float(wh) > 0
-    except (TypeError, ValueError):
-        return False
-
-
-def build_hours_grid_from_schedule(schedule_df: pd.DataFrame, hours_long: pd.DataFrame) -> pd.DataFrame:
-    """Сетка как график; в днях — факт часов из Biota или пояснение по графику/отметкам."""
-    grid = schedule_df.copy()
-    day_cols = [c for c in grid.columns if str(c).isdigit()]
-    lookup: dict[tuple[str, str], float] = {}
-    if not hours_long.empty:
-        hl = hours_long.copy()
-        hl["emp_code"] = hl["emp_code"].astype(str)
-        hl["day_key"] = pd.to_datetime(hl["shift_date"]).dt.day.astype(str)
-        hl = hl.sort_values("shift_date").drop_duplicates(["emp_code", "day_key"], keep="last")
-        for _, r in hl.iterrows():
-            lookup[(str(r["emp_code"]), str(r["day_key"]))] = r["worked_hours"]
-    for i in grid.index:
-        ec = str(grid.at[i, "Код"])
-        for c in day_cols:
-            code = _sanitize_schedule_cell(grid.at[i, c])
-            wh = lookup.get((ec, str(c)))
-            if code in ("д", "н"):
-                if _has_positive_biota_hours(wh):
-                    grid.at[i, c] = _fmt_hours_cell(wh)
-                else:
-                    grid.at[i, c] = HOURS_GRID_NO_PUNCH
-            elif not code:
-                if _has_positive_biota_hours(wh):
-                    grid.at[i, c] = _fmt_hours_cell(wh) + HOURS_GRID_SUFFIX_OUTSIDE_GRAPH
-                else:
-                    grid.at[i, c] = ""
-            else:
-                # от, б, п, кп — при факте часов показываем время и пометку «вне графика»
-                if _has_positive_biota_hours(wh):
-                    grid.at[i, c] = _fmt_hours_cell(wh) + HOURS_GRID_SUFFIX_OUTSIDE_GRAPH
-                else:
-                    grid.at[i, c] = code
-    return grid
-
-
 @functools.lru_cache(maxsize=256)
 def _load_years_cached(db_key: tuple, emp_code: str) -> list[int]:
     cfg = _conn_from_key(db_key)

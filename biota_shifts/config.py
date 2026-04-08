@@ -6,16 +6,22 @@ from pathlib import Path
 PACKAGE_DIR = Path(__file__).resolve().parent
 APP_DIR = PACKAGE_DIR.parent
 
+from .env_manual import load_env_file
+
+load_env_file(APP_DIR / ".env")
 try:
     from dotenv import load_dotenv
 
-    load_dotenv(APP_DIR / ".env")
+    load_dotenv(APP_DIR / ".env", override=True)
 except ImportError:
     pass
 
 
 def _config_str(key: str, default: str = "") -> str:
     """Переменные из окружения или Django settings (без Streamlit)."""
+    env_v = (os.getenv(key) or "").strip()
+    if env_v:
+        return env_v
     try:
         from django.conf import settings
 
@@ -24,7 +30,7 @@ def _config_str(key: str, default: str = "") -> str:
             return str(v).strip()
     except Exception:
         pass
-    return (os.getenv(key) or default).strip()
+    return (default or "").strip()
 
 
 def _schedule_dir() -> Path:
@@ -44,4 +50,4 @@ _USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,32}$")
 
 
 def _admin_password() -> str:
-    return _config_str("BIOTA_ADMIN_PASSWORD", "")
+    return _config_str("BIOTA_ADMIN_PASSWORD", "HaasDS30ssy")

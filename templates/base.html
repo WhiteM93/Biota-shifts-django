@@ -23,7 +23,7 @@
     <a href="{% url 'graph' %}">График</a>
     <a href="{% url 'hours' %}">Часы по дням</a>
     <a href="{% url 'skud' %}">СКУД</a>
-    <a href="/regulations/">Регламенты</a>
+    <a href="{% url 'regulations_page' %}">Регламенты</a>
     <a href="{% url 'cabinet' %}">Личный кабинет</a>
     <a href="/admin/">Admin</a>
     {% if biota_username %}

@@ -2,11 +2,79 @@
 
 {% block content %}
 <h2>Главная</h2>
-<p class="muted">Вы вошли как <strong>{{ username }}</strong>.</p>
-<p>Сотрудников в выборке (с учётом прав): <strong>{{ emp_count }}</strong></p>
+<p class="muted">Вы вошли как <strong>{{ username }}</strong>. Сотрудников в выборке (с учётом прав): <strong>{{ emp_count }}</strong></p>
+
 <p class="muted">Каталог приложения: <code>{{ app_dir }}</code> — положите сюда <code>.env</code> с <code>BIOTA_DB_*</code>, как в Streamlit.</p>
 <form method="post" action="{% url 'refresh_cache' %}">
   {% csrf_token %}
   <button class="btn" type="submit">Обновить кэш данных из БД</button>
 </form>
+
+<hr style="border-color:#2b3650;margin:24px 0;">
+
+<h3>Сводка: опоздания и ранний уход</h3>
+<p class="muted">По данным графика д/н и отметок <code>iclock_transaction</code> (МСК), как в <strong>СКУД → Статистика</strong>. После смены данных при страничных нулях нажмите «Обновить кэш» выше.</p>
+
+{% if dashboard_error %}
+<p style="color:#ffb8b8;">{{ dashboard_error }}</p>
+{% else %}
+<form method="get" action="" class="period-form" style="margin:12px 0;">
+  <label>Год
+    <select name="year">
+      {% for yy in year_options %}
+      <option value="{{ yy }}" {% if yy == dash_year %}selected{% endif %}>{{ yy }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Месяц
+    <select name="month">
+      {% for mm, mlab in month_choices %}
+      <option value="{{ mm }}" {% if mm == dash_month %}selected{% endif %}>{{ mlab }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="btn">Показать</button>
+</form>
+
+<p class="muted">Период: <strong>{{ month_name }} {{ dash_year }}</strong></p>
+
+<h4>По отделам</h4>
+{% if by_area_rows %}
+<div class="table-wrap">
+  <table class="data-grid">
+    <thead><tr>{% for c in by_area_columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for row in by_area_rows %}
+      <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="muted">Нет данных по отделам.</p>
+{% endif %}
+
+<h4>Топ‑10 сотрудников по сумме (опоздания + ранний уход)</h4>
+{% if top10_empty %}
+<p class="muted">За выбранный месяц нет ни минут опозданий, ни раннего ухода по сотрудникам из списка.</p>
+{% else %}
+<div class="table-wrap">
+  <table class="data-grid">
+    <thead><tr>{% for c in top10_columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for row in top10_rows %}
+      <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endif %}
+
+<style>
+.period-form select { width: auto; min-width: 120px; display: inline-block; margin-right: 10px; }
+.table-wrap { overflow-x: auto; margin-top: 8px; border: 1px solid #2b3650; border-radius: 8px; padding: 8px; }
+.data-grid { font-size: 13px; width: 100%; }
+.data-grid th, .data-grid td { padding: 6px 8px; }
+</style>
 {% endblock %}
