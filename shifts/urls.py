@@ -1,10 +1,12 @@
 from django.urls import path
 
+from . import graph_views
 from . import views
 
 urlpatterns = [
     path("", views.home_view, name="home"),
-    path("graph/", views.graph_placeholder, name="graph"),
+    path("graph/", graph_views.graph_view, name="graph"),
+    path("graph/download/", graph_views.graph_download, name="graph_download"),
     path("hours/", views.hours_placeholder, name="hours"),
     path("skud/", views.skud_placeholder, name="skud"),
     path("cabinet/", views.cabinet_placeholder, name="cabinet"),

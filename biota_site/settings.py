@@ -129,6 +129,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/"
 
+# Табель графика: много полей (сотрудники × дни месяца)
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+
 # Те же переменные, что и у Streamlit-приложения (PostgreSQL Biota, пароль admin и т.д.)
 BIOTA_DB_HOST = os.getenv("BIOTA_DB_HOST", "localhost")
 BIOTA_DB_PORT = os.getenv("BIOTA_DB_PORT", "5432")

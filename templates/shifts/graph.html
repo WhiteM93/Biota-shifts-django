@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>График смен</h2>
+<p class="muted">{{ month_name|capfirst }} {{ year }} — допустимые коды: <strong>д</strong>, <strong>н</strong>, <strong>от</strong>, <strong>б</strong>, <strong>п</strong>, <strong>кп</strong> или пусто.</p>
+
+<form method="get" action="" class="period-form">
+  <label>Год
+    <select name="year">
+      {% for y in year_options %}
+      <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Месяц
+    <select name="month">
+      {% for mm, mlab in month_choices %}
+      <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="btn">Показать</button>
+</form>
+
+<p style="margin:12px 0;">
+  <a class="btn" href="{% url 'graph_download' %}?year={{ year }}&month={{ month }}">Скачать Excel</a>
+</p>
+
+<div class="schedule-wrap">
+<form method="post" action="">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="save">
+  <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="month" value="{{ month }}">
+  <table class="schedule-table">
+    <thead>
+      <tr>
+        <th>Сотрудник</th>
+        {% for d, lab in day_headers %}
+        <th title="день {{ d }}">{{ lab }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in table_rows %}
+      <tr>
+        <td class="emp-cell">{{ row.name }} <span class="muted">({{ row.code }})</span></td>
+        {% for d, val in row.day_cells %}
+        <td><input type="text" name="cell_{{ row.i }}_{{ d }}" value="{{ val }}" maxlength="4" autocomplete="off" class="day-input"></td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p style="margin-top:14px;"><button type="submit" class="btn">Сохранить график</button></p>
+</form>
+</div>
+
+<hr style="border-color:#2b3650;margin:24px 0;">
+<h3>Загрузить из Excel</h3>
+<p class="muted">Лист «График» или первый лист файла — как в Streamlit.</p>
+<form method="post" action="" enctype="multipart/form-data">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="upload">
+  <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="month" value="{{ month }}">
+  <input type="file" name="schedule_file" accept=".xlsx">
+  <button type="submit" class="btn">Загрузить в систему</button>
+</form>
+
+<style>
+.period-form select { width: auto; min-width: 120px; display: inline-block; margin-right: 10px; }
+.schedule-wrap { overflow-x: auto; max-width: 100%; border: 1px solid #2b3650; border-radius: 8px; padding: 8px; }
+.schedule-table { min-width: max-content; font-size: 12px; }
+.schedule-table th, .schedule-table td { border: 1px solid #2b3650; padding: 2px; text-align: center; }
+.emp-cell { text-align: left !important; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.day-input { width: 36px; padding: 4px 2px; font-size: 11px; text-align: center; }
+</style>
+{% endblock %}
