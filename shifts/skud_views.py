@@ -47,8 +47,12 @@ def _parse_year_month(request, default_y: int, default_m: int) -> tuple[int, int
 
 def _skud_filter_employees(request, employees_df: pd.DataFrame):
     """Отдел / участок / должность — логика как в Streamlit (свёрнутый фильтр = все значения)."""
+    dep_mode = request.GET.get("dep_mode", "all")
+    area_mode = request.GET.get("area_mode", "all")
+    pos_mode = request.GET.get("pos_mode", "all")
+
     all_deps = sorted(employees_df["department_name"].unique().tolist())
-    if request.GET.get("dep_mode") == "all":
+    if dep_mode == "all":
         selected_deps = list(all_deps)
     else:
         dep_list = request.GET.getlist("dep")
@@ -58,7 +62,7 @@ def _skud_filter_employees(request, employees_df: pd.DataFrame):
     by_dept = employees_df[employees_df["department_name"].isin(selected_deps)].copy()
     areas_all = _distinct_area_tokens(by_dept["area_name"])
 
-    if request.GET.get("area_mode") == "all":
+    if area_mode == "all":
         selected_areas = list(areas_all)
     else:
         area_list = request.GET.getlist("area")
@@ -69,7 +73,7 @@ def _skud_filter_employees(request, employees_df: pd.DataFrame):
     positions_source = by_dept[_mask_rows_by_area_tokens(by_dept, _sel_area_set)].copy()
     positions_all = sorted(positions_source["position_name"].unique().tolist())
 
-    if request.GET.get("pos_mode") == "all":
+    if pos_mode == "all":
         selected_positions = list(positions_all)
     else:
         pos_list = request.GET.getlist("pos")
@@ -83,9 +87,9 @@ def _skud_filter_employees(request, employees_df: pd.DataFrame):
     ].copy()
 
     meta = {
-        "dep_mode_pick": request.GET.get("dep_mode", "pick") != "all",
-        "area_mode_pick": request.GET.get("area_mode", "pick") != "all",
-        "pos_mode_pick": request.GET.get("pos_mode", "pick") != "all",
+        "dep_mode_pick": dep_mode != "all",
+        "area_mode_pick": area_mode != "all",
+        "pos_mode_pick": pos_mode != "all",
         "sel_deps": selected_deps,
         "sel_areas": selected_areas,
         "sel_positions": selected_positions,

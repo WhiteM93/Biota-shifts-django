@@ -1,40 +1,51 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Часы по дням</h2>
 <p class="muted">{{ month_name|capfirst }} {{ year }} — в ячейках факт часов из Biota; <strong>{{ no_punch }}</strong> — нет отметок; звёздочка <strong>{{ suffix_out }}</strong> — часы вне графика.</p>
 
-<form method="get" action="" class="period-form hours-filters">
-  <div class="filter-row">
-    <label>Год
+<form method="get" action="" class="filter-panel hours-filters auto-submit-form">
+  <div class="filter-grid">
+    <label class="field"><span>Год</span>
       <select name="year">
         {% for yy in year_options %}
         <option value="{{ yy }}" {% if yy == year %}selected{% endif %}>{{ yy }}</option>
         {% endfor %}
       </select>
     </label>
-    <label>Месяц
+    <label class="field"><span>Месяц</span>
       <select name="month">
         {% for mm, mlab in month_choices %}
         <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
         {% endfor %}
       </select>
     </label>
-    <button type="submit" class="btn">Показать</button>
+    <div class="filter-actions">
+      <button type="submit" class="btn">Показать</button>
+    </div>
   </div>
-  <div class="filter-row filter-checkboxes">
-    <span class="filter-label">Отдел:</span>
+  <div class="mode-row">
+    <span class="label">Отдел:</span>
+    <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if dep_mode_pick %}checked{% endif %}> по списку</label>
+    <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not dep_mode_pick %}checked{% endif %}> все отделы</label>
+  </div>
+  <div class="check-row mode-target {% if not dep_mode_pick %}is-hidden{% endif %}" data-mode-target="dep">
+    <span class="label">Отдел:</span>
     {% for d in all_deps %}
     <label class="chk"><input type="checkbox" name="dep" value="{{ d }}" {% if d in sel_deps %}checked{% endif %}> {{ d }}</label>
     {% endfor %}
   </div>
-  <div class="filter-row filter-checkboxes">
-    <span class="filter-label">Должность:</span>
+  <div class="mode-row">
+    <span class="label">Должность:</span>
+    <label class="inline"><input type="radio" name="pos_mode" value="pick" {% if pos_mode_pick %}checked{% endif %}> по списку</label>
+    <label class="inline"><input type="radio" name="pos_mode" value="all" {% if not pos_mode_pick %}checked{% endif %}> все должности</label>
+  </div>
+  <div class="check-row mode-target {% if not pos_mode_pick %}is-hidden{% endif %}" data-mode-target="pos">
+    <span class="label">Должность:</span>
     {% for p in all_pos %}
     <label class="chk"><input type="checkbox" name="pos" value="{{ p }}" {% if p in sel_pos %}checked{% endif %}> {{ p }}</label>
     {% endfor %}
   </div>
-  <p class="muted" style="margin:8px 0 0 0;">Фильтры применяются вместе с периодом (кнопка «Показать»).</p>
+  <p class="muted" style="margin:8px 0 0 0;">Фильтры применяются автоматически при изменении.</p>
 </form>
 
 {% if error_message %}
@@ -52,8 +63,8 @@
     <thead>
       <tr>
         <th>Сотрудник</th>
-        {% for d, lab in day_headers %}
-        <th title="день {{ d }}">{{ lab }}</th>
+        {% for d, lab, is_non_working in day_headers %}
+        <th title="день {{ d }}" class="{% if is_non_working %}non-work-col{% endif %}">{{ lab }}</th>
         {% endfor %}
       </tr>
     </thead>
@@ -62,7 +73,7 @@
       <tr>
         <td class="emp-cell">{{ row.name }}</td>
         {% for cell in row.cells %}
-        <td class="hours-cell {% if cell == no_punch %}cell-nopunch{% elif suffix_out in cell %}cell-outside{% endif %}">{{ cell }}</td>
+        <td class="hours-cell {% if cell.is_non_working %}non-work-col {% endif %}{% if cell.value == no_punch %}cell-nopunch{% elif suffix_out in cell.value %}cell-outside{% endif %}">{{ cell.value }}</td>
         {% endfor %}
       </tr>
       {% endfor %}
@@ -72,18 +83,65 @@
 {% endif %}
 
 <style>
-.period-form select { width: auto; min-width: 120px; display: inline-block; margin-right: 10px; }
-.filter-row { margin-bottom: 10px; flex-wrap: wrap; align-items: center; gap: 8px; }
-.filter-checkboxes { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
-.filter-label { color: #9bb0d8; font-weight: 600; margin-right: 6px; }
-.chk { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; white-space: nowrap; }
-.chk input { width: auto; margin: 0; }
+.mode-row {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.inline {
+  margin-right: 0;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid #3a4868;
+  border-radius: 999px;
+  background: rgba(16, 21, 32, 0.88);
+  white-space: nowrap;
+}
+.inline input { width: auto; margin: 0; }
+.mode-target.is-hidden { display: none; }
 .schedule-wrap { overflow-x: auto; max-width: 100%; border: 1px solid #2b3650; border-radius: 8px; padding: 8px; margin-top: 8px; }
 .schedule-table { min-width: max-content; font-size: 12px; }
 .schedule-table th, .schedule-table td { border: 1px solid #2b3650; padding: 4px 2px; text-align: center; }
+.schedule-table th.non-work-col,
+.schedule-table td.non-work-col { background: #20283b; }
 .emp-cell { text-align: left !important; white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
 .hours-cell { font-variant-numeric: tabular-nums; max-width: 56px; }
 .cell-nopunch { color: #6b7a99; }
 .cell-outside { color: #c9d4f0; }
+@media (max-width: 720px) {
+  .mode-row { gap: 6px; }
+  .inline { padding: 4px 8px; font-size: 11px; }
+  .schedule-wrap { padding: 6px; }
+  .schedule-table { font-size: 11px; }
+  .emp-cell { max-width: 140px; font-size: 11px; }
+  .hours-cell { max-width: 46px; font-size: 11px; }
+}
 </style>
+<script>
+  (function () {
+    var form = document.querySelector("form.hours-filters");
+    if (!form) return;
+    function modeVal(name) {
+      var checked = form.querySelector('input[name="' + name + '"]:checked');
+      return checked ? checked.value : "all";
+    }
+    function syncVisibility() {
+      var depBlock = form.querySelector('[data-mode-target="dep"]');
+      var posBlock = form.querySelector('[data-mode-target="pos"]');
+      if (depBlock) depBlock.classList.toggle("is-hidden", modeVal("dep_mode") === "all");
+      if (posBlock) posBlock.classList.toggle("is-hidden", modeVal("pos_mode") === "all");
+    }
+    form.addEventListener("change", function (event) {
+      var t = event.target;
+      if (!t || (t.name !== "dep_mode" && t.name !== "pos_mode")) return;
+      syncVisibility();
+    });
+    syncVisibility();
+  })();
+</script>
 {% endblock %}

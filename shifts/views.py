@@ -3,6 +3,7 @@ from datetime import date, datetime
 import pandas as pd
 from django.conf import settings
 from django.contrib import messages
+from django.urls import reverse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -35,8 +36,11 @@ def _df_columns_rows(df: pd.DataFrame):
 
 @require_http_methods(["GET", "POST"])
 def login_view(request):
+    if biota_user(request):
+        return redirect("home")
     err = ""
-    next_url = request.POST.get("next") or request.GET.get("next") or "/"
+    next_url = request.POST.get("next") or request.GET.get("next") or reverse("home")
+    remember_me = request.method == "POST" and request.POST.get("remember_me") == "1"
     if request.method == "POST":
         username = (request.POST.get("username") or "").strip()
         password = request.POST.get("password") or ""
@@ -44,9 +48,23 @@ def login_view(request):
             request.session["biota_username"] = (
                 ADMIN_USERNAME if username.lower() == ADMIN_USERNAME.lower() else username
             )
-            return redirect(next_url or "/")
+            if remember_me:
+                request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
+            else:
+                request.session.set_expiry(0)  # browser session only
+            return redirect(next_url or reverse("home"))
         err = "Неверный логин или пароль"
-    return render(request, "shifts/login.html", {"error": err, "next_url": next_url})
+    return render(
+        request,
+        "shifts/login.html",
+        {
+            "error": err,
+            "next_url": next_url,
+            "remember_me": remember_me,
+            "hide_nav": True,
+            "auth_page": True,
+        },
+    )
 
 
 @require_http_methods(["GET", "POST"])
@@ -67,7 +85,11 @@ def register_view(request):
                 )
                 return redirect("login")
             err = msg
-    return render(request, "shifts/register.html", {"error": err})
+    return render(
+        request,
+        "shifts/register.html",
+        {"error": err, "hide_nav": True, "auth_page": True},
+    )
 
 
 def logout_view(request):

@@ -1,10 +1,8 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>СКУД</h2>
-<p class="muted">Отдел, участок, должность — режим «по списку» или «все»; период и сотрудник — как в Streamlit. Табель и отметки <code>iclock_transaction</code>, МСК.</p>
 
-<form method="get" action="" class="skud-form" id="skud-main-form">
+<form method="get" action="" class="skud-form filter-panel auto-submit-form" id="skud-main-form">
   <input type="hidden" name="tab" value="{{ active_tab }}">
 
   <h3>Фильтры</h3>
@@ -13,7 +11,7 @@
     <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if fmeta.dep_mode_pick %}checked{% endif %}> по списку</label>
     <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not fmeta.dep_mode_pick %}checked{% endif %}> все отделы</label>
   </div>
-  <div class="filter-checkboxes">{% for d in all_deps %}
+  <div class="check-row mode-target {% if not fmeta.dep_mode_pick %}is-hidden{% endif %}" data-mode-target="dep">{% for d in all_deps %}
     <label class="chk"><input type="checkbox" name="dep" value="{{ d }}" {% if d in fmeta.sel_deps %}checked{% endif %}> {{ d }}</label>
   {% endfor %}</div>
 
@@ -22,7 +20,7 @@
     <label class="inline"><input type="radio" name="area_mode" value="pick" {% if fmeta.area_mode_pick %}checked{% endif %}> по списку</label>
     <label class="inline"><input type="radio" name="area_mode" value="all" {% if not fmeta.area_mode_pick %}checked{% endif %}> все участки</label>
   </div>
-  <div class="filter-checkboxes">{% for a in fmeta.areas_all %}
+  <div class="check-row mode-target {% if not fmeta.area_mode_pick %}is-hidden{% endif %}" data-mode-target="area">{% for a in fmeta.areas_all %}
     <label class="chk"><input type="checkbox" name="area" value="{{ a }}" {% if a in fmeta.sel_areas %}checked{% endif %}> {{ a }}</label>
   {% empty %}
     <span class="muted">(нет выделенных участков в данных)</span>
@@ -33,16 +31,14 @@
     <label class="inline"><input type="radio" name="pos_mode" value="pick" {% if fmeta.pos_mode_pick %}checked{% endif %}> по списку</label>
     <label class="inline"><input type="radio" name="pos_mode" value="all" {% if not fmeta.pos_mode_pick %}checked{% endif %}> все должности</label>
   </div>
-  <div class="filter-checkboxes">{% for p in fmeta.positions_all %}
+  <div class="check-row mode-target {% if not fmeta.pos_mode_pick %}is-hidden{% endif %}" data-mode-target="pos">{% for p in fmeta.positions_all %}
     <label class="chk"><input type="checkbox" name="pos" value="{{ p }}" {% if p in fmeta.sel_positions %}checked{% endif %}> {{ p }}</label>
   {% endfor %}</div>
 
   <h3>Сотрудник и период</h3>
-  <p>
-    <label>Поиск <input type="search" name="q" value="{{ search_q }}" placeholder="Фамилия, имя, код…" style="max-width:320px;"></label>
-  </p>
-  <p>
-    <label>Сотрудник
+  <div class="filter-grid skud-period-grid">
+    <label class="field"><span>Поиск</span><input type="search" name="q" value="{{ search_q }}" placeholder="Фамилия, имя, код…"></label>
+    <label class="field"><span>Сотрудник</span>
       <select name="emp">
         {% for code, lab in emp_options %}
         <option value="{{ code }}" {% if code == selected_emp %}selected{% endif %}>{{ lab }} ({{ code }})</option>
@@ -51,20 +47,18 @@
         {% endfor %}
       </select>
     </label>
-  </p>
-  <p class="period-row">
-    <label>Год
+    <label class="field"><span>Год</span>
       <select name="year">{% for y in year_options %}
         <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
       {% endfor %}</select>
     </label>
-    <label>Месяц
+    <label class="field"><span>Месяц</span>
       <select name="month">{% for mm, mlab in month_choices %}
         <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
       {% endfor %}</select>
     </label>
-    <button type="submit" class="btn">Показать</button>
-  </p>
+    <div class="filter-actions"><button type="submit" class="btn">Показать</button></div>
+  </div>
 </form>
 
 {% if error_message %}
@@ -123,13 +117,30 @@
 
 <style>
 .skud-form h3 { margin-top: 18px; font-size: 1rem; color: #9bb0d8; }
-.mode-row { margin: 8px 0 4px 0; }
-.mode-label { color: #9bb0d8; font-weight: 600; margin-right: 8px; }
-.inline { margin-right: 14px; font-size: 13px; }
-.filter-checkboxes { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 12px; align-items: baseline; }
-.chk { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; white-space: nowrap; }
-.chk input { width: auto; margin: 0; }
-.period-row select { width: auto; min-width: 100px; display: inline-block; margin-right: 10px; }
+.skud-period-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+.mode-row {
+  margin: 10px 0 4px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.mode-label { color: #aebde8; font-weight: 700; margin-right: 4px; font-size: 12px; }
+.inline {
+  margin-right: 0;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid #3a4868;
+  border-radius: 999px;
+  background: rgba(16, 21, 32, 0.88);
+  white-space: nowrap;
+}
+.inline:hover { border-color: #5c709f; background: rgba(24, 31, 48, 0.95); }
+.inline input { width: auto; margin: 0; }
+.mode-target.is-hidden { display: none; }
 .err-banner { color: #ffb8b8; padding: 10px 0; }
 .skud-tabs { display: flex; gap: 8px; margin: 16px 0; }
 .skud-tabs .tab { padding: 8px 14px; border-radius: 6px; background: #202a3c; color: #7c8cff; text-decoration: none; font-weight: 600; }
@@ -139,5 +150,44 @@
 .data-grid th, .data-grid td { border: 1px solid #2b3650; padding: 4px 6px; text-align: left; }
 .dl-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .dl-row .btn { text-decoration: none; display: inline-block; }
+@media (max-width: 720px) {
+  .skud-period-grid { grid-template-columns: 1fr; }
+  .mode-row { gap: 6px; }
+  .inline { padding: 4px 8px; font-size: 11px; }
+  .skud-tabs .tab { padding: 7px 10px; font-size: 12px; }
+  .data-grid th, .data-grid td { font-size: 11px; padding: 4px; }
+}
 </style>
+<script>
+  (function () {
+    var form = document.getElementById("skud-main-form");
+    if (!form) return;
+
+    function modeVal(name) {
+      var checked = form.querySelector('input[name="' + name + '"]:checked');
+      return checked ? checked.value : "all";
+    }
+
+    function syncVisibility() {
+      [
+        ["dep_mode", "dep"],
+        ["area_mode", "area"],
+        ["pos_mode", "pos"],
+      ].forEach(function (pair) {
+        var m = modeVal(pair[0]);
+        var block = form.querySelector('[data-mode-target="' + pair[1] + '"]');
+        if (!block) return;
+        block.classList.toggle("is-hidden", m === "all");
+      });
+    }
+
+    form.addEventListener("change", function (event) {
+      var t = event.target;
+      if (!t || t.name !== "dep_mode" && t.name !== "area_mode" && t.name !== "pos_mode") return;
+      syncVisibility();
+    });
+
+    syncVisibility();
+  })();
+</script>
 {% endblock %}

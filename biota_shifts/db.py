@@ -18,7 +18,8 @@ def db_config() -> dict:
         "dbname": _config_str("BIOTA_DB_NAME", "biota_db"),
         "user": _config_str("BIOTA_DB_USER", "biota_user"),
         "password": _config_str("BIOTA_DB_PASSWORD", ""),
-        "connect_timeout": int(_config_str("BIOTA_DB_CONNECT_TIMEOUT", "15") or "15"),
+        # Keep UI responsive when DB is unreachable.
+        "connect_timeout": int(_config_str("BIOTA_DB_CONNECT_TIMEOUT", "3") or "3"),
     }
 
 
@@ -30,6 +31,7 @@ def _db_cache_key(cfg: dict) -> tuple:
         str(cfg["dbname"]),
         str(cfg["user"]),
         str(cfg["password"]),
+        int(cfg.get("connect_timeout", 3) or 3),
     )
 
 
@@ -40,7 +42,7 @@ def _conn_from_key(db_key: tuple) -> dict:
         "dbname": db_key[2],
         "user": db_key[3],
         "password": db_key[4],
-        "connect_timeout": 15,
+        "connect_timeout": db_key[5],
     }
 
 

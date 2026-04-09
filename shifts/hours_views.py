@@ -13,6 +13,7 @@ from biota_shifts.constants import HOURS_GRID_NO_PUNCH, HOURS_GRID_SUFFIX_OUTSID
 from biota_shifts import schedule as biota_schedule
 
 from .auth_utils import biota_login_required, biota_user
+from .ru_work_calendar import is_ru_non_working_day
 
 
 def _employees_for_user(request):
@@ -38,26 +39,29 @@ def _parse_year_month(request, default_y: int, default_m: int) -> tuple[int, int
 
 def _filter_lists(request, employees_df):
     """Отделы и должности из GET (как чекбоксы Streamlit): пустой список = все."""
+    dep_mode = request.GET.get("dep_mode", "all")
+    pos_mode = request.GET.get("pos_mode", "all")
+
     all_deps = sorted(employees_df["department_name"].unique().tolist())
     dep_list = request.GET.getlist("dep")
-    if not dep_list:
+    if dep_mode == "all":
         selected_deps = all_deps
     else:
-        selected_deps = [d for d in dep_list if d in all_deps]
+        selected_deps = [d for d in dep_list if d in all_deps] if dep_list else all_deps
 
     by_dep = employees_df[employees_df["department_name"].isin(selected_deps)].copy()
     all_pos = sorted(by_dep["position_name"].unique().tolist())
     pos_list = request.GET.getlist("pos")
-    if not pos_list:
+    if pos_mode == "all":
         selected_pos = all_pos
     else:
-        selected_pos = [p for p in pos_list if p in all_pos]
+        selected_pos = [p for p in pos_list if p in all_pos] if pos_list else all_pos
 
     filtered = employees_df[
         employees_df["department_name"].isin(selected_deps)
         & employees_df["position_name"].isin(selected_pos)
     ].copy()
-    return filtered, selected_deps, selected_pos, all_deps, all_pos
+    return filtered, selected_deps, selected_pos, all_deps, all_pos, dep_mode, pos_mode
 
 
 @biota_login_required
@@ -79,12 +83,13 @@ def hours_view(request):
     default_y = now.year if now.year in year_options else (year_options[0] if year_options else now.year)
 
     y, m = _parse_year_month(request, default_y, now.month)
-    filtered, sel_deps, sel_pos, all_deps, all_pos = _filter_lists(request, employees_df)
+    filtered, sel_deps, sel_pos, all_deps, all_pos, dep_mode, pos_mode = _filter_lists(request, employees_df)
 
     schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
     err_msg = None
     grid_view = None
     day_headers = []
+    non_working_days: list[str] = []
     table_rows = []
 
     if schedule_df.empty:
@@ -112,19 +117,27 @@ def hours_view(request):
                 )
                 cols = ["Сотрудник"] + day_cols_h
                 grid_view = grid_hours_df[cols].copy()
-                weekend_abbr = {5: "сб", 6: "вс"}
                 for d in day_cols_h:
                     di = int(d)
-                    wd = date(y, m, di).weekday()
-                    lab = f"{d} ({weekend_abbr[wd]})" if wd in weekend_abbr else str(d)
-                    day_headers.append((d, lab))
+                    day_date = date(y, m, di)
+                    is_non_working = is_ru_non_working_day(day_date)
+                    day_headers.append((d, str(d), is_non_working))
+                    if is_non_working:
+                        non_working_days.append(str(d))
                 for _, r in grid_view.iterrows():
+                    row_cells = []
+                    for c in day_cols_h:
+                        v = "" if pd.isna(r[c]) else str(r[c])
+                        row_cells.append(
+                            {
+                                "value": v,
+                                "is_non_working": str(c) in non_working_days,
+                            }
+                        )
                     table_rows.append(
                         {
                             "name": r["Сотрудник"],
-                            "cells": [
-                                "" if pd.isna(r[c]) else str(r[c]) for c in day_cols_h
-                            ],
+                            "cells": row_cells,
                         }
                     )
             except Exception as exc:
@@ -143,8 +156,11 @@ def hours_view(request):
         "all_pos": all_pos,
         "sel_deps": sel_deps,
         "sel_pos": sel_pos,
+        "dep_mode_pick": dep_mode != "all",
+        "pos_mode_pick": pos_mode != "all",
         "grid_view": grid_view,
         "day_headers": day_headers,
+        "non_working_days": non_working_days,
         "table_rows": table_rows,
         "error_message": err_msg,
         "no_punch": HOURS_GRID_NO_PUNCH,
@@ -163,7 +179,7 @@ def _hours_grid_for_download(request):
     year_options = biota_db.merged_year_options(biota_db.db_config(), ref_emp)
     default_y = now.year if now.year in year_options else (year_options[0] if year_options else now.year)
     y, m = _parse_year_month(request, default_y, now.month)
-    filtered, _, _, _, _ = _filter_lists(request, employees_df)
+    filtered, _, _, _, _, _, _ = _filter_lists(request, employees_df)
     schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
     if schedule_df.empty or filtered.empty:
         return None, "Нет данных"

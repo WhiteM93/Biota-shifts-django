@@ -18,6 +18,7 @@ from biota_shifts.auth import (
     _update_registered_profile,
     _user_access_scope_value,
 )
+from .department_order import apply_department_order, load_department_order, save_department_order
 
 from .auth_utils import biota_login_required, biota_user
 
@@ -79,6 +80,15 @@ def cabinet_view(request):
                 else:
                     messages.error(request, err)
                 return redirect("cabinet")
+            if action == "admin_dept_order":
+                raw = request.POST.get("dept_order_text") or ""
+                parts = [p.strip() for p in raw.replace("\r", "\n").replace(",", "\n").split("\n")]
+                dep_opts = sorted(employees_full["department_name"].unique().tolist()) if not employees_full.empty else []
+                allowed = set(dep_opts)
+                cleaned = [p for p in parts if p and p in allowed]
+                save_department_order(cleaned)
+                messages.success(request, "Порядок отделов сохранен.")
+                return redirect("cabinet")
         else:
             if action == "profile":
                 dn = request.POST.get("display_name") or ""
@@ -120,8 +130,11 @@ def cabinet_view(request):
         priv_store = _load_users_store()
         ctx["priv_users"] = sorted(priv_store.keys())
         dep_opts = sorted(employees_full["department_name"].unique().tolist()) if not employees_full.empty else []
+        dep_order = apply_department_order(dep_opts, load_department_order())
         area_opts = _distinct_area_tokens(employees_full["area_name"]) if not employees_full.empty else []
         ctx["dep_opts"] = dep_opts
+        ctx["dep_order_current"] = dep_order
+        ctx["dep_order_text"] = "\n".join(dep_order)
         ctx["area_opts"] = area_opts
         sel = (request.GET.get("priv_user") or "").strip()
         if sel not in priv_store and ctx["priv_users"]:

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Личный кабинет</h2>
 
 {% if is_admin %}
 <p class="muted">Роль: <strong>администратор</strong>. Логин: <code>{{ admin_username }}</code></p>
 <p class="muted">Пароль учётки задаётся в окружении / секретах (<code>BIOTA_ADMIN_PASSWORD</code>), как в Streamlit.</p>
+<p><a class="btn" href="/admin/">Открыть Django Admin</a></p>
 
 <form method="post" action="">
   {% csrf_token %}
@@ -14,6 +14,31 @@
   <p class="muted">Сохраняется в сессии до выхода (как в Streamlit).</p>
   <p><label>Имя <input type="text" name="admin_display_name" value="{{ admin_display_name }}" maxlength="200" style="max-width:360px;"></label></p>
   <p><button type="submit" class="btn">Сохранить имя</button></p>
+</form>
+
+<hr style="border-color:#2b3650;margin:28px 0;">
+
+<h3>Порядок отделов (для Графика)</h3>
+<p class="muted">Сотрудники в «Графике» сортируются: сначала по отделу, затем по фамилии А-Я. Расставьте отделы в нужном порядке (по одному в строке).</p>
+<form method="post" action="">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="admin_dept_order">
+  <input type="hidden" name="dept_order_text" id="dept-order-text" value="">
+  <div class="dept-order-box">
+    <ul class="dept-order-list" id="dept-order-list">
+      {% for dep in dep_order_current %}
+      <li class="dept-item" data-dep="{{ dep }}" draggable="true">
+        <span class="dept-drag-handle" title="Перетащить">⋮⋮</span>
+        <span class="dept-name">{{ dep }}</span>
+        <span class="dept-item-actions">
+          <button type="button" class="btn dept-move" data-dir="up" title="Вверх">↑</button>
+          <button type="button" class="btn dept-move" data-dir="down" title="Вниз">↓</button>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  <p><button type="submit" class="btn">Сохранить порядок отделов</button></p>
 </form>
 
 <hr style="border-color:#2b3650;margin:28px 0;">
@@ -81,7 +106,125 @@
 
 <style>
 .cab-multi { min-height: 140px; width: 100%; max-width: 520px; }
+.dept-order-box {
+  width: 100%;
+  max-width: 620px;
+  border: 1px solid #2f3b57;
+  border-radius: 10px;
+  background: rgba(16, 23, 36, 0.88);
+  padding: 8px;
+}
+.dept-order-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dept-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid #394766;
+  border-radius: 8px;
+  background: rgba(23, 31, 48, 0.92);
+  cursor: grab;
+}
+.dept-item:active { cursor: grabbing; }
+.dept-item.dragging {
+  opacity: 0.5;
+  border-color: #7c8cff;
+}
+.dept-item.drag-over {
+  border-color: #7c8cff;
+  box-shadow: 0 0 0 2px rgba(124, 140, 255, 0.2);
+}
+.dept-drag-handle {
+  color: #9bb0d8;
+  letter-spacing: -1px;
+  user-select: none;
+}
+.dept-name { font-weight: 600; }
+.dept-item-actions { display: inline-flex; gap: 6px; }
+.dept-move {
+  min-width: 34px;
+  padding: 4px 8px;
+  line-height: 1;
+}
 </style>
+<script>
+  (function () {
+    var list = document.getElementById("dept-order-list");
+    var hidden = document.getElementById("dept-order-text");
+    if (!list || !hidden) return;
+    var draggedItem = null;
+
+    function syncHidden() {
+      var deps = [];
+      list.querySelectorAll(".dept-item").forEach(function (item) {
+        var dep = item.getAttribute("data-dep") || "";
+        if (dep.trim()) deps.push(dep.trim());
+      });
+      hidden.value = deps.join("\n");
+    }
+
+    list.addEventListener("click", function (event) {
+      var btn = event.target.closest(".dept-move");
+      if (!btn) return;
+      var item = btn.closest(".dept-item");
+      if (!item) return;
+      var dir = btn.getAttribute("data-dir");
+      if (dir === "up" && item.previousElementSibling) {
+        list.insertBefore(item, item.previousElementSibling);
+      } else if (dir === "down" && item.nextElementSibling) {
+        list.insertBefore(item.nextElementSibling, item);
+      }
+      syncHidden();
+    });
+
+    function clearDragOver() {
+      list.querySelectorAll(".dept-item.drag-over").forEach(function (el) {
+        el.classList.remove("drag-over");
+      });
+    }
+
+    list.querySelectorAll(".dept-item").forEach(function (item) {
+      item.addEventListener("dragstart", function () {
+        draggedItem = item;
+        item.classList.add("dragging");
+      });
+      item.addEventListener("dragend", function () {
+        item.classList.remove("dragging");
+        clearDragOver();
+        draggedItem = null;
+        syncHidden();
+      });
+      item.addEventListener("dragover", function (event) {
+        event.preventDefault();
+        if (!draggedItem || draggedItem === item) return;
+        clearDragOver();
+        item.classList.add("drag-over");
+      });
+      item.addEventListener("drop", function (event) {
+        event.preventDefault();
+        if (!draggedItem || draggedItem === item) return;
+        clearDragOver();
+        var rect = item.getBoundingClientRect();
+        var dropAfter = event.clientY > rect.top + rect.height / 2;
+        if (dropAfter) {
+          item.insertAdjacentElement("afterend", draggedItem);
+        } else {
+          item.insertAdjacentElement("beforebegin", draggedItem);
+        }
+      });
+    });
+
+    syncHidden();
+  })();
+</script>
 
 {% else %}
 

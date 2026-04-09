@@ -7,7 +7,8 @@ from . import skud_views
 from . import views
 
 urlpatterns = [
-    path("", views.home_view, name="home"),
+    path("", views.login_view, name="root"),
+    path("home/", views.home_view, name="home"),
     path("graph/", graph_views.graph_view, name="graph"),
     path("graph/download/", graph_views.graph_download, name="graph_download"),
     path("hours/", hours_views.hours_view, name="hours"),

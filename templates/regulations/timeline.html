@@ -2,30 +2,34 @@
 {% load static %}
 
 {% block content %}
-<h2>Регламент питания</h2>
 <p class="muted" style="max-width: 48rem; line-height: 1.45;">
   Шкала <strong>08:00–20:00</strong>: подписи времени — каждые <strong>30 минут</strong>, линии сетки на дорожке — каждые <strong>10 минут</strong>; блоки с шагом <strong>5 минут</strong>.
   Синие — завтрак, зелёные — обед. Красная полоса — 5‑минутные интервалы, где <strong>одновременно</strong> (завтрак или обед) больше людей, чем порог слева. Данные в SQLite (не в Biota).
 </p>
 
-<div class="reg-toolbar">
-  <form method="get" action="{% url 'regulations_page' %}" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
-    <label>Дата
-      <input type="date" name="date" value="{{ plan_date }}" required>
-    </label>
-    <button type="submit" class="btn">Показать</button>
-    <span class="muted">{{ plan_date_display }}</span>
-    {% if biota_ok and emp_count is not None %}
-    <span class="muted">· в справочнике: {{ emp_count }} чел.</span>
-    {% endif %}
+<div class="reg-toolbar filter-panel">
+  <form method="get" action="{% url 'regulations_page' %}" class="reg-toolbar-form auto-submit-form">
+    <div class="reg-toolbar-group">
+      <label class="field"><span>Дата</span>
+        <input type="date" name="date" value="{{ plan_date }}" required>
+      </label>
+      <div class="reg-toolbar-meta">
+        <span class="muted">{{ plan_date_display }}</span>
+        {% if biota_ok and emp_count is not None %}
+        <span class="muted">в справочнике: {{ emp_count }} чел.</span>
+        {% endif %}
+      </div>
+    </div>
   </form>
-  <form method="post" action="{% url 'regulations_page' %}?date={{ plan_date }}" style="display:inline;">
-    {% csrf_token %}
-    <input type="hidden" name="plan_date" value="{{ plan_date }}">
-    <button type="submit" name="action" value="from_catalog" class="btn"
-      {% if not biota_ok %}disabled title="Нет связи со справочником Biota"{% endif %}>Заполнить из Biota</button>
-  </form>
-  <button type="button" class="btn" id="reg-save" style="margin-left:auto;">Сохранить на сервер</button>
+  <div class="reg-toolbar-actions">
+    <form method="post" action="{% url 'regulations_page' %}?date={{ plan_date }}" class="reg-toolbar-inline">
+      {% csrf_token %}
+      <input type="hidden" name="plan_date" value="{{ plan_date }}">
+      <button type="submit" name="action" value="from_catalog" class="btn"
+        {% if not biota_ok %}disabled title="Нет связи со справочником Biota"{% endif %}>Заполнить из Biota</button>
+    </form>
+    <button type="button" class="btn reg-save-btn" id="reg-save">Сохранить на сервер</button>
+  </div>
   <span id="reg-save-status" class="muted" style="min-width:120px;"></span>
 </div>
 
@@ -89,7 +93,13 @@
 </div>
 
 <style>
-  .reg-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .reg-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-bottom: 16px; }
+  .reg-toolbar-form { flex: 1 1 280px; margin: 0; }
+  .reg-toolbar-group { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+  .reg-toolbar-meta { display: flex; flex-direction: column; gap: 2px; }
+  .reg-toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+  .reg-toolbar-inline { display: inline-flex; margin: 0; }
+  .reg-save-btn { margin-left: 0; }
   .reg-shell { margin-top: 8px; user-select: none; }
   .reg-header-row, .reg-ovl-row, .reg-emp-row {
     display: grid;
@@ -275,6 +285,35 @@
   .reg-block:active .reg-block__edge { cursor: ew-resize; }
   .reg-block--bf { background: linear-gradient(180deg, #4f7dff, #3558cf); }
   .reg-block--ln { background: linear-gradient(180deg, #42c77a, #238a52); }
+  @media (max-width: 900px) {
+    .reg-header-row, .reg-ovl-row, .reg-emp-row {
+      grid-template-columns: minmax(120px, 160px) 1fr;
+      gap: 6px 8px;
+    }
+    .reg-name { font-size: 12px; }
+  }
+  @media (max-width: 720px) {
+    .reg-toolbar { gap: 8px; }
+    .reg-toolbar-form { width: 100%; flex: 1 1 100%; }
+    .reg-toolbar-group { width: 100%; }
+    .reg-toolbar-meta { width: 100%; }
+    .reg-toolbar-actions { width: 100%; margin-left: 0; }
+    .reg-toolbar-inline { width: 100%; }
+    .reg-toolbar-actions .btn { width: 100%; }
+    .reg-header-row, .reg-ovl-row, .reg-emp-row {
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+    .reg-name {
+      border-bottom: 0;
+      padding: 6px 2px 2px 2px;
+      font-weight: 600;
+    }
+    .reg-track { height: 34px; }
+    .reg-track--ovl { height: 24px; }
+    .reg-block { top: 4px; height: 26px; font-size: 9px; padding: 0 10px; }
+    .reg-hours { font-size: 10px; }
+  }
 </style>
 
 <script src="{% static 'regulations/timeline.js' %}"></script>
