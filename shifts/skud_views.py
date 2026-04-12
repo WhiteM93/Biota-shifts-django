@@ -56,8 +56,7 @@ def _skud_filter_employees(request, employees_df: pd.DataFrame):
         selected_deps = list(all_deps)
     else:
         dep_list = request.GET.getlist("dep")
-        selected_deps = dep_list if dep_list else list(all_deps)
-        selected_deps = [d for d in selected_deps if d in all_deps]
+        selected_deps = [d for d in dep_list if d in all_deps]
 
     by_dept = employees_df[employees_df["department_name"].isin(selected_deps)].copy()
     areas_all = _distinct_area_tokens(by_dept["area_name"])
@@ -66,8 +65,7 @@ def _skud_filter_employees(request, employees_df: pd.DataFrame):
         selected_areas = list(areas_all)
     else:
         area_list = request.GET.getlist("area")
-        selected_areas = area_list if area_list else list(areas_all)
-        selected_areas = [a for a in selected_areas if a in areas_all]
+        selected_areas = [a for a in area_list if a in areas_all]
 
     _sel_area_set = set(selected_areas)
     positions_source = by_dept[_mask_rows_by_area_tokens(by_dept, _sel_area_set)].copy()
@@ -77,8 +75,7 @@ def _skud_filter_employees(request, employees_df: pd.DataFrame):
         selected_positions = list(positions_all)
     else:
         pos_list = request.GET.getlist("pos")
-        selected_positions = pos_list if pos_list else list(positions_all)
-        selected_positions = [p for p in selected_positions if p in positions_all]
+        selected_positions = [p for p in pos_list if p in positions_all]
 
     employees_filtered = employees_df[
         employees_df["department_name"].isin(selected_deps)

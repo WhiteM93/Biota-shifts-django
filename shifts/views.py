@@ -15,6 +15,7 @@ from biota_shifts.auth import (
     _filter_employees_for_user,
     _is_admin,
     _register_user,
+    _resolve_registered_user,
 )
 from biota_shifts.config import APP_DIR
 from biota_shifts.constants import MONTH_NAMES_RU
@@ -34,7 +35,7 @@ def _df_columns_rows(df: pd.DataFrame):
     return cols, rows
 
 
-@require_http_methods(["GET", "POST"])
+@require_http_methods(["GET", "HEAD", "POST"])
 def login_view(request):
     if biota_user(request):
         return redirect("home")
@@ -45,15 +46,29 @@ def login_view(request):
         username = (request.POST.get("username") or "").strip()
         password = request.POST.get("password") or ""
         if _credentials_match(username, password):
-            request.session["biota_username"] = (
-                ADMIN_USERNAME if username.lower() == ADMIN_USERNAME.lower() else username
-            )
-            if remember_me:
-                request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
+            if not _is_admin(username):
+                rec = _resolve_registered_user(username)
+                if not rec or not rec.get("approved", True):
+                    err = (
+                        "Учётная запись ожидает подтверждения администратором. "
+                        "После подтверждения вы сможете войти."
+                    )
+                else:
+                    request.session["biota_username"] = username
+                    if remember_me:
+                        request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
+                    else:
+                        request.session.set_expiry(0)  # browser session only
+                    return redirect(next_url or reverse("home"))
             else:
-                request.session.set_expiry(0)  # browser session only
-            return redirect(next_url or reverse("home"))
-        err = "Неверный логин или пароль"
+                request.session["biota_username"] = ADMIN_USERNAME
+                if remember_me:
+                    request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
+                else:
+                    request.session.set_expiry(0)  # browser session only
+                return redirect(next_url or reverse("home"))
+        if not err:
+            err = "Неверный логин или пароль"
     return render(
         request,
         "shifts/login.html",
@@ -67,7 +82,7 @@ def login_view(request):
     )
 
 
-@require_http_methods(["GET", "POST"])
+@require_http_methods(["GET", "HEAD", "POST"])
 def register_view(request):
     err = ""
     if request.method == "POST":
@@ -81,7 +96,7 @@ def register_view(request):
             if ok:
                 messages.success(
                     request,
-                    "Регистрация прошла успешно. Войдите под новым логином.",
+                    "Регистрация принята. Вход будет возможен после подтверждения администратором в личном кабинете.",
                 )
                 return redirect("login")
             err = msg

@@ -19,12 +19,16 @@ from biota_shifts.env_manual import load_env_file
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 _env_path = BASE_DIR / ".env"
+_secrets_path = BASE_DIR / ".env.secrets"
 load_env_file(_env_path)
+load_env_file(_secrets_path)
 try:
     from dotenv import load_dotenv
 
     # override=True: значения из .env перекрывают устаревший BIOTA_* в окружении ОС/IDE
     load_dotenv(_env_path, override=True)
+    # Секреты поверх .env (пароли, SECRET_KEY)
+    load_dotenv(_secrets_path, override=True)
 except ImportError:
     pass
 
@@ -33,12 +37,19 @@ except ImportError:
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-&j#7pt+-7u0y)n&ihg(og#(x-3^yn^ax449c7e_d!r4&cbxbsx"
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-&j#7pt+-7u0y)n&ihg(og#(x-3^yn^ax449c7e_d!r4&cbxbsx",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+_debug_env = (os.getenv("DJANGO_DEBUG") or "").strip().lower()
+DEBUG = _debug_env not in ("0", "false", "no") if _debug_env else True
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+
+_csrf_raw = (os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS") or "").strip()
+CSRF_TRUSTED_ORIGINS = [x.strip() for x in _csrf_raw.split(",") if x.strip()]
 
 
 # Application definition
@@ -88,12 +99,29 @@ WSGI_APPLICATION = "biota_site.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+_site_db_host = (os.getenv("SITE_DB_HOST") or "").strip()
+if _site_db_host:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("SITE_DB_NAME", "site_db"),
+            "USER": os.getenv("SITE_DB_USER", "site_user"),
+            "PASSWORD": os.getenv("SITE_DB_PASSWORD", ""),
+            "HOST": _site_db_host,
+            "PORT": os.getenv("SITE_DB_PORT", "5432"),
+            "CONN_MAX_AGE": int(os.getenv("SITE_DB_CONN_MAX_AGE", "0") or "0"),
+            "OPTIONS": {
+                "connect_timeout": int(os.getenv("SITE_DB_CONNECT_TIMEOUT", "15") or "15"),
+            },
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # Password validation
@@ -132,6 +160,8 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+# Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

@@ -9,10 +9,12 @@ APP_DIR = PACKAGE_DIR.parent
 from .env_manual import load_env_file
 
 load_env_file(APP_DIR / ".env")
+load_env_file(APP_DIR / ".env.secrets")
 try:
     from dotenv import load_dotenv
 
     load_dotenv(APP_DIR / ".env", override=True)
+    load_dotenv(APP_DIR / ".env.secrets", override=True)
 except ImportError:
     pass
 
@@ -50,4 +52,4 @@ _USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,32}$")
 
 
 def _admin_password() -> str:
-    return _config_str("BIOTA_ADMIN_PASSWORD", "HaasDS30ssy")
+    return _config_str("BIOTA_ADMIN_PASSWORD", "")

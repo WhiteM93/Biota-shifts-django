@@ -73,15 +73,14 @@ def _schedule_with_department(schedule_df, employees_df):
 
 
 def _extract_selected_deps(request, all_deps, *, from_post: bool):
+    """Режим «все отделы» — весь список; «по списку» — только отмеченные (пустой список = ни один)."""
     source = request.POST if from_post else request.GET
     dep_mode = source.get("dep_mode", "all")
     if dep_mode == "all":
         return list(all_deps), dep_mode
     dep_list = source.getlist("dep")
-    if not dep_list:
-        return list(all_deps), dep_mode
     selected = [d for d in dep_list if d in all_deps]
-    return (selected if selected else list(all_deps)), dep_mode
+    return selected, dep_mode
 
 
 def _dept_rank_map(all_deps: list[str]) -> dict[str, int]:

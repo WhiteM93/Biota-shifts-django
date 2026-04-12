@@ -9,6 +9,7 @@ from biota_shifts.auth import (
     _access_scope_description,
     _allowed_areas_list,
     _allowed_departments_list,
+    _approve_registration,
     _change_password_registered,
     _distinct_area_tokens,
     _is_admin,
@@ -19,6 +20,7 @@ from biota_shifts.auth import (
     _user_access_scope_value,
 )
 from .department_order import apply_department_order, load_department_order, save_department_order
+from .db_health import collect_system_health
 
 from .auth_utils import biota_login_required, biota_user
 
@@ -80,6 +82,14 @@ def cabinet_view(request):
                 else:
                     messages.error(request, err)
                 return redirect("cabinet")
+            if action == "admin_approve_registration":
+                target = (request.POST.get("approve_login") or "").strip()
+                ok, err = _approve_registration(target)
+                if ok:
+                    messages.success(request, f"Регистрация подтверждена: {target}")
+                else:
+                    messages.error(request, err)
+                return redirect("cabinet")
             if action == "admin_dept_order":
                 raw = request.POST.get("dept_order_text") or ""
                 parts = [p.strip() for p in raw.replace("\r", "\n").replace(",", "\n").split("\n")]
@@ -126,8 +136,13 @@ def cabinet_view(request):
     }
 
     if _is_admin(user):
-        ctx["admin_display_name"] = (request.session.get("admin_display_name") or "").strip()
+        ctx["system_health"] = collect_system_health()
         priv_store = _load_users_store()
+        ctx["pending_registrations"] = sorted(
+            [k for k, v in priv_store.items() if not v.get("approved", True)],
+            key=lambda x: str(x).lower(),
+        )
+        ctx["admin_display_name"] = (request.session.get("admin_display_name") or "").strip()
         ctx["priv_users"] = sorted(priv_store.keys())
         dep_opts = sorted(employees_full["department_name"].unique().tolist()) if not employees_full.empty else []
         dep_order = apply_department_order(dep_opts, load_department_order())

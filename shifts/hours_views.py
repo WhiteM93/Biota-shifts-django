@@ -47,7 +47,7 @@ def _filter_lists(request, employees_df):
     if dep_mode == "all":
         selected_deps = all_deps
     else:
-        selected_deps = [d for d in dep_list if d in all_deps] if dep_list else all_deps
+        selected_deps = [d for d in dep_list if d in all_deps]
 
     by_dep = employees_df[employees_df["department_name"].isin(selected_deps)].copy()
     all_pos = sorted(by_dep["position_name"].unique().tolist())
@@ -55,7 +55,7 @@ def _filter_lists(request, employees_df):
     if pos_mode == "all":
         selected_pos = all_pos
     else:
-        selected_pos = [p for p in pos_list if p in all_pos] if pos_list else all_pos
+        selected_pos = [p for p in pos_list if p in all_pos]
 
     filtered = employees_df[
         employees_df["department_name"].isin(selected_deps)

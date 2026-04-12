@@ -1,6 +1,8 @@
 .venv/
+staticfiles/
 __pycache__/
 *.pyc
 db.sqlite3
 .env
+.env.secrets
 .biota_users.json

@@ -8,8 +8,8 @@
   <h3>Фильтры</h3>
   <div class="mode-row">
     <span class="mode-label">Отдел:</span>
-    <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if fmeta.dep_mode_pick %}checked{% endif %}> по списку</label>
-    <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not fmeta.dep_mode_pick %}checked{% endif %}> все отделы</label>
+    <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not fmeta.dep_mode_pick %}checked{% endif %}> Все</label>
+    <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if fmeta.dep_mode_pick %}checked{% endif %}> По списку</label>
   </div>
   <div class="check-row mode-target {% if not fmeta.dep_mode_pick %}is-hidden{% endif %}" data-mode-target="dep">{% for d in all_deps %}
     <label class="chk"><input type="checkbox" name="dep" value="{{ d }}" {% if d in fmeta.sel_deps %}checked{% endif %}> {{ d }}</label>
@@ -17,8 +17,8 @@
 
   <div class="mode-row">
     <span class="mode-label">Участок:</span>
-    <label class="inline"><input type="radio" name="area_mode" value="pick" {% if fmeta.area_mode_pick %}checked{% endif %}> по списку</label>
-    <label class="inline"><input type="radio" name="area_mode" value="all" {% if not fmeta.area_mode_pick %}checked{% endif %}> все участки</label>
+    <label class="inline"><input type="radio" name="area_mode" value="all" {% if not fmeta.area_mode_pick %}checked{% endif %}> Все</label>
+    <label class="inline"><input type="radio" name="area_mode" value="pick" {% if fmeta.area_mode_pick %}checked{% endif %}> По списку</label>
   </div>
   <div class="check-row mode-target {% if not fmeta.area_mode_pick %}is-hidden{% endif %}" data-mode-target="area">{% for a in fmeta.areas_all %}
     <label class="chk"><input type="checkbox" name="area" value="{{ a }}" {% if a in fmeta.sel_areas %}checked{% endif %}> {{ a }}</label>
@@ -28,8 +28,8 @@
 
   <div class="mode-row">
     <span class="mode-label">Должность:</span>
-    <label class="inline"><input type="radio" name="pos_mode" value="pick" {% if fmeta.pos_mode_pick %}checked{% endif %}> по списку</label>
-    <label class="inline"><input type="radio" name="pos_mode" value="all" {% if not fmeta.pos_mode_pick %}checked{% endif %}> все должности</label>
+    <label class="inline"><input type="radio" name="pos_mode" value="all" {% if not fmeta.pos_mode_pick %}checked{% endif %}> Все</label>
+    <label class="inline"><input type="radio" name="pos_mode" value="pick" {% if fmeta.pos_mode_pick %}checked{% endif %}> По списку</label>
   </div>
   <div class="check-row mode-target {% if not fmeta.pos_mode_pick %}is-hidden{% endif %}" data-mode-target="pos">{% for p in fmeta.positions_all %}
     <label class="chk"><input type="checkbox" name="pos" value="{{ p }}" {% if p in fmeta.sel_positions %}checked{% endif %}> {{ p }}</label>
@@ -183,7 +183,19 @@
 
     form.addEventListener("change", function (event) {
       var t = event.target;
-      if (!t || t.name !== "dep_mode" && t.name !== "area_mode" && t.name !== "pos_mode") return;
+      if (t && t.name === "dep_mode" && t.value === "pick" && t.checked) {
+        var b = form.querySelector('[data-mode-target="dep"]');
+        if (b) b.querySelectorAll('input[name="dep"]').forEach(function (cb) { cb.checked = false; });
+      }
+      if (t && t.name === "area_mode" && t.value === "pick" && t.checked) {
+        var b = form.querySelector('[data-mode-target="area"]');
+        if (b) b.querySelectorAll('input[name="area"]').forEach(function (cb) { cb.checked = false; });
+      }
+      if (t && t.name === "pos_mode" && t.value === "pick" && t.checked) {
+        var b = form.querySelector('[data-mode-target="pos"]');
+        if (b) b.querySelectorAll('input[name="pos"]').forEach(function (cb) { cb.checked = false; });
+      }
+      if (!t || (t.name !== "dep_mode" && t.name !== "area_mode" && t.name !== "pos_mode")) return;
       syncVisibility();
     });
 

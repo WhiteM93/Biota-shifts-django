@@ -413,3 +413,402 @@ def build_hours_grid_pdf(grid_df: pd.DataFrame, year: int, month: int) -> bytes:
     buffer.seek(0)
     return buffer.getvalue()
 
+
+# Регламент: шкала 08:00–20:00 (720 мин). Экспорт: 144 колонки по 5 мин; шапка — полуторачасовые метки до 20:00.
+REG_TL_START_MIN = 8 * 60
+REG_TL_END_MIN = 20 * 60
+REG_EXPORT_SLOT_MINUTES = 5
+REG_EXPORT_N_SLOTS = (REG_TL_END_MIN - REG_TL_START_MIN) // REG_EXPORT_SLOT_MINUTES
+REG_EXPORT_SLOTS_PER_30 = 30 // REG_EXPORT_SLOT_MINUTES
+
+DEPT_CLASS_BORDER_HEX = {
+    "dept-c1": "7AA2FF",
+    "dept-c2": "78D2B4",
+    "dept-c3": "F2B66E",
+    "dept-c4": "D89AF5",
+    "dept-c5": "FF9F9F",
+    "dept-c6": "9FD7FF",
+    "dept-c7": "B6DF83",
+    "dept-c8": "F0C4FF",
+}
+
+
+def _reg_hm_to_minutes(hm: str) -> int:
+    parts = str(hm).strip().split(":")
+    return int(parts[0]) * 60 + int(parts[1])
+
+
+def _reg_slot_overlap_export(start_m: int, end_m: int, slot_i: int) -> bool:
+    a = REG_TL_START_MIN + slot_i * REG_EXPORT_SLOT_MINUTES
+    b = a + REG_EXPORT_SLOT_MINUTES
+    return end_m > a and start_m < b
+
+
+def _reg_slot_paint_export(row: dict, slot_i: int) -> str:
+    """«ln» перекрывает «bf»; слоты по REG_EXPORT_SLOT_MINUTES (5 мин в экспорте)."""
+    bf_s = _reg_hm_to_minutes(row["breakfast_start"])
+    bf_e = _reg_hm_to_minutes(row["breakfast_end"])
+    ln_s = _reg_hm_to_minutes(row["lunch_start"])
+    ln_e = _reg_hm_to_minutes(row["lunch_end"])
+    if _reg_slot_overlap_export(ln_s, ln_e, slot_i):
+        return "ln"
+    if _reg_slot_overlap_export(bf_s, bf_e, slot_i):
+        return "bf"
+    return ""
+
+
+def _reg_shift_caption(shift: str) -> str:
+    return "Ночная смена" if shift == "н" else "Дневная смена"
+
+
+def _pdf_interval_paragraph_xml(start: str, end: str) -> str:
+    """В узкой ячейке одна строка «09:00–09:30» ломается; делаем три короткие строки."""
+    return (
+        f'<font size="6.5">{start}</font><br/>'
+        f'<font size="5" color="#5A6578">—</font><br/>'
+        f'<font size="6.5">{end}</font>'
+    )
+
+
+def _excel_interval_text(start: str, end: str, ncols: int) -> str:
+    """Одна строка, если ширина ≥ ~30 мин по сетке 5 мин (6 колонок)."""
+    if ncols >= REG_EXPORT_SLOTS_PER_30:
+        return f"{start}–{end}"
+    return f"{start}\n–\n{end}"
+
+
+def build_regulations_timeline_excel(
+    rows: list[dict],
+    plan_date: date,
+    shift: str,
+) -> bytes:
+    """Светлая вёрстка: 144 колонки по 5 мин (08:00–20:00), шапка — полчаса до 19:30–20:00."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Регламент"
+
+    grid = Side(style="thin", color="888888")
+    border = Border(left=grid, right=grid, top=grid, bottom=grid)
+    white = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+    title_fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
+    hdr_fill = PatternFill(start_color="ECECEC", end_color="ECECEC", fill_type="solid")
+    bf_fill = PatternFill(start_color="E8EEF9", end_color="E8EEF9", fill_type="solid")
+    ln_fill = PatternFill(start_color="E8F4EA", end_color="E8F4EA", fill_type="solid")
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left_wrap = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+    ws.cell(1, 1, value="Регламент: завтрак и обед · шкала 08:00–20:00 (колонка = 5 мин)")
+    ws.cell(1, 1).font = Font(bold=True, size=12, color="000000")
+    ws.cell(1, 1).fill = title_fill
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=REG_EXPORT_N_SLOTS + 1)
+    ws.cell(2, 1, value=f"{plan_date.strftime('%d.%m.%Y')} · {_reg_shift_caption(shift)}")
+    ws.cell(2, 1).font = Font(size=10, color="333333")
+    ws.cell(2, 1).fill = title_fill
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=REG_EXPORT_N_SLOTS + 1)
+
+    r0 = 4
+    ws.cell(r0, 1, value="Сотрудник")
+    ws.cell(r0, 1).font = Font(bold=True, size=9, color="000000")
+    ws.cell(r0, 1).fill = hdr_fill
+    ws.cell(r0, 1).alignment = left_wrap
+    ws.cell(r0, 1).border = border
+    for g in range(24):
+        si = g * REG_EXPORT_SLOTS_PER_30
+        c_lo = 2 + si
+        c_hi = 2 + si + REG_EXPORT_SLOTS_PER_30 - 1
+        ws.merge_cells(start_row=r0, start_column=c_lo, end_row=r0, end_column=c_hi)
+        total_min = REG_TL_START_MIN + g * 30
+        h, mi = divmod(total_min, 60)
+        lbl = f"{h:02d}:{mi:02d}"
+        if g == 23:
+            lbl = "19:30–20:00"
+        cell = ws.cell(r0, c_lo, value=lbl)
+        cell.fill = hdr_fill
+        cell.font = Font(bold=True, size=9, color="000000")
+        cell.alignment = center
+        cell.border = border
+
+    data_start = r0 + 1
+    for ri, row in enumerate(rows):
+        r = data_start + ri
+        name_cell = ws.cell(r, 1, value=row["employee_name"])
+        name_cell.alignment = left_wrap
+        name_cell.font = Font(size=10, color="000000")
+        name_cell.fill = white
+        dc = row.get("department_class") or "dept-c1"
+        hex_b = DEPT_CLASS_BORDER_HEX.get(dc, "7AA2FF")
+        name_cell.border = Border(
+            left=Side(style="medium", color=hex_b),
+            right=grid,
+            top=grid,
+            bottom=grid,
+        )
+
+        covered = [False] * REG_EXPORT_N_SLOTS
+        si = 0
+        while si < REG_EXPORT_N_SLOTS:
+            kind = _reg_slot_paint_export(row, si)
+            if not kind:
+                si += 1
+                continue
+            sj = si
+            while sj < REG_EXPORT_N_SLOTS and _reg_slot_paint_export(row, sj) == kind:
+                sj += 1
+            c_lo = 2 + si
+            c_hi = 2 + sj - 1
+            if c_hi >= c_lo:
+                ws.merge_cells(start_row=r, start_column=c_lo, end_row=r, end_column=c_hi)
+                top = ws.cell(r, c_lo)
+                top.border = border
+                ncols = c_hi - c_lo + 1
+                if kind == "bf":
+                    top.value = _excel_interval_text(
+                        row["breakfast_start"], row["breakfast_end"], ncols
+                    )
+                    top.fill = bf_fill
+                    top.font = Font(size=9, color="1A2D50", bold=True)
+                else:
+                    top.value = _excel_interval_text(
+                        row["lunch_start"], row["lunch_end"], ncols
+                    )
+                    top.fill = ln_fill
+                    top.font = Font(size=9, color="143D22", bold=True)
+                top.alignment = center
+            for i in range(si, sj):
+                covered[i] = True
+            si = sj
+
+        for si in range(REG_EXPORT_N_SLOTS):
+            if covered[si]:
+                continue
+            c = ws.cell(r, 2 + si, value="")
+            c.fill = white
+            c.border = border
+
+    ws.column_dimensions["A"].width = 24
+    for k in range(REG_EXPORT_N_SLOTS):
+        ws.column_dimensions[get_column_letter(2 + k)].width = 0.95
+
+    ws.freeze_panes = ws.cell(data_start, 1)
+    out = BytesIO()
+    wb.save(out)
+    out.seek(0)
+    return out.getvalue()
+
+
+def build_regulations_timeline_pdf(
+    rows: list[dict],
+    plan_date: date,
+    shift: str,
+) -> bytes:
+    """Светлый PDF: 144 колонки по 5 мин до 20:00; шапка — полчаса, последняя метка 19:30–20:00."""
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.platypus import SimpleDocTemplate, TableStyle, Paragraph, Spacer
+    from reportlab.platypus.tables import LongTable
+
+    font_name, ttf_path = _resolve_pdf_cyrillic_font()
+    if ttf_path is not None:
+        pdfmetrics.registerFont(TTFont("ArialUnicode", str(ttf_path)))
+        font_name = "ArialUnicode"
+
+    buffer = BytesIO()
+    page = landscape(A4)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=page,
+        leftMargin=8 * mm,
+        rightMargin=8 * mm,
+        topMargin=8 * mm,
+        bottomMargin=8 * mm,
+    )
+    styles = getSampleStyleSheet()
+    story = []
+
+    title_st = ParagraphStyle(
+        "RegTitle",
+        parent=styles["Title"],
+        fontName=font_name,
+        fontSize=14,
+        textColor=colors.HexColor("#111111"),
+        spaceAfter=4,
+    )
+    sub_st = ParagraphStyle(
+        "RegSub",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=9.5,
+        textColor=colors.HexColor("#444444"),
+        leading=12,
+        spaceAfter=4,
+    )
+    sub_st2 = ParagraphStyle(
+        "RegSub2",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=9,
+        textColor=colors.HexColor("#444444"),
+        leading=12,
+        spaceAfter=10,
+    )
+    story.append(Paragraph("Регламент завтрака и обеда", title_st))
+    # Два абзаца: длинная строка в одном Paragraph обрезалась у края («20:0»).
+    story.append(
+        Paragraph(
+            f"<b>{plan_date.strftime('%d.%m.%Y')}</b> · {_reg_shift_caption(shift)}",
+            sub_st,
+        )
+    )
+    story.append(
+        Paragraph(
+            "Шкала 08:00–20:00. Каждая колонка таблицы — 5&nbsp;мин; "
+            "в шапке — полчаса, последняя полоса до 20:00. "
+            "В цветных ячейках — время начала и конца обеда или завтрака.",
+            sub_st2,
+        )
+    )
+
+    name_w = 26 * mm
+    content_w = (297 - 16) * mm - name_w
+    slot_w = content_w / REG_EXPORT_N_SLOTS
+    col_widths = [name_w] + [slot_w] * REG_EXPORT_N_SLOTS
+
+    # Время в шапке — обычные строки (не Paragraph): в узких ячейках Paragraph ломал «08:00» на две строки.
+    hdr_st = ParagraphStyle(
+        "h0",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=8,
+        alignment=TA_LEFT,
+        leading=10,
+        textColor=colors.HexColor("#111111"),
+    )
+    hdr: list = [Paragraph("<b>Сотрудник</b>", hdr_st)]
+    for g in range(24):
+        for j in range(REG_EXPORT_SLOTS_PER_30):
+            if j == 0:
+                total_min = REG_TL_START_MIN + g * 30
+                h, mi = divmod(total_min, 60)
+                lbl = f"{h:02d}:{mi:02d}"
+                if g == 23:
+                    lbl = "19:30–20:00"
+                hdr.append(lbl)
+            else:
+                hdr.append("")
+
+    data: list[list] = [hdr]
+    name_ps = ParagraphStyle(
+        "rn",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=8,
+        alignment=TA_LEFT,
+        leading=10,
+        textColor=colors.HexColor("#111111"),
+    )
+    bf_ps = ParagraphStyle(
+        "rbf",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=6.5,
+        alignment=TA_CENTER,
+        leading=8,
+        textColor=colors.HexColor("#0D2847"),
+    )
+    ln_ps = ParagraphStyle(
+        "rln",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=6.5,
+        alignment=TA_CENTER,
+        leading=8,
+        textColor=colors.HexColor("#143D22"),
+    )
+
+    ts: list[tuple] = [
+        ("FONTNAME", (0, 0), (-1, -1), font_name),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (0, -1), "LEFT"),
+        ("ALIGN", (1, 0), (-1, 0), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, 0), 8),
+        ("FONTSIZE", (0, 1), (-1, -1), 7),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#111111")),
+    ]
+
+    for g in range(24):
+        c0 = 1 + g * REG_EXPORT_SLOTS_PER_30
+        c1 = c0 + REG_EXPORT_SLOTS_PER_30 - 1
+        ts.append(("SPAN", (c0, 0), (c1, 0)))
+        ts.append(("BACKGROUND", (c0, 0), (c1, 0), colors.HexColor("#EFEFEF")))
+
+    row_h = 10 * mm
+    hdr_h = 7 * mm
+    for ri, row in enumerate(rows):
+        r = 1 + ri
+        cells: list = [Paragraph(row["employee_name"], name_ps)] + [""] * REG_EXPORT_N_SLOTS
+        si = 0
+        while si < REG_EXPORT_N_SLOTS:
+            kind = _reg_slot_paint_export(row, si)
+            if not kind:
+                si += 1
+                continue
+            sj = si
+            while sj < REG_EXPORT_N_SLOTS and _reg_slot_paint_export(row, sj) == kind:
+                sj += 1
+            c0 = 1 + si
+            c1 = 1 + sj - 1
+            ncols = c1 - c0 + 1
+            if kind == "bf":
+                s, e = row["breakfast_start"], row["breakfast_end"]
+                if ncols >= 12:
+                    lab = f'<font size="7.5">{s}–{e}</font>'
+                else:
+                    lab = _pdf_interval_paragraph_xml(s, e)
+                cells[1 + si] = Paragraph(lab, bf_ps)
+                ts.append(("SPAN", (c0, r), (c1, r)))
+                ts.append(("BACKGROUND", (c0, r), (c1, r), colors.HexColor("#E8EEF9")))
+            else:
+                s, e = row["lunch_start"], row["lunch_end"]
+                if ncols >= 12:
+                    lab = f'<font size="7.5">{s}–{e}</font>'
+                else:
+                    lab = _pdf_interval_paragraph_xml(s, e)
+                cells[1 + si] = Paragraph(lab, ln_ps)
+                ts.append(("SPAN", (c0, r), (c1, r)))
+                ts.append(("BACKGROUND", (c0, r), (c1, r), colors.HexColor("#E8F4EA")))
+            si = sj
+        data.append(cells)
+        dc = row.get("department_class") or "dept-c1"
+        hx = DEPT_CLASS_BORDER_HEX.get(dc, "7AA2FF")
+        ts.append(("LINEBEFORE", (0, r), (0, r), 2.5, colors.HexColor("#" + hx)))
+
+    row_heights = [hdr_h] + [row_h] * len(rows)
+    tbl = LongTable(
+        data,
+        repeatRows=1,
+        colWidths=col_widths,
+        rowHeights=row_heights,
+        splitByRow=1,
+    )
+    ts.extend(
+        [
+            ("ROWBACKGROUNDS", (0, 1), (0, -1), [colors.white, colors.HexColor("#F7F7F7")]),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#BBBBBB")),
+        ]
+    )
+    tbl.setStyle(TableStyle(ts))
+    story.append(tbl)
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+

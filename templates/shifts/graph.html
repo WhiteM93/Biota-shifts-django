@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div class="graph-page" id="graph-page-root">
 <p class="muted">{{ month_name|capfirst }} {{ year }} — допустимые коды: <strong>д</strong>, <strong>н</strong>, <strong>от</strong>, <strong>б</strong>, <strong>п</strong>, <strong>кп</strong> или пусто.</p>
 
 <form method="get" action="" class="filter-panel auto-submit-form">
@@ -25,8 +26,8 @@
   </div>
   <div class="mode-row">
     <span class="label">Отделы:</span>
-    <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if dep_mode_pick %}checked{% endif %}> по списку</label>
-    <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not dep_mode_pick %}checked{% endif %}> все отделы</label>
+    <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not dep_mode_pick %}checked{% endif %}> Все</label>
+    <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if dep_mode_pick %}checked{% endif %}> По списку</label>
   </div>
   <div class="check-row mode-target {% if not dep_mode_pick %}is-hidden{% endif %}" data-mode-target="dep">
     <span class="label">Отделы:</span>
@@ -54,8 +55,16 @@
   </form>
 </div>
 
+<div class="graph-edit-bar">
+  <button type="button" class="btn btn-print-sheet" id="graph-print-btn" title="Печать или «Сохранить как PDF» в диалоге браузера">Печать</button>
+  <button type="button" class="btn btn-png-export" id="graph-png-btn" title="Снимок таблицы в тёмном оформлении (PNG)">PNG (тёмная тема)</button>
+  <button type="button" class="btn btn-theme-light-toggle" id="graph-theme-toggle" title="Удобно для скриншота и печати">Светлая тема</button>
+  <button type="button" class="btn btn-edit-unlock" id="graph-edit-toggle">Включить редактирование</button>
+  <span class="muted graph-edit-hint" id="graph-edit-hint">График только для просмотра. Включите редактирование, чтобы менять ячейки.</span>
+</div>
+
 <div class="schedule-wrap">
-<form method="post" action="" id="graph-save-form">
+<form method="post" action="" id="graph-save-form" class="graph-form--readonly">
   {% csrf_token %}
   <input type="hidden" name="action" value="save">
   <input type="hidden" name="year" value="{{ year }}">
@@ -78,8 +87,6 @@
       <tr>
         <td class="emp-cell {{ row.department_class }}">
           <span class="emp-name">{{ row.name }}</span>
-          <span class="muted">({{ row.code }})</span>
-          <span class="dept-badge">{{ row.department }}</span>
         </td>
         {% for d, val in row.day_cells %}
         <td class="{% if d in non_working_days %}non-work-col{% endif %}">
@@ -98,7 +105,8 @@
     </tbody>
   </table>
 </form>
-<p id="graph-save-status" class="muted graph-save-status">Изменения сохраняются автоматически.</p>
+<p id="graph-save-status" class="muted graph-save-status">График только для просмотра.</p>
+</div>
 </div>
 
 <style>
@@ -181,15 +189,6 @@
 .schedule-table td.non-work-col { background: #3a435a; }
 .emp-cell { text-align: left !important; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .emp-name { font-weight: 600; }
-.dept-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  font-size: 10px;
-  color: #f3f6ff;
-  background: rgba(21, 29, 45, 0.8);
-}
 .emp-cell.dept-c1 { border-left: 4px solid #7aa2ff; }
 .emp-cell.dept-c2 { border-left: 4px solid #78d2b4; }
 .emp-cell.dept-c3 { border-left: 4px solid #f2b66e; }
@@ -234,6 +233,224 @@
 .schedule-table .day-input--p:focus { background: #f2bb73; color: #1a1f2f; }
 .schedule-table .day-input--kp:focus { background: #f0a8cc; color: #1a1f2f; }
 .graph-save-status { margin: 10px 0 0 0; font-size: 12px; }
+.graph-edit-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 10px 0 8px 0;
+}
+.graph-edit-hint { font-size: 12px; max-width: 42rem; line-height: 1.4; }
+.btn-edit-unlock {
+  background: linear-gradient(180deg, #a82a32 0%, #751c22 100%);
+  border: 1px solid #d45760;
+  color: #fff;
+  font-weight: 600;
+}
+.btn-edit-unlock:hover {
+  background: linear-gradient(180deg, #c2323c 0%, #8e2229 100%);
+  border-color: #e87078;
+  color: #fff;
+}
+.btn-edit-unlock.is-editing-on {
+  background: linear-gradient(180deg, #32415f 0%, #26324b 100%);
+  border: 1px solid #4f6190;
+  color: #eaf0ff;
+  font-weight: 600;
+}
+.btn-edit-unlock.is-editing-on:hover {
+  background: linear-gradient(180deg, #3a4b6d 0%, #2d3a57 100%);
+  border-color: #5a6d9a;
+  color: #fff;
+}
+.graph-form--readonly .day-input {
+  cursor: default;
+  opacity: 0.94;
+}
+.btn-print-sheet {
+  background: linear-gradient(180deg, #f5f5f5 0%, #e4e4e4 100%);
+  color: #1a1a1a;
+  border: 1px solid #9a9a9a;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+.btn-print-sheet:hover {
+  filter: brightness(1.03);
+  border-color: #666;
+}
+.btn-png-export {
+  background: linear-gradient(180deg, #2d3a52 0%, #1f2838 100%);
+  color: #eaf0ff;
+  border: 1px solid #4f6190;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.btn-png-export:hover:not(:disabled) {
+  filter: brightness(1.06);
+  border-color: #6379ab;
+}
+.btn-png-export:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-theme-light-toggle {
+  background: linear-gradient(180deg, #f0f3fa 0%, #dce3f0 100%);
+  color: #1e2a44;
+  border: 1px solid #9aa8c4;
+  box-shadow: 0 2px 8px rgba(40, 60, 100, 0.12);
+}
+.btn-theme-light-toggle:hover {
+  filter: brightness(1.02);
+  border-color: #7a8aad;
+  color: #0f1728;
+}
+.btn-theme-light-toggle.is-active {
+  background: linear-gradient(180deg, #dce8ff 0%, #c5d6f5 100%);
+  border-color: #5a6d9a;
+  color: #0f1728;
+}
+#graph-page-root.theme-light {
+  color: #1a2233;
+}
+#graph-page-root.theme-light > p.muted { color: #4a5568; }
+#graph-page-root.theme-light .filter-panel {
+  background: linear-gradient(180deg, #ffffff 0%, #f3f5fa 100%);
+  border-color: #c5cdd8;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+#graph-page-root.theme-light .filter-panel .field span,
+#graph-page-root.theme-light .mode-row .label { color: #374151; }
+#graph-page-root.theme-light .inline {
+  background: #fff;
+  border-color: #b8c2d4;
+  color: #1f2937;
+}
+#graph-page-root.theme-light .chk {
+  background: #fff;
+  border-color: #c5cdd8;
+  color: #1f2937;
+}
+#graph-page-root.theme-light .graph-action-card {
+  background: #fff;
+  border-color: #c5cdd8;
+}
+#graph-page-root.theme-light .graph-action-title { color: #5c6578; }
+#graph-page-root.theme-light .graph-upload-row input[type="file"] {
+  background: #fff;
+  border-color: #b8c2d4;
+  color: #1f2937;
+}
+#graph-page-root.theme-light .graph-upload-row input[type="file"]::file-selector-button {
+  background: linear-gradient(180deg, #e8ecf4 0%, #d4dbe8 100%);
+  border: 1px solid #9aa8c4;
+  color: #1a2233;
+}
+#graph-page-root.theme-light .graph-edit-hint { color: #4b5568; }
+#graph-page-root.theme-light .graph-save-status { color: #374151; }
+#graph-page-root.theme-light .schedule-wrap {
+  background: #fff;
+  border-color: #b8c2d4;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+#graph-page-root.theme-light .schedule-table {
+  background: #fff;
+}
+#graph-page-root.theme-light .schedule-table th,
+#graph-page-root.theme-light .schedule-table td {
+  border-color: #c9d0db;
+  background: #fff;
+}
+#graph-page-root.theme-light .schedule-table th {
+  background: #eef1f7;
+  color: #111827;
+  font-weight: 700;
+}
+#graph-page-root.theme-light .schedule-table th.non-work-col,
+#graph-page-root.theme-light .schedule-table td.non-work-col {
+  background: #e8ecf4;
+}
+#graph-page-root.theme-light .emp-cell {
+  background: #fff;
+  color: #111827;
+}
+#graph-page-root.theme-light .filter-panel input,
+#graph-page-root.theme-light .filter-panel select {
+  background: #fff;
+  color: #111827;
+  border-color: #9aa8bc;
+}
+#graph-page-root.theme-light .filter-panel input:focus,
+#graph-page-root.theme-light .filter-panel select:focus {
+  background: #fff;
+  border-color: #4f6ad4;
+}
+#graph-page-root.theme-light .day-input {
+  background: #fff;
+  color: #111827;
+  border-color: #9aa8bc;
+}
+#graph-page-root.theme-light .schedule-table .day-input:focus {
+  background: #fff;
+  color: #111827;
+  border-color: #4f6ad4;
+  box-shadow: 0 0 0 2px rgba(79, 106, 212, 0.2);
+}
+@media print {
+  .nav { display: none !important; }
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .container {
+    padding: 8px !important;
+    max-width: 100% !important;
+  }
+  #graph-page-root {
+    color: #1a2233;
+    filter: grayscale(100%);
+    -webkit-filter: grayscale(100%);
+  }
+  #graph-page-root > p.muted,
+  #graph-page-root > form.filter-panel,
+  #graph-page-root .graph-actions,
+  #graph-page-root .graph-edit-bar,
+  #graph-page-root .graph-save-status {
+    display: none !important;
+  }
+  #graph-page-root .schedule-wrap {
+    background: #fff !important;
+    border: 1px solid #999 !important;
+    box-shadow: none !important;
+  }
+  #graph-page-root .schedule-table {
+    background: #fff !important;
+  }
+  #graph-page-root .schedule-table th,
+  #graph-page-root .schedule-table td {
+    border-color: #999 !important;
+    background: #fff !important;
+  }
+  #graph-page-root .schedule-table th { background: #eee !important; color: #000 !important; }
+  #graph-page-root .schedule-table th.non-work-col,
+  #graph-page-root .schedule-table td.non-work-col { background: #e8e8e8 !important; }
+  #graph-page-root .emp-cell { background: #fff !important; color: #000 !important; }
+  #graph-page-root .day-input {
+    background: #fff !important;
+    color: #111 !important;
+    border: 1px solid #888 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  #graph-page-root .day-input--d,
+  #graph-page-root .day-input--n,
+  #graph-page-root .day-input--ot,
+  #graph-page-root .day-input--b,
+  #graph-page-root .day-input--p,
+  #graph-page-root .day-input--kp {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
 @media (max-width: 720px) {
   .graph-actions { grid-template-columns: 1fr; }
   .graph-upload-row { grid-template-columns: 1fr; }
@@ -242,10 +459,10 @@
   .schedule-wrap { padding: 6px; }
   .schedule-table { font-size: 11px; }
   .emp-cell { max-width: 180px; font-size: 11px; }
-  .dept-badge { display: none; }
   .day-input { width: 30px; padding: 3px 1px; font-size: 10px; }
 }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
   (function () {
     var form = document.getElementById("graph-save-form");
@@ -260,6 +477,9 @@
     var depModeInputs = document.querySelectorAll('input[name="dep_mode"]');
     var depTarget = document.querySelector('[data-mode-target="dep"]');
     var hiddenDepMode = form.querySelector('input[name="dep_mode"][type="hidden"]');
+    var editing = false;
+    var editToggle = document.getElementById("graph-edit-toggle");
+    var editHint = document.getElementById("graph-edit-hint");
 
     function setStatus(text, color) {
       if (!statusEl) return;
@@ -302,7 +522,30 @@
       }
     }
 
+    function applyGraphEditingState() {
+      form.querySelectorAll(".day-input").forEach(function (inp) {
+        inp.readOnly = !editing;
+      });
+      form.classList.toggle("graph-form--readonly", !editing);
+      if (editToggle) {
+        editToggle.textContent = editing ? "Закончить редактирование" : "Включить редактирование";
+        editToggle.classList.toggle("is-editing-on", editing);
+      }
+      if (editHint) {
+        editHint.style.display = editing ? "none" : "";
+      }
+      if (statusEl) {
+        if (editing) {
+          statusEl.textContent = "Изменения сохраняются автоматически.";
+        } else {
+          statusEl.textContent = "График только для просмотра.";
+        }
+        statusEl.style.color = "";
+      }
+    }
+
     function saveNow() {
+      if (!editing) return;
       if (isSaving) {
         queued = true;
         return;
@@ -337,6 +580,7 @@
     }
 
     function scheduleSave() {
+      if (!editing) return;
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(saveNow, 600);
     }
@@ -351,6 +595,7 @@
     form.querySelectorAll(".day-input").forEach(function (input) {
       input.addEventListener("mousedown", function (event) {
         if (event.button !== 0) return;
+        if (!editing) return;
         applyColor(input);
         dragFill = {
           startInput: input,
@@ -378,13 +623,144 @@
     document.addEventListener("mouseup", function () {
       if (!dragFill) return;
       dragFill = null;
-      scheduleSave();
+      if (editing) scheduleSave();
     });
 
+    applyGraphEditingState();
+    if (editToggle) {
+      editToggle.addEventListener("click", function () {
+        editing = !editing;
+        applyGraphEditingState();
+      });
+    }
+
     depModeInputs.forEach(function (el) {
-      el.addEventListener("change", syncDepModeVisibility);
+      el.addEventListener("change", function () {
+        if (el.name === "dep_mode" && el.value === "pick" && el.checked && depTarget) {
+          depTarget.querySelectorAll('input[type="checkbox"][name="dep"]').forEach(function (cb) {
+            cb.checked = false;
+          });
+        }
+        syncDepModeVisibility();
+      });
     });
     syncDepModeVisibility();
+
+    var printBtn = document.getElementById("graph-print-btn");
+    if (printBtn) {
+      printBtn.addEventListener("click", function () {
+        window.print();
+      });
+    }
+    var pngBtn = document.getElementById("graph-png-btn");
+    if (pngBtn) {
+      pngBtn.addEventListener("click", function () {
+        if (typeof html2canvas !== "function") {
+          window.alert("Не удалось загрузить библиотеку снимка. Проверьте сеть и обновите страницу.");
+          return;
+        }
+        var wrap = document.querySelector("#graph-page-root .schedule-wrap");
+        var pageRoot = document.getElementById("graph-page-root");
+        var themeBtn = document.getElementById("graph-theme-toggle");
+        if (!wrap || !pageRoot) return;
+        var hadLight = pageRoot.classList.contains("theme-light");
+        if (hadLight) {
+          pageRoot.classList.remove("theme-light");
+          if (themeBtn) {
+            themeBtn.classList.remove("is-active");
+            themeBtn.textContent = "Светлая тема";
+          }
+        }
+        pngBtn.disabled = true;
+        var w = wrap.getBoundingClientRect().width;
+        var scale = w > 1600 ? 1 : 2;
+        function restoreTheme() {
+          if (hadLight) {
+            pageRoot.classList.add("theme-light");
+            if (themeBtn) {
+              themeBtn.classList.add("is-active");
+              themeBtn.textContent = "Обычная тема";
+            }
+          }
+          pngBtn.disabled = false;
+        }
+        function run() {
+          html2canvas(wrap, {
+            scale: scale,
+            useCORS: true,
+            allowTaint: false,
+            logging: false,
+            backgroundColor: "#141b29",
+            scrollX: 0,
+            scrollY: 0,
+            onclone: function (clonedDoc) {
+              var cloneWrap = clonedDoc.querySelector(".schedule-wrap");
+              if (!cloneWrap) return;
+              var origInputs = wrap.querySelectorAll("input.day-input");
+              var cloneInputs = cloneWrap.querySelectorAll("input.day-input");
+              for (var i = 0; i < cloneInputs.length && i < origInputs.length; i++) {
+                var oi = origInputs[i];
+                var ci = cloneInputs[i];
+                var span = clonedDoc.createElement("span");
+                span.textContent = (oi.value || "").trim();
+                span.className = oi.className;
+                var cs = window.getComputedStyle(oi);
+                span.style.display = "inline-flex";
+                span.style.alignItems = "center";
+                span.style.justifyContent = "center";
+                span.style.width = cs.width;
+                span.style.minWidth = cs.width;
+                span.style.height = cs.height;
+                span.style.boxSizing = cs.boxSizing || "border-box";
+                span.style.font = cs.font;
+                span.style.fontSize = cs.fontSize;
+                span.style.fontWeight = cs.fontWeight;
+                span.style.lineHeight = cs.lineHeight;
+                span.style.background = cs.background;
+                span.style.color = cs.color;
+                span.style.border = cs.border;
+                span.style.borderRadius = cs.borderRadius;
+                span.style.padding = cs.padding;
+                span.style.textAlign = "center";
+                span.style.whiteSpace = "nowrap";
+                span.style.overflow = "hidden";
+                ci.parentNode.replaceChild(span, ci);
+              }
+            }
+          })
+            .then(function (canvas) {
+              restoreTheme();
+              try {
+                var a = document.createElement("a");
+                a.download =
+                  "grafik_{{ year }}_" + String({{ month }}).padStart(2, "0") + ".png";
+                a.href = canvas.toDataURL("image/png");
+                a.click();
+              } catch (e) {
+                window.alert("Не удалось сформировать файл PNG.");
+              }
+            })
+            .catch(function () {
+              restoreTheme();
+              window.alert("Не удалось создать снимок таблицы.");
+            });
+        }
+        requestAnimationFrame(function () {
+          requestAnimationFrame(run);
+        });
+      });
+    }
+    var pageRoot = document.getElementById("graph-page-root");
+    var themeBtn = document.getElementById("graph-theme-toggle");
+    if (pageRoot && themeBtn) {
+      themeBtn.addEventListener("click", function () {
+        pageRoot.classList.toggle("theme-light");
+        themeBtn.textContent = pageRoot.classList.contains("theme-light")
+          ? "Обычная тема"
+          : "Светлая тема";
+        themeBtn.classList.toggle("is-active", pageRoot.classList.contains("theme-light"));
+      });
+    }
   })();
 </script>
 {% endblock %}

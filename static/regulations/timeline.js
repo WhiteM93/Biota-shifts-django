@@ -2,6 +2,11 @@
  * Шкала 08:00–20:00: drag + resize блоков завтрак/обед, строка перегруза.
  */
 (function () {
+  function regEditingEnabled() {
+    const root = document.getElementById("reg-timeline-root");
+    return !!(root && root.dataset.editing === "1");
+  }
+
   const TL_START = 8 * 60;
   const TL_END = 20 * 60;
   const TL_MIN = TL_END - TL_START;
@@ -77,19 +82,32 @@
     return { startRel, durRel };
   }
 
+  function metaForTrack(tr, cfgRows) {
+    const id = parseInt(tr.dataset.id, 10);
+    return (cfgRows || []).find(function (r) {
+      return r.id === id;
+    }) || {};
+  }
+
   /**
-   * Перегруз: в каждом 5-мин слоте — сколько человек имеют пересечение
-   * завтрака или обеда с этим интервалом (на человека не больше +1 за слот).
+   * Перегруз: 5-мин слоты — пересечение завтрака и обеда.
    */
   function computeOverload(rows) {
     const slot = 5;
     const slots = Math.ceil(TL_MIN / slot);
     const cnt = new Array(slots).fill(0);
     rows.forEach(function (r) {
-      const ivs = [
-        [dayMinToRel(parseHm(r.breakfast_start)), dayMinToRel(parseHm(r.breakfast_end))],
-        [dayMinToRel(parseHm(r.lunch_start)), dayMinToRel(parseHm(r.lunch_end))],
-      ];
+      const ivs = [];
+      if (!r.eight_hour_shift) {
+        ivs.push([
+          dayMinToRel(parseHm(r.breakfast_start)),
+          dayMinToRel(parseHm(r.breakfast_end)),
+        ]);
+      }
+      ivs.push([
+        dayMinToRel(parseHm(r.lunch_start)),
+        dayMinToRel(parseHm(r.lunch_end)),
+      ]);
       for (let i = 0; i < slots; i++) {
         const seg0 = i * slot;
         const seg1 = seg0 + slot;
@@ -106,6 +124,38 @@
       }
     });
     return cnt;
+  }
+
+  function buildOverloadRow(tr, cfgRows) {
+    const m = metaForTrack(tr, cfgRows);
+    const o = {
+      eight_hour_shift: !!m.eight_hour_shift,
+      breakfast_start: "08:00",
+      breakfast_end: "08:00",
+      lunch_start: "12:00",
+      lunch_end: "13:00",
+    };
+    const bf = tr.querySelector(".reg-block--bf");
+    const ln = tr.querySelector(".reg-block--ln");
+    if (bf && !m.eight_hour_shift) {
+      const b = readBlock(bf);
+      o.breakfast_start = fmtHm(TL_START + b.startRel);
+      o.breakfast_end = fmtHm(TL_START + b.startRel + b.durRel);
+    }
+    if (ln) {
+      const l = readBlock(ln);
+      o.lunch_start = fmtHm(TL_START + l.startRel);
+      o.lunch_end = fmtHm(TL_START + l.startRel + l.durRel);
+    }
+    return o;
+  }
+
+  function rowsFromDomForOverload(cfgRows) {
+    const out = [];
+    document.querySelectorAll(".reg-track[data-id]").forEach(function (tr) {
+      out.push(buildOverloadRow(tr, cfgRows));
+    });
+    return out;
   }
 
   function getOverloadThreshold() {
@@ -156,38 +206,33 @@
     });
   }
 
-  function rowsMealsFromDom() {
-    const out = [];
-    document.querySelectorAll(".reg-track[data-id]").forEach(function (tr) {
-      const bf = tr.querySelector(".reg-block--bf");
-      const ln = tr.querySelector(".reg-block--ln");
-      if (!bf || !ln) return;
-      const b = readBlock(bf);
-      const l = readBlock(ln);
-      out.push({
-        breakfast_start: fmtHm(TL_START + b.startRel),
-        breakfast_end: fmtHm(TL_START + b.startRel + b.durRel),
-        lunch_start: fmtHm(TL_START + l.startRel),
-        lunch_end: fmtHm(TL_START + l.startRel + l.durRel),
-      });
-    });
-    return out;
-  }
-
   function bindOverloadControls() {
     const inp = document.getElementById("reg-ovl-limit");
     const ovl = document.getElementById("reg-ovl-track");
     if (!inp || !ovl) return;
     function refresh() {
-      renderOverload(ovl, rowsMealsFromDom());
+      renderOverload(ovl, rowsFromDomForOverload(window.__regCfgRows || []));
     }
     inp.addEventListener("change", refresh);
     inp.addEventListener("input", refresh);
   }
 
+  window.syncRegTimelineEditingUi = function () {
+    const root = document.getElementById("reg-timeline-root");
+    const on = regEditingEnabled();
+    const ovl = document.getElementById("reg-ovl-limit");
+    const save = document.getElementById("reg-save");
+    if (root) root.classList.toggle("reg-shell--readonly", !on);
+    if (ovl) ovl.readOnly = !on;
+    if (save) save.disabled = !on;
+  };
+
   function wireBlock(track, block) {
     block.addEventListener("mousedown", function onDown(e) {
       if (e.button !== 0) return;
+      if (!regEditingEnabled()) return;
+      const rowLocked = track.closest(".reg-emp-row");
+      if (rowLocked && rowLocked.classList.contains("reg-row--locked")) return;
       const br = block.getBoundingClientRect();
       const edgePx = 12;
       const atLeft = e.clientX <= br.left + edgePx;
@@ -225,7 +270,7 @@
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);
         const ovl = document.getElementById("reg-ovl-track");
-        if (ovl) renderOverload(ovl, rowsMealsFromDom());
+        if (ovl) renderOverload(ovl, rowsFromDomForOverload(window.__regCfgRows || []));
       }
 
       document.addEventListener("mousemove", onMove);
@@ -236,6 +281,7 @@
   window.initRegTimeline = function (cfg) {
     const root = document.getElementById("reg-timeline-root");
     if (!root) return;
+    window.__regCfgRows = cfg.rows || [];
     const ovl = document.getElementById("reg-ovl-track");
     root.querySelectorAll(".reg-track[data-id]").forEach(function (track) {
       track.querySelectorAll(".reg-block").forEach(function (block) {
@@ -250,34 +296,51 @@
     });
     if (ovl) {
       if (cfg.rows && cfg.rows.length) {
-        renderOverload(ovl, cfg.rows);
+        renderOverload(ovl, rowsFromDomForOverload(window.__regCfgRows));
       } else {
         ovl.innerHTML = "";
       }
     }
     bindOverloadControls();
+    if (window.syncRegTimelineEditingUi) window.syncRegTimelineEditingUi();
   };
 
   window.saveRegTimeline = function (apiUrl, dateIso, getCookie) {
+    if (!regEditingEnabled()) {
+      return Promise.reject(new Error("Включите редактирование"));
+    }
     const root = document.getElementById("reg-timeline-root");
     if (!root) {
       return Promise.reject(new Error("нет разметки"));
     }
     const items = [];
     root.querySelectorAll(".reg-track[data-id]").forEach(function (tr) {
+      const row = tr.closest(".reg-emp-row");
+      if (row && row.classList.contains("reg-row--locked")) return;
       const id = tr.dataset.id;
       if (!id) return;
-      const bf = tr.querySelector(".reg-block--bf");
       const ln = tr.querySelector(".reg-block--ln");
-      const b = readBlock(bf);
+      if (!ln) return;
       const l = readBlock(ln);
-      items.push({
+      const ls = fmtHm(TL_START + l.startRel);
+      const le = fmtHm(TL_START + l.startRel + l.durRel);
+      const meta = metaForTrack(tr, window.__regCfgRows || []);
+      const item = {
         id: parseInt(id, 10),
-        breakfast_start: fmtHm(TL_START + b.startRel),
-        breakfast_end: fmtHm(TL_START + b.startRel + b.durRel),
-        lunch_start: fmtHm(TL_START + l.startRel),
-        lunch_end: fmtHm(TL_START + l.startRel + l.durRel),
-      });
+        lunch_start: ls,
+        lunch_end: le,
+      };
+      if (meta.eight_hour_shift) {
+        item.breakfast_start = ls;
+        item.breakfast_end = le;
+      } else {
+        const bf = tr.querySelector(".reg-block--bf");
+        if (!bf) return;
+        const b = readBlock(bf);
+        item.breakfast_start = fmtHm(TL_START + b.startRel);
+        item.breakfast_end = fmtHm(TL_START + b.startRel + b.durRel);
+      }
+      items.push(item);
     });
     const token = getCookie("csrftoken");
     return fetch(apiUrl, {
@@ -290,6 +353,141 @@
     }).then(function (r) {
       if (!r.ok) throw new Error(r.statusText);
       return r.json();
+    });
+  };
+
+  function mergeCfgFromServer(rowJson) {
+    const cfg = window.__regCfgRows || [];
+    const ix = cfg.findIndex(function (x) {
+      return x.id === rowJson.id;
+    });
+    if (ix < 0) return;
+    const cur = cfg[ix];
+    cur.eight_hour_shift = !!rowJson.eight_hour_shift;
+    cur.breakfast_start = rowJson.breakfast_start;
+    cur.breakfast_end = rowJson.breakfast_end;
+    cur.lunch_start = rowJson.lunch_start;
+    cur.lunch_end = rowJson.lunch_end;
+    cur.locked = !!rowJson.locked;
+  }
+
+  /** Обновить строку после 8ч без перезагрузки страницы (сохраняет режим «редактирование»). */
+  function applyEightHourDom(track, rowJson) {
+    mergeCfgFromServer(rowJson);
+    const eight = !!rowJson.eight_hour_shift;
+    let bf = track.querySelector(".reg-block--bf");
+    const ln = track.querySelector(".reg-block--ln");
+    if (eight) {
+      if (bf) bf.remove();
+      if (ln) ln.setAttribute("title", "Перерыв на питание (8ч)");
+    } else {
+      if (ln) ln.setAttribute("title", "Обед");
+      if (!bf && ln) {
+        bf = document.createElement("div");
+        bf.className = "reg-block reg-block--bf";
+        bf.setAttribute("data-kind", "bf");
+        bf.dataset.startHm = rowJson.breakfast_start;
+        bf.dataset.endHm = rowJson.breakfast_end;
+        bf.setAttribute("title", "Завтрак");
+        bf.innerHTML =
+          '<span class="reg-block__edge reg-block__edge--left" aria-hidden="true"></span>' +
+          '<span class="reg-block__edge reg-block__edge--right" aria-hidden="true"></span>' +
+          '<span class="reg-block__start"></span><span class="reg-block__end"></span>';
+        track.insertBefore(bf, ln);
+        const rs = dayMinToRel(parseHm(rowJson.breakfast_start));
+        const re = dayMinToRel(parseHm(rowJson.breakfast_end));
+        const dur = Math.max(SNAP_MIN, re - rs);
+        setBlockFromRel(bf, snap5(rs), dur);
+        wireBlock(track, bf);
+      }
+    }
+    if (ln) {
+      ln.dataset.startHm = rowJson.lunch_start;
+      ln.dataset.endHm = rowJson.lunch_end;
+      const rls = dayMinToRel(parseHm(rowJson.lunch_start));
+      const rle = dayMinToRel(parseHm(rowJson.lunch_end));
+      const ldur = Math.max(SNAP_MIN, rle - rls);
+      setBlockFromRel(ln, snap5(rls), ldur);
+    }
+    const ovl = document.getElementById("reg-ovl-track");
+    if (ovl) {
+      renderOverload(ovl, rowsFromDomForOverload(window.__regCfgRows || []));
+    }
+  }
+
+  /**
+   * Замок и 8ч — отдельный API (сразу на сервер).
+   */
+  window.regBindMetaControls = function (apiUrl, dateIso, getCookie) {
+    const root = document.getElementById("reg-timeline-root");
+    if (!root) return;
+
+    function postUpdates(updates) {
+      const token =
+        typeof getCookie === "function" ? getCookie("csrftoken") : "";
+      return fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": token || "",
+        },
+        body: JSON.stringify({ date: dateIso, updates: updates }),
+      }).then(function (r) {
+        if (!r.ok) throw new Error(r.statusText);
+        return r.json();
+      });
+    }
+
+    root.addEventListener("click", function (ev) {
+      const lockBtn = ev.target.closest(".reg-lock-btn");
+      if (lockBtn) {
+        if (!regEditingEnabled()) return;
+        ev.preventDefault();
+        const id = parseInt(lockBtn.getAttribute("data-id"), 10);
+        const row = lockBtn.closest(".reg-emp-row");
+        if (!row || isNaN(id)) return;
+        const willLock = !row.classList.contains("reg-row--locked");
+        postUpdates([{ id: id, locked: willLock }])
+          .then(function () {
+            row.classList.toggle("reg-row--locked", willLock);
+            lockBtn.textContent = willLock ? "🔒" : "🔓";
+            lockBtn.setAttribute("aria-pressed", willLock ? "true" : "false");
+          })
+          .catch(function () {
+            window.alert("Не удалось сохранить замок");
+          });
+        return;
+      }
+    });
+
+    root.addEventListener("change", function (ev) {
+      const cb = ev.target.closest(".reg-8h-cb");
+      if (!cb) return;
+      if (!regEditingEnabled()) {
+        cb.checked = !cb.checked;
+        return;
+      }
+      const id = parseInt(cb.getAttribute("data-id"), 10);
+      if (isNaN(id)) return;
+      const v = !!cb.checked;
+      postUpdates([{ id: id, eight_hour_shift: v }])
+        .then(function (data) {
+          const rowJson = (data.rows || []).find(function (r) {
+            return r.id === id;
+          });
+          const empRow = cb.closest(".reg-emp-row");
+          const track =
+            empRow && empRow.querySelector(".reg-track[data-id]");
+          if (rowJson && track) {
+            applyEightHourDom(track, rowJson);
+          } else {
+            window.location.reload();
+          }
+        })
+        .catch(function () {
+          window.alert("Не удалось сохранить признак 8ч");
+          cb.checked = !v;
+        });
     });
   };
 })();

@@ -14,13 +14,21 @@ class RegulationPlan(models.Model):
     breakfast_end = models.TimeField()
     lunch_start = models.TimeField()
     lunch_end = models.TimeField()
+    locked = models.BooleanField(
+        default=False,
+        help_text="Закрепить строку: нельзя случайно сдвинуть время на шкале.",
+    )
+    eight_hour_shift = models.BooleanField(
+        default=False,
+        help_text="8-часовая смена: один перерыв на питание вместо двух.",
+    )
 
     class Meta:
         ordering = ["employee_name"]
         constraints = [
             models.UniqueConstraint(
-                fields=["plan_date", "employee_code"],
-                name="uniq_regulation_employee_per_day",
+                fields=["plan_date", "employee_code", "shift"],
+                name="uniq_regulation_employee_day_shift",
             )
         ]
 

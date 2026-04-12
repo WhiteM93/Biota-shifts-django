@@ -25,8 +25,8 @@
   </div>
   <div class="mode-row">
     <span class="label">Отдел:</span>
-    <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if dep_mode_pick %}checked{% endif %}> по списку</label>
-    <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not dep_mode_pick %}checked{% endif %}> все отделы</label>
+    <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not dep_mode_pick %}checked{% endif %}> Все</label>
+    <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if dep_mode_pick %}checked{% endif %}> По списку</label>
   </div>
   <div class="check-row mode-target {% if not dep_mode_pick %}is-hidden{% endif %}" data-mode-target="dep">
     <span class="label">Отдел:</span>
@@ -36,8 +36,8 @@
   </div>
   <div class="mode-row">
     <span class="label">Должность:</span>
-    <label class="inline"><input type="radio" name="pos_mode" value="pick" {% if pos_mode_pick %}checked{% endif %}> по списку</label>
-    <label class="inline"><input type="radio" name="pos_mode" value="all" {% if not pos_mode_pick %}checked{% endif %}> все должности</label>
+    <label class="inline"><input type="radio" name="pos_mode" value="all" {% if not pos_mode_pick %}checked{% endif %}> Все</label>
+    <label class="inline"><input type="radio" name="pos_mode" value="pick" {% if pos_mode_pick %}checked{% endif %}> По списку</label>
   </div>
   <div class="check-row mode-target {% if not pos_mode_pick %}is-hidden{% endif %}" data-mode-target="pos">
     <span class="label">Должность:</span>
@@ -138,6 +138,14 @@
     }
     form.addEventListener("change", function (event) {
       var t = event.target;
+      if (t && t.name === "dep_mode" && t.value === "pick" && t.checked) {
+        var depBlock = form.querySelector('[data-mode-target="dep"]');
+        if (depBlock) depBlock.querySelectorAll('input[name="dep"]').forEach(function (cb) { cb.checked = false; });
+      }
+      if (t && t.name === "pos_mode" && t.value === "pick" && t.checked) {
+        var posBlock = form.querySelector('[data-mode-target="pos"]');
+        if (posBlock) posBlock.querySelectorAll('input[name="pos"]').forEach(function (cb) { cb.checked = false; });
+      }
       if (!t || (t.name !== "dep_mode" && t.name !== "pos_mode")) return;
       syncVisibility();
     });

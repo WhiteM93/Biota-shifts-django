@@ -79,7 +79,10 @@ def _verify_auth_cookie(token: str) -> str | None:
         return None
     if _is_admin(username):
         return ADMIN_USERNAME
-    if _resolve_registered_user(username):
+    rec = _resolve_registered_user(username)
+    if rec:
+        if not rec.get("approved", True):
+            return None
         return username
     return None
 
@@ -215,6 +218,7 @@ def _register_user(username: str, password: str) -> tuple[bool, str]:
         "salt_hex": salt_hex,
         "hash_hex": hash_hex,
         "created_at": datetime.now(MSK).strftime("%Y-%m-%d %H:%M"),
+        "approved": False,
         "display_name": "",
         "email": "",
         "access_scope": "none",
@@ -223,6 +227,31 @@ def _register_user(username: str, password: str) -> tuple[bool, str]:
         "allowed_departments": [],
         "allowed_areas": [],
     }
+    _save_users_store(store)
+    return True, ""
+
+
+def _approve_registration(username: str) -> tuple[bool, str]:
+    """Подтверждение регистрации в ЛК админа: можно входить в приложение."""
+    u = (username or "").strip()
+    if not u:
+        return False, "Пустой логин"
+    store = _load_users_store()
+    key = None
+    if u in store:
+        key = u
+    else:
+        ul = u.lower()
+        for k in store:
+            if str(k).strip().lower() == ul:
+                key = str(k)
+                break
+    if not key:
+        return False, "Пользователь не найден"
+    rec = store[key]
+    rec["approved"] = True
+    rec["approved_at"] = datetime.now(MSK).strftime("%Y-%m-%d %H:%M")
+    store[key] = rec
     _save_users_store(store)
     return True, ""
 
@@ -590,13 +619,25 @@ def _render_auth_page() -> None:
             if submitted:
                 u_in = username.strip()
                 if _credentials_match(username, pwd):
-                    st.session_state["authenticated"] = True
-                    st.session_state["auth_username"] = (
-                        ADMIN_USERNAME if u_in.lower() == ADMIN_USERNAME.lower() else u_in
-                    )
-                    _set_auth_cookie(st.session_state["auth_username"])
-                    st.rerun()
-                st.error("Неверный логин или пароль")
+                    if not _is_admin(u_in):
+                        rec = _resolve_registered_user(u_in)
+                        if not rec or not rec.get("approved", True):
+                            st.error(
+                                "Учётная запись ожидает подтверждения администратором. "
+                                "После подтверждения в веб-ЛК вы сможете войти."
+                            )
+                        else:
+                            st.session_state["authenticated"] = True
+                            st.session_state["auth_username"] = u_in
+                            _set_auth_cookie(st.session_state["auth_username"])
+                            st.rerun()
+                    else:
+                        st.session_state["authenticated"] = True
+                        st.session_state["auth_username"] = ADMIN_USERNAME
+                        _set_auth_cookie(st.session_state["auth_username"])
+                        st.rerun()
+                else:
+                    st.error("Неверный логин или пароль")
         with tab_reg:
             st.caption("Создайте логин и пароль для доступа к приложению")
             with st.form("biota_register_form", clear_on_submit=False):
@@ -610,7 +651,9 @@ def _render_auth_page() -> None:
                 else:
                     ok, err = _register_user(reg_user, reg_p1)
                     if ok:
-                        st.success("Регистрация прошла успешно. Войдите на вкладке «Вход».")
+                        st.success(
+                            "Регистрация принята. Вход будет возможен после подтверждения администратором в веб-личном кабинете."
+                        )
                     else:
                         st.error(err)
 
