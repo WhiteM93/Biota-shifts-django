@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods, require_POST
 
 from biota_shifts import db as biota_db
@@ -378,6 +378,7 @@ def regulations_pdf(request):
     return resp
 
 
+@ensure_csrf_cookie
 @biota_login_required
 @require_http_methods(["GET", "POST"])
 def regulation_page(request):
@@ -456,7 +457,6 @@ def regulation_page(request):
             "reg_shift": reg_shift,
             "reg_shift_title": _shift_title(reg_shift),
             "rows": rows,
-            "rows_json": json.dumps(rows, ensure_ascii=False),
             "biota_ok": biota_ok,
             "emp_count": emp_count,
             "scale_slots_30": _scale_slots_30min(),

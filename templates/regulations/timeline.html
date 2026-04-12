@@ -71,7 +71,7 @@
 <p class="muted">Нет строк на этот месяц — при открытии мы попробуем скопировать прошлый месяц; иначе нажмите «Заполнить из Biota» или добавьте записи в <a href="/admin/regulations/regulationplan/">админке</a>.</p>
 {% endif %}
 
-<script id="reg-initial-json" type="application/json">{{ rows_json|safe }}</script>
+{{ rows|json_script:"reg-initial-json" }}
 
 <div id="reg-timeline-root" class="reg-shell reg-shell--readonly{% if not rows %} reg-shell--empty{% endif %}" data-editing="0">
   <div class="reg-header-row">
@@ -752,7 +752,7 @@
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="{% static 'regulations/timeline.js' %}?v=2"></script>
+<script src="{% static 'regulations/timeline.js' %}?v=3"></script>
 <script>
   (function () {
     function getCookie(name) {

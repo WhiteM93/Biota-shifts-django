@@ -325,12 +325,15 @@
       const ls = fmtHm(TL_START + l.startRel);
       const le = fmtHm(TL_START + l.startRel + l.durRel);
       const meta = metaForTrack(tr, window.__regCfgRows || []);
+      const cb8 = row && row.querySelector(".reg-8h-cb");
+      /* Режим 8ч берём с чекбокса в строке — иначе при пустом/битом __regCfgRows обед считали «не 8ч» и выходили без bf. */
+      const eightHour = !!(cb8 && cb8.checked) || !!meta.eight_hour_shift;
       const item = {
         id: parseInt(id, 10),
         lunch_start: ls,
         lunch_end: le,
       };
-      if (meta.eight_hour_shift) {
+      if (eightHour) {
         item.breakfast_start = ls;
         item.breakfast_end = le;
       } else {
@@ -360,6 +363,14 @@
           var msg = r.status === 403 ? "403: CSRF или сессия (обновите страницу, проверьте домен в CSRF_TRUSTED_ORIGINS)." : r.statusText;
           if (t && t.length < 200) msg += " " + t;
           throw new Error(msg);
+        });
+      }
+      var ct = (r.headers.get("Content-Type") || "").toLowerCase();
+      if (ct.indexOf("application/json") < 0) {
+        return r.text().then(function (t) {
+          throw new Error(
+            "Ответ не JSON (часто сессия истекла — войдите снова). Начало ответа: " + (t || "").slice(0, 120)
+          );
         });
       }
       return r.json();

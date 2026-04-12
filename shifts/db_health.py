@@ -43,11 +43,21 @@ def check_django_database() -> dict:
 
     ok = False
     err = ""
+    write_ok: bool | None = None
+    write_err = ""
     try:
         connection.ensure_connection()
         with connection.cursor() as cur:
             cur.execute("SELECT 1")
         ok = True
+        with connection.cursor() as cur:
+            # Проверка права на запись (0 строк меняется, но СУБД проверяет привилегии UPDATE).
+            try:
+                cur.execute("UPDATE django_migrations SET id=id WHERE 1=0")
+                write_ok = True
+            except Exception as wexc:
+                write_ok = False
+                write_err = str(wexc)
     except Exception as exc:
         err = str(exc)
 
@@ -55,8 +65,18 @@ def check_django_database() -> dict:
     detail = "; ".join(detail_parts)
     if not ok:
         detail = f"{detail} — ошибка: {err}" if detail else err
-    elif warn:
-        detail += ". Для продакшена задайте SITE_DB_HOST и переменные PostgreSQL."
+    elif write_ok is False:
+        low = write_err.lower()
+        if "does not exist" in low or "no such table" in low:
+            detail += ". Запись: не проверена (нет таблицы django_migrations — выполните migrate)."
+            warn = True
+        else:
+            ok = False
+            detail += f". Запись в БД запрещена или ошибка: {write_err}"
+    elif write_ok is True:
+        detail += ". Права на запись (UPDATE): ок."
+    if ok and warn and is_sqlite:
+        detail += " Для продакшена задайте SITE_DB_HOST и переменные PostgreSQL."
 
     return {
         "id": "django",
