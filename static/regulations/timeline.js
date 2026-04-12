@@ -343,15 +343,25 @@
       items.push(item);
     });
     const token = getCookie("csrftoken");
+    if (!token) {
+      return Promise.reject(new Error("Нет CSRF-cookie (csrftoken). Обновите страницу или проверьте настройки cookies."));
+    }
     return fetch(apiUrl, {
       method: "POST",
+      credentials: "same-origin",
       headers: {
         "Content-Type": "application/json",
-        "X-CSRFToken": token || "",
+        "X-CSRFToken": token,
       },
       body: JSON.stringify({ date: dateIso, items: items }),
     }).then(function (r) {
-      if (!r.ok) throw new Error(r.statusText);
+      if (!r.ok) {
+        return r.text().then(function (t) {
+          var msg = r.status === 403 ? "403: CSRF или сессия (обновите страницу, проверьте домен в CSRF_TRUSTED_ORIGINS)." : r.statusText;
+          if (t && t.length < 200) msg += " " + t;
+          throw new Error(msg);
+        });
+      }
       return r.json();
     });
   };
@@ -427,13 +437,20 @@
         typeof getCookie === "function" ? getCookie("csrftoken") : "";
       return fetch(apiUrl, {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
           "X-CSRFToken": token || "",
         },
         body: JSON.stringify({ date: dateIso, updates: updates }),
       }).then(function (r) {
-        if (!r.ok) throw new Error(r.statusText);
+        if (!r.ok) {
+          return r.text().then(function (t) {
+            var msg = r.status === 403 ? "403 CSRF/сессия" : r.statusText;
+            if (t && t.length < 200) msg += " " + t;
+            throw new Error(msg);
+          });
+        }
         return r.json();
       });
     }

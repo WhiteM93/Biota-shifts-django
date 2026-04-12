@@ -1,4 +1,4 @@
-"""Регламенты: интерактивная шкала времени + API сохранения (SQLite)."""
+"""Регламенты: интерактивная шкала времени + API сохранения (БД Django)."""
 import json
 from datetime import date, datetime, time, timedelta
 from urllib.parse import urlencode
@@ -478,7 +478,7 @@ def regulations_api_save(request):
     if not d_raw or not isinstance(items, list):
         return HttpResponseBadRequest("date, items required")
     try:
-        plan_date = date.fromisoformat(str(d_raw).strip())
+        plan_date = _first_of_month(date.fromisoformat(str(d_raw).strip()))
     except ValueError:
         return HttpResponseBadRequest("bad date")
 

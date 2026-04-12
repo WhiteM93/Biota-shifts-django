@@ -7,7 +7,7 @@
   Регламент ведётся <strong>по месяцу</strong> (на шкале — завтрак и обед). Если на месяц ещё нет строк, они <strong>копируются с прошлого месяца</strong>; после «Заполнить из Biota» время и отметки (замок, 8&nbsp;ч) подтягиваются с прошлого месяца для совпадающих сотрудников.
   Шкала <strong>08:00–20:00</strong>: подписи — каждые <strong>30 минут</strong>, сетка — <strong>10 минут</strong>, блоки — шаг <strong>5 минут</strong>. Синие — завтрак, зелёные — обед. Красная полоса — перегруз по числу людей в 5‑минутном слоте.
   <strong>8ч</strong> — смена 8 часов: на шкале только <strong>один</strong> перерыв на питание. <strong>Замок</strong> — строка не двигается на шкале и не сохраняется при «Сохранить» до разблокировки.
-  Порядок строк — как на «Графике» за выбранный месяц. Данные в SQLite (не в Biota).
+  Порядок строк — как на «Графике» за выбранный месяц. Данные в базе сайта (Django), не в справочнике Biota.
 </p>
 
 <div class="reg-shift-tabs" role="tablist" aria-label="Смена регламента">
@@ -502,6 +502,8 @@
   .reg-shell--readonly .reg-lock-btn,
   .reg-shell--readonly .reg-8h-label { pointer-events: none; opacity: 0.78; }
   .reg-shell--readonly .reg-block { cursor: default; }
+  /* Пока «редактирование» выключено — шкалы сотрудников не принимают мышь/тач (дублирует проверку в JS). */
+  .reg-shell--readonly .reg-emp-row > .reg-track { pointer-events: none; }
   .reg-emp-text { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 2px; }
   /* Строка перегруза: под липкой шапкой сайта, всегда на экране при прокрутке вниз */
   .reg-ovl-row {
@@ -750,7 +752,7 @@
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="{% static 'regulations/timeline.js' %}"></script>
+<script src="{% static 'regulations/timeline.js' %}?v=2"></script>
 <script>
   (function () {
     function getCookie(name) {
@@ -779,8 +781,12 @@
         st.textContent = "…";
         window.saveRegTimeline("{% url 'regulations_api_save' %}", "{{ plan_date }}", getCookie)
           .then(function (d) {
-            st.textContent = "Сохранено (" + (d.updated || 0) + ")";
-            st.style.color = "#b8f5c8";
+            var n = d.updated || 0;
+            st.textContent =
+              n === 0
+                ? "Сервер принял запрос, обновлено строк: 0 (все строки 🔒 или нет изменений)."
+                : "Сохранено (" + n + ")";
+            st.style.color = n === 0 ? "#e8d48a" : "#b8f5c8";
           })
           .catch(function (e) {
             st.textContent = "Ошибка: " + (e && e.message ? e.message : e);
