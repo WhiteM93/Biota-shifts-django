@@ -66,6 +66,7 @@
         {% for d, lab, is_non_working in day_headers %}
         <th title="день {{ d }}" class="{% if is_non_working %}non-work-col{% endif %}">{{ lab }}</th>
         {% endfor %}
+        <th class="total-col">Итого</th>
       </tr>
     </thead>
     <tbody>
@@ -75,6 +76,7 @@
         {% for cell in row.cells %}
         <td class="hours-cell {% if cell.is_non_working %}non-work-col {% endif %}{% if cell.value == no_punch %}cell-nopunch{% elif suffix_out in cell.value %}cell-outside{% endif %}">{{ cell.value }}</td>
         {% endfor %}
+        <td class="hours-cell total-col">{{ row.total }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -111,6 +113,7 @@
 .schedule-table td.non-work-col { background: #20283b; }
 .emp-cell { text-align: left !important; white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
 .hours-cell { font-variant-numeric: tabular-nums; max-width: 56px; }
+.total-col { font-weight: 700; min-width: 58px; background: rgba(34, 44, 66, 0.7); }
 .cell-nopunch { color: #6b7a99; }
 .cell-outside { color: #c9d4f0; }
 @media (max-width: 720px) {

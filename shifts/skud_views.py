@@ -10,16 +10,25 @@ from biota_shifts import db as biota_db
 from biota_shifts import export as biota_export
 from biota_shifts import logic as biota_logic
 from biota_shifts.auth import (
-    _distinct_area_tokens,
     _filter_employees_for_user,
     _is_admin,
-    _mask_rows_by_area_tokens,
 )
 from biota_shifts.constants import MONTH_NAMES_RU
 from biota_shifts import schedule as biota_schedule
 from biota_shifts.schedule import employee_label_row
 
 from .auth_utils import biota_login_required, biota_user
+
+
+def _fmt_minutes_human(v) -> str:
+    try:
+        mins = int(v)
+    except (TypeError, ValueError):
+        mins = 0
+    mins = max(0, mins)
+    if mins < 60:
+        return f"{mins} мин"
+    return f"{mins // 60} ч {mins % 60} мин"
 
 
 def _employees_for_user(request):
@@ -46,54 +55,8 @@ def _parse_year_month(request, default_y: int, default_m: int) -> tuple[int, int
 
 
 def _skud_filter_employees(request, employees_df: pd.DataFrame):
-    """Отдел / участок / должность — логика как в Streamlit (свёрнутый фильтр = все значения)."""
-    dep_mode = request.GET.get("dep_mode", "all")
-    area_mode = request.GET.get("area_mode", "all")
-    pos_mode = request.GET.get("pos_mode", "all")
-
-    all_deps = sorted(employees_df["department_name"].unique().tolist())
-    if dep_mode == "all":
-        selected_deps = list(all_deps)
-    else:
-        dep_list = request.GET.getlist("dep")
-        selected_deps = [d for d in dep_list if d in all_deps]
-
-    by_dept = employees_df[employees_df["department_name"].isin(selected_deps)].copy()
-    areas_all = _distinct_area_tokens(by_dept["area_name"])
-
-    if area_mode == "all":
-        selected_areas = list(areas_all)
-    else:
-        area_list = request.GET.getlist("area")
-        selected_areas = [a for a in area_list if a in areas_all]
-
-    _sel_area_set = set(selected_areas)
-    positions_source = by_dept[_mask_rows_by_area_tokens(by_dept, _sel_area_set)].copy()
-    positions_all = sorted(positions_source["position_name"].unique().tolist())
-
-    if pos_mode == "all":
-        selected_positions = list(positions_all)
-    else:
-        pos_list = request.GET.getlist("pos")
-        selected_positions = [p for p in pos_list if p in positions_all]
-
-    employees_filtered = employees_df[
-        employees_df["department_name"].isin(selected_deps)
-        & _mask_rows_by_area_tokens(employees_df, _sel_area_set)
-        & employees_df["position_name"].isin(selected_positions)
-    ].copy()
-
-    meta = {
-        "dep_mode_pick": dep_mode != "all",
-        "area_mode_pick": area_mode != "all",
-        "pos_mode_pick": pos_mode != "all",
-        "sel_deps": selected_deps,
-        "sel_areas": selected_areas,
-        "sel_positions": selected_positions,
-        "areas_all": areas_all,
-        "positions_all": positions_all,
-    }
-    return employees_filtered, meta
+    """Фильтры отдел/участок/должность отключены: для СКУД используем весь доступный сотрудникам список."""
+    return employees_df.copy(), {}
 
 
 def _df_to_table(df: pd.DataFrame | None) -> tuple[list[str], list[list[str]]]:
@@ -148,6 +111,12 @@ def _skud_load_bundle(request, employees_df: pd.DataFrame, filtered: pd.DataFram
         punches_month_df = biota_logic.punches_list_for_month(punches_df, start_date, end_date)
     except Exception as exc:
         return None, str(exc)
+
+    for col in ("Опоздал (мин)", "Ранний уход (мин)"):
+        if col in stats_df.columns:
+            stats_df[col] = stats_df[col].apply(
+                lambda x: "" if x is None or (isinstance(x, float) and pd.isna(x)) else _fmt_minutes_human(x)
+            )
 
     stats_cols, stats_rows = _df_to_table(stats_df)
     punch_cols, punch_rows = _df_to_table(punches_month_df)

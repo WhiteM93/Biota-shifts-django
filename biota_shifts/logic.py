@@ -85,6 +85,78 @@ def build_hours_grid_from_schedule(schedule_df: pd.DataFrame, hours_long: pd.Dat
     return grid
 
 
+def build_hours_long_from_punches(
+    schedule_df: pd.DataFrame,
+    punches_long: pd.DataFrame,
+    year: int,
+    month: int,
+) -> pd.DataFrame:
+    """Часы по дням из отметок СКУД с теми же правилами выбора последней отметки, что и в СКУД-статистике."""
+    if schedule_df.empty:
+        return pd.DataFrame(columns=["emp_code", "shift_date", "worked_hours"])
+    day_cols = sorted([c for c in schedule_df.columns if str(c).isdigit()], key=lambda x: int(x))
+    if not day_cols:
+        return pd.DataFrame(columns=["emp_code", "shift_date", "worked_hours"])
+
+    sched_lookup: dict[tuple[str, str], str] = {}
+    for _, r in schedule_df.iterrows():
+        ec = normalize_emp_code(r.get("Код"))
+        if not ec:
+            continue
+        for c in day_cols:
+            sched_lookup[(ec, str(c))] = sanitize_schedule_cell(r.get(c))
+
+    pts_by_emp: dict[str, pd.Series] = {}
+    if punches_long is not None and not punches_long.empty:
+        p = punches_long.copy()
+        p["emp_code"] = p["emp_code"].map(normalize_emp_code)
+        p = p[p["emp_code"] != ""]
+        p["punch_time"] = pd.to_datetime(p["punch_time"], utc=True, errors="coerce")
+        p = p[p["punch_time"].notna()]
+        p["punch_time_msk"] = p["punch_time"].dt.tz_convert(MSK_TZ)
+        for ec, gp in p.groupby("emp_code", sort=False):
+            pts_by_emp[ec] = gp["punch_time_msk"].sort_values().reset_index(drop=True)
+
+    rows: list[dict] = []
+    for ec in sorted({normalize_emp_code(x) for x in schedule_df["Код"].tolist() if normalize_emp_code(x)}):
+        pts = pts_by_emp.get(ec, pd.Series(pd.DatetimeIndex([], tz=MSK_TZ)))
+        for c in day_cols:
+            d = date(year, month, int(c))
+            code = sched_lookup.get((ec, str(c)), "")
+            if code == "д":
+                # Дневная смена: считаем только в пределах календарного дня [00:00, 24:00).
+                first_dt, last_dt = first_last_for_day_shift(pts, d)
+            elif code == "н":
+                # Ночная смена: окно [12:00 текущего дня, 12:00 следующего дня).
+                first_dt, last_dt = first_last_for_night_shift(pts, d)
+            else:
+                prev_code = sched_lookup.get((ec, str(int(c) - 1)), "") if int(c) > 1 else ""
+                if prev_code == "н":
+                    no_shift_start = datetime(d.year, d.month, d.day, 12, 0, 0, tzinfo=MSK)
+                    no_shift_end = no_shift_start + timedelta(hours=12)
+                    first_dt, last_dt = first_last_for_day_shift(
+                        pts,
+                        d,
+                        window_start=no_shift_start,
+                        window_end=no_shift_end,
+                    )
+                else:
+                    first_dt, last_dt = first_last_for_day_shift(pts, d)
+            if first_dt is None or last_dt is None:
+                continue
+            hours = round((last_dt - first_dt).total_seconds() / 3600.0, 2)
+            if hours <= 0:
+                continue
+            rows.append(
+                {
+                    "emp_code": ec,
+                    "shift_date": d,
+                    "worked_hours": hours,
+                }
+            )
+    return pd.DataFrame(rows, columns=["emp_code", "shift_date", "worked_hours"])
+
+
 def _schedule_row_for_emp(schedule_df: pd.DataFrame, emp_code: str) -> pd.Series | None:
     if schedule_df.empty or "Код" not in schedule_df.columns:
         return None
@@ -210,9 +282,11 @@ def build_employee_stats_month(
 
         exp_start, exp_end = expected_shift_times(code, d)
         if code == "д":
-            first_dt, last_dt = first_last_for_day_shift(pts_msk, d, expected_end=exp_end)
+            # Единое правило окна для дневной смены: [00:00, 24:00) текущего дня.
+            first_dt, last_dt = first_last_for_day_shift(pts_msk, d)
         elif code == "н":
-            first_dt, last_dt = first_last_for_night_shift(pts_msk, d, expected_end=exp_end)
+            # Единое правило окна для ночной смены: [12:00, 12:00+1).
+            first_dt, last_dt = first_last_for_night_shift(pts_msk, d)
         else:
             # Без смены в графике: отметки за календарный день (как в табеле)
             prev_code = _schedule_code_for_day(row, d - timedelta(days=1))
@@ -471,8 +545,8 @@ def build_timesheet_view(
                 remark = SCHEDULE_REMARK_RU.get(code, SCHEDULE_REMARK_RU[""])
         elif code == "д":
             shift_human = "дневная"
-            _, exp_end = expected_shift_times("д", d)
-            t1, t2 = first_last_for_day_shift(pts_msk, d, expected_end=exp_end)
+            # В табеле используем то же окно, что и в «Часы по дням» и СКУД-статистике.
+            t1, t2 = first_last_for_day_shift(pts_msk, d)
             if t1:
                 first_s = t1.strftime("%H:%M")
             if t2:
@@ -481,8 +555,7 @@ def build_timesheet_view(
                 remark = "В графике дневная смена, отметок за этот день нет"
         elif code == "н":
             shift_human = "ночная"
-            _, exp_end = expected_shift_times("н", d)
-            t1, t2 = first_last_for_night_shift(pts_msk, d, expected_end=exp_end)
+            t1, t2 = first_last_for_night_shift(pts_msk, d)
             if t1:
                 first_s = t1.strftime("%H:%M (%d.%m)")
             if t2:

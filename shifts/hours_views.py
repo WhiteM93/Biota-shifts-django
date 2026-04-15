@@ -1,11 +1,12 @@
 """Страница «Часы по дням» — сетка как в Графике, факт часов из Biota."""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 from django.http import HttpResponse
 from django.shortcuts import render
 
 from biota_shifts import db as biota_db
+from biota_shifts.emp_codes import normalize_emp_code
 from biota_shifts import export as biota_export
 from biota_shifts import logic as biota_logic
 from biota_shifts.auth import _filter_employees_for_user, _is_admin
@@ -64,6 +65,11 @@ def _filter_lists(request, employees_df):
     return filtered, selected_deps, selected_pos, all_deps, all_pos, dep_mode, pos_mode
 
 
+def _fmt_minutes_hhmm(total_minutes: int) -> str:
+    total_minutes = max(0, int(total_minutes or 0))
+    return f"{total_minutes // 60}:{total_minutes % 60:02d}"
+
+
 @biota_login_required
 def hours_view(request):
     now = datetime.now()
@@ -105,17 +111,40 @@ def hours_view(request):
             try:
                 codes_h = schedule_df_h["Код"].astype(str).tolist()
                 start_date, end_date = biota_schedule.month_bounds(date(y, m, 1))
-                hours_batch_df = biota_db.load_shifts_hours_batch(
-                    biota_db.db_config(), codes_h, start_date, end_date
+                punches_batch_df = biota_db.load_iclock_punches_batch(
+                    biota_db.db_config(),
+                    codes_h,
+                    start_date - timedelta(days=1),
+                    end_date + timedelta(days=1),
+                )
+                hours_batch_df = biota_logic.build_hours_long_from_punches(
+                    schedule_df_h,
+                    punches_batch_df,
+                    y,
+                    m,
                 )
                 grid_hours_df = biota_logic.build_hours_grid_from_schedule(
                     schedule_df_h, hours_batch_df
                 )
+                month_minutes_by_emp: dict[str, int] = {}
+                if not hours_batch_df.empty:
+                    hb = hours_batch_df.copy()
+                    hb["emp_code"] = hb["emp_code"].map(normalize_emp_code)
+                    hb = hb[hb["emp_code"] != ""]
+                    hb = hb[hb["worked_hours"].notna()]
+                    hb["worked_minutes"] = (
+                        hb["worked_hours"].astype(float).mul(60.0).round().astype(int)
+                    )
+                    hb = hb[hb["worked_minutes"] > 0]
+                    if not hb.empty:
+                        month_minutes_by_emp = (
+                            hb.groupby("emp_code", sort=False)["worked_minutes"].sum().to_dict()
+                        )
                 day_cols_h = sorted(
                     [c for c in schedule_df_h.columns if str(c).isdigit()],
                     key=lambda x: int(x),
                 )
-                cols = ["Сотрудник"] + day_cols_h
+                cols = ["Код", "Сотрудник"] + day_cols_h
                 grid_view = grid_hours_df[cols].copy()
                 for d in day_cols_h:
                     di = int(d)
@@ -125,6 +154,7 @@ def hours_view(request):
                     if is_non_working:
                         non_working_days.append(str(d))
                 for _, r in grid_view.iterrows():
+                    emp_code = normalize_emp_code(r["Код"])
                     row_cells = []
                     for c in day_cols_h:
                         v = "" if pd.isna(r[c]) else str(r[c])
@@ -138,6 +168,7 @@ def hours_view(request):
                         {
                             "name": r["Сотрудник"],
                             "cells": row_cells,
+                            "total": _fmt_minutes_hhmm(month_minutes_by_emp.get(emp_code, 0)),
                         }
                     )
             except Exception as exc:
@@ -189,15 +220,38 @@ def _hours_grid_for_download(request):
         return None, "Нет строк"
     start_date, end_date = biota_schedule.month_bounds(date(y, m, 1))
     codes_h = schedule_df_h["Код"].astype(str).tolist()
-    hours_batch_df = biota_db.load_shifts_hours_batch(
-        biota_db.db_config(), codes_h, start_date, end_date
+    punches_batch_df = biota_db.load_iclock_punches_batch(
+        biota_db.db_config(),
+        codes_h,
+        start_date - timedelta(days=1),
+        end_date + timedelta(days=1),
+    )
+    hours_batch_df = biota_logic.build_hours_long_from_punches(
+        schedule_df_h,
+        punches_batch_df,
+        y,
+        m,
     )
     grid_hours_df = biota_logic.build_hours_grid_from_schedule(schedule_df_h, hours_batch_df)
     day_cols_h = sorted(
         [c for c in schedule_df_h.columns if str(c).isdigit()],
         key=lambda x: int(x),
     )
-    grid_view = grid_hours_df[["Сотрудник"] + day_cols_h].copy()
+    month_minutes_by_emp: dict[str, int] = {}
+    if not hours_batch_df.empty:
+        hb = hours_batch_df.copy()
+        hb["emp_code"] = hb["emp_code"].map(normalize_emp_code)
+        hb = hb[hb["emp_code"] != ""]
+        hb = hb[hb["worked_hours"].notna()]
+        hb["worked_minutes"] = hb["worked_hours"].astype(float).mul(60.0).round().astype(int)
+        hb = hb[hb["worked_minutes"] > 0]
+        if not hb.empty:
+            month_minutes_by_emp = hb.groupby("emp_code", sort=False)["worked_minutes"].sum().to_dict()
+    grid_view = grid_hours_df[["Код", "Сотрудник"] + day_cols_h].copy()
+    grid_view["Итого"] = (
+        grid_view["Код"].map(normalize_emp_code).map(lambda ec: _fmt_minutes_hhmm(month_minutes_by_emp.get(ec, 0)))
+    )
+    grid_view = grid_view[["Сотрудник"] + day_cols_h + ["Итого"]].copy()
     return (grid_view, y, m), None
 
 

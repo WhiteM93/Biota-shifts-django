@@ -3,13 +3,6 @@
 
 {% block content %}
 <div class="reg-page" id="reg-page-root">
-<p class="muted reg-intro" style="max-width: 48rem; line-height: 1.45;">
-  Регламент ведётся <strong>по месяцу</strong> (на шкале — завтрак и обед). Если на месяц ещё нет строк, они <strong>копируются с прошлого месяца</strong>; после «Заполнить из Biota» время и отметки (замок, 8&nbsp;ч) подтягиваются с прошлого месяца для совпадающих сотрудников.
-  Шкала <strong>08:00–20:00</strong>: подписи — каждые <strong>30 минут</strong>, сетка — <strong>10 минут</strong>, блоки — шаг <strong>5 минут</strong>. Синие — завтрак, зелёные — обед. Красная полоса — перегруз по числу людей в 5‑минутном слоте.
-  <strong>8ч</strong> — смена 8 часов: на шкале только <strong>один</strong> перерыв на питание. <strong>Замок</strong> — строка не двигается на шкале и не сохраняется при «Сохранить» до разблокировки.
-  Порядок строк — как на «Графике» за выбранный месяц. Данные в базе сайта (Django), не в справочнике Biota.
-</p>
-
 <div class="reg-shift-tabs" role="tablist" aria-label="Смена регламента">
   <a role="tab" class="reg-shift-tab {% if reg_shift == 'д' %}reg-shift-tab--active{% endif %}"
     href="{% url 'regulations_page' %}?month={{ plan_month_value }}&shift=д{{ reg_dep_qs }}">Дневная смена</a>
@@ -60,7 +53,6 @@
     </form>
     <button type="button" class="btn btn-print-sheet" id="reg-print-btn" title="Диалог печати браузера (можно сохранить в PDF)">Печать</button>
     <button type="button" class="btn btn-png-export" id="reg-png-btn" title="Снимок шкалы в тёмном оформлении (PNG)"{% if not rows %} disabled{% endif %}>PNG (тёмная тема)</button>
-    <button type="button" class="btn btn-theme-light-toggle" id="reg-theme-toggle" title="Светлая чёрно-белая тема для экрана и печати">Светлая (Ч/Б)</button>
     <button type="button" class="btn btn-edit-unlock" id="reg-edit-toggle">Включить редактирование</button>
     <button type="button" class="btn reg-save-btn" id="reg-save" disabled>Сохранить на сервер</button>
   </div>

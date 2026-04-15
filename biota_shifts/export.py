@@ -812,3 +812,123 @@ def build_regulations_timeline_pdf(
     buffer.seek(0)
     return buffer.getvalue()
 
+
+def build_regulations_list_pdf(
+    rows: list[dict],
+    plan_date: date,
+    shift: str,
+) -> bytes:
+    """PDF регламента в табличном виде: №, сотрудник, завтрак, обед (как в образце)."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.platypus import LongTable, Paragraph, SimpleDocTemplate, Spacer, TableStyle
+
+    font_name, ttf_path = _resolve_pdf_cyrillic_font()
+    if ttf_path is not None:
+        pdfmetrics.registerFont(TTFont("ArialUnicode", str(ttf_path)))
+        font_name = "ArialUnicode"
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=12 * mm,
+        rightMargin=12 * mm,
+        topMargin=12 * mm,
+        bottomMargin=12 * mm,
+    )
+    styles = getSampleStyleSheet()
+    story = []
+
+    title_style = ParagraphStyle(
+        "RegListTitle",
+        parent=styles["Title"],
+        fontName=font_name,
+        fontSize=15,
+        leading=18,
+        textColor=colors.HexColor("#111111"),
+        spaceAfter=2 * mm,
+    )
+    sub_style = ParagraphStyle(
+        "RegListSub",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=10,
+        leading=12,
+        textColor=colors.HexColor("#222222"),
+        spaceAfter=1 * mm,
+    )
+    info_style = ParagraphStyle(
+        "RegListInfo",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=9,
+        leading=11,
+        textColor=colors.HexColor("#3a3a3a"),
+        spaceAfter=4 * mm,
+    )
+
+    story.append(Paragraph("Регламент: питания", title_style))
+    story.append(
+        Paragraph(
+            f"{_reg_shift_caption(shift)} · шкала учёта 08:00–20:00",
+            sub_style,
+        )
+    )
+    story.append(Paragraph(f"Действует с {plan_date.strftime('%d.%m.%Y')}", sub_style))
+    story.append(
+        Paragraph(
+            "В таблице указаны только временные окна (начало и конец перерыва). "
+            "Колонка «Завтрак» — первый интервал приёма пищи, «Обед» — второй.",
+            info_style,
+        )
+    )
+    story.append(
+        Paragraph(
+            "Соблюдайте график, чтобы не пересекаться на кухне и сохранять ритм смены.",
+            info_style,
+        )
+    )
+    story.append(Spacer(1, 2 * mm))
+
+    header = [
+        "№",
+        "Сотрудник",
+        "Завтрак (1-й интервал)",
+        "Обед (2-й интервал)",
+    ]
+    table_data: list[list[str]] = [header]
+    for i, r in enumerate(rows, start=1):
+        b = f"{r['breakfast_start']}–{r['breakfast_end']}"
+        l = f"{r['lunch_start']}–{r['lunch_end']}"
+        table_data.append([str(i), str(r["employee_name"]), b, l])
+
+    col_widths = [12 * mm, 78 * mm, 42 * mm, 42 * mm]
+    table = LongTable(table_data, repeatRows=1, colWidths=col_widths, splitByRow=1)
+    table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), font_name),
+                ("FONTSIZE", (0, 0), (-1, 0), 9),
+                ("FONTSIZE", (0, 1), (-1, -1), 9),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#EFEFEF")),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#111111")),
+                ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                ("ALIGN", (2, 0), (-1, -1), "CENTER"),
+                ("ALIGN", (1, 0), (1, -1), "LEFT"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#AAAAAA")),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    story.append(table)
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+

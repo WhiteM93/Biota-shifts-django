@@ -35,6 +35,18 @@ def _df_columns_rows(df: pd.DataFrame):
     return cols, rows
 
 
+def _fmt_minutes_human(v) -> str:
+    """Минуты -> человекочитаемый формат для главной."""
+    try:
+        mins = int(v)
+    except (TypeError, ValueError):
+        mins = 0
+    mins = max(0, mins)
+    if mins < 60:
+        return f"{mins} мин"
+    return f"{mins // 60} ч {mins % 60} мин"
+
+
 @require_http_methods(["GET", "HEAD", "POST"])
 def login_view(request):
     if biota_user(request):
@@ -221,6 +233,9 @@ def home_view(request):
         .rename(columns={"label": "Сотрудник", "emp_code": "Код"})
         .reset_index(drop=True)
     )
+    for _c in ("Опоздания (мин)", "Ранний уход (мин)", "Всего (мин)"):
+        _by_area[_c] = _by_area[_c].map(_fmt_minutes_human)
+        _top10[_c] = _top10[_c].map(_fmt_minutes_human)
 
     ac, ar = _df_columns_rows(_by_area)
     tc, tr = _df_columns_rows(_top10)

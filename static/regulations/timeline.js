@@ -224,7 +224,8 @@
     const save = document.getElementById("reg-save");
     if (root) root.classList.toggle("reg-shell--readonly", !on);
     if (ovl) ovl.readOnly = !on;
-    if (save) save.disabled = !on;
+    // Режим редактирования должен запрещать только изменение шкалы, но не сохранение.
+    if (save) save.disabled = false;
   };
 
   function wireBlock(track, block) {
@@ -306,17 +307,12 @@
   };
 
   window.saveRegTimeline = function (apiUrl, dateIso, getCookie) {
-    if (!regEditingEnabled()) {
-      return Promise.reject(new Error("Включите редактирование"));
-    }
     const root = document.getElementById("reg-timeline-root");
     if (!root) {
       return Promise.reject(new Error("нет разметки"));
     }
     const items = [];
     root.querySelectorAll(".reg-track[data-id]").forEach(function (tr) {
-      const row = tr.closest(".reg-emp-row");
-      if (row && row.classList.contains("reg-row--locked")) return;
       const id = tr.dataset.id;
       if (!id) return;
       const ln = tr.querySelector(".reg-block--ln");
@@ -325,6 +321,7 @@
       const ls = fmtHm(TL_START + l.startRel);
       const le = fmtHm(TL_START + l.startRel + l.durRel);
       const meta = metaForTrack(tr, window.__regCfgRows || []);
+      const row = tr.closest(".reg-emp-row");
       const cb8 = row && row.querySelector(".reg-8h-cb");
       /* Режим 8ч берём с чекбокса в строке — иначе при пустом/битом __regCfgRows обед считали «не 8ч» и выходили без bf. */
       const eightHour = !!(cb8 && cb8.checked) || !!meta.eight_hour_shift;

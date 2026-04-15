@@ -270,28 +270,27 @@ def _load_shifts_hours_batch_cached(
     month_start = date.fromisoformat(month_start_s)
     month_end = date.fromisoformat(month_end_s)
     sql = """
-    with emp_payload as (
+    with emp_punches as (
         select
-            e.emp_code::text as emp_code,
-            tc.att_date::date as att_date,
-            min(tc.clock_in) as actual_in,
-            max(tc.clock_out) as actual_out
-        from att_payloadtimecard tc
-        join personnel_employee e on e.id = tc.emp_id
-        where e.emp_code = any(%(emp_codes)s)
-          and tc.att_date between %(month_start)s and %(month_end)s
-        group by e.emp_code, tc.att_date
+            t.emp_code::text as emp_code,
+            (t.punch_time at time zone 'Europe/Moscow')::date as shift_date,
+            min(t.punch_time) as first_punch,
+            max(t.punch_time) as last_punch
+        from iclock_transaction t
+        where t.emp_code = any(%(emp_codes)s)
+          and (t.punch_time at time zone 'Europe/Moscow')::date between %(month_start)s and %(month_end)s
+        group by t.emp_code, (t.punch_time at time zone 'Europe/Moscow')::date
     )
     select
         ep.emp_code,
-        ep.att_date as shift_date,
+        ep.shift_date,
         case
-            when ep.actual_in is not null and ep.actual_out is not null
-                then round(extract(epoch from (ep.actual_out - ep.actual_in)) / 3600.0, 2)
+            when ep.first_punch is not null and ep.last_punch is not null
+                then round(extract(epoch from (ep.last_punch - ep.first_punch)) / 3600.0, 2)
             else null
         end as worked_hours
-    from emp_payload ep
-    order by ep.emp_code, ep.att_date;
+    from emp_punches ep
+    order by ep.emp_code, ep.shift_date;
     """
     with psycopg.connect(**cfg) as conn:
         return pd.read_sql(

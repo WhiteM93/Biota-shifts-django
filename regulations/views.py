@@ -367,7 +367,7 @@ def regulations_pdf(request):
         return HttpResponse("Нет данных на выбранную дату и смену", status=400, content_type="text/plain; charset=utf-8")
     rows = _regulation_timeline_export_rows(plans, dep_color_map)
     try:
-        data = biota_export.build_regulations_timeline_pdf(rows, plan_date, shift)
+        data = biota_export.build_regulations_list_pdf(rows, plan_date, shift)
     except Exception as exc:
         return HttpResponse(f"PDF недоступен: {exc}", status=500, content_type="text/plain; charset=utf-8")
     y, m, d = plan_date.year, plan_date.month, plan_date.day
@@ -491,7 +491,7 @@ def regulations_api_save(request):
         except (TypeError, ValueError):
             continue
         row = RegulationPlan.objects.filter(pk=pk, plan_date=plan_date).first()
-        if not row or row.locked:
+        if not row:
             continue
         try:
             ln_s = _parse_hm(str(it.get("lunch_start", "")))
@@ -503,7 +503,7 @@ def regulations_api_save(request):
                 bf_e = _parse_hm(str(it.get("breakfast_end", "")))
         except ValueError:
             return HttpResponseBadRequest("bad time")
-        n = RegulationPlan.objects.filter(pk=pk, plan_date=plan_date, locked=False).update(
+        n = RegulationPlan.objects.filter(pk=pk, plan_date=plan_date).update(
             breakfast_start=bf_s,
             breakfast_end=bf_e,
             lunch_start=ln_s,
