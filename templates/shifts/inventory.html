@@ -1,0 +1,593 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="inventory-top-actions">
+  <a class="btn {% if panel == 'stock' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=stock">Склад</a>
+  <a class="btn {% if panel == 'history' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=history">История</a>
+  <a class="btn {% if panel == 'issue' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=issue">Выдать</a>
+  <a class="btn {% if panel == 'issue_outcome' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=issue_outcome">Списание/Возврат</a>
+  <a class="btn {% if panel == 'arrival' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=arrival">Приход</a>
+</div>
+<h2 style="margin-top:0;">Склад инструмента</h2>
+<p class="muted">По умолчанию показано только то, что есть на складе (остаток больше 0).</p>
+
+{% if panel == "stock" %}
+<form method="get" class="filter-panel auto-submit-form">
+  <input type="hidden" name="panel" value="stock">
+  <h3>Фильтр наличия</h3>
+  <div class="filter-grid">
+    <label class="field"><span>Категория</span>
+      <select name="category">
+        <option value="">Выберите категорию</option>
+        <option value="end_mill" {% if filters.category == "end_mill" %}selected{% endif %}>Фрезы</option>
+        <option value="tap" {% if filters.category == "tap" %}selected{% endif %}>Резьбовой инструмент</option>
+      </select>
+    </label>
+    <label class="field"><span>Показывать нулевые остатки</span>
+      <select name="show_all">
+        <option value="0" {% if not filters.show_all %}selected{% endif %}>Нет</option>
+        <option value="1" {% if filters.show_all %}selected{% endif %}>Да</option>
+      </select>
+    </label>
+    {% if filters.category == "end_mill" %}
+    <label class="field"><span>Тип фрезы</span>
+      <select name="mill_type">
+        <option value="">Все</option>
+        {% for key, label in end_mill_types %}
+        <option value="{{ key }}" {% if filters.mill_type == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Диаметр, мм</span>
+      <select name="diameter_mm">
+        <option value="">Все</option>
+        {% for v in end_mill_filter_options.diameters %}
+        <option value="{{ v }}" {% if filters.diameter_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Радиус, мм</span>
+      <select name="mill_corner_radius_mm">
+        <option value="">Все</option>
+        {% for v in end_mill_filter_options.corner_radii %}
+        <option value="{{ v }}" {% if filters.mill_corner_radius_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Длина общая, мм</span>
+      <select name="mill_overall_length_mm">
+        <option value="">Все</option>
+        {% for v in end_mill_filter_options.overall_lengths %}
+        <option value="{{ v }}" {% if filters.mill_overall_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Длина реж. части, мм</span>
+      <select name="mill_cutting_length_mm">
+        <option value="">Все</option>
+        {% for v in end_mill_filter_options.cutting_lengths %}
+        <option value="{{ v }}" {% if filters.mill_cutting_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Кромки</span>
+      <select name="mill_flutes_count">
+        <option value="">Все</option>
+        {% for v in end_mill_filter_options.flutes %}
+        <option value="{{ v }}" {% if filters.mill_flutes_count == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "tap" %}
+    <label class="field"><span>Размер</span>
+      <select name="tap_size">
+        <option value="">Все</option>
+        {% for v in tap_filter_options.sizes %}
+        <option value="{{ v }}" {% if filters.tap_size == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Шаг, мм</span>
+      <select name="tap_pitch">
+        <option value="">Все</option>
+        {% for v in tap_filter_options.pitches %}
+        <option value="{{ v }}" {% if filters.tap_pitch == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Стандарт резьбы</span>
+      <select name="tap_thread_standard">
+        <option value="">Все</option>
+        {% for key, label in thread_standards %}
+          {% if key in tap_filter_options.thread_standards %}
+          <option value="{{ key }}" {% if filters.tap_thread_standard == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Тип отверстия</span>
+      <select name="tap_hole_type">
+        <option value="">Все</option>
+        {% for key, label in tap_hole_types %}
+          {% if key in tap_filter_options.hole_types %}
+          <option value="{{ key }}" {% if filters.tap_hole_type == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Тип инструмента</span>
+      <select name="tap_tool_type">
+        <option value="">Все</option>
+        {% for key, label in tap_tool_types %}
+          {% if key in tap_filter_options.tool_types %}
+          <option value="{{ key }}" {% if filters.tap_tool_type == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Длина общая, мм</span>
+      <select name="tap_overall_length_mm">
+        <option value="">Все</option>
+        {% for v in tap_filter_options.overall_lengths %}
+        <option value="{{ v }}" {% if filters.tap_overall_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Длина реж. части, мм</span>
+      <select name="tap_cutting_length_mm">
+        <option value="">Все</option>
+        {% for v in tap_filter_options.cutting_lengths %}
+        <option value="{{ v }}" {% if filters.tap_cutting_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    {% if filters.category %}
+    <label class="field"><span>Материал инструмента</span>
+      <select name="tool_material">
+        <option value="">Все</option>
+        {% for key, label in tool_material_types %}
+        <option value="{{ key }}" {% if filters.tool_material == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="field">
+      <span>Материал покрытия</span>
+      <div class="coating-picker">
+        <label class="coating-chip">
+          <input type="radio" name="coating_type" value="" {% if not filters.coating_type %}checked{% endif %}>
+          <span class="swatch swatch-all" title="Все"></span>
+        </label>
+        {% for key, label in coating_types %}
+        <label class="coating-chip">
+          <input type="radio" name="coating_type" value="{{ key }}" {% if filters.coating_type == key %}checked{% endif %}>
+          <span class="swatch swatch-{{ key }}" title="{{ label }}"></span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="field"><span>Материал обработки</span>
+      <div class="wm-picker">
+        <label class="wm-chip">
+          <input type="radio" name="work_material" value="" {% if not filters.work_material %}checked{% endif %}>
+          <span class="wm-square wm-all">Все</span>
+        </label>
+        {% for key, label in work_material_types %}
+        <label class="wm-chip">
+          <input type="radio" name="work_material" value="{{ key }}" {% if filters.work_material == key %}checked{% endif %}>
+          <span class="wm-square wm-{{ key|lower }}" title="{{ label }}">{{ key }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% if not filters.category %}
+  <p class="muted" style="margin:8px 0 0 0;">Сначала выберите категорию инструмента, затем появятся фильтры этого типа.</p>
+  {% endif %}
+</form>
+
+<div class="table-wrap">
+  <table class="data-grid">
+    <thead>
+      <tr>
+        <th>Категория</th>
+        <th>Наименование</th>
+        <th>Параметры</th>
+        <th>Материал инструмента</th>
+        <th>Материал покрытия</th>
+        <th>Материал обработки</th>
+        <th>Остаток</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tool_items %}
+      <tr>
+        <td>{{ t.get_category_display }}</td>
+        <td>{{ t.name }}</td>
+        <td>
+          {% if t.category == "end_mill" and t.end_mill_spec %}
+            {{ t.end_mill_spec.get_mill_type_display }} | D{{ t.end_mill_spec.diameter_mm|default:"неизв." }} | R={{ t.end_mill_spec.corner_radius_mm|default:"0" }} | L={{ t.end_mill_spec.overall_length_mm|default:"неизв." }} | Lc={{ t.end_mill_spec.cutting_length_mm|default:"неизв." }} | Z={{ t.end_mill_spec.flutes_count|default:"неизв." }}
+          {% elif t.category == "tap" and t.tap_spec %}
+            {{ t.tap_spec.size_label|default:"Размер неизвестен" }} | {{ t.tap_spec.get_thread_standard_display }} | P={{ t.tap_spec.pitch_mm|default:"неизв." }} {% if t.tap_spec.tpi %}| TPI={{ t.tap_spec.tpi }}{% endif %} | {{ t.tap_spec.get_hole_type_display }} | {{ t.tap_spec.get_tap_type_display }}
+          {% endif %}
+        </td>
+        <td>{{ t.get_tool_material_display|default:"-" }}</td>
+        <td>{{ t.get_coating_type_display }}</td>
+        <td>
+          {% if t.work_material == "P" %}<span class="wm-badge wm-p">P</span>
+          {% elif t.work_material == "M" %}<span class="wm-badge wm-m">M</span>
+          {% elif t.work_material == "K" %}<span class="wm-badge wm-k">K</span>
+          {% elif t.work_material == "N" %}<span class="wm-badge wm-n">N</span>
+          {% elif t.work_material == "S" %}<span class="wm-badge wm-s">S</span>
+          {% elif t.work_material == "H" %}<span class="wm-badge wm-h">H</span>
+          {% else %}-{% endif %}
+          {{ t.get_work_material_display|default:"" }}
+        </td>
+        <td><strong>{{ t.quantity }}</strong></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if panel == "issue" %}
+<div class="filter-panel" id="issue-block">
+  <h3>Выдача инструмента</h3>
+  <form method="post" class="filter-grid">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="move_stock">
+    <label class="field"><span>Операция</span>
+      <select name="movement_type">
+        <option value="issue">Выдача</option>
+      </select>
+    </label>
+    <label class="field"><span>Тип инструмента</span>
+      <select class="js-tool-category" data-target-select="issue-tool-select">
+        <option value="">Все</option>
+        <option value="end_mill">Фрезы</option>
+        <option value="tap">Резьбовой инструмент</option>
+      </select>
+    </label>
+    <label class="field"><span>Инструмент</span>
+      <select id="issue-tool-select" name="tool_id" required>
+        <option value="">Выбрать...</option>
+        {% for t in movement_tool_options %}
+        <option value="{{ t.id }}" data-category="{{ t.category }}">
+          {{ t.get_category_display }}
+          {% if t.category == "end_mill" and t.end_mill_spec %}| {{ t.end_mill_spec.get_mill_type_display }}{% elif t.category == "tap" and t.tap_spec %}| {{ t.tap_spec.get_tap_type_display }}{% endif %}
+          | {{ t.name }} | остаток {{ t.quantity }}
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Количество</span><input type="number" name="quantity" min="1" required></label>
+    <label class="field"><span>Сотрудник (для выдачи)</span><input type="text" name="employee_name" placeholder="ФИО"></label>
+    <label class="field"><span>Дата</span><input type="date" name="movement_date" value="{{ today }}" required></label>
+    <label class="field"><span>Комментарий</span><input type="text" name="comment"></label>
+    <div class="filter-actions"><button type="submit" class="btn">Сохранить операцию</button></div>
+  </form>
+</div>
+{% endif %}
+
+{% if panel == "arrival" %}
+<div class="filter-panel" id="arrival-block">
+  <h3>Приход инструмента (автосовпадение)</h3>
+  <p class="muted" style="margin-top:0;">Укажи параметры пришедшего инструмента: если такая позиция уже есть, остаток увеличится; если нет — создастся новая.</p>
+  <form method="post" class="filter-grid">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="add_arrival_new">
+    <label class="field"><span>Категория инструмента</span>
+      <select class="js-new-arrival-category" name="new_category" required>
+        <option value="">Выбрать...</option>
+        <option value="end_mill">Фрезы</option>
+        <option value="tap">Резьбовой инструмент</option>
+      </select>
+    </label>
+    <label class="field"><span>Количество</span><input type="number" name="quantity" min="1" required></label>
+    <label class="field"><span>Дата</span><input type="date" name="movement_date" value="{{ today }}" required></label>
+    <label class="field"><span>Материал инструмента</span>
+      <select name="tool_material">
+        <option value="">Неизвестно</option>
+        {% for key, label in tool_material_types %}
+        <option value="{{ key }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="field">
+      <span>Материал покрытия</span>
+      <div class="coating-picker">
+        {% for key, label in coating_types %}
+        <label class="coating-chip">
+          <input type="radio" name="coating_type" value="{{ key }}" {% if key == "none" %}checked{% endif %}>
+          <span class="swatch swatch-{{ key }}" title="{{ label }}"></span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="field"><span>Материал обработки</span>
+      <div class="wm-picker">
+        <label class="wm-chip">
+          <input type="radio" name="work_material" value="" checked>
+          <span class="wm-square wm-all">?</span>
+        </label>
+        {% for key, label in work_material_types %}
+        <label class="wm-chip">
+          <input type="radio" name="work_material" value="{{ key }}">
+          <span class="wm-square wm-{{ key|lower }}" title="{{ label }}">{{ key }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <label class="field"><span>Комментарий</span><input type="text" name="comment" placeholder="Новый приход"></label>
+
+    <div class="arrival-subsection is-hidden" data-new-cat="end_mill">
+      <div class="filter-grid">
+        <label class="field"><span>Тип фрезы</span>
+          <select name="mill_type">
+            {% for key, label in end_mill_types %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field"><span>Диаметр, мм</span><input type="number" step="0.01" name="em_diameter_mm" placeholder="если неизвестно - пусто"></label>
+        <label class="field"><span>Радиус, мм</span><input type="number" step="0.01" name="em_corner_radius_mm" placeholder="0 или пусто = без радиуса"></label>
+        <label class="field"><span>Длина общая, мм</span><input type="number" step="0.01" name="em_overall_length_mm" placeholder="если неизвестно - пусто"></label>
+        <label class="field"><span>Длина реж. части, мм</span><input type="number" step="0.01" name="em_cutting_length_mm" placeholder="если неизвестно - пусто"></label>
+        <label class="field"><span>Количество кромок</span><input type="number" name="em_flutes_count" placeholder="если неизвестно - пусто"></label>
+      </div>
+    </div>
+
+    <div class="arrival-subsection is-hidden" data-new-cat="tap">
+      <div class="filter-grid">
+        <label class="field"><span>Стандарт резьбы</span>
+          <select name="thread_standard">
+            {% for key, label in thread_standards %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field"><span>Размер</span><input type="text" name="size_label" placeholder="M2, M2.5...; можно пусто"></label>
+        <label class="field"><span>Шаг, мм</span><input type="number" step="0.001" name="tap_pitch_mm" placeholder="если неизвестно - пусто"></label>
+        <label class="field"><span>TPI</span><input type="number" name="tap_tpi" placeholder="для дюймовой"></label>
+        <label class="field"><span>Тип отверстия</span>
+          <select name="hole_type">
+            {% for key, label in tap_hole_types %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field"><span>Тип резьбового инструмента</span>
+          <select name="tap_type">
+            {% for key, label in tap_tool_types %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field"><span>Длина общая, мм</span><input type="number" step="0.01" name="tap_overall_length_mm" placeholder="если неизвестно - пусто"></label>
+        <label class="field"><span>Длина реж. части, мм</span><input type="number" step="0.01" name="tap_cutting_length_mm" placeholder="если неизвестно - пусто"></label>
+      </div>
+    </div>
+    <div class="filter-actions"><button type="submit" class="btn">Оприходовать</button></div>
+  </form>
+</div>
+{% endif %}
+
+{% if panel == "issue_outcome" %}
+<div class="filter-panel" id="issue-outcome-block">
+  <h3>Списание / Возврат по выдаче</h3>
+  <p class="muted" style="margin-top:0;">Выбери конкретную выдачу и укажи, сколько вернулось и сколько списано.</p>
+  <form method="post" class="filter-grid">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="process_issue_outcome">
+    <label class="field"><span>Выданная позиция</span>
+      <select name="issue_id" required>
+        <option value="">Выбрать...</option>
+        {% for iss in issue_candidates %}
+        <option value="{{ iss.id }}">
+          #{{ iss.id }} | {{ iss.movement_date }} | {{ iss.tool.get_category_display }}
+          {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% endif %}
+          | {{ iss.tool.name }} | выдано {{ iss.quantity }} | осталось обработать {{ iss.remaining_qty }}
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Вернулось на склад, шт</span><input type="number" name="returned_qty" min="0" value="0"></label>
+    <label class="field"><span>Списано, шт</span><input type="number" name="writeoff_qty" min="0" value="0"></label>
+    <label class="field"><span>Сотрудник</span><input type="text" name="employee_name" placeholder="ФИО"></label>
+    <label class="field"><span>Дата</span><input type="date" name="movement_date" value="{{ today }}" required></label>
+    <label class="field"><span>Комментарий (обязательно)</span><input type="text" name="comment" placeholder="Причина списания/возврата" required></label>
+    <div class="filter-actions"><button type="submit" class="btn">Провести операцию</button></div>
+  </form>
+</div>
+{% endif %}
+
+{% if panel == "history" %}
+<h3 id="history-block">Последние движения</h3>
+<div class="table-wrap">
+  <table class="data-grid">
+    <thead><tr><th>Дата</th><th>Операция</th><th>Категория</th><th>Подтип</th><th>Инструмент</th><th>Количество</th><th>Сотрудник</th><th>Комментарий</th></tr></thead>
+    <tbody>
+      {% for m in movements %}
+      <tr>
+        <td>{{ m.movement_date }}</td>
+        <td>{{ m.get_movement_type_display }}</td>
+        <td>{{ m.tool.get_category_display }}</td>
+        <td>{% if m.tool.category == "end_mill" and m.tool.end_mill_spec %}{{ m.tool.end_mill_spec.get_mill_type_display }}{% elif m.tool.category == "tap" and m.tool.tap_spec %}{{ m.tool.tap_spec.get_tap_type_display }}{% else %}-{% endif %}</td>
+        <td>{{ m.tool.name }}</td>
+        <td>{{ m.quantity }}</td>
+        <td>{{ m.employee_name|default:"-" }}</td>
+        <td>{{ m.comment|default:"-" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="muted">Пока нет движений.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+<style>
+  .inventory-top-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 0 10px 0;
+  }
+  .inventory-top-actions .btn.is-active {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+    filter: brightness(1.1);
+  }
+  .arrival-subsection.is-hidden { display: none; }
+  .coating-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .coating-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .coating-chip input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    border: 2px solid #44557c;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+    display: inline-block;
+  }
+  .coating-chip input:checked + .swatch {
+    border-color: #9fb2ff;
+    box-shadow: 0 0 0 2px rgba(120, 146, 255, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+    transform: scale(1.06);
+  }
+  .swatch-all {
+    background: conic-gradient(from 90deg, #f6c343, #b8741e, #151515, #2877f0, #2fbc52, #a457d8, #f6c343);
+  }
+  .swatch-yellow { background: #f6c343; }
+  .swatch-brown { background: #8b5a2b; }
+  .swatch-black { background: #151515; }
+  .swatch-none {
+    background:
+      repeating-linear-gradient(-45deg, #e6ebfb 0 6px, #c4cde6 6px 12px);
+  }
+  .swatch-multicolor {
+    background: linear-gradient(120deg, #f44336 0%, #ff9800 20%, #ffeb3b 35%, #4caf50 52%, #2196f3 70%, #9c27b0 100%);
+  }
+  .swatch-blue { background: #2877f0; }
+  .swatch-other {
+    background:
+      linear-gradient(45deg, transparent 42%, #ff4f8b 42%, #ff4f8b 58%, transparent 58%),
+      linear-gradient(-45deg, transparent 42%, #5aa2ff 42%, #5aa2ff 58%, transparent 58%),
+      #2f3b57;
+  }
+  .wm-badge {
+    display: inline-block;
+    min-width: 20px;
+    text-align: center;
+    border-radius: 999px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-right: 6px;
+    color: #101520;
+  }
+  .wm-p { background: #3c8dff; color: #fff; }
+  .wm-m { background: #ffd648; }
+  .wm-k { background: #ff5b5b; color: #fff; }
+  .wm-n { background: #57d07a; }
+  .wm-s { background: #9b6a3b; color: #fff; }
+  .wm-h { background: #a7aab3; }
+  .wm-picker {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .wm-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .wm-chip input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .wm-square {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: 2px solid #44557c;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+    color: #0f1115;
+  }
+  .wm-chip input:checked + .wm-square {
+    border-color: #9fb2ff;
+    box-shadow: 0 0 0 2px rgba(120, 146, 255, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+    transform: scale(1.05);
+  }
+  .wm-all { background: #2a3656; color: #eaf0ff; width: 36px; }
+</style>
+<script>
+  (function () {
+    var categorySelects = document.querySelectorAll(".js-tool-category");
+    if (!categorySelects.length) return;
+
+    function filterToolOptions(categorySelect) {
+      var targetId = categorySelect.getAttribute("data-target-select");
+      if (!targetId) return;
+      var toolSelect = document.getElementById(targetId);
+      if (!toolSelect) return;
+      var selectedCategory = categorySelect.value;
+
+      Array.prototype.forEach.call(toolSelect.options, function (opt, idx) {
+        if (idx === 0) {
+          opt.hidden = false;
+          return;
+        }
+        var optionCategory = opt.getAttribute("data-category");
+        opt.hidden = !!selectedCategory && optionCategory !== selectedCategory;
+      });
+
+      if (toolSelect.selectedIndex > 0 && toolSelect.options[toolSelect.selectedIndex].hidden) {
+        toolSelect.selectedIndex = 0;
+      }
+    }
+
+    Array.prototype.forEach.call(categorySelects, function (select) {
+      select.addEventListener("change", function () { filterToolOptions(select); });
+      filterToolOptions(select);
+    });
+  })();
+  (function () {
+    var categorySelect = document.querySelector(".js-new-arrival-category");
+    if (!categorySelect) return;
+    var blocks = document.querySelectorAll(".arrival-subsection");
+    function syncCategory() {
+      var val = categorySelect.value;
+      Array.prototype.forEach.call(blocks, function (b) {
+        b.classList.toggle("is-hidden", b.getAttribute("data-new-cat") !== val);
+      });
+    }
+    categorySelect.addEventListener("change", syncCategory);
+    syncCategory();
+  })();
+</script>
+{% endblock %}

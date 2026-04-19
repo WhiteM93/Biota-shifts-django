@@ -3,6 +3,7 @@ from django.urls import path
 from . import cabinet_views
 from . import graph_views
 from . import hours_views
+from . import inventory_views
 from . import skud_views
 from . import views
 
@@ -19,6 +20,7 @@ urlpatterns = [
     path("skud/stats.xlsx", skud_views.skud_stats_excel, name="skud_stats_excel"),
     path("skud/stats.csv", skud_views.skud_stats_csv, name="skud_stats_csv"),
     path("skud/stats.pdf", skud_views.skud_stats_pdf, name="skud_stats_pdf"),
+    path("inventory/", inventory_views.inventory_view, name="inventory"),
     path("cabinet/", cabinet_views.cabinet_view, name="cabinet"),
     path("refresh-cache/", views.refresh_db_cache, name="refresh_cache"),
     path("accounts/login/", views.login_view, name="login"),
