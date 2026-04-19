@@ -79,6 +79,31 @@
 
 <hr style="border-color:#2b3650;margin:28px 0;">
 
+<h3>Порядок должностей (для Графика)</h3>
+<p class="muted">При сортировке «Сначала должность» строки упорядочиваются по этому списку, затем по отделу и фамилии.</p>
+<form method="post" action="">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="admin_pos_order">
+  <input type="hidden" name="pos_order_text" id="pos-order-text" value="">
+  <div class="dept-order-box">
+    <ul class="dept-order-list" id="pos-order-list">
+      {% for pos in pos_order_current %}
+      <li class="dept-item" data-dep="{{ pos }}" draggable="true">
+        <span class="dept-drag-handle" title="Перетащить">⋮⋮</span>
+        <span class="dept-name">{{ pos }}</span>
+        <span class="dept-item-actions">
+          <button type="button" class="btn dept-move" data-dir="up" title="Вверх">↑</button>
+          <button type="button" class="btn dept-move" data-dir="down" title="Вниз">↓</button>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  <p><button type="submit" class="btn">Сохранить порядок должностей</button></p>
+</form>
+
+<hr style="border-color:#2b3650;margin:28px 0;">
+
 <h3>Права пользователей</h3>
 <p class="muted">Новые аккаунты по умолчанию без доступа к сотрудникам, пока не назначены права.</p>
 {% if not priv_users %}
@@ -136,6 +161,15 @@
   {% else %}
   <p class="muted">Нет участков в справочнике.</p>
   {% endif %}
+  <p class="muted">Разделы меню (кроме «Главная» и личного кабинета): снимите галочки, чтобы скрыть разделы.</p>
+  <p style="display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;">
+    {% for row in priv_nav_rows %}
+    <label class="chk" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+      <input type="checkbox" name="priv_nav" value="{{ row.key }}" {% if row.on %}checked{% endif %}>
+      {{ row.label }}
+    </label>
+    {% endfor %}
+  </p>
   <p><button type="submit" class="btn">Сохранить права</button></p>
 </form>
 {% endif %}
@@ -242,72 +276,76 @@
 </style>
 <script>
   (function () {
-    var list = document.getElementById("dept-order-list");
-    var hidden = document.getElementById("dept-order-text");
-    if (!list || !hidden) return;
-    var draggedItem = null;
+    function initOrderList(listId, hiddenId) {
+      var list = document.getElementById(listId);
+      var hidden = document.getElementById(hiddenId);
+      if (!list || !hidden) return;
+      var draggedItem = null;
 
-    function syncHidden() {
-      var deps = [];
-      list.querySelectorAll(".dept-item").forEach(function (item) {
-        var dep = item.getAttribute("data-dep") || "";
-        if (dep.trim()) deps.push(dep.trim());
-      });
-      hidden.value = deps.join("\n");
-    }
-
-    list.addEventListener("click", function (event) {
-      var btn = event.target.closest(".dept-move");
-      if (!btn) return;
-      var item = btn.closest(".dept-item");
-      if (!item) return;
-      var dir = btn.getAttribute("data-dir");
-      if (dir === "up" && item.previousElementSibling) {
-        list.insertBefore(item, item.previousElementSibling);
-      } else if (dir === "down" && item.nextElementSibling) {
-        list.insertBefore(item.nextElementSibling, item);
+      function syncHidden() {
+        var vals = [];
+        list.querySelectorAll(".dept-item").forEach(function (item) {
+          var v = item.getAttribute("data-dep") || "";
+          if (v.trim()) vals.push(v.trim());
+        });
+        hidden.value = vals.join("\n");
       }
-      syncHidden();
-    });
 
-    function clearDragOver() {
-      list.querySelectorAll(".dept-item.drag-over").forEach(function (el) {
-        el.classList.remove("drag-over");
-      });
-    }
-
-    list.querySelectorAll(".dept-item").forEach(function (item) {
-      item.addEventListener("dragstart", function () {
-        draggedItem = item;
-        item.classList.add("dragging");
-      });
-      item.addEventListener("dragend", function () {
-        item.classList.remove("dragging");
-        clearDragOver();
-        draggedItem = null;
+      list.addEventListener("click", function (event) {
+        var btn = event.target.closest(".dept-move");
+        if (!btn) return;
+        var item = btn.closest(".dept-item");
+        if (!item) return;
+        var dir = btn.getAttribute("data-dir");
+        if (dir === "up" && item.previousElementSibling) {
+          list.insertBefore(item, item.previousElementSibling);
+        } else if (dir === "down" && item.nextElementSibling) {
+          list.insertBefore(item.nextElementSibling, item);
+        }
         syncHidden();
       });
-      item.addEventListener("dragover", function (event) {
-        event.preventDefault();
-        if (!draggedItem || draggedItem === item) return;
-        clearDragOver();
-        item.classList.add("drag-over");
-      });
-      item.addEventListener("drop", function (event) {
-        event.preventDefault();
-        if (!draggedItem || draggedItem === item) return;
-        clearDragOver();
-        var rect = item.getBoundingClientRect();
-        var dropAfter = event.clientY > rect.top + rect.height / 2;
-        if (dropAfter) {
-          item.insertAdjacentElement("afterend", draggedItem);
-        } else {
-          item.insertAdjacentElement("beforebegin", draggedItem);
-        }
-      });
-    });
 
-    syncHidden();
+      function clearDragOver() {
+        list.querySelectorAll(".dept-item.drag-over").forEach(function (el) {
+          el.classList.remove("drag-over");
+        });
+      }
+
+      list.querySelectorAll(".dept-item").forEach(function (item) {
+        item.addEventListener("dragstart", function () {
+          draggedItem = item;
+          item.classList.add("dragging");
+        });
+        item.addEventListener("dragend", function () {
+          item.classList.remove("dragging");
+          clearDragOver();
+          draggedItem = null;
+          syncHidden();
+        });
+        item.addEventListener("dragover", function (event) {
+          event.preventDefault();
+          if (!draggedItem || draggedItem === item) return;
+          clearDragOver();
+          item.classList.add("drag-over");
+        });
+        item.addEventListener("drop", function (event) {
+          event.preventDefault();
+          if (!draggedItem || draggedItem === item) return;
+          clearDragOver();
+          var rect = item.getBoundingClientRect();
+          var dropAfter = event.clientY > rect.top + rect.height / 2;
+          if (dropAfter) {
+            item.insertAdjacentElement("afterend", draggedItem);
+          } else {
+            item.insertAdjacentElement("beforebegin", draggedItem);
+          }
+        });
+      });
+
+      syncHidden();
+    }
+    initOrderList("dept-order-list", "dept-order-text");
+    initOrderList("pos-order-list", "pos-order-text");
   })();
 </script>
 

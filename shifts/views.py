@@ -16,6 +16,7 @@ from biota_shifts.auth import (
     _is_admin,
     _register_user,
     _resolve_registered_user,
+    nav_permissions_for_user,
 )
 from biota_shifts.config import APP_DIR
 from biota_shifts.constants import MONTH_NAMES_RU
@@ -187,6 +188,9 @@ def home_view(request):
     ctx["dash_year"] = y
     ctx["dash_month"] = m
     ctx["month_name"] = MONTH_NAMES_RU[m]
+
+    if not nav_permissions_for_user(user or "").get("skud", True):
+        return render(request, "shifts/home.html", ctx)
 
     _month_home = date(y, m, 1)
     _sd_h, _ed_h = biota_schedule.month_bounds(_month_home)

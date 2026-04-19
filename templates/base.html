@@ -227,11 +227,21 @@
     </form>
     {% endif %}
     <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">Главная</a>
+    {% if biota_nav.graph %}
     <a href="{% url 'graph' %}" class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' %}active{% endif %}">График</a>
+    {% endif %}
+    {% if biota_nav.hours %}
     <a href="{% url 'hours' %}" class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' %}active{% endif %}">Часы по дням</a>
+    {% endif %}
+    {% if biota_nav.skud %}
     <a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
+    {% endif %}
+    {% if biota_nav.inventory %}
     <a href="{% url 'inventory' %}" class="{% if request.resolver_match.url_name == 'inventory' %}active{% endif %}">Склад</a>
+    {% endif %}
+    {% if biota_nav.regulations %}
     <a href="{% url 'regulations_page' %}" class="{% if request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">Регламенты</a>
+    {% endif %}
     <span class="nav-spacer"></span>
     {% if biota_username %}
     <a href="{% url 'cabinet' %}" class="nav-user {% if request.resolver_match.url_name == 'cabinet' %}active{% endif %}">{{ biota_username }}</a>

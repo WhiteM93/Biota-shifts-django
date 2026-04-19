@@ -8,6 +8,7 @@ import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 from biota_shifts.config import APP_DIR
+from biota_shifts.schedule import is_schedule_day_column, schedule_column_to_date
 from biota_shifts.constants import (
     HOURS_GRID_NO_PUNCH,
     HOURS_GRID_SUFFIX_OUTSIDE_GRAPH,
@@ -73,19 +74,18 @@ def build_schedule_excel(df: pd.DataFrame, sheet_name: str = "График", yea
         if year is not None and month is not None:
             # weekday: Пн=0 ... Вс=6
             for col_idx, col_name in enumerate(df.columns, start=1):
-                if str(col_name).isdigit():
-                    day_num = int(col_name)
-                    if 1 <= day_num <= 31:
-                        wd = date(year, month, day_num).weekday()
-                        if wd in (5, 6):
-                            cell = ws.cell(row=1, column=col_idx)
-                            cell.fill = weekend_header_fill
-                            cell.font = Font(color="000000", bold=True)
+                dt = schedule_column_to_date(str(col_name), year, month)
+                if dt is not None:
+                    wd = dt.weekday()
+                    if wd in (5, 6):
+                        cell = ws.cell(row=1, column=col_idx)
+                        cell.fill = weekend_header_fill
+                        cell.font = Font(color="000000", bold=True)
 
         ws.freeze_panes = "D2"
         ws.auto_filter.ref = ws.dimensions
 
-        day_cols = [idx for idx, name in enumerate(df.columns, start=1) if str(name).isdigit()]
+        day_cols = [idx for idx, name in enumerate(df.columns, start=1) if is_schedule_day_column(name)]
         for row in range(2, ws.max_row + 1):
             for col_idx in day_cols:
                 cell = ws.cell(row=row, column=col_idx)
@@ -127,7 +127,7 @@ def build_schedule_excel(df: pd.DataFrame, sheet_name: str = "График", yea
         employee_width_units = int(round(180 / 7))
 
         for idx, col_name in enumerate(df.columns, start=1):
-            if str(col_name).isdigit():
+            if is_schedule_day_column(col_name):
                 width = day_width_units
             elif col_name == "Сотрудник":
                 width = employee_width_units

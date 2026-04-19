@@ -15,15 +15,18 @@ from biota_shifts import export as biota_export
 from biota_shifts import schedule as biota_schedule
 from biota_shifts.auth import _filter_employees_for_user, _is_admin
 
-from shifts.auth_utils import biota_login_required, biota_user
+from shifts.auth_utils import biota_login_required, biota_user, nav_permission_required
 from shifts.department_order import apply_department_order, load_department_order
 from shifts.graph_views import (
     DEPT_COLOR_CLASSES,
     _dept_rank_map,
     _extract_selected_deps,
+    _parse_sort_mode,
+    _pos_rank_map,
     _schedule_with_department,
     _sort_graph_rows,
 )
+from shifts.position_order import apply_position_order, load_position_order
 
 from .models import RegulationPlan
 
@@ -227,6 +230,42 @@ def _scale_slots_30min() -> list[dict]:
     return slots
 
 
+def _sync_regulation_catalog_fields(plan_date: date, employees_df) -> int:
+    """Подставить актуальные ФИО, отдел и должность из Biota в строки регламента."""
+    if employees_df is None or getattr(employees_df, "empty", True):
+        return 0
+    by_code: dict[str, tuple[str, str, str]] = {}
+    for _, row in employees_df.iterrows():
+        code = str(row.get("emp_code") or "").strip()
+        if not code:
+            continue
+        ln = str(row.get("last_name") or "").strip()
+        fn = str(row.get("first_name") or "").strip()
+        name = f"{ln} {fn}".strip() or code
+        dept = str(row.get("department_name") or "").strip()
+        pos = str(row.get("position_name") or "").strip()
+        by_code[code] = (name, dept, pos)
+    updated = 0
+    for obj in RegulationPlan.objects.filter(plan_date=plan_date):
+        info = by_code.get(str(obj.employee_code).strip())
+        if not info:
+            continue
+        name, dept, pos = info
+        if (
+            (obj.employee_name or "") == name
+            and (obj.department or "") == dept
+            and (obj.position or "") == pos
+        ):
+            continue
+        RegulationPlan.objects.filter(pk=obj.pk).update(
+            employee_name=name,
+            department=dept,
+            position=pos,
+        )
+        updated += 1
+    return updated
+
+
 def _row_json(o: RegulationPlan) -> dict:
     return {
         "id": o.pk,
@@ -261,17 +300,22 @@ def _regulation_plans_and_colors(
     if shift not in ("д", "н"):
         shift = "д"
     base_all = list(RegulationPlan.objects.filter(plan_date=plan_date))
-    base = [o for o in base_all if o.shift == shift]
-    if not base:
-        return [], {}
+    employees_df = None
     try:
         employees_df = _employees_for_user(request)
     except Exception:
+        employees_df = None
+    if employees_df is not None and not getattr(employees_df, "empty", True):
+        active_codes = set(employees_df["emp_code"].astype(str).str.strip())
+        base_all = [o for o in base_all if str(o.employee_code).strip() in active_codes]
+    base = [o for o in base_all if o.shift == shift]
+    if not base:
+        return [], {}
+    if employees_df is None:
         base.sort(key=lambda o: (o.employee_name.lower(), o.employee_code))
         return base, _fallback_dep_color_map(base)
     if employees_df.empty:
-        base.sort(key=lambda o: (o.employee_name.lower(), o.employee_code))
-        return base, _fallback_dep_color_map(base)
+        return [], {}
     try:
         y, m = plan_date.year, plan_date.month
         schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
@@ -283,10 +327,18 @@ def _regulation_plans_and_colors(
         dep_color_map = _dept_color_map_from_list(all_deps)
         selected_deps, dep_mode = _extract_selected_deps(request, all_deps, from_post=False)
         dep_rank = _dept_rank_map(all_deps)
+        all_positions = apply_position_order(
+            sorted(schedule_df["Должность"].unique().tolist()),
+            load_position_order(),
+        )
+        pos_rank = _pos_rank_map(all_positions)
+        sort_mode = _parse_sort_mode(request, from_post=False)
         if not selected_deps:
             return [], dep_color_map
         schedule_df = schedule_df[schedule_df["Отдел"].isin(selected_deps)].copy()
-        schedule_df = _sort_graph_rows(schedule_df, dep_rank).reset_index(drop=True)
+        schedule_df = _sort_graph_rows(
+            schedule_df, dep_rank, pos_rank, sort_mode=sort_mode
+        ).reset_index(drop=True)
         code_order = [str(c).strip() for c in schedule_df["Код"].tolist()]
     except Exception:
         base.sort(key=lambda o: (o.employee_name.lower(), o.employee_code))
@@ -336,6 +388,7 @@ def _regulation_timeline_export_rows(
 
 
 @biota_login_required
+@nav_permission_required("regulations")
 @require_http_methods(["GET"])
 def regulations_excel(request):
     plan_date = _resolve_plan_date(request)
@@ -358,6 +411,7 @@ def regulations_excel(request):
 
 
 @biota_login_required
+@nav_permission_required("regulations")
 @require_http_methods(["GET"])
 def regulations_pdf(request):
     plan_date = _resolve_plan_date(request)
@@ -380,6 +434,7 @@ def regulations_pdf(request):
 
 @ensure_csrf_cookie
 @biota_login_required
+@nav_permission_required("regulations")
 @require_http_methods(["GET", "POST"])
 def regulation_page(request):
     plan_date = _resolve_plan_date(request)
@@ -425,6 +480,16 @@ def regulation_page(request):
                 request,
                 f"Для этого месяца не было строк — скопировано из прошлого месяца: {seeded}.",
             )
+        try:
+            employees_sync = _employees_for_user(request)
+            n_sync = _sync_regulation_catalog_fields(plan_date, employees_sync)
+            if n_sync:
+                messages.info(
+                    request,
+                    f"Обновлено из справочника Biota: {n_sync} строк (ФИО, отдел, должность).",
+                )
+        except Exception:
+            pass
 
     plans, dep_color_map = _regulation_plans_and_colors(
         plan_date, request, shift=reg_shift
@@ -467,6 +532,7 @@ def regulation_page(request):
 
 @csrf_protect
 @biota_login_required
+@nav_permission_required("regulations")
 @require_POST
 def regulations_api_save(request):
     try:
@@ -516,6 +582,7 @@ def regulations_api_save(request):
 
 @csrf_protect
 @biota_login_required
+@nav_permission_required("regulations")
 @require_POST
 def regulations_api_meta(request):
     """Переключение замка и 8-часовой смены (без сохранения шкалы)."""

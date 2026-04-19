@@ -406,6 +406,36 @@ def _filter_employees_for_user(full_df: pd.DataFrame, username: str) -> pd.DataF
     return full_df.iloc[0:0].copy()
 
 
+# Разделы меню Django (кроме «Главная» и личного кабинета): права в JSON users.*.nav
+NAV_KEYS = ("graph", "hours", "skud", "inventory", "regulations")
+NAV_LABELS_RU = {
+    "graph": "График",
+    "hours": "Часы по дням",
+    "skud": "СКУД",
+    "inventory": "Склад",
+    "regulations": "Регламенты",
+}
+
+
+def nav_permissions_for_user(username: str | None) -> dict[str, bool]:
+    """Какие пункты меню доступны. Админ — всё. Если в store нет nav — все разделы разрешены (обратная совместимость)."""
+    defaults = {k: True for k in NAV_KEYS}
+    u = (username or "").strip()
+    if not u:
+        return defaults.copy()
+    if _is_admin(u):
+        return defaults.copy()
+    rec = _resolve_registered_user(u) or {}
+    nav = rec.get("nav")
+    if not isinstance(nav, dict):
+        return defaults.copy()
+    out = defaults.copy()
+    for k in NAV_KEYS:
+        if k in nav:
+            out[k] = bool(nav[k])
+    return out
+
+
 def _access_scope_description(rec: dict) -> str:
     scope = _user_access_scope_value(rec)
     if scope in ("none", ""):
@@ -426,6 +456,8 @@ def _set_user_privileges(
     scope: str,
     allowed_departments,
     allowed_areas,
+    *,
+    nav: dict[str, bool] | None = None,
 ) -> tuple[bool, str]:
     if scope not in ("none", "all", "department", "area"):
         return False, "Неверный тип доступа"
@@ -440,6 +472,8 @@ def _set_user_privileges(
     rec["allowed_areas"] = ars if scope == "area" else []
     rec["allowed_department"] = ""
     rec["allowed_area"] = ""
+    if nav is not None:
+        rec["nav"] = {k: bool(nav.get(k, True)) for k in NAV_KEYS}
     store[target_username] = rec
     _save_users_store(store)
     return True, ""

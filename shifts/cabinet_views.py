@@ -6,6 +6,8 @@ from django.views.decorators.http import require_http_methods
 from biota_shifts import db as biota_db
 from biota_shifts.auth import (
     ADMIN_USERNAME,
+    NAV_KEYS,
+    NAV_LABELS_RU,
     _access_scope_description,
     _allowed_areas_list,
     _allowed_departments_list,
@@ -18,8 +20,10 @@ from biota_shifts.auth import (
     _set_user_privileges,
     _update_registered_profile,
     _user_access_scope_value,
+    nav_permissions_for_user,
 )
 from .department_order import apply_department_order, load_department_order, save_department_order
+from .position_order import apply_position_order, load_position_order, save_position_order
 from .db_health import collect_system_health
 
 from .auth_utils import biota_login_required, biota_user
@@ -76,7 +80,9 @@ def cabinet_view(request):
                     scope = "none"
                 deps = request.POST.getlist("priv_dep")
                 areas = request.POST.getlist("priv_area")
-                ok, err = _set_user_privileges(target, scope, deps, areas)
+                sel_nav = request.POST.getlist("priv_nav")
+                nav_map = {k: (k in sel_nav) for k in NAV_KEYS}
+                ok, err = _set_user_privileges(target, scope, deps, areas, nav=nav_map)
                 if ok:
                     messages.success(request, "Права сохранены.")
                 else:
@@ -98,6 +104,15 @@ def cabinet_view(request):
                 cleaned = [p for p in parts if p and p in allowed]
                 save_department_order(cleaned)
                 messages.success(request, "Порядок отделов сохранен.")
+                return redirect("cabinet")
+            if action == "admin_pos_order":
+                raw = request.POST.get("pos_order_text") or ""
+                parts = [p.strip() for p in raw.replace("\r", "\n").replace(",", "\n").split("\n")]
+                pos_opts = sorted(employees_full["position_name"].unique().tolist()) if not employees_full.empty else []
+                allowed = set(pos_opts)
+                cleaned = [p for p in parts if p and p in allowed]
+                save_position_order(cleaned)
+                messages.success(request, "Порядок должностей сохранен.")
                 return redirect("cabinet")
         else:
             if action == "profile":
@@ -146,10 +161,15 @@ def cabinet_view(request):
         ctx["priv_users"] = sorted(priv_store.keys())
         dep_opts = sorted(employees_full["department_name"].unique().tolist()) if not employees_full.empty else []
         dep_order = apply_department_order(dep_opts, load_department_order())
+        pos_opts = sorted(employees_full["position_name"].unique().tolist()) if not employees_full.empty else []
+        pos_order = apply_position_order(pos_opts, load_position_order())
         area_opts = _distinct_area_tokens(employees_full["area_name"]) if not employees_full.empty else []
         ctx["dep_opts"] = dep_opts
         ctx["dep_order_current"] = dep_order
         ctx["dep_order_text"] = "\n".join(dep_order)
+        ctx["pos_opts"] = pos_opts
+        ctx["pos_order_current"] = pos_order
+        ctx["pos_order_text"] = "\n".join(pos_order)
         ctx["area_opts"] = area_opts
         sel = (request.GET.get("priv_user") or "").strip()
         if sel not in priv_store and ctx["priv_users"]:
@@ -163,6 +183,11 @@ def cabinet_view(request):
         ctx["priv_dep_selected"] = [x for x in _allowed_departments_list(pr) if x in dep_opts]
         ctx["priv_area_selected"] = [x for x in _allowed_areas_list(pr) if x in area_opts]
         ctx["scope_choices"] = [(s, _SCOPE_LABELS[s]) for s in _SCOPE_OPTIONS]
+        _pn = nav_permissions_for_user(ctx["priv_selected"]) if ctx["priv_selected"] else {k: True for k in NAV_KEYS}
+        ctx["priv_nav"] = _pn
+        ctx["priv_nav_rows"] = [
+            {"key": k, "label": NAV_LABELS_RU[k], "on": _pn.get(k, True)} for k in NAV_KEYS
+        ]
     else:
         rec = _resolve_registered_user(user) or {}
         ctx["profile_login"] = user

@@ -12,9 +12,16 @@ from biota_shifts.auth import _filter_employees_for_user, _is_admin
 from biota_shifts.constants import MONTH_NAMES_RU, SCHEDULE_CODES
 from biota_shifts import export as biota_export
 from biota_shifts import schedule as biota_schedule
+from biota_shifts.schedule import (
+    PREV_MONTH_KEYS,
+    is_schedule_day_column,
+    schedule_column_to_date,
+    sort_schedule_day_columns,
+)
 
-from .auth_utils import biota_login_required, biota_user
+from .auth_utils import biota_login_required, biota_user, nav_permission_required
 from .department_order import apply_department_order, load_department_order
+from .position_order import apply_position_order, load_position_order
 from .ru_work_calendar import is_ru_non_working_day
 
 
@@ -61,6 +68,12 @@ def _schedule_with_department(schedule_df, employees_df):
     out = schedule_df.copy()
     out["Отдел"] = out["Код"].astype(str).map(dep_map).fillna("")
     out["Отдел"] = out["Отдел"].apply(lambda v: v if str(v).strip() else "Без отдела")
+    pos_map = {
+        str(r["emp_code"]): str(r.get("position_name") or "").strip()
+        for _, r in employees_df.iterrows()
+    }
+    out["Должность"] = out["Код"].astype(str).map(pos_map).fillna("")
+    out["Должность"] = out["Должность"].apply(lambda v: v if str(v).strip() else "Без должности")
     last_map = {
         str(r["emp_code"]): str(r.get("last_name", "") or "").strip() for _, r in employees_df.iterrows()
     }
@@ -87,19 +100,38 @@ def _dept_rank_map(all_deps: list[str]) -> dict[str, int]:
     return {d: i for i, d in enumerate(all_deps)}
 
 
-def _sort_graph_rows(df, dep_rank: dict[str, int]):
+def _pos_rank_map(all_positions: list[str]) -> dict[str, int]:
+    return {p: i for i, p in enumerate(all_positions)}
+
+
+def _parse_sort_mode(request, *, from_post: bool) -> str:
+    source = request.POST if from_post else request.GET
+    s = (source.get("sort_mode") or "dept").strip().lower()
+    return "pos" if s == "pos" else "dept"
+
+
+def _sort_graph_rows(
+    df,
+    dep_rank: dict[str, int],
+    pos_rank: dict[str, int],
+    *,
+    sort_mode: str = "dept",
+):
     out = df.copy()
     out["_dep_rank"] = out["Отдел"].map(lambda d: dep_rank.get(str(d), 10_000))
+    out["_pos_rank"] = out["Должность"].map(lambda p: pos_rank.get(str(p), 10_000))
     out["_ln_sort"] = out["_last_name"].astype(str).str.lower()
     out["_fn_sort"] = out["_first_name"].astype(str).str.lower()
     out["_name_sort"] = out["Сотрудник"].astype(str).str.lower()
-    return out.sort_values(
-        ["_dep_rank", "_ln_sort", "_fn_sort", "_name_sort", "Код"],
-        kind="stable",
-    )
+    if sort_mode == "pos":
+        keys = ["_pos_rank", "_dep_rank", "_ln_sort", "_fn_sort", "_name_sort", "Код"]
+    else:
+        keys = ["_dep_rank", "_pos_rank", "_ln_sort", "_fn_sort", "_name_sort", "Код"]
+    return out.sort_values(keys, kind="stable")
 
 
 @biota_login_required
+@nav_permission_required("graph")
 @require_http_methods(["GET", "POST"])
 def graph_view(request):
     now = datetime.now()
@@ -130,23 +162,27 @@ def graph_view(request):
     if request.method == "POST":
         action = (request.POST.get("action") or "save").strip().lower()
         y, m = _parse_year_month(request, default_year=default_y, default_month=default_m)
+        sort_mode = _parse_sort_mode(request, from_post=True)
 
         if action == "upload":
             upl = request.FILES.get("schedule_file")
             if not upl:
                 messages.error(request, "Выберите файл .xlsx")
-                return redirect(f"/graph/?year={y}&month={m}")
+                return redirect(f"/graph/?year={y}&month={m}&sort_mode={sort_mode}")
             try:
                 raw = upl.read()
                 xl_imp = biota_schedule.read_schedule_sheet_from_bytes(raw)
                 imported = biota_schedule.normalize_schedule_excel(xl_imp, employees_df, y, m)
+                imported = biota_schedule.apply_prev_month_tail_from_previous_schedule(
+                    imported, employees_df, y, m
+                )
                 biota_schedule.save_schedule_table(imported, y, m)
                 messages.success(request, f"График загружен из файла ({upl.name}).")
             except ValueError as err:
                 messages.error(request, str(err))
             except Exception as exc:
                 messages.error(request, f"Не удалось прочитать файл: {exc}")
-            return redirect(f"/graph/?year={y}&month={m}")
+            return redirect(f"/graph/?year={y}&month={m}&sort_mode={sort_mode}")
 
         # save
         full_schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
@@ -155,16 +191,24 @@ def graph_view(request):
             sorted(schedule_df["Отдел"].unique().tolist()),
             load_department_order(),
         )
+        all_positions = apply_position_order(
+            sorted(schedule_df["Должность"].unique().tolist()),
+            load_position_order(),
+        )
         selected_deps, _dep_mode = _extract_selected_deps(request, all_deps, from_post=True)
         dep_rank = _dept_rank_map(all_deps)
+        pos_rank = _pos_rank_map(all_positions)
         filtered = schedule_df[schedule_df["Отдел"].isin(selected_deps)].copy()
-        filtered = _sort_graph_rows(filtered, dep_rank)
+        filtered = _sort_graph_rows(filtered, dep_rank, pos_rank, sort_mode=sort_mode)
 
-        day_columns = [c for c in full_schedule_df.columns if str(c).isdigit()]
-        day_columns = sorted(day_columns, key=lambda x: int(x))
+        day_columns = sort_schedule_day_columns(
+            [c for c in full_schedule_df.columns if is_schedule_day_column(c)], y, m
+        )
         for i, row in enumerate(filtered.itertuples(index=True)):
             base_idx = int(row.Index)
             for d in day_columns:
+                if str(d) in PREV_MONTH_KEYS:
+                    continue
                 key = f"cell_{i}_{d}"
                 if key not in request.POST:
                     continue
@@ -172,45 +216,97 @@ def graph_view(request):
                 if raw not in SCHEDULE_CODES:
                     raw = ""
                 full_schedule_df.at[base_idx, d] = raw
+        full_schedule_df = biota_schedule.apply_prev_month_tail_from_previous_schedule(
+            full_schedule_df, employees_df, y, m
+        )
         full_schedule_df = full_schedule_df.sort_values(["Порядок", "Код"]).reset_index(drop=True)
         saved_path = biota_schedule.save_schedule_table(full_schedule_df, y, m)
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return JsonResponse({"ok": True, "saved": saved_path.name})
         messages.success(request, f"Сохранено: {saved_path.name}")
-        return redirect(f"/graph/?year={y}&month={m}")
+        return redirect(f"/graph/?year={y}&month={m}&sort_mode={sort_mode}")
 
     # GET
     y, m = _parse_year_month(request, default_year=default_y, default_month=default_m)
+    sort_mode = _parse_sort_mode(request, from_post=False)
     schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
     schedule_df = _schedule_with_department(schedule_df, employees_df)
     all_deps = apply_department_order(
         sorted(schedule_df["Отдел"].unique().tolist()),
         load_department_order(),
     )
+    all_positions = apply_position_order(
+        sorted(schedule_df["Должность"].unique().tolist()),
+        load_position_order(),
+    )
     selected_deps, dep_mode = _extract_selected_deps(request, all_deps, from_post=False)
     dep_rank = _dept_rank_map(all_deps)
+    pos_rank = _pos_rank_map(all_positions)
     schedule_df = schedule_df[schedule_df["Отдел"].isin(selected_deps)].copy()
-    schedule_df = _sort_graph_rows(schedule_df, dep_rank).reset_index(drop=True)
+    schedule_df = _sort_graph_rows(schedule_df, dep_rank, pos_rank, sort_mode=sort_mode).reset_index(drop=True)
 
     dep_color_map = {
         dep: DEPT_COLOR_CLASSES[i % len(DEPT_COLOR_CLASSES)] for i, dep in enumerate(all_deps)
     }
-    day_columns = [c for c in schedule_df.columns if str(c).isdigit()]
-    day_columns = sorted(day_columns, key=lambda x: int(x))
-    day_headers: list[tuple[str, str, bool]] = []
+    day_columns = sort_schedule_day_columns(
+        [c for c in schedule_df.columns if is_schedule_day_column(c)], y, m
+    )
+    today = date.today()
+    day_headers: list[dict] = []
     non_working_days: list[str] = []
+    day_shift_counts: list[dict] = []
     for d in day_columns:
-        di = int(d)
-        day_date = date(y, m, di)
-        is_non_working = is_ru_non_working_day(day_date)
-        day_headers.append((d, str(d), is_non_working))
+        col_key = str(d)
+        day_date = schedule_column_to_date(col_key, y, m)
+        is_prev = col_key in PREV_MONTH_KEYS
+        label = str(day_date.day) if day_date else col_key
+        if is_prev and day_date:
+            label = f"{day_date.day}.{day_date.month:02d}"
+        is_non_working = bool(day_date) and is_ru_non_working_day(day_date)
+        is_today = bool(day_date) and day_date == today
+        day_headers.append(
+            {
+                "key": col_key,
+                "label": label,
+                "is_non_working": is_non_working,
+                "is_prev_month": is_prev,
+                "is_today": is_today,
+            }
+        )
         if is_non_working:
-            non_working_days.append(str(d))
+            non_working_days.append(col_key)
+        d_cnt = n_cnt = 0
+        if col_key in schedule_df.columns:
+            for _, row in schedule_df.iterrows():
+                v = str(row.get(col_key, "") or "").strip().lower()
+                if v == "д":
+                    d_cnt += 1
+                elif v == "н":
+                    n_cnt += 1
+        day_shift_counts.append({"d": d_cnt, "n": n_cnt})
 
+    for i, h in enumerate(day_headers):
+        if i < len(day_shift_counts):
+            h["d_count"] = day_shift_counts[i]["d"]
+            h["n_count"] = day_shift_counts[i]["n"]
+        else:
+            h["d_count"] = h["n_count"] = 0
+
+    col_meta = {str(h["key"]): h for h in day_headers}
     table_rows: list[dict] = []
     for i in range(len(schedule_df)):
         row = schedule_df.iloc[i]
-        day_cells = [(d, str(row.get(d, "") or "")) for d in day_columns]
+        day_cells: list[dict] = []
+        for d in day_columns:
+            meta = col_meta.get(str(d), {})
+            day_cells.append(
+                {
+                    "key": str(d),
+                    "val": str(row.get(d, "") or ""),
+                    "is_prev_month": bool(meta.get("is_prev_month")),
+                    "is_today": bool(meta.get("is_today")),
+                }
+            )
         table_rows.append(
             {
                 "i": i,
@@ -236,6 +332,7 @@ def graph_view(request):
             "all_deps": all_deps,
             "sel_deps": selected_deps,
             "dep_mode_pick": dep_mode != "all",
+            "sort_mode": sort_mode,
             "day_headers": day_headers,
             "non_working_days": non_working_days,
             "table_rows": table_rows,
@@ -244,6 +341,7 @@ def graph_view(request):
 
 
 @biota_login_required
+@nav_permission_required("graph")
 def graph_download(request):
     now = datetime.now()
     y, m = _parse_year_month(request, default_year=now.year, default_month=now.month)

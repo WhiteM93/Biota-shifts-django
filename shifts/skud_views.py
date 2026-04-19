@@ -17,7 +17,7 @@ from biota_shifts.constants import MONTH_NAMES_RU
 from biota_shifts import schedule as biota_schedule
 from biota_shifts.schedule import employee_label_row
 
-from .auth_utils import biota_login_required, biota_user
+from .auth_utils import biota_login_required, biota_user, nav_permission_required
 
 
 def _fmt_minutes_human(v) -> str:
@@ -195,6 +195,7 @@ def _skud_empty_shell(request, employees_df: pd.DataFrame, fmeta: dict, err: str
 
 
 @biota_login_required
+@nav_permission_required("skud")
 def skud_view(request):
     try:
         employees_df = _employees_for_user(request)
@@ -227,6 +228,7 @@ def _safe_filename_part(s: str) -> str:
 
 
 @biota_login_required
+@nav_permission_required("skud")
 def skud_punches_csv(request):
     employees_df = _employees_for_user(request)
     if employees_df.empty:
@@ -254,6 +256,7 @@ def skud_punches_csv(request):
 
 
 @biota_login_required
+@nav_permission_required("skud")
 def skud_stats_excel(request):
     employees_df = _employees_for_user(request)
     if employees_df.empty:
@@ -285,6 +288,7 @@ def skud_stats_excel(request):
 
 
 @biota_login_required
+@nav_permission_required("skud")
 def skud_stats_csv(request):
     employees_df = _employees_for_user(request)
     if employees_df.empty:
@@ -313,6 +317,7 @@ def skud_stats_csv(request):
 
 
 @biota_login_required
+@nav_permission_required("skud")
 def skud_stats_pdf(request):
     employees_df = _employees_for_user(request)
     if employees_df.empty:

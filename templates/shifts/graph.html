@@ -2,6 +2,33 @@
 
 {% block content %}
 <div class="graph-page" id="graph-page-root">
+
+<div class="graph-top-strip">
+<div class="graph-actions">
+  <div class="graph-action-card">
+    <span class="graph-action-title">Экспорт</span>
+    <a class="btn" href="{% url 'graph_download' %}?year={{ year }}&month={{ month }}">Скачать Excel</a>
+  </div>
+  <form method="post" action="" enctype="multipart/form-data" class="graph-upload-form graph-action-card">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="upload">
+    <input type="hidden" name="year" value="{{ year }}">
+    <input type="hidden" name="month" value="{{ month }}">
+    <input type="hidden" name="sort_mode" value="{{ sort_mode }}">
+    <span class="graph-action-title">Импорт</span>
+    <div class="graph-upload-row">
+      <input type="file" name="schedule_file" accept=".xlsx" required>
+      <button type="submit" class="btn">Загрузить в систему</button>
+    </div>
+  </form>
+</div>
+<div class="graph-top-tools">
+  <button type="button" class="btn btn-print-sheet" id="graph-print-btn" title="Печать или «Сохранить как PDF» в диалоге браузера">Печать</button>
+  <button type="button" class="btn btn-png-export" id="graph-png-btn" title="Снимок таблицы в тёмном оформлении (PNG)">PNG (тёмная тема)</button>
+  <button type="button" class="btn btn-theme-light-toggle" id="graph-theme-toggle" title="Удобно для скриншота и печати">Светлая тема</button>
+</div>
+</div>
+
 <p class="muted">{{ month_name|capfirst }} {{ year }} — допустимые коды: <strong>д</strong>, <strong>н</strong>, <strong>от</strong>, <strong>б</strong>, <strong>п</strong>, <strong>кп</strong> или пусто.</p>
 
 <form method="get" action="" class="filter-panel auto-submit-form">
@@ -25,6 +52,11 @@
   </div>
   </div>
   <div class="mode-row">
+    <span class="label">Сортировка:</span>
+    <label class="inline"><input type="radio" name="sort_mode" value="dept" {% if sort_mode != "pos" %}checked{% endif %}> Сначала отдел</label>
+    <label class="inline"><input type="radio" name="sort_mode" value="pos" {% if sort_mode == "pos" %}checked{% endif %}> Сначала должность</label>
+  </div>
+  <div class="mode-row">
     <span class="label">Отделы:</span>
     <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not dep_mode_pick %}checked{% endif %}> Все</label>
     <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if dep_mode_pick %}checked{% endif %}> По списку</label>
@@ -37,38 +69,31 @@
   </div>
 </form>
 
-<div class="graph-actions">
-  <div class="graph-action-card">
-    <span class="graph-action-title">Экспорт</span>
-    <a class="btn" href="{% url 'graph_download' %}?year={{ year }}&month={{ month }}">Скачать Excel</a>
+<div class="graph-body">
+<aside class="graph-side-toolbar" id="graph-side-toolbar" aria-label="Редактирование графика">
+  <button type="button" class="btn btn-edit-unlock graph-side-toolbar__edit" id="graph-edit-toggle">Включить редактирование</button>
+  <p class="graph-edit-hint" id="graph-edit-hint">График только для просмотра. Включите редактирование, чтобы менять ячейки.</p>
+  <div class="graph-code-palette" id="graph-code-palette" aria-label="Код для ячеек" hidden>
+    <span class="graph-code-palette__label">Заполнение</span>
+    <button type="button" class="graph-code-btn graph-code-btn--d" data-code="д" title="Дневная смена">д</button>
+    <button type="button" class="graph-code-btn graph-code-btn--n" data-code="н" title="Ночная смена">н</button>
+    <button type="button" class="graph-code-btn graph-code-btn--ot" data-code="от" title="Отпуск">от</button>
+    <button type="button" class="graph-code-btn graph-code-btn--b" data-code="б" title="Больничный">б</button>
+    <button type="button" class="graph-code-btn graph-code-btn--p" data-code="п" title="Прогул">п</button>
+    <button type="button" class="graph-code-btn graph-code-btn--kp" data-code="кп" title="Компенсация">кп</button>
+    <button type="button" class="graph-code-btn graph-code-btn--clear" data-code="" title="Очистить ячейку">пусто</button>
+    <button type="button" class="graph-code-btn graph-code-btn--keyboard" data-brush="keyboard" title="Ввод с клавиатуры без палитры">⌨ Клавиатура</button>
   </div>
-  <form method="post" action="" enctype="multipart/form-data" class="graph-upload-form graph-action-card">
-    {% csrf_token %}
-    <input type="hidden" name="action" value="upload">
-    <input type="hidden" name="year" value="{{ year }}">
-    <input type="hidden" name="month" value="{{ month }}">
-    <span class="graph-action-title">Импорт</span>
-    <div class="graph-upload-row">
-      <input type="file" name="schedule_file" accept=".xlsx" required>
-      <button type="submit" class="btn">Загрузить в систему</button>
-    </div>
-  </form>
-</div>
+</aside>
 
-<div class="graph-edit-bar">
-  <button type="button" class="btn btn-print-sheet" id="graph-print-btn" title="Печать или «Сохранить как PDF» в диалоге браузера">Печать</button>
-  <button type="button" class="btn btn-png-export" id="graph-png-btn" title="Снимок таблицы в тёмном оформлении (PNG)">PNG (тёмная тема)</button>
-  <button type="button" class="btn btn-theme-light-toggle" id="graph-theme-toggle" title="Удобно для скриншота и печати">Светлая тема</button>
-  <button type="button" class="btn btn-edit-unlock" id="graph-edit-toggle">Включить редактирование</button>
-  <span class="muted graph-edit-hint" id="graph-edit-hint">График только для просмотра. Включите редактирование, чтобы менять ячейки.</span>
-</div>
-
+<div class="graph-main-column">
 <div class="schedule-wrap">
 <form method="post" action="" id="graph-save-form" class="graph-form--readonly">
   {% csrf_token %}
   <input type="hidden" name="action" value="save">
   <input type="hidden" name="year" value="{{ year }}">
   <input type="hidden" name="month" value="{{ month }}">
+  <input type="hidden" name="sort_mode" value="{{ sort_mode }}">
   <input type="hidden" name="dep_mode" value="{% if dep_mode_pick %}pick{% else %}all{% endif %}">
   {% for dep in sel_deps %}
   <input type="hidden" name="dep" value="{{ dep }}">
@@ -76,9 +101,19 @@
   <table class="schedule-table">
     <thead>
       <tr>
-        <th>Сотрудник</th>
-        {% for d, lab, is_non_working in day_headers %}
-        <th title="день {{ d }}" class="{% if is_non_working %}non-work-col{% endif %}">{{ lab }}</th>
+        <th rowspan="2" class="emp-header-th">Сотрудник</th>
+        {% for h in day_headers %}
+        <th class="shift-count-cell {% if h.is_non_working %}non-work-col{% endif %} {% if h.is_prev_month %}prev-month-col{% endif %} {% if h.is_today %}today-col{% endif %}" title="Дневных / ночных смен (по видимым строкам)">
+          <div class="shift-count-pair">
+            <div class="shift-count-box shift-count-box--d" title="Дневных смен">{{ h.d_count }}</div>
+            <div class="shift-count-box shift-count-box--n" title="Ночных смен">{{ h.n_count }}</div>
+          </div>
+        </th>
+        {% endfor %}
+      </tr>
+      <tr>
+        {% for h in day_headers %}
+        <th title="{% if h.is_prev_month %}пред. месяц · {% endif %}{{ h.label }}" class="day-num-th {% if h.is_non_working %}non-work-col{% endif %} {% if h.is_prev_month %}prev-month-col{% endif %} {% if h.is_today %}today-col{% endif %}">{{ h.label }}</th>
         {% endfor %}
       </tr>
     </thead>
@@ -88,15 +123,17 @@
         <td class="emp-cell {{ row.department_class }}">
           <span class="emp-name">{{ row.name }}</span>
         </td>
-        {% for d, val in row.day_cells %}
-        <td class="{% if d in non_working_days %}non-work-col{% endif %}">
+        {% for cell in row.day_cells %}
+        <td class="{% if cell.key in non_working_days %}non-work-col{% endif %} {% if cell.is_prev_month %}prev-month-col{% endif %} {% if cell.is_today %}today-col{% endif %}">
           <input
             type="text"
-            name="cell_{{ row.i }}_{{ d }}"
-            value="{{ val }}"
+            name="cell_{{ row.i }}_{{ cell.key }}"
+            value="{{ cell.val }}"
             maxlength="4"
             autocomplete="off"
-            class="day-input{% if val == 'д' %} day-input--d{% elif val == 'н' %} day-input--n{% elif val == 'от' %} day-input--ot{% elif val == 'б' %} day-input--b{% elif val == 'п' %} day-input--p{% elif val == 'кп' %} day-input--kp{% endif %}"
+            data-day="{{ cell.key }}"
+            {% if cell.is_prev_month %}readonly data-locked="1"{% endif %}
+            class="day-input{% if cell.is_prev_month %} day-input--locked{% endif %}{% if cell.val == 'д' %} day-input--d{% elif cell.val == 'н' %} day-input--n{% elif cell.val == 'от' %} day-input--ot{% elif cell.val == 'б' %} day-input--b{% elif cell.val == 'п' %} day-input--p{% elif cell.val == 'кп' %} day-input--kp{% endif %}"
           >
         </td>
         {% endfor %}
@@ -108,13 +145,127 @@
 <p id="graph-save-status" class="muted graph-save-status">График только для просмотра.</p>
 </div>
 </div>
+</div>
+
+</div>
 
 <style>
+.graph-top-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 16px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #2b3650;
+}
 .graph-actions {
-  margin: 12px 0;
+  margin: 0;
   display: grid;
   grid-template-columns: minmax(180px, 240px) 1fr;
   gap: 10px;
+  flex: 1 1 420px;
+  min-width: min(100%, 320px);
+}
+.graph-top-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  flex: 0 1 auto;
+}
+.graph-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 4px;
+}
+.graph-side-toolbar {
+  position: sticky;
+  top: 10px;
+  flex: 0 0 120px;
+  width: 120px;
+  z-index: 20;
+  padding: 10px 8px;
+  border: 1px solid #2f3b57;
+  border-radius: 10px;
+  background: rgba(14, 18, 28, 0.97);
+  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.35);
+  max-height: calc(100vh - 20px);
+  overflow-y: auto;
+  align-self: flex-start;
+}
+.graph-side-toolbar__edit {
+  width: 100%;
+  padding-left: 8px;
+  padding-right: 8px;
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: normal;
+  text-align: center;
+}
+.graph-main-column {
+  flex: 1;
+  min-width: 0;
+}
+.graph-edit-hint {
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 8px 0 0 0;
+  color: #9eb0d8;
+}
+.graph-code-palette__label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7a8aad;
+  margin-bottom: 6px;
+}
+.graph-code-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 10px;
+}
+.graph-code-btn {
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(45, 55, 78, 0.45);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  color: #1a1f2f;
+  transition: transform 0.08s ease, box-shadow 0.12s ease;
+}
+.graph-code-btn:hover {
+  filter: brightness(1.05);
+}
+.graph-code-btn.is-active {
+  box-shadow: 0 0 0 2px rgba(124, 140, 255, 0.95);
+  border-color: #7c8cff;
+}
+.graph-code-btn--d { background: #f6e899; }
+.graph-code-btn--n { background: #b8aed8; }
+.graph-code-btn--ot { background: #f5d94d; }
+.graph-code-btn--b { background: #9bd889; }
+.graph-code-btn--p { background: #f2bb73; }
+.graph-code-btn--kp { background: #f0a8cc; }
+.graph-code-btn--clear {
+  background: #2a3348;
+  color: #d7e2ff;
+  border-color: #4a5878;
+  font-weight: 700;
+}
+.graph-code-btn--keyboard {
+  background: linear-gradient(180deg, #32415f 0%, #26324b 100%);
+  color: #eaf0ff;
+  border-color: #4f6190;
+  font-size: 11px;
+  font-weight: 600;
 }
 .graph-action-card {
   border: 1px solid #2f3b57;
@@ -187,6 +338,37 @@
 .schedule-table th, .schedule-table td { border: 1px solid #2b3650; padding: 2px; text-align: center; }
 .schedule-table th.non-work-col,
 .schedule-table td.non-work-col { background: #3a435a; }
+.schedule-table th.prev-month-col,
+.schedule-table td.prev-month-col { background: rgba(55, 62, 82, 0.95); }
+.schedule-table th.today-col,
+.schedule-table td.today-col {
+  box-shadow: inset 0 0 0 2px rgba(90, 208, 255, 0.85);
+}
+.emp-header-th { vertical-align: middle; }
+.shift-count-cell { font-size: 11px; font-weight: 800; line-height: 1.15; padding: 4px 2px !important; vertical-align: middle; }
+.shift-count-pair {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.shift-count-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  min-height: 18px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+  color: #1a1f2f;
+  border: 1px solid rgba(26, 31, 47, 0.12);
+  box-sizing: border-box;
+}
+.shift-count-box--d { background: #f6e899; }
+.shift-count-box--n { background: #b8aed8; }
+.day-num-th { font-weight: 700; }
 .emp-cell { text-align: left !important; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .emp-name { font-weight: 600; }
 .emp-cell.dept-c1 { border-left: 4px solid #7aa2ff; }
@@ -233,14 +415,6 @@
 .schedule-table .day-input--p:focus { background: #f2bb73; color: #1a1f2f; }
 .schedule-table .day-input--kp:focus { background: #f0a8cc; color: #1a1f2f; }
 .graph-save-status { margin: 10px 0 0 0; font-size: 12px; }
-.graph-edit-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 14px;
-  margin: 10px 0 8px 0;
-}
-.graph-edit-hint { font-size: 12px; max-width: 42rem; line-height: 1.4; }
 .btn-edit-unlock {
   background: linear-gradient(180deg, #a82a32 0%, #751c22 100%);
   border: 1px solid #d45760;
@@ -266,6 +440,13 @@
 .graph-form--readonly .day-input {
   cursor: default;
   opacity: 0.94;
+}
+.day-input--locked {
+  cursor: not-allowed !important;
+  opacity: 1;
+}
+.graph-form--readonly .day-input--locked {
+  cursor: not-allowed !important;
 }
 .btn-print-sheet {
   background: linear-gradient(180deg, #f5f5f5 0%, #e4e4e4 100%);
@@ -335,6 +516,14 @@
   border-color: #c5cdd8;
 }
 #graph-page-root.theme-light .graph-action-title { color: #5c6578; }
+#graph-page-root.theme-light .graph-top-strip { border-bottom-color: #c5cdd8; }
+#graph-page-root.theme-light .graph-side-toolbar {
+  background: #fff;
+  border-color: #c5cdd8;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+#graph-page-root.theme-light .graph-edit-hint { color: #5c6578; }
+#graph-page-root.theme-light .graph-code-palette__label { color: #6b7280; }
 #graph-page-root.theme-light .graph-upload-row input[type="file"] {
   background: #fff;
   border-color: #b8c2d4;
@@ -365,9 +554,19 @@
   color: #111827;
   font-weight: 700;
 }
+#graph-page-root.theme-light .shift-count-box--d { background: #f6e899; color: #1a1f2f; }
+#graph-page-root.theme-light .shift-count-box--n { background: #b8aed8; color: #1a1f2f; }
 #graph-page-root.theme-light .schedule-table th.non-work-col,
 #graph-page-root.theme-light .schedule-table td.non-work-col {
   background: #e8ecf4;
+}
+#graph-page-root.theme-light .schedule-table th.prev-month-col,
+#graph-page-root.theme-light .schedule-table td.prev-month-col {
+  background: #dde3ee;
+}
+#graph-page-root.theme-light .schedule-table th.today-col,
+#graph-page-root.theme-light .schedule-table td.today-col {
+  box-shadow: inset 0 0 0 2px #3b82c4;
 }
 #graph-page-root.theme-light .emp-cell {
   background: #fff;
@@ -395,6 +594,31 @@
   border-color: #4f6ad4;
   box-shadow: 0 0 0 2px rgba(79, 106, 212, 0.2);
 }
+@media (max-width: 900px) {
+  .graph-body { flex-direction: column; }
+  .graph-side-toolbar {
+    position: relative;
+    top: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: none;
+    flex: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .graph-side-toolbar__edit { width: auto; flex: 1 1 200px; }
+  .graph-code-palette {
+    flex: 1 1 220px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 0;
+    align-items: center;
+  }
+  .graph-code-palette__label { width: 100%; }
+  .graph-code-btn { width: auto; min-width: 44px; flex: 1 1 44px; }
+}
 @media print {
   .nav { display: none !important; }
   body {
@@ -413,7 +637,8 @@
   #graph-page-root > p.muted,
   #graph-page-root > form.filter-panel,
   #graph-page-root .graph-actions,
-  #graph-page-root .graph-edit-bar,
+  #graph-page-root .graph-top-strip,
+  #graph-page-root .graph-side-toolbar,
   #graph-page-root .graph-save-status {
     display: none !important;
   }
@@ -480,6 +705,35 @@
     var editing = false;
     var editToggle = document.getElementById("graph-edit-toggle");
     var editHint = document.getElementById("graph-edit-hint");
+    var codePalette = document.getElementById("graph-code-palette");
+    var brushOn = false;
+    var brushVal = "";
+
+    function updatePaletteActive() {
+      if (!codePalette) return;
+      codePalette.querySelectorAll(".graph-code-btn").forEach(function (btn) {
+        if (btn.getAttribute("data-brush") === "keyboard") {
+          btn.classList.toggle("is-active", editing && !brushOn);
+        } else if (btn.hasAttribute("data-code")) {
+          var c = btn.getAttribute("data-code") || "";
+          btn.classList.toggle("is-active", editing && brushOn && brushVal === c);
+        }
+      });
+    }
+
+    function syncBrushHint() {
+      if (!editHint) return;
+      if (!editing) {
+        editHint.textContent =
+          "График только для просмотра. Включите редактирование, чтобы менять ячейки.";
+      } else if (brushOn) {
+        editHint.textContent =
+          "Выбран код — кликайте по ячейкам или протягивайте, как в Excel. «Клавиатура» — ввод вручную.";
+      } else {
+        editHint.textContent =
+          "Ввод с клавиатуры. Слева можно выбрать код и кликать по ячейкам.";
+      }
+    }
 
     function setStatus(text, color) {
       if (!statusEl) return;
@@ -506,7 +760,37 @@
       return Array.prototype.slice.call(tr.querySelectorAll(".day-input"));
     }
 
-    function fillRange(fromInput, toInput, value) {
+    function columnInputs(dayKey) {
+      if (!dayKey) return [];
+      return Array.prototype.slice.call(form.querySelectorAll('.day-input[data-day="' + dayKey + '"]'));
+    }
+
+    function refreshShiftCounts() {
+      var firstRow = form.querySelector("tbody tr");
+      if (!firstRow) return;
+      var sampleInputs = firstRow.querySelectorAll(".day-input");
+      var headerCells = form.querySelectorAll("thead tr:first-child th.shift-count-cell");
+      if (!sampleInputs.length || sampleInputs.length !== headerCells.length) return;
+      for (var i = 0; i < sampleInputs.length; i += 1) {
+        var dk = sampleInputs[i].getAttribute("data-day");
+        if (!dk) continue;
+        var dCount = 0;
+        var nCount = 0;
+        form.querySelectorAll('.day-input[data-day="' + dk + '"]').forEach(function (inp) {
+          var v = (inp.value || "").trim().toLowerCase();
+          if (v === "д") dCount += 1;
+          else if (v === "н") nCount += 1;
+        });
+        var pair = headerCells[i].querySelector(".shift-count-pair");
+        if (!pair) continue;
+        var dBox = pair.querySelector(".shift-count-box--d");
+        var nBox = pair.querySelector(".shift-count-box--n");
+        if (dBox) dBox.textContent = String(dCount);
+        if (nBox) nBox.textContent = String(nCount);
+      }
+    }
+
+    function fillRowRange(fromInput, toInput, value) {
       if (!fromInput || !toInput) return;
       if (fromInput.closest("tr") !== toInput.closest("tr")) return;
       var row = rowInputs(fromInput);
@@ -517,23 +801,53 @@
       var left = Math.min(a, b);
       var right = Math.max(a, b);
       for (var i = left; i <= right; i += 1) {
+        if (isLockedInput(row[i])) continue;
         row[i].value = value;
         applyColor(row[i]);
       }
+      refreshShiftCounts();
+    }
+
+    function fillColumnRange(fromInput, toInput, value) {
+      if (!fromInput || !toInput) return;
+      var dk = fromInput.getAttribute("data-day");
+      if (!dk || dk !== toInput.getAttribute("data-day")) return;
+      var col = columnInputs(dk);
+      var a = col.indexOf(fromInput);
+      var b = col.indexOf(toInput);
+      if (a < 0 || b < 0) return;
+      var top = Math.min(a, b);
+      var bot = Math.max(a, b);
+      for (var j = top; j <= bot; j += 1) {
+        if (isLockedInput(col[j])) continue;
+        col[j].value = value;
+        applyColor(col[j]);
+      }
+      refreshShiftCounts();
+    }
+
+    function isLockedInput(inp) {
+      return !!(inp && (inp.getAttribute("data-locked") === "1" || inp.classList.contains("day-input--locked")));
     }
 
     function applyGraphEditingState() {
       form.querySelectorAll(".day-input").forEach(function (inp) {
-        inp.readOnly = !editing;
+        inp.readOnly = !editing || isLockedInput(inp);
       });
       form.classList.toggle("graph-form--readonly", !editing);
       if (editToggle) {
         editToggle.textContent = editing ? "Закончить редактирование" : "Включить редактирование";
         editToggle.classList.toggle("is-editing-on", editing);
       }
-      if (editHint) {
-        editHint.style.display = editing ? "none" : "";
+      if (codePalette) {
+        codePalette.hidden = !editing;
       }
+      if (!editing) {
+        brushOn = false;
+        brushVal = "";
+      }
+      syncBrushHint();
+      updatePaletteActive();
       if (statusEl) {
         if (editing) {
           statusEl.textContent = "Изменения сохраняются автоматически.";
@@ -596,6 +910,16 @@
       input.addEventListener("mousedown", function (event) {
         if (event.button !== 0) return;
         if (!editing) return;
+        if (isLockedInput(input)) return;
+        if (brushOn) {
+          input.value = brushVal;
+          applyColor(input);
+          dragFill = {
+            startInput: input,
+            sourceValue: brushVal,
+          };
+          return;
+        }
         applyColor(input);
         dragFill = {
           startInput: input,
@@ -604,18 +928,27 @@
       });
       input.addEventListener("mouseenter", function () {
         if (!dragFill) return;
-        fillRange(dragFill.startInput, input, dragFill.sourceValue);
+        if (isLockedInput(input)) return;
+        var start = dragFill.startInput;
+        if (start.closest("tr") === input.closest("tr")) {
+          fillRowRange(start, input, dragFill.sourceValue);
+        } else if (start.getAttribute("data-day") === input.getAttribute("data-day")) {
+          fillColumnRange(start, input, dragFill.sourceValue);
+        }
       });
       input.addEventListener("input", function () {
         applyColor(input);
+        refreshShiftCounts();
         scheduleSave();
       });
       input.addEventListener("change", function () {
         applyColor(input);
+        refreshShiftCounts();
         scheduleSave();
       });
       input.addEventListener("blur", function () {
         applyColor(input);
+        refreshShiftCounts();
         scheduleSave();
       });
     });
@@ -623,7 +956,10 @@
     document.addEventListener("mouseup", function () {
       if (!dragFill) return;
       dragFill = null;
-      if (editing) scheduleSave();
+      if (editing) {
+        refreshShiftCounts();
+        scheduleSave();
+      }
     });
 
     applyGraphEditingState();
@@ -631,6 +967,23 @@
       editToggle.addEventListener("click", function () {
         editing = !editing;
         applyGraphEditingState();
+      });
+    }
+
+    if (codePalette) {
+      codePalette.querySelectorAll(".graph-code-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          if (!editing) return;
+          if (btn.getAttribute("data-brush") === "keyboard") {
+            brushOn = false;
+            brushVal = "";
+          } else if (btn.hasAttribute("data-code")) {
+            brushOn = true;
+            brushVal = btn.getAttribute("data-code") || "";
+          }
+          syncBrushHint();
+          updatePaletteActive();
+        });
       });
     }
 

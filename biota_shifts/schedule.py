@@ -9,6 +9,48 @@ from openpyxl.styles import Alignment, Border, Side
 from biota_shifts.config import SCHEDULE_DIR
 from biota_shifts.constants import SCHEDULE_CODES
 
+# Три последних дня предыдущего месяца (слева от «1» текущего месяца).
+PREV_MONTH_KEYS = ("p1", "p2", "p3")
+
+
+def prev_month_tail_dates(year: int, month: int) -> tuple[date, date, date]:
+    first = date(year, month, 1)
+    d0 = first - timedelta(days=3)
+    d1 = first - timedelta(days=2)
+    d2 = first - timedelta(days=1)
+    return d0, d1, d2
+
+
+def is_schedule_day_column(name) -> bool:
+    s = str(name).strip()
+    if s in PREV_MONTH_KEYS:
+        return True
+    return s.isdigit() and s.isascii()
+
+
+def sort_schedule_day_columns(columns: list, year: int, month: int) -> list:
+    """Порядок колонок: p1,p2,p3, затем 1..N текущего месяца (только существующие в columns)."""
+    colset = {str(c) for c in columns}
+    prev = [k for k in PREV_MONTH_KEYS if k in colset]
+    digits = sorted([c for c in columns if str(c).isdigit()], key=lambda x: int(str(x)))
+    return prev + digits
+
+
+def schedule_column_to_date(col_key: str, year: int, month: int) -> date | None:
+    """Календарная дата для колонки графика (или None)."""
+    s = str(col_key).strip()
+    if s in PREV_MONTH_KEYS:
+        d0, d1, d2 = prev_month_tail_dates(year, month)
+        return {PREV_MONTH_KEYS[0]: d0, PREV_MONTH_KEYS[1]: d1, PREV_MONTH_KEYS[2]: d2}[s]
+    if s.isdigit():
+        di = int(s)
+        try:
+            return date(year, month, di)
+        except ValueError:
+            return None
+    return None
+
+
 def available_schedule_years() -> list[int]:
     years = set()
     for p in SCHEDULE_DIR.glob("schedule_*.xlsx"):
@@ -40,7 +82,7 @@ def employee_label_row(r: pd.Series) -> str:
 
 def _schedule_day_cols(year: int, month: int) -> list[str]:
     days_in_month = (date(year + (month // 12), (month % 12) + 1, 1) - timedelta(days=1)).day
-    return [str(d) for d in range(1, days_in_month + 1)]
+    return list(PREV_MONTH_KEYS) + [str(d) for d in range(1, days_in_month + 1)]
 
 
 def sanitize_schedule_cell(v) -> str:
@@ -162,7 +204,7 @@ def build_schedule_template_bytes(employees_df: pd.DataFrame, year: int, month: 
 
         for ridx, _ in enumerate(df.columns, start=1):
             col_letter = ws.cell(row=1, column=ridx).column_letter
-            if str(df.columns[ridx - 1]).isdigit():
+            if is_schedule_day_column(df.columns[ridx - 1]):
                 ws.column_dimensions[col_letter].width = day_width_units
 
         # центр + обводка для ячеек шаблона
@@ -175,7 +217,8 @@ def build_schedule_template_bytes(employees_df: pd.DataFrame, year: int, month: 
     return out.getvalue()
 
 
-def load_schedule_table(employees_df: pd.DataFrame, year: int, month: int) -> pd.DataFrame:
+def _read_schedule_dataframe(employees_df: pd.DataFrame, year: int, month: int) -> pd.DataFrame:
+    """Чтение и нормализация графика за месяц без подстановки хвоста из прошлого месяца."""
     file_path = schedule_path(year, month)
     if file_path.exists():
         try:
@@ -184,6 +227,37 @@ def load_schedule_table(employees_df: pd.DataFrame, year: int, month: int) -> pd
             xl = pd.read_excel(file_path, sheet_name=0)
         return normalize_schedule_excel(xl, employees_df, year, month)
     return empty_schedule_from_db(employees_df, year, month)
+
+
+def apply_prev_month_tail_from_previous_schedule(
+    df: pd.DataFrame, employees_df: pd.DataFrame, year: int, month: int
+) -> pd.DataFrame:
+    """Заполняет колонки p1–p3 значениями из соответствующих календарных дней предыдущего месяца."""
+    out = df.copy()
+    d0, d1, d2 = prev_month_tail_dates(year, month)
+    yp, mp = d0.year, d0.month
+    prev_df = _read_schedule_dataframe(employees_df, yp, mp)
+    day_src = [str(d0.day), str(d1.day), str(d2.day)]
+    for pk, src_col in zip(PREV_MONTH_KEYS, day_src):
+        if pk not in out.columns:
+            continue
+        if src_col not in prev_df.columns:
+            out[pk] = ""
+            continue
+        cmap: dict[str, str] = {}
+        for _, r in prev_df.iterrows():
+            code = str(r.get("Код", "")).strip()
+            if code:
+                cmap[code] = sanitize_schedule_cell(r.get(src_col))
+        for idx, row in out.iterrows():
+            code = str(row.get("Код", "")).strip()
+            out.at[idx, pk] = cmap.get(code, "")
+    return out
+
+
+def load_schedule_table(employees_df: pd.DataFrame, year: int, month: int) -> pd.DataFrame:
+    df = _read_schedule_dataframe(employees_df, year, month)
+    return apply_prev_month_tail_from_previous_schedule(df, employees_df, year, month)
 
 
 def save_schedule_table(df: pd.DataFrame, year: int, month: int) -> Path:

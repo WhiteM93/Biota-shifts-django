@@ -8,7 +8,7 @@ from django.db.models.functions import Coalesce
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
-from .auth_utils import biota_login_required
+from .auth_utils import biota_login_required, nav_permission_required
 from .models import (
     COATING_TYPES,
     END_MILL_TYPES,
@@ -83,6 +83,7 @@ def _build_tap_name(size_label: str, thread_standard: str, tap_type: str, hole_t
 
 
 @biota_login_required
+@nav_permission_required("inventory")
 @require_http_methods(["GET", "POST"])
 def inventory_view(request):
     action = request.POST.get("action") if request.method == "POST" else ""

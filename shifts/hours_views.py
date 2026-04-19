@@ -13,7 +13,7 @@ from biota_shifts.auth import _filter_employees_for_user, _is_admin
 from biota_shifts.constants import HOURS_GRID_NO_PUNCH, HOURS_GRID_SUFFIX_OUTSIDE_GRAPH, MONTH_NAMES_RU
 from biota_shifts import schedule as biota_schedule
 
-from .auth_utils import biota_login_required, biota_user
+from .auth_utils import biota_login_required, biota_user, nav_permission_required
 from .ru_work_calendar import is_ru_non_working_day
 
 
@@ -71,6 +71,7 @@ def _fmt_minutes_hhmm(total_minutes: int) -> str:
 
 
 @biota_login_required
+@nav_permission_required("hours")
 def hours_view(request):
     now = datetime.now()
     try:
@@ -256,6 +257,7 @@ def _hours_grid_for_download(request):
 
 
 @biota_login_required
+@nav_permission_required("hours")
 def hours_excel(request):
     result, err = _hours_grid_for_download(request)
     if err:
@@ -271,6 +273,7 @@ def hours_excel(request):
 
 
 @biota_login_required
+@nav_permission_required("hours")
 def hours_pdf(request):
     result, err = _hours_grid_for_download(request)
     if err:

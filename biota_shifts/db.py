@@ -1,4 +1,4 @@
-"""Загрузка данных из PostgreSQL (кэш через functools; в Streamlit был st.cache_data)."""
+"""Загрузка данных из PostgreSQL (кэш выборок через functools; справочник сотрудников без кэша)."""
 import functools
 from datetime import date, datetime
 
@@ -6,6 +6,28 @@ import pandas as pd
 import psycopg
 
 from biota_shifts.config import _config_str
+
+
+def employee_active_where_suffix() -> str:
+    """Доп. AND для personnel_employee e: не подставлять уволенных в справочник.
+
+    По умолчанию ZKBioTA / zkbiota: признак «уволен» — ``is_active = false`` в ``personnel_employee``.
+    Переопределение: BIOTA_EMPLOYEE_ACTIVE_SQL или BIOTA_INCLUDE_DISMISSED_EMPLOYEES=1.
+    """
+    if (_config_str("BIOTA_INCLUDE_DISMISSED_EMPLOYEES") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        return ""
+    custom = (_config_str("BIOTA_EMPLOYEE_ACTIVE_SQL") or "").strip()
+    if custom:
+        if not custom.lower().startswith("and "):
+            custom = "and " + custom
+        return " " + custom
+    # ZKBioTA (PostgreSQL zkbiota): сотрудник скрыт в UI при is_active = false
+    return " and coalesce(e.is_active, true) = true"
 from biota_shifts.emp_codes import normalize_emp_codes_list, sql_emp_code
 from biota_shifts.schedule import available_schedule_years
 
@@ -46,8 +68,8 @@ def _conn_from_key(db_key: tuple) -> dict:
     }
 
 
-@functools.lru_cache(maxsize=8)
-def _load_employees_cached(db_key: tuple) -> pd.DataFrame:
+def _load_employees_uncached(db_key: tuple) -> pd.DataFrame:
+    """Без LRU: ФИО/отделы в справочнике должны подтягиваться сразу после правок в Biota."""
     cfg = _conn_from_key(db_key)
     sql = """
     select
@@ -63,6 +85,7 @@ def _load_employees_cached(db_key: tuple) -> pd.DataFrame:
     left join personnel_employee_area ea on ea.employee_id = e.id
     left join personnel_area a on a.id = ea.area_id
     where coalesce(e.emp_code, '') <> ''
+""" + employee_active_where_suffix() + """
     group by e.emp_code, e.last_name, e.first_name, e.department_id, p.position_name
     order by e.emp_code
     """
@@ -71,7 +94,7 @@ def _load_employees_cached(db_key: tuple) -> pd.DataFrame:
 
 
 def load_employees(cfg: dict) -> pd.DataFrame:
-    return _load_employees_cached(_db_cache_key(cfg))
+    return _load_employees_uncached(_db_cache_key(cfg))
 
 
 @functools.lru_cache(maxsize=128)
@@ -469,7 +492,6 @@ def load_iclock_punches_batch(
 
 def clear_biota_db_cache() -> None:
     """Сбросить кэш всех выборок из PostgreSQL (повторно с БД — после кнопки «Обновить данные из БД»)."""
-    _load_employees_cached.cache_clear()
     _load_shifts_cached.cache_clear()
     _load_shifts_batch_cached.cache_clear()
     _load_shifts_hours_batch_cached.cache_clear()
