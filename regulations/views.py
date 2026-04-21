@@ -34,6 +34,81 @@ _DEFAULT_BREAKFAST = (time(9, 0), time(9, 30))
 _DEFAULT_LUNCH = (time(12, 0), time(13, 0))
 
 
+def _default_breaks_for_plan(o: RegulationPlan) -> list[dict]:
+    items = [
+        {
+            "label": "Завтрак",
+            "start": o.breakfast_start.strftime("%H:%M"),
+            "end": o.breakfast_end.strftime("%H:%M"),
+            "color_kind": "bf",
+        },
+        {
+            "label": "Обед",
+            "start": o.lunch_start.strftime("%H:%M"),
+            "end": o.lunch_end.strftime("%H:%M"),
+            "color_kind": "ln",
+        },
+    ]
+    if o.extra_start and o.extra_end:
+        items.append(
+            {
+                "label": (o.extra_label or "").strip() or "Доп. ползунок",
+                "start": o.extra_start.strftime("%H:%M"),
+                "end": o.extra_end.strftime("%H:%M"),
+                "color_kind": "br",
+            }
+        )
+    return items
+
+
+def _normalized_breaks(o: RegulationPlan, raw_items) -> list[dict]:
+    items = raw_items if isinstance(raw_items, list) else []
+    out: list[dict] = []
+    for idx, it in enumerate(items):
+        if not isinstance(it, dict):
+            continue
+        label = str(it.get("label") or "").strip()[:100] or f"Ползунок {idx + 1}"
+        try:
+            st = _parse_hm(str(it.get("start", "")))
+            en = _parse_hm(str(it.get("end", "")))
+        except ValueError:
+            continue
+        if (st.hour * 60 + st.minute) >= (en.hour * 60 + en.minute):
+            continue
+        kind = str(it.get("color_kind") or "").strip().lower()
+        if kind == "ex":
+            kind = "br"
+        if kind not in ("bf", "ln", "br"):
+            kind = "br"
+        out.append(
+            {
+                "label": label,
+                "start": st.strftime("%H:%M"),
+                "end": en.strftime("%H:%M"),
+                "color_kind": kind,
+            }
+        )
+    if out:
+        return out
+    return _default_breaks_for_plan(o)
+
+
+def _primary_windows_from_breaks(plan: RegulationPlan, breaks: list[dict]) -> tuple[time, time, time, time, str, time | None, time | None]:
+    bf = next((b for b in breaks if b.get("color_kind") == "bf"), None)
+    ln = next((b for b in breaks if b.get("color_kind") == "ln"), None)
+    br = next((b for b in breaks if b.get("color_kind") == "br"), None)
+    bf_s = _parse_hm(str((bf or {}).get("start") or plan.breakfast_start.strftime("%H:%M")))
+    bf_e = _parse_hm(str((bf or {}).get("end") or plan.breakfast_end.strftime("%H:%M")))
+    ln_s = _parse_hm(str((ln or {}).get("start") or plan.lunch_start.strftime("%H:%M")))
+    ln_e = _parse_hm(str((ln or {}).get("end") or plan.lunch_end.strftime("%H:%M")))
+    if br:
+        br_s = _parse_hm(str(br.get("start") or ""))
+        br_e = _parse_hm(str(br.get("end") or ""))
+        br_l = str(br.get("label") or "").strip()[:100] or "Перерыв 1"
+        return bf_s, bf_e, ln_s, ln_e, br_l, br_s, br_e
+    return bf_s, bf_e, ln_s, ln_e, "", None, None
+
+
 def _department_filter_context(request, plan_date: date) -> dict:
     """Фильтр отделов как на «Графике» (пустой список = ни один отдел)."""
     ctx = {
@@ -267,6 +342,7 @@ def _sync_regulation_catalog_fields(plan_date: date, employees_df) -> int:
 
 
 def _row_json(o: RegulationPlan) -> dict:
+    breaks = _normalized_breaks(o, o.breaks)
     return {
         "id": o.pk,
         "employee_code": o.employee_code,
@@ -276,7 +352,7 @@ def _row_json(o: RegulationPlan) -> dict:
         "lunch_start": o.lunch_start.strftime("%H:%M"),
         "lunch_end": o.lunch_end.strftime("%H:%M"),
         "locked": o.locked,
-        "eight_hour_shift": o.eight_hour_shift,
+        "breaks": breaks,
     }
 
 
@@ -374,14 +450,35 @@ def _regulation_timeline_export_rows(
     out: list[dict] = []
     for o in plans:
         dept = (o.department or "").strip() or "Без отдела"
+        breaks = _normalized_breaks(o, o.breaks)
+        breakfasts = [b for b in breaks if b.get("color_kind") == "bf"]
+        lunches = [b for b in breaks if b.get("color_kind") == "ln"]
+        pauses = [b for b in breaks if b.get("color_kind") == "br"]
+
+        breakfast_text_lines: list[str] = []
+        for i, b in enumerate(breakfasts, start=1):
+            breakfast_text_lines.append(f"{b.get('start','')}–{b.get('end','')}")
+        lunch_text_lines: list[str] = []
+        for i, b in enumerate(lunches, start=1):
+            lunch_text_lines.append(f"{b.get('start','')}–{b.get('end','')}")
+        pause_lines: list[str] = []
+        for i, p in enumerate(pauses, start=1):
+            pause_lines.append(f"{p.get('start','')}–{p.get('end','')}")
+
+        first_bf = breakfasts[0] if breakfasts else None
+        first_ln = lunches[0] if lunches else None
         out.append(
             {
                 "employee_name": o.employee_name,
                 "department_class": dep_color_map.get(dept, "dept-c1"),
-                "breakfast_start": o.breakfast_start.strftime("%H:%M"),
-                "breakfast_end": o.breakfast_end.strftime("%H:%M"),
-                "lunch_start": o.lunch_start.strftime("%H:%M"),
-                "lunch_end": o.lunch_end.strftime("%H:%M"),
+                "breakfast_start": (first_bf or {}).get("start") or o.breakfast_start.strftime("%H:%M"),
+                "breakfast_end": (first_bf or {}).get("end") or o.breakfast_end.strftime("%H:%M"),
+                "lunch_start": (first_ln or {}).get("start") or o.lunch_start.strftime("%H:%M"),
+                "lunch_end": (first_ln or {}).get("end") or o.lunch_end.strftime("%H:%M"),
+                "breaks": breaks,
+                "breakfast_text": "\n".join(breakfast_text_lines) if breakfast_text_lines else "—",
+                "lunch_text": "\n".join(lunch_text_lines) if lunch_text_lines else "—",
+                "pause_text": "\n".join(pause_lines) if pause_lines else "—",
             }
         )
     return out
@@ -559,21 +656,20 @@ def regulations_api_save(request):
         row = RegulationPlan.objects.filter(pk=pk, plan_date=plan_date).first()
         if not row:
             continue
+        breaks = _normalized_breaks(row, it.get("breaks"))
         try:
-            ln_s = _parse_hm(str(it.get("lunch_start", "")))
-            ln_e = _parse_hm(str(it.get("lunch_end", "")))
-            if row.eight_hour_shift:
-                bf_s, bf_e = ln_s, ln_e
-            else:
-                bf_s = _parse_hm(str(it.get("breakfast_start", "")))
-                bf_e = _parse_hm(str(it.get("breakfast_end", "")))
-        except ValueError:
-            return HttpResponseBadRequest("bad time")
+            bf_s, bf_e, ln_s, ln_e, ex_l, ex_s, ex_e = _primary_windows_from_breaks(row, breaks)
+        except (ValueError, KeyError, TypeError):
+            return HttpResponseBadRequest("bad breaks")
         n = RegulationPlan.objects.filter(pk=pk, plan_date=plan_date).update(
             breakfast_start=bf_s,
             breakfast_end=bf_e,
             lunch_start=ln_s,
             lunch_end=ln_e,
+            extra_label=ex_l,
+            extra_start=ex_s,
+            extra_end=ex_e,
+            breaks=breaks,
         )
         updated += n
 
@@ -585,7 +681,7 @@ def regulations_api_save(request):
 @nav_permission_required("regulations")
 @require_POST
 def regulations_api_meta(request):
-    """Переключение замка и 8-часовой смены (без сохранения шкалы)."""
+    """Переключение замка строки."""
     try:
         payload = json.loads(request.body.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError):
@@ -612,8 +708,6 @@ def regulations_api_meta(request):
         fields: dict = {}
         if "locked" in u:
             fields["locked"] = bool(u.get("locked"))
-        if "eight_hour_shift" in u:
-            fields["eight_hour_shift"] = bool(u.get("eight_hour_shift"))
         if not fields:
             continue
         n = RegulationPlan.objects.filter(pk=pk, plan_date=plan_date).update(**fields)

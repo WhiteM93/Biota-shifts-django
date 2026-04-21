@@ -96,36 +96,29 @@
         <button type="button" class="reg-tool-btn reg-lock-btn" data-id="{{ r.id }}"
           title="{% if r.locked %}Разблокировать — снова можно двигать блоки на шкале{% else %}Заблокировать строку от случайного сдвига{% endif %}"
           aria-pressed="{% if r.locked %}true{% else %}false{% endif %}">{% if r.locked %}🔒{% else %}🔓{% endif %}</button>
-        <label class="reg-8h-label" title="8-часовая смена: один перерыв на питание (не два)"><input type="checkbox" class="reg-8h-cb" data-id="{{ r.id }}" {% if r.eight_hour_shift %}checked{% endif %}> 8ч</label>
+        <button type="button" class="reg-tool-btn reg-add-btn reg-add-bf" data-kind="bf" data-id="{{ r.id }}" title="Добавить завтрак">З</button>
+        <button type="button" class="reg-tool-btn reg-add-btn reg-add-ln" data-kind="ln" data-id="{{ r.id }}" title="Добавить обед">О</button>
+        <button type="button" class="reg-tool-btn reg-add-btn reg-add-br" data-kind="br" data-id="{{ r.id }}" title="Добавить перерыв">П</button>
       </span>
       <span class="reg-emp-text">
         <span class="emp-name">{{ r.employee_name }}</span>
-        <span class="dept-badge">{{ r.department }}</span>
       </span>
     </div>
     <div class="reg-track" data-id="{{ r.id }}">
-      {% if not r.eight_hour_shift %}
-      <div class="reg-block reg-block--bf"
-        data-kind="bf"
-        data-start-hm="{{ r.breakfast_start }}"
-        data-end-hm="{{ r.breakfast_end }}"
-        title="Завтрак">
+      {% for b in r.breaks %}
+      <div class="reg-block reg-block--{{ b.color_kind|default:'br' }}"
+        data-kind="{{ b.color_kind|default:'br' }}"
+        data-start-hm="{{ b.start }}"
+        data-end-hm="{{ b.end }}"
+        title="{{ b.label }}">
         <span class="reg-block__edge reg-block__edge--left" aria-hidden="true"></span>
         <span class="reg-block__edge reg-block__edge--right" aria-hidden="true"></span>
-        <span class="reg-block__start">{{ r.breakfast_start }}</span>
-        <span class="reg-block__end">{{ r.breakfast_end }}</span>
+        <span class="reg-block__start">{{ b.start }}</span>
+        <span class="reg-block__end">{{ b.end }}</span>
+        <button type="button" class="reg-block-del" title="Удалить ползунок" aria-label="Удалить ползунок">✕</button>
+        <input type="text" class="reg-block-label" value="{{ b.label }}" maxlength="100" placeholder="Название">
       </div>
-      {% endif %}
-      <div class="reg-block reg-block--ln"
-        data-kind="ln"
-        data-start-hm="{{ r.lunch_start }}"
-        data-end-hm="{{ r.lunch_end }}"
-        title="{% if r.eight_hour_shift %}Перерыв на питание (8ч){% else %}Обед{% endif %}">
-        <span class="reg-block__edge reg-block__edge--left" aria-hidden="true"></span>
-        <span class="reg-block__edge reg-block__edge--right" aria-hidden="true"></span>
-        <span class="reg-block__start">{{ r.lunch_start }}</span>
-        <span class="reg-block__end">{{ r.lunch_end }}</span>
-      </div>
+      {% endfor %}
     </div>
   </div>
   {% endfor %}
@@ -452,7 +445,7 @@
   .reg-shell { margin-top: 8px; user-select: none; }
   .reg-header-row, .reg-ovl-row, .reg-emp-row {
     display: grid;
-    grid-template-columns: minmax(220px, 320px) 1fr;
+    grid-template-columns: minmax(180px, 250px) 1fr;
     gap: 8px 12px;
     align-items: stretch;
   }
@@ -473,18 +466,18 @@
     color: #eaf0ff;
   }
   .reg-tool-btn:hover { border-color: #7c8cff; background: #232d48; }
-  .reg-8h-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #c8d6ff;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    cursor: pointer;
-    white-space: nowrap;
-    user-select: none;
+  .reg-add-btn {
+    background: #3f2f68;
+    border-color: #9f86d8;
+    color: #f2eaff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 4px;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 4px;
   }
-  .reg-8h-cb { width: 14px; height: 14px; accent-color: #6b8cff; cursor: pointer; }
+  .reg-add-btn:hover { background: #554181; border-color: #c2a9ff; }
   .reg-row--locked {
     background: linear-gradient(90deg, rgba(100, 140, 255, 0.14) 0%, transparent 55%);
     box-shadow: inset 3px 0 0 rgba(120, 160, 255, 0.55);
@@ -492,7 +485,10 @@
   .reg-row--locked .reg-track { pointer-events: none; }
   .reg-row--locked .reg-block { cursor: not-allowed !important; opacity: 0.92; }
   .reg-shell--readonly .reg-lock-btn,
-  .reg-shell--readonly .reg-8h-label { pointer-events: none; opacity: 0.78; }
+  .reg-shell--readonly .reg-add-btn { pointer-events: none; opacity: 0.78; }
+  .reg-shell--readonly .reg-emp-tools { display: none; }
+  .reg-shell--readonly .reg-block-del { display: none; }
+  .reg-shell--readonly .reg-ovl-limit-label { display: none; }
   .reg-shell--readonly .reg-block { cursor: default; }
   /* Пока «редактирование» выключено — шкалы сотрудников не принимают мышь/тач (дублирует проверку в JS). */
   .reg-shell--readonly .reg-emp-row > .reg-track { pointer-events: none; }
@@ -511,21 +507,11 @@
     align-items: center;
     gap: 8px 10px;
     overflow: hidden;
-    padding-left: 10px;
+    padding: 6px 8px;
     border-left: 4px solid transparent;
     box-sizing: border-box;
   }
   .emp-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .dept-badge {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 1px 6px;
-    border-radius: 999px;
-    font-size: 10px;
-    color: #f3f6ff;
-    background: rgba(21, 29, 45, 0.8);
-    vertical-align: middle;
-  }
   .reg-name.emp-cell.dept-c1 { border-left-color: #7aa2ff; }
   .reg-name.emp-cell.dept-c2 { border-left-color: #78d2b4; }
   .reg-name.emp-cell.dept-c3 { border-left-color: #f2b66e; }
@@ -664,7 +650,7 @@
     cursor: grab;
     box-sizing: border-box;
     padding: 0 14px;
-    overflow: hidden;
+    overflow: visible;
     text-shadow: 0 1px 1px rgba(0,0,0,0.35);
     box-shadow: 0 1px 3px rgba(0,0,0,0.35);
     display: flex;
@@ -712,6 +698,31 @@
   .reg-block:active .reg-block__edge { cursor: ew-resize; }
   .reg-block--bf { background: linear-gradient(180deg, #4f7dff, #3558cf); }
   .reg-block--ln { background: linear-gradient(180deg, #42c77a, #238a52); }
+  .reg-block--br { background: linear-gradient(180deg, #c48dff, #7f4dd1); }
+  .reg-block-label {
+    display: none;
+  }
+  .reg-block-del {
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: auto;
+    height: auto;
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 700;
+    z-index: 8;
+    cursor: pointer;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+    opacity: 0.85;
+  }
+  .reg-block-del:hover {
+    opacity: 1;
+  }
   @media (max-width: 900px) {
     .reg-header-row, .reg-ovl-row, .reg-emp-row {
       grid-template-columns: minmax(120px, 160px) 1fr;
@@ -744,7 +755,7 @@
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="{% static 'regulations/timeline.js' %}?v=3"></script>
+<script src="{% static 'regulations/timeline.js' %}?v=9"></script>
 <script>
   (function () {
     function getCookie(name) {

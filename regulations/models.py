@@ -14,6 +14,27 @@ class RegulationPlan(models.Model):
     breakfast_end = models.TimeField()
     lunch_start = models.TimeField()
     lunch_end = models.TimeField()
+    extra_label = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Название дополнительного ползунка сотрудника.",
+    )
+    extra_start = models.TimeField(
+        null=True,
+        blank=True,
+        help_text="Начало дополнительного ползунка.",
+    )
+    extra_end = models.TimeField(
+        null=True,
+        blank=True,
+        help_text="Конец дополнительного ползунка.",
+    )
+    breaks = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Список ползунков сотрудника: [{label,start,end,color_kind}].",
+    )
     locked = models.BooleanField(
         default=False,
         help_text="Закрепить строку: нельзя случайно сдвинуть время на шкале.",

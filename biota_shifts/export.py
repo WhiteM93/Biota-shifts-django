@@ -818,7 +818,7 @@ def build_regulations_list_pdf(
     plan_date: date,
     shift: str,
 ) -> bytes:
-    """PDF регламента в табличном виде: №, сотрудник, завтрак, обед (как в образце)."""
+    """PDF регламента: №, сотрудник, завтрак, обед, перерывы."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -871,6 +871,14 @@ def build_regulations_list_pdf(
         textColor=colors.HexColor("#3a3a3a"),
         spaceAfter=4 * mm,
     )
+    cell_style = ParagraphStyle(
+        "RegListCell",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=8.5,
+        leading=10.5,
+        textColor=colors.HexColor("#111111"),
+    )
 
     story.append(Paragraph("Регламент: питания", title_style))
     story.append(
@@ -882,14 +890,14 @@ def build_regulations_list_pdf(
     story.append(Paragraph(f"Действует с {plan_date.strftime('%d.%m.%Y')}", sub_style))
     story.append(
         Paragraph(
-            "В таблице указаны только временные окна (начало и конец перерыва). "
-            "Колонка «Завтрак» — первый интервал приёма пищи, «Обед» — второй.",
+            "В таблице указаны временные окна: завтрак, обед и дополнительные перерывы.",
             info_style,
         )
     )
     story.append(
         Paragraph(
-            "Соблюдайте график, чтобы не пересекаться на кухне и сохранять ритм смены.",
+            "Соблюдайте график. Перерывы не предназначены для постоянного нахождения на кухне: "
+            "находиться там можно только при наличии свободных мест.",
             info_style,
         )
     )
@@ -898,16 +906,21 @@ def build_regulations_list_pdf(
     header = [
         "№",
         "Сотрудник",
-        "Завтрак (1-й интервал)",
-        "Обед (2-й интервал)",
+        "Завтрак",
+        "Обед",
+        "Перерыв",
     ]
-    table_data: list[list[str]] = [header]
+    table_data: list[list] = [header]
     for i, r in enumerate(rows, start=1):
-        b = f"{r['breakfast_start']}–{r['breakfast_end']}"
-        l = f"{r['lunch_start']}–{r['lunch_end']}"
-        table_data.append([str(i), str(r["employee_name"]), b, l])
+        b_raw = str(r.get("breakfast_text") or f"{r['breakfast_start']}–{r['breakfast_end']}")
+        l_raw = str(r.get("lunch_text") or f"{r['lunch_start']}–{r['lunch_end']}")
+        p_raw = str(r.get("pause_text") or "—")
+        b = Paragraph(b_raw.replace("\n", "<br/>"), cell_style)
+        l = Paragraph(l_raw.replace("\n", "<br/>"), cell_style)
+        p = Paragraph(p_raw.replace("\n", "<br/>"), cell_style)
+        table_data.append([str(i), str(r["employee_name"]), b, l, p])
 
-    col_widths = [12 * mm, 78 * mm, 42 * mm, 42 * mm]
+    col_widths = [10 * mm, 56 * mm, 36 * mm, 36 * mm, 48 * mm]
     table = LongTable(table_data, repeatRows=1, colWidths=col_widths, splitByRow=1)
     table.setStyle(
         TableStyle(
@@ -918,9 +931,8 @@ def build_regulations_list_pdf(
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#EFEFEF")),
                 ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#111111")),
                 ("ALIGN", (0, 0), (0, -1), "CENTER"),
-                ("ALIGN", (2, 0), (-1, -1), "CENTER"),
-                ("ALIGN", (1, 0), (1, -1), "LEFT"),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#AAAAAA")),
                 ("TOPPADDING", (0, 0), (-1, -1), 4),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 4),

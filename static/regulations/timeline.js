@@ -1,5 +1,5 @@
 /**
- * Шкала 08:00–20:00: drag + resize блоков завтрак/обед, строка перегруза.
+ * Шкала 08:00–20:00: drag + resize произвольных ползунков + перегруз.
  */
 (function () {
   function regEditingEnabled() {
@@ -90,7 +90,7 @@
   }
 
   /**
-   * Перегруз: 5-мин слоты — пересечение завтрака и обеда.
+   * Перегруз: 5-мин слоты — пересечение любых ползунков.
    */
   function computeOverload(rows) {
     const slot = 5;
@@ -98,16 +98,14 @@
     const cnt = new Array(slots).fill(0);
     rows.forEach(function (r) {
       const ivs = [];
-      if (!r.eight_hour_shift) {
+      (r.breaks || []).forEach(function (b) {
+        const k = (b.color_kind || "").toLowerCase();
+        if (k !== "bf" && k !== "ln") return;
         ivs.push([
-          dayMinToRel(parseHm(r.breakfast_start)),
-          dayMinToRel(parseHm(r.breakfast_end)),
+          dayMinToRel(parseHm(b.start)),
+          dayMinToRel(parseHm(b.end)),
         ]);
-      }
-      ivs.push([
-        dayMinToRel(parseHm(r.lunch_start)),
-        dayMinToRel(parseHm(r.lunch_end)),
-      ]);
+      });
       for (let i = 0; i < slots; i++) {
         const seg0 = i * slot;
         const seg1 = seg0 + slot;
@@ -127,26 +125,17 @@
   }
 
   function buildOverloadRow(tr, cfgRows) {
-    const m = metaForTrack(tr, cfgRows);
-    const o = {
-      eight_hour_shift: !!m.eight_hour_shift,
-      breakfast_start: "08:00",
-      breakfast_end: "08:00",
-      lunch_start: "12:00",
-      lunch_end: "13:00",
-    };
-    const bf = tr.querySelector(".reg-block--bf");
-    const ln = tr.querySelector(".reg-block--ln");
-    if (bf && !m.eight_hour_shift) {
-      const b = readBlock(bf);
-      o.breakfast_start = fmtHm(TL_START + b.startRel);
-      o.breakfast_end = fmtHm(TL_START + b.startRel + b.durRel);
-    }
-    if (ln) {
-      const l = readBlock(ln);
-      o.lunch_start = fmtHm(TL_START + l.startRel);
-      o.lunch_end = fmtHm(TL_START + l.startRel + l.durRel);
-    }
+    const o = { breaks: [] };
+    tr.querySelectorAll(".reg-block").forEach(function (blk) {
+      const r = readBlock(blk);
+      const labEl = blk.querySelector(".reg-block-label");
+      o.breaks.push({
+        label: labEl ? String(labEl.value || "").trim() : "Ползунок",
+        start: fmtHm(TL_START + r.startRel),
+        end: fmtHm(TL_START + r.startRel + r.durRel),
+        color_kind: blk.dataset.kind || "ex",
+      });
+    });
     return o;
   }
 
@@ -315,31 +304,20 @@
     root.querySelectorAll(".reg-track[data-id]").forEach(function (tr) {
       const id = tr.dataset.id;
       if (!id) return;
-      const ln = tr.querySelector(".reg-block--ln");
-      if (!ln) return;
-      const l = readBlock(ln);
-      const ls = fmtHm(TL_START + l.startRel);
-      const le = fmtHm(TL_START + l.startRel + l.durRel);
-      const meta = metaForTrack(tr, window.__regCfgRows || []);
-      const row = tr.closest(".reg-emp-row");
-      const cb8 = row && row.querySelector(".reg-8h-cb");
-      /* Режим 8ч берём с чекбокса в строке — иначе при пустом/битом __regCfgRows обед считали «не 8ч» и выходили без bf. */
-      const eightHour = !!(cb8 && cb8.checked) || !!meta.eight_hour_shift;
       const item = {
         id: parseInt(id, 10),
-        lunch_start: ls,
-        lunch_end: le,
+        breaks: [],
       };
-      if (eightHour) {
-        item.breakfast_start = ls;
-        item.breakfast_end = le;
-      } else {
-        const bf = tr.querySelector(".reg-block--bf");
-        if (!bf) return;
-        const b = readBlock(bf);
-        item.breakfast_start = fmtHm(TL_START + b.startRel);
-        item.breakfast_end = fmtHm(TL_START + b.startRel + b.durRel);
-      }
+      tr.querySelectorAll(".reg-block").forEach(function (blk) {
+        const r = readBlock(blk);
+        const labelEl = blk.querySelector(".reg-block-label");
+        item.breaks.push({
+          label: labelEl ? String(labelEl.value || "").trim() : "Ползунок",
+          start: fmtHm(TL_START + r.startRel),
+          end: fmtHm(TL_START + r.startRel + r.durRel),
+          color_kind: blk.dataset.kind || "ex",
+        });
+      });
       items.push(item);
     });
     const token = getCookie("csrftoken");
@@ -374,67 +352,38 @@
     });
   };
 
-  function mergeCfgFromServer(rowJson) {
-    const cfg = window.__regCfgRows || [];
-    const ix = cfg.findIndex(function (x) {
-      return x.id === rowJson.id;
+  function nextBreakLabel(track) {
+    let n = 1;
+    track.querySelectorAll(".reg-block").forEach(function (blk) {
+      if ((blk.dataset.kind || "").toLowerCase() !== "br") return;
+      const v = (blk.querySelector(".reg-block-label") || {}).value || "";
+      const m = /Перерыв\s+(\d+)/i.exec(v);
+      if (m) n = Math.max(n, parseInt(m[1], 10) + 1);
     });
-    if (ix < 0) return;
-    const cur = cfg[ix];
-    cur.eight_hour_shift = !!rowJson.eight_hour_shift;
-    cur.breakfast_start = rowJson.breakfast_start;
-    cur.breakfast_end = rowJson.breakfast_end;
-    cur.lunch_start = rowJson.lunch_start;
-    cur.lunch_end = rowJson.lunch_end;
-    cur.locked = !!rowJson.locked;
+    return "Перерыв " + n;
   }
 
-  /** Обновить строку после 8ч без перезагрузки страницы (сохраняет режим «редактирование»). */
-  function applyEightHourDom(track, rowJson) {
-    mergeCfgFromServer(rowJson);
-    const eight = !!rowJson.eight_hour_shift;
-    let bf = track.querySelector(".reg-block--bf");
-    const ln = track.querySelector(".reg-block--ln");
-    if (eight) {
-      if (bf) bf.remove();
-      if (ln) ln.setAttribute("title", "Перерыв на питание (8ч)");
-    } else {
-      if (ln) ln.setAttribute("title", "Обед");
-      if (!bf && ln) {
-        bf = document.createElement("div");
-        bf.className = "reg-block reg-block--bf";
-        bf.setAttribute("data-kind", "bf");
-        bf.dataset.startHm = rowJson.breakfast_start;
-        bf.dataset.endHm = rowJson.breakfast_end;
-        bf.setAttribute("title", "Завтрак");
-        bf.innerHTML =
-          '<span class="reg-block__edge reg-block__edge--left" aria-hidden="true"></span>' +
-          '<span class="reg-block__edge reg-block__edge--right" aria-hidden="true"></span>' +
-          '<span class="reg-block__start"></span><span class="reg-block__end"></span>';
-        track.insertBefore(bf, ln);
-        const rs = dayMinToRel(parseHm(rowJson.breakfast_start));
-        const re = dayMinToRel(parseHm(rowJson.breakfast_end));
-        const dur = Math.max(SNAP_MIN, re - rs);
-        setBlockFromRel(bf, snap5(rs), dur);
-        wireBlock(track, bf);
-      }
-    }
-    if (ln) {
-      ln.dataset.startHm = rowJson.lunch_start;
-      ln.dataset.endHm = rowJson.lunch_end;
-      const rls = dayMinToRel(parseHm(rowJson.lunch_start));
-      const rle = dayMinToRel(parseHm(rowJson.lunch_end));
-      const ldur = Math.max(SNAP_MIN, rle - rls);
-      setBlockFromRel(ln, snap5(rls), ldur);
-    }
-    const ovl = document.getElementById("reg-ovl-track");
-    if (ovl) {
-      renderOverload(ovl, rowsFromDomForOverload(window.__regCfgRows || []));
-    }
+  function createBreakBlock(track, kind) {
+    const k = (kind || "br").toLowerCase();
+    const cls = k === "bf" ? "bf" : k === "ln" ? "ln" : "br";
+    const label = k === "bf" ? "Завтрак" : k === "ln" ? "Обед" : nextBreakLabel(track);
+    const startMin = k === "bf" ? 9 * 60 : k === "ln" ? 12 * 60 : 14 * 60;
+    const blk = document.createElement("div");
+    blk.className = "reg-block reg-block--" + cls;
+    blk.dataset.kind = cls;
+    blk.innerHTML =
+      '<span class="reg-block__edge reg-block__edge--left" aria-hidden="true"></span>' +
+      '<span class="reg-block__edge reg-block__edge--right" aria-hidden="true"></span>' +
+      '<span class="reg-block__start"></span><span class="reg-block__end"></span>' +
+      '<button type="button" class="reg-block-del" title="Удалить ползунок" aria-label="Удалить ползунок">✕</button>' +
+      '<input type="text" class="reg-block-label" value="' + label + '" maxlength="100" placeholder="Название">';
+    track.appendChild(blk);
+    setBlockFromRel(blk, dayMinToRel(startMin), 30);
+    wireBlock(track, blk);
   }
 
   /**
-   * Замок и 8ч — отдельный API (сразу на сервер).
+   * Meta API: только замок.
    */
   window.regBindMetaControls = function (apiUrl, dateIso, getCookie) {
     const root = document.getElementById("reg-timeline-root");
@@ -485,34 +434,27 @@
       }
     });
 
-    root.addEventListener("change", function (ev) {
-      const cb = ev.target.closest(".reg-8h-cb");
-      if (!cb) return;
-      if (!regEditingEnabled()) {
-        cb.checked = !cb.checked;
+    root.addEventListener("click", function (ev) {
+      const addBtn = ev.target.closest(".reg-add-btn");
+      if (addBtn) {
+        if (!regEditingEnabled()) return;
+        const row = addBtn.closest(".reg-emp-row");
+        const track = row && row.querySelector(".reg-track[data-id]");
+        if (!track) return;
+        createBreakBlock(track, addBtn.getAttribute("data-kind"));
+        const ovl = document.getElementById("reg-ovl-track");
+        if (ovl) renderOverload(ovl, rowsFromDomForOverload(window.__regCfgRows || []));
         return;
       }
-      const id = parseInt(cb.getAttribute("data-id"), 10);
-      if (isNaN(id)) return;
-      const v = !!cb.checked;
-      postUpdates([{ id: id, eight_hour_shift: v }])
-        .then(function (data) {
-          const rowJson = (data.rows || []).find(function (r) {
-            return r.id === id;
-          });
-          const empRow = cb.closest(".reg-emp-row");
-          const track =
-            empRow && empRow.querySelector(".reg-track[data-id]");
-          if (rowJson && track) {
-            applyEightHourDom(track, rowJson);
-          } else {
-            window.location.reload();
-          }
-        })
-        .catch(function () {
-          window.alert("Не удалось сохранить признак 8ч");
-          cb.checked = !v;
-        });
+      const delBtn = ev.target.closest(".reg-block-del");
+      if (delBtn) {
+        if (!regEditingEnabled()) return;
+        const blk = delBtn.closest(".reg-block");
+        if (!blk) return;
+        blk.remove();
+        const ovl = document.getElementById("reg-ovl-track");
+        if (ovl) renderOverload(ovl, rowsFromDomForOverload(window.__regCfgRows || []));
+      }
     });
   };
 })();
