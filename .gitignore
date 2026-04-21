@@ -7,3 +7,4 @@ db.sqlite3
 .env.secrets
 .biota_users.json
 FETCH_HEAD
+FETCH_HEAD
