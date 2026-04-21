@@ -2,6 +2,28 @@
 
 {% block content %}
 
+{% if biota_nav.inventory %}
+<h4>Склад: остаток меньше 10</h4>
+{% if low_stock_items %}
+<div class="table-wrap">
+  <table class="data-grid">
+    <thead><tr><th>Категория</th><th>Инструмент</th><th>Остаток</th></tr></thead>
+    <tbody>
+      {% for t in low_stock_items %}
+      <tr>
+        <td>{{ t.get_category_display }}</td>
+        <td>{{ t.name }}</td>
+        <td><strong>{{ t.quantity }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="muted">Позиции с остатком меньше 10 отсутствуют.</p>
+{% endif %}
+{% endif %}
+
 {% if dashboard_error %}
 <p style="color:#ffb8b8;">{{ dashboard_error }}</p>
 {% else %}

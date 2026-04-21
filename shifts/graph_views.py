@@ -96,6 +96,17 @@ def _extract_selected_deps(request, all_deps, *, from_post: bool):
     return selected, dep_mode
 
 
+def _extract_selected_positions(request, all_positions, *, from_post: bool):
+    """Режим «все должности» — весь список; «по списку» — только отмеченные."""
+    source = request.POST if from_post else request.GET
+    pos_mode = source.get("pos_mode", "all")
+    if pos_mode == "all":
+        return list(all_positions), pos_mode
+    pos_list = source.getlist("pos")
+    selected = [p for p in pos_list if p in all_positions]
+    return selected, pos_mode
+
+
 def _dept_rank_map(all_deps: list[str]) -> dict[str, int]:
     return {d: i for i, d in enumerate(all_deps)}
 
@@ -105,9 +116,12 @@ def _pos_rank_map(all_positions: list[str]) -> dict[str, int]:
 
 
 def _parse_sort_mode(request, *, from_post: bool) -> str:
-    source = request.POST if from_post else request.GET
-    s = (source.get("sort_mode") or "dept").strip().lower()
-    return "pos" if s == "pos" else "dept"
+    """
+    Совместимость с другими модулями.
+    В интерфейсе графика сортировка больше не настраивается и всегда "dept".
+    """
+    _ = request, from_post
+    return "dept"
 
 
 def _sort_graph_rows(
@@ -117,16 +131,14 @@ def _sort_graph_rows(
     *,
     sort_mode: str = "dept",
 ):
+    _ = sort_mode
     out = df.copy()
     out["_dep_rank"] = out["Отдел"].map(lambda d: dep_rank.get(str(d), 10_000))
     out["_pos_rank"] = out["Должность"].map(lambda p: pos_rank.get(str(p), 10_000))
     out["_ln_sort"] = out["_last_name"].astype(str).str.lower()
     out["_fn_sort"] = out["_first_name"].astype(str).str.lower()
     out["_name_sort"] = out["Сотрудник"].astype(str).str.lower()
-    if sort_mode == "pos":
-        keys = ["_pos_rank", "_dep_rank", "_ln_sort", "_fn_sort", "_name_sort", "Код"]
-    else:
-        keys = ["_dep_rank", "_pos_rank", "_ln_sort", "_fn_sort", "_name_sort", "Код"]
+    keys = ["_dep_rank", "_pos_rank", "_ln_sort", "_fn_sort", "_name_sort", "Код"]
     return out.sort_values(keys, kind="stable")
 
 
@@ -162,13 +174,12 @@ def graph_view(request):
     if request.method == "POST":
         action = (request.POST.get("action") or "save").strip().lower()
         y, m = _parse_year_month(request, default_year=default_y, default_month=default_m)
-        sort_mode = _parse_sort_mode(request, from_post=True)
 
         if action == "upload":
             upl = request.FILES.get("schedule_file")
             if not upl:
                 messages.error(request, "Выберите файл .xlsx")
-                return redirect(f"/graph/?year={y}&month={m}&sort_mode={sort_mode}")
+                return redirect(f"/graph/?year={y}&month={m}")
             try:
                 raw = upl.read()
                 xl_imp = biota_schedule.read_schedule_sheet_from_bytes(raw)
@@ -182,7 +193,7 @@ def graph_view(request):
                 messages.error(request, str(err))
             except Exception as exc:
                 messages.error(request, f"Не удалось прочитать файл: {exc}")
-            return redirect(f"/graph/?year={y}&month={m}&sort_mode={sort_mode}")
+            return redirect(f"/graph/?year={y}&month={m}")
 
         # save
         full_schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
@@ -196,10 +207,16 @@ def graph_view(request):
             load_position_order(),
         )
         selected_deps, _dep_mode = _extract_selected_deps(request, all_deps, from_post=True)
+        selected_positions, _pos_mode = _extract_selected_positions(
+            request, all_positions, from_post=True
+        )
         dep_rank = _dept_rank_map(all_deps)
         pos_rank = _pos_rank_map(all_positions)
-        filtered = schedule_df[schedule_df["Отдел"].isin(selected_deps)].copy()
-        filtered = _sort_graph_rows(filtered, dep_rank, pos_rank, sort_mode=sort_mode)
+        filtered = schedule_df[
+            schedule_df["Отдел"].isin(selected_deps)
+            & schedule_df["Должность"].isin(selected_positions)
+        ].copy()
+        filtered = _sort_graph_rows(filtered, dep_rank, pos_rank)
 
         day_columns = sort_schedule_day_columns(
             [c for c in full_schedule_df.columns if is_schedule_day_column(c)], y, m
@@ -224,11 +241,10 @@ def graph_view(request):
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return JsonResponse({"ok": True, "saved": saved_path.name})
         messages.success(request, f"Сохранено: {saved_path.name}")
-        return redirect(f"/graph/?year={y}&month={m}&sort_mode={sort_mode}")
+        return redirect(f"/graph/?year={y}&month={m}")
 
     # GET
     y, m = _parse_year_month(request, default_year=default_y, default_month=default_m)
-    sort_mode = _parse_sort_mode(request, from_post=False)
     schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
     schedule_df = _schedule_with_department(schedule_df, employees_df)
     all_deps = apply_department_order(
@@ -240,10 +256,16 @@ def graph_view(request):
         load_position_order(),
     )
     selected_deps, dep_mode = _extract_selected_deps(request, all_deps, from_post=False)
+    selected_positions, pos_mode = _extract_selected_positions(
+        request, all_positions, from_post=False
+    )
     dep_rank = _dept_rank_map(all_deps)
     pos_rank = _pos_rank_map(all_positions)
-    schedule_df = schedule_df[schedule_df["Отдел"].isin(selected_deps)].copy()
-    schedule_df = _sort_graph_rows(schedule_df, dep_rank, pos_rank, sort_mode=sort_mode).reset_index(drop=True)
+    schedule_df = schedule_df[
+        schedule_df["Отдел"].isin(selected_deps)
+        & schedule_df["Должность"].isin(selected_positions)
+    ].copy()
+    schedule_df = _sort_graph_rows(schedule_df, dep_rank, pos_rank).reset_index(drop=True)
 
     dep_color_map = {
         dep: DEPT_COLOR_CLASSES[i % len(DEPT_COLOR_CLASSES)] for i, dep in enumerate(all_deps)
@@ -332,7 +354,9 @@ def graph_view(request):
             "all_deps": all_deps,
             "sel_deps": selected_deps,
             "dep_mode_pick": dep_mode != "all",
-            "sort_mode": sort_mode,
+            "all_positions": all_positions,
+            "sel_positions": selected_positions,
+            "pos_mode_pick": pos_mode != "all",
             "day_headers": day_headers,
             "non_working_days": non_working_days,
             "table_rows": table_rows,

@@ -9,16 +9,15 @@
   <a class="btn {% if panel == 'arrival' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=arrival">Приход</a>
 </div>
 <h2 style="margin-top:0;">Склад инструмента</h2>
-<p class="muted">По умолчанию показано только то, что есть на складе (остаток больше 0).</p>
+<p class="muted">Отображается один тип инструмента за раз (по умолчанию: фрезы), только с остатком больше 0.</p>
 
 {% if panel == "stock" %}
 <form method="get" class="filter-panel auto-submit-form">
   <input type="hidden" name="panel" value="stock">
   <h3>Фильтр наличия</h3>
   <div class="filter-grid">
-    <label class="field"><span>Категория</span>
+    <label class="field"><span>Тип инструмента</span>
       <select name="category">
-        <option value="">Выберите категорию</option>
         <option value="end_mill" {% if filters.category == "end_mill" %}selected{% endif %}>Фрезы</option>
         <option value="tap" {% if filters.category == "tap" %}selected{% endif %}>Резьбовой инструмент</option>
       </select>
@@ -142,7 +141,6 @@
       </select>
     </label>
     {% endif %}
-    {% if filters.category %}
     <label class="field"><span>Материал инструмента</span>
       <select name="tool_material">
         <option value="">Все</option>
@@ -180,41 +178,42 @@
         {% endfor %}
       </div>
     </div>
-    {% endif %}
   </div>
-  {% if not filters.category %}
-  <p class="muted" style="margin:8px 0 0 0;">Сначала выберите категорию инструмента, затем появятся фильтры этого типа.</p>
-  {% endif %}
 </form>
 
 <div class="table-wrap">
-  <table class="data-grid">
+  {% if filters.category == "end_mill" %}
+  <table class="data-grid js-sortable-table">
     <thead>
       <tr>
-        <th>Категория</th>
-        <th>Наименование</th>
-        <th>Параметры</th>
-        <th>Материал инструмента</th>
-        <th>Материал покрытия</th>
-        <th>Материал обработки</th>
-        <th>Остаток</th>
+        <th class="sortable">Тип фрезы</th>
+        <th class="sortable">D, мм</th>
+        <th class="sortable">R, мм</th>
+        <th class="sortable">L, мм</th>
+        <th class="sortable">Lc, мм</th>
+        <th class="sortable">Z</th>
+        <th class="sortable">Материал инструмента</th>
+        <th class="sortable">Покрытие</th>
+        <th class="sortable">Материал обработки</th>
+        <th class="sortable">Остаток</th>
       </tr>
     </thead>
     <tbody>
       {% for t in tool_items %}
       <tr>
-        <td>{{ t.get_category_display }}</td>
-        <td>{{ t.name }}</td>
-        <td>
-          {% if t.category == "end_mill" and t.end_mill_spec %}
-            {{ t.end_mill_spec.get_mill_type_display }} | D{{ t.end_mill_spec.diameter_mm|default:"неизв." }} | R={{ t.end_mill_spec.corner_radius_mm|default:"0" }} | L={{ t.end_mill_spec.overall_length_mm|default:"неизв." }} | Lc={{ t.end_mill_spec.cutting_length_mm|default:"неизв." }} | Z={{ t.end_mill_spec.flutes_count|default:"неизв." }}
-          {% elif t.category == "tap" and t.tap_spec %}
-            {{ t.tap_spec.size_label|default:"Размер неизвестен" }} | {{ t.tap_spec.get_thread_standard_display }} | P={{ t.tap_spec.pitch_mm|default:"неизв." }} {% if t.tap_spec.tpi %}| TPI={{ t.tap_spec.tpi }}{% endif %} | {{ t.tap_spec.get_hole_type_display }} | {{ t.tap_spec.get_tap_type_display }}
-          {% endif %}
+        <td data-sort="{{ t.end_mill_spec.get_mill_type_display|default:'-' }}">{{ t.end_mill_spec.get_mill_type_display|default:"-" }}</td>
+        <td data-sort="{{ t.end_mill_spec.diameter_mm|default:'-1' }}">
+          {% if t.end_mill_spec.diameter_mm %}Ø{{ t.end_mill_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}
         </td>
+        <td data-sort="{{ t.end_mill_spec.corner_radius_mm|default:'-1' }}">{{ t.end_mill_spec.corner_radius_mm|default:"-" }}</td>
+        <td data-sort="{{ t.end_mill_spec.overall_length_mm|default:'-1' }}">{{ t.end_mill_spec.overall_length_mm|default:"-" }}</td>
+        <td data-sort="{{ t.end_mill_spec.cutting_length_mm|default:'-1' }}">{{ t.end_mill_spec.cutting_length_mm|default:"-" }}</td>
+        <td data-sort="{{ t.end_mill_spec.flutes_count|default:'-1' }}">{{ t.end_mill_spec.flutes_count|default:"-" }}</td>
         <td>{{ t.get_tool_material_display|default:"-" }}</td>
-        <td>{{ t.get_coating_type_display }}</td>
-        <td>
+        <td data-sort="{{ t.coating_type }}">
+          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
+        </td>
+        <td data-sort="{{ t.work_material|default:'-' }}">
           {% if t.work_material == "P" %}<span class="wm-badge wm-p">P</span>
           {% elif t.work_material == "M" %}<span class="wm-badge wm-m">M</span>
           {% elif t.work_material == "K" %}<span class="wm-badge wm-k">K</span>
@@ -222,15 +221,64 @@
           {% elif t.work_material == "S" %}<span class="wm-badge wm-s">S</span>
           {% elif t.work_material == "H" %}<span class="wm-badge wm-h">H</span>
           {% else %}-{% endif %}
-          {{ t.get_work_material_display|default:"" }}
         </td>
-        <td><strong>{{ t.quantity }}</strong></td>
+        <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
       </tr>
       {% empty %}
-      <tr><td colspan="7" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="10" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
+  {% else %}
+  <table class="data-grid js-sortable-table">
+    <thead>
+      <tr>
+        <th class="sortable">Размер</th>
+        <th class="sortable">Стандарт</th>
+        <th class="sortable">Шаг, мм</th>
+        <th class="sortable">TPI</th>
+        <th class="sortable">Тип отверстия</th>
+        <th class="sortable">Тип инструмента</th>
+        <th class="sortable">L, мм</th>
+        <th class="sortable">Lc, мм</th>
+        <th class="sortable">Материал инструмента</th>
+        <th class="sortable">Покрытие</th>
+        <th class="sortable">Материал обработки</th>
+        <th class="sortable">Остаток</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tool_items %}
+      <tr>
+        <td data-sort="{{ t.tap_spec.size_label|default:'-' }}">{{ t.tap_spec.size_label|default:"-" }}</td>
+        <td data-sort="{{ t.tap_spec.get_thread_standard_display|default:'-' }}">{{ t.tap_spec.get_thread_standard_display|default:"-" }}</td>
+        <td data-sort="{{ t.tap_spec.pitch_mm|default:'-1' }}">{{ t.tap_spec.pitch_mm|default:"-" }}</td>
+        <td data-sort="{{ t.tap_spec.tpi|default:'-1' }}">{{ t.tap_spec.tpi|default:"-" }}</td>
+        <td data-sort="{{ t.tap_spec.get_hole_type_display|default:'-' }}">{{ t.tap_spec.get_hole_type_display|default:"-" }}</td>
+        <td data-sort="{{ t.tap_spec.get_tap_type_display|default:'-' }}">{{ t.tap_spec.get_tap_type_display|default:"-" }}</td>
+        <td data-sort="{{ t.tap_spec.overall_length_mm|default:'-1' }}">{{ t.tap_spec.overall_length_mm|default:"-" }}</td>
+        <td data-sort="{{ t.tap_spec.cutting_length_mm|default:'-1' }}">{{ t.tap_spec.cutting_length_mm|default:"-" }}</td>
+        <td>{{ t.get_tool_material_display|default:"-" }}</td>
+        <td data-sort="{{ t.coating_type }}">
+          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
+        </td>
+        <td data-sort="{{ t.work_material|default:'-' }}">
+          {% if t.work_material == "P" %}<span class="wm-badge wm-p">P</span>
+          {% elif t.work_material == "M" %}<span class="wm-badge wm-m">M</span>
+          {% elif t.work_material == "K" %}<span class="wm-badge wm-k">K</span>
+          {% elif t.work_material == "N" %}<span class="wm-badge wm-n">N</span>
+          {% elif t.work_material == "S" %}<span class="wm-badge wm-s">S</span>
+          {% elif t.work_material == "H" %}<span class="wm-badge wm-h">H</span>
+          {% else %}-{% endif %}
+        </td>
+        <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="12" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -251,6 +299,9 @@
         <option value="end_mill">Фрезы</option>
         <option value="tap">Резьбовой инструмент</option>
       </select>
+    </label>
+    <label class="field"><span>Поиск инструмента</span>
+      <input type="text" class="js-tool-search" data-target-select="issue-tool-select" placeholder="Например: 1, 1.0, M6, D1">
     </label>
     <label class="field"><span>Инструмент</span>
       <select id="issue-tool-select" name="tool_id" required>
@@ -383,8 +434,11 @@
   <form method="post" class="filter-grid">
     {% csrf_token %}
     <input type="hidden" name="action" value="process_issue_outcome">
+    <label class="field"><span>Поиск инструмента</span>
+      <input type="text" id="issue-search-input" placeholder="Например: 1, 1.0, M6, D1">
+    </label>
     <label class="field"><span>Выданная позиция</span>
-      <select name="issue_id" required>
+      <select name="issue_id" id="issue-id-select" required>
         <option value="">Выбрать...</option>
         {% for iss in issue_candidates %}
         <option value="{{ iss.id }}">
@@ -402,6 +456,55 @@
     <label class="field"><span>Комментарий (обязательно)</span><input type="text" name="comment" placeholder="Причина списания/возврата" required></label>
     <div class="filter-actions"><button type="submit" class="btn">Провести операцию</button></div>
   </form>
+
+  <h4 style="margin:16px 0 8px;">Активные выдачи (быстрое оформление)</h4>
+  <p class="muted" style="margin-top:0;">Нажми на строку и сразу оформи частичный возврат/списание по этой выдаче.</p>
+  <div class="table-wrap">
+    <table class="data-grid">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Дата</th>
+          <th>Инструмент</th>
+          <th>Выдано</th>
+          <th>Осталось</th>
+          <th>Быстрое оформление</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for iss in issue_candidates %}
+        <tr class="issue-candidate-row" data-issue-id="{{ iss.id }}">
+          <td>#{{ iss.id }}</td>
+          <td>{{ iss.movement_date }}</td>
+          <td>
+            {{ iss.tool.get_category_display }}
+            {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% endif %}
+            | {{ iss.tool.name }}
+          </td>
+          <td>{{ iss.quantity }}</td>
+          <td><strong>{{ iss.remaining_qty }}</strong></td>
+          <td style="min-width: 340px;">
+            <form method="post" class="issue-inline-form">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="process_issue_outcome">
+              <input type="hidden" name="issue_id" value="{{ iss.id }}">
+              <input type="hidden" name="employee_name" value="{{ iss.employee_name|default:'' }}">
+              <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                <input type="number" name="returned_qty" min="0" max="{{ iss.remaining_qty }}" value="0" title="Возврат" style="width:80px;">
+                <input type="number" name="writeoff_qty" min="0" max="{{ iss.remaining_qty }}" value="0" title="Списание" style="width:80px;">
+                <input type="date" name="movement_date" value="{{ today }}" required style="width:145px;">
+                <input type="text" name="comment" required placeholder="Комментарий" style="min-width:160px; flex:1 1 160px;">
+                <button type="submit" class="btn">Провести</button>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="muted">Нет активных выдач для обработки.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endif %}
 
@@ -544,18 +647,93 @@
     transform: scale(1.05);
   }
   .wm-all { background: #2a3656; color: #eaf0ff; width: 36px; }
+  .coating-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    border: 1px solid #44557c;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .table-wrap .data-grid th,
+  .table-wrap .data-grid td {
+    text-align: center;
+    vertical-align: middle;
+  }
+  .data-grid th.sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .data-grid th.sortable::after {
+    content: " \2195";
+    opacity: 0.5;
+    font-size: 11px;
+  }
+  .data-grid th.sortable.is-asc::after { content: " \2191"; opacity: 0.9; }
+  .data-grid th.sortable.is-desc::after { content: " \2193"; opacity: 0.9; }
 </style>
 <script>
   (function () {
-    var categorySelects = document.querySelectorAll(".js-tool-category");
-    if (!categorySelects.length) return;
+    var tables = document.querySelectorAll(".js-sortable-table");
+    if (!tables.length) return;
 
-    function filterToolOptions(categorySelect) {
-      var targetId = categorySelect.getAttribute("data-target-select");
+    function toSortableValue(cell) {
+      var raw = (cell.getAttribute("data-sort") || cell.textContent || "").trim();
+      var normalized = raw.replace(",", ".");
+      var num = parseFloat(normalized);
+      if (!Number.isNaN(num) && /^-?\d+(\.\d+)?$/.test(normalized)) return num;
+      return raw.toLowerCase();
+    }
+
+    Array.prototype.forEach.call(tables, function (table) {
+      var headers = table.querySelectorAll("thead th.sortable");
+      var tbody = table.querySelector("tbody");
+      if (!headers.length || !tbody) return;
+      Array.prototype.forEach.call(headers, function (th, idx) {
+        th.addEventListener("click", function () {
+          var isAsc = !th.classList.contains("is-asc");
+          Array.prototype.forEach.call(headers, function (h) { h.classList.remove("is-asc", "is-desc"); });
+          th.classList.add(isAsc ? "is-asc" : "is-desc");
+
+          var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr"));
+          rows.sort(function (a, b) {
+            var aCell = a.children[idx];
+            var bCell = b.children[idx];
+            var av = toSortableValue(aCell);
+            var bv = toSortableValue(bCell);
+            if (av < bv) return isAsc ? -1 : 1;
+            if (av > bv) return isAsc ? 1 : -1;
+            return 0;
+          });
+          rows.forEach(function (row) { tbody.appendChild(row); });
+        });
+      });
+    });
+  })();
+  (function () {
+    var categorySelects = document.querySelectorAll(".js-tool-category");
+    var searchInputs = document.querySelectorAll(".js-tool-search");
+    if (!categorySelects.length && !searchInputs.length) return;
+
+    function normalizeText(s) {
+      return String(s || "")
+        .toLowerCase()
+        .replace(/,/g, ".")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function filterToolOptions(targetId) {
       if (!targetId) return;
       var toolSelect = document.getElementById(targetId);
       if (!toolSelect) return;
-      var selectedCategory = categorySelect.value;
+      var categorySelect = document.querySelector('.js-tool-category[data-target-select="' + targetId + '"]');
+      var searchInput = document.querySelector('.js-tool-search[data-target-select="' + targetId + '"]');
+      var selectedCategory = categorySelect ? categorySelect.value : "";
+      var queryRaw = normalizeText(searchInput ? searchInput.value : "");
+      var queryCompact = queryRaw.replace(/\.0+\b/g, "");
 
       Array.prototype.forEach.call(toolSelect.options, function (opt, idx) {
         if (idx === 0) {
@@ -563,7 +741,11 @@
           return;
         }
         var optionCategory = opt.getAttribute("data-category");
-        opt.hidden = !!selectedCategory && optionCategory !== selectedCategory;
+        var categoryMatch = !selectedCategory || optionCategory === selectedCategory;
+        var text = normalizeText(opt.textContent);
+        var textCompact = text.replace(/\.0+\b/g, "");
+        var searchMatch = !queryRaw || text.indexOf(queryRaw) !== -1 || textCompact.indexOf(queryCompact) !== -1;
+        opt.hidden = !(categoryMatch && searchMatch);
       });
 
       if (toolSelect.selectedIndex > 0 && toolSelect.options[toolSelect.selectedIndex].hidden) {
@@ -572,8 +754,14 @@
     }
 
     Array.prototype.forEach.call(categorySelects, function (select) {
-      select.addEventListener("change", function () { filterToolOptions(select); });
-      filterToolOptions(select);
+      var targetId = select.getAttribute("data-target-select");
+      select.addEventListener("change", function () { filterToolOptions(targetId); });
+      filterToolOptions(targetId);
+    });
+    Array.prototype.forEach.call(searchInputs, function (input) {
+      var targetId = input.getAttribute("data-target-select");
+      input.addEventListener("input", function () { filterToolOptions(targetId); });
+      filterToolOptions(targetId);
     });
   })();
   (function () {
@@ -588,6 +776,54 @@
     }
     categorySelect.addEventListener("change", syncCategory);
     syncCategory();
+  })();
+  (function () {
+    var searchInput = document.getElementById("issue-search-input");
+    var issueSelect = document.getElementById("issue-id-select");
+    if (!searchInput || !issueSelect) return;
+
+    function normalizeText(s) {
+      return String(s || "")
+        .toLowerCase()
+        .replace(/,/g, ".")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function filterIssueOptions() {
+      var queryRaw = normalizeText(searchInput.value);
+      var queryCompact = queryRaw.replace(/\.0+\b/g, "");
+      Array.prototype.forEach.call(issueSelect.options, function (opt, idx) {
+        if (idx === 0) {
+          opt.hidden = false;
+          return;
+        }
+        var text = normalizeText(opt.textContent);
+        var textCompact = text.replace(/\.0+\b/g, "");
+        var match = !queryRaw || text.indexOf(queryRaw) !== -1 || textCompact.indexOf(queryCompact) !== -1;
+        opt.hidden = !match;
+      });
+      if (issueSelect.selectedIndex > 0 && issueSelect.options[issueSelect.selectedIndex].hidden) {
+        issueSelect.selectedIndex = 0;
+      }
+    }
+
+    searchInput.addEventListener("input", filterIssueOptions);
+    filterIssueOptions();
+  })();
+  (function () {
+    var rows = document.querySelectorAll(".issue-candidate-row");
+    var issueSelect = document.getElementById("issue-id-select");
+    if (!rows.length) return;
+    Array.prototype.forEach.call(rows, function (row) {
+      row.addEventListener("click", function (evt) {
+        if (evt.target.closest("input, button, select, textarea, form, label")) return;
+        var issueId = row.getAttribute("data-issue-id");
+        if (issueSelect) issueSelect.value = issueId;
+        var firstInput = row.querySelector('input[name="returned_qty"]');
+        if (firstInput) firstInput.focus();
+      });
+    });
   })();
 </script>
 {% endblock %}

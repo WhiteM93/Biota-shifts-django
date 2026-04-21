@@ -386,13 +386,14 @@ def inventory_view(request):
         messages.success(request, "Приход сохранен: остаток обновлен (или создана новая позиция).")
         return redirect("inventory")
 
-    show_all = (request.GET.get("show_all") or "").strip() == "1"
+    show_all = (request.GET.get("show_all") or "1").strip() == "1"
     qs = ToolItem.objects.all()
     if not show_all:
         qs = qs.filter(quantity__gt=0)
-    filter_category = (request.GET.get("category") or "").strip()
-    if filter_category in {"end_mill", "tap"}:
-        qs = qs.filter(category=filter_category)
+    filter_category = (request.GET.get("category") or "end_mill").strip()
+    if filter_category not in {"end_mill", "tap"}:
+        filter_category = "end_mill"
+    qs = qs.filter(category=filter_category)
 
     diameter_mm_raw = (request.GET.get("diameter_mm") or "").strip()
     mill_overall_length_raw = (request.GET.get("mill_overall_length_mm") or "").strip()
@@ -467,8 +468,7 @@ def inventory_view(request):
     option_source_qs = ToolItem.objects.all()
     if not show_all:
         option_source_qs = option_source_qs.filter(quantity__gt=0)
-    if filter_category in {"end_mill", "tap"}:
-        option_source_qs = option_source_qs.filter(category=filter_category)
+    option_source_qs = option_source_qs.filter(category=filter_category)
 
     end_mill_diameters = _distinct_numeric_values(option_source_qs.filter(category="end_mill"), "end_mill_spec__diameter_mm")
     end_mill_overall_lengths = _distinct_numeric_values(option_source_qs.filter(category="end_mill"), "end_mill_spec__overall_length_mm")

@@ -4,32 +4,22 @@
 <div class="graph-page" id="graph-page-root">
 
 <div class="graph-top-strip">
-<div class="graph-actions">
-  <div class="graph-action-card">
-    <span class="graph-action-title">Экспорт</span>
-    <a class="btn" href="{% url 'graph_download' %}?year={{ year }}&month={{ month }}">Скачать Excel</a>
-  </div>
-  <form method="post" action="" enctype="multipart/form-data" class="graph-upload-form graph-action-card">
+  <a class="btn" href="{% url 'graph_download' %}?year={{ year }}&month={{ month }}">Скачать Excel</a>
+  <form method="post" action="" enctype="multipart/form-data" class="graph-upload-form">
     {% csrf_token %}
     <input type="hidden" name="action" value="upload">
     <input type="hidden" name="year" value="{{ year }}">
     <input type="hidden" name="month" value="{{ month }}">
-    <input type="hidden" name="sort_mode" value="{{ sort_mode }}">
-    <span class="graph-action-title">Импорт</span>
     <div class="graph-upload-row">
-      <input type="file" name="schedule_file" accept=".xlsx" required>
+      <input id="graph-schedule-file" type="file" name="schedule_file" accept=".xlsx" required class="graph-upload-input">
+      <label for="graph-schedule-file" class="btn graph-upload-pick-btn">Выбрать файл</label>
+      <span class="graph-upload-filename" id="graph-upload-filename">Файл не выбран</span>
       <button type="submit" class="btn">Загрузить в систему</button>
     </div>
   </form>
-</div>
-<div class="graph-top-tools">
   <button type="button" class="btn btn-print-sheet" id="graph-print-btn" title="Печать или «Сохранить как PDF» в диалоге браузера">Печать</button>
   <button type="button" class="btn btn-png-export" id="graph-png-btn" title="Снимок таблицы в тёмном оформлении (PNG)">PNG (тёмная тема)</button>
-  <button type="button" class="btn btn-theme-light-toggle" id="graph-theme-toggle" title="Удобно для скриншота и печати">Светлая тема</button>
 </div>
-</div>
-
-<p class="muted">{{ month_name|capfirst }} {{ year }} — допустимые коды: <strong>д</strong>, <strong>н</strong>, <strong>от</strong>, <strong>б</strong>, <strong>п</strong>, <strong>кп</strong> или пусто.</p>
 
 <form method="get" action="" class="filter-panel auto-submit-form">
   <div class="filter-grid">
@@ -52,11 +42,6 @@
   </div>
   </div>
   <div class="mode-row">
-    <span class="label">Сортировка:</span>
-    <label class="inline"><input type="radio" name="sort_mode" value="dept" {% if sort_mode != "pos" %}checked{% endif %}> Сначала отдел</label>
-    <label class="inline"><input type="radio" name="sort_mode" value="pos" {% if sort_mode == "pos" %}checked{% endif %}> Сначала должность</label>
-  </div>
-  <div class="mode-row">
     <span class="label">Отделы:</span>
     <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not dep_mode_pick %}checked{% endif %}> Все</label>
     <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if dep_mode_pick %}checked{% endif %}> По списку</label>
@@ -65,6 +50,17 @@
     <span class="label">Отделы:</span>
     {% for dep in all_deps %}
     <label class="chk"><input type="checkbox" name="dep" value="{{ dep }}" {% if dep in sel_deps %}checked{% endif %}> {{ dep }}</label>
+    {% endfor %}
+  </div>
+  <div class="mode-row">
+    <span class="label">Должности:</span>
+    <label class="inline"><input type="radio" name="pos_mode" value="all" {% if not pos_mode_pick %}checked{% endif %}> Все</label>
+    <label class="inline"><input type="radio" name="pos_mode" value="pick" {% if pos_mode_pick %}checked{% endif %}> По списку</label>
+  </div>
+  <div class="check-row mode-target {% if not pos_mode_pick %}is-hidden{% endif %}" data-mode-target="pos">
+    <span class="label">Должности:</span>
+    {% for pos in all_positions %}
+    <label class="chk"><input type="checkbox" name="pos" value="{{ pos }}" {% if pos in sel_positions %}checked{% endif %}> {{ pos }}</label>
     {% endfor %}
   </div>
 </form>
@@ -93,10 +89,13 @@
   <input type="hidden" name="action" value="save">
   <input type="hidden" name="year" value="{{ year }}">
   <input type="hidden" name="month" value="{{ month }}">
-  <input type="hidden" name="sort_mode" value="{{ sort_mode }}">
   <input type="hidden" name="dep_mode" value="{% if dep_mode_pick %}pick{% else %}all{% endif %}">
   {% for dep in sel_deps %}
   <input type="hidden" name="dep" value="{{ dep }}">
+  {% endfor %}
+  <input type="hidden" name="pos_mode" value="{% if pos_mode_pick %}pick{% else %}all{% endif %}">
+  {% for pos in sel_positions %}
+  <input type="hidden" name="pos" value="{{ pos }}">
   {% endfor %}
   <table class="schedule-table">
     <thead>
@@ -153,26 +152,13 @@
 .graph-top-strip {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 12px 16px;
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #2b3650;
-}
-.graph-actions {
-  margin: 0;
-  display: grid;
-  grid-template-columns: minmax(180px, 240px) 1fr;
-  gap: 10px;
-  flex: 1 1 420px;
-  min-width: min(100%, 320px);
-}
-.graph-top-tools {
-  display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  flex: 0 1 auto;
+  margin-bottom: 14px;
+  padding: 10px;
+  border: 1px solid #2f3b57;
+  border-radius: 10px;
+  background: rgba(16, 23, 36, 0.88);
 }
 .graph-body {
   display: flex;
@@ -267,50 +253,33 @@
   font-size: 11px;
   font-weight: 600;
 }
-.graph-action-card {
-  border: 1px solid #2f3b57;
-  border-radius: 10px;
-  background: rgba(16, 23, 36, 0.88);
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.graph-action-title {
-  color: #aebde8;
-  font-size: 12px;
-  font-weight: 700;
-}
 .graph-upload-form {
   margin: 0;
 }
 .graph-upload-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
-.graph-upload-row input[type="file"] {
-  background: rgba(13, 19, 31, 0.92);
-  border: 1px solid #3a4a72;
-  border-radius: 8px;
-  color: #d7e2ff;
-  padding: 5px 8px;
-  font-size: 12px;
+.graph-upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
 }
-.graph-upload-row input[type="file"]::file-selector-button {
-  margin-right: 10px;
-  border: 1px solid #4f6190;
-  border-radius: 7px;
-  background: linear-gradient(180deg, #32415f 0%, #26324b 100%);
-  color: #eaf0ff;
-  padding: 6px 10px;
+.graph-upload-pick-btn { cursor: pointer; }
+.graph-upload-filename {
   font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.graph-upload-row input[type="file"]::file-selector-button:hover {
-  background: linear-gradient(180deg, #3a4b6d 0%, #2d3a57 100%);
+  color: #aebde8;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .mode-row {
   margin-top: 10px;
@@ -475,20 +444,7 @@
   cursor: not-allowed;
 }
 .btn-theme-light-toggle {
-  background: linear-gradient(180deg, #f0f3fa 0%, #dce3f0 100%);
-  color: #1e2a44;
-  border: 1px solid #9aa8c4;
-  box-shadow: 0 2px 8px rgba(40, 60, 100, 0.12);
-}
-.btn-theme-light-toggle:hover {
-  filter: brightness(1.02);
-  border-color: #7a8aad;
-  color: #0f1728;
-}
-.btn-theme-light-toggle.is-active {
-  background: linear-gradient(180deg, #dce8ff 0%, #c5d6f5 100%);
-  border-color: #5a6d9a;
-  color: #0f1728;
+  display: none;
 }
 #graph-page-root.theme-light {
   color: #1a2233;
@@ -534,6 +490,7 @@
   border: 1px solid #9aa8c4;
   color: #1a2233;
 }
+#graph-page-root.theme-light .graph-upload-filename { color: #4b5568; }
 #graph-page-root.theme-light .graph-edit-hint { color: #4b5568; }
 #graph-page-root.theme-light .graph-save-status { color: #374151; }
 #graph-page-root.theme-light .schedule-wrap {
@@ -677,9 +634,8 @@
   }
 }
 @media (max-width: 720px) {
-  .graph-actions { grid-template-columns: 1fr; }
-  .graph-upload-row { grid-template-columns: 1fr; }
-  .graph-upload-row input[type="file"] { width: 100%; }
+  .graph-upload-row { display: flex; }
+  .graph-upload-filename { max-width: 100%; flex: 1 1 100%; }
   .graph-upload-row .btn { width: 100%; }
   .schedule-wrap { padding: 6px; }
   .schedule-table { font-size: 11px; }
@@ -702,12 +658,17 @@
     var depModeInputs = document.querySelectorAll('input[name="dep_mode"]');
     var depTarget = document.querySelector('[data-mode-target="dep"]');
     var hiddenDepMode = form.querySelector('input[name="dep_mode"][type="hidden"]');
+    var posModeInputs = document.querySelectorAll('input[name="pos_mode"]');
+    var posTarget = document.querySelector('[data-mode-target="pos"]');
+    var hiddenPosMode = form.querySelector('input[name="pos_mode"][type="hidden"]');
     var editing = false;
     var editToggle = document.getElementById("graph-edit-toggle");
     var editHint = document.getElementById("graph-edit-hint");
     var codePalette = document.getElementById("graph-code-palette");
     var brushOn = false;
     var brushVal = "";
+    var fileInput = document.getElementById("graph-schedule-file");
+    var fileNameEl = document.getElementById("graph-upload-filename");
 
     function updatePaletteActive() {
       if (!codePalette) return;
@@ -906,6 +867,13 @@
       if (hiddenDepMode) hiddenDepMode.value = isPick ? "pick" : "all";
     }
 
+    function syncPosModeVisibility() {
+      var picked = document.querySelector('input[name="pos_mode"][value="pick"]');
+      var isPick = !!(picked && picked.checked);
+      if (posTarget) posTarget.classList.toggle("is-hidden", !isPick);
+      if (hiddenPosMode) hiddenPosMode.value = isPick ? "pick" : "all";
+    }
+
     form.querySelectorAll(".day-input").forEach(function (input) {
       input.addEventListener("mousedown", function (event) {
         if (event.button !== 0) return;
@@ -986,6 +954,12 @@
         });
       });
     }
+    if (fileInput && fileNameEl) {
+      fileInput.addEventListener("change", function () {
+        var hasFile = fileInput.files && fileInput.files.length > 0;
+        fileNameEl.textContent = hasFile ? fileInput.files[0].name : "Файл не выбран";
+      });
+    }
 
     depModeInputs.forEach(function (el) {
       el.addEventListener("change", function () {
@@ -998,6 +972,17 @@
       });
     });
     syncDepModeVisibility();
+    posModeInputs.forEach(function (el) {
+      el.addEventListener("change", function () {
+        if (el.name === "pos_mode" && el.value === "pick" && el.checked && posTarget) {
+          posTarget.querySelectorAll('input[type="checkbox"][name="pos"]').forEach(function (cb) {
+            cb.checked = false;
+          });
+        }
+        syncPosModeVisibility();
+      });
+    });
+    syncPosModeVisibility();
 
     var printBtn = document.getElementById("graph-print-btn");
     if (printBtn) {
@@ -1013,28 +998,11 @@
           return;
         }
         var wrap = document.querySelector("#graph-page-root .schedule-wrap");
-        var pageRoot = document.getElementById("graph-page-root");
-        var themeBtn = document.getElementById("graph-theme-toggle");
-        if (!wrap || !pageRoot) return;
-        var hadLight = pageRoot.classList.contains("theme-light");
-        if (hadLight) {
-          pageRoot.classList.remove("theme-light");
-          if (themeBtn) {
-            themeBtn.classList.remove("is-active");
-            themeBtn.textContent = "Светлая тема";
-          }
-        }
+        if (!wrap) return;
         pngBtn.disabled = true;
         var w = wrap.getBoundingClientRect().width;
         var scale = w > 1600 ? 1 : 2;
         function restoreTheme() {
-          if (hadLight) {
-            pageRoot.classList.add("theme-light");
-            if (themeBtn) {
-              themeBtn.classList.add("is-active");
-              themeBtn.textContent = "Обычная тема";
-            }
-          }
           pngBtn.disabled = false;
         }
         function run() {
@@ -1101,17 +1069,6 @@
         requestAnimationFrame(function () {
           requestAnimationFrame(run);
         });
-      });
-    }
-    var pageRoot = document.getElementById("graph-page-root");
-    var themeBtn = document.getElementById("graph-theme-toggle");
-    if (pageRoot && themeBtn) {
-      themeBtn.addEventListener("click", function () {
-        pageRoot.classList.toggle("theme-light");
-        themeBtn.textContent = pageRoot.classList.contains("theme-light")
-          ? "Обычная тема"
-          : "Светлая тема";
-        themeBtn.classList.toggle("is-active", pageRoot.classList.contains("theme-light"));
       });
     }
   })();

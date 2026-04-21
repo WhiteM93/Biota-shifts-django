@@ -24,6 +24,7 @@ from biota_shifts import schedule as biota_schedule
 from biota_shifts.schedule import employee_label_row
 
 from .auth_utils import biota_login_required, biota_user
+from .models import ToolItem
 
 
 def _df_columns_rows(df: pd.DataFrame):
@@ -154,7 +155,16 @@ def home_view(request):
         "dash_month": datetime.now().month,
         "year_options": [],
         "month_choices": [(mm, MONTH_NAMES_RU[mm]) for mm in range(1, 13)],
+        "low_stock_items": [],
     }
+
+    can_inventory = nav_permissions_for_user(user or "").get("inventory", True)
+    if can_inventory:
+        ctx["low_stock_items"] = list(
+            ToolItem.objects.filter(quantity__lt=10)
+            .select_related("end_mill_spec", "tap_spec")
+            .order_by("quantity", "category", "name")[:100]
+        )
 
     if employees_df.empty:
         ctx["dashboard_error"] = (
