@@ -54,6 +54,13 @@ WORK_MATERIAL_TYPES = [
     ("H", "H (серый) — закалённые стали (45–65 HRC)"),
 ]
 
+PURCHASE_STATUSES = [
+    ("processing", "В обработке"),
+    ("ordered", "Заказано"),
+    ("delivered", "Доставлено"),
+    ("stocked", "Реализовано на складе"),
+]
+
 
 class ToolItem(models.Model):
     category = models.CharField(
@@ -158,3 +165,40 @@ class StockMovement(models.Model):
 
     def __str__(self):
         return f"{self.get_movement_type_display()} {self.quantity} / {self.tool.name}"
+
+
+class PurchaseRequest(models.Model):
+    requested_item = models.CharField(max_length=255, verbose_name="Что закупить")
+    store_link = models.URLField(blank=True, verbose_name="Ссылка на магазин")
+    article = models.CharField(max_length=120, blank=True, verbose_name="Артикул")
+    quantity = models.PositiveIntegerField(verbose_name="Количество")
+    unit_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        verbose_name="Цена за 1 шт",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=PURCHASE_STATUSES,
+        default="processing",
+        verbose_name="Статус",
+    )
+    request_comment = models.CharField(max_length=500, blank=True, verbose_name="Комментарий к заявке")
+    status_comment = models.CharField(max_length=500, blank=True, verbose_name="Комментарий по статусу")
+    requested_by = models.CharField(max_length=120, verbose_name="Кто запросил")
+    status_updated_by = models.CharField(max_length=120, blank=True, verbose_name="Кто сменил статус")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = "Заявка на закупку"
+        verbose_name_plural = "Заявки на закупку"
+
+    def __str__(self):
+        return f"{self.requested_item} x{self.quantity} ({self.get_status_display()})"
+
+    @property
+    def total_price(self):
+        return self.unit_price * self.quantity

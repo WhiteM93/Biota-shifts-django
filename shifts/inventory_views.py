@@ -8,7 +8,8 @@ from django.db.models.functions import Coalesce
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
-from .auth_utils import biota_login_required, nav_permission_required
+from biota_shifts.auth import _is_admin
+from .auth_utils import biota_login_required, biota_user, nav_permission_required
 from .models import (
     COATING_TYPES,
     END_MILL_TYPES,
@@ -16,11 +17,13 @@ from .models import (
     StockMovement,
     TapSpec,
     ToolItem,
+    PurchaseRequest,
     TAP_HOLE_TYPES,
     TAP_TOOL_TYPES,
     THREAD_STANDARDS,
     TOOL_MATERIAL_TYPES,
     WORK_MATERIAL_TYPES,
+    PURCHASE_STATUSES,
 )
 
 
@@ -88,8 +91,11 @@ def _build_tap_name(size_label: str, thread_standard: str, tap_type: str, hole_t
 def inventory_view(request):
     action = request.POST.get("action") if request.method == "POST" else ""
     panel = (request.GET.get("panel") or "stock").strip()
-    if panel not in {"stock", "history", "issue", "arrival", "issue_outcome"}:
+    if panel not in {"stock", "history", "issue", "arrival", "issue_outcome", "purchases"}:
         panel = "stock"
+
+    username = biota_user(request) or "Неизвестный пользователь"
+    is_admin_user = _is_admin(username)
 
     if action == "add_end_mill":
         diameter_mm = _to_decimal(request.POST.get("diameter_mm"), Decimal("0"))
@@ -386,6 +392,67 @@ def inventory_view(request):
         messages.success(request, "Приход сохранен: остаток обновлен (или создана новая позиция).")
         return redirect("inventory")
 
+    if action == "create_purchase_request":
+        requested_item = (request.POST.get("requested_item") or "").strip()
+        store_link = (request.POST.get("store_link") or "").strip()
+        article = (request.POST.get("article") or "").strip()
+        quantity = _to_int(request.POST.get("quantity"), 0)
+        unit_price = _to_decimal(request.POST.get("unit_price"), Decimal("0"))
+        request_comment = (request.POST.get("request_comment") or "").strip()
+        if not requested_item or quantity <= 0:
+            messages.error(request, "Укажите что закупать и количество больше нуля.")
+            return redirect(f"{request.path}?panel=purchases")
+        if unit_price < 0:
+            messages.error(request, "Цена за 1 шт не может быть отрицательной.")
+            return redirect(f"{request.path}?panel=purchases")
+        if not store_link and not article:
+            messages.error(request, "Добавьте ссылку на магазин или артикул.")
+            return redirect(f"{request.path}?panel=purchases")
+        PurchaseRequest.objects.create(
+            requested_item=requested_item,
+            store_link=store_link,
+            article=article,
+            quantity=quantity,
+            unit_price=unit_price,
+            request_comment=request_comment,
+            requested_by=username,
+        )
+        messages.success(request, "Заявка на закупку добавлена.")
+        return redirect(f"{request.path}?panel=purchases")
+
+    if action == "update_purchase_status":
+        req_id = _to_int(request.POST.get("request_id"), 0)
+        new_status = (request.POST.get("status") or "").strip()
+        status_comment = (request.POST.get("status_comment") or "").strip()
+        if req_id <= 0 or new_status not in {x[0] for x in PURCHASE_STATUSES}:
+            messages.error(request, "Проверьте заявку и новый статус.")
+            return redirect(f"{request.path}?panel=purchases")
+        pr = PurchaseRequest.objects.filter(id=req_id).first()
+        if not pr:
+            messages.error(request, "Заявка не найдена.")
+            return redirect(f"{request.path}?panel=purchases")
+        pr.status = new_status
+        pr.status_comment = status_comment
+        pr.status_updated_by = username
+        pr.save(update_fields=["status", "status_comment", "status_updated_by", "updated_at"])
+        messages.success(request, "Статус заявки обновлён.")
+        return redirect(f"{request.path}?panel=purchases")
+
+    if action == "delete_purchase_request":
+        if not is_admin_user:
+            messages.error(request, "Удалять заявки может только администратор.")
+            return redirect(f"{request.path}?panel=purchases")
+        req_id = _to_int(request.POST.get("request_id"), 0)
+        if req_id <= 0:
+            messages.error(request, "Заявка не найдена.")
+            return redirect(f"{request.path}?panel=purchases")
+        deleted, _ = PurchaseRequest.objects.filter(id=req_id).delete()
+        if deleted:
+            messages.success(request, "Заявка удалена.")
+        else:
+            messages.error(request, "Заявка не найдена.")
+        return redirect(f"{request.path}?panel=purchases")
+
     show_all = (request.GET.get("show_all") or "1").strip() == "1"
     qs = ToolItem.objects.all()
     if not show_all:
@@ -497,6 +564,19 @@ def inventory_view(request):
         .filter(remaining_qty__gt=0)
         .order_by("-movement_date", "-id")[:200]
     )
+    purchase_status = (request.GET.get("purchase_status") or "").strip()
+    purchase_date_from = (request.GET.get("purchase_date_from") or "").strip()
+    purchase_date_to = (request.GET.get("purchase_date_to") or "").strip()
+    purchase_employee = (request.GET.get("purchase_employee") or "").strip()
+    purchase_qs = PurchaseRequest.objects.all()
+    if purchase_status in {x[0] for x in PURCHASE_STATUSES}:
+        purchase_qs = purchase_qs.filter(status=purchase_status)
+    if purchase_date_from:
+        purchase_qs = purchase_qs.filter(created_at__date__gte=purchase_date_from)
+    if purchase_date_to:
+        purchase_qs = purchase_qs.filter(created_at__date__lte=purchase_date_to)
+    if purchase_employee:
+        purchase_qs = purchase_qs.filter(requested_by__icontains=purchase_employee)
 
     ctx = {
         "tool_items": qs.select_related("end_mill_spec", "tap_spec"),
@@ -548,6 +628,15 @@ def inventory_view(request):
         "today": date.today().isoformat(),
         "movement_tool_options": ToolItem.objects.select_related("end_mill_spec", "tap_spec").all().order_by("category", "name"),
         "issue_candidates": issue_candidates,
+        "purchase_requests": purchase_qs[:300],
+        "purchase_statuses": PURCHASE_STATUSES,
+        "purchase_filters": {
+            "status": purchase_status,
+            "date_from": purchase_date_from,
+            "date_to": purchase_date_to,
+            "employee": purchase_employee,
+        },
+        "is_admin_user": is_admin_user,
         "panel": panel,
     }
     return render(request, "shifts/inventory.html", ctx)

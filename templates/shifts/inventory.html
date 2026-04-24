@@ -7,6 +7,7 @@
   <a class="btn {% if panel == 'issue' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=issue">Выдать</a>
   <a class="btn {% if panel == 'issue_outcome' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=issue_outcome">Списание/Возврат</a>
   <a class="btn {% if panel == 'arrival' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=arrival">Приход</a>
+  <a class="btn {% if panel == 'purchases' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=purchases">Закупки</a>
 </div>
 <h2 style="margin-top:0;">Склад инструмента</h2>
 <p class="muted">Отображается один тип инструмента за раз (по умолчанию: фрезы), только с остатком больше 0.</p>
@@ -505,6 +506,111 @@
       </tbody>
     </table>
   </div>
+</div>
+{% endif %}
+
+{% if panel == "purchases" %}
+<div class="filter-panel">
+  <h3>Заявка на закупку</h3>
+  <form method="post" class="filter-grid">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create_purchase_request">
+    <label class="field"><span>Что закупить</span><input type="text" name="requested_item" required placeholder="Название позиции"></label>
+    <label class="field"><span>Ссылка на магазин</span><input type="url" name="store_link" placeholder="https://..."></label>
+    <label class="field"><span>Артикул</span><input type="text" name="article" placeholder="SKU / артикул"></label>
+    <label class="field"><span>Количество</span><input type="number" name="quantity" min="1" required></label>
+    <label class="field"><span>Цена за 1 шт</span><input type="number" name="unit_price" min="0" step="0.01" value="0" required></label>
+    <label class="field"><span>Комментарий</span><input type="text" name="request_comment" placeholder="Примечание к закупке"></label>
+    <div class="filter-actions"><button type="submit" class="btn">Добавить заявку</button></div>
+  </form>
+</div>
+
+<form method="get" class="filter-panel auto-submit-form">
+  <input type="hidden" name="panel" value="purchases">
+  <h3>Фильтр заявок</h3>
+  <div class="filter-grid">
+    <label class="field"><span>Статус</span>
+      <select name="purchase_status">
+        <option value="">Все</option>
+        {% for key, label in purchase_statuses %}
+        <option value="{{ key }}" {% if purchase_filters.status == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Дата с</span><input type="date" name="purchase_date_from" value="{{ purchase_filters.date_from }}"></label>
+    <label class="field"><span>Дата по</span><input type="date" name="purchase_date_to" value="{{ purchase_filters.date_to }}"></label>
+    <label class="field"><span>Сотрудник</span><input type="text" name="purchase_employee" value="{{ purchase_filters.employee }}" placeholder="Кто создал"></label>
+  </div>
+</form>
+
+<div class="table-wrap">
+  <table class="data-grid">
+    <thead>
+      <tr>
+        <th>Создано</th>
+        <th>Кто запросил</th>
+        <th>Позиция</th>
+        <th>Ссылка / артикул</th>
+        <th>Кол-во</th>
+        <th>Цена за 1 шт</th>
+        <th>Итого</th>
+        <th>Статус</th>
+        <th>Комментарий</th>
+        <th>Обновил</th>
+        <th>Сменить статус</th>
+        {% if is_admin_user %}<th>Удалить</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for pr in purchase_requests %}
+      <tr>
+        <td>{{ pr.created_at|date:"Y-m-d H:i" }}</td>
+        <td>{{ pr.requested_by }}</td>
+        <td>{{ pr.requested_item }}</td>
+        <td>
+          {% if pr.store_link %}<a href="{{ pr.store_link }}" target="_blank" rel="noopener">Ссылка</a>{% endif %}
+          {% if pr.store_link and pr.article %} / {% endif %}
+          {{ pr.article|default:"-" }}
+        </td>
+        <td>{{ pr.quantity }}</td>
+        <td>{{ pr.unit_price|floatformat:2 }}</td>
+        <td><strong>{{ pr.total_price|floatformat:2 }}</strong></td>
+        <td>{{ pr.get_status_display }}</td>
+        <td>
+          {% if pr.request_comment %}{{ pr.request_comment }}{% endif %}
+          {% if pr.status_comment %}<br><span class="muted">{{ pr.status_comment }}</span>{% endif %}
+        </td>
+        <td>{{ pr.status_updated_by|default:"-" }}<br><span class="muted">{{ pr.updated_at|date:"Y-m-d H:i" }}</span></td>
+        <td>
+          <form method="post" class="issue-inline-form" style="display:flex; gap:6px; flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_purchase_status">
+            <input type="hidden" name="request_id" value="{{ pr.id }}">
+            <select name="status">
+              {% for key, label in purchase_statuses %}
+              <option value="{{ key }}" {% if pr.status == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <input type="text" name="status_comment" value="{{ pr.status_comment }}" placeholder="Комментарий по статусу">
+            <button type="submit" class="btn">Сохранить</button>
+          </form>
+        </td>
+        {% if is_admin_user %}
+        <td>
+          <form method="post" onsubmit="return confirm('Удалить заявку?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_purchase_request">
+            <input type="hidden" name="request_id" value="{{ pr.id }}">
+            <button type="submit" class="btn">Удалить</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% empty %}
+      <tr><td colspan="{% if is_admin_user %}12{% else %}11{% endif %}" class="muted">Заявок пока нет.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 {% endif %}
 
