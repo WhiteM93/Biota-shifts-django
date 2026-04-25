@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-actions">
+  <a href="{% url 'product_create' %}" class="btn">+ Создать изделие</a>
+</div>
+
+<form method="get" action="" class="filter-panel" style="margin-top:12px;">
+  <div class="filter-grid" style="grid-template-columns: 1fr auto; align-items: end;">
+    <label class="field"><span>Поиск по названию и описанию</span>
+      <input type="search" name="q" value="{{ search_q }}" placeholder="Введите текст…">
+    </label>
+    <div class="filter-actions">
+      <button type="submit" class="btn">Найти</button>
+    </div>
+  </div>
+</form>
+
+<div class="products-tiles">
+  {% for p in products_page %}
+  <article class="product-tile">
+    <a href="{% url 'product_detail' p.pk %}" class="product-tile-title" title="{{ p.name }}">{{ p.name }}</a>
+    {% if p.list_preview_image %}
+      <div class="product-tile-3d product-tile-preview-image-wrap">
+        <img src="{{ p.list_preview_image.url }}" alt="Превью {{ p.name }}" class="product-tile-preview-image" loading="lazy" />
+      </div>
+    {% elif p.preview_stl %}
+      <div class="product-tile-3d" data-stl-url="{{ p.preview_stl.url }}">
+        <p class="muted product-tile-3d-msg">Загрузка 3D…</p>
+      </div>
+    {% elif p.cad_model and p.cad_filename_endswith_stl %}
+      <div class="product-tile-3d" data-stl-url="{{ p.cad_model.url }}">
+        <p class="muted product-tile-3d-msg">Загрузка 3D…</p>
+      </div>
+    {% else %}
+      <div class="product-tile-3d product-tile-3d-empty">
+        <p class="muted product-tile-3d-msg">Нет STL для предпросмотра</p>
+      </div>
+    {% endif %}
+    <div class="product-tile-meta">
+      <span class="muted">Обновлено: {{ p.updated_at|date:"d.m.Y H:i" }}</span>
+    </div>
+  </article>
+  {% empty %}
+  <div class="filter-panel">
+    <p class="muted" style="margin:0;">Пока нет изделий. Нажмите «Создать изделие».</p>
+  </div>
+  {% endfor %}
+</div>
+
+{% if products_page.has_other_pages %}
+<div class="page-actions" style="margin-top:14px;">
+  <span class="muted" style="padding:8px 0;">Страница {{ products_page.number }} из {{ products_page.paginator.num_pages }}</span>
+  {% if products_page.has_previous %}<a class="btn btn-ghost" href="?page={{ products_page.previous_page_number }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}">← Назад</a>{% endif %}
+  {% if products_page.has_next %}<a class="btn btn-ghost" href="?page={{ products_page.next_page_number }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}">Вперёд →</a>{% endif %}
+</div>
+{% endif %}
+
+<style>
+  .products-tiles {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .product-tile {
+    border: 1px solid #2f3b57;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(30, 41, 64, 0.8) 0%, rgba(20, 27, 41, 0.94) 100%);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  .product-tile-title {
+    color: #eaf0ff;
+    text-decoration: none;
+    font-weight: 700;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.7em;
+  }
+  .product-tile-title:hover { color: #bcd0ff; }
+  .product-tile-3d {
+    height: 190px;
+    border-radius: 10px;
+    border: 1px solid #374563;
+    background: #d3d7de;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .product-tile-3d-empty {
+    background: #cfd3da;
+  }
+  .product-tile-preview-image-wrap {
+    padding: 0;
+    border: 1px solid #aeb6c4;
+    background: #dde1e8;
+  }
+  .product-tile-preview-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .product-tile-3d-msg {
+    margin: 0;
+    font-size: 12px;
+    padding: 10px;
+    text-align: center;
+  }
+  .product-tile-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+  import * as THREE from "three";
+  import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+  import { STLLoader } from "three/addons/loaders/STLLoader.js";
+
+  const hosts = Array.from(document.querySelectorAll(".product-tile-3d[data-stl-url]"));
+  if (!hosts.length) {
+    // Nothing to render.
+  } else {
+    hosts.forEach((host) => {
+      const rawUrl = host.dataset.stlUrl || "";
+      let stlUrl = "";
+      try {
+        stlUrl = new URL(rawUrl, window.location.origin).href;
+      } catch (_) {
+        stlUrl = "";
+      }
+      if (!stlUrl) return;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xd3d7de);
+      const camera = new THREE.PerspectiveCamera(40, host.clientWidth / Math.max(host.clientHeight, 1), 0.1, 1e7);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(host.clientWidth, host.clientHeight);
+      host.innerHTML = "";
+      host.appendChild(renderer.domElement);
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+      const key = new THREE.DirectionalLight(0xffffff, 0.5);
+      key.position.set(460, 520, 680);
+      scene.add(key);
+      const fill = new THREE.DirectionalLight(0xffffff, 0.2);
+      fill.position.set(-380, -180, -520);
+      scene.add(fill);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.enablePan = false;
+
+      function fit(root) {
+        const box = new THREE.Box3().setFromObject(root);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z, 1e-6);
+        camera.position.set(center.x + maxDim * 1.3, center.y + maxDim * 1.0, center.z + maxDim * 1.4);
+        controls.target.copy(center);
+        camera.lookAt(center);
+        controls.update();
+      }
+
+      function onResize() {
+        const w = host.clientWidth || 260;
+        const h = host.clientHeight || 190;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+      window.addEventListener("resize", onResize);
+
+      new STLLoader().load(
+        stlUrl,
+        (geometry) => {
+          geometry.computeBoundingSphere();
+          geometry.center();
+          const mesh = new THREE.Mesh(
+            geometry,
+            new THREE.MeshStandardMaterial({
+              color: 0x7f8790,
+              metalness: 0.08,
+              roughness: 0.5,
+            })
+          );
+          const root = new THREE.Group();
+          root.add(mesh);
+          scene.add(root);
+          fit(root);
+        },
+        undefined,
+        () => {
+          host.innerHTML = '<p class="muted product-tile-3d-msg">Не удалось загрузить STL</p>';
+        }
+      );
+
+      function tick() {
+        requestAnimationFrame(tick);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      tick();
+    });
+  }
+</script>
+{% endblock %}

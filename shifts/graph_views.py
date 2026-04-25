@@ -8,7 +8,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
 from biota_shifts import db as biota_db
-from biota_shifts.auth import _filter_employees_for_user, _is_admin
+from biota_shifts.auth import employees_df_for_nav
 from biota_shifts.constants import MONTH_NAMES_RU, SCHEDULE_CODES
 from biota_shifts import export as biota_export
 from biota_shifts import schedule as biota_schedule
@@ -40,10 +40,7 @@ DEPT_COLOR_CLASSES = [
 def _employees_for_user(request):
     cfg = biota_db.db_config()
     employees_df = biota_db.load_employees(cfg)
-    user = biota_user(request)
-    if user and not _is_admin(user):
-        employees_df = _filter_employees_for_user(employees_df, user)
-    return employees_df
+    return employees_df_for_nav(biota_user(request), "graph", employees_df)
 
 
 def _parse_year_month(request, *, default_year: int, default_month: int) -> tuple[int, int]:

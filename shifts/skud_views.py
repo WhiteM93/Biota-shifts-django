@@ -9,10 +9,7 @@ from django.shortcuts import render
 from biota_shifts import db as biota_db
 from biota_shifts import export as biota_export
 from biota_shifts import logic as biota_logic
-from biota_shifts.auth import (
-    _filter_employees_for_user,
-    _is_admin,
-)
+from biota_shifts.auth import employees_df_for_nav
 from biota_shifts.constants import MONTH_NAMES_RU
 from biota_shifts import schedule as biota_schedule
 from biota_shifts.schedule import employee_label_row
@@ -34,9 +31,7 @@ def _fmt_minutes_human(v) -> str:
 def _employees_for_user(request):
     cfg = biota_db.db_config()
     employees_df = biota_db.load_employees(cfg)
-    user = biota_user(request)
-    if user and not _is_admin(user):
-        employees_df = _filter_employees_for_user(employees_df, user)
+    employees_df = employees_df_for_nav(biota_user(request), "skud", employees_df)
     employees_df = employees_df.copy()
     employees_df["label"] = employees_df.apply(employee_label_row, axis=1)
     return employees_df

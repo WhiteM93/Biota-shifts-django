@@ -1,0 +1,904 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-actions" style="margin-bottom:10px;">
+  <a href="{% url 'products_list' %}" class="btn btn-ghost">← К списку изделий</a>
+  <a href="{% url 'product_edit' product.pk %}" class="btn btn-ghost">Редактировать изделие</a>
+  <a href="{% url 'product_setup_create' product.pk %}" class="btn btn-ghost">+ Новая установка</a>
+</div>
+<div class="product-detail-grid">
+  <div class="product-detail-main">
+  {% if product.description %}
+  <p class="muted" style="white-space:pre-wrap; margin:0 0 14px 0;">{{ product.description }}</p>
+  {% endif %}
+
+  <div class="product-tabs" id="product-tabs">
+    <div class="product-tabs-nav" role="tablist" aria-label="Документация и наладка">
+      <button type="button" class="product-tab{% if tab_default == 'drawing' %} is-active{% endif %}" role="tab" data-tab="drawing" id="tab-drawing" aria-controls="panel-drawing" aria-selected="{% if tab_default == 'drawing' %}true{% else %}false{% endif %}">Чертёж</button>
+      {% for setup in setups %}
+      <button type="button" class="product-tab{% if tab_default == setup.tab_slug %} is-active{% endif %}" role="tab" data-tab="{{ setup.tab_slug }}" id="tab-setup-{{ setup.pk }}" aria-controls="panel-setup-{{ setup.pk }}" aria-selected="{% if tab_default == setup.tab_slug %}true{% else %}false{% endif %}" {% if setup.tool_pdf %}data-tool-pdf-url="{{ setup.tool_pdf.url }}"{% endif %} data-setup-name="{{ setup.name|escape }}">{{ setup.name }}</button>
+      {% endfor %}
+      {% if not setups %}
+      <button type="button" class="product-tab{% if tab_default == 'setup' %} is-active{% endif %}" role="tab" data-tab="setup" id="tab-setup" aria-controls="panel-setup" aria-selected="{% if tab_default == 'setup' %}true{% else %}false{% endif %}">Наладка</button>
+      <button type="button" class="product-tab{% if tab_default == 'program' %} is-active{% endif %}" role="tab" data-tab="program" id="tab-program" aria-controls="panel-program" aria-selected="{% if tab_default == 'program' %}true{% else %}false{% endif %}">Программа</button>
+      {% endif %}
+    </div>
+    <div class="product-tab-panels">
+      <section class="product-tab-panel" id="panel-drawing" data-panel="drawing" role="tabpanel" aria-labelledby="tab-drawing" {% if tab_default != 'drawing' %}hidden{% endif %}>
+        {% if product.drawing_pdf %}
+        <div class="product-pdf-frame">
+          <iframe src="{{ product.drawing_pdf.url }}#toolbar=1" title="Чертёж PDF" loading="lazy"></iframe>
+          <p class="muted" style="margin-top:8px;font-size:12px;">Пусто? <a href="{{ product.drawing_pdf.url }}" target="_blank" rel="noopener">В новой вкладке</a> или скачайте справа.</p>
+        </div>
+        {% else %}
+        <p class="muted">Чертёж (PDF) не загружен. Можно добавить в <a href="{% url 'product_edit' product.pk %}">редактировании изделия</a>.</p>
+        {% endif %}
+      </section>
+      {% for setup in setups %}
+      <section class="product-tab-panel" id="panel-setup-{{ setup.pk }}" data-panel="{{ setup.tab_slug }}" role="tabpanel" aria-labelledby="tab-setup-{{ setup.pk }}" {% if tab_default != setup.tab_slug %}hidden{% endif %}>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 10px 0;">
+          <h3 style="margin:0;font-size:15px;">{{ setup.name }}</h3>
+          <a class="btn product-btn-secondary" href="{% url 'product_setup_edit' product.pk setup.pk %}">Изменить установку</a>
+        </div>
+        <h4 style="margin:0 0 8px 0;font-size:13px;color:#9bb0d8;">Наладка</h4>
+        <div class="product-setup-specs">
+          <div class="product-setup-spec-group">
+            <h5>Привязки</h5>
+            <div><span class="muted">X:</span> {{ setup.binding_x|default:"—" }}</div>
+            <div><span class="muted">Y:</span> {{ setup.binding_y|default:"—" }}</div>
+            <div><span class="muted">Z:</span> {{ setup.binding_z|default:"—" }}</div>
+          </div>
+          <div class="product-setup-spec-group">
+            <h5>Заготовка</h5>
+            <div><span class="muted">Тип:</span> {{ setup.workpiece|default:"—" }}</div>
+            <div><span class="muted">Материал:</span> {{ setup.material|default:"—" }}</div>
+            <div><span class="muted">Размер:</span> {{ setup.size|default:"—" }}</div>
+          </div>
+        </div>
+        <div style="height:8px;"></div>
+        {% if setup.setup_notes %}
+        <div class="muted" style="white-space:pre-wrap; line-height:1.5;">{{ setup.setup_notes }}</div>
+        {% else %}
+        <p class="muted" style="margin:0 0 10px 0;">Наладка не заполнена.</p>
+        {% endif %}
+        <h4 style="margin:14px 0 8px 0;font-size:13px;color:#9bb0d8;">Программа</h4>
+        {% if setup.program_too_large %}
+        <p class="muted">Файл слишком велик для просмотра здесь — <a href="{{ setup.program_file.url }}">скачайте</a>.</p>
+        {% elif setup.program_text is not None %}
+        <div class="program-search-bar">
+          <input type="search" class="program-search-input" placeholder="Поиск по программе..." data-program-target="program-pre-setup-{{ setup.pk }}" />
+          <button type="button" class="btn btn-ghost program-search-nav" data-program-target="program-pre-setup-{{ setup.pk }}" data-nav="-1" title="Предыдущее совпадение">↑</button>
+          <button type="button" class="btn btn-ghost program-search-nav" data-program-target="program-pre-setup-{{ setup.pk }}" data-nav="1" title="Следующее совпадение">↓</button>
+          <button type="button" class="btn btn-ghost program-tool-nav" data-program-target="program-pre-setup-{{ setup.pk }}" data-tool-nav="-1">Предыдущий инструмент</button>
+          <button type="button" class="btn btn-ghost program-tool-nav" data-program-target="program-pre-setup-{{ setup.pk }}" data-tool-nav="1">Следующий инструмент</button>
+          <button type="button" class="btn btn-ghost program-search-clear" data-program-target="program-pre-setup-{{ setup.pk }}">Очистить</button>
+          <span class="muted program-search-count" data-program-target="program-pre-setup-{{ setup.pk }}">Совпадений: 0</span>
+        </div>
+        <pre id="program-pre-setup-{{ setup.pk }}" class="program-gcode-pre" spellcheck="false">{{ setup.program_text|escape }}</pre>
+        {% else %}
+        <p class="muted">Программа не загружена.</p>
+        {% endif %}
+      </section>
+      {% endfor %}
+
+      {% if not setups %}
+      <section class="product-tab-panel" id="panel-setup" data-panel="setup" role="tabpanel" aria-labelledby="tab-setup" {% if tab_default != 'setup' %}hidden{% endif %}>
+        {% if product.setup_notes %}
+        <div class="muted" style="white-space:pre-wrap; line-height:1.5;">{{ product.setup_notes }}</div>
+        {% else %}
+        <p class="muted" style="margin:0 0 10px 0;">Наладка (текст) не заполнена.</p>
+        {% endif %}
+        {% if setup_photos %}
+        <div class="product-setup-photos">
+          {% for sp in setup_photos %}
+          <figure>
+            <a href="{{ sp.image.url }}" target="_blank" rel="noopener">
+              <img src="{{ sp.image.url }}" alt="{% if sp.caption %}{{ sp.caption }}{% else %}Наладка {{ forloop.counter }}{% endif %}" loading="lazy" />
+            </a>
+            {% if sp.caption %}<figcaption class="muted">{{ sp.caption }}</figcaption>{% endif %}
+          </figure>
+          {% endfor %}
+        </div>
+        {% elif not product.setup_notes %}
+        <p class="muted">Можно добавить в <a href="{% url 'product_edit' product.pk %}">редактировании</a>.</p>
+        {% endif %}
+      </section>
+      <section class="product-tab-panel" id="panel-program" data-panel="program" role="tabpanel" aria-labelledby="tab-program" {% if tab_default != 'program' %}hidden{% endif %}>
+        {% if program_too_large %}
+        <p class="muted">Файл слишком велик для просмотра здесь — <a href="{{ product.program_file.url }}">скачайте</a> (справа тоже есть ссылка).</p>
+        {% elif program_text is not None %}
+        <div class="program-search-bar">
+          <input type="search" class="program-search-input" placeholder="Поиск по программе..." data-program-target="program-pre-main" />
+          <button type="button" class="btn btn-ghost program-search-nav" data-program-target="program-pre-main" data-nav="-1" title="Предыдущее совпадение">↑</button>
+          <button type="button" class="btn btn-ghost program-search-nav" data-program-target="program-pre-main" data-nav="1" title="Следующее совпадение">↓</button>
+          <button type="button" class="btn btn-ghost program-tool-nav" data-program-target="program-pre-main" data-tool-nav="-1">Предыдущий инструмент</button>
+          <button type="button" class="btn btn-ghost program-tool-nav" data-program-target="program-pre-main" data-tool-nav="1">Следующий инструмент</button>
+          <button type="button" class="btn btn-ghost program-search-clear" data-program-target="program-pre-main">Очистить</button>
+          <span class="muted program-search-count" data-program-target="program-pre-main">Совпадений: 0</span>
+        </div>
+        <pre id="program-pre-main" class="program-gcode-pre" spellcheck="false">{{ program_text|escape }}</pre>
+        {% else %}
+        <p class="muted">Программа не загружена. <a href="{% url 'product_edit' product.pk %}">Редактирование</a></p>
+        {% endif %}
+      </section>
+      {% endif %}
+    </div>
+  </div>
+  </div>
+
+  <aside class="product-detail-side">
+    <h3 style="margin:0 0 8px 0;font-size:14px;color:#9bb0d8;">3D</h3>
+    {% if product.cad_model or product.preview_stl %}
+    <div id="product-cad-viewport" class="product-cad-viewport"
+      {% if preview_stl_url %}data-stl-url="{{ preview_stl_url }}"{% endif %}
+      data-cad-ext="{{ cad_ext }}">
+      {% if cad_inline_preview %}
+      <p class="muted product-cad-loading" style="padding:12px;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;background:rgba(211,215,222,0.78);z-index:1;">Загрузка предпросмотра…</p>
+      {% elif product.cad_model and cad_is_step %}
+      <p class="muted" style="padding:12px;">В браузере показывается только STL. Загрузите <strong>STL для предпросмотра</strong> в <a href="{% url 'product_edit' product.pk %}">редактировании изделия</a> (экспорт из CAD из вашего STEP) или скачайте STEP ниже.</p>
+      {% elif product.cad_model %}
+      <p class="muted" style="padding:12px;">Предпросмотр{% if cad_ext %} для .{{ cad_ext }}{% else %} этого файла{% endif %} в браузере не поддерживается. Скачайте файл ниже или добавьте STL для предпросмотра.</p>
+      {% else %}
+      <p class="muted" style="padding:12px;">Загружен только STL предпросмотра; основная 3D-модель не указана.</p>
+      {% endif %}
+    </div>
+    {% if product.preview_stl and cad_inline_preview and cad_is_step %}
+    <p class="muted" style="margin-top:8px;font-size:12px;">В окне — отдельно загруженный STL; кнопка «Скачать 3D-модель» — исходный STEP/STP.</p>
+    {% endif %}
+    {% else %}
+    <p class="muted">3D не загружен.</p>
+    {% endif %}
+    <div id="product-tool-pdf-block" style="margin-top:12px;" hidden>
+      <h3 style="margin:0 0 8px 0;font-size:14px;color:#9bb0d8;">Инструмент (PDF)</h3>
+      <div class="product-pdf-frame product-tool-pdf-frame">
+        <iframe id="product-tool-pdf-frame" src="" title="PDF инструмента" loading="lazy"></iframe>
+      </div>
+      <p class="muted" style="margin:8px 0 0 0;font-size:12px;">
+        <a id="product-tool-pdf-open" href="#" target="_blank" rel="noopener">Открыть в новой вкладке</a>
+        или
+        <a id="product-tool-pdf-download" href="#" download>скачать PDF</a>.
+      </p>
+    </div>
+    <p class="muted" id="product-tool-pdf-empty" style="margin-top:12px;font-size:12px;">Для этой вкладки PDF инструмента не загружен.</p>
+    {% if cad_inline_preview %}
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+      <button type="button" class="btn btn-ghost" id="save-list-preview-btn">Сохранить превью для списка</button>
+      <p class="muted" id="save-list-preview-msg" style="margin:0;font-size:12px;">Поверните модель как нужно и нажмите кнопку.</p>
+    </div>
+    {% endif %}
+    <div class="product-downloads">
+      {% if product.cad_model %}
+      <a href="{{ product.cad_model.url }}" download class="btn">Скачать 3D-модель{% if cad_ext %} (.{{ cad_ext }}){% endif %}</a>
+      {% endif %}
+      {% if product.preview_stl %}
+      <a href="{{ product.preview_stl.url }}" download class="btn product-btn-secondary">Скачать STL</a>
+      {% endif %}
+      {% if product.drawing_pdf %}
+      <a href="{{ product.drawing_pdf.url }}" download class="btn product-btn-secondary">Скачать чертёж (PDF)</a>
+      {% endif %}
+      {% if product.program_file %}
+      <a href="{{ product.program_file.url }}" download class="btn product-btn-program">Скачать программу</a>
+      {% endif %}
+    </div>
+  </aside>
+</div>
+
+<style>
+  .product-setup-photos {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+  .product-setup-photos figure {
+    margin: 0;
+  }
+  .product-setup-photos a {
+    display: block;
+    border: 1px solid #2f3b57;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #0a0c12;
+  }
+  .product-setup-photos img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    display: block;
+  }
+  .product-setup-photos figcaption {
+    font-size: 12px;
+    margin-top: 4px;
+  }
+  .product-btn-secondary { background: #2a3656; }
+  .product-btn-program { background: #1a2f1e; border-color: #2a4a38; }
+  .product-tabs {
+    min-width: 0;
+  }
+  .product-tabs-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .product-tab {
+    background: #151b28;
+    border: 1px solid #2f3b57;
+    color: #9bb0d8;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .product-tab:hover {
+    background: #1a2233;
+    color: #c4d4ec;
+  }
+  .product-tab.is-active {
+    background: #24314a;
+    border-color: #4a6fa5;
+    color: #e8eef8;
+  }
+  .product-tab-panels {
+    min-width: 0;
+  }
+  .product-setup-specs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid #2f3b57;
+    border-radius: 10px;
+    background: rgba(24, 30, 44, 0.7);
+    font-size: 13px;
+  }
+  .product-setup-spec-group {
+    border: 1px solid #33415f;
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: rgba(14, 19, 30, 0.55);
+    display: grid;
+    gap: 5px;
+  }
+  .product-setup-spec-group h5 {
+    margin: 0 0 3px 0;
+    font-size: 12px;
+    letter-spacing: 0.2px;
+    color: #c7d5ef;
+  }
+  @media (max-width: 760px) {
+    .product-setup-specs {
+      grid-template-columns: 1fr;
+    }
+  }
+  .product-tab-panel[hidden] {
+    display: none !important;
+  }
+  .program-gcode-pre {
+    margin: 0;
+    padding: 12px 14px;
+    max-height: min(72vh, 820px);
+    overflow: auto;
+    font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+    font-size: 12px;
+    line-height: 1.45;
+    tab-size: 4;
+    white-space: pre;
+    background: #0a0d12;
+    border: 1px solid #2f3b57;
+    border-radius: 12px;
+    color: #b8c5d9;
+  }
+  .program-gcode-pre .gc-comment { color: #7fb089; }
+  .program-gcode-pre .gc-cmd { color: #87b7ff; font-weight: 600; }
+  .program-gcode-pre .gc-axis { color: #ffd27d; }
+  .program-gcode-pre .gc-line { color: #c792ea; }
+  .program-gcode-pre .gc-num { color: #f8a4a4; }
+  .program-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .program-search-input {
+    width: 230px;
+    min-width: 180px;
+    flex: 0 0 auto;
+  }
+  .program-gcode-pre mark.gc-search-hit {
+    background: #fff29a;
+    color: #161616;
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+  .program-gcode-pre mark.gc-search-hit.is-current {
+    background: #ffb84d;
+    color: #111;
+  }
+  .program-gcode-pre mark.gc-tool-hit {
+    background: rgba(135, 183, 255, 0.25);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+  .program-gcode-pre mark.gc-tool-hit.is-current-tool {
+    background: #6eb2ff;
+    color: #0f1a2a;
+  }
+  .product-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+    gap: 18px;
+    margin-top: 0;
+    align-items: start;
+  }
+  .product-detail-main {
+    min-width: 0;
+  }
+  .product-pdf-frame {
+    height: min(72vh, 820px);
+    border: 1px solid #2f3b57;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0a0d14;
+  }
+  .product-pdf-frame iframe {
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+    border: 0;
+    background: #fff;
+  }
+  .product-tool-pdf-frame {
+    height: min(52vh, 560px);
+  }
+  .product-cad-viewport {
+    width: 100%;
+    height: 260px;
+    border-radius: 12px;
+    border: 1px solid #3d4045;
+    background: #d3d7de;
+    overflow: hidden;
+    position: relative;
+  }
+  .product-downloads {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  @media (max-width: 960px) {
+    .product-detail-grid {
+      grid-template-columns: 1fr;
+    }
+    .product-pdf-frame { height: 55vh; }
+  }
+</style>
+<script>
+  (function () {
+    var root = document.getElementById("product-tabs");
+    if (!root) return;
+    var tabButtons = root.querySelectorAll(".product-tab");
+    var panels = root.querySelectorAll(".product-tab-panel");
+    var toolPdfBlock = document.getElementById("product-tool-pdf-block");
+    var toolPdfEmpty = document.getElementById("product-tool-pdf-empty");
+    var toolPdfFrame = document.getElementById("product-tool-pdf-frame");
+    var toolPdfOpen = document.getElementById("product-tool-pdf-open");
+    var toolPdfDownload = document.getElementById("product-tool-pdf-download");
+
+    function setToolPdfByTab(tabName) {
+      if (!toolPdfBlock || !toolPdfEmpty || !toolPdfFrame || !toolPdfOpen || !toolPdfDownload) return;
+      var btn = root.querySelector('.product-tab[data-tab="' + tabName + '"]');
+      if (!btn) {
+        toolPdfBlock.hidden = true;
+        toolPdfEmpty.hidden = false;
+        return;
+      }
+      var pdfUrl = btn.getAttribute("data-tool-pdf-url") || "";
+      if (!pdfUrl) {
+        toolPdfBlock.hidden = true;
+        toolPdfEmpty.hidden = false;
+        return;
+      }
+      toolPdfFrame.src = pdfUrl + "#toolbar=1";
+      toolPdfOpen.href = pdfUrl;
+      toolPdfDownload.href = pdfUrl;
+      toolPdfBlock.hidden = false;
+      toolPdfEmpty.hidden = true;
+    }
+
+    function activate(tabName) {
+      tabButtons.forEach(function (btn) {
+        var on = btn.getAttribute("data-tab") === tabName;
+        btn.classList.toggle("is-active", on);
+        btn.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      panels.forEach(function (panel) {
+        if (panel.getAttribute("data-panel") === tabName) {
+          panel.removeAttribute("hidden");
+        } else {
+          panel.setAttribute("hidden", "hidden");
+        }
+      });
+      setToolPdfByTab(tabName);
+    }
+    tabButtons.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var name = btn.getAttribute("data-tab");
+        if (name) activate(name);
+      });
+    });
+    var activeBtn = root.querySelector(".product-tab.is-active");
+    if (activeBtn) {
+      setToolPdfByTab(activeBtn.getAttribute("data-tab") || "");
+    } else if (tabButtons.length) {
+      setToolPdfByTab(tabButtons[0].getAttribute("data-tab") || "");
+    }
+  })();
+  (function () {
+    function esc(s) {
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function renderToken(token) {
+      if (/^N\d+$/i.test(token)) return '<span class="gc-line">' + esc(token) + "</span>";
+      if (/^(?:G|M|T)\d+(?:\.\d+)?$/i.test(token)) return '<span class="gc-cmd">' + esc(token) + "</span>";
+      if (/^(?:X|Y|Z|A|B|C|I|J|K|U|V|W|F|S|H|D|R)-?\d+(?:\.\d+)?$/i.test(token)) return '<span class="gc-axis">' + esc(token) + "</span>";
+      if (/^-?\d+(?:\.\d+)?$/.test(token)) return '<span class="gc-num">' + esc(token) + "</span>";
+      return esc(token);
+    }
+
+    function highlightPlainSegment(seg) {
+      var re = /([A-Za-z][A-Za-z0-9.+-]*|-?\d+(?:\.\d+)?)/g;
+      var out = "";
+      var last = 0;
+      var m;
+      while ((m = re.exec(seg)) !== null) {
+        if (m.index > last) out += esc(seg.slice(last, m.index));
+        out += renderToken(m[0]);
+        last = re.lastIndex;
+      }
+      if (last < seg.length) out += esc(seg.slice(last));
+      return out;
+    }
+
+    function highlightLine(line) {
+      var commentStart = line.indexOf(";");
+      var parenStart = line.indexOf("(");
+      if (parenStart !== -1 && (commentStart === -1 || parenStart < commentStart)) {
+        commentStart = parenStart;
+      }
+      if (commentStart === -1) return highlightPlainSegment(line);
+      var code = line.slice(0, commentStart);
+      var comment = line.slice(commentStart);
+      return highlightPlainSegment(code) + '<span class="gc-comment">' + esc(comment) + "</span>";
+    }
+
+    function highlightGcode(text) {
+      return text
+        .split("\n")
+        .map(function (line) { return highlightLine(line); })
+        .join("\n");
+    }
+
+    document.querySelectorAll(".program-gcode-pre").forEach(function (el) {
+      if (el.dataset.gcodeHighlighted === "1") return;
+      var src = el.textContent || "";
+      el.innerHTML = highlightGcode(src);
+      el.dataset.gcodeHighlighted = "1";
+    });
+  })();
+  (function () {
+    var searchState = new Map();
+
+    function clearSearchMarks(pre) {
+      pre.querySelectorAll("mark.gc-search-hit").forEach(function (m) {
+        m.replaceWith(document.createTextNode(m.textContent || ""));
+      });
+      pre.normalize();
+    }
+    function clearToolMarks(pre) {
+      pre.querySelectorAll("mark.gc-tool-hit").forEach(function (m) {
+        m.replaceWith(document.createTextNode(m.textContent || ""));
+      });
+      pre.normalize();
+    }
+
+    function markInTextNode(node, matcher) {
+      var count = 0;
+      var current = node;
+      while (current && current.nodeType === Node.TEXT_NODE) {
+        var source = current.nodeValue || "";
+        var match = matcher(source);
+        if (!match) break;
+        var mid = current.splitText(match.index);
+        var tail = mid.splitText(match.length);
+        var mark = document.createElement("mark");
+        mark.className = "gc-search-hit";
+        mark.textContent = mid.nodeValue;
+        mid.parentNode.replaceChild(mark, mid);
+        count += 1;
+        current = tail;
+      }
+      return count;
+    }
+
+    function buildMatcher(rawQuery) {
+      var q = (rawQuery || "").trim();
+      if (!q) return null;
+      var toolMatch = q.match(/^(?:T)?0*(\d{1,3})$/i);
+      if (toolMatch) {
+        var num = String(Number(toolMatch[1] || "0"));
+        var reTool = new RegExp("\\bT0*" + num + "\\b", "i");
+        return function (source) {
+          var m = reTool.exec(source);
+          if (!m) return null;
+          return { index: m.index, length: m[0].length };
+        };
+      }
+      var qLower = q.toLowerCase();
+      return function (source) {
+        var idx = source.toLowerCase().indexOf(qLower);
+        if (idx === -1) return null;
+        return { index: idx, length: q.length };
+      };
+    }
+
+    function applySearch(pre, query) {
+      clearSearchMarks(pre);
+      var matcher = buildMatcher(query);
+      if (!matcher) return [];
+      var walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT);
+      var nodes = [];
+      var n;
+      while ((n = walker.nextNode())) nodes.push(n);
+      nodes.forEach(function (textNode) {
+        markInTextNode(textNode, matcher);
+      });
+      return Array.from(pre.querySelectorAll("mark.gc-search-hit"));
+    }
+
+    function setCurrentHit(pre, matches, index) {
+      matches.forEach(function (m) { m.classList.remove("is-current"); });
+      if (!matches.length) return -1;
+      var safe = ((index % matches.length) + matches.length) % matches.length;
+      var current = matches[safe];
+      current.classList.add("is-current");
+      current.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+      return safe;
+    }
+
+    function bindSearchInput(input) {
+      var targetId = input.getAttribute("data-program-target");
+      if (!targetId) return;
+      var pre = document.getElementById(targetId);
+      if (!pre) return;
+      var countEl = document.querySelector('.program-search-count[data-program-target="' + targetId + '"]');
+      var clearBtn = document.querySelector('.program-search-clear[data-program-target="' + targetId + '"]');
+      var navBtns = Array.from(document.querySelectorAll('.program-search-nav[data-program-target="' + targetId + '"]'));
+      var toolNavBtns = Array.from(document.querySelectorAll('.program-tool-nav[data-program-target="' + targetId + '"]'));
+
+      function updateCount(matches, currentIdx) {
+        if (!countEl) return;
+        if (!matches.length) {
+          countEl.textContent = "Совпадений: 0";
+          return;
+        }
+        countEl.textContent = "Совпадений: " + matches.length + " (текущее: " + (currentIdx + 1) + ")";
+      }
+
+      function refresh() {
+        clearToolMarks(pre);
+        var matches = applySearch(pre, input.value || "");
+        var currentIdx = matches.length ? 0 : -1;
+        if (matches.length) currentIdx = setCurrentHit(pre, matches, currentIdx);
+        searchState.set(targetId, { matches: matches, currentIdx: currentIdx });
+        updateCount(matches, currentIdx);
+      }
+
+      input.addEventListener("input", refresh);
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          var st = searchState.get(targetId);
+          if (!st || !st.matches.length) return;
+          var dir = e.shiftKey ? -1 : 1;
+          st.currentIdx = setCurrentHit(pre, st.matches, st.currentIdx + dir);
+          updateCount(st.matches, st.currentIdx);
+        }
+      });
+      if (clearBtn) {
+        clearBtn.addEventListener("click", function () {
+          input.value = "";
+          refresh();
+          input.focus();
+        });
+      }
+      navBtns.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var st = searchState.get(targetId);
+          if (!st || !st.matches.length) return;
+          var dir = Number(btn.getAttribute("data-nav") || "0");
+          if (!dir) return;
+          st.currentIdx = setCurrentHit(pre, st.matches, st.currentIdx + dir);
+          updateCount(st.matches, st.currentIdx);
+        });
+      });
+
+      function collectToolMarks() {
+        clearToolMarks(pre);
+        var walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT);
+        var nodes = [];
+        var n;
+        while ((n = walker.nextNode())) nodes.push(n);
+        var toolRe = /\bT0*\d+\b/gi;
+        nodes.forEach(function (textNode) {
+          var cur = textNode;
+          while (cur && cur.nodeType === Node.TEXT_NODE) {
+            var src = cur.nodeValue || "";
+            toolRe.lastIndex = 0;
+            var m = toolRe.exec(src);
+            if (!m) break;
+            var mid = cur.splitText(m.index);
+            var tail = mid.splitText(m[0].length);
+            var mark = document.createElement("mark");
+            mark.className = "gc-tool-hit";
+            mark.textContent = mid.nodeValue;
+            mid.parentNode.replaceChild(mark, mid);
+            cur = tail;
+          }
+        });
+        return Array.from(pre.querySelectorAll("mark.gc-tool-hit"));
+      }
+
+      function setCurrentTool(matches, idx) {
+        matches.forEach(function (m) { m.classList.remove("is-current-tool"); });
+        if (!matches.length) return -1;
+        var safe = ((idx % matches.length) + matches.length) % matches.length;
+        var current = matches[safe];
+        current.classList.add("is-current-tool");
+        current.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+        return safe;
+      }
+
+      var toolState = { matches: [], idx: -1 };
+      toolNavBtns.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          if ((input.value || "").trim()) {
+            input.value = "";
+            refresh();
+          }
+          if (!toolState.matches.length) {
+            toolState.matches = collectToolMarks();
+            toolState.idx = -1;
+          }
+          var dir = Number(btn.getAttribute("data-tool-nav") || "0");
+          if (!dir || !toolState.matches.length) return;
+          toolState.idx = setCurrentTool(toolState.matches, toolState.idx + dir);
+          if (countEl) countEl.textContent = "Инструменты: " + toolState.matches.length + " (текущий: " + (toolState.idx + 1) + ")";
+        });
+      });
+    }
+
+    document.querySelectorAll(".program-search-input").forEach(bindSearchInput);
+  })();
+</script>
+
+{% if cad_inline_preview and preview_stl_url %}
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+  import * as THREE from "three";
+  import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+  import { STLLoader } from "three/addons/loaders/STLLoader.js";
+  import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
+  import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+  import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
+
+  const host = document.getElementById("product-cad-viewport");
+  const saveBtn = document.getElementById("save-list-preview-btn");
+  const saveMsg = document.getElementById("save-list-preview-msg");
+  const stlUrl = host && host.dataset.stlUrl ? new URL(host.dataset.stlUrl, window.location.origin).href : "";
+  const savePreviewUrl = "{% url 'product_save_list_preview' product.pk %}";
+  let cadRenderer = null;
+
+  function clearCadLoading() {
+    if (!host) return;
+    host.querySelectorAll(".product-cad-loading").forEach((el) => el.remove());
+  }
+
+  function showCadError(text) {
+    clearCadLoading();
+    if (!host) return;
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.style.padding = "12px";
+    p.textContent = text;
+    host.appendChild(p);
+  }
+
+  let _layoutTries = 0;
+  function waitLayout(cb) {
+    if (!host) return;
+    if (host.clientWidth >= 32) {
+      cb();
+      return;
+    }
+    _layoutTries += 1;
+    if (_layoutTries < 90) {
+      requestAnimationFrame(() => waitLayout(cb));
+    } else {
+      showCadError("Недостаточно места для предпросмотра. Скачайте файл ниже.");
+    }
+  }
+
+  function fitCameraToObject(camera, controls, root) {
+    const box = new THREE.Box3().setFromObject(root);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z, 1e-6);
+    camera.position.set(center.x + maxDim * 1.2, center.y + maxDim * 0.9, center.z + maxDim * 1.4);
+    controls.target.copy(center);
+    camera.lookAt(controls.target);
+    controls.update();
+  }
+
+  function runStlViewer() {
+    if (!host || !stlUrl) return;
+    if (host.querySelector("canvas")) return;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xd3d7de);
+    const camera = new THREE.PerspectiveCamera(45, host.clientWidth / host.clientHeight, 0.1, 1e7);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(host.clientWidth, host.clientHeight);
+    cadRenderer = renderer;
+    host.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    const dFar = 800;
+    const dInt = 0.18;
+    const axes = [
+      [1, 0, 0], [-1, 0, 0],
+      [0, 1, 0], [0, -1, 0],
+      [0, 0, 1], [0, 0, -1],
+    ];
+    axes.forEach((ax) => {
+      const l = new THREE.DirectionalLight(0xffffff, dInt);
+      l.position.set(ax[0] * dFar, ax[1] * dFar, ax[2] * dFar);
+      scene.add(l);
+    });
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    let edgeLineMaterial = null;
+
+    function onResize() {
+      const w = host.clientWidth;
+      const h = host.clientHeight || 260;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+      if (edgeLineMaterial) {
+        edgeLineMaterial.resolution.set(w, h);
+      }
+    }
+    window.addEventListener("resize", onResize);
+
+    function tick() {
+      requestAnimationFrame(tick);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    tick();
+
+    new STLLoader().load(
+      stlUrl,
+      function (geometry) {
+        clearCadLoading();
+        geometry.computeBoundingSphere();
+        geometry.center();
+
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0x7f8790,
+          metalness: 0.06,
+          roughness: 0.48,
+          transparent: true,
+          opacity: 0.86,
+          depthWrite: true,
+        });
+        const mesh = new THREE.Mesh(geometry, mat);
+        mesh.renderOrder = 0;
+
+        const edgePos = new THREE.EdgesGeometry(geometry, 22);
+        const posAttr = edgePos.getAttribute("position");
+        const lineGeo = new LineSegmentsGeometry();
+        lineGeo.setPositions(posAttr.array);
+        const w0 = host.clientWidth;
+        const h0 = host.clientHeight || 260;
+        edgeLineMaterial = new LineMaterial({
+          color: 0x14181c,
+          linewidth: 2.6,
+          worldUnits: false,
+          resolution: new THREE.Vector2(w0, h0),
+          depthTest: true,
+          depthWrite: true,
+        });
+        const thickEdges = new LineSegments2(lineGeo, edgeLineMaterial);
+        thickEdges.renderOrder = 1;
+
+        const root = new THREE.Group();
+        root.add(mesh);
+        root.add(thickEdges);
+        scene.add(root);
+        fitCameraToObject(camera, controls, root);
+      },
+      undefined,
+      function () {
+        showCadError("Не удалось загрузить STL для предпросмотра. Скачайте файл по ссылке ниже.");
+      }
+    );
+  }
+
+  try {
+    waitLayout(() => runStlViewer());
+  } catch (e) {
+    showCadError("Предпросмотр 3D недоступен в этом браузере. Скачайте файл ниже.");
+  }
+
+  function getCookie(name) {
+    const m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));
+    return m ? decodeURIComponent(m[2]) : "";
+  }
+
+  if (saveBtn) {
+    saveBtn.addEventListener("click", function () {
+      if (!cadRenderer || !cadRenderer.domElement) {
+        if (saveMsg) saveMsg.textContent = "3D ещё не готово для сохранения.";
+        return;
+      }
+      saveBtn.disabled = true;
+      if (saveMsg) saveMsg.textContent = "Сохраняю превью...";
+      cadRenderer.domElement.toBlob(async function (blob) {
+        if (!blob) {
+          saveBtn.disabled = false;
+          if (saveMsg) saveMsg.textContent = "Не удалось создать изображение.";
+          return;
+        }
+        try {
+          const fd = new FormData();
+          fd.append("preview_image", blob, "preview.png");
+          const r = await fetch(savePreviewUrl, {
+            method: "POST",
+            headers: { "X-CSRFToken": getCookie("csrftoken") },
+            body: fd,
+            credentials: "same-origin",
+          });
+          const j = await r.json();
+          if (!r.ok || !j.ok) throw new Error(j.error || "Ошибка сохранения.");
+          if (saveMsg) saveMsg.textContent = "Превью сохранено. Откройте список изделий для проверки.";
+        } catch (err) {
+          if (saveMsg) saveMsg.textContent = "Не удалось сохранить превью.";
+        } finally {
+          saveBtn.disabled = false;
+        }
+      }, "image/png");
+    });
+  }
+</script>
+{% endif %}
+{% endblock %}

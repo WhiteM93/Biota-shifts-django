@@ -4,6 +4,7 @@ from . import cabinet_views
 from . import graph_views
 from . import hours_views
 from . import inventory_views
+from . import product_views
 from . import skud_views
 from . import views
 
@@ -21,6 +22,13 @@ urlpatterns = [
     path("skud/stats.csv", skud_views.skud_stats_csv, name="skud_stats_csv"),
     path("skud/stats.pdf", skud_views.skud_stats_pdf, name="skud_stats_pdf"),
     path("inventory/", inventory_views.inventory_view, name="inventory"),
+    path("products/", product_views.products_list_view, name="products_list"),
+    path("products/new/", product_views.product_create_view, name="product_create"),
+    path("products/<int:pk>/edit/", product_views.product_edit_view, name="product_edit"),
+    path("products/<int:pk>/setups/new/", product_views.product_setup_create_view, name="product_setup_create"),
+    path("products/<int:pk>/setups/<int:setup_pk>/edit/", product_views.product_setup_edit_view, name="product_setup_edit"),
+    path("products/<int:pk>/save-list-preview/", product_views.product_save_list_preview_view, name="product_save_list_preview"),
+    path("products/<int:pk>/", product_views.product_detail_view, name="product_detail"),
     path("cabinet/", cabinet_views.cabinet_view, name="cabinet"),
     path("refresh-cache/", views.refresh_db_cache, name="refresh_cache"),
     path("accounts/login/", views.login_view, name="login"),

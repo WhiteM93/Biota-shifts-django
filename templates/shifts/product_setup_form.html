@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-actions">
+  <a href="{% url 'products_list' %}" class="btn btn-ghost">← К списку изделий</a>
+  <a href="{% url 'product_detail' product.pk %}" class="btn btn-ghost">К карточке изделия</a>
+</div>
+
+<h2 style="margin-top:8px;">
+  {% if is_edit %}
+    Редактирование установки: {{ setup.name }}
+  {% else %}
+    Новая установка для: {{ product.name }}
+  {% endif %}
+</h2>
+
+<form method="post" enctype="multipart/form-data" class="filter-panel" style="margin-top:16px;">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <p style="color:#ffb8b8;">{{ form.non_field_errors }}</p>
+  {% endif %}
+  <div class="filter-grid">
+    <label class="field">
+      <span>Название установки</span>
+      {{ form.name }}
+      {% if form.name.errors %}<span class="muted">{{ form.name.errors }}</span>{% endif %}
+    </label>
+    <label class="field">
+      <span>Порядок</span>
+      {{ form.sort_order }}
+      {% if form.sort_order.errors %}<span class="muted">{{ form.sort_order.errors }}</span>{% endif %}
+    </label>
+    <label class="field">
+      <span>Привязка X</span>
+      {{ form.binding_x }}
+      {% if form.binding_x.errors %}<span class="muted">{{ form.binding_x.errors }}</span>{% endif %}
+    </label>
+    <label class="field">
+      <span>Привязка Y</span>
+      {{ form.binding_y }}
+      {% if form.binding_y.errors %}<span class="muted">{{ form.binding_y.errors }}</span>{% endif %}
+    </label>
+    <label class="field">
+      <span>Привязка Z</span>
+      {{ form.binding_z }}
+      {% if form.binding_z.errors %}<span class="muted">{{ form.binding_z.errors }}</span>{% endif %}
+    </label>
+    <label class="field">
+      <span>Заготовка</span>
+      {{ form.workpiece }}
+      {% if form.workpiece.errors %}<span class="muted">{{ form.workpiece.errors }}</span>{% endif %}
+    </label>
+    <label class="field">
+      <span>Материал</span>
+      {{ form.material }}
+      {% if form.material.errors %}<span class="muted">{{ form.material.errors }}</span>{% endif %}
+    </label>
+    <label class="field">
+      <span>Размер</span>
+      {{ form.size }}
+      {% if form.size.errors %}<span class="muted">{{ form.size.errors }}</span>{% endif %}
+    </label>
+    <label class="field" style="grid-column:1/-1;">
+      <span>PDF с инструментом</span>
+      {{ form.tool_pdf }}
+      {% if form.tool_pdf.errors %}<span class="muted">{{ form.tool_pdf.errors }}</span>{% endif %}
+    </label>
+    <label class="field" style="grid-column:1/-1;">
+      <span>Наладка (текст)</span>
+      {{ form.setup_notes }}
+      {% if form.setup_notes.errors %}<span class="muted">{{ form.setup_notes.errors }}</span>{% endif %}
+    </label>
+    <label class="field" style="grid-column:1/-1;">
+      <span>Программа</span>
+      {{ form.program_file }}
+      {% if form.program_file.errors %}<span class="muted">{{ form.program_file.errors }}</span>{% endif %}
+    </label>
+  </div>
+  <div style="margin-top:14px;padding-top:12px;border-top:1px solid #2f3b57;">
+    <p class="muted" style="margin:0;font-size:13px;line-height:1.5;">
+      Здесь хранится содержимое вкладки установки: текст наладки и файл программы.
+    </p>
+  </div>
+  <p class="filter-actions" style="margin-top:18px;">
+    <button type="submit" class="btn">{% if is_edit %}Сохранить{% else %}Создать{% endif %}</button>
+    <a href="{% url 'product_detail' product.pk %}" class="btn btn-ghost">Отмена</a>
+  </p>
+</form>
+{% endblock %}

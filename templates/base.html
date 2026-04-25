@@ -36,6 +36,62 @@
       border-color: #6379ab;
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
     }
+    .nav-dropdown {
+      position: relative;
+      align-self: center;
+    }
+    .nav-dropdown > summary {
+      list-style: none;
+      cursor: pointer;
+      color: #c7d4fb;
+      font-weight: 600;
+      white-space: nowrap;
+      font-size: 13px;
+      padding: 6px 10px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      transition: background .14s ease, border-color .14s ease, color .14s ease;
+      user-select: none;
+    }
+    .nav-dropdown > summary::-webkit-details-marker { display: none; }
+    .nav-dropdown > summary::after {
+      content: "▾";
+      margin-left: 5px;
+      font-size: 9px;
+      opacity: 0.75;
+    }
+    .nav-dropdown > summary:hover {
+      color: #fff;
+      background: #253150;
+      border-color: #3a4a72;
+    }
+    .nav-dropdown > summary.active {
+      color: #ffffff;
+      background: linear-gradient(180deg, #4f6190 0%, #3b4b72 100%);
+      border-color: #6379ab;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+    .nav-dropdown[open] > summary {
+      color: #fff;
+      background: #253150;
+      border-color: #3a4a72;
+    }
+    .nav-dropdown-menu {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      min-width: 200px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: rgba(24, 32, 50, 0.98);
+      border: 1px solid #3a4a72;
+      border-radius: 12px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+      z-index: 40;
+    }
+    .nav-dropdown-menu a { border-radius: 8px; }
     .nav .nav-spacer { margin-left: auto; }
     .nav .nav-refresh-form { margin: 0; }
     .nav .nav-refresh-btn {
@@ -107,6 +163,23 @@
     }
     .btn:hover { filter: brightness(1.05); transform: translateY(-1px); }
     .btn:active { transform: translateY(0); }
+    .btn.btn-ghost {
+      background: #2a3656;
+      box-shadow: none;
+      border: 1px solid #445884;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .page-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 2px 0 14px 0;
+      align-items: center;
+    }
     .muted { color: #9bb0d8; }
     .filter-panel {
       margin: 12px 0 14px 0;
@@ -226,21 +299,43 @@
       <button class="nav-refresh-btn" type="submit" title="Обновить кэш данных из БД" aria-label="Обновить кэш данных из БД">↻</button>
     </form>
     {% endif %}
+    {% if biota_nav.home %}
     <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">Главная</a>
-    {% if biota_nav.graph %}
+    {% endif %}
+    {% if biota_nav.graph and biota_nav.regulations %}
+    <details class="nav-dropdown">
+      <summary class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' or request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">График и регламенты</summary>
+      <div class="nav-dropdown-menu">
+        <a href="{% url 'graph' %}" class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' %}active{% endif %}">График</a>
+        <a href="{% url 'regulations_page' %}" class="{% if request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">Регламенты</a>
+      </div>
+    </details>
+    {% elif biota_nav.graph %}
     <a href="{% url 'graph' %}" class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' %}active{% endif %}">График</a>
+    {% elif biota_nav.regulations %}
+    <a href="{% url 'regulations_page' %}" class="{% if request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">Регламенты</a>
     {% endif %}
-    {% if biota_nav.hours %}
+    {% if biota_nav.hours and biota_nav.skud %}
+    <details class="nav-dropdown">
+      <summary class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' or request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">Часы и СКУД</summary>
+      <div class="nav-dropdown-menu">
+        <a href="{% url 'hours' %}" class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' %}active{% endif %}">Часы по дням</a>
+        <a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
+      </div>
+    </details>
+    {% elif biota_nav.hours %}
     <a href="{% url 'hours' %}" class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' %}active{% endif %}">Часы по дням</a>
-    {% endif %}
-    {% if biota_nav.skud %}
+    {% elif biota_nav.skud %}
     <a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
     {% endif %}
     {% if biota_nav.inventory %}
-    <a href="{% url 'inventory' %}" class="{% if request.resolver_match.url_name == 'inventory' %}active{% endif %}">Склад</a>
+    <a href="{% url 'inventory' %}" class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel != 'defects' %}active{% endif %}">Склад</a>
     {% endif %}
-    {% if biota_nav.regulations %}
-    <a href="{% url 'regulations_page' %}" class="{% if request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">Регламенты</a>
+    {% if biota_nav.defects %}
+    <a href="{% url 'inventory' %}?panel=defects" class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel == 'defects' %}active{% endif %}">Учёт брака</a>
+    {% endif %}
+    {% if biota_nav.products %}
+    <a href="{% url 'products_list' %}" class="{% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_detail' %}active{% endif %}">Изделия</a>
     {% endif %}
     <span class="nav-spacer"></span>
     {% if biota_username %}
@@ -297,6 +392,25 @@
       refreshForm.addEventListener("submit", function () {
         btn.classList.add("is-loading");
         btn.setAttribute("aria-label", "Обновление данных из БД...");
+      });
+    })();
+    (function () {
+      var nav = document.querySelector(".nav");
+      if (!nav) return;
+      var drops = nav.querySelectorAll("details.nav-dropdown");
+      if (!drops.length) return;
+      drops.forEach(function (d) {
+        d.addEventListener("toggle", function () {
+          if (!d.open) return;
+          drops.forEach(function (other) {
+            if (other !== d) other.removeAttribute("open");
+          });
+        });
+      });
+      document.addEventListener("click", function (ev) {
+        if (!nav.contains(ev.target)) {
+          drops.forEach(function (d) { d.removeAttribute("open"); });
+        }
       });
     })();
   </script>

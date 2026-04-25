@@ -1,3 +1,4 @@
+from django.core.validators import FileExtensionValidator
 from django.db import models
 
 
@@ -202,3 +203,163 @@ class PurchaseRequest(models.Model):
     @property
     def total_price(self):
         return self.unit_price * self.quantity
+
+
+class EmployeeDefectRecord(models.Model):
+    defect_date = models.DateField(verbose_name="Дата")
+    responsible_name = models.CharField(max_length=120, verbose_name="Ответственный")
+    employee_name = models.CharField(max_length=120, db_index=True, verbose_name="Сотрудник")
+    department_name = models.CharField(max_length=200, blank=True, default="", db_index=True, verbose_name="Отдел")
+    defect_quantity = models.PositiveIntegerField(verbose_name="Кол-во брака")
+    good_quantity = models.PositiveIntegerField(default=0, verbose_name="Исправно")
+    bad_quantity = models.PositiveIntegerField(default=0, verbose_name="Неисправно")
+    defect_reason = models.CharField(max_length=500, verbose_name="Причина брака")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+
+    class Meta:
+        ordering = ("-defect_date", "-id")
+        verbose_name = "Запись учёта брака сотрудника"
+        verbose_name_plural = "Учёт брака сотрудников"
+
+    def __str__(self):
+        return f"{self.defect_date} / {self.employee_name} / брак: {self.defect_quantity}"
+
+
+class Product(models.Model):
+    """Карточка изделия: чертёж, 3D, наладка, программа."""
+
+    name = models.CharField(max_length=300, verbose_name="Название")
+    description = models.TextField(blank=True, default="", verbose_name="Описание")
+    drawing_pdf = models.FileField(
+        upload_to="products/drawings/",
+        blank=True,
+        verbose_name="Чертёж (PDF)",
+        validators=[FileExtensionValidator(["pdf"])],
+    )
+    cad_model = models.FileField(
+        upload_to="products/cad/",
+        blank=True,
+        verbose_name="3D-модель (STL, STP, STEP)",
+        validators=[FileExtensionValidator(["stl", "stp", "step"])],
+        help_text="Скачивание; для STP/STEP в окне — отдельный STL ниже.",
+    )
+    preview_stl = models.FileField(
+        upload_to="products/preview_stl/",
+        blank=True,
+        verbose_name="STL для предпросмотра",
+        validators=[FileExtensionValidator(["stl"])],
+        help_text="Сетка для 3D в карточке; для STP/STEP — экспорт в STL сюда.",
+    )
+    list_preview_image = models.FileField(
+        upload_to="products/list_previews/",
+        blank=True,
+        verbose_name="Превью для списка изделий (PNG)",
+        validators=[FileExtensionValidator(["png", "jpg", "jpeg", "webp"])],
+        help_text="Сохраняется из 3D-окна кнопкой «Сохранить превью».",
+    )
+    setup_notes = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Наладка (текст)",
+        help_text="Заготовка, привязка, инструмент, прочее.",
+    )
+    program_file = models.FileField(
+        upload_to="products/programs/",
+        blank=True,
+        verbose_name="Программа (G/M, любой файл)",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("-updated_at", "-id")
+        verbose_name = "Изделие"
+        verbose_name_plural = "Изделия"
+
+    def __str__(self):
+        return self.name
+
+    def cad_filename_endswith_stl(self) -> bool:
+        n = (self.cad_model.name or "").lower() if self.cad_model else ""
+        return n.endswith(".stl")
+
+    @property
+    def preview_stl_list_label(self) -> str:
+        if self.preview_stl:
+            return "отдельный"
+        if self.cad_filename_endswith_stl():
+            return "из основного"
+        return "—"
+
+
+class ProductSetup(models.Model):
+    """Установка изделия: наладка и программа."""
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="setups",
+    )
+    name = models.CharField(max_length=180, verbose_name="Название установки")
+    binding_x = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка X")
+    binding_y = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка Y")
+    binding_z = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка Z")
+    workpiece = models.CharField(max_length=220, blank=True, default="", verbose_name="Заготовка")
+    material = models.CharField(max_length=180, blank=True, default="", verbose_name="Материал")
+    size = models.CharField(max_length=180, blank=True, default="", verbose_name="Размер")
+    tool_pdf = models.FileField(
+        upload_to="products/setup_tools/",
+        blank=True,
+        verbose_name="Инструмент (PDF)",
+        validators=[FileExtensionValidator(["pdf"])],
+    )
+    setup_notes = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Наладка (текст)",
+    )
+    program_file = models.FileField(
+        upload_to="products/programs/",
+        blank=True,
+        verbose_name="Программа (G/M, любой файл)",
+    )
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Установка изделия"
+        verbose_name_plural = "Установки изделий"
+
+    def __str__(self) -> str:
+        return f"{self.product_id} / {self.name}"
+
+
+class ProductSetupPhoto(models.Model):
+    """Фото в блоке «Наладка»."""
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="setup_photos",
+    )
+    image = models.FileField(
+        upload_to="products/setup/",
+        verbose_name="Фото",
+    )
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    caption = models.CharField(
+        max_length=300,
+        blank=True,
+        default="",
+        verbose_name="Подпись",
+    )
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Фото наладки (изделие)"
+        verbose_name_plural = "Фото наладки (изделие)"
+
+    def __str__(self) -> str:
+        return f"{self.product_id} #{self.pk}"

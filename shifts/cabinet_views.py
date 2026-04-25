@@ -8,9 +8,8 @@ from biota_shifts.auth import (
     ADMIN_USERNAME,
     NAV_KEYS,
     NAV_LABELS_RU,
+    _nav_department_filters_map,
     _access_scope_description,
-    _allowed_areas_list,
-    _allowed_departments_list,
     _approve_registration,
     _change_password_registered,
     _distinct_area_tokens,
@@ -19,7 +18,6 @@ from biota_shifts.auth import (
     _resolve_registered_user,
     _set_user_privileges,
     _update_registered_profile,
-    _user_access_scope_value,
     nav_permissions_for_user,
 )
 from .department_order import apply_department_order, load_department_order, save_department_order
@@ -41,15 +39,6 @@ def _canonical_store_username(username: str) -> str | None:
         if str(k).strip().lower() == ul:
             return str(k)
     return None
-
-
-_SCOPE_OPTIONS = ("none", "all", "department", "area")
-_SCOPE_LABELS = {
-    "none": "Нет доступа",
-    "all": "Вся организация",
-    "department": "Только выбранные цехи (отделы)",
-    "area": "Только выбранные участки",
-}
 
 
 @biota_login_required
@@ -75,14 +64,26 @@ def cabinet_view(request):
                 return redirect("cabinet")
             if action == "admin_privileges":
                 target = (request.POST.get("priv_user") or "").strip()
-                scope = (request.POST.get("priv_scope") or "none").strip()
-                if scope not in _SCOPE_OPTIONS:
-                    scope = "none"
-                deps = request.POST.getlist("priv_dep")
-                areas = request.POST.getlist("priv_area")
                 sel_nav = request.POST.getlist("priv_nav")
                 nav_map = {k: (k in sel_nav) for k in NAV_KEYS}
-                ok, err = _set_user_privileges(target, scope, deps, areas, nav=nav_map)
+                dep_opts = sorted(employees_full["department_name"].unique().tolist()) if not employees_full.empty else []
+                allowed_dep_set = set(dep_opts)
+                nav_dep_filters: dict[str, list[str]] = {}
+                for k in NAV_KEYS:
+                    if not nav_map.get(k, True):
+                        continue
+                    if k == "products":
+                        continue
+                    picked = [d for d in request.POST.getlist(f"priv_nav_dep__{k}") if d in allowed_dep_set]
+                    nav_dep_filters[k] = picked
+                ok, err = _set_user_privileges(
+                    target,
+                    None,
+                    [],
+                    [],
+                    nav=nav_map,
+                    nav_dep_filters=nav_dep_filters,
+                )
                 if ok:
                     messages.success(request, "Права сохранены.")
                 else:
@@ -176,18 +177,21 @@ def cabinet_view(request):
             sel = ctx["priv_users"][0]
         ctx["priv_selected"] = sel if sel in priv_store else (ctx["priv_users"][0] if ctx["priv_users"] else "")
         pr = priv_store.get(ctx["priv_selected"], {}) if ctx["priv_selected"] else {}
-        psc = _user_access_scope_value(pr)
-        if psc not in _SCOPE_OPTIONS:
-            psc = "none"
-        ctx["priv_scope_current"] = psc
-        ctx["priv_dep_selected"] = [x for x in _allowed_departments_list(pr) if x in dep_opts]
-        ctx["priv_area_selected"] = [x for x in _allowed_areas_list(pr) if x in area_opts]
-        ctx["scope_choices"] = [(s, _SCOPE_LABELS[s]) for s in _SCOPE_OPTIONS]
         _pn = nav_permissions_for_user(ctx["priv_selected"]) if ctx["priv_selected"] else {k: True for k in NAV_KEYS}
         ctx["priv_nav"] = _pn
-        ctx["priv_nav_rows"] = [
-            {"key": k, "label": NAV_LABELS_RU[k], "on": _pn.get(k, True)} for k in NAV_KEYS
-        ]
+        _ndf = _nav_department_filters_map(pr) if ctx["priv_selected"] else {}
+        ctx["priv_nav_rows"] = []
+        for k in NAV_KEYS:
+            sel_deps = [d for d in (_ndf.get(k) or []) if d in dep_opts]
+            ctx["priv_nav_rows"].append(
+                {
+                    "key": k,
+                    "label": NAV_LABELS_RU.get(k, k),
+                    "on": _pn.get(k, True),
+                    "locked": False,
+                    "dep_selected": sel_deps,
+                }
+            )
     else:
         rec = _resolve_registered_user(user) or {}
         ctx["profile_login"] = user

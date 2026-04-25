@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-actions">
+  <a href="{% url 'products_list' %}" class="btn btn-ghost">← К списку изделий</a>
+  {% if is_edit and product %}
+  <a href="{% url 'product_detail' product.pk %}" class="btn btn-ghost">К карточке изделия</a>
+  {% endif %}
+</div>
+
+<h2 style="margin-top:8px;">{% if is_edit %}Редактирование: {{ product.name }}{% else %}Новое изделие{% endif %}</h2>
+
+<p class="muted" style="margin:10px 0 0; line-height:1.5; max-width:640px; font-size:14px;">PDF — чертёж; STL/STP/STEP — основной 3D, при STEP дополнительно STL для вращения в карточке. Наладка и программа теперь заполняются в отдельных «Установках» на странице карточки изделия.</p>
+
+<form method="post" enctype="multipart/form-data" class="filter-panel" style="margin-top:16px;">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <p style="color:#ffb8b8;">{{ form.non_field_errors }}</p>
+  {% endif %}
+  <div class="filter-grid">
+    <label class="field"><span>Название</span>{{ form.name }}{% if form.name.errors %}<span class="muted">{{ form.name.errors }}</span>{% endif %}</label>
+    <label class="field" style="grid-column:1/-1;"><span>Описание</span>{{ form.description }}{% if form.description.errors %}<span class="muted">{{ form.description.errors }}</span>{% endif %}</label>
+    <label class="field"><span>Чертёж (PDF)</span>{{ form.drawing_pdf }}{% if form.drawing_pdf.errors %}<span class="muted">{{ form.drawing_pdf.errors }}</span>{% endif %}</label>
+    <label class="field"><span>3D-модель (STL / STP / STEP)</span>{{ form.cad_model }}{% if form.cad_model.errors %}<span class="muted">{{ form.cad_model.errors }}</span>{% endif %}</label>
+    <label class="field" style="grid-column:1/-1;"><span>STL для предпросмотра (только .stl)</span>{{ form.preview_stl }}{% if form.preview_stl.errors %}<span class="muted">{{ form.preview_stl.errors }}</span>{% endif %}</label>
+  </div>
+  {% if is_edit and product %}
+  <p class="muted" style="margin:12px 0 0 0;">
+    После сохранения можно добавить установки в <a href="{% url 'product_detail' product.pk %}">карточке изделия</a>.
+  </p>
+  {% endif %}
+  <div style="margin-top:16px;border-top:1px solid #2f3b57;padding-top:14px;">
+    <h3 style="margin:0 0 8px 0;font-size:14px;color:#9bb0d8;">Фото по наладке</h3>
+    <p class="muted" style="font-size:13px;margin:0 0 10px 0;">Несколько изображений за раз; в редактировании — снять галочки и сохранить, чтобы удалить.</p>
+    <input type="file" name="new_setup_photos" multiple accept="image/*,.jpg,.jpeg,.png,.webp,.gif" style="max-width:100%;" />
+    {% if is_edit and product and product.setup_photos.all %}
+    <ul style="margin:12px 0 0;padding:0;list-style:none;">
+      {% for sp in product.setup_photos.all %}
+      <li style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #2a3348;">
+        <input type="checkbox" name="remove_setup_photo" value="{{ sp.id }}" id="rmsp{{ sp.id }}" />
+        <label for="rmsp{{ sp.id }}" style="display:flex;gap:10px;align-items:center;flex:1;cursor:pointer;">
+          <img src="{{ sp.image.url }}" alt="" style="max-width:120px;max-height:90px;object-fit:cover;border-radius:6px;border:1px solid #2f3b57;" />
+          <span class="muted">пометить к удалению (после «Сохранить»)</span>
+        </label>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  <p class="filter-actions" style="margin-top:18px;">
+    <button type="submit" class="btn">{% if is_edit %}Сохранить{% else %}Создать{% endif %}</button>
+    <a href="{% if is_edit and product %}{% url 'product_detail' product.pk %}{% else %}{% url 'products_list' %}{% endif %}" class="btn btn-ghost">Отмена</a>
+  </p>
+</form>
+{% endblock %}

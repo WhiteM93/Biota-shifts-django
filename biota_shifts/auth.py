@@ -226,6 +226,7 @@ def _register_user(username: str, password: str) -> tuple[bool, str]:
         "allowed_area": "",
         "allowed_departments": [],
         "allowed_areas": [],
+        "nav_dep_filters": {},
     }
     _save_users_store(store)
     return True, ""
@@ -406,14 +407,17 @@ def _filter_employees_for_user(full_df: pd.DataFrame, username: str) -> pd.DataF
     return full_df.iloc[0:0].copy()
 
 
-# Разделы меню Django (кроме «Главная» и личного кабинета): права в JSON users.*.nav
-NAV_KEYS = ("graph", "hours", "skud", "inventory", "regulations")
+# Разделы меню Django (кроме личного кабинета): права в JSON users.*.nav
+NAV_KEYS = ("home", "graph", "hours", "skud", "inventory", "defects", "regulations", "products")
 NAV_LABELS_RU = {
+    "home": "Главная (сводка)",
     "graph": "График",
     "hours": "Часы по дням",
     "skud": "СКУД",
     "inventory": "Склад",
+    "defects": "Учёт брака",
     "regulations": "Регламенты",
+    "products": "Изделия",
 }
 
 
@@ -436,8 +440,64 @@ def nav_permissions_for_user(username: str | None) -> dict[str, bool]:
     return out
 
 
+def _nav_department_filters_map(rec: dict | None) -> dict[str, list[str]]:
+    """Пер-разделные ограничения по отделам: users.*.nav_dep_filters {graph:[...], ...}.
+
+    Пустой список для ключа раздела означает «ни один отдел не разрешён» (пустой список сотрудников).
+    Если ключа раздела в JSON нет — фильтр не задан (обратная совместимость: все отделы).
+    """
+    if not rec or not isinstance(rec.get("nav_dep_filters"), dict):
+        return {}
+    raw = rec.get("nav_dep_filters") or {}
+    out: dict[str, list[str]] = {}
+    for k, v in raw.items():
+        key = str(k or "").strip()
+        if key not in NAV_KEYS:
+            continue
+        if isinstance(v, list):
+            vals = [_norm_label(x) for x in v if _norm_label(x)]
+        elif isinstance(v, str) and v.strip():
+            vals = [_norm_label(p) for p in v.split(",") if _norm_label(p)]
+        else:
+            vals = []
+        out[key] = vals
+    return out
+
+
+def employees_df_for_nav(username: str | None, nav_key: str, employees_df: pd.DataFrame) -> pd.DataFrame:
+    """Список сотрудников для конкретного раздела: базовые права + (опционально) фильтр по отделам для раздела."""
+    if employees_df is None or getattr(employees_df, "empty", True):
+        return employees_df
+    u = (username or "").strip()
+    if not u or _is_admin(u):
+        return employees_df
+    rec = _resolve_registered_user(u)
+    if rec is None:
+        return employees_df.iloc[0:0].copy()
+    # В Django-интерфейсе доступ к сотрудникам в разделах задаётся через nav_dep_filters.
+    # Глобальный access_scope оставляем для Streamlit/обратной совместимости, но здесь не сужаем базу по нему.
+    base = employees_df
+    nk = (nav_key or "").strip()
+    if nk == "products":
+        return employees_df
+    filt = _nav_department_filters_map(rec).get(nk)
+    if filt is None:
+        return base
+    if not filt:
+        return base.iloc[0:0].copy()
+    if base.empty:
+        return base
+    allow = {_cmp_str(x) for x in filt}
+    mask = base["department_name"].map(_cmp_str).isin(allow)
+    return base[mask].copy()
+
+
 def _access_scope_description(rec: dict) -> str:
     scope = _user_access_scope_value(rec)
+    nd = _nav_department_filters_map(rec or {})
+    if nd:
+        keys = ", ".join(NAV_LABELS_RU.get(k, k) for k in sorted(nd.keys()))
+        return f"Фильтр по отделам настроен для разделов: {keys}"
     if scope in ("none", ""):
         return "Нет доступа к данным — администратор ещё не назначил права"
     if scope == "department":
@@ -453,27 +513,59 @@ def _access_scope_description(rec: dict) -> str:
 
 def _set_user_privileges(
     target_username: str,
-    scope: str,
+    scope: str | None,
     allowed_departments,
     allowed_areas,
     *,
     nav: dict[str, bool] | None = None,
+    nav_dep_filters: dict[str, list[str]] | None = None,
 ) -> tuple[bool, str]:
-    if scope not in ("none", "all", "department", "area"):
+    if scope is not None and str(scope).strip() not in ("none", "all", "department", "area"):
         return False, "Неверный тип доступа"
     store = _load_users_store()
     if target_username not in store:
         return False, "Пользователь не найден"
     rec = store[target_username]
-    rec["access_scope"] = scope
-    deps = [_norm_label(x) for x in (allowed_departments or []) if _norm_label(x)]
-    ars = [_norm_label(x) for x in (allowed_areas or []) if _norm_label(x)]
-    rec["allowed_departments"] = deps if scope == "department" else []
-    rec["allowed_areas"] = ars if scope == "area" else []
-    rec["allowed_department"] = ""
-    rec["allowed_area"] = ""
+    if scope is not None:
+        scope = str(scope).strip()
+        rec["access_scope"] = scope
+        deps = [_norm_label(x) for x in (allowed_departments or []) if _norm_label(x)]
+        ars = [_norm_label(x) for x in (allowed_areas or []) if _norm_label(x)]
+        rec["allowed_departments"] = deps if scope == "department" else []
+        rec["allowed_areas"] = ars if scope == "area" else []
+        rec["allowed_department"] = ""
+        rec["allowed_area"] = ""
     if nav is not None:
-        rec["nav"] = {k: bool(nav.get(k, True)) for k in NAV_KEYS}
+        merged_nav = {k: bool(nav.get(k, True)) for k in NAV_KEYS}
+        rec["nav"] = merged_nav
+    if nav_dep_filters is not None:
+        cleaned: dict[str, list[str]] = {}
+        for k, vals in (nav_dep_filters or {}).items():
+            key = str(k or "").strip()
+            if key not in NAV_KEYS:
+                continue
+            if not isinstance(vals, list):
+                continue
+            uniq = []
+            seen = set()
+            for x in vals:
+                t = _norm_label(x)
+                if not t:
+                    continue
+                cf = _cmp_str(t)
+                if cf in seen:
+                    continue
+                seen.add(cf)
+                uniq.append(t)
+            cleaned[key] = uniq
+        current_nav = rec.get("nav")
+        if not isinstance(current_nav, dict):
+            current_nav = {nk: True for nk in NAV_KEYS}
+        rec["nav_dep_filters"] = {
+            k: v
+            for k, v in cleaned.items()
+            if k in NAV_KEYS and bool(current_nav.get(k, True))
+        }
     store[target_username] = rec
     _save_users_store(store)
     return True, ""

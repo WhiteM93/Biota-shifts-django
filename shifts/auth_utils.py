@@ -1,16 +1,83 @@
 """Авторизация Biota (сессия Django, те же пароли что и в Streamlit)."""
 from functools import wraps
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote, urlparse
 
 from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import redirect
+from django.urls import NoReverseMatch, resolve, reverse
 
-from biota_shifts.auth import _is_admin, _resolve_registered_user, nav_permissions_for_user
+from biota_shifts.auth import NAV_KEYS, _is_admin, _resolve_registered_user, nav_permissions_for_user
 
 
 def biota_user(request):
     return (request.session.get("biota_username") or "").strip() or None
+
+
+def _nav_key_for_url_name(url_name: str) -> str | None:
+    n = (url_name or "").strip()
+    if not n:
+        return None
+    if n == "home":
+        return "home"
+    if n.startswith("graph"):
+        return "graph"
+    if n.startswith("hours"):
+        return "hours"
+    if n.startswith("skud"):
+        return "skud"
+    if n == "inventory":
+        return "inventory"
+    if n.startswith("regulations"):
+        return "regulations"
+    if n.startswith("product"):
+        return "products"
+    return None
+
+
+def _nav_key_for_internal_path(path: str, query: str) -> str | None:
+    p = (path or "").strip()
+    if not p.startswith("/"):
+        p = "/" + p
+    try:
+        match = resolve(p)
+    except Exception:
+        return None
+    key = _nav_key_for_url_name(match.url_name)
+    if key == "inventory":
+        q = parse_qs(query or "")
+        panel_vals = [x for x in (q.get("panel") or []) if x]
+        panel = (panel_vals[0] or "").strip() if panel_vals else ""
+        if panel == "defects":
+            return "defects"
+        return "inventory"
+    return key
+
+
+def post_login_redirect(username: str | None, next_path: str | None = None) -> str:
+    """Куда отправить пользователя после входа / при отказе в nav-правах (если «Главная» выключена — не зацикливаться на /home/)."""
+    u = (username or "").strip()
+    perms = nav_permissions_for_user(u) if u else {k: True for k in NAV_KEYS}
+
+    if next_path:
+        raw = str(next_path).strip()
+        if raw.startswith("/") and not raw.startswith("//"):
+            parsed = urlparse(raw)
+            nk = _nav_key_for_internal_path(parsed.path, parsed.query)
+            if nk is None or perms.get(nk, True):
+                return raw
+
+    order = ("home", "graph", "hours", "skud", "inventory", "defects", "regulations", "products")
+    for k in order:
+        if not perms.get(k, True):
+            continue
+        try:
+            if k == "defects":
+                return f"{reverse('inventory')}?panel=defects"
+            return reverse(k)
+        except NoReverseMatch:
+            continue
+    return reverse("cabinet")
 
 
 def biota_login_required(view_func):
@@ -46,7 +113,7 @@ def nav_permission_required(nav_key: str):
                 return redirect(f"{settings.LOGIN_URL}?next={next_url}")
             if not nav_permissions_for_user(u).get(nav_key, True):
                 messages.warning(request, "У вас нет доступа к этому разделу.")
-                return redirect("home")
+                return redirect(post_login_redirect(u))
             return view_func(request, *args, **kwargs)
 
         return _wrapped

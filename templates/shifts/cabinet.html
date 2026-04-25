@@ -105,7 +105,7 @@
 <hr style="border-color:#2b3650;margin:28px 0;">
 
 <h3>Права пользователей</h3>
-<p class="muted">Новые аккаунты по умолчанию без доступа к сотрудникам, пока не назначены права.</p>
+<p class="muted">Новые аккаунты по умолчанию ждут подтверждения администратором. Ниже настраиваются доступы к разделам и (опционально) фильтр по отделам внутри каждого раздела.</p>
 {% if not priv_users %}
 <p class="muted">Пока нет зарегистрированных пользователей (файл пользователей пуст).</p>
 {% else %}
@@ -125,51 +125,42 @@
   {% csrf_token %}
   <input type="hidden" name="action" value="admin_privileges">
   <input type="hidden" name="priv_user" value="{{ priv_selected }}">
-  <p>
-    <label>Видимость сотрудников
-      <select name="priv_scope">
-        {% for val, lab in scope_choices %}
-        <option value="{{ val }}" {% if val == priv_scope_current %}selected{% endif %}>{{ lab }}</option>
-        {% endfor %}
-      </select>
-    </label>
+  <p class="muted">
+    Разделы меню: снимите галочку, чтобы скрыть раздел.
+    Ниже для каждого включённого раздела отметьте отделы: в разделе будут видны только они. Если ни одной галочки не стоит — по этому разделу не будет видно сотрудников ни из одного отдела.
   </p>
-  <p class="muted">При ограничении по цеху или участку выберите один или несколько пунктов (Ctrl+щелчок).</p>
   {% if dep_opts %}
-  <p>
-    <label>Цехи (отделы)<br>
-      <select name="priv_dep" multiple size="8" class="cab-multi">
-        {% for d in dep_opts %}
-        <option value="{{ d }}" {% if d in priv_dep_selected %}selected{% endif %}>{{ d }}</option>
-        {% endfor %}
-      </select>
-    </label>
-  </p>
+  {% for row in priv_nav_rows %}
+  <div class="cab-nav-block">
+    <div class="cab-nav-head">
+      <label class="chk" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+        <input type="checkbox" name="priv_nav" value="{{ row.key }}" {% if row.on %}checked{% endif %}>
+        <span><strong>{{ row.label }}</strong></span>
+      </label>
+      {% if row.key != "products" %}
+      <span class="cab-nav-bulk">
+        <button type="button" class="btn js-cab-dep-all" data-nav-key="{{ row.key }}">Все</button>
+        <button type="button" class="btn js-cab-dep-none" data-nav-key="{{ row.key }}">Снять всё</button>
+      </span>
+      {% endif %}
+    </div>
+    <div class="cab-check-grid" style="padding-left: 10px;">
+      {% if row.key == "products" %}
+      <p class="muted" style="margin:4px 0 0 0;">Раздел «Изделия» не привязан к отделам.</p>
+      {% else %}
+      {% for d in dep_opts %}
+      <label class="chk">
+        <input type="checkbox" name="priv_nav_dep__{{ row.key }}" value="{{ d }}" {% if d in row.dep_selected %}checked{% endif %}>
+        {{ d }}
+      </label>
+      {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
   {% else %}
-  <p class="muted">Нет цехов в справочнике.</p>
+  <p class="muted">Нет цехов в справочнике — настройка отделов по разделам недоступна.</p>
   {% endif %}
-  {% if area_opts %}
-  <p>
-    <label>Участки<br>
-      <select name="priv_area" multiple size="8" class="cab-multi">
-        {% for a in area_opts %}
-        <option value="{{ a }}" {% if a in priv_area_selected %}selected{% endif %}>{{ a }}</option>
-        {% endfor %}
-      </select>
-    </label>
-  </p>
-  {% else %}
-  <p class="muted">Нет участков в справочнике.</p>
-  {% endif %}
-  <p class="muted">Разделы меню (кроме «Главная» и личного кабинета): снимите галочки, чтобы скрыть разделы.</p>
-  <p style="display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;">
-    {% for row in priv_nav_rows %}
-    <label class="chk" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
-      <input type="checkbox" name="priv_nav" value="{{ row.key }}" {% if row.on %}checked{% endif %}>
-      {{ row.label }}
-    </label>
-    {% endfor %}
-  </p>
   <p><button type="submit" class="btn">Сохранить права</button></p>
 </form>
 {% endif %}
@@ -225,6 +216,46 @@
 .admin-health-item--warn .admin-health-detail { color: #f5d99a; }
 .admin-health-item--err .admin-health-detail { color: #ffb8b8; }
 .cab-multi { min-height: 140px; width: 100%; max-width: 520px; }
+.cab-check-group {
+  margin: 10px 0 14px 0;
+  max-width: 780px;
+}
+.cab-check-title {
+  color: #aebde8;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.cab-check-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+.cab-nav-block {
+  margin: 12px 0 14px 0;
+  padding: 10px 10px 8px 10px;
+  border: 1px solid #2f3b57;
+  border-radius: 12px;
+  background: rgba(16, 23, 36, 0.55);
+}
+.cab-nav-head {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cab-nav-bulk {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cab-nav-bulk .btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  box-shadow: none;
+}
 .dept-order-box {
   width: 100%;
   max-width: 620px;
@@ -346,6 +377,23 @@
     }
     initOrderList("dept-order-list", "dept-order-text");
     initOrderList("pos-order-list", "pos-order-text");
+  })();
+</script>
+<script>
+  (function () {
+    function deptBoxesInBlock(block) {
+      return block.querySelectorAll('input[type="checkbox"][name^="priv_nav_dep__"]');
+    }
+    document.addEventListener("click", function (event) {
+      var allBtn = event.target.closest(".js-cab-dep-all");
+      var noneBtn = event.target.closest(".js-cab-dep-none");
+      var btn = allBtn || noneBtn;
+      if (!btn) return;
+      var block = btn.closest(".cab-nav-block");
+      if (!block) return;
+      var on = Boolean(allBtn);
+      deptBoxesInBlock(block).forEach(function (cb) { cb.checked = on; });
+    });
   })();
 </script>
 

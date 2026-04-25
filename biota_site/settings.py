@@ -163,6 +163,16 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Загрузки изделий (чертежи, CAD). При DEBUG файлы отдаёт Django; в проде настройте раздачу /media/ через nginx.
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# Иначе <object>/<iframe> с PDF с того же сайта часто блокируются при значении по умолчанию DENY.
+X_FRAME_OPTIONS = "SAMEORIGIN"
+
+# Раздавать /media/ через Django при DEBUG или если явно DJANGO_SERVE_MEDIA=1 (например gunicorn без nginx).
+SERVE_MEDIA_FROM_DJANGO = (os.getenv("DJANGO_SERVE_MEDIA") or "").strip().lower() in ("1", "true", "yes")
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

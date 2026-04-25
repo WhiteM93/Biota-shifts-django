@@ -13,7 +13,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from biota_shifts import db as biota_db
 from biota_shifts import export as biota_export
 from biota_shifts import schedule as biota_schedule
-from biota_shifts.auth import _filter_employees_for_user, _is_admin
+from biota_shifts.auth import employees_df_for_nav
 
 from shifts.auth_utils import biota_login_required, biota_user, nav_permission_required
 from shifts.department_order import apply_department_order, load_department_order
@@ -91,6 +91,33 @@ def _normalized_breaks(o: RegulationPlan, raw_items) -> list[dict]:
     if out:
         return out
     return _default_breaks_for_plan(o)
+
+
+def _break_intervals_minutes_day(breaks: list[dict]) -> list[tuple[int, int]]:
+    """Интервалы промежутков в минутах от полуночи (только валидные start < end)."""
+    out: list[tuple[int, int]] = []
+    for b in breaks:
+        try:
+            st = _parse_hm(str(b.get("start", "")))
+            en = _parse_hm(str(b.get("end", "")))
+        except ValueError:
+            continue
+        a0 = st.hour * 60 + st.minute
+        a1 = en.hour * 60 + en.minute
+        if a0 < a1:
+            out.append((a0, a1))
+    return out
+
+
+def _intervals_overlap_pairwise(intervals: list[tuple[int, int]]) -> bool:
+    """Пересечение [a0,a1) и [b0,b1) при строгих неравенствах (стык a1==b0 — не пересечение)."""
+    for i in range(len(intervals)):
+        a0, a1 = intervals[i]
+        for j in range(i + 1, len(intervals)):
+            b0, b1 = intervals[j]
+            if a0 < b1 and b0 < a1:
+                return True
+    return False
 
 
 def _primary_windows_from_breaks(plan: RegulationPlan, breaks: list[dict]) -> tuple[time, time, time, time, str, time | None, time | None]:
@@ -198,10 +225,7 @@ def _shift_title(shift: str) -> str:
 def _employees_for_user(request):
     cfg = biota_db.db_config()
     employees_df = biota_db.load_employees(cfg)
-    user = biota_user(request)
-    if user and not _is_admin(user):
-        employees_df = _filter_employees_for_user(employees_df, user)
-    return employees_df
+    return employees_df_for_nav(biota_user(request), "regulations", employees_df)
 
 
 def _fill_from_catalog(plan_date: date, employees_df) -> tuple[int, int]:
@@ -657,6 +681,12 @@ def regulations_api_save(request):
         if not row:
             continue
         breaks = _normalized_breaks(row, it.get("breaks"))
+        ivs = _break_intervals_minutes_day(breaks)
+        if _intervals_overlap_pairwise(ivs):
+            return HttpResponseBadRequest(
+                "Интервалы (завтрак, обед и доп. промежутки) не должны пересекаться.",
+                content_type="text/plain; charset=utf-8",
+            )
         try:
             bf_s, bf_e, ln_s, ln_e, ex_l, ex_s, ex_e = _primary_windows_from_breaks(row, breaks)
         except (ValueError, KeyError, TypeError):

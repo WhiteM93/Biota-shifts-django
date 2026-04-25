@@ -9,7 +9,7 @@ from biota_shifts import db as biota_db
 from biota_shifts.emp_codes import normalize_emp_code
 from biota_shifts import export as biota_export
 from biota_shifts import logic as biota_logic
-from biota_shifts.auth import _filter_employees_for_user, _is_admin
+from biota_shifts.auth import employees_df_for_nav
 from biota_shifts.constants import HOURS_GRID_NO_PUNCH, HOURS_GRID_SUFFIX_OUTSIDE_GRAPH, MONTH_NAMES_RU
 from biota_shifts import schedule as biota_schedule
 
@@ -20,10 +20,7 @@ from .ru_work_calendar import is_ru_non_working_day
 def _employees_for_user(request):
     cfg = biota_db.db_config()
     employees_df = biota_db.load_employees(cfg)
-    user = biota_user(request)
-    if user and not _is_admin(user):
-        employees_df = _filter_employees_for_user(employees_df, user)
-    return employees_df
+    return employees_df_for_nav(biota_user(request), "hours", employees_df)
 
 
 def _parse_year_month(request, default_y: int, default_m: int) -> tuple[int, int]:

@@ -5,10 +5,14 @@ from django.contrib import messages
 from django.db import transaction
 from django.db.models import F, IntegerField, Sum, Value
 from django.db.models.functions import Coalesce
+from django.db.models import Q
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
-from biota_shifts.auth import _is_admin
+from biota_shifts import db as biota_db
+from biota_shifts.auth import _is_admin, employees_df_for_nav, nav_permissions_for_user
+from biota_shifts.schedule import employee_label_row
 from .auth_utils import biota_login_required, biota_user, nav_permission_required
 from .models import (
     COATING_TYPES,
@@ -18,6 +22,7 @@ from .models import (
     TapSpec,
     ToolItem,
     PurchaseRequest,
+    EmployeeDefectRecord,
     TAP_HOLE_TYPES,
     TAP_TOOL_TYPES,
     THREAD_STANDARDS,
@@ -91,11 +96,33 @@ def _build_tap_name(size_label: str, thread_standard: str, tap_type: str, hole_t
 def inventory_view(request):
     action = request.POST.get("action") if request.method == "POST" else ""
     panel = (request.GET.get("panel") or "stock").strip()
-    if panel not in {"stock", "history", "issue", "arrival", "issue_outcome", "purchases"}:
+    if panel not in {"stock", "history", "issue", "arrival", "issue_outcome", "purchases", "defects"}:
         panel = "stock"
 
     username = biota_user(request) or "Неизвестный пользователь"
     is_admin_user = _is_admin(username)
+    can_defects = nav_permissions_for_user(username).get("defects", True)
+    if panel == "defects" and not can_defects:
+        messages.warning(request, "У вас нет доступа к разделу «Учёт брака».")
+        return redirect(reverse("inventory"))
+    employee_options = []
+    employee_department_map = {}
+    if panel == "defects" or action == "create_defect_record":
+        try:
+            cfg = biota_db.db_config()
+            employees_df = employees_df_for_nav(username, "defects", biota_db.load_employees(cfg))
+            if not employees_df.empty:
+                for _, row in employees_df.iterrows():
+                    label = employee_label_row(row)
+                    if not label or label == "Без имени":
+                        continue
+                    dept = str(row.get("department_name") or "").strip()
+                    if label not in employee_department_map:
+                        employee_department_map[label] = dept
+                employee_options = sorted(employee_department_map.keys())
+        except Exception:
+            employee_options = []
+            employee_department_map = {}
 
     if action == "add_end_mill":
         diameter_mm = _to_decimal(request.POST.get("diameter_mm"), Decimal("0"))
@@ -453,6 +480,69 @@ def inventory_view(request):
             messages.error(request, "Заявка не найдена.")
         return redirect(f"{request.path}?panel=purchases")
 
+    if action == "create_defect_record":
+        if not can_defects:
+            messages.warning(request, "У вас нет доступа к разделу «Учёт брака».")
+            return redirect(reverse("inventory"))
+        defect_date_raw = (request.POST.get("defect_date") or "").strip()
+        employee_name = (request.POST.get("employee_name") or "").strip()
+        responsible_name = employee_name
+        department_name = employee_department_map.get(employee_name, "")
+        defect_quantity = _to_int(request.POST.get("defect_quantity"), 0)
+        good_quantity = _to_int(request.POST.get("good_quantity"), 0)
+        bad_quantity = _to_int(request.POST.get("bad_quantity"), 0)
+        defect_reason = (request.POST.get("defect_reason") or "").strip()
+        try:
+            defect_date = date.fromisoformat(defect_date_raw)
+        except ValueError:
+            messages.error(request, "Введите корректную дату.")
+            return redirect(f"{request.path}?panel=defects")
+        if not employee_name or not defect_reason:
+            messages.error(request, "Заполните сотрудника и причину брака.")
+            return redirect(f"{request.path}?panel=defects")
+        if employee_options and employee_name not in employee_options:
+            messages.error(request, "Выберите сотрудника из списка (нет доступа к этому сотруднику).")
+            return redirect(f"{request.path}?panel=defects")
+        if employee_name not in employee_department_map:
+            messages.error(request, "Не удалось определить отдел сотрудника — обновите страницу и выберите сотрудника заново.")
+            return redirect(f"{request.path}?panel=defects")
+        if defect_quantity <= 0:
+            messages.error(request, "Количество брака должно быть больше нуля.")
+            return redirect(f"{request.path}?panel=defects")
+        if good_quantity < 0 or bad_quantity < 0:
+            messages.error(request, "Исправно/неисправно не может быть отрицательным.")
+            return redirect(f"{request.path}?panel=defects")
+        if good_quantity + bad_quantity > defect_quantity:
+            messages.error(request, "Сумма исправно + неисправно не должна превышать кол-во брака.")
+            return redirect(f"{request.path}?panel=defects")
+        EmployeeDefectRecord.objects.create(
+            defect_date=defect_date,
+            responsible_name=responsible_name,
+            employee_name=employee_name,
+            department_name=department_name,
+            defect_quantity=defect_quantity,
+            good_quantity=good_quantity,
+            bad_quantity=bad_quantity,
+            defect_reason=defect_reason,
+        )
+        messages.success(request, "Запись о браке сохранена.")
+        return redirect(f"{request.path}?panel=defects")
+
+    if action == "delete_defect_record":
+        if not is_admin_user:
+            messages.error(request, "Удалять записи учёта брака может только администратор.")
+            return redirect(f"{request.path}?panel=defects")
+        rec_id = _to_int(request.POST.get("defect_id"), 0)
+        if rec_id <= 0:
+            messages.error(request, "Запись не найдена.")
+            return redirect(f"{request.path}?panel=defects")
+        deleted, _ = EmployeeDefectRecord.objects.filter(id=rec_id).delete()
+        if deleted:
+            messages.success(request, "Запись учёта брака удалена.")
+        else:
+            messages.error(request, "Запись не найдена.")
+        return redirect(f"{request.path}?panel=defects")
+
     show_all = (request.GET.get("show_all") or "1").strip() == "1"
     qs = ToolItem.objects.all()
     if not show_all:
@@ -578,6 +668,43 @@ def inventory_view(request):
     if purchase_employee:
         purchase_qs = purchase_qs.filter(requested_by__icontains=purchase_employee)
 
+    defect_date_from = (request.GET.get("defect_date_from") or "").strip()
+    defect_date_to = (request.GET.get("defect_date_to") or "").strip()
+    defect_employee = (request.GET.get("defect_employee") or "").strip()
+    defect_responsible = (request.GET.get("defect_responsible") or "").strip()
+    defect_department = (request.GET.get("defect_department") or "").strip()
+    defects_qs = EmployeeDefectRecord.objects.all()
+    if not is_admin_user:
+        allowed_departments = {d for d in employee_department_map.values() if d}
+        if allowed_departments:
+            defects_qs = defects_qs.filter(
+                Q(department_name__in=allowed_departments)
+                | Q(department_name="", employee_name__in=employee_options)
+            )
+        else:
+            defects_qs = defects_qs.none()
+    if defect_date_from:
+        defects_qs = defects_qs.filter(defect_date__gte=defect_date_from)
+    if defect_date_to:
+        defects_qs = defects_qs.filter(defect_date__lte=defect_date_to)
+    if defect_employee:
+        defects_qs = defects_qs.filter(employee_name__icontains=defect_employee)
+    if defect_responsible:
+        defects_qs = defects_qs.filter(responsible_name__icontains=defect_responsible)
+    if defect_department:
+        defects_qs = defects_qs.filter(department_name=defect_department)
+    defect_department_options = sorted(
+        {
+            d
+            for d in list(employee_department_map.values()) + list(
+                EmployeeDefectRecord.objects.exclude(department_name="")
+                .values_list("department_name", flat=True)
+                .distinct()
+            )
+            if d
+        }
+    )
+
     ctx = {
         "tool_items": qs.select_related("end_mill_spec", "tap_spec"),
         "movements": StockMovement.objects.select_related("tool")[:50],
@@ -638,5 +765,15 @@ def inventory_view(request):
         },
         "is_admin_user": is_admin_user,
         "panel": panel,
+        "employee_options": employee_options,
+        "defect_records": defects_qs[:300],
+        "defect_filters": {
+            "date_from": defect_date_from,
+            "date_to": defect_date_to,
+            "employee": defect_employee,
+            "responsible": defect_responsible,
+            "department": defect_department,
+        },
+        "defect_department_options": defect_department_options,
     }
     return render(request, "shifts/inventory.html", ctx)

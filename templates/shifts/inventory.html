@@ -614,6 +614,96 @@
 </div>
 {% endif %}
 
+{% if panel == "defects" %}
+<div class="filter-panel">
+  <h3>Учёт брака сотрудников</h3>
+  <form method="post" class="filter-grid">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create_defect_record">
+    <label class="field"><span>Дата</span><input type="date" name="defect_date" value="{{ today }}" required></label>
+    <label class="field"><span>Поиск сотрудника</span>
+      <input type="text" class="js-tool-search" data-target-select="defect-employee-select" placeholder="Введите ФИО">
+    </label>
+    <label class="field"><span>Сотрудник / Ответственный</span>
+      <select id="defect-employee-select" name="employee_name" required>
+        <option value="">Выбрать...</option>
+        {% for employee in employee_options %}
+        <option value="{{ employee }}">{{ employee }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Кол-во брака</span><input type="number" name="defect_quantity" min="1" required></label>
+    <label class="field"><span>Исправно</span><input type="number" name="good_quantity" min="0" value="0"></label>
+    <label class="field"><span>Неисправно</span><input type="number" name="bad_quantity" min="0" value="0"></label>
+    <label class="field"><span>Причина брака</span><input type="text" name="defect_reason" required placeholder="Опишите причину"></label>
+    <div class="filter-actions"><button type="submit" class="btn">Добавить запись</button></div>
+  </form>
+</div>
+
+<form method="get" class="filter-panel auto-submit-form">
+  <input type="hidden" name="panel" value="defects">
+  <h3>Фильтр записей</h3>
+  <div class="filter-grid">
+    <label class="field"><span>Дата с</span><input type="date" name="defect_date_from" value="{{ defect_filters.date_from }}"></label>
+    <label class="field"><span>Дата по</span><input type="date" name="defect_date_to" value="{{ defect_filters.date_to }}"></label>
+    <label class="field"><span>Отдел</span>
+      <select name="defect_department">
+        <option value="">Все</option>
+        {% for dep in defect_department_options %}
+        <option value="{{ dep }}" {% if defect_filters.department == dep %}selected{% endif %}>{{ dep }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Сотрудник</span><input type="text" name="defect_employee" value="{{ defect_filters.employee }}" placeholder="ФИО сотрудника"></label>
+    <label class="field"><span>Ответственный</span><input type="text" name="defect_responsible" value="{{ defect_filters.responsible }}" placeholder="ФИО ответственного"></label>
+  </div>
+</form>
+
+<div class="table-wrap">
+  <table class="data-grid">
+    <thead>
+      <tr>
+        <th>Дата</th>
+        <th>Отдел</th>
+        <th>Ответственный</th>
+        <th>Сотрудник</th>
+        <th>Кол-во брака</th>
+        <th>Исправно</th>
+        <th>Неисправно</th>
+        <th>Причина брака</th>
+        {% if is_admin_user %}<th></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for rec in defect_records %}
+      <tr>
+        <td>{{ rec.defect_date }}</td>
+        <td>{{ rec.department_name|default:"-" }}</td>
+        <td>{{ rec.responsible_name }}</td>
+        <td>{{ rec.employee_name }}</td>
+        <td><strong>{{ rec.defect_quantity }}</strong></td>
+        <td>{{ rec.good_quantity }}</td>
+        <td>{{ rec.bad_quantity }}</td>
+        <td>{{ rec.defect_reason }}</td>
+        {% if is_admin_user %}
+        <td>
+          <form method="post" style="margin:0;" onsubmit="return confirm('Удалить эту запись учёта брака?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_defect_record">
+            <input type="hidden" name="defect_id" value="{{ rec.id }}">
+            <button type="submit" class="btn" style="padding:4px 10px;font-size:12px;">Удалить</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% empty %}
+      <tr><td colspan="{% if is_admin_user %}9{% else %}8{% endif %}" class="muted">Записей по браку пока нет.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
 {% if panel == "history" %}
 <h3 id="history-block">Последние движения</h3>
 <div class="table-wrap">

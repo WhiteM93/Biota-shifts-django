@@ -704,24 +704,39 @@
   }
   .reg-block-del {
     position: absolute;
-    top: -8px;
+    top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: auto;
-    height: auto;
-    border: none;
-    background: transparent;
-    color: #ffffff;
-    font-size: 12px;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 120, 120, 0.95);
+    background: rgba(40, 10, 14, 0.82);
+    color: #ff6b6b;
+    font-size: 13px;
     line-height: 1;
     font-weight: 700;
     z-index: 8;
     cursor: pointer;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
-    opacity: 0.85;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-shadow: none;
+    opacity: 0.95;
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+    flex-shrink: 0;
   }
   .reg-block-del:hover {
     opacity: 1;
+    color: #fff;
+    background: #b83232;
+    border-color: #ffb4b4;
+  }
+  .reg-block-del:focus-visible {
+    outline: 2px solid #ff9f9f;
+    outline-offset: 2px;
   }
   @media (max-width: 900px) {
     .reg-header-row, .reg-ovl-row, .reg-emp-row {
@@ -750,12 +765,13 @@
     .reg-track { height: 34px; }
     .reg-track--ovl { height: 24px; }
     .reg-block { top: 4px; height: 26px; font-size: 9px; padding: 0 10px; }
+    .reg-block-del { width: 20px; height: 20px; font-size: 11px; }
     .reg-hours { font-size: 10px; }
   }
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="{% static 'regulations/timeline.js' %}?v=9"></script>
+<script src="{% static 'regulations/timeline.js' %}?v=10"></script>
 <script>
   (function () {
     function getCookie(name) {

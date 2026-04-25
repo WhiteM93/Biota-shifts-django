@@ -12,7 +12,7 @@ from biota_shifts import logic as biota_logic
 from biota_shifts.auth import (
     ADMIN_USERNAME,
     _credentials_match,
-    _filter_employees_for_user,
+    employees_df_for_nav,
     _is_admin,
     _register_user,
     _resolve_registered_user,
@@ -23,7 +23,7 @@ from biota_shifts.constants import MONTH_NAMES_RU
 from biota_shifts import schedule as biota_schedule
 from biota_shifts.schedule import employee_label_row
 
-from .auth_utils import biota_login_required, biota_user
+from .auth_utils import biota_login_required, biota_user, post_login_redirect
 from .models import ToolItem
 
 
@@ -51,10 +51,11 @@ def _fmt_minutes_human(v) -> str:
 
 @require_http_methods(["GET", "HEAD", "POST"])
 def login_view(request):
-    if biota_user(request):
-        return redirect("home")
+    u0 = biota_user(request)
+    if u0:
+        return redirect(post_login_redirect(u0))
     err = ""
-    next_url = request.POST.get("next") or request.GET.get("next") or reverse("home")
+    next_url = request.POST.get("next") or request.GET.get("next") or ""
     remember_me = request.method == "POST" and request.POST.get("remember_me") == "1"
     if request.method == "POST":
         username = (request.POST.get("username") or "").strip()
@@ -73,14 +74,14 @@ def login_view(request):
                         request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
                     else:
                         request.session.set_expiry(0)  # browser session only
-                    return redirect(next_url or reverse("home"))
+                    return redirect(post_login_redirect(username, next_url))
             else:
                 request.session["biota_username"] = ADMIN_USERNAME
                 if remember_me:
                     request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
                 else:
                     request.session.set_expiry(0)  # browser session only
-                return redirect(next_url or reverse("home"))
+                return redirect(post_login_redirect(ADMIN_USERNAME, next_url))
         if not err:
             err = "Неверный логин или пароль"
     return render(
@@ -128,6 +129,11 @@ def logout_view(request):
 
 @biota_login_required
 def home_view(request):
+    user = biota_user(request)
+    if user and not nav_permissions_for_user(user).get("home", True):
+        messages.warning(request, "У вас нет доступа к разделу «Главная (сводка)».")
+        return redirect(post_login_redirect(user))
+
     cfg = biota_db.db_config()
     try:
         employees_df = biota_db.load_employees(cfg)
@@ -137,9 +143,7 @@ def home_view(request):
             "shifts/error.html",
             {"title": "Ошибка БД", "message": str(exc)},
         )
-    user = biota_user(request)
-    if user and not _is_admin(user):
-        employees_df = _filter_employees_for_user(employees_df, user)
+    employees_df = employees_df_for_nav(user, "home", employees_df)
 
     ctx = {
         "username": user,

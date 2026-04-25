@@ -82,6 +82,57 @@
     return { startRel, durRel };
   }
 
+  function intervalsOverlapRel(a0, a1, b0, b1) {
+    return a0 < b1 && b0 < a1;
+  }
+
+  function trackHasOverlap(track) {
+    const blocks = Array.from(track.querySelectorAll(".reg-block"));
+    const ivs = blocks.map(function (blk) {
+      const r = readBlock(blk);
+      return [r.startRel, r.startRel + r.durRel];
+    });
+    for (let i = 0; i < ivs.length; i++) {
+      for (let j = i + 1; j < ivs.length; j++) {
+        if (intervalsOverlapRel(ivs[i][0], ivs[i][1], ivs[j][0], ivs[j][1])) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Сдвигает ползунки слева направо, чтобы не пересекались (сохраняет правый край при сдвиге вправо). */
+  function normalizeTrackNoOverlap(track) {
+    const blocks = Array.from(track.querySelectorAll(".reg-block"));
+    if (blocks.length <= 1) return;
+    for (let pass = 0; pass < 10; pass++) {
+      blocks.sort(function (a, b) {
+        return readBlock(a).startRel - readBlock(b).startRel;
+      });
+      let prevEnd = 0;
+      let touched = false;
+      for (let i = 0; i < blocks.length; i++) {
+        const blk = blocks[i];
+        const r = readBlock(blk);
+        const origEnd = r.startRel + r.durRel;
+        let s = r.startRel;
+        if (s < prevEnd) {
+          s = snap5(prevEnd);
+          let d = snap5(Math.max(SNAP_MIN, origEnd - s));
+          if (s + d > TL_MIN) {
+            d = snap5(Math.max(SNAP_MIN, TL_MIN - s));
+          }
+          setBlockFromRel(blk, s, d);
+          touched = true;
+        }
+        const r2 = readBlock(blk);
+        prevEnd = r2.startRel + r2.durRel;
+      }
+      if (!touched || !trackHasOverlap(track)) break;
+    }
+  }
+
   function metaForTrack(tr, cfgRows) {
     const id = parseInt(tr.dataset.id, 10);
     return (cfgRows || []).find(function (r) {
@@ -259,6 +310,7 @@
       function onUp() {
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);
+        normalizeTrackNoOverlap(track);
         const ovl = document.getElementById("reg-ovl-track");
         if (ovl) renderOverload(ovl, rowsFromDomForOverload(window.__regCfgRows || []));
       }
@@ -283,6 +335,7 @@
         setBlockFromRel(block, snap5(rs), dur);
         wireBlock(track, block);
       });
+      normalizeTrackNoOverlap(track);
     });
     if (ovl) {
       if (cfg.rows && cfg.rows.length) {
@@ -300,6 +353,9 @@
     if (!root) {
       return Promise.reject(new Error("нет разметки"));
     }
+    root.querySelectorAll(".reg-track[data-id]").forEach(function (tr) {
+      normalizeTrackNoOverlap(tr);
+    });
     const items = [];
     root.querySelectorAll(".reg-track[data-id]").forEach(function (tr) {
       const id = tr.dataset.id;
@@ -380,6 +436,7 @@
     track.appendChild(blk);
     setBlockFromRel(blk, dayMinToRel(startMin), 30);
     wireBlock(track, blk);
+    normalizeTrackNoOverlap(track);
   }
 
   /**
@@ -451,7 +508,9 @@
         if (!regEditingEnabled()) return;
         const blk = delBtn.closest(".reg-block");
         if (!blk) return;
+        const tr = blk.closest(".reg-track[data-id]");
         blk.remove();
+        if (tr) normalizeTrackNoOverlap(tr);
         const ovl = document.getElementById("reg-ovl-track");
         if (ovl) renderOverload(ovl, rowsFromDomForOverload(window.__regCfgRows || []));
       }
