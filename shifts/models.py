@@ -1,5 +1,6 @@
 from django.core.validators import FileExtensionValidator
 from django.db import models
+import os
 
 
 THREAD_STANDARDS = [
@@ -284,6 +285,12 @@ class Product(models.Model):
         return n.endswith(".stl")
 
     @property
+    def program_filename(self) -> str:
+        if not self.program_file:
+            return ""
+        return os.path.basename(self.program_file.name or "")
+
+    @property
     def preview_stl_list_label(self) -> str:
         if self.preview_stl:
             return "отдельный"
@@ -335,6 +342,12 @@ class ProductSetup(models.Model):
     def __str__(self) -> str:
         return f"{self.product_id} / {self.name}"
 
+    @property
+    def program_filename(self) -> str:
+        if not self.program_file:
+            return ""
+        return os.path.basename(self.program_file.name or "")
+
 
 class ProductSetupPhoto(models.Model):
     """Фото в блоке «Наладка»."""
@@ -343,6 +356,14 @@ class ProductSetupPhoto(models.Model):
         Product,
         on_delete=models.CASCADE,
         related_name="setup_photos",
+    )
+    setup = models.ForeignKey(
+        ProductSetup,
+        on_delete=models.CASCADE,
+        related_name="photos",
+        null=True,
+        blank=True,
+        verbose_name="Установка",
     )
     image = models.FileField(
         upload_to="products/setup/",

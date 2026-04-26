@@ -13,7 +13,7 @@ from django.views.decorators.http import require_http_methods
 from biota_shifts import db as biota_db
 from biota_shifts.auth import _is_admin, employees_df_for_nav, nav_permissions_for_user
 from biota_shifts.schedule import employee_label_row
-from .auth_utils import biota_login_required, biota_user, nav_permission_required
+from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
 from .models import (
     COATING_TYPES,
     END_MILL_TYPES,
@@ -92,6 +92,7 @@ def _build_tap_name(size_label: str, thread_standard: str, tap_type: str, hole_t
 
 @biota_login_required
 @nav_permission_required("inventory")
+@write_permission_required
 @require_http_methods(["GET", "POST"])
 def inventory_view(request):
     action = request.POST.get("action") if request.method == "POST" else ""

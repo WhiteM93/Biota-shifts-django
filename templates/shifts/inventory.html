@@ -4,9 +4,11 @@
 <div class="inventory-top-actions">
   <a class="btn {% if panel == 'stock' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=stock">Склад</a>
   <a class="btn {% if panel == 'history' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=history">История</a>
+  {% if biota_can_edit %}
   <a class="btn {% if panel == 'issue' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=issue">Выдать</a>
   <a class="btn {% if panel == 'issue_outcome' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=issue_outcome">Списание/Возврат</a>
   <a class="btn {% if panel == 'arrival' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=arrival">Приход</a>
+  {% endif %}
   <a class="btn {% if panel == 'purchases' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=purchases">Закупки</a>
 </div>
 <h2 style="margin-top:0;">Склад инструмента</h2>
@@ -284,6 +286,7 @@
 {% endif %}
 
 {% if panel == "issue" %}
+{% if biota_can_edit %}
 <div class="filter-panel" id="issue-block">
   <h3>Выдача инструмента</h3>
   <form method="post" class="filter-grid">
@@ -323,9 +326,13 @@
     <div class="filter-actions"><button type="submit" class="btn">Сохранить операцию</button></div>
   </form>
 </div>
+{% else %}
+<p class="muted">Режим исполнителя: только просмотр и скачивание.</p>
+{% endif %}
 {% endif %}
 
 {% if panel == "arrival" %}
+{% if biota_can_edit %}
 <div class="filter-panel" id="arrival-block">
   <h3>Приход инструмента (автосовпадение)</h3>
   <p class="muted" style="margin-top:0;">Укажи параметры пришедшего инструмента: если такая позиция уже есть, остаток увеличится; если нет — создастся новая.</p>
@@ -426,9 +433,13 @@
     <div class="filter-actions"><button type="submit" class="btn">Оприходовать</button></div>
   </form>
 </div>
+{% else %}
+<p class="muted">Режим исполнителя: только просмотр и скачивание.</p>
+{% endif %}
 {% endif %}
 
 {% if panel == "issue_outcome" %}
+{% if biota_can_edit %}
 <div class="filter-panel" id="issue-outcome-block">
   <h3>Списание / Возврат по выдаче</h3>
   <p class="muted" style="margin-top:0;">Выбери конкретную выдачу и укажи, сколько вернулось и сколько списано.</p>
@@ -507,9 +518,13 @@
     </table>
   </div>
 </div>
+{% else %}
+<p class="muted">Режим исполнителя: только просмотр и скачивание.</p>
+{% endif %}
 {% endif %}
 
 {% if panel == "purchases" %}
+{% if biota_can_edit %}
 <div class="filter-panel">
   <h3>Заявка на закупку</h3>
   <form method="post" class="filter-grid">
@@ -524,6 +539,7 @@
     <div class="filter-actions"><button type="submit" class="btn">Добавить заявку</button></div>
   </form>
 </div>
+{% endif %}
 
 <form method="get" class="filter-panel auto-submit-form">
   <input type="hidden" name="panel" value="purchases">
@@ -582,6 +598,7 @@
         </td>
         <td>{{ pr.status_updated_by|default:"-" }}<br><span class="muted">{{ pr.updated_at|date:"Y-m-d H:i" }}</span></td>
         <td>
+          {% if biota_can_edit %}
           <form method="post" class="issue-inline-form" style="display:flex; gap:6px; flex-wrap:wrap;">
             {% csrf_token %}
             <input type="hidden" name="action" value="update_purchase_status">
@@ -594,6 +611,9 @@
             <input type="text" name="status_comment" value="{{ pr.status_comment }}" placeholder="Комментарий по статусу">
             <button type="submit" class="btn">Сохранить</button>
           </form>
+          {% else %}
+          <span class="muted">Только просмотр</span>
+          {% endif %}
         </td>
         {% if is_admin_user %}
         <td>
@@ -615,6 +635,7 @@
 {% endif %}
 
 {% if panel == "defects" %}
+{% if biota_can_edit %}
 <div class="filter-panel">
   <h3>Учёт брака сотрудников</h3>
   <form method="post" class="filter-grid">
@@ -639,6 +660,7 @@
     <div class="filter-actions"><button type="submit" class="btn">Добавить запись</button></div>
   </form>
 </div>
+{% endif %}
 
 <form method="get" class="filter-panel auto-submit-form">
   <input type="hidden" name="panel" value="defects">

@@ -290,10 +290,10 @@
     }
   </style>
 </head>
-<body class="{% if auth_page %}auth-page{% endif %}">
+<body class="{% if auth_page %}auth-page{% endif %}" data-biota-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}">
   {% if not hide_nav %}
   <div class="nav">
-    {% if biota_username %}
+    {% if biota_username and biota_can_edit %}
     <form method="post" action="{% url 'refresh_cache' %}" class="nav-refresh-form">
       {% csrf_token %}
       <button class="nav-refresh-btn" type="submit" title="Обновить кэш данных из БД" aria-label="Обновить кэш данных из БД">↻</button>
@@ -335,7 +335,7 @@
     <a href="{% url 'inventory' %}?panel=defects" class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel == 'defects' %}active{% endif %}">Учёт брака</a>
     {% endif %}
     {% if biota_nav.products %}
-    <a href="{% url 'products_list' %}" class="{% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_detail' %}active{% endif %}">Изделия</a>
+    <a href="{% url 'products_list' %}" class="{% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_edit' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_setup_create' or request.resolver_match.url_name == 'product_setup_edit' %}active{% endif %}">Наладки</a>
     {% endif %}
     <span class="nav-spacer"></span>
     {% if biota_username %}
@@ -357,6 +357,21 @@
     {% block content %}{% endblock %}
   </div>
   <script>
+    (function () {
+      var canEdit = document.body && document.body.getAttribute("data-biota-can-edit") === "1";
+      if (canEdit) return;
+      document.querySelectorAll('form').forEach(function (form) {
+        var method = (form.getAttribute("method") || "get").toLowerCase();
+        if (method !== "post") return;
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+        });
+        form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function (btn) {
+          btn.disabled = true;
+          btn.title = "Роль «исполнитель»: только просмотр и скачивание";
+        });
+      });
+    })();
     (function () {
       var forms = document.querySelectorAll("form.auto-submit-form");
       if (!forms.length) return;

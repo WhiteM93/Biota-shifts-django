@@ -2,7 +2,9 @@
 
 {% block content %}
 <div class="page-actions">
-  <a href="{% url 'product_create' %}" class="btn">+ Создать изделие</a>
+  {% if biota_can_edit %}
+  <a href="{% url 'product_create' %}" class="btn">+ Создать наладку</a>
+  {% endif %}
 </div>
 
 <form method="get" action="" class="filter-panel" style="margin-top:12px;">

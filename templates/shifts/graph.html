@@ -5,6 +5,7 @@
 
 <div class="graph-top-strip">
   <a class="btn" href="{% url 'graph_download' %}?year={{ year }}&month={{ month }}">Скачать Excel</a>
+  {% if biota_can_edit %}
   <form method="post" action="" enctype="multipart/form-data" class="graph-upload-form">
     {% csrf_token %}
     <input type="hidden" name="action" value="upload">
@@ -17,6 +18,7 @@
       <button type="submit" class="btn">Загрузить в систему</button>
     </div>
   </form>
+  {% endif %}
   <button type="button" class="btn btn-print-sheet" id="graph-print-btn" title="Печать или «Сохранить как PDF» в диалоге браузера">Печать</button>
   <button type="button" class="btn btn-png-export" id="graph-png-btn" title="Снимок таблицы в тёмном оформлении (PNG)">PNG (тёмная тема)</button>
 </div>
@@ -66,6 +68,7 @@
 </form>
 
 <div class="graph-body">
+{% if biota_can_edit %}
 <aside class="graph-side-toolbar" id="graph-side-toolbar" aria-label="Редактирование графика">
   <button type="button" class="btn btn-edit-unlock graph-side-toolbar__edit" id="graph-edit-toggle">Включить редактирование</button>
   <p class="graph-edit-hint" id="graph-edit-hint">График только для просмотра. Включите редактирование, чтобы менять ячейки.</p>
@@ -81,6 +84,7 @@
     <button type="button" class="graph-code-btn graph-code-btn--keyboard" data-brush="keyboard" title="Ввод с клавиатуры без палитры">⌨ Клавиатура</button>
   </div>
 </aside>
+{% endif %}
 
 <div class="graph-main-column">
 <div class="schedule-wrap">
@@ -141,7 +145,7 @@
     </tbody>
   </table>
 </form>
-<p id="graph-save-status" class="muted graph-save-status">График только для просмотра.</p>
+<p id="graph-save-status" class="muted graph-save-status">{% if biota_can_edit %}График только для просмотра.{% else %}Режим исполнителя: только просмотр и скачивание.{% endif %}</p>
 </div>
 </div>
 </div>
@@ -661,6 +665,7 @@
     var posModeInputs = document.querySelectorAll('input[name="pos_mode"]');
     var posTarget = document.querySelector('[data-mode-target="pos"]');
     var hiddenPosMode = form.querySelector('input[name="pos_mode"][type="hidden"]');
+    var canEdit = document.body && document.body.getAttribute("data-biota-can-edit") === "1";
     var editing = false;
     var editToggle = document.getElementById("graph-edit-toggle");
     var editHint = document.getElementById("graph-edit-hint");
@@ -684,7 +689,7 @@
 
     function syncBrushHint() {
       if (!editHint) return;
-      if (!editing) {
+      if (!canEdit || !editing) {
         editHint.textContent =
           "График только для просмотра. Включите редактирование, чтобы менять ячейки.";
       } else if (brushOn) {
@@ -793,9 +798,9 @@
 
     function applyGraphEditingState() {
       form.querySelectorAll(".day-input").forEach(function (inp) {
-        inp.readOnly = !editing || isLockedInput(inp);
+        inp.readOnly = !canEdit || !editing || isLockedInput(inp);
       });
-      form.classList.toggle("graph-form--readonly", !editing);
+      form.classList.toggle("graph-form--readonly", !canEdit || !editing);
       if (editToggle) {
         editToggle.textContent = editing ? "Закончить редактирование" : "Включить редактирование";
         editToggle.classList.toggle("is-editing-on", editing);
@@ -803,24 +808,24 @@
       if (codePalette) {
         codePalette.hidden = !editing;
       }
-      if (!editing) {
+      if (!canEdit || !editing) {
         brushOn = false;
         brushVal = "";
       }
       syncBrushHint();
       updatePaletteActive();
       if (statusEl) {
-        if (editing) {
+        if (canEdit && editing) {
           statusEl.textContent = "Изменения сохраняются автоматически.";
         } else {
-          statusEl.textContent = "График только для просмотра.";
+          statusEl.textContent = canEdit ? "График только для просмотра." : "Режим исполнителя: только просмотр и скачивание.";
         }
         statusEl.style.color = "";
       }
     }
 
     function saveNow() {
-      if (!editing) return;
+      if (!canEdit || !editing) return;
       if (isSaving) {
         queued = true;
         return;
@@ -855,7 +860,7 @@
     }
 
     function scheduleSave() {
-      if (!editing) return;
+      if (!canEdit || !editing) return;
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(saveNow, 600);
     }
@@ -877,7 +882,7 @@
     form.querySelectorAll(".day-input").forEach(function (input) {
       input.addEventListener("mousedown", function (event) {
         if (event.button !== 0) return;
-        if (!editing) return;
+        if (!canEdit || !editing) return;
         if (isLockedInput(input)) return;
         if (brushOn) {
           input.value = brushVal;
@@ -924,7 +929,7 @@
     document.addEventListener("mouseup", function () {
       if (!dragFill) return;
       dragFill = null;
-      if (editing) {
+      if (canEdit && editing) {
         refreshShiftCounts();
         scheduleSave();
       }
@@ -941,7 +946,7 @@
     if (codePalette) {
       codePalette.querySelectorAll(".graph-code-btn").forEach(function (btn) {
         btn.addEventListener("click", function () {
-          if (!editing) return;
+          if (!canEdit || !editing) return;
           if (btn.getAttribute("data-brush") === "keyboard") {
             brushOn = false;
             brushVal = "";

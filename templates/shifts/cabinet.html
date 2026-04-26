@@ -125,6 +125,17 @@
   {% csrf_token %}
   <input type="hidden" name="action" value="admin_privileges">
   <input type="hidden" name="priv_user" value="{{ priv_selected }}">
+  <p>
+    <label>Тип аккаунта
+      <select name="priv_role">
+        {% for r in priv_role_choices %}
+        <option value="{{ r }}" {% if r == priv_role %}selected{% endif %}>
+          {% if r == "executor" %}Исполнитель (только просмотр/скачивание){% else %}Руководитель{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+  </p>
   <p class="muted">
     Разделы меню: снимите галочку, чтобы скрыть раздел.
     Ниже для каждого включённого раздела отметьте отделы: в разделе будут видны только они. Если ни одной галочки не стоит — по этому разделу не будет видно сотрудников ни из одного отдела.
@@ -146,7 +157,7 @@
     </div>
     <div class="cab-check-grid" style="padding-left: 10px;">
       {% if row.key == "products" %}
-      <p class="muted" style="margin:4px 0 0 0;">Раздел «Изделия» не привязан к отделам.</p>
+      <p class="muted" style="margin:4px 0 0 0;">Раздел «Наладки» не привязан к отделам.</p>
       {% else %}
       {% for d in dep_opts %}
       <label class="chk">
@@ -402,7 +413,7 @@
 {% if profile_missing %}
 <p style="color:#ffb8b8;">Данные профиля не найдены.</p>
 {% else %}
-<p class="muted">Роль: <strong>пользователь</strong>. Логин: <code>{{ profile_login }}</code></p>
+<p class="muted">Роль: <strong>{{ profile_role }}</strong>. Логин: <code>{{ profile_login }}</code></p>
 <p class="muted">Регистрация: {{ profile_created }}</p>
 <p><strong>Доступ:</strong> {{ profile_access }}</p>
 

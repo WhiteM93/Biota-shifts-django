@@ -8,6 +8,9 @@ from biota_shifts.auth import (
     ADMIN_USERNAME,
     NAV_KEYS,
     NAV_LABELS_RU,
+    USER_ROLE_CHOICES,
+    USER_ROLE_EXECUTOR,
+    USER_ROLE_MANAGER,
     _nav_department_filters_map,
     _access_scope_description,
     _approve_registration,
@@ -19,6 +22,7 @@ from biota_shifts.auth import (
     _set_user_privileges,
     _update_registered_profile,
     nav_permissions_for_user,
+    user_role_for_username,
 )
 from .department_order import apply_department_order, load_department_order, save_department_order
 from .position_order import apply_position_order, load_position_order, save_position_order
@@ -64,6 +68,7 @@ def cabinet_view(request):
                 return redirect("cabinet")
             if action == "admin_privileges":
                 target = (request.POST.get("priv_user") or "").strip()
+                target_role = (request.POST.get("priv_role") or USER_ROLE_MANAGER).strip()
                 sel_nav = request.POST.getlist("priv_nav")
                 nav_map = {k: (k in sel_nav) for k in NAV_KEYS}
                 dep_opts = sorted(employees_full["department_name"].unique().tolist()) if not employees_full.empty else []
@@ -83,6 +88,7 @@ def cabinet_view(request):
                     [],
                     nav=nav_map,
                     nav_dep_filters=nav_dep_filters,
+                    role=target_role,
                 )
                 if ok:
                     messages.success(request, "Права сохранены.")
@@ -178,6 +184,12 @@ def cabinet_view(request):
         ctx["priv_selected"] = sel if sel in priv_store else (ctx["priv_users"][0] if ctx["priv_users"] else "")
         pr = priv_store.get(ctx["priv_selected"], {}) if ctx["priv_selected"] else {}
         _pn = nav_permissions_for_user(ctx["priv_selected"]) if ctx["priv_selected"] else {k: True for k in NAV_KEYS}
+        ctx["priv_role"] = user_role_for_username(ctx["priv_selected"]) if ctx["priv_selected"] else USER_ROLE_MANAGER
+        ctx["priv_role_choices"] = USER_ROLE_CHOICES
+        ctx["priv_role_labels"] = {
+            USER_ROLE_MANAGER: "Руководитель",
+            USER_ROLE_EXECUTOR: "Исполнитель (только просмотр/скачивание)",
+        }
         ctx["priv_nav"] = _pn
         _ndf = _nav_department_filters_map(pr) if ctx["priv_selected"] else {}
         ctx["priv_nav_rows"] = []
@@ -197,6 +209,8 @@ def cabinet_view(request):
         ctx["profile_login"] = user
         ctx["profile_created"] = rec.get("created_at") or "—"
         ctx["profile_access"] = _access_scope_description(rec)
+        role = user_role_for_username(user)
+        ctx["profile_role"] = "исполнитель" if role == USER_ROLE_EXECUTOR else "руководитель"
         ctx["profile_display_name"] = (rec.get("display_name") or "").strip()
         ctx["profile_email"] = (rec.get("email") or "").strip()
         ctx["profile_missing"] = not bool(rec)

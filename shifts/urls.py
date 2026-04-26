@@ -24,6 +24,7 @@ urlpatterns = [
     path("inventory/", inventory_views.inventory_view, name="inventory"),
     path("products/", product_views.products_list_view, name="products_list"),
     path("products/new/", product_views.product_create_view, name="product_create"),
+    path("products/name-suggestions/", product_views.product_name_suggestions_view, name="product_name_suggestions"),
     path("products/<int:pk>/edit/", product_views.product_edit_view, name="product_edit"),
     path("products/<int:pk>/setups/new/", product_views.product_setup_create_view, name="product_setup_create"),
     path("products/<int:pk>/setups/<int:setup_pk>/edit/", product_views.product_setup_edit_view, name="product_setup_edit"),

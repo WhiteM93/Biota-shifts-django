@@ -23,7 +23,7 @@ from biota_shifts.constants import MONTH_NAMES_RU
 from biota_shifts import schedule as biota_schedule
 from biota_shifts.schedule import employee_label_row
 
-from .auth_utils import biota_login_required, biota_user, post_login_redirect
+from .auth_utils import biota_login_required, biota_user, post_login_redirect, write_permission_required
 from .models import ToolItem
 
 
@@ -267,6 +267,7 @@ def home_view(request):
 
 
 @biota_login_required
+@write_permission_required
 @require_POST
 def refresh_db_cache(request):
     biota_db.clear_biota_db_cache()

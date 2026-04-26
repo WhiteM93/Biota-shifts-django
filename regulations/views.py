@@ -15,7 +15,7 @@ from biota_shifts import export as biota_export
 from biota_shifts import schedule as biota_schedule
 from biota_shifts.auth import employees_df_for_nav
 
-from shifts.auth_utils import biota_login_required, biota_user, nav_permission_required
+from shifts.auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
 from shifts.department_order import apply_department_order, load_department_order
 from shifts.graph_views import (
     DEPT_COLOR_CLASSES,
@@ -556,6 +556,7 @@ def regulations_pdf(request):
 @ensure_csrf_cookie
 @biota_login_required
 @nav_permission_required("regulations")
+@write_permission_required
 @require_http_methods(["GET", "POST"])
 def regulation_page(request):
     plan_date = _resolve_plan_date(request)
@@ -654,6 +655,7 @@ def regulation_page(request):
 @csrf_protect
 @biota_login_required
 @nav_permission_required("regulations")
+@write_permission_required
 @require_POST
 def regulations_api_save(request):
     try:
@@ -709,6 +711,7 @@ def regulations_api_save(request):
 @csrf_protect
 @biota_login_required
 @nav_permission_required("regulations")
+@write_permission_required
 @require_POST
 def regulations_api_meta(request):
     """Переключение замка строки."""

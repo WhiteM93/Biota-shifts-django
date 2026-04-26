@@ -42,6 +42,7 @@
       {% if not rows %}aria-disabled="true" tabindex="-1" style="pointer-events:none;opacity:0.45;" title="Нет строк на этот месяц"{% endif %}>Скачать Excel</a>
     <a class="btn" href="{% url 'regulations_pdf' %}?month={{ plan_month_value }}&shift={{ reg_shift }}{{ reg_dep_qs }}"
       {% if not rows %}aria-disabled="true" tabindex="-1" style="pointer-events:none;opacity:0.45;" title="Нет строк на этот месяц"{% endif %}>Скачать PDF</a>
+    {% if biota_can_edit %}
     <form method="post" action="{% url 'regulations_page' %}?month={{ plan_month_value }}&shift={{ reg_shift }}{{ reg_dep_qs }}" class="reg-toolbar-inline">
       {% csrf_token %}
       <input type="hidden" name="month" value="{{ plan_month_value }}">
@@ -51,10 +52,13 @@
       <button type="submit" name="action" value="from_catalog" class="btn"
         {% if not biota_ok %}disabled title="Нет связи со справочником Biota"{% endif %}>Заполнить из Biota</button>
     </form>
+    {% endif %}
     <button type="button" class="btn btn-print-sheet" id="reg-print-btn" title="Диалог печати браузера (можно сохранить в PDF)">Печать</button>
     <button type="button" class="btn btn-png-export" id="reg-png-btn" title="Снимок шкалы в тёмном оформлении (PNG)"{% if not rows %} disabled{% endif %}>PNG (тёмная тема)</button>
+    {% if biota_can_edit %}
     <button type="button" class="btn btn-edit-unlock" id="reg-edit-toggle">Включить редактирование</button>
     <button type="button" class="btn reg-save-btn" id="reg-save" disabled>Сохранить на сервер</button>
+    {% endif %}
   </div>
   <span id="reg-save-status" class="muted" style="min-width:120px;"></span>
 </div>
@@ -92,6 +96,7 @@
   {% for r in rows %}
   <div class="reg-emp-row{% if r.locked %} reg-row--locked{% endif %}" data-emp-row="{{ r.id }}">
     <div class="reg-name emp-cell {{ r.department_class }}" title="{{ r.employee_code }}">
+      {% if biota_can_edit %}
       <span class="reg-emp-tools">
         <button type="button" class="reg-tool-btn reg-lock-btn" data-id="{{ r.id }}"
           title="{% if r.locked %}Разблокировать — снова можно двигать блоки на шкале{% else %}Заблокировать строку от случайного сдвига{% endif %}"
@@ -100,6 +105,7 @@
         <button type="button" class="reg-tool-btn reg-add-btn reg-add-ln" data-kind="ln" data-id="{{ r.id }}" title="Добавить обед">О</button>
         <button type="button" class="reg-tool-btn reg-add-btn reg-add-br" data-kind="br" data-id="{{ r.id }}" title="Добавить перерыв">П</button>
       </span>
+      {% endif %}
       <span class="reg-emp-text">
         <span class="emp-name">{{ r.employee_name }}</span>
       </span>
@@ -115,8 +121,10 @@
         <span class="reg-block__edge reg-block__edge--right" aria-hidden="true"></span>
         <span class="reg-block__start">{{ b.start }}</span>
         <span class="reg-block__end">{{ b.end }}</span>
+        {% if biota_can_edit %}
         <button type="button" class="reg-block-del" title="Удалить ползунок" aria-label="Удалить ползунок">✕</button>
         <input type="text" class="reg-block-label" value="{{ b.label }}" maxlength="100" placeholder="Название">
+        {% endif %}
       </div>
       {% endfor %}
     </div>

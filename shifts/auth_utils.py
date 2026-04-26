@@ -7,7 +7,13 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from django.urls import NoReverseMatch, resolve, reverse
 
-from biota_shifts.auth import NAV_KEYS, _is_admin, _resolve_registered_user, nav_permissions_for_user
+from biota_shifts.auth import (
+    NAV_KEYS,
+    _is_admin,
+    _resolve_registered_user,
+    nav_permissions_for_user,
+    user_is_executor,
+)
 
 
 def biota_user(request):
@@ -119,3 +125,20 @@ def nav_permission_required(nav_key: str):
         return _wrapped
 
     return decorator
+
+
+def write_permission_required(view_func):
+    """Блокирует изменения для роли executor: только просмотр и скачивание."""
+
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        u = biota_user(request)
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and user_is_executor(u):
+            messages.warning(
+                request,
+                "У вас роль «исполнитель»: доступны только просмотр и скачивание.",
+            )
+            return redirect(request.META.get("HTTP_REFERER") or post_login_redirect(u))
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped

@@ -2,8 +2,8 @@
 
 {% block content %}
 <div class="page-actions">
-  <a href="{% url 'products_list' %}" class="btn btn-ghost">← К списку изделий</a>
-  <a href="{% url 'product_detail' product.pk %}" class="btn btn-ghost">К карточке изделия</a>
+  <a href="{% url 'products_list' %}" class="btn btn-ghost">← К списку наладок</a>
+  <a href="{% url 'product_detail' product.pk %}" class="btn btn-ghost">К карточке наладки</a>
 </div>
 
 <h2 style="margin-top:8px;">
@@ -62,7 +62,28 @@
     </label>
     <label class="field" style="grid-column:1/-1;">
       <span>PDF с инструментом</span>
-      {{ form.tool_pdf }}
+      {% if is_edit and setup and setup.tool_pdf %}
+      <div id="tool-pdf-card" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:10px;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
+        <div style="min-width:0;display:grid;gap:4px;">
+          <div class="muted" style="font-size:12px;">Текущий PDF инструмента</div>
+          <a href="{{ setup.tool_pdf.url }}" target="_blank" rel="noopener" style="color:#c9ddff;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ setup.tool_pdf.name|cut:"products/setup_tools/" }}
+          </a>
+        </div>
+        <input type="hidden" name="remove_tool_pdf" id="id_remove_tool_pdf" value="0" />
+        <div style="display:inline-flex;gap:8px;align-items:center;">
+          <label for="id_tool_pdf" class="btn btn-ghost setup-file-action-btn" style="cursor:pointer;">Заменить</label>
+          <button type="button" class="btn btn-ghost setup-file-action-btn" id="tool-pdf-delete-btn" title="Удалить текущий PDF">Удалить</button>
+        </div>
+      </div>
+      {% endif %}
+      {% if not is_edit or not setup or not setup.tool_pdf %}
+      <div class="setup-file-picker">
+        <label for="id_tool_pdf" class="btn btn-ghost" style="cursor:pointer;">Выбрать PDF инструмента</label>
+        <span class="muted js-setup-file-name" data-for="id_tool_pdf">Файл не выбран</span>
+      </div>
+      {% endif %}
+      <input type="file" name="tool_pdf" id="id_tool_pdf" accept=".pdf,application/pdf" style="display:none;" />
       {% if form.tool_pdf.errors %}<span class="muted">{{ form.tool_pdf.errors }}</span>{% endif %}
     </label>
     <label class="field" style="grid-column:1/-1;">
@@ -72,18 +93,254 @@
     </label>
     <label class="field" style="grid-column:1/-1;">
       <span>Программа</span>
-      {{ form.program_file }}
+      {% if is_edit and setup and setup.program_file %}
+      <div id="program-file-card" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:10px;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
+        <div style="min-width:0;display:grid;gap:4px;">
+          <div class="muted" style="font-size:12px;">Текущий файл программы</div>
+          <a href="{{ setup.program_file.url }}" target="_blank" rel="noopener" style="color:#c9ddff;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ setup.program_filename }}
+          </a>
+        </div>
+        <input type="hidden" name="remove_program_file" id="id_remove_program_file" value="0" />
+        <div style="display:inline-flex;gap:8px;align-items:center;">
+          <label for="id_program_file" class="btn btn-ghost setup-file-action-btn" style="cursor:pointer;">Заменить</label>
+          <button type="button" class="btn btn-ghost setup-file-action-btn" id="program-file-delete-btn" title="Удалить текущий файл">Удалить</button>
+        </div>
+      </div>
+      {% endif %}
+      {% if not is_edit or not setup or not setup.program_file %}
+      <div class="setup-file-picker">
+        <label for="id_program_file" class="btn btn-ghost" style="cursor:pointer;">Выбрать файл программы</label>
+        <span class="muted js-setup-file-name" data-for="id_program_file">Файл не выбран</span>
+      </div>
+      {% endif %}
+      <input type="file" name="program_file" id="id_program_file" style="display:none;" />
       {% if form.program_file.errors %}<span class="muted">{{ form.program_file.errors }}</span>{% endif %}
     </label>
   </div>
   <div style="margin-top:14px;padding-top:12px;border-top:1px solid #2f3b57;">
-    <p class="muted" style="margin:0;font-size:13px;line-height:1.5;">
-      Здесь хранится содержимое вкладки установки: текст наладки и файл программы.
-    </p>
+  </div>
+  <div style="margin-top:14px;padding-top:12px;border-top:1px solid #2f3b57;">
+    <h3 style="margin:0 0 8px 0;font-size:14px;color:#9bb0d8;">Фото установки</h3>
+    <div id="setup-photo-blocks" style="display:grid;gap:10px;">
+      {% if is_edit and setup and setup.photos.all %}
+        {% for sp in setup.photos.all %}
+        <div class="setup-photo-block" data-block-key="existing-{{ sp.id }}" style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
+          <input type="hidden" name="photo_block_keys" value="existing-{{ sp.id }}" />
+          <input type="hidden" name="photo_remove__existing-{{ sp.id }}" value="0" class="photo-remove-hidden" />
+          <div>
+            <img src="{{ sp.image.url }}" alt="" class="setup-photo-preview" style="width:140px;height:100px;object-fit:cover;border-radius:6px;border:1px solid #2f3b57;display:block;background:#0a0c12;" />
+          </div>
+          <div style="display:grid;gap:8px;">
+            <label class="field" style="margin:0;">
+              <span>Подпись</span>
+              <input type="text" name="photo_caption__existing-{{ sp.id }}" value="{{ sp.caption }}" />
+            </label>
+            <label class="field" style="margin:0;">
+              <span>Заменить фото</span>
+              <input type="file" name="photo_file__existing-{{ sp.id }}" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" />
+            </label>
+            <button type="button" class="btn btn-ghost setup-photo-delete-btn" style="justify-self:start;" data-existing="1">Удалить блок</button>
+          </div>
+        </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+    <div style="margin-top:10px;">
+      <button type="button" id="add-photo-block-btn" class="btn btn-ghost">+ Добавить блок фото</button>
+    </div>
   </div>
   <p class="filter-actions" style="margin-top:18px;">
-    <button type="submit" class="btn">{% if is_edit %}Сохранить{% else %}Создать{% endif %}</button>
-    <a href="{% url 'product_detail' product.pk %}" class="btn btn-ghost">Отмена</a>
+    <button type="submit" class="btn setup-form-action-btn">{% if is_edit %}Сохранить{% else %}Создать{% endif %}</button>
+    <a href="{% url 'product_detail' product.pk %}" class="btn btn-ghost setup-form-action-btn">Отмена</a>
   </p>
 </form>
+<template id="setup-photo-block-template">
+  <div class="setup-photo-block" style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
+    <input type="hidden" name="photo_block_keys" value="" />
+    <input type="hidden" name="" value="0" class="photo-remove-hidden" />
+    <div>
+      <img src="" alt="" class="setup-photo-preview" style="width:140px;height:100px;object-fit:cover;border-radius:6px;border:1px solid #2f3b57;display:none;background:#0a0c12;" />
+      <div class="muted setup-photo-empty" style="height:100px;display:flex;align-items:center;justify-content:center;border:1px dashed #2f3b57;border-radius:6px;">Без фото</div>
+    </div>
+    <div style="display:grid;gap:8px;">
+      <label class="field" style="margin:0;">
+        <span>Подпись</span>
+        <input type="text" name="" />
+      </label>
+      <label class="field" style="margin:0;">
+        <span>Фото</span>
+        <input type="file" name="" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-photo-file-input" />
+      </label>
+      <button type="button" class="btn btn-ghost setup-photo-delete-btn" style="justify-self:start;" data-existing="0">Удалить блок</button>
+    </div>
+  </div>
+</template>
+<script>
+  (function () {
+    var removeInput = document.getElementById("id_remove_program_file");
+    var deleteBtn = document.getElementById("program-file-delete-btn");
+    var card = document.getElementById("program-file-card");
+    var removeToolInput = document.getElementById("id_remove_tool_pdf");
+    var deleteToolBtn = document.getElementById("tool-pdf-delete-btn");
+    var toolCard = document.getElementById("tool-pdf-card");
+    var programFileInput = document.getElementById("id_program_file");
+    var toolFileInput = document.getElementById("id_tool_pdf");
+    if (programFileInput) {
+      programFileInput.addEventListener("change", function () {
+        var nameEl = document.querySelector('.js-setup-file-name[data-for="id_program_file"]');
+        if (!nameEl) return;
+        var f = programFileInput.files && programFileInput.files[0];
+        nameEl.textContent = f ? f.name : "Файл не выбран";
+      });
+    }
+    if (toolFileInput) {
+      toolFileInput.addEventListener("change", function () {
+        var nameEl = document.querySelector('.js-setup-file-name[data-for="id_tool_pdf"]');
+        if (!nameEl) return;
+        var f = toolFileInput.files && toolFileInput.files[0];
+        nameEl.textContent = f ? f.name : "Файл не выбран";
+      });
+    }
+    if (removeInput && deleteBtn && card) {
+      deleteBtn.addEventListener("click", function () {
+        removeInput.value = "1";
+        card.style.display = "none";
+      });
+    }
+    if (removeToolInput && deleteToolBtn && toolCard) {
+      deleteToolBtn.addEventListener("click", function () {
+        removeToolInput.value = "1";
+        toolCard.style.display = "none";
+      });
+    }
+  })();
+  (function () {
+    var wrap = document.getElementById("setup-photo-blocks");
+    var addBtn = document.getElementById("add-photo-block-btn");
+    var tpl = document.getElementById("setup-photo-block-template");
+    if (!wrap || !addBtn || !tpl) return;
+
+    var seed = 1;
+
+    function bindPreview(block) {
+      var fileInput = block.querySelector(".setup-photo-file-input");
+      var preview = block.querySelector(".setup-photo-preview");
+      var empty = block.querySelector(".setup-photo-empty");
+      if (!fileInput || !preview || !empty) return;
+      fileInput.addEventListener("change", function () {
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) {
+          preview.src = "";
+          preview.style.display = "none";
+          empty.style.display = "flex";
+          return;
+        }
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = "block";
+        empty.style.display = "none";
+      });
+    }
+
+    function createBlock() {
+      var key = "new-" + seed;
+      seed += 1;
+      var node = tpl.content.firstElementChild.cloneNode(true);
+      node.dataset.blockKey = key;
+
+      var keyInput = node.querySelector('input[name="photo_block_keys"]');
+      if (keyInput) keyInput.value = key;
+
+      var caption = node.querySelector('input[type="text"]');
+      if (caption) caption.name = "photo_caption__" + key;
+
+      var fileInput = node.querySelector('input[type="file"]');
+      if (fileInput) fileInput.name = "photo_file__" + key;
+
+      var removeHidden = node.querySelector(".photo-remove-hidden");
+      if (removeHidden) removeHidden.name = "photo_remove__" + key;
+
+      var deleteBtn = node.querySelector(".setup-photo-delete-btn");
+      if (deleteBtn) {
+        deleteBtn.addEventListener("click", function () {
+          node.remove();
+        });
+      }
+
+      bindPreview(node);
+      wrap.appendChild(node);
+    }
+
+    wrap.querySelectorAll(".setup-photo-block").forEach(function (block) {
+      var deleteBtn = block.querySelector(".setup-photo-delete-btn");
+      var removeHidden = block.querySelector(".photo-remove-hidden");
+      if (deleteBtn) {
+        deleteBtn.addEventListener("click", function () {
+          if (deleteBtn.dataset.existing === "1") {
+            if (removeHidden) removeHidden.value = "1";
+            block.style.display = "none";
+            return;
+          }
+          block.remove();
+        });
+      }
+      bindPreview(block);
+    });
+
+    if (!wrap.querySelector(".setup-photo-block")) {
+      createBlock();
+    }
+
+    addBtn.addEventListener("click", function () {
+      createBlock();
+    });
+  })();
+</script>
+<style>
+  .setup-form-action-btn {
+    height: 36px;
+    min-height: 36px;
+    padding: 0 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+    box-sizing: border-box;
+    white-space: nowrap;
+  }
+  .setup-file-action-btn {
+    height: 36px;
+    min-height: 36px;
+    padding: 0 12px;
+    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    white-space: nowrap;
+  }
+  .setup-file-picker {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  #id_setup_notes {
+    background: #101520;
+    color: #eaf0ff;
+    border: 1px solid #33415f;
+    border-radius: 10px;
+    line-height: 1.45;
+    resize: vertical;
+  }
+  #id_setup_notes:hover {
+    border-color: #415277;
+  }
+  #id_setup_notes:focus {
+    outline: none;
+    border-color: #7c8cff;
+    box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.22);
+    background: #121a2a;
+  }
+</style>
 {% endblock %}

@@ -19,7 +19,7 @@ from biota_shifts.schedule import (
     sort_schedule_day_columns,
 )
 
-from .auth_utils import biota_login_required, biota_user, nav_permission_required
+from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
 from .department_order import apply_department_order, load_department_order
 from .position_order import apply_position_order, load_position_order
 from .ru_work_calendar import is_ru_non_working_day
@@ -141,6 +141,7 @@ def _sort_graph_rows(
 
 @biota_login_required
 @nav_permission_required("graph")
+@write_permission_required
 @require_http_methods(["GET", "POST"])
 def graph_view(request):
     now = datetime.now()

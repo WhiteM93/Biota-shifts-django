@@ -6,7 +6,7 @@ from .models import Product, ProductSetup, ProductSetupPhoto
 class ProductSetupPhotoInline(admin.TabularInline):
     model = ProductSetupPhoto
     extra = 0
-    fields = ("image", "sort_order", "caption")
+    fields = ("setup", "image", "sort_order", "caption")
 
 
 class ProductSetupInline(admin.TabularInline):

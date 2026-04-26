@@ -219,6 +219,7 @@ def _register_user(username: str, password: str) -> tuple[bool, str]:
         "hash_hex": hash_hex,
         "created_at": datetime.now(MSK).strftime("%Y-%m-%d %H:%M"),
         "approved": False,
+        "role": USER_ROLE_MANAGER,
         "display_name": "",
         "email": "",
         "access_scope": "none",
@@ -409,6 +410,9 @@ def _filter_employees_for_user(full_df: pd.DataFrame, username: str) -> pd.DataF
 
 # Разделы меню Django (кроме личного кабинета): права в JSON users.*.nav
 NAV_KEYS = ("home", "graph", "hours", "skud", "inventory", "defects", "regulations", "products")
+USER_ROLE_MANAGER = "manager"
+USER_ROLE_EXECUTOR = "executor"
+USER_ROLE_CHOICES = (USER_ROLE_MANAGER, USER_ROLE_EXECUTOR)
 NAV_LABELS_RU = {
     "home": "Главная (сводка)",
     "graph": "График",
@@ -438,6 +442,22 @@ def nav_permissions_for_user(username: str | None) -> dict[str, bool]:
         if k in nav:
             out[k] = bool(nav[k])
     return out
+
+
+def user_role_for_username(username: str | None) -> str:
+    """Роль пользователя в Django-интерфейсе: manager/executor (admin — manager)."""
+    u = (username or "").strip()
+    if not u or _is_admin(u):
+        return USER_ROLE_MANAGER
+    rec = _resolve_registered_user(u) or {}
+    role = str(rec.get("role") or USER_ROLE_MANAGER).strip().lower()
+    if role not in USER_ROLE_CHOICES:
+        return USER_ROLE_MANAGER
+    return role
+
+
+def user_is_executor(username: str | None) -> bool:
+    return user_role_for_username(username) == USER_ROLE_EXECUTOR
 
 
 def _nav_department_filters_map(rec: dict | None) -> dict[str, list[str]]:
@@ -519,9 +539,12 @@ def _set_user_privileges(
     *,
     nav: dict[str, bool] | None = None,
     nav_dep_filters: dict[str, list[str]] | None = None,
+    role: str | None = None,
 ) -> tuple[bool, str]:
     if scope is not None and str(scope).strip() not in ("none", "all", "department", "area"):
         return False, "Неверный тип доступа"
+    if role is not None and str(role).strip() not in USER_ROLE_CHOICES:
+        return False, "Неверный тип аккаунта"
     store = _load_users_store()
     if target_username not in store:
         return False, "Пользователь не найден"
@@ -566,6 +589,8 @@ def _set_user_privileges(
             for k, v in cleaned.items()
             if k in NAV_KEYS and bool(current_nav.get(k, True))
         }
+    if role is not None:
+        rec["role"] = str(role).strip()
     store[target_username] = rec
     _save_users_store(store)
     return True, ""

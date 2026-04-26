@@ -2,54 +2,274 @@
 
 {% block content %}
 <div class="page-actions">
-  <a href="{% url 'products_list' %}" class="btn btn-ghost">← К списку изделий</a>
+  <a href="{% url 'products_list' %}" class="btn btn-ghost">← К списку наладок</a>
   {% if is_edit and product %}
-  <a href="{% url 'product_detail' product.pk %}" class="btn btn-ghost">К карточке изделия</a>
+  <a href="{% url 'product_detail' product.pk %}" class="btn btn-ghost">К карточке наладки</a>
   {% endif %}
 </div>
 
 <h2 style="margin-top:8px;">{% if is_edit %}Редактирование: {{ product.name }}{% else %}Новое изделие{% endif %}</h2>
 
-<p class="muted" style="margin:10px 0 0; line-height:1.5; max-width:640px; font-size:14px;">PDF — чертёж; STL/STP/STEP — основной 3D, при STEP дополнительно STL для вращения в карточке. Наладка и программа теперь заполняются в отдельных «Установках» на странице карточки изделия.</p>
 
-<form method="post" enctype="multipart/form-data" class="filter-panel" style="margin-top:16px;">
+<form method="post" enctype="multipart/form-data" class="filter-panel product-form-panel" style="margin-top:16px;">
   {% csrf_token %}
   {% if form.non_field_errors %}
   <p style="color:#ffb8b8;">{{ form.non_field_errors }}</p>
   {% endif %}
-  <div class="filter-grid">
-    <label class="field"><span>Название</span>{{ form.name }}{% if form.name.errors %}<span class="muted">{{ form.name.errors }}</span>{% endif %}</label>
+  <div class="filter-grid product-form-grid">
+    <label class="field">
+      <span>Название</span>
+      {{ form.name }}
+      <div id="name-duplicate-hint" class="muted" style="display:none;"></div>
+      <ul id="name-duplicate-list" style="display:none;margin:6px 0 0 0;padding-left:18px;"></ul>
+      {% if form.name.errors %}<span class="muted">{{ form.name.errors }}</span>{% endif %}
+    </label>
     <label class="field" style="grid-column:1/-1;"><span>Описание</span>{{ form.description }}{% if form.description.errors %}<span class="muted">{{ form.description.errors }}</span>{% endif %}</label>
-    <label class="field"><span>Чертёж (PDF)</span>{{ form.drawing_pdf }}{% if form.drawing_pdf.errors %}<span class="muted">{{ form.drawing_pdf.errors }}</span>{% endif %}</label>
-    <label class="field"><span>3D-модель (STL / STP / STEP)</span>{{ form.cad_model }}{% if form.cad_model.errors %}<span class="muted">{{ form.cad_model.errors }}</span>{% endif %}</label>
-    <label class="field" style="grid-column:1/-1;"><span>STL для предпросмотра (только .stl)</span>{{ form.preview_stl }}{% if form.preview_stl.errors %}<span class="muted">{{ form.preview_stl.errors }}</span>{% endif %}</label>
-  </div>
-  {% if is_edit and product %}
-  <p class="muted" style="margin:12px 0 0 0;">
-    После сохранения можно добавить установки в <a href="{% url 'product_detail' product.pk %}">карточке изделия</a>.
-  </p>
-  {% endif %}
-  <div style="margin-top:16px;border-top:1px solid #2f3b57;padding-top:14px;">
-    <h3 style="margin:0 0 8px 0;font-size:14px;color:#9bb0d8;">Фото по наладке</h3>
-    <p class="muted" style="font-size:13px;margin:0 0 10px 0;">Несколько изображений за раз; в редактировании — снять галочки и сохранить, чтобы удалить.</p>
-    <input type="file" name="new_setup_photos" multiple accept="image/*,.jpg,.jpeg,.png,.webp,.gif" style="max-width:100%;" />
-    {% if is_edit and product and product.setup_photos.all %}
-    <ul style="margin:12px 0 0;padding:0;list-style:none;">
-      {% for sp in product.setup_photos.all %}
-      <li style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #2a3348;">
-        <input type="checkbox" name="remove_setup_photo" value="{{ sp.id }}" id="rmsp{{ sp.id }}" />
-        <label for="rmsp{{ sp.id }}" style="display:flex;gap:10px;align-items:center;flex:1;cursor:pointer;">
-          <img src="{{ sp.image.url }}" alt="" style="max-width:120px;max-height:90px;object-fit:cover;border-radius:6px;border:1px solid #2f3b57;" />
-          <span class="muted">пометить к удалению (после «Сохранить»)</span>
-        </label>
-      </li>
-      {% endfor %}
-    </ul>
-    {% endif %}
+    <label class="field" style="grid-column:1/-1;">
+      <span>Чертёж (PDF)</span>
+      {% if is_edit and product and product.drawing_pdf %}
+      <div class="product-file-row">
+        <a href="{{ product.drawing_pdf.url }}" target="_blank" rel="noopener" style="text-decoration:none;color:#c9ddff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ product.drawing_pdf.name|cut:"products/drawings/" }}</a>
+        <input type="hidden" name="remove_drawing_pdf" id="id_remove_drawing_pdf" value="0" />
+        <div class="product-file-actions">
+          <label for="id_drawing_pdf" class="btn btn-ghost file-action-btn" style="cursor:pointer;">Заменить</label>
+          <button type="button" class="btn btn-ghost file-action-btn js-remove-file-btn" data-target="id_remove_drawing_pdf">Удалить</button>
+        </div>
+      </div>
+      {% endif %}
+      {% if not is_edit or not product or not product.drawing_pdf %}
+      <div class="product-file-picker">
+        <label for="id_drawing_pdf" class="btn btn-ghost" style="cursor:pointer;">Выбрать PDF</label>
+        <span class="muted js-file-name" data-for="id_drawing_pdf">Файл не выбран</span>
+      </div>
+      {% endif %}
+      <input type="file" name="drawing_pdf" id="id_drawing_pdf" accept=".pdf,application/pdf" style="display:none;" />
+      {% if form.drawing_pdf.errors %}<span class="muted">{{ form.drawing_pdf.errors }}</span>{% endif %}
+    </label>
+    <label class="field" style="grid-column:1/-1;">
+      <span>3D-модель (STL / STP / STEP)</span>
+      {% if is_edit and product and product.cad_model %}
+      <div class="product-file-row">
+        <a href="{{ product.cad_model.url }}" target="_blank" rel="noopener" style="text-decoration:none;color:#c9ddff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ product.cad_model.name|cut:"products/cad/" }}</a>
+        <input type="hidden" name="remove_cad_model" id="id_remove_cad_model" value="0" />
+        <div class="product-file-actions">
+          <label for="id_cad_model" class="btn btn-ghost file-action-btn" style="cursor:pointer;">Заменить</label>
+          <button type="button" class="btn btn-ghost file-action-btn js-remove-file-btn" data-target="id_remove_cad_model">Удалить</button>
+        </div>
+      </div>
+      {% endif %}
+      {% if not is_edit or not product or not product.cad_model %}
+      <div class="product-file-picker">
+        <label for="id_cad_model" class="btn btn-ghost" style="cursor:pointer;">Выбрать 3D-модель</label>
+        <span class="muted js-file-name" data-for="id_cad_model">Файл не выбран</span>
+      </div>
+      {% endif %}
+      <input type="file" name="cad_model" id="id_cad_model" accept=".stl,.stp,.step" style="display:none;" />
+      {% if form.cad_model.errors %}<span class="muted">{{ form.cad_model.errors }}</span>{% endif %}
+    </label>
+    <label class="field" style="grid-column:1/-1;">
+      <span>STL для предпросмотра (только .stl)</span>
+      {% if is_edit and product and product.preview_stl %}
+      <div class="product-file-row">
+        <a href="{{ product.preview_stl.url }}" target="_blank" rel="noopener" style="text-decoration:none;color:#c9ddff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ product.preview_stl.name|cut:"products/preview_stl/" }}</a>
+        <input type="hidden" name="remove_preview_stl" id="id_remove_preview_stl" value="0" />
+        <div class="product-file-actions">
+          <label for="id_preview_stl" class="btn btn-ghost file-action-btn" style="cursor:pointer;">Заменить</label>
+          <button type="button" class="btn btn-ghost file-action-btn js-remove-file-btn" data-target="id_remove_preview_stl">Удалить</button>
+        </div>
+      </div>
+      {% endif %}
+      {% if not is_edit or not product or not product.preview_stl %}
+      <div class="product-file-picker">
+        <label for="id_preview_stl" class="btn btn-ghost" style="cursor:pointer;">Выбрать STL</label>
+        <span class="muted js-file-name" data-for="id_preview_stl">Файл не выбран</span>
+      </div>
+      {% endif %}
+      <input type="file" name="preview_stl" id="id_preview_stl" accept=".stl" style="display:none;" />
+      {% if form.preview_stl.errors %}<span class="muted">{{ form.preview_stl.errors }}</span>{% endif %}
+    </label>
   </div>
   <p class="filter-actions" style="margin-top:18px;">
-    <button type="submit" class="btn">{% if is_edit %}Сохранить{% else %}Создать{% endif %}</button>
-    <a href="{% if is_edit and product %}{% url 'product_detail' product.pk %}{% else %}{% url 'products_list' %}{% endif %}" class="btn btn-ghost">Отмена</a>
+    <button type="submit" class="btn form-action-btn">{% if is_edit %}Сохранить{% else %}Создать{% endif %}</button>
+    <a href="{% if is_edit and product %}{% url 'product_detail' product.pk %}{% else %}{% url 'products_list' %}{% endif %}" class="btn btn-ghost form-action-btn">Отмена</a>
   </p>
 </form>
+<style>
+  .product-form-panel {
+    max-width: 1280px;
+  }
+  .product-form-grid {
+    gap: 14px;
+  }
+  .product-form-panel .field > span {
+    font-size: 12px;
+    font-weight: 700;
+    color: #c4d4ec;
+  }
+  .product-form-panel #id_name {
+    min-height: 40px;
+  }
+  .product-form-panel #id_description {
+    min-height: 110px;
+    resize: vertical;
+    line-height: 1.45;
+    border-radius: 10px;
+    background: #101520;
+    color: #eaf0ff;
+    border: 1px solid #33415f;
+  }
+  .product-form-panel #id_description:hover {
+    border-color: #415277;
+  }
+  .product-form-panel #id_description:focus {
+    outline: none;
+    border-color: #7c8cff;
+    box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.22);
+    background: #121a2a;
+  }
+  .product-file-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #2f3b57;
+    border-radius: 10px;
+    background: #111827;
+  }
+  .product-file-actions {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .product-file-picker {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-left: 2px;
+  }
+  .file-action-btn {
+    height: 36px;
+    min-height: 36px;
+    padding: 0 12px;
+    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    white-space: nowrap;
+  }
+  .form-action-btn {
+    height: 36px;
+    min-height: 36px;
+    padding: 0 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+    box-sizing: border-box;
+    white-space: nowrap;
+  }
+</style>
+<script>
+  (function () {
+    var nameInput = document.getElementById("id_name");
+    var hint = document.getElementById("name-duplicate-hint");
+    var list = document.getElementById("name-duplicate-list");
+    var timer = null;
+    var endpoint = "{% url 'product_name_suggestions' %}";
+    var excludeId = "{% if is_edit and product %}{{ product.pk }}{% endif %}";
+
+    function clearSuggestions() {
+      if (hint) {
+        hint.style.display = "none";
+        hint.textContent = "";
+      }
+      if (list) {
+        list.style.display = "none";
+        list.innerHTML = "";
+      }
+    }
+
+    function renderSuggestions(items, q) {
+      if (!hint || !list) return;
+      if (!items || !items.length) {
+        clearSuggestions();
+        return;
+      }
+      hint.style.display = "block";
+      hint.textContent = "Найдены похожие наладки. Проверьте, чтобы не создать дубль:";
+      list.style.display = "block";
+      list.innerHTML = "";
+      items.forEach(function (it) {
+        var li = document.createElement("li");
+        var a = document.createElement("a");
+        a.href = "/products/" + it.id + "/";
+        a.textContent = it.name;
+        a.className = "muted";
+        li.appendChild(a);
+        list.appendChild(li);
+      });
+      var exact = items.some(function (it) {
+        return (it.name || "").trim().toLowerCase() === (q || "").trim().toLowerCase();
+      });
+      if (exact) {
+        hint.textContent = "Есть полное совпадение названия. Рекомендуется не создавать дубль:";
+      }
+    }
+
+    function requestSuggestions(q) {
+      var query = (q || "").trim();
+      if (query.length < 2) {
+        clearSuggestions();
+        return;
+      }
+      var url = endpoint + "?q=" + encodeURIComponent(query);
+      if (excludeId) url += "&exclude_id=" + encodeURIComponent(excludeId);
+      fetch(url, { credentials: "same-origin" })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (!j || !j.ok) {
+            clearSuggestions();
+            return;
+          }
+          renderSuggestions(j.items || [], query);
+        })
+        .catch(function () {
+          clearSuggestions();
+        });
+    }
+
+    if (nameInput) {
+      nameInput.addEventListener("input", function () {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () {
+          requestSuggestions(nameInput.value || "");
+        }, 280);
+      });
+      if ((nameInput.value || "").trim().length >= 2) {
+        requestSuggestions(nameInput.value || "");
+      }
+    }
+
+    document.querySelectorAll('input[type="file"][id^="id_"]').forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        var nameEl = document.querySelector('.js-file-name[data-for="' + inp.id + '"]');
+        if (!nameEl) return;
+        var f = inp.files && inp.files[0];
+        nameEl.textContent = f ? f.name : "Файл не выбран";
+      });
+    });
+    document.querySelectorAll(".js-remove-file-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var targetId = btn.getAttribute("data-target");
+        var hiddenInput = targetId ? document.getElementById(targetId) : null;
+        var card = btn.closest("div");
+        if (hiddenInput) hiddenInput.value = "1";
+        if (card) card.style.display = "none";
+      });
+    });
+  })();
+</script>
 {% endblock %}
