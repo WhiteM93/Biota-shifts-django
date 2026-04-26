@@ -317,8 +317,8 @@ class ProductSetup(models.Model):
     tool_pdf = models.FileField(
         upload_to="products/setup_tools/",
         blank=True,
-        verbose_name="Инструмент (PDF)",
-        validators=[FileExtensionValidator(["pdf"])],
+        verbose_name="Инструмент (PDF/HTML)",
+        validators=[FileExtensionValidator(["pdf", "html", "htm"])],
     )
     setup_notes = models.TextField(
         blank=True,

@@ -67,11 +67,23 @@
             </div>
             <div>
               {% if setup.tool_pdf %}
+              {% with tool_name=setup.tool_pdf.name|lower %}
+              {% if tool_name|slice:"-5:" == ".html" or tool_name|slice:"-4:" == ".htm" %}
               <div class="product-pdf-frame setup-inline-pdf">
-                <iframe src="{{ setup.tool_pdf.url }}#toolbar=1" title="PDF инструмента {{ setup.name }}" loading="lazy"></iframe>
+                <iframe id="setup-tool-frame-{{ setup.pk }}" src="{{ setup.tool_pdf.url }}" title="HTML инструмента {{ setup.name }}" loading="lazy"></iframe>
               </div>
               {% else %}
-              <div class="product-setup-notes muted">PDF инструмента не загружен.</div>
+              <div class="product-pdf-frame setup-inline-pdf">
+                <iframe id="setup-tool-frame-{{ setup.pk }}" src="{{ setup.tool_pdf.url }}#toolbar=1" title="PDF инструмента {{ setup.name }}" loading="lazy"></iframe>
+              </div>
+              {% endif %}
+              <div class="setup-inline-actions">
+                <a href="{{ setup.tool_pdf.url }}" target="_blank" rel="noopener" class="btn btn-ghost">{% if tool_name|slice:"-5:" == ".html" or tool_name|slice:"-4:" == ".htm" %}Открыть HTML{% else %}Открыть файл{% endif %}</a>
+                <button type="button" class="btn btn-ghost js-print-setup-html" data-frame-id="setup-tool-frame-{{ setup.pk }}">Распечатать список инструментов</button>
+              </div>
+              {% endwith %}
+              {% else %}
+              <div class="product-setup-notes muted">Файл инструмента не загружен.</div>
               {% endif %}
             </div>
           </div>
@@ -269,7 +281,7 @@
     border: 1px solid #2f3b57;
     border-radius: 10px;
     background: rgba(24, 30, 44, 0.7);
-    font-size: 13px;
+    font-size: 15px;
   }
   .product-setup-spec-group {
     border: 1px solid #33415f;
@@ -278,6 +290,7 @@
     background: rgba(14, 19, 30, 0.55);
     display: grid;
     gap: 5px;
+    line-height: 1.55;
   }
   .product-setup-spec-group h5 {
     margin: 0 0 3px 0;
@@ -287,12 +300,12 @@
   }
   .product-setup-notes {
     white-space: pre-wrap;
-    line-height: 1.5;
+    line-height: 1.55;
     border: 1px solid #2f3b57;
     border-radius: 10px;
     background: rgba(24, 30, 44, 0.7);
     padding: 10px;
-    font-size: 13px;
+    font-size: 15px;
     min-height: 210px;
   }
   .product-setup-content-grid {
@@ -304,6 +317,12 @@
   }
   .setup-inline-pdf {
     height: 230px;
+  }
+  .setup-inline-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
   }
   @media (max-width: 760px) {
     .product-setup-specs {
@@ -465,6 +484,41 @@
   }
 </style>
 <script>
+  (function () {
+    document.querySelectorAll(".js-print-setup-html").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var frameId = btn.getAttribute("data-frame-id") || "";
+        if (!frameId) return;
+        var frame = document.getElementById(frameId);
+        try {
+          if (frame && frame.contentWindow) {
+            frame.contentWindow.focus();
+            frame.contentWindow.print();
+            return;
+          }
+        } catch (err) {}
+        var htmlUrl = "";
+        if (frame && frame.getAttribute("src")) {
+          htmlUrl = frame.getAttribute("src") || "";
+        }
+        if (!htmlUrl) {
+          var openLink = btn.closest(".setup-inline-actions")?.querySelector("a[href]");
+          if (openLink) htmlUrl = openLink.getAttribute("href") || "";
+        }
+        if (!htmlUrl) return;
+        var printWin = window.open(htmlUrl, "_blank", "noopener");
+        if (!printWin) return;
+        var launchPrint = function () {
+          try {
+            printWin.focus();
+            printWin.print();
+          } catch (e) {}
+        };
+        printWin.addEventListener("load", launchPrint, { once: true });
+      });
+    });
+  })();
+
   (function () {
     var modal = document.getElementById("setup-photo-modal");
     var modalImg = document.getElementById("setup-photo-modal-img");

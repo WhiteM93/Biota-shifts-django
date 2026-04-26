@@ -61,11 +61,11 @@
       {% if form.size.errors %}<span class="muted">{{ form.size.errors }}</span>{% endif %}
     </label>
     <label class="field" style="grid-column:1/-1;">
-      <span>PDF с инструментом</span>
+      <span>Файл инструмента (PDF/HTML)</span>
       {% if is_edit and setup and setup.tool_pdf %}
       <div id="tool-pdf-card" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:10px;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
         <div style="min-width:0;display:grid;gap:4px;">
-          <div class="muted" style="font-size:12px;">Текущий PDF инструмента</div>
+          <div class="muted" style="font-size:12px;">Текущий файл инструмента</div>
           <a href="{{ setup.tool_pdf.url }}" target="_blank" rel="noopener" style="color:#c9ddff;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
             {{ setup.tool_pdf.name|cut:"products/setup_tools/" }}
           </a>
@@ -73,17 +73,17 @@
         <input type="hidden" name="remove_tool_pdf" id="id_remove_tool_pdf" value="0" />
         <div style="display:inline-flex;gap:8px;align-items:center;">
           <label for="id_tool_pdf" class="btn btn-ghost setup-file-action-btn" style="cursor:pointer;">Заменить</label>
-          <button type="button" class="btn btn-ghost setup-file-action-btn" id="tool-pdf-delete-btn" title="Удалить текущий PDF">Удалить</button>
+          <button type="button" class="btn btn-ghost setup-file-action-btn" id="tool-pdf-delete-btn" title="Удалить текущий файл">Удалить</button>
         </div>
       </div>
       {% endif %}
       {% if not is_edit or not setup or not setup.tool_pdf %}
       <div class="setup-file-picker">
-        <label for="id_tool_pdf" class="btn btn-ghost" style="cursor:pointer;">Выбрать PDF инструмента</label>
+        <label for="id_tool_pdf" class="btn btn-ghost" style="cursor:pointer;">Выбрать файл инструмента</label>
         <span class="muted js-setup-file-name" data-for="id_tool_pdf">Файл не выбран</span>
       </div>
       {% endif %}
-      <input type="file" name="tool_pdf" id="id_tool_pdf" accept=".pdf,application/pdf" style="display:none;" />
+      <input type="file" name="tool_pdf" id="id_tool_pdf" accept=".pdf,application/pdf,.html,text/html,.htm" style="display:none;" />
       {% if form.tool_pdf.errors %}<span class="muted">{{ form.tool_pdf.errors }}</span>{% endif %}
     </label>
     <label class="field" style="grid-column:1/-1;">
