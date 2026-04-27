@@ -103,12 +103,14 @@ def inventory_view(request):
     username = biota_user(request) or "Неизвестный пользователь"
     is_admin_user = _is_admin(username)
     can_defects = nav_permissions_for_user(username).get("defects", True)
+    if is_admin_user:
+        can_defects = True
     if panel == "defects" and not can_defects:
         messages.warning(request, "У вас нет доступа к разделу «Учёт брака».")
         return redirect(reverse("inventory"))
     employee_options = []
     employee_department_map = {}
-    if panel == "defects" or action == "create_defect_record":
+    if panel == "defects" or action in {"create_defect_record", "update_defect_record"}:
         try:
             cfg = biota_db.db_config()
             employees_df = employees_df_for_nav(username, "defects", biota_db.load_employees(cfg))
@@ -490,7 +492,6 @@ def inventory_view(request):
         responsible_name = employee_name
         department_name = employee_department_map.get(employee_name, "")
         defect_quantity = _to_int(request.POST.get("defect_quantity"), 0)
-        good_quantity = _to_int(request.POST.get("good_quantity"), 0)
         bad_quantity = _to_int(request.POST.get("bad_quantity"), 0)
         defect_reason = (request.POST.get("defect_reason") or "").strip()
         try:
@@ -510,12 +511,13 @@ def inventory_view(request):
         if defect_quantity <= 0:
             messages.error(request, "Количество брака должно быть больше нуля.")
             return redirect(f"{request.path}?panel=defects")
-        if good_quantity < 0 or bad_quantity < 0:
-            messages.error(request, "Исправно/неисправно не может быть отрицательным.")
+        if bad_quantity < 0:
+            messages.error(request, "Неисправно не может быть отрицательным.")
             return redirect(f"{request.path}?panel=defects")
-        if good_quantity + bad_quantity > defect_quantity:
-            messages.error(request, "Сумма исправно + неисправно не должна превышать кол-во брака.")
+        if bad_quantity > defect_quantity:
+            messages.error(request, "Неисправно не должно превышать кол-во брака.")
             return redirect(f"{request.path}?panel=defects")
+        good_quantity = defect_quantity - bad_quantity
         EmployeeDefectRecord.objects.create(
             defect_date=defect_date,
             responsible_name=responsible_name,
@@ -527,6 +529,82 @@ def inventory_view(request):
             defect_reason=defect_reason,
         )
         messages.success(request, "Запись о браке сохранена.")
+        return redirect(f"{request.path}?panel=defects")
+
+    if action == "update_defect_record":
+        if not can_defects:
+            messages.warning(request, "У вас нет доступа к разделу «Учёт брака».")
+            return redirect(reverse("inventory"))
+        rec_id = _to_int(request.POST.get("defect_id"), 0)
+        if rec_id <= 0:
+            messages.error(request, "Запись не найдена.")
+            return redirect(f"{request.path}?panel=defects")
+        rec = EmployeeDefectRecord.objects.filter(id=rec_id).first()
+        if not rec:
+            messages.error(request, "Запись не найдена.")
+            return redirect(f"{request.path}?panel=defects")
+
+        if not is_admin_user:
+            allowed_departments = {d for d in employee_department_map.values() if d}
+            has_access = (
+                (rec.department_name and rec.department_name in allowed_departments)
+                or (not rec.department_name and rec.employee_name in employee_options)
+            )
+            if not has_access:
+                messages.error(request, "Нет прав на редактирование этой записи.")
+                return redirect(f"{request.path}?panel=defects")
+
+        defect_date_raw = (request.POST.get("defect_date") or "").strip()
+        employee_name = (request.POST.get("employee_name") or "").strip()
+        defect_quantity = _to_int(request.POST.get("defect_quantity"), 0)
+        bad_quantity = _to_int(request.POST.get("bad_quantity"), 0)
+        defect_reason = (request.POST.get("defect_reason") or "").strip()
+        try:
+            defect_date = date.fromisoformat(defect_date_raw)
+        except ValueError:
+            messages.error(request, "Введите корректную дату.")
+            return redirect(f"{request.path}?panel=defects")
+        if not employee_name or not defect_reason:
+            messages.error(request, "Заполните сотрудника и причину брака.")
+            return redirect(f"{request.path}?panel=defects")
+        if employee_options and employee_name not in employee_options:
+            messages.error(request, "Выберите сотрудника из списка (нет доступа к этому сотруднику).")
+            return redirect(f"{request.path}?panel=defects")
+        if employee_name not in employee_department_map:
+            messages.error(request, "Не удалось определить отдел сотрудника — обновите страницу и выберите сотрудника заново.")
+            return redirect(f"{request.path}?panel=defects")
+        if defect_quantity <= 0:
+            messages.error(request, "Количество брака должно быть больше нуля.")
+            return redirect(f"{request.path}?panel=defects")
+        if bad_quantity < 0:
+            messages.error(request, "Неисправно не может быть отрицательным.")
+            return redirect(f"{request.path}?panel=defects")
+        if bad_quantity > defect_quantity:
+            messages.error(request, "Неисправно не должно превышать кол-во брака.")
+            return redirect(f"{request.path}?panel=defects")
+        good_quantity = defect_quantity - bad_quantity
+
+        rec.defect_date = defect_date
+        rec.employee_name = employee_name
+        rec.responsible_name = employee_name
+        rec.department_name = employee_department_map.get(employee_name, "")
+        rec.defect_quantity = defect_quantity
+        rec.good_quantity = good_quantity
+        rec.bad_quantity = bad_quantity
+        rec.defect_reason = defect_reason
+        rec.save(
+            update_fields=[
+                "defect_date",
+                "employee_name",
+                "responsible_name",
+                "department_name",
+                "defect_quantity",
+                "good_quantity",
+                "bad_quantity",
+                "defect_reason",
+            ]
+        )
+        messages.success(request, "Запись учёта брака обновлена.")
         return redirect(f"{request.path}?panel=defects")
 
     if action == "delete_defect_record":

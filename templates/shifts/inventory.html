@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% if panel != "defects" %}
 <div class="inventory-top-actions">
   <a class="btn {% if panel == 'stock' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=stock">Склад</a>
   <a class="btn {% if panel == 'history' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=history">История</a>
@@ -11,8 +12,11 @@
   {% endif %}
   <a class="btn {% if panel == 'purchases' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=purchases">Закупки</a>
 </div>
+{% endif %}
+{% if panel != "defects" %}
 <h2 style="margin-top:0;">Склад инструмента</h2>
 <p class="muted">Отображается один тип инструмента за раз (по умолчанию: фрезы), только с остатком больше 0.</p>
+{% endif %}
 
 {% if panel == "stock" %}
 <form method="get" class="filter-panel auto-submit-form">
@@ -654,7 +658,6 @@
       </select>
     </label>
     <label class="field"><span>Кол-во брака</span><input type="number" name="defect_quantity" min="1" required></label>
-    <label class="field"><span>Исправно</span><input type="number" name="good_quantity" min="0" value="0"></label>
     <label class="field"><span>Неисправно</span><input type="number" name="bad_quantity" min="0" value="0"></label>
     <label class="field"><span>Причина брака</span><input type="text" name="defect_reason" required placeholder="Опишите причину"></label>
     <div class="filter-actions"><button type="submit" class="btn">Добавить запись</button></div>
@@ -693,23 +696,81 @@
         <th>Исправно</th>
         <th>Неисправно</th>
         <th>Причина брака</th>
-        {% if is_admin_user %}<th></th>{% endif %}
+        {% if is_admin_user %}<th>Действия</th>{% endif %}
       </tr>
     </thead>
     <tbody>
       {% for rec in defect_records %}
       <tr>
-        <td>{{ rec.defect_date }}</td>
+        <td>
+          {% if biota_can_edit or is_admin_user %}
+          <input class="defect-cell-input" type="date" name="defect_date" value="{{ rec.defect_date|date:'Y-m-d' }}" form="defect-edit-form-{{ rec.id }}" readonly required>
+          {% else %}
+          {{ rec.defect_date }}
+          {% endif %}
+        </td>
         <td>{{ rec.department_name|default:"-" }}</td>
         <td>{{ rec.responsible_name }}</td>
-        <td>{{ rec.employee_name }}</td>
-        <td><strong>{{ rec.defect_quantity }}</strong></td>
-        <td>{{ rec.good_quantity }}</td>
-        <td>{{ rec.bad_quantity }}</td>
-        <td>{{ rec.defect_reason }}</td>
+        <td>
+          {% if biota_can_edit or is_admin_user %}
+          <select class="defect-cell-input" name="employee_name" form="defect-edit-form-{{ rec.id }}" disabled required>
+            {% if rec.employee_name and rec.employee_name not in employee_options %}
+            <option value="{{ rec.employee_name }}" selected>{{ rec.employee_name }}</option>
+            {% endif %}
+            {% for employee in employee_options %}
+            <option value="{{ employee }}" {% if employee == rec.employee_name %}selected{% endif %}>{{ employee }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
+          {{ rec.employee_name }}
+          {% endif %}
+        </td>
+        <td>
+          {% if biota_can_edit or is_admin_user %}
+          <input class="defect-cell-input defect-num-input" type="number" name="defect_quantity" min="1" value="{{ rec.defect_quantity }}" form="defect-edit-form-{{ rec.id }}" readonly required>
+          {% else %}
+          <strong>{{ rec.defect_quantity }}</strong>
+          {% endif %}
+        </td>
+        <td>
+          {% if biota_can_edit or is_admin_user %}
+          <span><strong>{{ rec.good_quantity }}</strong></span>
+          {% else %}
+          {{ rec.good_quantity }}
+          {% endif %}
+        </td>
+        <td>
+          {% if biota_can_edit or is_admin_user %}
+          <input class="defect-cell-input defect-num-input" type="number" name="bad_quantity" min="0" value="{{ rec.bad_quantity }}" form="defect-edit-form-{{ rec.id }}" readonly>
+          {% else %}
+          {{ rec.bad_quantity }}
+          {% endif %}
+        </td>
+        <td>
+          {% if biota_can_edit or is_admin_user %}
+          <input class="defect-cell-input" type="text" name="defect_reason" value="{{ rec.defect_reason }}" form="defect-edit-form-{{ rec.id }}" readonly required>
+          {% else %}
+          {{ rec.defect_reason }}
+          {% endif %}
+        </td>
+        {% if biota_can_edit or is_admin_user %}
+        <form method="post" id="defect-edit-form-{{ rec.id }}" style="display:none;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_defect_record">
+          <input type="hidden" name="defect_id" value="{{ rec.id }}">
+        </form>
+        {% endif %}
         {% if is_admin_user %}
         <td>
-          <form method="post" style="margin:0;" onsubmit="return confirm('Удалить эту запись учёта брака?');">
+          <button
+            type="button"
+            class="btn btn-ghost defects-row-edit-toggle"
+            data-defect-form-id="defect-edit-form-{{ rec.id }}"
+            title="Включить редактирование строки"
+            aria-label="Включить редактирование строки"
+            style="padding:4px 10px;font-size:14px;line-height:1;"
+          >🔒</button>
+          <form method="post" style="margin-top:6px;" onsubmit="return confirm('Удалить эту запись учёта брака?');">
             {% csrf_token %}
             <input type="hidden" name="action" value="delete_defect_record">
             <input type="hidden" name="defect_id" value="{{ rec.id }}">
@@ -891,8 +952,127 @@
   }
   .data-grid th.sortable.is-asc::after { content: " \2191"; opacity: 0.9; }
   .data-grid th.sortable.is-desc::after { content: " \2193"; opacity: 0.9; }
+  .defect-cell-input {
+    width: 100%;
+    min-width: 110px;
+    background: #101520;
+    color: #eaf0ff;
+    border: 1px solid #33415f;
+    border-radius: 8px;
+    padding: 6px 8px;
+    box-sizing: border-box;
+  }
+  .defect-cell-input[readonly],
+  .defect-cell-input:disabled {
+    background: #192235;
+    color: #b7c5e6;
+    border-color: #33415f;
+    cursor: default;
+  }
+  .defect-num-input { min-width: 78px; }
+  @media (max-width: 720px) {
+    .inventory-top-actions {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 8px;
+    }
+    .inventory-top-actions .btn {
+      flex: 0 0 auto;
+      min-height: 34px;
+      padding: 7px 10px;
+      font-size: 12px;
+    }
+    #issue-outcome-block .issue-inline-form > div {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      align-items: stretch !important;
+    }
+    #issue-outcome-block .issue-inline-form input[type="date"],
+    #issue-outcome-block .issue-inline-form input[type="text"],
+    #issue-outcome-block .issue-inline-form .btn {
+      grid-column: 1 / -1;
+      width: 100% !important;
+      min-width: 0 !important;
+    }
+    #issue-outcome-block .issue-inline-form input[type="number"] {
+      width: 100% !important;
+      min-width: 0 !important;
+    }
+    #issue-outcome-block td[style*="min-width"] {
+      min-width: 0 !important;
+    }
+    #issue-outcome-block .issue-candidate-row td {
+      white-space: nowrap;
+    }
+    .defect-cell-input {
+      min-width: 88px;
+      padding: 5px 7px;
+      font-size: 12px;
+    }
+    .defect-num-input { min-width: 68px; }
+  }
 </style>
 <script>
+  (function () {
+    var inputs = document.querySelectorAll(".defect-cell-input");
+    var rowToggles = document.querySelectorAll(".defects-row-edit-toggle");
+    if (!rowToggles.length) return;
+    var saveTimer = null;
+    var inSubmit = false;
+    var pendingFormId = "";
+    var editableForms = new Set();
+
+    function submitDefectForm(formId) {
+      var form = formId ? document.getElementById(formId) : null;
+      if (!form || inSubmit) return;
+      inSubmit = true;
+      form.submit();
+    }
+
+    function applyRowEditState(formId, editing) {
+      document.querySelectorAll('.defect-cell-input[form="' + formId + '"]').forEach(function (el) {
+        if (el.tagName === "SELECT") {
+          el.disabled = !editing;
+        } else {
+          el.readOnly = !editing;
+        }
+      });
+    }
+
+    inputs.forEach(function (el) {
+      el.addEventListener("change", function () {
+        var formId = el.getAttribute("form") || "";
+        if (!formId || !editableForms.has(formId)) return;
+        pendingFormId = formId;
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(function () {
+          submitDefectForm(pendingFormId);
+        }, 240);
+      });
+      el.addEventListener("blur", function () {
+        var formId = el.getAttribute("form") || "";
+        if (!formId || !editableForms.has(formId)) return;
+        pendingFormId = formId;
+      });
+    });
+
+    rowToggles.forEach(function (btn) {
+      var formId = btn.getAttribute("data-defect-form-id") || "";
+      if (!formId) return;
+      applyRowEditState(formId, false);
+      btn.addEventListener("click", function () {
+        var editing = !editableForms.has(formId);
+        if (editing) editableForms.add(formId);
+        else editableForms.delete(formId);
+        applyRowEditState(formId, editing);
+        btn.textContent = editing ? "🔓" : "🔒";
+        btn.title = editing ? "Выключить редактирование строки" : "Включить редактирование строки";
+        btn.setAttribute("aria-label", btn.title);
+      });
+    });
+  })();
   (function () {
     var tables = document.querySelectorAll(".js-sortable-table");
     if (!tables.length) return;

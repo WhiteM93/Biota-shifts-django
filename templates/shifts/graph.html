@@ -70,18 +70,15 @@
 <div class="graph-body">
 {% if biota_can_edit %}
 <aside class="graph-side-toolbar" id="graph-side-toolbar" aria-label="Редактирование графика">
-  <button type="button" class="btn btn-edit-unlock graph-side-toolbar__edit" id="graph-edit-toggle">Включить редактирование</button>
-  <p class="graph-edit-hint" id="graph-edit-hint">График только для просмотра. Включите редактирование, чтобы менять ячейки.</p>
+  <button type="button" class="btn btn-edit-unlock graph-side-toolbar__edit" id="graph-edit-toggle" aria-label="Режим редактирования" title="Режим редактирования">🔒</button>
   <div class="graph-code-palette" id="graph-code-palette" aria-label="Код для ячеек" hidden>
-    <span class="graph-code-palette__label">Заполнение</span>
     <button type="button" class="graph-code-btn graph-code-btn--d" data-code="д" title="Дневная смена">д</button>
     <button type="button" class="graph-code-btn graph-code-btn--n" data-code="н" title="Ночная смена">н</button>
     <button type="button" class="graph-code-btn graph-code-btn--ot" data-code="от" title="Отпуск">от</button>
     <button type="button" class="graph-code-btn graph-code-btn--b" data-code="б" title="Больничный">б</button>
     <button type="button" class="graph-code-btn graph-code-btn--p" data-code="п" title="Прогул">п</button>
     <button type="button" class="graph-code-btn graph-code-btn--kp" data-code="кп" title="Компенсация">кп</button>
-    <button type="button" class="graph-code-btn graph-code-btn--clear" data-code="" title="Очистить ячейку">пусто</button>
-    <button type="button" class="graph-code-btn graph-code-btn--keyboard" data-brush="keyboard" title="Ввод с клавиатуры без палитры">⌨ Клавиатура</button>
+    <button type="button" class="graph-code-btn graph-code-btn--clear" data-code="" title="Очистить ячейку" aria-label="Очистить ячейку">⌫</button>
   </div>
 </aside>
 {% endif %}
@@ -172,11 +169,12 @@
 }
 .graph-side-toolbar {
   position: sticky;
-  top: 10px;
-  flex: 0 0 120px;
-  width: 120px;
-  z-index: 20;
-  padding: 10px 8px;
+  top: var(--graph-sticky-top, 64px);
+  flex: 0 0 64px;
+  width: 64px;
+  z-index: 10;
+  padding: 8px 5px;
+  box-sizing: border-box;
   border: 1px solid #2f3b57;
   border-radius: 10px;
   background: rgba(14, 18, 28, 0.97);
@@ -187,22 +185,17 @@
 }
 .graph-side-toolbar__edit {
   width: 100%;
-  padding-left: 8px;
-  padding-right: 8px;
-  font-size: 12px;
+  padding-left: 0;
+  padding-right: 0;
+  font-size: 18px;
   line-height: 1.25;
-  white-space: normal;
+  white-space: nowrap;
   text-align: center;
 }
 .graph-main-column {
   flex: 1;
   min-width: 0;
-}
-.graph-edit-hint {
-  font-size: 11px;
-  line-height: 1.35;
-  margin: 8px 0 0 0;
-  color: #9eb0d8;
+  width: 100%;
 }
 .graph-code-palette__label {
   display: block;
@@ -216,13 +209,13 @@
 .graph-code-palette {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  margin-top: 10px;
+  gap: 4px;
+  margin-top: 8px;
 }
 .graph-code-btn {
   width: 100%;
-  min-height: 30px;
-  padding: 4px 6px;
+  min-height: 26px;
+  padding: 2px 4px;
   border-radius: 6px;
   border: 1px solid rgba(45, 55, 78, 0.45);
   font-size: 12px;
@@ -249,13 +242,6 @@
   color: #d7e2ff;
   border-color: #4a5878;
   font-weight: 700;
-}
-.graph-code-btn--keyboard {
-  background: linear-gradient(180deg, #32415f 0%, #26324b 100%);
-  color: #eaf0ff;
-  border-color: #4f6190;
-  font-size: 11px;
-  font-weight: 600;
 }
 .graph-upload-form {
   margin: 0;
@@ -306,7 +292,18 @@
 }
 .inline input { width: auto; margin: 0; }
 .mode-target.is-hidden { display: none; }
-.schedule-wrap { overflow-x: auto; max-width: 100%; border: 1px solid #2b3650; border-radius: 8px; padding: 8px; }
+.schedule-wrap {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #2b3650;
+  border-radius: 8px;
+  padding: 8px;
+}
 .schedule-table { min-width: max-content; font-size: 12px; }
 .schedule-table th, .schedule-table td { border: 1px solid #2b3650; padding: 2px; text-align: center; }
 .schedule-table th.non-work-col,
@@ -482,7 +479,6 @@
   border-color: #c5cdd8;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
-#graph-page-root.theme-light .graph-edit-hint { color: #5c6578; }
 #graph-page-root.theme-light .graph-code-palette__label { color: #6b7280; }
 #graph-page-root.theme-light .graph-upload-row input[type="file"] {
   background: #fff;
@@ -495,7 +491,6 @@
   color: #1a2233;
 }
 #graph-page-root.theme-light .graph-upload-filename { color: #4b5568; }
-#graph-page-root.theme-light .graph-edit-hint { color: #4b5568; }
 #graph-page-root.theme-light .graph-save-status { color: #374151; }
 #graph-page-root.theme-light .schedule-wrap {
   background: #fff;
@@ -558,16 +553,19 @@
 @media (max-width: 900px) {
   .graph-body { flex-direction: column; }
   .graph-side-toolbar {
-    position: relative;
-    top: 0;
+    position: sticky;
+    top: var(--graph-sticky-top, 64px);
     width: 100%;
     max-width: 100%;
+    min-width: 0;
     max-height: none;
     flex: none;
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
     gap: 10px;
+    z-index: 10;
+    box-sizing: border-box;
   }
   .graph-side-toolbar__edit { width: auto; flex: 1 1 200px; }
   .graph-code-palette {
@@ -638,10 +636,85 @@
   }
 }
 @media (max-width: 720px) {
-  .graph-upload-row { display: flex; }
-  .graph-upload-filename { max-width: 100%; flex: 1 1 100%; }
-  .graph-upload-row .btn { width: 100%; }
-  .schedule-wrap { padding: 6px; }
+  .graph-top-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 8px;
+    border-radius: 10px;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+  }
+  .graph-top-strip > .btn:first-child { grid-column: 1 / -1; }
+  .graph-top-strip > .btn {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 34px;
+    justify-content: center;
+    text-align: center;
+    padding: 6px 9px;
+    font-size: 13px;
+    box-sizing: border-box;
+  }
+  .graph-top-strip > .graph-upload-form {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 6px;
+    border: 1px solid #2f3b57;
+    border-radius: 8px;
+    background: rgba(10, 14, 22, 0.35);
+    box-sizing: border-box;
+  }
+  .graph-upload-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    align-items: stretch;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .graph-upload-row .btn {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 34px;
+    justify-content: center;
+    font-size: 13px;
+    box-sizing: border-box;
+  }
+  .graph-upload-filename {
+    max-width: 100%;
+    width: 100%;
+    flex: none;
+    white-space: normal;
+    word-break: break-word;
+    padding: 5px 8px;
+    border: 1px dashed #3a4868;
+    border-radius: 8px;
+    background: rgba(16, 21, 32, 0.55);
+    box-sizing: border-box;
+    text-align: center;
+  }
+  .graph-top-strip .btn-print-sheet,
+  .graph-top-strip .btn-png-export {
+    grid-column: span 1;
+  }
+  .graph-body,
+  .graph-main-column {
+    width: 100%;
+    min-width: 0;
+  }
+  .schedule-wrap {
+    padding: 6px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+  }
   .schedule-table { font-size: 11px; }
   .emp-cell { max-width: 180px; font-size: 11px; }
   .day-input { width: 30px; padding: 3px 1px; font-size: 10px; }
@@ -650,6 +723,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
   (function () {
+    function syncGraphStickyOffset() {
+      var nav = document.querySelector(".nav");
+      var root = document.getElementById("graph-page-root");
+      if (!root) return;
+      var navHeight = nav ? nav.getBoundingClientRect().height : 0;
+      var offset = Math.max(64, Math.round(navHeight + 8));
+      root.style.setProperty("--graph-sticky-top", offset + "px");
+    }
+
+    syncGraphStickyOffset();
+    window.addEventListener("resize", syncGraphStickyOffset);
+
     var form = document.getElementById("graph-save-form");
     var statusEl = document.getElementById("graph-save-status");
     if (!form) return;
@@ -668,7 +753,6 @@
     var canEdit = document.body && document.body.getAttribute("data-biota-can-edit") === "1";
     var editing = false;
     var editToggle = document.getElementById("graph-edit-toggle");
-    var editHint = document.getElementById("graph-edit-hint");
     var codePalette = document.getElementById("graph-code-palette");
     var brushOn = false;
     var brushVal = "";
@@ -678,9 +762,7 @@
     function updatePaletteActive() {
       if (!codePalette) return;
       codePalette.querySelectorAll(".graph-code-btn").forEach(function (btn) {
-        if (btn.getAttribute("data-brush") === "keyboard") {
-          btn.classList.toggle("is-active", editing && !brushOn);
-        } else if (btn.hasAttribute("data-code")) {
+        if (btn.hasAttribute("data-code")) {
           var c = btn.getAttribute("data-code") || "";
           btn.classList.toggle("is-active", editing && brushOn && brushVal === c);
         }
@@ -688,17 +770,7 @@
     }
 
     function syncBrushHint() {
-      if (!editHint) return;
-      if (!canEdit || !editing) {
-        editHint.textContent =
-          "График только для просмотра. Включите редактирование, чтобы менять ячейки.";
-      } else if (brushOn) {
-        editHint.textContent =
-          "Выбран код — кликайте по ячейкам или протягивайте, как в Excel. «Клавиатура» — ввод вручную.";
-      } else {
-        editHint.textContent =
-          "Ввод с клавиатуры. Слева можно выбрать код и кликать по ячейкам.";
-      }
+      // Hint removed from toolbar by design.
     }
 
     function setStatus(text, color) {
@@ -802,7 +874,9 @@
       });
       form.classList.toggle("graph-form--readonly", !canEdit || !editing);
       if (editToggle) {
-        editToggle.textContent = editing ? "Закончить редактирование" : "Включить редактирование";
+        editToggle.textContent = editing ? "✏️" : "🔒";
+        editToggle.setAttribute("aria-label", editing ? "Редактирование включено" : "Редактирование выключено");
+        editToggle.setAttribute("title", editing ? "Редактирование включено" : "Редактирование выключено");
         editToggle.classList.toggle("is-editing-on", editing);
       }
       if (codePalette) {
@@ -947,12 +1021,15 @@
       codePalette.querySelectorAll(".graph-code-btn").forEach(function (btn) {
         btn.addEventListener("click", function () {
           if (!canEdit || !editing) return;
-          if (btn.getAttribute("data-brush") === "keyboard") {
-            brushOn = false;
-            brushVal = "";
-          } else if (btn.hasAttribute("data-code")) {
-            brushOn = true;
-            brushVal = btn.getAttribute("data-code") || "";
+          if (btn.hasAttribute("data-code")) {
+            var selectedCode = btn.getAttribute("data-code") || "";
+            if (brushOn && brushVal === selectedCode) {
+              brushOn = false;
+              brushVal = "";
+            } else {
+              brushOn = true;
+              brushVal = selectedCode;
+            }
           }
           syncBrushHint();
           updatePaletteActive();

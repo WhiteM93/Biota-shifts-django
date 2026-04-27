@@ -342,5 +342,39 @@
     box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.22);
     background: #121a2a;
   }
+  @media (max-width: 720px) {
+    #tool-pdf-card,
+    #program-file-card {
+      grid-template-columns: 1fr !important;
+      gap: 8px !important;
+    }
+    #tool-pdf-card > div:last-child,
+    #program-file-card > div:last-child {
+      width: 100%;
+      display: grid !important;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px !important;
+    }
+    #tool-pdf-card .setup-file-action-btn,
+    #program-file-card .setup-file-action-btn {
+      width: 100%;
+      justify-content: center;
+    }
+    .setup-photo-block,
+    #setup-photo-block-template .setup-photo-block {
+      grid-template-columns: 1fr !important;
+      gap: 8px !important;
+    }
+    .setup-photo-preview {
+      width: 100% !important;
+      height: 180px !important;
+    }
+    .setup-photo-empty {
+      height: 180px !important;
+    }
+    .setup-form-action-btn {
+      width: 100%;
+    }
+  }
 </style>
 {% endblock %}

@@ -75,6 +75,7 @@
     flex-direction: column;
     gap: 10px;
     min-width: 0;
+    aspect-ratio: 1 / 1;
   }
   .product-tile-title {
     color: #eaf0ff;
@@ -90,7 +91,8 @@
   }
   .product-tile-title:hover { color: #bcd0ff; }
   .product-tile-3d {
-    height: 190px;
+    flex: 1 1 auto;
+    min-height: 0;
     border-radius: 10px;
     border: 1px solid #374563;
     background: #d3d7de;
@@ -125,6 +127,29 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+  }
+  @media (max-width: 720px) {
+    form.filter-panel .filter-grid[style*="grid-template-columns"] {
+      grid-template-columns: 1fr !important;
+      gap: 10px;
+    }
+    form.filter-panel .filter-actions {
+      width: 100%;
+    }
+    form.filter-panel .filter-actions .btn {
+      width: 100%;
+    }
+    .products-tiles {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .product-tile {
+      border-radius: 12px;
+      padding: 8px;
+      gap: 8px;
+    }
+    .product-tile-title { font-size: 13px; min-height: 2.5em; }
+    .product-tile-meta .muted { font-size: 11px; }
   }
 </style>
 

@@ -282,6 +282,7 @@
     border-radius: 10px;
     background: rgba(24, 30, 44, 0.7);
     font-size: 15px;
+    min-width: 0;
   }
   .product-setup-spec-group {
     border: 1px solid #33415f;
@@ -291,6 +292,11 @@
     display: grid;
     gap: 5px;
     line-height: 1.55;
+    min-width: 0;
+  }
+  .product-setup-spec-group div {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   .product-setup-spec-group h5 {
     margin: 0 0 3px 0;
@@ -307,6 +313,8 @@
     padding: 10px;
     font-size: 15px;
     min-height: 210px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   .product-setup-content-grid {
     display: grid;
@@ -314,6 +322,9 @@
     gap: 12px;
     align-items: start;
     grid-column: 1 / -1;
+  }
+  .product-setup-content-grid > div {
+    min-width: 0;
   }
   .setup-inline-pdf {
     height: 230px;
@@ -398,6 +409,10 @@
   .product-detail-main {
     min-width: 0;
   }
+  .product-detail-side {
+    min-width: 0;
+    width: 100%;
+  }
   .product-detail-grid.is-drawing-only {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -429,12 +444,29 @@
     flex-direction: column;
     gap: 8px;
     margin-top: 12px;
+    min-width: 0;
+    width: 100%;
+  }
+  .product-downloads .btn {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    text-align: center;
   }
   @media (max-width: 960px) {
     .product-detail-grid {
       grid-template-columns: 1fr;
     }
     .product-pdf-frame { height: 55vh; }
+    .product-detail-side,
+    #product-downloads-block {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
   }
   .setup-photo-modal[hidden] {
     display: none !important;
@@ -482,6 +514,68 @@
     font-size: 20px;
     min-width: 34px;
   }
+  @media (max-width: 720px) {
+    .product-tabs-nav {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 10px;
+    }
+    .product-tab {
+      flex: 0 0 auto;
+      font-size: 13px;
+      padding: 7px 11px;
+    }
+    .product-detail-grid {
+      gap: 12px;
+    }
+    .product-cad-viewport {
+      height: 220px;
+    }
+    .product-downloads .btn,
+    #product-save-preview-block .btn {
+      width: 100%;
+      justify-content: center;
+    }
+    .product-setup-photos {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .product-setup-photos img {
+      height: 120px;
+    }
+    .setup-inline-actions .btn {
+      flex: 1 1 100%;
+    }
+    .setup-inline-pdf {
+      height: auto;
+      min-height: 72vh;
+    }
+    .setup-inline-pdf iframe {
+      min-height: 72vh;
+    }
+    .setup-inline-pdf.is-html-embed {
+      min-height: 0;
+    }
+    .setup-inline-pdf.is-html-embed iframe {
+      min-height: 0;
+      height: auto;
+    }
+    .product-setup-specs {
+      overflow-x: hidden;
+    }
+    .setup-photo-modal {
+      padding: 10px;
+    }
+    .setup-photo-modal-dialog {
+      width: 100%;
+      max-height: 88vh;
+      padding: 10px;
+    }
+    .setup-photo-modal-dialog img {
+      max-height: 72vh;
+    }
+  }
 </style>
 <script>
   (function () {
@@ -517,6 +611,41 @@
         printWin.addEventListener("load", launchPrint, { once: true });
       });
     });
+  })();
+  (function () {
+    function syncSetupHtmlIframeHeight() {
+      if (window.innerWidth > 720) return;
+      document.querySelectorAll(".setup-inline-pdf iframe").forEach(function (frame) {
+        var src = (frame.getAttribute("src") || "").toLowerCase();
+        if (!src || (src.indexOf(".html") === -1 && src.indexOf(".htm") === -1)) return;
+        var wrap = frame.closest(".setup-inline-pdf");
+        if (!wrap) return;
+        var applyHeight = function () {
+          try {
+            var doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+            if (!doc || !doc.body) return;
+            var body = doc.body;
+            var html = doc.documentElement;
+            var h = Math.max(
+              body.scrollHeight || 0,
+              body.offsetHeight || 0,
+              html ? html.scrollHeight : 0,
+              html ? html.offsetHeight : 0
+            );
+            if (!h) return;
+            wrap.classList.add("is-html-embed");
+            frame.style.height = h + "px";
+          } catch (e) {
+            // Ignore non-accessible frames (e.g. PDF viewer).
+          }
+        };
+        frame.addEventListener("load", applyHeight);
+        applyHeight();
+      });
+    }
+
+    syncSetupHtmlIframeHeight();
+    window.addEventListener("resize", syncSetupHtmlIframeHeight);
   })();
 
   (function () {

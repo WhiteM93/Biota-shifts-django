@@ -171,6 +171,34 @@
     box-sizing: border-box;
     white-space: nowrap;
   }
+  @media (max-width: 720px) {
+    .product-file-row {
+      grid-template-columns: 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+    .product-file-actions {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .product-file-actions .file-action-btn {
+      width: 100%;
+      justify-content: center;
+    }
+    .product-file-picker .btn {
+      width: 100%;
+      justify-content: center;
+    }
+    .product-file-picker .js-file-name {
+      width: 100%;
+      word-break: break-word;
+    }
+    .form-action-btn {
+      width: 100%;
+    }
+  }
 </style>
 <script>
   (function () {

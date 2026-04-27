@@ -1,9 +1,11 @@
+{% load static %}
 <!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Biota shifts Django</title>
+  <title>MetaBase</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
   <style>
     body { font-family: Inter, Segoe UI, Arial, sans-serif; margin: 0; background: radial-gradient(circle at top right, #1a2337 0%, #0f1115 42%); color: #eaf0ff; }
     .nav {
@@ -263,11 +265,30 @@
       .nav {
         padding: 8px 10px;
         gap: 6px;
-        overflow-x: auto;
-        flex-wrap: nowrap;
+        overflow-x: visible;
+        flex-wrap: wrap;
+        align-items: stretch;
       }
-      .nav a { font-size: 12px; padding: 6px 9px; }
+      .nav a,
+      .nav-dropdown > summary {
+        font-size: 12px;
+        padding: 7px 9px;
+        line-height: 1.2;
+      }
+      .nav .nav-spacer {
+        flex-basis: 100%;
+        width: 100%;
+        margin-left: 0;
+      }
+      .nav .nav-refresh-form {
+        align-self: center;
+      }
       .nav .nav-refresh-btn { width: 32px; height: 32px; font-size: 15px; }
+      .nav-dropdown-menu {
+        left: 0;
+        right: auto;
+        min-width: min(260px, calc(100vw - 24px));
+      }
       .filter-panel {
         padding: 10px;
         margin: 10px 0 12px 0;

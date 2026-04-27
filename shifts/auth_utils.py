@@ -133,7 +133,7 @@ def write_permission_required(view_func):
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
         u = biota_user(request)
-        if request.method not in {"GET", "HEAD", "OPTIONS"} and user_is_executor(u):
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and not _is_admin(u) and user_is_executor(u):
             messages.warning(
                 request,
                 "У вас роль «исполнитель»: доступны только просмотр и скачивание.",

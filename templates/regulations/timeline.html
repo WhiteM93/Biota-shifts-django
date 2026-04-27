@@ -69,6 +69,53 @@
 
 {{ rows|json_script:"reg-initial-json" }}
 
+<div class="reg-mobile-table-wrap">
+  <div class="table-wrap">
+    <table class="data-grid reg-mobile-table">
+      <thead>
+        <tr>
+          <th>Сотрудник</th>
+          <th>Завтрак</th>
+          <th>Обед</th>
+          <th>Перерывы</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.employee_name }}</td>
+          <td>
+            {% with found=0 %}
+            {% for b in r.breaks %}
+              {% if b.color_kind == "bf" %}
+                {{ b.start }}-{{ b.end }}
+              {% endif %}
+            {% endfor %}
+            {% endwith %}
+          </td>
+          <td>
+            {% for b in r.breaks %}
+              {% if b.color_kind == "ln" %}
+                {{ b.start }}-{{ b.end }}
+              {% endif %}
+            {% endfor %}
+          </td>
+          <td>
+            {% for b in r.breaks %}
+              {% if b.color_kind == "br" %}
+                <div>{{ b.start }}-{{ b.end }}{% if b.label %} ({{ b.label }}){% endif %}</div>
+              {% endif %}
+            {% endfor %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="muted">Нет строк на выбранный месяц.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <div id="reg-timeline-root" class="reg-shell reg-shell--readonly{% if not rows %} reg-shell--empty{% endif %}" data-editing="0">
   <div class="reg-header-row">
     <div class="reg-corner"></div>
@@ -775,6 +822,17 @@
     .reg-block { top: 4px; height: 26px; font-size: 9px; padding: 0 10px; }
     .reg-block-del { width: 20px; height: 20px; font-size: 11px; }
     .reg-hours { font-size: 10px; }
+    .reg-mobile-table-wrap { display: block; margin-top: 8px; }
+    #reg-timeline-root { display: none; }
+    .reg-toolbar-actions .btn-edit-unlock,
+    .reg-toolbar-actions .reg-save-btn {
+      display: none !important;
+    }
+    .reg-mobile-table td { text-align: left !important; vertical-align: top; }
+    .reg-mobile-table td:first-child { font-weight: 600; }
+  }
+  @media (min-width: 721px) {
+    .reg-mobile-table-wrap { display: none; }
   }
 </style>
 
