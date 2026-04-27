@@ -47,13 +47,45 @@
         <div class="product-setup-specs">
           <div class="product-setup-spec-group">
             <h5>Привязки</h5>
-            <div><span class="muted">X:</span> {{ setup.binding_x|default:"—" }}</div>
-            <div><span class="muted">Y:</span> {{ setup.binding_y|default:"—" }}</div>
-            <div><span class="muted">Z:</span> {{ setup.binding_z|default:"—" }}</div>
+            <div>
+              <span class="muted">X:</span> {{ setup.binding_x|default:"—" }}
+              {% if setup.binding_x_photo %}
+              <a href="{{ setup.binding_x_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_x_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка X" aria-label="Фото привязки X">
+                📷
+                <span class="binding-photo-hover"><img src="{{ setup.binding_x_photo.url }}" alt="Привязка X"></span>
+              </a>
+              {% endif %}
+            </div>
+            <div>
+              <span class="muted">Y:</span> {{ setup.binding_y|default:"—" }}
+              {% if setup.binding_y_photo %}
+              <a href="{{ setup.binding_y_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_y_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка Y" aria-label="Фото привязки Y">
+                📷
+                <span class="binding-photo-hover"><img src="{{ setup.binding_y_photo.url }}" alt="Привязка Y"></span>
+              </a>
+              {% endif %}
+            </div>
+            <div>
+              <span class="muted">Z:</span> {{ setup.binding_z|default:"—" }}
+              {% if setup.binding_z_photo %}
+              <a href="{{ setup.binding_z_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_z_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка Z" aria-label="Фото привязки Z">
+                📷
+                <span class="binding-photo-hover"><img src="{{ setup.binding_z_photo.url }}" alt="Привязка Z"></span>
+              </a>
+              {% endif %}
+            </div>
           </div>
           <div class="product-setup-spec-group">
             <h5>Заготовка</h5>
-            <div><span class="muted">Тип:</span> {{ setup.workpiece|default:"—" }}</div>
+            <div>
+              <span class="muted">Тип:</span> {{ setup.workpiece|default:"—" }}
+              {% if setup.workpiece_photo %}
+              <a href="{{ setup.workpiece_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.workpiece_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Заготовка" aria-label="Фото заготовки">
+                📷
+                <span class="binding-photo-hover"><img src="{{ setup.workpiece_photo.url }}" alt="Заготовка"></span>
+              </a>
+              {% endif %}
+            </div>
             <div><span class="muted">Материал:</span> {{ setup.material|default:"—" }}</div>
             <div><span class="muted">Размер:</span> {{ setup.size|default:"—" }}</div>
           </div>
@@ -304,6 +336,47 @@
     letter-spacing: 0.2px;
     color: #c7d5ef;
   }
+  .binding-photo-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-left: 6px;
+    border: 1px solid #3b4b6e;
+    border-radius: 999px;
+    text-decoration: none;
+    font-size: 12px;
+    line-height: 1;
+    position: relative;
+    vertical-align: middle;
+    background: #1a2438;
+  }
+  .binding-photo-hover {
+    display: none;
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 8px);
+    transform: translateX(-50%);
+    z-index: 30;
+    width: 220px;
+    border: 1px solid #2f3b57;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #0a0d14;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+  .binding-photo-hover img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    display: block;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .binding-photo-link:hover .binding-photo-hover {
+      display: block;
+    }
+  }
   .product-setup-notes {
     white-space: pre-wrap;
     line-height: 1.55;
@@ -478,7 +551,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 8px;
   }
   .setup-photo-modal-backdrop {
     position: absolute;
@@ -489,22 +562,25 @@
   .setup-photo-modal-dialog {
     position: relative;
     z-index: 1;
-    width: min(900px, 88vw);
-    max-height: 82vh;
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
     border: 1px solid #2f3b57;
-    border-radius: 12px;
+    border-radius: 0;
     background: #111827;
-    padding: 14px;
+    padding: 6px;
     display: grid;
     overflow: auto;
   }
   .setup-photo-modal-dialog img {
+    width: 100%;
     max-width: 100%;
-    max-height: 66vh;
-    width: auto;
+    height: calc(100vh - 78px);
+    max-height: calc(100vh - 78px);
+    object-fit: contain;
     margin: 0 auto;
-    border-radius: 8px;
-    border: 1px solid #2a3348;
+    border-radius: 0;
+    border: 0;
     background: #0a0c12;
   }
   .setup-photo-modal-close {
@@ -565,15 +641,17 @@
       overflow-x: hidden;
     }
     .setup-photo-modal {
-      padding: 10px;
+      padding: 4px;
     }
     .setup-photo-modal-dialog {
       width: 100%;
-      max-height: 88vh;
-      padding: 10px;
+      height: 100vh;
+      max-height: 100vh;
+      padding: 2px;
     }
     .setup-photo-modal-dialog img {
-      max-height: 72vh;
+      height: calc(100vh - 64px);
+      max-height: calc(100vh - 64px);
     }
   }
 </style>

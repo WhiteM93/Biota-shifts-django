@@ -156,6 +156,10 @@ class ProductSetupForm(forms.ModelForm):
             "binding_x",
             "binding_y",
             "binding_z",
+            "binding_x_photo",
+            "binding_y_photo",
+            "binding_z_photo",
+            "workpiece_photo",
             "workpiece",
             "material",
             "size",
@@ -168,6 +172,10 @@ class ProductSetupForm(forms.ModelForm):
             "binding_x": forms.TextInput(attrs={"placeholder": "Например, X0 или -12.5"}),
             "binding_y": forms.TextInput(attrs={"placeholder": "Например, Y0 или 34.2"}),
             "binding_z": forms.TextInput(attrs={"placeholder": "Например, Z0 или +3.0"}),
+            "binding_x_photo": forms.FileInput(attrs={"accept": "image/*,.jpg,.jpeg,.png,.webp,.gif"}),
+            "binding_y_photo": forms.FileInput(attrs={"accept": "image/*,.jpg,.jpeg,.png,.webp,.gif"}),
+            "binding_z_photo": forms.FileInput(attrs={"accept": "image/*,.jpg,.jpeg,.png,.webp,.gif"}),
+            "workpiece_photo": forms.FileInput(attrs={"accept": "image/*,.jpg,.jpeg,.png,.webp,.gif"}),
             "workpiece": forms.TextInput(attrs={"placeholder": "Например, круг D50 L120"}),
             "material": forms.TextInput(attrs={"placeholder": "Например, Сталь 45"}),
             "size": forms.TextInput(attrs={"placeholder": "Например, 50x120 мм"}),
@@ -433,6 +441,14 @@ def product_setup_edit_view(request, pk: int, setup_pk: int):
                     saved_setup.program_file.delete(save=False)
                 saved_setup.program_file = ""
                 saved_setup.save(update_fields=["program_file"])
+            for field_name in ("binding_x_photo", "binding_y_photo", "binding_z_photo", "workpiece_photo"):
+                remove_flag = request.POST.get(f"remove_{field_name}") == "1"
+                if remove_flag and not request.FILES.get(field_name):
+                    f = getattr(saved_setup, field_name)
+                    if f:
+                        f.delete(save=False)
+                    setattr(saved_setup, field_name, "")
+                    saved_setup.save(update_fields=[field_name])
             _apply_setup_instance_photo_changes(request, product, setup)
             messages.success(request, "Установка сохранена.")
             return redirect("product_detail", pk=product.pk)

@@ -311,6 +311,30 @@ class ProductSetup(models.Model):
     binding_x = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка X")
     binding_y = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка Y")
     binding_z = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка Z")
+    binding_x_photo = models.FileField(
+        upload_to="products/setup_bindings/",
+        blank=True,
+        verbose_name="Фото привязки X",
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png", "webp", "gif"])],
+    )
+    binding_y_photo = models.FileField(
+        upload_to="products/setup_bindings/",
+        blank=True,
+        verbose_name="Фото привязки Y",
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png", "webp", "gif"])],
+    )
+    binding_z_photo = models.FileField(
+        upload_to="products/setup_bindings/",
+        blank=True,
+        verbose_name="Фото привязки Z",
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png", "webp", "gif"])],
+    )
+    workpiece_photo = models.FileField(
+        upload_to="products/setup_bindings/",
+        blank=True,
+        verbose_name="Фото заготовки",
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png", "webp", "gif"])],
+    )
     workpiece = models.CharField(max_length=220, blank=True, default="", verbose_name="Заготовка")
     material = models.CharField(max_length=180, blank=True, default="", verbose_name="Материал")
     size = models.CharField(max_length=180, blank=True, default="", verbose_name="Размер")

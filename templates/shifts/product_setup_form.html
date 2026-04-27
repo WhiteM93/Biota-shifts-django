@@ -46,9 +46,77 @@
       {% if form.binding_z.errors %}<span class="muted">{{ form.binding_z.errors }}</span>{% endif %}
     </label>
     <label class="field">
+      <span>Фото привязки X</span>
+      {% if is_edit and setup and setup.binding_x_photo %}
+      <div class="binding-photo-card" id="binding-x-photo-card">
+        <a href="{{ setup.binding_x_photo.url }}" target="_blank" rel="noopener">
+          <img src="{{ setup.binding_x_photo.url }}" alt="Фото привязки X">
+        </a>
+        <input type="hidden" name="remove_binding_x_photo" id="id_remove_binding_x_photo" value="0" />
+        <div class="binding-photo-actions">
+          <label for="id_binding_x_photo" class="btn btn-ghost setup-file-action-btn" style="cursor:pointer;">Заменить</label>
+          <button type="button" class="btn btn-ghost setup-file-action-btn" id="binding-x-photo-delete-btn">Удалить</button>
+        </div>
+      </div>
+      {% endif %}
+      {{ form.binding_x_photo }}
+      {% if form.binding_x_photo.errors %}<span class="muted">{{ form.binding_x_photo.errors }}</span>{% endif %}
+    </label>
+    <label class="field">
+      <span>Фото привязки Y</span>
+      {% if is_edit and setup and setup.binding_y_photo %}
+      <div class="binding-photo-card" id="binding-y-photo-card">
+        <a href="{{ setup.binding_y_photo.url }}" target="_blank" rel="noopener">
+          <img src="{{ setup.binding_y_photo.url }}" alt="Фото привязки Y">
+        </a>
+        <input type="hidden" name="remove_binding_y_photo" id="id_remove_binding_y_photo" value="0" />
+        <div class="binding-photo-actions">
+          <label for="id_binding_y_photo" class="btn btn-ghost setup-file-action-btn" style="cursor:pointer;">Заменить</label>
+          <button type="button" class="btn btn-ghost setup-file-action-btn" id="binding-y-photo-delete-btn">Удалить</button>
+        </div>
+      </div>
+      {% endif %}
+      {{ form.binding_y_photo }}
+      {% if form.binding_y_photo.errors %}<span class="muted">{{ form.binding_y_photo.errors }}</span>{% endif %}
+    </label>
+    <label class="field">
+      <span>Фото привязки Z</span>
+      {% if is_edit and setup and setup.binding_z_photo %}
+      <div class="binding-photo-card" id="binding-z-photo-card">
+        <a href="{{ setup.binding_z_photo.url }}" target="_blank" rel="noopener">
+          <img src="{{ setup.binding_z_photo.url }}" alt="Фото привязки Z">
+        </a>
+        <input type="hidden" name="remove_binding_z_photo" id="id_remove_binding_z_photo" value="0" />
+        <div class="binding-photo-actions">
+          <label for="id_binding_z_photo" class="btn btn-ghost setup-file-action-btn" style="cursor:pointer;">Заменить</label>
+          <button type="button" class="btn btn-ghost setup-file-action-btn" id="binding-z-photo-delete-btn">Удалить</button>
+        </div>
+      </div>
+      {% endif %}
+      {{ form.binding_z_photo }}
+      {% if form.binding_z_photo.errors %}<span class="muted">{{ form.binding_z_photo.errors }}</span>{% endif %}
+    </label>
+    <label class="field">
       <span>Заготовка</span>
       {{ form.workpiece }}
       {% if form.workpiece.errors %}<span class="muted">{{ form.workpiece.errors }}</span>{% endif %}
+    </label>
+    <label class="field">
+      <span>Фото заготовки</span>
+      {% if is_edit and setup and setup.workpiece_photo %}
+      <div class="binding-photo-card" id="workpiece-photo-card">
+        <a href="{{ setup.workpiece_photo.url }}" target="_blank" rel="noopener">
+          <img src="{{ setup.workpiece_photo.url }}" alt="Фото заготовки">
+        </a>
+        <input type="hidden" name="remove_workpiece_photo" id="id_remove_workpiece_photo" value="0" />
+        <div class="binding-photo-actions">
+          <label for="id_workpiece_photo" class="btn btn-ghost setup-file-action-btn" style="cursor:pointer;">Заменить</label>
+          <button type="button" class="btn btn-ghost setup-file-action-btn" id="workpiece-photo-delete-btn">Удалить</button>
+        </div>
+      </div>
+      {% endif %}
+      {{ form.workpiece_photo }}
+      {% if form.workpiece_photo.errors %}<span class="muted">{{ form.workpiece_photo.errors }}</span>{% endif %}
     </label>
     <label class="field">
       <span>Материал</span>
@@ -214,6 +282,28 @@
         toolCard.style.display = "none";
       });
     }
+    [
+      ["binding_x", "id_remove_binding_x_photo", "binding-x-photo-delete-btn", "binding-x-photo-card"],
+      ["binding_y", "id_remove_binding_y_photo", "binding-y-photo-delete-btn", "binding-y-photo-card"],
+      ["binding_z", "id_remove_binding_z_photo", "binding-z-photo-delete-btn", "binding-z-photo-card"],
+      ["workpiece", "id_remove_workpiece_photo", "workpiece-photo-delete-btn", "workpiece-photo-card"],
+    ].forEach(function (cfg) {
+      var field = document.getElementById("id_" + cfg[0] + "_photo");
+      var remove = document.getElementById(cfg[1]);
+      var delBtn = document.getElementById(cfg[2]);
+      var cardEl = document.getElementById(cfg[3]);
+      if (field) {
+        field.addEventListener("change", function () {
+          if (remove) remove.value = "0";
+        });
+      }
+      if (remove && delBtn && cardEl) {
+        delBtn.addEventListener("click", function () {
+          remove.value = "1";
+          cardEl.style.display = "none";
+        });
+      }
+    });
   })();
   (function () {
     var wrap = document.getElementById("setup-photo-blocks");
@@ -323,6 +413,28 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
+  }
+  .binding-photo-card {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 8px;
+    border: 1px solid #2f3b57;
+    border-radius: 10px;
+    background: #111827;
+  }
+  .binding-photo-card img {
+    width: 100%;
+    max-height: 160px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #2f3b57;
+    display: block;
+  }
+  .binding-photo-actions {
+    display: flex;
+    gap: 8px;
     flex-wrap: wrap;
   }
   #id_setup_notes {
