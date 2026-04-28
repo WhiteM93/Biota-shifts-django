@@ -18,9 +18,11 @@ Including another URLconf
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.views.generic import RedirectView
 from django.urls import include, path
 
 urlpatterns = [
+    path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}favicon.ico", permanent=True)),
     path("admin/", admin.site.urls),
     path("regulations/", include("regulations.urls")),
     path("", include("shifts.urls")),
