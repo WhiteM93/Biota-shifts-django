@@ -659,6 +659,7 @@
     </label>
     <label class="field"><span>Кол-во брака</span><input type="number" name="defect_quantity" min="0" value="0"></label>
     <label class="field"><span>Неисправно</span><input type="number" name="bad_quantity" min="0" value="0"></label>
+    <label class="field"><span>Изделие</span><input type="text" name="product_name" placeholder="Название изделия"></label>
     <label class="field"><span>Причина брака</span><input type="text" name="defect_reason" required placeholder="Опишите причину"></label>
     <div class="filter-actions"><button type="submit" class="btn">Добавить запись</button></div>
   </form>
@@ -679,39 +680,44 @@
         {% endfor %}
       </select>
     </label>
-    <label class="field"><span>Сотрудник</span><input type="text" name="defect_employee" value="{{ defect_filters.employee }}" placeholder="ФИО сотрудника"></label>
-    <label class="field"><span>Ответственный</span><input type="text" name="defect_responsible" value="{{ defect_filters.responsible }}" placeholder="ФИО ответственного"></label>
   </div>
 </form>
 
 <div class="table-wrap">
-  <table class="data-grid">
+  <table class="data-grid defects-table">
+    <colgroup>
+      <col class="col-date">
+      <col class="col-employee">
+      <col class="col-qty">
+      <col class="col-good">
+      <col class="col-bad">
+      <col class="col-product">
+      <col class="col-reason">
+      {% if is_admin_user %}<col class="col-actions">{% endif %}
+    </colgroup>
     <thead>
       <tr>
-        <th>Дата</th>
-        <th>Отдел</th>
-        <th>Ответственный</th>
-        <th>Сотрудник</th>
-        <th>Кол-во брака</th>
-        <th>Исправно</th>
-        <th>Неисправно</th>
-        <th>Причина брака</th>
-        {% if is_admin_user %}<th>Действия</th>{% endif %}
+        <th class="defect-col-date">Дата</th>
+        <th class="defect-col-employee">Сотрудник</th>
+        <th class="defect-col-qty">Кол-во брака</th>
+        <th class="defect-col-good">Исправно</th>
+        <th class="defect-col-bad">Неисправно</th>
+        <th class="defect-col-product">Изделие</th>
+        <th class="defect-col-reason">Причина брака</th>
+        {% if is_admin_user %}<th class="defect-col-actions">Действия</th>{% endif %}
       </tr>
     </thead>
     <tbody>
       {% for rec in defect_records %}
       <tr>
-        <td>
+        <td class="defect-col-date">
           {% if biota_can_edit or is_admin_user %}
           <input class="defect-cell-input" type="date" name="defect_date" value="{{ rec.defect_date|date:'Y-m-d' }}" form="defect-edit-form-{{ rec.id }}" readonly required>
           {% else %}
           {{ rec.defect_date }}
           {% endif %}
         </td>
-        <td>{{ rec.department_name|default:"-" }}</td>
-        <td>{{ rec.responsible_name }}</td>
-        <td>
+        <td class="defect-col-employee">
           {% if biota_can_edit or is_admin_user %}
           <select class="defect-cell-input" name="employee_name" form="defect-edit-form-{{ rec.id }}" disabled required>
             {% if rec.employee_name and rec.employee_name not in employee_options %}
@@ -725,28 +731,35 @@
           {{ rec.employee_name }}
           {% endif %}
         </td>
-        <td>
+        <td class="defect-col-qty">
           {% if biota_can_edit or is_admin_user %}
           <input class="defect-cell-input defect-num-input" type="number" name="defect_quantity" min="0" value="{{ rec.defect_quantity }}" form="defect-edit-form-{{ rec.id }}" readonly required>
           {% else %}
           <strong>{{ rec.defect_quantity }}</strong>
           {% endif %}
         </td>
-        <td>
+        <td class="defect-col-good">
           {% if biota_can_edit or is_admin_user %}
           <span><strong>{{ rec.good_quantity }}</strong></span>
           {% else %}
           {{ rec.good_quantity }}
           {% endif %}
         </td>
-        <td>
+        <td class="defect-col-bad">
           {% if biota_can_edit or is_admin_user %}
           <input class="defect-cell-input defect-num-input" type="number" name="bad_quantity" min="0" value="{{ rec.bad_quantity }}" form="defect-edit-form-{{ rec.id }}" readonly>
           {% else %}
           {{ rec.bad_quantity }}
           {% endif %}
         </td>
-        <td>
+        <td class="defect-col-product">
+          {% if biota_can_edit or is_admin_user %}
+          <input class="defect-cell-input" type="text" name="product_name" value="{{ rec.product_name }}" form="defect-edit-form-{{ rec.id }}" readonly placeholder="Название изделия">
+          {% else %}
+          {{ rec.product_name|default:"-" }}
+          {% endif %}
+        </td>
+        <td class="defect-col-reason">
           {% if biota_can_edit or is_admin_user %}
           <input class="defect-cell-input" type="text" name="defect_reason" value="{{ rec.defect_reason }}" form="defect-edit-form-{{ rec.id }}" readonly required>
           {% else %}
@@ -761,7 +774,7 @@
         </form>
         {% endif %}
         {% if is_admin_user %}
-        <td>
+        <td class="defect-col-actions">
           <button
             type="button"
             class="btn btn-ghost defects-row-edit-toggle"
@@ -780,7 +793,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if is_admin_user %}9{% else %}8{% endif %}" class="muted">Записей по браку пока нет.</td></tr>
+      <tr><td colspan="{% if is_admin_user %}8{% else %}7{% endif %}" class="muted">Записей по браку пока нет.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -968,6 +981,31 @@
     color: #b7c5e6;
     border-color: #33415f;
     cursor: default;
+  }
+  .defects-table .col-date { width: 132px; }
+  .defects-table .col-employee { width: 240px; }
+  .defects-table .col-qty { width: 92px; }
+  .defects-table .col-good { width: 92px; }
+  .defects-table .col-bad { width: 96px; }
+  .defects-table .col-product { width: 210px; }
+  .defects-table .col-actions { width: 96px; }
+  .defects-table th.defect-col-reason,
+  .defects-table td.defect-col-reason {
+    width: auto;
+    min-width: 320px;
+  }
+  .defects-table td.defect-col-good,
+  .defects-table td.defect-col-qty,
+  .defects-table td.defect-col-bad,
+  .defects-table th.defect-col-good,
+  .defects-table th.defect-col-qty,
+  .defects-table th.defect-col-bad {
+    text-align: center;
+  }
+  .defects-table td.defect-col-date,
+  .defects-table td.defect-col-employee,
+  .defects-table td.defect-col-product {
+    white-space: nowrap;
   }
   .defect-num-input { min-width: 78px; }
   @media (max-width: 720px) {

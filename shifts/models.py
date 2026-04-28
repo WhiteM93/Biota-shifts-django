@@ -214,6 +214,7 @@ class EmployeeDefectRecord(models.Model):
     defect_quantity = models.PositiveIntegerField(verbose_name="Кол-во брака")
     good_quantity = models.PositiveIntegerField(default=0, verbose_name="Исправно")
     bad_quantity = models.PositiveIntegerField(default=0, verbose_name="Неисправно")
+    product_name = models.CharField(max_length=300, blank=True, default="", verbose_name="Изделие")
     defect_reason = models.CharField(max_length=500, verbose_name="Причина брака")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
 

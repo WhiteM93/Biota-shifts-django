@@ -115,11 +115,30 @@ def inventory_view(request):
             cfg = biota_db.db_config()
             employees_df = employees_df_for_nav(username, "defects", biota_db.load_employees(cfg))
             if not employees_df.empty:
+                prepared: list[tuple[str, str, str, str]] = []
+                base_counts: dict[str, int] = {}
                 for _, row in employees_df.iterrows():
-                    label = employee_label_row(row)
-                    if not label or label == "Без имени":
+                    base_label = employee_label_row(row)
+                    if not base_label or base_label == "Без имени":
                         continue
                     dept = str(row.get("department_name") or "").strip()
+                    last = str(row.get("last_name") or "").strip()
+                    first = str(row.get("first_name") or "").strip()
+                    full_name = " ".join(p for p in (last, first) if p)
+                    emp_code = str(row.get("emp_code") or "").strip()
+                    prepared.append((base_label, full_name, emp_code, dept))
+                    base_counts[base_label] = base_counts.get(base_label, 0) + 1
+
+                for base_label, full_name, emp_code, dept in prepared:
+                    label = base_label
+                    if base_counts.get(base_label, 0) > 1:
+                        if full_name and full_name != base_label:
+                            label = f"{base_label} ({full_name})"
+                        elif emp_code:
+                            label = f"{base_label} [{emp_code}]"
+                    # На случай редких коллизий (однофамильцы с одинаковым именем)
+                    if label in employee_department_map and emp_code:
+                        label = f"{label} [{emp_code}]"
                     if label not in employee_department_map:
                         employee_department_map[label] = dept
                 employee_options = sorted(employee_department_map.keys())
@@ -493,6 +512,7 @@ def inventory_view(request):
         department_name = employee_department_map.get(employee_name, "")
         defect_quantity = _to_int(request.POST.get("defect_quantity"), 0)
         bad_quantity = _to_int(request.POST.get("bad_quantity"), 0)
+        product_name = (request.POST.get("product_name") or "").strip()
         defect_reason = (request.POST.get("defect_reason") or "").strip()
         try:
             defect_date = date.fromisoformat(defect_date_raw)
@@ -526,6 +546,7 @@ def inventory_view(request):
             defect_quantity=defect_quantity,
             good_quantity=good_quantity,
             bad_quantity=bad_quantity,
+            product_name=product_name,
             defect_reason=defect_reason,
         )
         messages.success(request, "Запись о браке сохранена.")
@@ -558,6 +579,7 @@ def inventory_view(request):
         employee_name = (request.POST.get("employee_name") or "").strip()
         defect_quantity = _to_int(request.POST.get("defect_quantity"), 0)
         bad_quantity = _to_int(request.POST.get("bad_quantity"), 0)
+        product_name = (request.POST.get("product_name") or "").strip()
         defect_reason = (request.POST.get("defect_reason") or "").strip()
         try:
             defect_date = date.fromisoformat(defect_date_raw)
@@ -591,6 +613,7 @@ def inventory_view(request):
         rec.defect_quantity = defect_quantity
         rec.good_quantity = good_quantity
         rec.bad_quantity = bad_quantity
+        rec.product_name = product_name
         rec.defect_reason = defect_reason
         rec.save(
             update_fields=[
@@ -601,6 +624,7 @@ def inventory_view(request):
                 "defect_quantity",
                 "good_quantity",
                 "bad_quantity",
+                "product_name",
                 "defect_reason",
             ]
         )
@@ -749,8 +773,6 @@ def inventory_view(request):
 
     defect_date_from = (request.GET.get("defect_date_from") or "").strip()
     defect_date_to = (request.GET.get("defect_date_to") or "").strip()
-    defect_employee = (request.GET.get("defect_employee") or "").strip()
-    defect_responsible = (request.GET.get("defect_responsible") or "").strip()
     defect_department = (request.GET.get("defect_department") or "").strip()
     defects_qs = EmployeeDefectRecord.objects.all()
     if not is_admin_user:
@@ -766,10 +788,6 @@ def inventory_view(request):
         defects_qs = defects_qs.filter(defect_date__gte=defect_date_from)
     if defect_date_to:
         defects_qs = defects_qs.filter(defect_date__lte=defect_date_to)
-    if defect_employee:
-        defects_qs = defects_qs.filter(employee_name__icontains=defect_employee)
-    if defect_responsible:
-        defects_qs = defects_qs.filter(responsible_name__icontains=defect_responsible)
     if defect_department:
         defects_qs = defects_qs.filter(department_name=defect_department)
     defect_department_options = sorted(
@@ -849,8 +867,6 @@ def inventory_view(request):
         "defect_filters": {
             "date_from": defect_date_from,
             "date_to": defect_date_to,
-            "employee": defect_employee,
-            "responsible": defect_responsible,
             "department": defect_department,
         },
         "defect_department_options": defect_department_options,
