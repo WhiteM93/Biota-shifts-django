@@ -657,7 +657,7 @@
         {% endfor %}
       </select>
     </label>
-    <label class="field"><span>Кол-во брака</span><input type="number" name="defect_quantity" min="1" required></label>
+    <label class="field"><span>Кол-во брака</span><input type="number" name="defect_quantity" min="0" value="0"></label>
     <label class="field"><span>Неисправно</span><input type="number" name="bad_quantity" min="0" value="0"></label>
     <label class="field"><span>Причина брака</span><input type="text" name="defect_reason" required placeholder="Опишите причину"></label>
     <div class="filter-actions"><button type="submit" class="btn">Добавить запись</button></div>
@@ -727,7 +727,7 @@
         </td>
         <td>
           {% if biota_can_edit or is_admin_user %}
-          <input class="defect-cell-input defect-num-input" type="number" name="defect_quantity" min="1" value="{{ rec.defect_quantity }}" form="defect-edit-form-{{ rec.id }}" readonly required>
+          <input class="defect-cell-input defect-num-input" type="number" name="defect_quantity" min="0" value="{{ rec.defect_quantity }}" form="defect-edit-form-{{ rec.id }}" readonly required>
           {% else %}
           <strong>{{ rec.defect_quantity }}</strong>
           {% endif %}

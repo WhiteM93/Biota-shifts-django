@@ -508,8 +508,8 @@ def inventory_view(request):
         if employee_name not in employee_department_map:
             messages.error(request, "Не удалось определить отдел сотрудника — обновите страницу и выберите сотрудника заново.")
             return redirect(f"{request.path}?panel=defects")
-        if defect_quantity <= 0:
-            messages.error(request, "Количество брака должно быть больше нуля.")
+        if defect_quantity < 0:
+            messages.error(request, "Количество брака не может быть отрицательным.")
             return redirect(f"{request.path}?panel=defects")
         if bad_quantity < 0:
             messages.error(request, "Неисправно не может быть отрицательным.")
@@ -573,8 +573,8 @@ def inventory_view(request):
         if employee_name not in employee_department_map:
             messages.error(request, "Не удалось определить отдел сотрудника — обновите страницу и выберите сотрудника заново.")
             return redirect(f"{request.path}?panel=defects")
-        if defect_quantity <= 0:
-            messages.error(request, "Количество брака должно быть больше нуля.")
+        if defect_quantity < 0:
+            messages.error(request, "Количество брака не может быть отрицательным.")
             return redirect(f"{request.path}?panel=defects")
         if bad_quantity < 0:
             messages.error(request, "Неисправно не может быть отрицательным.")
