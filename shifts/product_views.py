@@ -625,6 +625,27 @@ def product_detail_view(request, pk: int):
             new_file = getattr(setup, field_name)
             return JsonResponse({"ok": True, "url": new_file.url if new_file else ""})
 
+        if action == "inline_replace_setup_stl":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            stl_file = request.FILES.get("stl_file")
+            if not stl_file:
+                return JsonResponse({"ok": False, "error": "Выберите STL файл."}, status=400)
+            fname = (stl_file.name or "").lower()
+            if not fname.endswith(".stl"):
+                return JsonResponse({"ok": False, "error": "Разрешены только STL файлы."}, status=400)
+            if setup.preview_stl:
+                try:
+                    setup.preview_stl.delete(save=False)
+                except Exception:
+                    pass
+            setup.preview_stl = stl_file
+            setup.save(update_fields=["preview_stl", "updated_at"])
+            return JsonResponse({"ok": True, "url": setup.preview_stl.url if setup.preview_stl else ""})
+
         if action == "inline_update_setup":
             setup_id_raw = (request.POST.get("setup_id") or "").strip()
             setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0

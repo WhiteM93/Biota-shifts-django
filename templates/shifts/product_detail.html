@@ -213,6 +213,10 @@
     <div id="product-detail-side-inner">
     {% if product.cad_model or product.preview_stl %}
     <div id="product-cad-block">
+    {% if biota_can_edit %}
+    <button type="button" class="btn btn-ghost cad-setup-stl-btn" id="cad-setup-stl-btn" hidden>Залить 3D</button>
+    <input type="file" id="cad-setup-stl-input" accept=".stl" hidden />
+    {% endif %}
     <div id="product-cad-viewport" class="product-cad-viewport"
       {% if preview_stl_url %}data-stl-url="{{ preview_stl_url }}"{% endif %}
       data-cad-ext="{{ cad_ext }}">
@@ -230,14 +234,18 @@
     {% if setups %}
     <div id="setup-cad-gallery" class="setup-cad-gallery">
       {% for setup in setups %}
-      {% if setup.preview_stl %}
       <div class="setup-cad-item" data-setup-cad-item="{{ setup.pk }}">
         <div class="muted setup-cad-title">{{ setup.name }}</div>
+        {% if setup.preview_stl %}
         <div class="setup-cad-mini-viewport" data-setup-stl-url="{{ setup.preview_stl.url }}">
           <p class="muted" style="padding:8px;margin:0;">Загрузка 3D…</p>
         </div>
+        {% else %}
+        <div class="setup-cad-mini-viewport setup-cad-mini-empty">
+          <p class="muted" style="padding:8px;margin:0;">3D не загружен</p>
+        </div>
+        {% endif %}
       </div>
-      {% endif %}
       {% endfor %}
     </div>
     {% endif %}
@@ -524,13 +532,13 @@
     word-break: break-word;
   }
   .setup-tools-view th.setup-tools-th-rot {
-    height: 72px;
+    height: auto;
     min-width: 34px;
-    padding: 0;
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    transform: rotate(180deg);
-    letter-spacing: 0.5px;
+    padding: 4px 6px;
+    writing-mode: horizontal-tb;
+    text-orientation: initial;
+    transform: none;
+    letter-spacing: normal;
   }
   .setup-tools-view td.setup-tool-override {
     border-color: #6f7ef2;
@@ -773,6 +781,22 @@
     overflow: hidden;
     position: relative;
   }
+  #product-cad-block {
+    position: relative;
+  }
+  .cad-setup-stl-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 6;
+    height: 28px;
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+  .cad-setup-stl-btn[hidden] {
+    display: none !important;
+  }
   .setup-cad-gallery {
     margin-top: 10px;
     display: grid;
@@ -802,6 +826,12 @@
     background: #d3d7de;
     overflow: hidden;
     position: relative;
+  }
+  .setup-cad-mini-viewport.setup-cad-mini-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(211, 215, 222, 0.5);
   }
   .product-downloads {
     display: flex;
@@ -1400,6 +1430,7 @@
       });
       setToolsEditMode(panel, inlineEditMode);
       editToggleBtn.textContent = inlineEditMode ? "Сохранить изменения" : "Быстрое редактирование";
+      window.dispatchEvent(new CustomEvent("setup-inline-edit-mode", { detail: { enabled: inlineEditMode } }));
     }
 
     function forceDisableInlineEdit() {
@@ -1428,6 +1459,7 @@
       root.querySelectorAll(".product-tab-panel").forEach(function (panel) {
         setToolsEditMode(panel, false);
       });
+      window.dispatchEvent(new CustomEvent("setup-inline-edit-mode", { detail: { enabled: false } }));
     }
 
     editToggleBtn.addEventListener("click", async function () {
@@ -2024,10 +2056,14 @@
   import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 
   const host = document.getElementById("product-cad-viewport");
+  const tabsRoot = document.getElementById("product-tabs");
   const saveBtn = document.getElementById("save-list-preview-btn");
   const saveMsg = document.getElementById("save-list-preview-msg");
+  const setupStlBtn = document.getElementById("cad-setup-stl-btn");
+  const setupStlInput = document.getElementById("cad-setup-stl-input");
   let stlUrl = host && host.dataset.stlUrl ? new URL(host.dataset.stlUrl, window.location.origin).href : "";
   const savePreviewUrl = "{% url 'product_save_list_preview' product.pk %}";
+  let inlineEditEnabled = false;
   let cadRenderer = null;
   let cadViewerStarted = false;
   let cadViewerState = null;
@@ -2334,6 +2370,70 @@
     }
     startCadViewerWhenVisible();
   };
+  function refreshSetupCadButton() {
+    if (!setupStlBtn || !tabsRoot) return;
+    var sideEl = document.getElementById("product-detail-side");
+    var activeTab = tabsRoot.querySelector(".product-tab.is-active");
+    var tabName = activeTab ? (activeTab.getAttribute("data-tab") || "") : "";
+    if (!tabName) {
+      var setupSelect = document.getElementById("setup-tab-select");
+      tabName = setupSelect ? (setupSelect.value || "") : "";
+    }
+    if (sideEl) sideEl.setAttribute("data-current-tab", tabName || "");
+    var isSetupTab = tabName.indexOf("setup-") === 0;
+    setupStlBtn.hidden = !(isSetupTab && inlineEditEnabled);
+    if (!(isSetupTab && inlineEditEnabled)) return;
+    var hasSetupStl = !!(activeTab && (activeTab.getAttribute("data-setup-stl-url") || "").trim());
+    setupStlBtn.textContent = hasSetupStl ? "Заменить 3D" : "Залить 3D";
+  }
+  window.addEventListener("setup-inline-edit-mode", function (ev) {
+    inlineEditEnabled = !!(ev && ev.detail && ev.detail.enabled);
+    refreshSetupCadButton();
+  });
+  document.addEventListener("click", function (ev) {
+    var btn = ev.target && ev.target.closest ? ev.target.closest(".product-tab, #setup-tab-select") : null;
+    if (btn) setTimeout(refreshSetupCadButton, 0);
+  });
+  if (setupStlBtn && setupStlInput) {
+    setupStlBtn.addEventListener("click", function () {
+      setupStlInput.click();
+    });
+    setupStlInput.addEventListener("change", async function () {
+      var f = setupStlInput.files && setupStlInput.files[0];
+      if (!f) return;
+      if (!/\.stl$/i.test(f.name || "")) {
+        alert("Можно загружать только STL.");
+        setupStlInput.value = "";
+        return;
+      }
+      var activeTab = tabsRoot ? tabsRoot.querySelector(".product-tab.is-active") : null;
+      if (!activeTab) return;
+      var tabId = activeTab.id || "";
+      var m = tabId.match(/tab-setup-(\d+)/);
+      if (!m) return;
+      var setupId = m[1];
+      var fd = new FormData();
+      fd.append("action", "inline_replace_setup_stl");
+      fd.append("setup_id", setupId);
+      fd.append("stl_file", f);
+      var resp = await fetch(window.location.href, {
+        method: "POST",
+        headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+        body: fd,
+        credentials: "same-origin",
+      });
+      var data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        alert(data.error || "Не удалось загрузить STL.");
+        setupStlInput.value = "";
+        return;
+      }
+      activeTab.setAttribute("data-setup-stl-url", data.url || "");
+      window.setProductCadSource(data.url || "");
+      refreshSetupCadButton();
+      setupStlInput.value = "";
+    });
+  }
   const side = document.getElementById("product-detail-side");
   if (!side || !side.hidden) {
     startCadViewerWhenVisible();
@@ -2342,6 +2442,7 @@
     const miniUrl = mini.getAttribute("data-setup-stl-url") || "";
     if (miniUrl) mountMiniStlViewer(mini, miniUrl);
   });
+  refreshSetupCadButton();
 
   function getCookie(name) {
     const m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));
