@@ -1,4 +1,5 @@
 """Карточки изделий."""
+import json
 import uuid
 import re
 
@@ -166,6 +167,7 @@ class ProductSetupForm(forms.ModelForm):
             "size",
             "setup_notes",
             "program_file",
+            "preview_stl",
         )
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Например, Установка 1"}),
@@ -185,6 +187,7 @@ class ProductSetupForm(forms.ModelForm):
                     "placeholder": "Заготовка, привязка, инструмент, нюансы.",
                 }
             ),
+            "preview_stl": forms.FileInput(attrs={"accept": ".stl"}),
         }
 
 
@@ -535,9 +538,136 @@ def product_name_suggestions_view(request):
 
 @biota_login_required
 @nav_permission_required("products")
-@require_http_methods(["GET"])
+@write_permission_required
+@require_http_methods(["GET", "POST"])
 def product_detail_view(request, pk: int):
     product = get_object_or_404(Product, pk=pk)
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "inline_update_setup_photo_caption":
+            photo_id_raw = (request.POST.get("photo_id") or "").strip()
+            photo_id = int(photo_id_raw) if photo_id_raw.isdigit() else 0
+            photo = ProductSetupPhoto.objects.filter(
+                pk=photo_id,
+                product=product,
+                setup__isnull=False,
+            ).first()
+            if not photo:
+                return JsonResponse({"ok": False, "error": "Фото не найдено."}, status=404)
+            photo.caption = (request.POST.get("caption") or "").strip()
+            photo.save(update_fields=["caption"])
+            return JsonResponse({"ok": True, "photo": {"id": photo.pk, "caption": photo.caption}})
+
+        if action == "inline_delete_setup_photo":
+            photo_id_raw = (request.POST.get("photo_id") or "").strip()
+            photo_id = int(photo_id_raw) if photo_id_raw.isdigit() else 0
+            photo = ProductSetupPhoto.objects.filter(
+                pk=photo_id,
+                product=product,
+                setup__isnull=False,
+            ).first()
+            if not photo:
+                return JsonResponse({"ok": False, "error": "Фото не найдено."}, status=404)
+            photo.delete()
+            return JsonResponse({"ok": True})
+
+        if action == "inline_create_setup_photo":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            image_file = request.FILES.get("image")
+            if not image_file:
+                return JsonResponse({"ok": False, "error": "Добавьте фото."}, status=400)
+            caption = (request.POST.get("caption") or "").strip()
+            nmax = setup.photos.aggregate(m=Max("sort_order"))["m"]
+            sort_order = (nmax if nmax is not None else -1) + 1
+            photo = ProductSetupPhoto.objects.create(
+                product=product,
+                setup=setup,
+                image=image_file,
+                caption=caption,
+                sort_order=sort_order,
+            )
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "photo": {
+                        "id": photo.pk,
+                        "image_url": photo.image.url,
+                        "caption": photo.caption,
+                    },
+                }
+            )
+
+        if action == "inline_update_setup":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            editable_fields = (
+                "binding_x",
+                "binding_y",
+                "binding_z",
+                "workpiece",
+                "material",
+                "size",
+                "setup_notes",
+            )
+            for field in editable_fields:
+                setattr(setup, field, (request.POST.get(field) or "").strip())
+            setup.save(update_fields=list(editable_fields) + ["updated_at"])
+            rows_json = (request.POST.get("rows_json") or "").strip()
+            if rows_json:
+                try:
+                    rows = json.loads(rows_json)
+                except Exception:
+                    return JsonResponse({"ok": False, "error": "Некорректные данные таблицы инструмента."}, status=400)
+                if not isinstance(rows, list):
+                    return JsonResponse({"ok": False, "error": "Некорректный формат таблицы инструмента."}, status=400)
+                ProductSetupToolRow.objects.filter(setup=setup).delete()
+                for idx, row in enumerate(rows):
+                    if not isinstance(row, dict):
+                        continue
+                    row_tool_number = str((row.get("tool_number") or "")).strip()
+                    row_kor_n = str((row.get("kor_n") or "")).strip()
+                    row_kor_d = str((row.get("kor_d") or "")).strip()
+                    row_tool_type = str((row.get("tool_type") or "")).strip()
+                    row_diameter = str((row.get("diameter") or "")).strip()
+                    row_overhang = str((row.get("overhang") or "")).strip()
+                    row_vals = (row_tool_number, row_kor_n, row_kor_d, row_tool_type, row_diameter, row_overhang)
+                    if all(v == "" for v in row_vals):
+                        continue
+                    ProductSetupToolRow.objects.create(
+                        setup=setup,
+                        sort_order=idx,
+                        tool_number=row_tool_number,
+                        kor_n=row_kor_n,
+                        kor_d=row_kor_d,
+                        tool_type=row_tool_type,
+                        diameter=row_diameter,
+                        overhang=row_overhang,
+                        tap_hole_type="",
+                        name="",
+                    )
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "setup": {
+                        "id": setup.pk,
+                        "binding_x": setup.binding_x or "—",
+                        "binding_y": setup.binding_y or "—",
+                        "binding_z": setup.binding_z or "—",
+                        "workpiece": setup.workpiece or "—",
+                        "material": setup.material or "—",
+                        "size": setup.size or "—",
+                        "setup_notes": (setup.setup_notes or "").strip(),
+                    },
+                }
+            )
+        return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
     setup_photos = list(product.setup_photos.filter(setup__isnull=True))
     setups = list(product.setups.prefetch_related("tools"))
     for setup in setups:
@@ -555,16 +685,7 @@ def product_detail_view(request, pk: int):
         preview_stl_url = product.cad_model.url
     cad_inline_preview = bool(preview_stl_url)
     program_text, program_too_large = _read_program_file_for_display(product.program_file)
-    if product.drawing_pdf:
-        tab_default = "drawing"
-    elif setups:
-        tab_default = setups[0].tab_slug
-    elif (product.setup_notes or "").strip() or setup_photos:
-        tab_default = "setup"
-    elif product.program_file:
-        tab_default = "program"
-    else:
-        tab_default = "drawing"
+    tab_default = "drawing"
     active_setup = None
     if tab_default.startswith("setup-"):
         for setup in setups:
@@ -589,6 +710,7 @@ def product_detail_view(request, pk: int):
             "program_too_large": program_too_large,
             "tab_default": tab_default,
             "active_setup": active_setup,
+            "tool_type_choices": SETUP_TOOL_TYPE_CHOICES,
             "username": biota_user(request),
         },
     )
@@ -725,6 +847,12 @@ def product_setup_edit_view(request, pk: int, setup_pk: int):
                     saved_setup.program_file.delete(save=False)
                 saved_setup.program_file = ""
                 saved_setup.save(update_fields=["program_file"])
+            remove_preview_stl = request.POST.get("remove_preview_stl") == "1"
+            if remove_preview_stl and not request.FILES.get("preview_stl"):
+                if saved_setup.preview_stl:
+                    saved_setup.preview_stl.delete(save=False)
+                saved_setup.preview_stl = ""
+                saved_setup.save(update_fields=["preview_stl"])
             for field_name in ("binding_x_photo", "binding_y_photo", "binding_z_photo", "workpiece_photo"):
                 remove_flag = request.POST.get(f"remove_{field_name}") == "1"
                 if remove_flag and not request.FILES.get(field_name):

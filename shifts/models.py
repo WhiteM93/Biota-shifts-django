@@ -355,6 +355,12 @@ class ProductSetup(models.Model):
         blank=True,
         verbose_name="Программа (G/M, любой файл)",
     )
+    preview_stl = models.FileField(
+        upload_to="products/setup_preview_stl/",
+        blank=True,
+        verbose_name="STL предпросмотра установки",
+        validators=[FileExtensionValidator(["stl"])],
+    )
     sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")

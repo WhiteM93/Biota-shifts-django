@@ -17,16 +17,23 @@
   <div class="product-tabs" id="product-tabs" {% if product.program_file %}data-product-program-url="{{ product.program_file.url }}" data-product-program-filename="{{ product.program_filename|escape }}"{% endif %}>
     <div class="product-tabs-nav" role="tablist" aria-label="Документация и наладка">
       <button type="button" class="product-tab{% if tab_default == 'drawing' %} is-active{% endif %}" role="tab" data-tab="drawing" id="tab-drawing" aria-controls="panel-drawing" aria-selected="{% if tab_default == 'drawing' %}true{% else %}false{% endif %}">Изделие</button>
-      {% for setup in setups %}
-      <button type="button" class="product-tab{% if tab_default == setup.tab_slug %} is-active{% endif %}" role="tab" data-tab="{{ setup.tab_slug }}" id="tab-setup-{{ setup.pk }}" aria-controls="panel-setup-{{ setup.pk }}" aria-selected="{% if tab_default == setup.tab_slug %}true{% else %}false{% endif %}" {% if setup.tool_pdf %}data-tool-pdf-url="{{ setup.tool_pdf.url }}"{% endif %} {% if setup.program_file %}data-program-url="{{ setup.program_file.url }}" data-program-filename="{{ setup.program_filename|escape }}"{% endif %} data-setup-name="{{ setup.name|escape }}" data-setup-edit-url="{% url 'product_setup_edit' product.pk setup.pk %}">Уст. {{ forloop.counter }}</button>
-      {% endfor %}
-      {% if not setups %}
-      <button type="button" class="product-tab{% if tab_default == 'setup' %} is-active{% endif %}" role="tab" data-tab="setup" id="tab-setup" aria-controls="panel-setup" aria-selected="{% if tab_default == 'setup' %}true{% else %}false{% endif %}">Наладка</button>
-      <button type="button" class="product-tab{% if tab_default == 'program' %} is-active{% endif %}" role="tab" data-tab="program" id="tab-program" aria-controls="panel-program" aria-selected="{% if tab_default == 'program' %}true{% else %}false{% endif %}">Программа</button>
+      {% if setups %}
+      <label class="field product-setup-select-wrap">
+        <select id="setup-tab-select">
+          <option value="drawing" {% if tab_default == 'drawing' %}selected{% endif %}>Изделие</option>
+          {% for setup in setups %}
+          <option value="{{ setup.tab_slug }}" {% if tab_default == setup.tab_slug %}selected{% endif %}>Уст. {{ forloop.counter }} — {{ setup.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
       {% endif %}
+      {% for setup in setups %}
+      <button type="button" class="product-tab{% if tab_default == setup.tab_slug %} is-active{% endif %}" role="tab" data-tab="{{ setup.tab_slug }}" id="tab-setup-{{ setup.pk }}" aria-controls="panel-setup-{{ setup.pk }}" aria-selected="{% if tab_default == setup.tab_slug %}true{% else %}false{% endif %}" {% if setup.program_file %}data-program-url="{{ setup.program_file.url }}" data-program-filename="{{ setup.program_filename|escape }}"{% endif %} {% if setup.preview_stl %}data-setup-stl-url="{{ setup.preview_stl.url }}"{% endif %} data-setup-name="{{ setup.name|escape }}" data-setup-edit-url="{% url 'product_setup_edit' product.pk setup.pk %}" hidden>Уст. {{ forloop.counter }}</button>
+      {% endfor %}
       {% if biota_can_edit and active_setup %}
       <span class="nav-spacer" style="flex:1 1 auto;"></span>
       <a class="btn product-btn-edit-mode" id="setup-edit-mode-btn" href="{% url 'product_setup_edit' product.pk active_setup.pk %}">Режим редактирования</a>
+      <button type="button" class="btn product-btn-edit-mode" id="setup-inline-edit-btn">Быстрое редактирование</button>
       {% endif %}
     </div>
     <div class="product-tab-panels">
@@ -49,7 +56,7 @@
               <div class="setup-spec-split">
                 <div class="setup-spec-col">
                   <div>
-                    <span class="muted">X:</span> {{ setup.binding_x|default:"—" }}
+                    <span class="muted">X:</span> <span data-field-text="binding_x">{{ setup.binding_x|default:"—" }}</span>
                     {% if setup.binding_x_photo %}
                     <a href="{{ setup.binding_x_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_x_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка X" aria-label="Фото привязки X">
                       📷
@@ -58,7 +65,7 @@
                     {% endif %}
                   </div>
                   <div>
-                    <span class="muted">Y:</span> {{ setup.binding_y|default:"—" }}
+                    <span class="muted">Y:</span> <span data-field-text="binding_y">{{ setup.binding_y|default:"—" }}</span>
                     {% if setup.binding_y_photo %}
                     <a href="{{ setup.binding_y_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_y_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка Y" aria-label="Фото привязки Y">
                       📷
@@ -67,7 +74,7 @@
                     {% endif %}
                   </div>
                   <div>
-                    <span class="muted">Z:</span> {{ setup.binding_z|default:"—" }}
+                    <span class="muted">Z:</span> <span data-field-text="binding_z">{{ setup.binding_z|default:"—" }}</span>
                     {% if setup.binding_z_photo %}
                     <a href="{{ setup.binding_z_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_z_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка Z" aria-label="Фото привязки Z">
                       📷
@@ -78,7 +85,7 @@
                 </div>
                 <div class="setup-spec-col">
                   <div>
-                    <span class="muted">Тип:</span> {{ setup.workpiece|default:"—" }}
+                    <span class="muted">Тип:</span> <span data-field-text="workpiece">{{ setup.workpiece|default:"—" }}</span>
                     {% if setup.workpiece_photo %}
                     <a href="{{ setup.workpiece_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.workpiece_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Заготовка" aria-label="Фото заготовки">
                       📷
@@ -86,16 +93,38 @@
                     </a>
                     {% endif %}
                   </div>
-                  <div><span class="muted">Материал:</span> {{ setup.material|default:"—" }}</div>
-                  <div><span class="muted">Размер:</span> {{ setup.size|default:"—" }}</div>
+                  <div><span class="muted">Материал:</span> <span data-field-text="material">{{ setup.material|default:"—" }}</span></div>
+                  <div><span class="muted">Размер:</span> <span data-field-text="size">{{ setup.size|default:"—" }}</span></div>
                 </div>
               </div>
             </div>
+            {% if biota_can_edit %}
+            <div class="setup-inline-toolbar-block" data-setup-toolbar="{{ setup.pk }}" hidden>
+              <div class="setup-inline-toolbar">
+                <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="bold" title="Жирный"><b>B</b></button>
+                <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="italic" title="Курсив"><i>I</i></button>
+                <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="underline" title="Подчеркнутый"><u>U</u></button>
+                <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="justifyLeft" title="По левому краю">L</button>
+                <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="justifyCenter" title="По центру">C</button>
+                <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="justifyRight" title="По правому краю">R</button>
+                <label class="muted setup-inline-toolbar-size">
+                  Размер
+                  <select class="js-notes-fontsize">
+                    <option value="2">10</option>
+                    <option value="3" selected>12</option>
+                    <option value="4">14</option>
+                    <option value="5">18</option>
+                    <option value="6">24</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            {% endif %}
             <div class="product-setup-notes-row">
               {% if setup.setup_notes %}
-              <div class="product-setup-notes muted">{{ setup.setup_notes }}</div>
+              <div class="product-setup-notes muted" data-field-text="setup_notes">{{ setup.setup_notes|safe }}</div>
               {% else %}
-              <div class="product-setup-notes muted">Наладка не заполнена.</div>
+              <div class="product-setup-notes muted" data-field-text="setup_notes">Наладка не заполнена.</div>
               {% endif %}
             </div>
           </div>
@@ -114,47 +143,41 @@
                 </thead>
                 <tbody>
                   {% for row in setup.tool_display_rows %}
-                  <tr>
-                    <td>{{ row.tool_number }}</td>
-                    <td class="{% if row.kor_n_override %}setup-tool-override{% endif %}">{{ row.kor_n }}</td>
-                    <td class="{% if row.kor_d_override %}setup-tool-override{% endif %}">{{ row.kor_d }}</td>
-                    <td>{% if row.tool_type == "Метчик" and row.tap_hole_type %}{{ row.tool_type }} ({{ row.tap_hole_type }}){% else %}{{ row.tool_type }}{% endif %}</td>
-                    <td>{{ row.diameter }}</td>
-                    <td>{{ row.overhang }}</td>
+                  <tr data-tool-row-index="{{ forloop.counter0 }}">
+                    <td data-tool-col="tool_number">{{ row.tool_number }}</td>
+                    <td data-tool-col="kor_n" class="{% if row.kor_n_override %}setup-tool-override{% endif %}">{{ row.kor_n }}</td>
+                    <td data-tool-col="kor_d" class="{% if row.kor_d_override %}setup-tool-override{% endif %}">{{ row.kor_d }}</td>
+                    <td data-tool-col="tool_type" data-tool-type-value="{{ row.tool_type|default:'' }}">{{ row.tool_type }}</td>
+                    <td data-tool-col="diameter">{{ row.diameter }}</td>
+                    <td data-tool-col="overhang">{{ row.overhang }}</td>
                   </tr>
                   {% endfor %}
                 </tbody>
               </table>
             </div>
-            {% if setup.tool_pdf %}
-            {% with tool_name=setup.tool_pdf.name|lower %}
-            {% if tool_name|slice:"-5:" == ".html" or tool_name|slice:"-4:" == ".htm" %}
-            <div class="product-pdf-frame setup-inline-pdf">
-              <iframe id="setup-tool-frame-{{ setup.pk }}" src="{{ setup.tool_pdf.url }}" title="HTML инструмента {{ setup.name }}" loading="lazy"></iframe>
-            </div>
-            {% else %}
-            <div class="product-pdf-frame setup-inline-pdf">
-              <iframe id="setup-tool-frame-{{ setup.pk }}" src="{{ setup.tool_pdf.url }}#toolbar=1" title="PDF инструмента {{ setup.name }}" loading="lazy"></iframe>
-            </div>
-            {% endif %}
-            <div class="setup-inline-actions">
-              <a href="{{ setup.tool_pdf.url }}" target="_blank" rel="noopener" class="btn btn-ghost">{% if tool_name|slice:"-5:" == ".html" or tool_name|slice:"-4:" == ".htm" %}Открыть HTML{% else %}Открыть файл{% endif %}</a>
-              <button type="button" class="btn btn-ghost js-print-setup-html" data-frame-id="setup-tool-frame-{{ setup.pk }}">Распечатать список инструментов</button>
-            </div>
-            {% endwith %}
-            {% endif %}
           </div>
         </div>
         {% if setup.photos.all %}
         <div class="product-setup-photos">
           {% for sp in setup.photos.all %}
-          <figure>
+          <figure class="setup-photo-figure" data-photo-id="{{ sp.id }}" data-setup-id="{{ setup.pk }}">
             <a href="{{ sp.image.url }}" class="setup-photo-open" data-photo-url="{{ sp.image.url }}" data-photo-caption="{% if sp.caption %}{{ sp.caption|escape }}{% else %}{{ setup.name }} — фото {{ forloop.counter }}{% endif %}">
               <img src="{{ sp.image.url }}" alt="{% if sp.caption %}{{ sp.caption }}{% else %}{{ setup.name }} — фото {{ forloop.counter }}{% endif %}" loading="lazy" />
             </a>
-            {% if sp.caption %}<figcaption class="muted">{{ sp.caption }}</figcaption>{% endif %}
+            <figcaption class="muted setup-photo-caption" data-caption-editable="1">{% if sp.caption %}{{ sp.caption }}{% endif %}</figcaption>
+            {% if biota_can_edit %}
+            <div class="setup-photo-inline-controls" hidden>
+              <button type="button" class="btn btn-ghost js-setup-photo-save-caption" title="Сохранить подпись">Сохранить</button>
+              <button type="button" class="btn btn-ghost js-setup-photo-delete" title="Удалить блок">×</button>
+            </div>
+            {% endif %}
           </figure>
           {% endfor %}
+        </div>
+        {% endif %}
+        {% if biota_can_edit %}
+        <div class="setup-photo-add-row" data-setup-photo-add-row="{{ setup.pk }}" hidden>
+          <button type="button" class="btn btn-ghost js-add-empty-photo-block" data-setup-id="{{ setup.pk }}">+ Блок фото</button>
         </div>
         {% endif %}
         {% if not setup.program_file %}
@@ -163,61 +186,11 @@
       </section>
       {% endfor %}
 
-      {% if not setups %}
-      <section class="product-tab-panel" id="panel-setup" data-panel="setup" role="tabpanel" aria-labelledby="tab-setup" {% if tab_default != 'setup' %}hidden{% endif %}>
-        {% if product.setup_notes %}
-        <div class="muted" style="white-space:pre-wrap; line-height:1.5;">{{ product.setup_notes }}</div>
-        {% else %}
-        <p class="muted" style="margin:0 0 10px 0;">Наладка (текст) не заполнена.</p>
-        {% endif %}
-        {% if setup_photos %}
-        <div class="product-setup-photos">
-          {% for sp in setup_photos %}
-          <figure>
-            <a href="{{ sp.image.url }}" class="setup-photo-open" data-photo-url="{{ sp.image.url }}" data-photo-caption="{% if sp.caption %}{{ sp.caption|escape }}{% else %}Наладка {{ forloop.counter }}{% endif %}">
-              <img src="{{ sp.image.url }}" alt="{% if sp.caption %}{{ sp.caption }}{% else %}Наладка {{ forloop.counter }}{% endif %}" loading="lazy" />
-            </a>
-            {% if sp.caption %}<figcaption class="muted">{{ sp.caption }}</figcaption>{% endif %}
-          </figure>
-          {% endfor %}
-        </div>
-        {% elif not product.setup_notes %}
-        <p class="muted">Можно добавить в <a href="{% url 'product_edit' product.pk %}">редактировании</a>.</p>
-        {% endif %}
-      </section>
-      <section class="product-tab-panel" id="panel-program" data-panel="program" role="tabpanel" aria-labelledby="tab-program" {% if tab_default != 'program' %}hidden{% endif %}>
-        {% if program_too_large %}
-        <p class="muted">Файл слишком велик для просмотра здесь — <a href="{{ product.program_file.url }}">скачать {{ product.program_filename }}</a> (справа тоже есть ссылка).</p>
-        {% elif program_text is not None %}
-        <div class="program-search-bar">
-          <input type="search" class="program-search-input" placeholder="Поиск по программе..." data-program-target="program-pre-main" />
-          <button type="button" class="btn btn-ghost program-search-nav" data-program-target="program-pre-main" data-nav="-1" title="Предыдущее совпадение">↑</button>
-          <button type="button" class="btn btn-ghost program-search-nav" data-program-target="program-pre-main" data-nav="1" title="Следующее совпадение">↓</button>
-          <button type="button" class="btn btn-ghost program-tool-nav" data-program-target="program-pre-main" data-tool-nav="-1">Предыдущий инструмент</button>
-          <button type="button" class="btn btn-ghost program-tool-nav" data-program-target="program-pre-main" data-tool-nav="1">Следующий инструмент</button>
-          <button type="button" class="btn btn-ghost program-search-clear" data-program-target="program-pre-main">Очистить</button>
-          <span class="muted program-search-count" data-program-target="program-pre-main">Совпадений: 0</span>
-        </div>
-        <pre id="program-pre-main" class="program-gcode-pre" spellcheck="false">{{ program_text|escape }}</pre>
-        {% else %}
-        <p class="muted">Программа не загружена. <a href="{% url 'product_edit' product.pk %}">Редактирование</a></p>
-        {% endif %}
-      </section>
-      {% endif %}
     </div>
   </div>
   </div>
 
-  <aside class="product-detail-side" id="product-detail-side">
-    <button
-      type="button"
-      class="btn btn-ghost product-side-toggle"
-      id="product-side-toggle"
-      aria-label="Свернуть/развернуть правую панель"
-      title="Свернуть/развернуть правую панель"
-    >
-      <span class="product-side-toggle-arrow" id="product-side-toggle-arrow" aria-hidden="true">«</span>
-    </button>
+  <div class="product-detail-side" id="product-detail-side">
     <div id="product-detail-side-inner">
     {% if product.cad_model or product.preview_stl %}
     <div id="product-cad-block">
@@ -258,7 +231,7 @@
       <a href="#" download class="btn product-btn-program" id="product-program-download" hidden>Скачать программу</a>
     </div>
     </div>
-  </aside>
+  </div>
 </div>
 <div id="setup-photo-modal" class="setup-photo-modal" hidden>
   <div class="setup-photo-modal-backdrop" data-close-photo-modal="1"></div>
@@ -308,6 +281,31 @@
     text-align: center;
     width: 100%;
   }
+  .setup-photo-inline-controls {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    justify-content: center;
+  }
+  .setup-photo-inline-controls .btn {
+    height: 26px;
+    min-height: 26px;
+    padding: 2px 8px;
+  }
+  .setup-photo-caption.is-inline-edit {
+    border: 1px dashed #6f7ef2;
+    border-radius: 6px;
+    padding: 2px 6px;
+    background: rgba(111, 126, 242, 0.12);
+    min-height: 18px;
+    outline: none;
+  }
+  .setup-photo-add-row {
+    margin-top: 10px;
+  }
+  .setup-photo-draft {
+    border: 1px dashed #4a5f87;
+  }
   .product-btn-secondary { background: #2a3656; }
   .product-btn-edit-mode {
     background: linear-gradient(180deg, #ef6a6a 0%, #cf4242 100%);
@@ -324,6 +322,10 @@
     gap: 8px;
     margin-bottom: 12px;
     align-items: center;
+  }
+  .product-setup-select-wrap {
+    margin: 0;
+    min-width: 220px;
   }
   .product-tab {
     background: #151b28;
@@ -467,6 +469,17 @@
   .setup-tools-view {
     min-width: 0;
   }
+  .setup-tools-view td.is-inline-edit {
+    border: 1px dashed #6f7ef2;
+    background: rgba(111, 126, 242, 0.12);
+    border-radius: 6px;
+    outline: none;
+  }
+  .setup-tools-view select.js-inline-tool-type {
+    width: 100%;
+    font-size: 12px;
+    min-height: 24px;
+  }
   .product-setup-content-grid {
     display: grid;
     /* Левый блок сжимается раньше правого, чтобы таблица справа не вызывала горизонтальный скролл. */
@@ -488,7 +501,7 @@
   .product-setup-left-col {
     min-width: 0;
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
     gap: 12px;
     align-content: stretch;
     min-height: 0;
@@ -599,33 +612,64 @@
   .product-detail-side {
     min-width: 0;
     width: 100%;
+    background: rgba(20, 28, 44, 0.92);
+    backdrop-filter: blur(6px);
+    border: 1px solid #2a3651;
+    border-radius: 12px;
+    padding: 8px;
+    margin-top: 52px;
   }
-  .product-side-toggle {
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    position: sticky;
-    top: 12px;
-    z-index: 5;
+  [data-field-text].is-inline-edit {
+    display: inline-block;
+    min-width: 28px;
+    padding: 1px 6px;
+    border: 1px dashed #6f7ef2;
+    border-radius: 6px;
+    background: rgba(111, 126, 242, 0.12);
+    outline: none;
+  }
+  .product-setup-notes.is-inline-edit {
+    border-style: solid;
+    min-height: 220px;
+    cursor: text;
+  }
+  .setup-inline-toolbar-block {
+    margin: 8px 0 0 0;
+    padding: 4px 6px;
+    border: 1px solid #33415f;
+    border-radius: 8px;
+    background: rgba(14, 19, 30, 0.55);
     align-self: start;
   }
-  .product-side-toggle-arrow {
-    font-size: 18px;
+  .setup-inline-toolbar {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: nowrap;
+    margin: 8px 0 0 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    padding-bottom: 2px;
+    margin: 0;
+  }
+  .setup-inline-toolbar .btn {
+    min-width: 28px;
+    height: 28px;
+    padding: 2px 7px;
     line-height: 1;
-    transition: transform 0.18s ease;
+    flex: 0 0 auto;
+  }
+  .setup-inline-toolbar select { height: 28px; }
+  .setup-inline-toolbar-size {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
   }
   #product-detail-side-inner {
     width: 100%;
-  }
-  .product-detail-grid.is-side-collapsed #product-detail-side-inner {
-    display: none;
-  }
-  .product-detail-grid.is-side-collapsed {
-    grid-template-columns: minmax(0, 1fr) 44px;
   }
   .product-detail-grid.is-drawing-only {
     grid-template-columns: minmax(0, 1fr);
@@ -720,6 +764,9 @@
   @media (max-width: 960px) {
     .product-detail-grid {
       grid-template-columns: 1fr;
+    }
+    .product-detail-side {
+      margin-top: 0;
     }
     .product-pdf-frame { height: 55vh; }
     .product-detail-side,
@@ -935,11 +982,11 @@
       document.body.style.overflow = "hidden";
     }
 
-    document.querySelectorAll(".setup-photo-open").forEach(function (a) {
-      a.addEventListener("click", function (e) {
-        e.preventDefault();
-        openModal(a.getAttribute("data-photo-url"), a.getAttribute("data-photo-caption"));
-      });
+    document.addEventListener("click", function (e) {
+      var a = e.target && e.target.closest ? e.target.closest(".setup-photo-open") : null;
+      if (!a) return;
+      e.preventDefault();
+      openModal(a.getAttribute("data-photo-url"), a.getAttribute("data-photo-caption"));
     });
 
     modal.addEventListener("click", function (e) {
@@ -1005,7 +1052,7 @@
     }
 
     function setSideBlocksByTab(tabName) {
-      var hideForDrawing = tabName === "drawing";
+      var hideForDrawing = false;
       var side = document.getElementById("product-detail-side");
       var grid = document.querySelector(".product-detail-grid");
       var savePreviewBlock = document.getElementById("product-save-preview-block");
@@ -1016,6 +1063,12 @@
       if (downloadsBlock) downloadsBlock.hidden = hideForDrawing;
       if (!hideForDrawing && typeof window.startProductCadViewer === "function") {
         window.startProductCadViewer();
+      }
+      if (!hideForDrawing && typeof window.setProductCadSource === "function") {
+        var tabBtn = root.querySelector('.product-tab[data-tab="' + tabName + '"]');
+        var setupStlUrl = tabBtn ? (tabBtn.getAttribute("data-setup-stl-url") || "") : "";
+        var drawingStlUrl = "{{ preview_stl_url|default:'' }}";
+        window.setProductCadSource(setupStlUrl || drawingStlUrl);
       }
     }
 
@@ -1028,17 +1081,6 @@
         block.classList.toggle("is-collapsed");
         var isCollapsed = block.classList.contains("is-collapsed");
         toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
-      });
-    }
-
-    function initProductSideCollapse() {
-      var grid = document.querySelector(".product-detail-grid");
-      var toggle = document.getElementById("product-side-toggle");
-      var arrow = document.getElementById("product-side-toggle-arrow");
-      if (!grid || !toggle) return;
-      toggle.addEventListener("click", function () {
-        var collapsed = grid.classList.toggle("is-side-collapsed");
-        if (arrow) arrow.textContent = collapsed ? "»" : "«";
       });
     }
 
@@ -1058,6 +1100,8 @@
       setProgramDownloadByTab(tabName);
       setEditModeByTab(tabName);
       setSideBlocksByTab(tabName);
+      var setupSelect = document.getElementById("setup-tab-select");
+      if (setupSelect) setupSelect.value = tabName;
     }
     tabButtons.forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -1067,19 +1111,447 @@
     });
 
     initProductDownloadsCollapse();
-    initProductSideCollapse();
+    var setupSelect = document.getElementById("setup-tab-select");
+    if (setupSelect) {
+      setupSelect.addEventListener("change", function () {
+        var tab = setupSelect.value || "";
+        if (tab) activate(tab);
+      });
+    }
     var activeBtn = root.querySelector(".product-tab.is-active");
     if (activeBtn) {
       var activeName = activeBtn.getAttribute("data-tab") || "";
       setProgramDownloadByTab(activeName);
       setEditModeByTab(activeName);
       setSideBlocksByTab(activeName);
+      if (setupSelect && activeName !== "drawing") setupSelect.value = activeName;
     } else if (tabButtons.length) {
       var firstName = tabButtons[0].getAttribute("data-tab") || "";
       setProgramDownloadByTab(firstName);
       setEditModeByTab(firstName);
       setSideBlocksByTab(firstName);
+      if (setupSelect && firstName !== "drawing") setupSelect.value = firstName;
     }
+  })();
+  (function () {
+    var editToggleBtn = document.getElementById("setup-inline-edit-btn");
+    var root = document.getElementById("product-tabs");
+    if (!editToggleBtn || !root) return;
+    var inlineEditMode = false;
+    var notesSelection = null;
+    var TOOL_TYPE_OPTIONS = [
+      {% for v, lbl in tool_type_choices %}
+      { value: "{{ v|escapejs }}", label: "{{ lbl|escapejs }}" },
+      {% endfor %}
+    ];
+
+    function getCookie(name) {
+      var m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));
+      return m ? decodeURIComponent(m[2]) : "";
+    }
+
+    function activeSetupPanel() {
+      var activeTab = root.querySelector(".product-tab.is-active");
+      if (!activeTab) return null;
+      var tabName = activeTab.getAttribute("data-tab") || "";
+      if (!tabName || tabName === "drawing") return null;
+      return root.querySelector('.product-tab-panel[data-panel="' + tabName + '"]');
+    }
+
+    function setToolsEditMode(panel, enabled) {
+      panel.querySelectorAll(".setup-tools-view tbody tr").forEach(function (row) {
+        row.querySelectorAll("td[data-tool-col]").forEach(function (cell) {
+          var col = cell.getAttribute("data-tool-col") || "";
+          if (col === "tool_number") {
+            cell.classList.remove("is-inline-edit");
+            cell.removeAttribute("contenteditable");
+            return;
+          }
+          if (col === "tool_type") {
+            if (enabled) {
+              var cur = cell.getAttribute("data-tool-type-value") || (cell.textContent || "").trim();
+              cell.innerHTML = "";
+              var sel = document.createElement("select");
+              sel.className = "js-inline-tool-type";
+              TOOL_TYPE_OPTIONS.forEach(function (optDef) {
+                var opt = document.createElement("option");
+                opt.value = optDef.value;
+                opt.textContent = optDef.label;
+                if (optDef.value === cur) opt.selected = true;
+                sel.appendChild(opt);
+              });
+              cell.appendChild(sel);
+              cell.classList.add("is-inline-edit");
+            } else {
+              var selectEl = cell.querySelector("select.js-inline-tool-type");
+              if (selectEl) {
+                var val = selectEl.value || "";
+                cell.setAttribute("data-tool-type-value", val);
+                cell.textContent = val;
+              }
+              cell.classList.remove("is-inline-edit");
+            }
+            return;
+          }
+          if (enabled) {
+            cell.classList.add("is-inline-edit");
+            cell.setAttribute("contenteditable", "true");
+            cell.setAttribute("spellcheck", "false");
+            if (col === "kor_n" || col === "kor_d") {
+              var raw = (cell.textContent || "").toUpperCase().trim();
+              var digits = raw.replace(/[^0-9]/g, "");
+              cell.textContent = digits;
+            }
+          } else {
+            if (col === "kor_n" || col === "kor_d") {
+              var digitsOut = (cell.textContent || "").replace(/[^0-9]/g, "");
+              if (digitsOut) {
+                var prefix = col === "kor_n" ? "H" : "D";
+                cell.textContent = prefix + digitsOut;
+              } else {
+                cell.textContent = "";
+              }
+            }
+            cell.classList.remove("is-inline-edit");
+            cell.removeAttribute("contenteditable");
+          }
+        });
+      });
+    }
+
+    function collectToolsRows(panel) {
+      var rows = [];
+      panel.querySelectorAll(".setup-tools-view tbody tr").forEach(function (row) {
+        var getCellValue = function (colName) {
+          var cell = row.querySelector('td[data-tool-col="' + colName + '"]');
+          if (!cell) return "";
+          if (colName === "tool_type") {
+            var sel = cell.querySelector("select.js-inline-tool-type");
+            return (sel ? sel.value : (cell.getAttribute("data-tool-type-value") || cell.textContent || "")).trim();
+          }
+          if (colName === "kor_n" || colName === "kor_d") {
+            var digits = (cell.textContent || "").replace(/[^0-9]/g, "");
+            if (!digits) return "";
+            return (colName === "kor_n" ? "H" : "D") + digits;
+          }
+          return (cell.textContent || "").trim();
+        };
+        rows.push({
+          tool_number: getCellValue("tool_number"),
+          kor_n: getCellValue("kor_n"),
+          kor_d: getCellValue("kor_d"),
+          tool_type: getCellValue("tool_type"),
+          diameter: getCellValue("diameter"),
+          overhang: getCellValue("overhang"),
+        });
+      });
+      return rows;
+    }
+
+    function toggleInlineEdit() {
+      var panel = activeSetupPanel();
+      if (!panel) return;
+      inlineEditMode = !inlineEditMode;
+      var toolbar = panel.querySelector(".setup-inline-toolbar-block");
+      if (toolbar) {
+        if (inlineEditMode) toolbar.removeAttribute("hidden");
+        else toolbar.setAttribute("hidden", "hidden");
+      }
+      panel.querySelectorAll("[data-field-text]").forEach(function (node) {
+        var field = node.getAttribute("data-field-text");
+        if (!field) return;
+        if (inlineEditMode) {
+          node.classList.add("is-inline-edit");
+          node.setAttribute("contenteditable", "true");
+          node.setAttribute("spellcheck", field === "setup_notes" ? "true" : "false");
+        } else {
+          node.classList.remove("is-inline-edit");
+          node.removeAttribute("contenteditable");
+        }
+      });
+      panel.querySelectorAll(".setup-photo-inline-controls").forEach(function (row) {
+        if (inlineEditMode) row.removeAttribute("hidden");
+        else row.setAttribute("hidden", "hidden");
+      });
+      panel.querySelectorAll(".setup-photo-caption").forEach(function (cap) {
+        if (inlineEditMode) {
+          cap.classList.add("is-inline-edit");
+          cap.setAttribute("contenteditable", "true");
+          cap.setAttribute("spellcheck", "true");
+        } else {
+          cap.classList.remove("is-inline-edit");
+          cap.removeAttribute("contenteditable");
+        }
+      });
+      panel.querySelectorAll(".setup-photo-add-row").forEach(function (row) {
+        if (inlineEditMode) row.removeAttribute("hidden");
+        else row.setAttribute("hidden", "hidden");
+      });
+      setToolsEditMode(panel, inlineEditMode);
+      editToggleBtn.textContent = inlineEditMode ? "Сохранить изменения" : "Быстрое редактирование";
+    }
+
+    function forceDisableInlineEdit() {
+      inlineEditMode = false;
+      editToggleBtn.textContent = "Быстрое редактирование";
+      root.querySelectorAll(".setup-inline-toolbar-block").forEach(function (toolbar) {
+        toolbar.setAttribute("hidden", "hidden");
+      });
+      root.querySelectorAll("[data-field-text]").forEach(function (node) {
+        node.classList.remove("is-inline-edit");
+        node.removeAttribute("contenteditable");
+      });
+      root.querySelectorAll(".setup-photo-inline-controls").forEach(function (row) {
+        row.setAttribute("hidden", "hidden");
+      });
+      root.querySelectorAll(".setup-photo-add-row").forEach(function (row) {
+        row.setAttribute("hidden", "hidden");
+      });
+      root.querySelectorAll(".setup-photo-caption").forEach(function (cap) {
+        cap.classList.remove("is-inline-edit");
+        cap.removeAttribute("contenteditable");
+      });
+      root.querySelectorAll(".product-tab-panel").forEach(function (panel) {
+        setToolsEditMode(panel, false);
+      });
+    }
+
+    editToggleBtn.addEventListener("click", async function () {
+      if (!inlineEditMode) {
+        toggleInlineEdit();
+        return;
+      }
+      var panel = activeSetupPanel();
+      if (!panel) return;
+      var setupTab = root.querySelector('.product-tab.is-active[data-setup-edit-url]');
+      if (!setupTab) return;
+      var setupIdMatch = (setupTab.id || "").match(/tab-setup-(\d+)/);
+      if (!setupIdMatch) return;
+
+      var payload = new FormData();
+      payload.append("action", "inline_update_setup");
+      payload.append("setup_id", setupIdMatch[1]);
+      ["binding_x", "binding_y", "binding_z", "workpiece", "material", "size"].forEach(function (name) {
+        var el = panel.querySelector('[data-field-text="' + name + '"]');
+        var txt = el ? (el.textContent || "").trim() : "";
+        payload.append(name, txt === "—" ? "" : txt);
+      });
+      var notesEl = panel.querySelector('[data-field-text="setup_notes"]');
+      var notesText = notesEl ? (notesEl.innerHTML || "").trim() : "";
+      payload.append("setup_notes", notesText === "Наладка не заполнена." ? "" : notesText);
+      payload.append("rows_json", JSON.stringify(collectToolsRows(panel)));
+
+      var res = await fetch(window.location.href, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": getCookie("csrftoken"),
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: payload,
+        credentials: "same-origin",
+      });
+      var data = await res.json();
+      if (!res.ok || !data.ok) {
+        alert(data.error || "Не удалось сохранить.");
+        return;
+      }
+      panel.querySelectorAll("[data-field-text]").forEach(function (node) {
+        var k = node.getAttribute("data-field-text");
+        if (!k || !Object.prototype.hasOwnProperty.call(data.setup, k)) return;
+        var val = data.setup[k];
+        if (k === "setup_notes") {
+          node.innerHTML = val ? val : "Наладка не заполнена.";
+        } else {
+          node.textContent = val || "—";
+        }
+      });
+      toggleInlineEdit();
+    });
+
+    root.addEventListener("click", function (e) {
+      var el = e.target;
+      if (!el) return;
+      if (!inlineEditMode) return;
+      if (el.closest(".product-tab") || el.closest("#setup-tab-select")) {
+        forceDisableInlineEdit();
+      }
+    });
+
+    root.addEventListener("mouseup", function () {
+      var panel = activeSetupPanel();
+      if (!panel || !inlineEditMode) return;
+      var notesEl = panel.querySelector('[data-field-text="setup_notes"]');
+      if (!notesEl) return;
+      var sel = window.getSelection();
+      if (sel && sel.rangeCount && notesEl.contains(sel.anchorNode)) {
+        notesSelection = sel.getRangeAt(0).cloneRange();
+      }
+    });
+
+    root.querySelectorAll(".setup-inline-toolbar-block").forEach(function (tb) {
+      tb.querySelectorAll(".js-notes-cmd").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var panel = btn.closest(".product-tab-panel");
+          if (!panel) return;
+          var notesEl = panel.querySelector('[data-field-text="setup_notes"]');
+          if (!notesEl) return;
+          notesEl.focus();
+          if (notesSelection) {
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(notesSelection);
+          }
+          document.execCommand(btn.getAttribute("data-cmd"), false, null);
+        });
+      });
+      var fontSel = tb.querySelector(".js-notes-fontsize");
+      if (fontSel) {
+        fontSel.addEventListener("change", function () {
+          var panel = fontSel.closest(".product-tab-panel");
+          if (!panel) return;
+          var notesEl = panel.querySelector('[data-field-text="setup_notes"]');
+          if (!notesEl) return;
+          notesEl.focus();
+          if (notesSelection) {
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(notesSelection);
+          }
+          document.execCommand("fontSize", false, fontSel.value);
+        });
+      }
+    });
+
+    root.addEventListener("click", async function (e) {
+      var btnSaveCaption = e.target.closest(".js-setup-photo-save-caption");
+      if (btnSaveCaption) {
+        var figure = btnSaveCaption.closest(".setup-photo-figure");
+        if (!figure) return;
+        var photoId = figure.getAttribute("data-photo-id") || "";
+        if (!photoId) return;
+        var captionEl = figure.querySelector(".setup-photo-caption");
+        var caption = captionEl ? (captionEl.textContent || "").trim() : "";
+        var fd = new FormData();
+        fd.append("action", "inline_update_setup_photo_caption");
+        fd.append("photo_id", photoId);
+        fd.append("caption", caption);
+        var resCap = await fetch(window.location.href, {
+          method: "POST",
+          headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+          body: fd,
+          credentials: "same-origin",
+        });
+        var dataCap = await resCap.json();
+        if (!resCap.ok || !dataCap.ok) {
+          alert(dataCap.error || "Не удалось сохранить подпись.");
+        }
+        return;
+      }
+
+      var btnDelete = e.target.closest(".js-setup-photo-delete");
+      if (btnDelete) {
+        var figureDel = btnDelete.closest(".setup-photo-figure");
+        if (!figureDel) return;
+        var photoIdDel = figureDel.getAttribute("data-photo-id") || "";
+        if (!photoIdDel) {
+          figureDel.remove();
+          return;
+        }
+        if (!confirm("Удалить блок фото?")) return;
+        var fdDel = new FormData();
+        fdDel.append("action", "inline_delete_setup_photo");
+        fdDel.append("photo_id", photoIdDel);
+        var resDel = await fetch(window.location.href, {
+          method: "POST",
+          headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+          body: fdDel,
+          credentials: "same-origin",
+        });
+        var dataDel = await resDel.json();
+        if (!resDel.ok || !dataDel.ok) {
+          alert(dataDel.error || "Не удалось удалить.");
+          return;
+        }
+        figureDel.remove();
+        return;
+      }
+
+      var btnAdd = e.target.closest(".js-add-empty-photo-block");
+      if (btnAdd) {
+        var setupId = btnAdd.getAttribute("data-setup-id") || "";
+        if (!setupId) return;
+        var panel = btnAdd.closest(".product-tab-panel");
+        if (!panel) return;
+        var photosWrap = panel.querySelector(".product-setup-photos");
+        if (!photosWrap) {
+          photosWrap = document.createElement("div");
+          photosWrap.className = "product-setup-photos";
+          btnAdd.closest(".setup-photo-add-row").before(photosWrap);
+        }
+        var draft = document.createElement("figure");
+        draft.className = "setup-photo-figure setup-photo-draft";
+        draft.innerHTML = '' +
+          '<div class="muted" style="width:100%;text-align:center;padding:8px 6px;border:1px dashed #2f3b57;border-radius:8px;">Новый блок</div>' +
+          '<input type="file" class="js-new-photo-file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" />' +
+          '<figcaption class="muted"><input type="text" class="js-new-photo-caption" placeholder="Описание" style="width:100%;"/></figcaption>' +
+          '<div class="setup-photo-inline-controls">' +
+            '<button type="button" class="btn btn-ghost js-save-new-photo">Сохранить</button>' +
+            '<button type="button" class="btn btn-ghost js-setup-photo-delete">×</button>' +
+          '</div>';
+        photosWrap.appendChild(draft);
+        return;
+      }
+
+      var btnSaveNew = e.target.closest(".js-save-new-photo");
+      if (btnSaveNew) {
+        var draftFig = btnSaveNew.closest(".setup-photo-figure");
+        if (!draftFig) return;
+        var panelDraft = btnSaveNew.closest(".product-tab-panel");
+        if (!panelDraft) return;
+        var activeTab = root.querySelector(".product-tab.is-active");
+        if (!activeTab) return;
+        var tabId = activeTab.id || "";
+        var m = tabId.match(/tab-setup-(\d+)/);
+        if (!m) return;
+        var setupIdDraft = m[1];
+        var fileInput = draftFig.querySelector(".js-new-photo-file");
+        var captionInput = draftFig.querySelector(".js-new-photo-caption");
+        var fileObj = fileInput && fileInput.files ? fileInput.files[0] : null;
+        if (!fileObj) {
+          alert("Выберите фото для нового блока.");
+          return;
+        }
+        var fdNew = new FormData();
+        fdNew.append("action", "inline_create_setup_photo");
+        fdNew.append("setup_id", setupIdDraft);
+        fdNew.append("caption", captionInput ? (captionInput.value || "") : "");
+        fdNew.append("image", fileObj);
+        var resNew = await fetch(window.location.href, {
+          method: "POST",
+          headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+          body: fdNew,
+          credentials: "same-origin",
+        });
+        var dataNew = await resNew.json();
+        if (!resNew.ok || !dataNew.ok) {
+          alert(dataNew.error || "Не удалось добавить блок фото.");
+          return;
+        }
+        var ph = dataNew.photo;
+        draftFig.className = "setup-photo-figure";
+        draftFig.setAttribute("data-photo-id", String(ph.id));
+        draftFig.setAttribute("data-setup-id", String(setupIdDraft));
+        draftFig.innerHTML = '' +
+          '<a href="' + ph.image_url + '" class="setup-photo-open" data-photo-url="' + ph.image_url + '" data-photo-caption="' + (ph.caption || "") + '">' +
+            '<img src="' + ph.image_url + '" alt="' + (ph.caption || "") + '" loading="lazy" />' +
+          '</a>' +
+          '<figcaption class="muted setup-photo-caption is-inline-edit" data-caption-editable="1" contenteditable="true" spellcheck="true">' + (ph.caption || "") + '</figcaption>' +
+          '<div class="setup-photo-inline-controls">' +
+            '<button type="button" class="btn btn-ghost js-setup-photo-save-caption" title="Сохранить подпись">Сохранить</button>' +
+            '<button type="button" class="btn btn-ghost js-setup-photo-delete" title="Удалить блок">×</button>' +
+          '</div>';
+      }
+    });
   })();
   (function () {
     var MAX_GCODE_HIGHLIGHT_CHARS = 120000;
@@ -1368,10 +1840,12 @@
   const host = document.getElementById("product-cad-viewport");
   const saveBtn = document.getElementById("save-list-preview-btn");
   const saveMsg = document.getElementById("save-list-preview-msg");
-  const stlUrl = host && host.dataset.stlUrl ? new URL(host.dataset.stlUrl, window.location.origin).href : "";
+  let stlUrl = host && host.dataset.stlUrl ? new URL(host.dataset.stlUrl, window.location.origin).href : "";
   const savePreviewUrl = "{% url 'product_save_list_preview' product.pk %}";
   let cadRenderer = null;
   let cadViewerStarted = false;
+  let cadViewerState = null;
+  let cadLoadToken = 0;
 
   function clearCadLoading() {
     if (!host) return;
@@ -1387,6 +1861,40 @@
     p.style.padding = "12px";
     p.textContent = text;
     host.appendChild(p);
+  }
+
+  function disposeCadViewer() {
+    if (!cadViewerState) return;
+    try {
+      if (cadViewerState.rafId) cancelAnimationFrame(cadViewerState.rafId);
+    } catch (e) {}
+    try {
+      if (cadViewerState.onResize) window.removeEventListener("resize", cadViewerState.onResize);
+    } catch (e) {}
+    try {
+      if (cadViewerState.controls) cadViewerState.controls.dispose();
+    } catch (e) {}
+    try {
+      if (cadViewerState.lineMaterial) cadViewerState.lineMaterial.dispose();
+    } catch (e) {}
+    try {
+      if (cadViewerState.root) {
+        cadViewerState.root.traverse((obj) => {
+          if (obj && obj.geometry && typeof obj.geometry.dispose === "function") obj.geometry.dispose();
+          if (obj && obj.material) {
+            if (Array.isArray(obj.material)) {
+              obj.material.forEach((m) => m && m.dispose && m.dispose());
+            } else if (typeof obj.material.dispose === "function") {
+              obj.material.dispose();
+            }
+          }
+        });
+      }
+    } catch (e) {}
+    try {
+      if (cadViewerState.renderer) cadViewerState.renderer.dispose();
+    } catch (e) {}
+    cadViewerState = null;
   }
 
   let _layoutTries = 0;
@@ -1462,15 +1970,30 @@
     window.addEventListener("resize", onResize);
 
     function tick() {
-      requestAnimationFrame(tick);
+      const rafId = requestAnimationFrame(tick);
+      if (cadViewerState) cadViewerState.rafId = rafId;
       controls.update();
       renderer.render(scene, camera);
     }
+    const myToken = ++cadLoadToken;
+    cadViewerState = {
+      renderer: renderer,
+      controls: controls,
+      onResize: onResize,
+      lineMaterial: null,
+      root: null,
+      rafId: null,
+      loadToken: myToken,
+    };
     tick();
 
     new STLLoader().load(
       stlUrl,
       function (geometry) {
+        if (!cadViewerState || cadViewerState.loadToken !== myToken) {
+          try { geometry.dispose(); } catch (e) {}
+          return;
+        }
         clearCadLoading();
         geometry.computeBoundingSphere();
         geometry.center();
@@ -1507,10 +2030,15 @@
         root.add(mesh);
         root.add(thickEdges);
         scene.add(root);
+        if (cadViewerState && cadViewerState.loadToken === myToken) {
+          cadViewerState.lineMaterial = edgeLineMaterial;
+          cadViewerState.root = root;
+        }
         fitCameraToObject(camera, controls, root);
       },
       undefined,
       function () {
+        if (!cadViewerState || cadViewerState.loadToken !== myToken) return;
         showCadError("Не удалось загрузить STL для предпросмотра. Скачайте файл по ссылке ниже.");
       }
     );
@@ -1527,6 +2055,19 @@
     }
   }
   window.startProductCadViewer = startCadViewerWhenVisible;
+  window.setProductCadSource = function (nextUrl) {
+    if (!host) return;
+    stlUrl = nextUrl ? new URL(nextUrl, window.location.origin).href : "";
+    host.dataset.stlUrl = stlUrl;
+    disposeCadViewer();
+    host.innerHTML = '<p class="muted product-cad-loading" style="padding:12px;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;background:rgba(211,215,222,0.78);z-index:1;">Загрузка предпросмотра…</p>';
+    cadViewerStarted = false;
+    if (cadRenderer) {
+      try { cadRenderer.dispose(); } catch (e) {}
+      cadRenderer = null;
+    }
+    startCadViewerWhenVisible();
+  };
   const side = document.getElementById("product-detail-side");
   if (!side || !side.hidden) {
     startCadViewerWhenVisible();

@@ -198,6 +198,32 @@
       <input type="file" name="program_file" id="id_program_file" style="display:none;" />
       {% if form.program_file.errors %}<span class="muted">{{ form.program_file.errors }}</span>{% endif %}
     </label>
+    <label class="field" style="grid-column:1/-1;">
+      <span>STL предпросмотра установки</span>
+      {% if is_edit and setup and setup.preview_stl %}
+      <div id="preview-stl-card" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:10px;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
+        <div style="min-width:0;display:grid;gap:4px;">
+          <div class="muted" style="font-size:12px;">Текущий STL установки</div>
+          <a href="{{ setup.preview_stl.url }}" target="_blank" rel="noopener" style="color:#c9ddff;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ setup.preview_stl.name|default:"preview.stl" }}
+          </a>
+        </div>
+        <input type="hidden" name="remove_preview_stl" id="id_remove_preview_stl" value="0" />
+        <div style="display:inline-flex;gap:8px;align-items:center;">
+          <label for="id_preview_stl" class="btn btn-ghost setup-file-action-btn" style="cursor:pointer;">Заменить</label>
+          <button type="button" class="btn btn-ghost setup-file-action-btn" id="preview-stl-delete-btn" title="Удалить текущий STL">Удалить</button>
+        </div>
+      </div>
+      {% endif %}
+      {% if not is_edit or not setup or not setup.preview_stl %}
+      <div class="setup-file-picker">
+        <label for="id_preview_stl" class="btn btn-ghost" style="cursor:pointer;">Выбрать STL</label>
+        <span class="muted js-setup-file-name" data-for="id_preview_stl">Файл не выбран</span>
+      </div>
+      {% endif %}
+      <input type="file" name="preview_stl" id="id_preview_stl" style="display:none;" accept=".stl" />
+      {% if form.preview_stl.errors %}<span class="muted">{{ form.preview_stl.errors }}</span>{% endif %}
+    </label>
   </div>
   <div style="margin-top:14px;padding-top:12px;border-top:1px solid #2f3b57;">
   </div>
@@ -262,11 +288,11 @@
     var removeInput = document.getElementById("id_remove_program_file");
     var deleteBtn = document.getElementById("program-file-delete-btn");
     var card = document.getElementById("program-file-card");
-    var removeToolInput = document.getElementById("id_remove_tool_pdf");
-    var deleteToolBtn = document.getElementById("tool-pdf-delete-btn");
-    var toolCard = document.getElementById("tool-pdf-card");
+    var removePreviewStlInput = document.getElementById("id_remove_preview_stl");
+    var deletePreviewStlBtn = document.getElementById("preview-stl-delete-btn");
+    var previewStlCard = document.getElementById("preview-stl-card");
     var programFileInput = document.getElementById("id_program_file");
-    var toolFileInput = document.getElementById("id_tool_pdf");
+    var previewStlInput = document.getElementById("id_preview_stl");
     if (programFileInput) {
       programFileInput.addEventListener("change", function () {
         var nameEl = document.querySelector('.js-setup-file-name[data-for="id_program_file"]');
@@ -275,11 +301,11 @@
         nameEl.textContent = f ? f.name : "Файл не выбран";
       });
     }
-    if (toolFileInput) {
-      toolFileInput.addEventListener("change", function () {
-        var nameEl = document.querySelector('.js-setup-file-name[data-for="id_tool_pdf"]');
+    if (previewStlInput) {
+      previewStlInput.addEventListener("change", function () {
+        var nameEl = document.querySelector('.js-setup-file-name[data-for="id_preview_stl"]');
         if (!nameEl) return;
-        var f = toolFileInput.files && toolFileInput.files[0];
+        var f = previewStlInput.files && previewStlInput.files[0];
         nameEl.textContent = f ? f.name : "Файл не выбран";
       });
     }
@@ -289,10 +315,10 @@
         card.style.display = "none";
       });
     }
-    if (removeToolInput && deleteToolBtn && toolCard) {
-      deleteToolBtn.addEventListener("click", function () {
-        removeToolInput.value = "1";
-        toolCard.style.display = "none";
+    if (removePreviewStlInput && deletePreviewStlBtn && previewStlCard) {
+      deletePreviewStlBtn.addEventListener("click", function () {
+        removePreviewStlInput.value = "1";
+        previewStlCard.style.display = "none";
       });
     }
     [
@@ -541,19 +567,19 @@
     background: #121a2a;
   }
   @media (max-width: 720px) {
-    #tool-pdf-card,
+    #preview-stl-card,
     #program-file-card {
       grid-template-columns: 1fr !important;
       gap: 8px !important;
     }
-    #tool-pdf-card > div:last-child,
+    #preview-stl-card > div:last-child,
     #program-file-card > div:last-child {
       width: 100%;
       display: grid !important;
       grid-template-columns: 1fr 1fr;
       gap: 6px !important;
     }
-    #tool-pdf-card .setup-file-action-btn,
+    #preview-stl-card .setup-file-action-btn,
     #program-file-card .setup-file-action-btn {
       width: 100%;
       justify-content: center;
