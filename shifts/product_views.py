@@ -601,6 +601,30 @@ def product_detail_view(request, pk: int):
                 }
             )
 
+        if action == "inline_replace_binding_photo":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            field_name = (request.POST.get("field_name") or "").strip()
+            allowed_fields = {"binding_x_photo", "binding_y_photo", "binding_z_photo", "workpiece_photo"}
+            if field_name not in allowed_fields:
+                return JsonResponse({"ok": False, "error": "Некорректное поле фото."}, status=400)
+            image_file = request.FILES.get("image")
+            if not image_file:
+                return JsonResponse({"ok": False, "error": "Выберите фото."}, status=400)
+            old_file = getattr(setup, field_name)
+            if old_file:
+                try:
+                    old_file.delete(save=False)
+                except Exception:
+                    pass
+            setattr(setup, field_name, image_file)
+            setup.save(update_fields=[field_name, "updated_at"])
+            new_file = getattr(setup, field_name)
+            return JsonResponse({"ok": True, "url": new_file.url if new_file else ""})
+
         if action == "inline_update_setup":
             setup_id_raw = (request.POST.get("setup_id") or "").strip()
             setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
@@ -675,6 +699,7 @@ def product_detail_view(request, pk: int):
         setup.program_text, setup.program_too_large = _read_program_file_for_display(setup.program_file)
         setup.tool_rows = list(setup.tools.all())
         setup.tool_display_rows = _build_display_tool_rows(setup.tool_rows)
+    has_setup_preview_stl = any(bool(getattr(s, "preview_stl", None)) for s in setups)
     cad_name = (product.cad_model.name or "") if product.cad_model else ""
     cad_ext = _cad_ext(cad_name)
     cad_is_step = cad_ext in ("step", "stp")
@@ -706,6 +731,7 @@ def product_detail_view(request, pk: int):
             "cad_is_step": cad_is_step,
             "preview_stl_url": preview_stl_url,
             "cad_inline_preview": cad_inline_preview,
+            "has_setup_preview_stl": has_setup_preview_stl,
             "program_text": program_text,
             "program_too_large": program_too_large,
             "tab_default": tab_default,

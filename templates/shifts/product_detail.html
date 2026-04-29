@@ -4,8 +4,7 @@
 <div class="page-actions" style="margin-bottom:10px;">
   <a href="{% url 'products_list' %}" class="btn btn-ghost">← К списку наладок</a>
   {% if biota_can_edit %}
-  <a href="{% url 'product_edit' product.pk %}" class="btn btn-ghost">Редактировать наладку</a>
-  <a href="{% url 'product_setup_create' product.pk %}" class="btn btn-ghost">+ Новая установка</a>
+  <a href="{% url 'product_setup_create' product.pk %}" class="btn btn-ghost">+</a>
   {% endif %}
 </div>
 <div class="product-detail-grid">
@@ -16,8 +15,10 @@
 
   <div class="product-tabs" id="product-tabs" {% if product.program_file %}data-product-program-url="{{ product.program_file.url }}" data-product-program-filename="{{ product.program_filename|escape }}"{% endif %}>
     <div class="product-tabs-nav" role="tablist" aria-label="Документация и наладка">
-      <button type="button" class="product-tab{% if tab_default == 'drawing' %} is-active{% endif %}" role="tab" data-tab="drawing" id="tab-drawing" aria-controls="panel-drawing" aria-selected="{% if tab_default == 'drawing' %}true{% else %}false{% endif %}">Изделие</button>
       {% if setups %}
+      {% if biota_can_edit %}
+      <a href="{% url 'product_setup_create' product.pk %}" class="btn btn-ghost product-add-setup-inline" title="Новая установка">+</a>
+      {% endif %}
       <label class="field product-setup-select-wrap">
         <select id="setup-tab-select">
           <option value="drawing" {% if tab_default == 'drawing' %}selected{% endif %}>Изделие</option>
@@ -26,13 +27,15 @@
           {% endfor %}
         </select>
       </label>
+      {% if biota_can_edit %}
+      <a href="{% url 'product_edit' product.pk %}" class="btn btn-ghost product-edit-product-inline" id="product-edit-main-btn" title="Редактировать изделие">Редактировать наладку</a>
+      {% endif %}
       {% endif %}
       {% for setup in setups %}
       <button type="button" class="product-tab{% if tab_default == setup.tab_slug %} is-active{% endif %}" role="tab" data-tab="{{ setup.tab_slug }}" id="tab-setup-{{ setup.pk }}" aria-controls="panel-setup-{{ setup.pk }}" aria-selected="{% if tab_default == setup.tab_slug %}true{% else %}false{% endif %}" {% if setup.program_file %}data-program-url="{{ setup.program_file.url }}" data-program-filename="{{ setup.program_filename|escape }}"{% endif %} {% if setup.preview_stl %}data-setup-stl-url="{{ setup.preview_stl.url }}"{% endif %} data-setup-name="{{ setup.name|escape }}" data-setup-edit-url="{% url 'product_setup_edit' product.pk setup.pk %}" hidden>Уст. {{ forloop.counter }}</button>
       {% endfor %}
       {% if biota_can_edit and active_setup %}
       <span class="nav-spacer" style="flex:1 1 auto;"></span>
-      <a class="btn product-btn-edit-mode" id="setup-edit-mode-btn" href="{% url 'product_setup_edit' product.pk active_setup.pk %}">Режим редактирования</a>
       <button type="button" class="btn product-btn-edit-mode" id="setup-inline-edit-btn">Быстрое редактирование</button>
       {% endif %}
     </div>
@@ -63,6 +66,10 @@
                       <span class="binding-photo-hover"><img src="{{ setup.binding_x_photo.url }}" alt="Привязка X"></span>
                     </a>
                     {% endif %}
+                    {% if biota_can_edit %}
+                    <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_x_photo" data-setup-id="{{ setup.pk }}" hidden>{{ setup.binding_x_photo|yesno:"Заменить,Добавить" }}</button>
+                    <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-binding-photo-input" data-photo-field-input="binding_x_photo" data-setup-id="{{ setup.pk }}" hidden />
+                    {% endif %}
                   </div>
                   <div>
                     <span class="muted">Y:</span> <span data-field-text="binding_y">{{ setup.binding_y|default:"—" }}</span>
@@ -72,6 +79,10 @@
                       <span class="binding-photo-hover"><img src="{{ setup.binding_y_photo.url }}" alt="Привязка Y"></span>
                     </a>
                     {% endif %}
+                    {% if biota_can_edit %}
+                    <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_y_photo" data-setup-id="{{ setup.pk }}" hidden>{{ setup.binding_y_photo|yesno:"Заменить,Добавить" }}</button>
+                    <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-binding-photo-input" data-photo-field-input="binding_y_photo" data-setup-id="{{ setup.pk }}" hidden />
+                    {% endif %}
                   </div>
                   <div>
                     <span class="muted">Z:</span> <span data-field-text="binding_z">{{ setup.binding_z|default:"—" }}</span>
@@ -80,6 +91,10 @@
                       📷
                       <span class="binding-photo-hover"><img src="{{ setup.binding_z_photo.url }}" alt="Привязка Z"></span>
                     </a>
+                    {% endif %}
+                    {% if biota_can_edit %}
+                    <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_z_photo" data-setup-id="{{ setup.pk }}" hidden>{{ setup.binding_z_photo|yesno:"Заменить,Добавить" }}</button>
+                    <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-binding-photo-input" data-photo-field-input="binding_z_photo" data-setup-id="{{ setup.pk }}" hidden />
                     {% endif %}
                   </div>
                 </div>
@@ -91,6 +106,10 @@
                       📷
                       <span class="binding-photo-hover"><img src="{{ setup.workpiece_photo.url }}" alt="Заготовка"></span>
                     </a>
+                    {% endif %}
+                    {% if biota_can_edit %}
+                    <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="workpiece_photo" data-setup-id="{{ setup.pk }}" hidden>{{ setup.workpiece_photo|yesno:"Заменить,Добавить" }}</button>
+                    <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-binding-photo-input" data-photo-field-input="workpiece_photo" data-setup-id="{{ setup.pk }}" hidden />
                     {% endif %}
                   </div>
                   <div><span class="muted">Материал:</span> <span data-field-text="material">{{ setup.material|default:"—" }}</span></div>
@@ -208,6 +227,20 @@
       {% endif %}
     </div>
     </div>
+    {% if setups %}
+    <div id="setup-cad-gallery" class="setup-cad-gallery">
+      {% for setup in setups %}
+      {% if setup.preview_stl %}
+      <div class="setup-cad-item" data-setup-cad-item="{{ setup.pk }}">
+        <div class="muted setup-cad-title">{{ setup.name }}</div>
+        <div class="setup-cad-mini-viewport" data-setup-stl-url="{{ setup.preview_stl.url }}">
+          <p class="muted" style="padding:8px;margin:0;">Загрузка 3D…</p>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
     {% if product.preview_stl and cad_inline_preview and cad_is_step %}{% endif %}
     {% else %}
     <p class="muted">3D не загружен.</p>
@@ -327,6 +360,33 @@
     margin: 0;
     min-width: 220px;
   }
+  .product-add-setup-inline {
+    height: 34px;
+    min-height: 34px;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .product-edit-product-inline {
+    width: 220px;
+    min-width: 220px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+  }
+  #product-tabs[data-current-tab="drawing"] #product-edit-main-btn {
+    display: inline-flex;
+  }
+  #product-tabs:not([data-current-tab="drawing"]) #product-edit-main-btn {
+    display: none !important;
+  }
   .product-tab {
     background: #151b28;
     border: 1px solid #2f3b57;
@@ -406,6 +466,17 @@
     position: relative;
     vertical-align: middle;
     background: #1a2438;
+  }
+  .setup-binding-photo-btn {
+    margin-left: 6px;
+    height: 22px;
+    min-height: 22px;
+    padding: 0 7px;
+    font-size: 11px;
+    display: none;
+  }
+  .setup-binding-photo-btn[hidden] {
+    display: none !important;
   }
   .binding-photo-hover {
     display: none;
@@ -617,6 +688,11 @@
     border: 1px solid #2a3651;
     border-radius: 12px;
     padding: 8px;
+    margin-top: 48px;
+    margin-left: 0;
+    box-sizing: border-box;
+  }
+  .product-detail-side[data-current-tab="drawing"] {
     margin-top: 52px;
   }
   [data-field-text].is-inline-edit {
@@ -697,6 +773,36 @@
     overflow: hidden;
     position: relative;
   }
+  .setup-cad-gallery {
+    margin-top: 10px;
+    display: grid;
+    gap: 8px;
+  }
+  #product-detail-side[data-current-tab="drawing"] #setup-cad-gallery {
+    display: grid;
+  }
+  #product-detail-side:not([data-current-tab="drawing"]) #setup-cad-gallery {
+    display: none !important;
+  }
+  .setup-cad-item {
+    border: 1px solid #2f3b57;
+    border-radius: 10px;
+    padding: 6px;
+    background: rgba(14, 19, 30, 0.55);
+  }
+  .setup-cad-title {
+    font-size: 12px;
+    margin-bottom: 5px;
+  }
+  .setup-cad-mini-viewport {
+    width: 100%;
+    height: 220px;
+    border-radius: 8px;
+    border: 1px solid #3d4045;
+    background: #d3d7de;
+    overflow: hidden;
+    position: relative;
+  }
   .product-downloads {
     display: flex;
     flex-direction: column;
@@ -767,6 +873,7 @@
     }
     .product-detail-side {
       margin-top: 0;
+      margin-left: 0;
     }
     .product-pdf-frame { height: 55vh; }
     .product-detail-side,
@@ -1042,29 +1149,31 @@
       programDownloadBtn.hidden = false;
     }
 
-    function setEditModeByTab(tabName) {
-      var editBtn = document.getElementById("setup-edit-mode-btn");
-      if (!editBtn) return;
-      var setupBtn = root.querySelector('.product-tab[data-tab="' + tabName + '"][data-setup-edit-url]');
-      if (!setupBtn) return;
-      var editUrl = setupBtn.getAttribute("data-setup-edit-url") || "";
-      if (editUrl) editBtn.href = editUrl;
+    function setTopButtonsByTab(tabName) {
+      var isDrawing = tabName === "drawing";
+      var fastBtn = document.getElementById("setup-inline-edit-btn");
+      var productEditBtn = document.getElementById("product-edit-main-btn");
+      if (fastBtn) fastBtn.hidden = isDrawing;
+      if (productEditBtn) productEditBtn.hidden = !isDrawing;
     }
 
     function setSideBlocksByTab(tabName) {
-      var hideForDrawing = false;
+      var isDrawing = tabName === "drawing";
       var side = document.getElementById("product-detail-side");
       var grid = document.querySelector(".product-detail-grid");
       var savePreviewBlock = document.getElementById("product-save-preview-block");
       var downloadsBlock = document.getElementById("product-downloads-block");
-      if (side) side.hidden = hideForDrawing;
-      if (grid) grid.classList.toggle("is-drawing-only", hideForDrawing);
-      if (savePreviewBlock) savePreviewBlock.hidden = hideForDrawing;
-      if (downloadsBlock) downloadsBlock.hidden = hideForDrawing;
-      if (!hideForDrawing && typeof window.startProductCadViewer === "function") {
+      if (side) side.hidden = false;
+      if (side) side.setAttribute("data-current-tab", tabName || "");
+      if (grid) grid.classList.toggle("is-drawing-only", false);
+      if (savePreviewBlock) savePreviewBlock.hidden = false;
+      if (downloadsBlock) downloadsBlock.hidden = false;
+      var gallery = document.getElementById("setup-cad-gallery");
+      if (gallery) gallery.hidden = !isDrawing;
+      if (typeof window.startProductCadViewer === "function") {
         window.startProductCadViewer();
       }
-      if (!hideForDrawing && typeof window.setProductCadSource === "function") {
+      if (typeof window.setProductCadSource === "function") {
         var tabBtn = root.querySelector('.product-tab[data-tab="' + tabName + '"]');
         var setupStlUrl = tabBtn ? (tabBtn.getAttribute("data-setup-stl-url") || "") : "";
         var drawingStlUrl = "{{ preview_stl_url|default:'' }}";
@@ -1085,6 +1194,7 @@
     }
 
     function activate(tabName) {
+      root.setAttribute("data-current-tab", tabName || "");
       tabButtons.forEach(function (btn) {
         var on = btn.getAttribute("data-tab") === tabName;
         btn.classList.toggle("is-active", on);
@@ -1098,7 +1208,7 @@
         }
       });
       setProgramDownloadByTab(tabName);
-      setEditModeByTab(tabName);
+      setTopButtonsByTab(tabName);
       setSideBlocksByTab(tabName);
       var setupSelect = document.getElementById("setup-tab-select");
       if (setupSelect) setupSelect.value = tabName;
@@ -1117,20 +1227,17 @@
         var tab = setupSelect.value || "";
         if (tab) activate(tab);
       });
+      var initialTab = setupSelect.value || "drawing";
+      activate(initialTab);
+      return;
     }
-    var activeBtn = root.querySelector(".product-tab.is-active");
-    if (activeBtn) {
-      var activeName = activeBtn.getAttribute("data-tab") || "";
-      setProgramDownloadByTab(activeName);
-      setEditModeByTab(activeName);
-      setSideBlocksByTab(activeName);
-      if (setupSelect && activeName !== "drawing") setupSelect.value = activeName;
-    } else if (tabButtons.length) {
-      var firstName = tabButtons[0].getAttribute("data-tab") || "";
-      setProgramDownloadByTab(firstName);
-      setEditModeByTab(firstName);
-      setSideBlocksByTab(firstName);
-      if (setupSelect && firstName !== "drawing") setupSelect.value = firstName;
+    if (tabButtons.length) {
+      activate(tabButtons[0].getAttribute("data-tab") || "");
+    } else {
+      root.setAttribute("data-current-tab", "drawing");
+      setProgramDownloadByTab("drawing");
+      setTopButtonsByTab("drawing");
+      setSideBlocksByTab("drawing");
     }
   })();
   (function () {
@@ -1287,6 +1394,10 @@
         if (inlineEditMode) row.removeAttribute("hidden");
         else row.setAttribute("hidden", "hidden");
       });
+      panel.querySelectorAll(".setup-binding-photo-btn").forEach(function (btn) {
+        if (inlineEditMode) btn.removeAttribute("hidden");
+        else btn.setAttribute("hidden", "hidden");
+      });
       setToolsEditMode(panel, inlineEditMode);
       editToggleBtn.textContent = inlineEditMode ? "Сохранить изменения" : "Быстрое редактирование";
     }
@@ -1310,6 +1421,9 @@
       root.querySelectorAll(".setup-photo-caption").forEach(function (cap) {
         cap.classList.remove("is-inline-edit");
         cap.removeAttribute("contenteditable");
+      });
+      root.querySelectorAll(".setup-binding-photo-btn").forEach(function (btn) {
+        btn.setAttribute("hidden", "hidden");
       });
       root.querySelectorAll(".product-tab-panel").forEach(function (panel) {
         setToolsEditMode(panel, false);
@@ -1502,6 +1616,15 @@
         return;
       }
 
+      var btnBindingPhoto = e.target.closest(".setup-binding-photo-btn");
+      if (btnBindingPhoto) {
+        var setupIdBtn = btnBindingPhoto.getAttribute("data-setup-id") || "";
+        var fieldBtn = btnBindingPhoto.getAttribute("data-photo-field") || "";
+        if (!setupIdBtn || !fieldBtn) return;
+        var input = root.querySelector('.setup-binding-photo-input[data-setup-id="' + setupIdBtn + '"][data-photo-field-input="' + fieldBtn + '"]');
+        if (input) input.click();
+      }
+
       var btnSaveNew = e.target.closest(".js-save-new-photo");
       if (btnSaveNew) {
         var draftFig = btnSaveNew.closest(".setup-photo-figure");
@@ -1551,6 +1674,69 @@
             '<button type="button" class="btn btn-ghost js-setup-photo-delete" title="Удалить блок">×</button>' +
           '</div>';
       }
+    });
+
+    root.querySelectorAll(".setup-binding-photo-input").forEach(function (input) {
+      input.addEventListener("change", async function () {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        var setupId = input.getAttribute("data-setup-id") || "";
+        var fieldName = input.getAttribute("data-photo-field-input") || "";
+        if (!setupId || !fieldName) return;
+        var fd = new FormData();
+        fd.append("action", "inline_replace_binding_photo");
+        fd.append("setup_id", setupId);
+        fd.append("field_name", fieldName);
+        fd.append("image", file);
+        var res = await fetch(window.location.href, {
+          method: "POST",
+          headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+          body: fd,
+          credentials: "same-origin",
+        });
+        var data = await res.json();
+        if (!res.ok || !data.ok) {
+          alert(data.error || "Не удалось обновить фото.");
+          input.value = "";
+          return;
+        }
+        var rowFieldMap = {
+          binding_x_photo: "Привязка X",
+          binding_y_photo: "Привязка Y",
+          binding_z_photo: "Привязка Z",
+          workpiece_photo: "Заготовка",
+        };
+        var label = rowFieldMap[fieldName] || "Фото";
+        var panel = input.closest(".product-tab-panel");
+        var setupName = "";
+        var activeBtn = root.querySelector(".product-tab.is-active");
+        if (activeBtn) setupName = activeBtn.getAttribute("data-setup-name") || "";
+        if (panel) {
+          var existingLink = panel.querySelector('[data-photo-caption*="' + label + '"]');
+          if (existingLink && existingLink.classList.contains("binding-photo-link")) {
+            existingLink.href = data.url;
+            existingLink.setAttribute("data-photo-url", data.url);
+            existingLink.setAttribute("data-photo-caption", (setupName ? setupName + " — " : "") + label);
+            var hoverImg = existingLink.querySelector(".binding-photo-hover img");
+            if (hoverImg) hoverImg.src = data.url;
+          } else {
+            var btn = panel.querySelector('.setup-binding-photo-btn[data-photo-field="' + fieldName + '"]');
+            if (btn) {
+              var link = document.createElement("a");
+              link.href = data.url;
+              link.className = "binding-photo-link setup-photo-open";
+              link.setAttribute("data-photo-url", data.url);
+              link.setAttribute("data-photo-caption", (setupName ? setupName + " — " : "") + label);
+              link.setAttribute("aria-label", "Фото: " + label);
+              link.innerHTML = '📷<span class="binding-photo-hover"><img src="' + data.url + '" alt="' + label + '"></span>';
+              btn.insertAdjacentElement("beforebegin", link);
+            }
+          }
+          var editBtn = panel.querySelector('.setup-binding-photo-btn[data-photo-field="' + fieldName + '"]');
+          if (editBtn) editBtn.textContent = "Заменить";
+        }
+        input.value = "";
+      });
     });
   })();
   (function () {
@@ -1820,7 +2006,7 @@
   })();
 </script>
 
-{% if cad_inline_preview and preview_stl_url %}
+{% if cad_inline_preview or has_setup_preview_stl %}
 <script type="importmap">
 {
   "imports": {
@@ -1921,6 +2107,86 @@
     controls.target.copy(center);
     camera.lookAt(controls.target);
     controls.update();
+  }
+
+  function mountMiniStlViewer(targetHost, url) {
+    if (!targetHost || !url) return;
+    if (targetHost.querySelector("canvas")) return;
+    targetHost.innerHTML = "";
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xd3d7de);
+    const camera = new THREE.PerspectiveCamera(45, targetHost.clientWidth / (targetHost.clientHeight || 220), 0.1, 1e7);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(targetHost.clientWidth, targetHost.clientHeight || 220);
+    targetHost.appendChild(renderer.domElement);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    const dFar = 800;
+    const dInt = 0.18;
+    const axes = [
+      [1, 0, 0], [-1, 0, 0],
+      [0, 1, 0], [0, -1, 0],
+      [0, 0, 1], [0, 0, -1],
+    ];
+    axes.forEach((ax) => {
+      const l = new THREE.DirectionalLight(0xffffff, dInt);
+      l.position.set(ax[0] * dFar, ax[1] * dFar, ax[2] * dFar);
+      scene.add(l);
+    });
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    let edgeLineMaterial = null;
+    new STLLoader().load(
+      new URL(url, window.location.origin).href,
+      function (geometry) {
+        geometry.computeBoundingSphere();
+        geometry.center();
+        const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+          color: 0x7f8790,
+          metalness: 0.06,
+          roughness: 0.48,
+          transparent: true,
+          opacity: 0.86,
+          depthWrite: true,
+        }));
+        const edgePos = new THREE.EdgesGeometry(geometry, 22);
+        const posAttr = edgePos.getAttribute("position");
+        const lineGeo = new LineSegmentsGeometry();
+        lineGeo.setPositions(posAttr.array);
+        edgeLineMaterial = new LineMaterial({
+          color: 0x14181c,
+          linewidth: 2.6,
+          worldUnits: false,
+          resolution: new THREE.Vector2(targetHost.clientWidth, targetHost.clientHeight || 130),
+          depthTest: true,
+          depthWrite: true,
+        });
+        const thickEdges = new LineSegments2(lineGeo, edgeLineMaterial);
+        const root = new THREE.Group();
+        root.add(mesh);
+        root.add(thickEdges);
+        scene.add(root);
+        fitCameraToObject(camera, controls, root);
+      },
+      undefined,
+      function () {
+        targetHost.innerHTML = '<p class="muted" style="padding:8px;margin:0;">Не удалось загрузить STL.</p>';
+      }
+    );
+    function onResize() {
+      const w = targetHost.clientWidth;
+      const h = targetHost.clientHeight || 220;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+      if (edgeLineMaterial) edgeLineMaterial.resolution.set(w, h);
+    }
+    window.addEventListener("resize", onResize);
+    (function tick() {
+      requestAnimationFrame(tick);
+      controls.update();
+      renderer.render(scene, camera);
+    })();
   }
 
   function runStlViewer() {
@@ -2072,6 +2338,10 @@
   if (!side || !side.hidden) {
     startCadViewerWhenVisible();
   }
+  document.querySelectorAll(".setup-cad-mini-viewport").forEach((mini) => {
+    const miniUrl = mini.getAttribute("data-setup-stl-url") || "";
+    if (miniUrl) mountMiniStlViewer(mini, miniUrl);
+  });
 
   function getCookie(name) {
     const m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));
