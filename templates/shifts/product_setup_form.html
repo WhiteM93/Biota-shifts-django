@@ -129,30 +129,43 @@
       {% if form.size.errors %}<span class="muted">{{ form.size.errors }}</span>{% endif %}
     </label>
     <label class="field" style="grid-column:1/-1;">
-      <span>Файл инструмента (PDF/HTML)</span>
-      {% if is_edit and setup and setup.tool_pdf %}
-      <div id="tool-pdf-card" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:10px;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
-        <div style="min-width:0;display:grid;gap:4px;">
-          <div class="muted" style="font-size:12px;">Текущий файл инструмента</div>
-          <a href="{{ setup.tool_pdf.url }}" target="_blank" rel="noopener" style="color:#c9ddff;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-            {{ setup.tool_pdf.name|cut:"products/setup_tools/" }}
-          </a>
-        </div>
-        <input type="hidden" name="remove_tool_pdf" id="id_remove_tool_pdf" value="0" />
-        <div style="display:inline-flex;gap:8px;align-items:center;">
-          <label for="id_tool_pdf" class="btn btn-ghost setup-file-action-btn" style="cursor:pointer;">Заменить</label>
-          <button type="button" class="btn btn-ghost setup-file-action-btn" id="tool-pdf-delete-btn" title="Удалить текущий файл">Удалить</button>
-        </div>
+      <span>Таблица инструмента</span>
+      <div class="table-wrap" style="margin-top:8px;">
+        {{ tools_formset.management_form }}
+        <table class="data-grid setup-tools-editor" style="min-width:max-content;font-size:12px;">
+          <thead>
+            <tr>
+              <th>Номер</th>
+              <th>Кор. н</th>
+              <th>Кор. д</th>
+              <th>Тип</th>
+              <th>Метчик</th>
+              <th>Размер</th>
+              <th>Вылет</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tform in tools_formset.forms %}
+            <tr>
+              <td>
+                <div style="display:none;">{{ tform.id }}</div>
+                <div style="display:none;">{{ tform.name }}</div>
+                {{ tform.tool_number }}
+              </td>
+              <td>{{ tform.kor_n }}</td>
+              <td>{{ tform.kor_d }}</td>
+              <td>{{ tform.tool_type }}</td>
+              <td>{{ tform.tap_hole_type }}</td>
+              <td>{{ tform.diameter }}</td>
+              <td>{{ tform.overhang }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      {% endif %}
-      {% if not is_edit or not setup or not setup.tool_pdf %}
-      <div class="setup-file-picker">
-        <label for="id_tool_pdf" class="btn btn-ghost" style="cursor:pointer;">Выбрать файл инструмента</label>
-        <span class="muted js-setup-file-name" data-for="id_tool_pdf">Файл не выбран</span>
-      </div>
-      {% endif %}
-      <input type="file" name="tool_pdf" id="id_tool_pdf" accept=".pdf,application/pdf,.html,text/html,.htm" style="display:none;" />
-      {% if form.tool_pdf.errors %}<span class="muted">{{ form.tool_pdf.errors }}</span>{% endif %}
+      <p class="muted" style="margin:8px 0 0 0;font-size:12px;">
+        Оставьте строку пустой — она не будет сохранена.
+      </p>
     </label>
     <label class="field" style="grid-column:1/-1;">
       <span>Наладка (текст)</span>
@@ -385,6 +398,60 @@
       createBlock();
     });
   })();
+  (function () {
+    var table = document.querySelector(".setup-tools-editor");
+    if (!table) return;
+
+    function expectedFromToolNumber(raw) {
+      var src = (raw || "").toUpperCase().trim();
+      if (!src) return null;
+      var m = src.match(/^(?:T\s*)?([0-9]{1,2})$/);
+      if (!m) return null;
+      var n = m[1].padStart(2, "0");
+      return { h: "H" + n, d: "D" + n };
+    }
+
+    function syncRow(row) {
+      var toolInput = row.querySelector('input[name$="-tool_number"]');
+      var korNInput = row.querySelector('input[name$="-kor_n"]');
+      var korDInput = row.querySelector('input[name$="-kor_d"]');
+      var typeSelect = row.querySelector('select[name$="-tool_type"]');
+      var tapSelect = row.querySelector('select[name$="-tap_hole_type"]');
+      if (!toolInput || !korNInput || !korDInput || !typeSelect || !tapSelect) return;
+
+      var expected = expectedFromToolNumber(toolInput.value);
+      var numMatch = (toolInput.value || "").trim().toUpperCase().match(/^(?:T\s*)?([0-9]{1,2})$/);
+      if (numMatch) toolInput.value = String(parseInt(numMatch[1], 10));
+      if (expected) {
+        if (!korNInput.value.trim()) korNInput.value = expected.h;
+        if (!korDInput.value.trim()) korDInput.value = expected.d;
+      }
+
+      var curN = (korNInput.value || "").trim().toUpperCase();
+      var curD = (korDInput.value || "").trim().toUpperCase();
+      var expN = expected ? expected.h : "";
+      var expD = expected ? expected.d : "";
+      korNInput.classList.toggle("tool-auto-override", !!(expN && curN && curN !== expN));
+      korDInput.classList.toggle("tool-auto-override", !!(expD && curD && curD !== expD));
+
+      var isTap = (typeSelect.value || "") === "Метчик";
+      tapSelect.disabled = !isTap;
+      tapSelect.style.opacity = isTap ? "1" : "0.55";
+      if (!isTap) tapSelect.value = "";
+    }
+
+    table.querySelectorAll("tbody tr").forEach(function (row) {
+      var toolInput = row.querySelector('input[name$="-tool_number"]');
+      var korNInput = row.querySelector('input[name$="-kor_n"]');
+      var korDInput = row.querySelector('input[name$="-kor_d"]');
+      var typeSelect = row.querySelector('select[name$="-tool_type"]');
+      if (toolInput) toolInput.addEventListener("input", function () { syncRow(row); });
+      if (korNInput) korNInput.addEventListener("input", function () { syncRow(row); });
+      if (korDInput) korDInput.addEventListener("input", function () { syncRow(row); });
+      if (typeSelect) typeSelect.addEventListener("change", function () { syncRow(row); });
+      syncRow(row);
+    });
+  })();
 </script>
 <style>
   .setup-form-action-btn {
@@ -436,6 +503,25 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+  }
+  .setup-tools-editor th,
+  .setup-tools-editor td {
+    text-align: center;
+    padding: 4px 6px;
+    vertical-align: middle;
+  }
+  .setup-tools-editor input {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+  .setup-tools-editor select {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+  .setup-tools-editor .tool-auto-override {
+    border-color: #6f7ef2 !important;
+    box-shadow: 0 0 0 2px rgba(111, 126, 242, 0.28);
+    background: rgba(111, 126, 242, 0.14);
   }
   #id_setup_notes {
     background: #101520;

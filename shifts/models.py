@@ -374,6 +374,40 @@ class ProductSetup(models.Model):
         return os.path.basename(self.program_file.name or "")
 
 
+class ProductSetupToolRow(models.Model):
+    """
+    Строка таблицы инструмента внутри установки.
+    Данные редактируются на странице редактирования установки и отображаются в карточке продукта.
+    """
+
+    setup = models.ForeignKey(
+        ProductSetup,
+        on_delete=models.CASCADE,
+        related_name="tools",
+        verbose_name="Установка",
+    )
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+
+    tool_number = models.CharField(max_length=20, blank=True, default="", verbose_name="Номер")
+    kor_n = models.CharField(max_length=20, blank=True, default="", verbose_name="Кор. н")
+    kor_d = models.CharField(max_length=20, blank=True, default="", verbose_name="Кор. д")
+
+    tool_type = models.CharField(max_length=80, blank=True, default="", verbose_name="Тип")
+    tap_hole_type = models.CharField(max_length=20, blank=True, default="", verbose_name="Метчик: тип отверстия")
+    name = models.CharField(max_length=180, blank=True, default="", verbose_name="Наименование")
+
+    diameter = models.CharField(max_length=40, blank=True, default="", verbose_name="Диаметр")
+    overhang = models.CharField(max_length=40, blank=True, default="", verbose_name="Вылет")
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Строка инструмента"
+        verbose_name_plural = "Строки инструмента"
+
+    def __str__(self) -> str:
+        return f"{self.tool_number or self.name}".strip() or f"#{self.pk}"
+
+
 class ProductSetupPhoto(models.Model):
     """Фото в блоке «Наладка»."""
 

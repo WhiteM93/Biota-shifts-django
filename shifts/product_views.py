@@ -3,6 +3,7 @@ import uuid
 import re
 
 from django import forms
+from django.forms import inlineformset_factory
 from django.contrib import messages
 from django.core.files.base import ContentFile
 from django.core.paginator import Paginator
@@ -12,7 +13,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
-from .models import Product, ProductSetup, ProductSetupPhoto
+from .models import Product, ProductSetup, ProductSetupPhoto, ProductSetupToolRow
 
 # Ограничение вывода ПП в карточке (страница)
 MAX_PROGRAM_DISPLAY_BYTES = 800_000
@@ -163,7 +164,6 @@ class ProductSetupForm(forms.ModelForm):
             "workpiece",
             "material",
             "size",
-            "tool_pdf",
             "setup_notes",
             "program_file",
         )
@@ -186,6 +186,202 @@ class ProductSetupForm(forms.ModelForm):
                 }
             ),
         }
+
+
+class ProductSetupToolRowForm(forms.ModelForm):
+    class Meta:
+        model = ProductSetupToolRow
+        fields = (
+            "tool_number",
+            "kor_n",
+            "kor_d",
+            "tool_type",
+            "tap_hole_type",
+            "name",
+            "diameter",
+            "overhang",
+        )
+        widgets = {
+            "tool_number": forms.TextInput(attrs={"placeholder": "1", "inputmode": "numeric"}),
+            "kor_n": forms.TextInput(attrs={"placeholder": "H1"}),
+            "kor_d": forms.TextInput(attrs={"placeholder": "D1"}),
+            "tool_type": forms.Select(
+                choices=[
+                    ("", "—"),
+                    ("Фреза", "Фреза"),
+                    ("Метчик", "Метчик"),
+                    ("Раскатник", "Раскатник"),
+                    ("Резьбофреза", "Резьбофреза"),
+                    ("Центровка", "Центровка"),
+                    ("Зенкер", "Зенкер"),
+                    ("Развертка", "Развертка"),
+                    ("Сверло", "Сверло"),
+                    ("Т-образная фреза", "Т-образная фреза"),
+                    ("Радиусная", "Радиусная"),
+                    ("Сферическая", "Сферическая"),
+                    ("Датчик привязки", "Датчик привязки"),
+                    ("Другое", "Другое"),
+                ]
+            ),
+            "tap_hole_type": forms.Select(
+                choices=[
+                    ("", "—"),
+                    ("Сквозной", "Сквозной"),
+                    ("Глухой", "Глухой"),
+                ]
+            ),
+            "name": forms.TextInput(attrs={"placeholder": "MILL_50_KVL"}),
+            "diameter": forms.TextInput(attrs={"placeholder": "Ø50.0"}),
+            "overhang": forms.TextInput(attrs={"placeholder": "50 мм"}),
+        }
+
+
+ProductSetupToolRowFormSet = inlineformset_factory(
+    ProductSetup,
+    ProductSetupToolRow,
+    form=ProductSetupToolRowForm,
+    extra=26,
+    can_delete=False,
+)
+
+SETUP_TOOL_TYPE_CHOICES = [
+    ("", "—"),
+    ("Фреза", "Фреза"),
+    ("Метчик", "Метчик"),
+    ("Раскатник", "Раскатник"),
+    ("Резьбофреза", "Резьбофреза"),
+    ("Центровка", "Центровка"),
+    ("Зенкер", "Зенкер"),
+    ("Развертка", "Развертка"),
+    ("Сверло", "Сверло"),
+    ("Т-образная фреза", "Т-образная фреза"),
+    ("Радиусная", "Радиусная"),
+    ("Сферическая", "Сферическая"),
+    ("Датчик привязки", "Датчик привязки"),
+    ("Другое", "Другое"),
+]
+
+SETUP_TAP_HOLE_CHOICES = [
+    ("", "—"),
+    ("Сквозной", "Сквозной"),
+    ("Глухой", "Глухой"),
+]
+
+
+def _normalize_tool_number(raw: str) -> str:
+    src = (raw or "").strip().upper()
+    if not src:
+        return ""
+    m = re.match(r"^(?:T\s*)?(\d{1,2})$", src)
+    if not m:
+        return src
+    return f"T{int(m.group(1)):02d}"
+
+
+def _default_tool_number_list() -> list[str]:
+    return [f"T{n:02d}" for n in range(25)] + ["T99"]
+
+
+def _expected_correctors(tool_no: str) -> tuple[str, str]:
+    norm = _normalize_tool_number(tool_no)
+    if not norm.startswith("T") or len(norm) < 3:
+        return "", ""
+    suffix = norm[1:].zfill(2)
+    return f"H{suffix}", f"D{suffix}"
+
+
+def _build_default_tool_rows(existing_rows: list[ProductSetupToolRow] | None = None) -> list[dict]:
+    existing_rows = existing_rows or []
+    mapped: dict[str, ProductSetupToolRow] = {}
+    for row in existing_rows:
+        key = _normalize_tool_number(row.tool_number)
+        if key:
+            mapped[key] = row
+
+    out = []
+    for tool_no in _default_tool_number_list():
+        row = mapped.get(tool_no)
+        if row:
+            out.append(
+                {
+                    "tool_number": str(int(tool_no[1:])),
+                    "kor_n": row.kor_n or "",
+                    "kor_d": row.kor_d or "",
+                    "tool_type": row.tool_type or "",
+                    "tap_hole_type": row.tap_hole_type or "",
+                    "name": row.name or "",
+                    "diameter": row.diameter or "",
+                    "overhang": row.overhang or "",
+                }
+            )
+            continue
+
+        default_row = {
+            "tool_number": str(int(tool_no[1:])),
+            "kor_n": "",
+            "kor_d": "",
+            "tool_type": "",
+            "tap_hole_type": "",
+            "name": "",
+            "diameter": "",
+            "overhang": "",
+        }
+        if tool_no == "T20":
+            default_row["tool_type"] = "Датчик привязки"
+            default_row["kor_n"] = "H20"
+            default_row["kor_d"] = "D20"
+            default_row["diameter"] = "Шарик ⌀6 мм"
+        out.append(default_row)
+    return out
+
+
+def _build_display_tool_rows(existing_rows: list[ProductSetupToolRow] | None = None) -> list[dict]:
+    existing_rows = existing_rows or []
+    mapped: dict[str, ProductSetupToolRow] = {}
+    for row in existing_rows:
+        key = _normalize_tool_number(row.tool_number)
+        if key:
+            mapped[key] = row
+
+    out = []
+    for tool_no in _default_tool_number_list():
+        row = mapped.get(tool_no)
+        if row:
+            exp_h, exp_d = _expected_correctors(tool_no)
+            cur_h = (row.kor_n or "").strip().upper()
+            cur_d = (row.kor_d or "").strip().upper()
+            out.append(
+                {
+                    "tool_number": tool_no,
+                    "kor_n": row.kor_n or "",
+                    "kor_d": row.kor_d or "",
+                    "tool_type": row.tool_type or "",
+                    "tap_hole_type": row.tap_hole_type or "",
+                    "diameter": row.diameter or "",
+                    "overhang": row.overhang or "",
+                    "kor_n_override": bool(exp_h and cur_h and cur_h != exp_h),
+                    "kor_d_override": bool(exp_d and cur_d and cur_d != exp_d),
+                }
+            )
+            continue
+        default_row = {
+            "tool_number": tool_no,
+            "kor_n": "",
+            "kor_d": "",
+            "tool_type": "",
+            "tap_hole_type": "",
+            "diameter": "",
+            "overhang": "",
+            "kor_n_override": False,
+            "kor_d_override": False,
+        }
+        if tool_no == "T20":
+            default_row["tool_type"] = "Датчик привязки"
+            default_row["kor_n"] = "H20"
+            default_row["kor_d"] = "D20"
+            default_row["diameter"] = "Шарик ⌀6 мм"
+        out.append(default_row)
+    return out
 
 
 @biota_login_required
@@ -343,10 +539,12 @@ def product_name_suggestions_view(request):
 def product_detail_view(request, pk: int):
     product = get_object_or_404(Product, pk=pk)
     setup_photos = list(product.setup_photos.filter(setup__isnull=True))
-    setups = list(product.setups.all())
+    setups = list(product.setups.prefetch_related("tools"))
     for setup in setups:
         setup.tab_slug = f"setup-{setup.pk}"
         setup.program_text, setup.program_too_large = _read_program_file_for_display(setup.program_file)
+        setup.tool_rows = list(setup.tools.all())
+        setup.tool_display_rows = _build_display_tool_rows(setup.tool_rows)
     cad_name = (product.cad_model.name or "") if product.cad_model else ""
     cad_ext = _cad_ext(cad_name)
     cad_is_step = cad_ext in ("step", "stp")
@@ -367,6 +565,14 @@ def product_detail_view(request, pk: int):
         tab_default = "program"
     else:
         tab_default = "drawing"
+    active_setup = None
+    if tab_default.startswith("setup-"):
+        for setup in setups:
+            if setup.tab_slug == tab_default:
+                active_setup = setup
+                break
+    if active_setup is None and setups:
+        active_setup = setups[0]
     return render(
         request,
         "shifts/product_detail.html",
@@ -382,6 +588,7 @@ def product_detail_view(request, pk: int):
             "program_text": program_text,
             "program_too_large": program_too_large,
             "tab_default": tab_default,
+            "active_setup": active_setup,
             "username": biota_user(request),
         },
     )
@@ -398,14 +605,63 @@ def product_setup_create_view(request, pk: int):
         if form.is_valid():
             setup: ProductSetup = form.save(commit=False)
             setup.product = product
-            setup.save()
-            _apply_setup_instance_photo_changes(request, product, setup)
-            messages.success(request, "Установка добавлена.")
-            return redirect("product_detail", pk=product.pk)
+            tools_formset = ProductSetupToolRowFormSet(
+                request.POST,
+                instance=setup,
+                queryset=ProductSetupToolRow.objects.none(),
+                prefix="tools",
+            )
+            if tools_formset.is_valid():
+                setup.save()
+                # Сначала удаляем (на всякий случай), затем пересоздаём строки.
+                ProductSetupToolRow.objects.filter(setup=setup).delete()
+                for idx, tform in enumerate(tools_formset.forms):
+                    cd = tform.cleaned_data
+                    row_vals = (
+                        cd.get("tool_number"),
+                        cd.get("kor_n"),
+                        cd.get("kor_d"),
+                        cd.get("tool_type"),
+                        cd.get("tap_hole_type"),
+                        cd.get("name"),
+                        cd.get("diameter"),
+                        cd.get("overhang"),
+                    )
+                    if all((v or "").strip() == "" for v in row_vals):
+                        continue
+                    ProductSetupToolRow.objects.create(
+                        setup=setup,
+                        sort_order=idx,
+                        tool_number=cd.get("tool_number") or "",
+                        kor_n=cd.get("kor_n") or "",
+                        kor_d=cd.get("kor_d") or "",
+                        tool_type=cd.get("tool_type") or "",
+                        tap_hole_type=cd.get("tap_hole_type") or "",
+                        name=cd.get("name") or "",
+                        diameter=cd.get("diameter") or "",
+                        overhang=cd.get("overhang") or "",
+                    )
+                _apply_setup_instance_photo_changes(request, product, setup)
+                messages.success(request, "Установка добавлена.")
+                return redirect("product_detail", pk=product.pk)
+            tools_formset_bad = tools_formset
+        else:
+            tools_formset_bad = ProductSetupToolRowFormSet(
+                request.POST,
+                instance=ProductSetup(product=product),
+                queryset=ProductSetupToolRow.objects.none(),
+                prefix="tools",
+            )
         messages.error(request, "Исправьте ошибки в форме установки.")
     else:
         max_order = product.setups.aggregate(m=Max("sort_order"))["m"]
         form = ProductSetupForm(initial={"sort_order": (max_order + 1) if max_order is not None else 0})
+        tools_formset_bad = ProductSetupToolRowFormSet(
+            instance=ProductSetup(product=product),
+            queryset=ProductSetupToolRow.objects.none(),
+            initial=_build_default_tool_rows(),
+            prefix="tools",
+        )
     return render(
         request,
         "shifts/product_setup_form.html",
@@ -413,6 +669,7 @@ def product_setup_create_view(request, pk: int):
             "form": form,
             "product": product,
             "is_edit": False,
+            "tools_formset": tools_formset_bad,
             "username": biota_user(request),
         },
     )
@@ -427,14 +684,41 @@ def product_setup_edit_view(request, pk: int, setup_pk: int):
     setup = get_object_or_404(ProductSetup, pk=setup_pk, product=product)
     if request.method == "POST":
         form = ProductSetupForm(request.POST, request.FILES, instance=setup)
-        if form.is_valid():
+        tools_formset = ProductSetupToolRowFormSet(
+            request.POST,
+            instance=setup,
+            queryset=ProductSetupToolRow.objects.none(),
+            prefix="tools",
+        )
+        if form.is_valid() and tools_formset.is_valid():
             saved_setup: ProductSetup = form.save()
-            remove_tool_pdf = request.POST.get("remove_tool_pdf") == "1"
-            if remove_tool_pdf and not request.FILES.get("tool_pdf"):
-                if saved_setup.tool_pdf:
-                    saved_setup.tool_pdf.delete(save=False)
-                saved_setup.tool_pdf = ""
-                saved_setup.save(update_fields=["tool_pdf"])
+            ProductSetupToolRow.objects.filter(setup=saved_setup).delete()
+            for idx, tform in enumerate(tools_formset.forms):
+                cd = tform.cleaned_data
+                row_vals = (
+                    cd.get("tool_number"),
+                    cd.get("kor_n"),
+                    cd.get("kor_d"),
+                    cd.get("tool_type"),
+                    cd.get("tap_hole_type"),
+                    cd.get("name"),
+                    cd.get("diameter"),
+                    cd.get("overhang"),
+                )
+                if all((v or "").strip() == "" for v in row_vals):
+                    continue
+                ProductSetupToolRow.objects.create(
+                    setup=saved_setup,
+                    sort_order=idx,
+                    tool_number=cd.get("tool_number") or "",
+                    kor_n=cd.get("kor_n") or "",
+                    kor_d=cd.get("kor_d") or "",
+                    tool_type=cd.get("tool_type") or "",
+                    tap_hole_type=cd.get("tap_hole_type") or "",
+                    name=cd.get("name") or "",
+                    diameter=cd.get("diameter") or "",
+                    overhang=cd.get("overhang") or "",
+                )
             remove_program_file = request.POST.get("remove_program_file") == "1"
             if remove_program_file and not request.FILES.get("program_file"):
                 if saved_setup.program_file:
@@ -452,9 +736,16 @@ def product_setup_edit_view(request, pk: int, setup_pk: int):
             _apply_setup_instance_photo_changes(request, product, setup)
             messages.success(request, "Установка сохранена.")
             return redirect("product_detail", pk=product.pk)
+        tools_formset_bad = tools_formset
         messages.error(request, "Исправьте ошибки в форме установки.")
     else:
         form = ProductSetupForm(instance=setup)
+        tools_formset_bad = ProductSetupToolRowFormSet(
+            instance=setup,
+            queryset=ProductSetupToolRow.objects.none(),
+            initial=_build_default_tool_rows(list(setup.tools.all())),
+            prefix="tools",
+        )
     return render(
         request,
         "shifts/product_setup_form.html",
@@ -463,6 +754,7 @@ def product_setup_edit_view(request, pk: int, setup_pk: int):
             "product": product,
             "setup": setup,
             "is_edit": True,
+            "tools_formset": tools_formset_bad,
             "username": biota_user(request),
         },
     )

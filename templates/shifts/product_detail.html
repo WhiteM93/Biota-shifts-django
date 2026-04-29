@@ -16,13 +16,17 @@
 
   <div class="product-tabs" id="product-tabs" {% if product.program_file %}data-product-program-url="{{ product.program_file.url }}" data-product-program-filename="{{ product.program_filename|escape }}"{% endif %}>
     <div class="product-tabs-nav" role="tablist" aria-label="Документация и наладка">
-      <button type="button" class="product-tab{% if tab_default == 'drawing' %} is-active{% endif %}" role="tab" data-tab="drawing" id="tab-drawing" aria-controls="panel-drawing" aria-selected="{% if tab_default == 'drawing' %}true{% else %}false{% endif %}">Чертёж</button>
+      <button type="button" class="product-tab{% if tab_default == 'drawing' %} is-active{% endif %}" role="tab" data-tab="drawing" id="tab-drawing" aria-controls="panel-drawing" aria-selected="{% if tab_default == 'drawing' %}true{% else %}false{% endif %}">Изделие</button>
       {% for setup in setups %}
-      <button type="button" class="product-tab{% if tab_default == setup.tab_slug %} is-active{% endif %}" role="tab" data-tab="{{ setup.tab_slug }}" id="tab-setup-{{ setup.pk }}" aria-controls="panel-setup-{{ setup.pk }}" aria-selected="{% if tab_default == setup.tab_slug %}true{% else %}false{% endif %}" {% if setup.tool_pdf %}data-tool-pdf-url="{{ setup.tool_pdf.url }}"{% endif %} {% if setup.program_file %}data-program-url="{{ setup.program_file.url }}" data-program-filename="{{ setup.program_filename|escape }}"{% endif %} data-setup-name="{{ setup.name|escape }}">{{ setup.name }}</button>
+      <button type="button" class="product-tab{% if tab_default == setup.tab_slug %} is-active{% endif %}" role="tab" data-tab="{{ setup.tab_slug }}" id="tab-setup-{{ setup.pk }}" aria-controls="panel-setup-{{ setup.pk }}" aria-selected="{% if tab_default == setup.tab_slug %}true{% else %}false{% endif %}" {% if setup.tool_pdf %}data-tool-pdf-url="{{ setup.tool_pdf.url }}"{% endif %} {% if setup.program_file %}data-program-url="{{ setup.program_file.url }}" data-program-filename="{{ setup.program_filename|escape }}"{% endif %} data-setup-name="{{ setup.name|escape }}" data-setup-edit-url="{% url 'product_setup_edit' product.pk setup.pk %}">Уст. {{ forloop.counter }}</button>
       {% endfor %}
       {% if not setups %}
       <button type="button" class="product-tab{% if tab_default == 'setup' %} is-active{% endif %}" role="tab" data-tab="setup" id="tab-setup" aria-controls="panel-setup" aria-selected="{% if tab_default == 'setup' %}true{% else %}false{% endif %}">Наладка</button>
       <button type="button" class="product-tab{% if tab_default == 'program' %} is-active{% endif %}" role="tab" data-tab="program" id="tab-program" aria-controls="panel-program" aria-selected="{% if tab_default == 'program' %}true{% else %}false{% endif %}">Программа</button>
+      {% endif %}
+      {% if biota_can_edit and active_setup %}
+      <span class="nav-spacer" style="flex:1 1 auto;"></span>
+      <a class="btn product-btn-edit-mode" id="setup-edit-mode-btn" href="{% url 'product_setup_edit' product.pk active_setup.pk %}">Режим редактирования</a>
       {% endif %}
     </div>
     <div class="product-tab-panels">
@@ -38,86 +42,107 @@
       </section>
       {% for setup in setups %}
       <section class="product-tab-panel" id="panel-setup-{{ setup.pk }}" data-panel="{{ setup.tab_slug }}" role="tabpanel" aria-labelledby="tab-setup-{{ setup.pk }}" {% if tab_default != setup.tab_slug %}hidden{% endif %}>
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 10px 0;">
-          <h3 style="margin:0;font-size:15px;">{{ setup.name }}</h3>
-          {% if biota_can_edit %}
-          <a class="btn product-btn-secondary" href="{% url 'product_setup_edit' product.pk setup.pk %}">Изменить установку</a>
-          {% endif %}
-        </div>
         <div class="product-setup-specs">
-          <div class="product-setup-spec-group">
-            <h5>Привязки</h5>
-            <div>
-              <span class="muted">X:</span> {{ setup.binding_x|default:"—" }}
-              {% if setup.binding_x_photo %}
-              <a href="{{ setup.binding_x_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_x_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка X" aria-label="Фото привязки X">
-                📷
-                <span class="binding-photo-hover"><img src="{{ setup.binding_x_photo.url }}" alt="Привязка X"></span>
-              </a>
-              {% endif %}
+          <div class="product-setup-left-col">
+            <div class="product-setup-spec-group">
+              <h5>Привязки и заготовка</h5>
+              <div class="setup-spec-split">
+                <div class="setup-spec-col">
+                  <div>
+                    <span class="muted">X:</span> {{ setup.binding_x|default:"—" }}
+                    {% if setup.binding_x_photo %}
+                    <a href="{{ setup.binding_x_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_x_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка X" aria-label="Фото привязки X">
+                      📷
+                      <span class="binding-photo-hover"><img src="{{ setup.binding_x_photo.url }}" alt="Привязка X"></span>
+                    </a>
+                    {% endif %}
+                  </div>
+                  <div>
+                    <span class="muted">Y:</span> {{ setup.binding_y|default:"—" }}
+                    {% if setup.binding_y_photo %}
+                    <a href="{{ setup.binding_y_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_y_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка Y" aria-label="Фото привязки Y">
+                      📷
+                      <span class="binding-photo-hover"><img src="{{ setup.binding_y_photo.url }}" alt="Привязка Y"></span>
+                    </a>
+                    {% endif %}
+                  </div>
+                  <div>
+                    <span class="muted">Z:</span> {{ setup.binding_z|default:"—" }}
+                    {% if setup.binding_z_photo %}
+                    <a href="{{ setup.binding_z_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_z_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка Z" aria-label="Фото привязки Z">
+                      📷
+                      <span class="binding-photo-hover"><img src="{{ setup.binding_z_photo.url }}" alt="Привязка Z"></span>
+                    </a>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="setup-spec-col">
+                  <div>
+                    <span class="muted">Тип:</span> {{ setup.workpiece|default:"—" }}
+                    {% if setup.workpiece_photo %}
+                    <a href="{{ setup.workpiece_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.workpiece_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Заготовка" aria-label="Фото заготовки">
+                      📷
+                      <span class="binding-photo-hover"><img src="{{ setup.workpiece_photo.url }}" alt="Заготовка"></span>
+                    </a>
+                    {% endif %}
+                  </div>
+                  <div><span class="muted">Материал:</span> {{ setup.material|default:"—" }}</div>
+                  <div><span class="muted">Размер:</span> {{ setup.size|default:"—" }}</div>
+                </div>
+              </div>
             </div>
-            <div>
-              <span class="muted">Y:</span> {{ setup.binding_y|default:"—" }}
-              {% if setup.binding_y_photo %}
-              <a href="{{ setup.binding_y_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_y_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка Y" aria-label="Фото привязки Y">
-                📷
-                <span class="binding-photo-hover"><img src="{{ setup.binding_y_photo.url }}" alt="Привязка Y"></span>
-              </a>
-              {% endif %}
-            </div>
-            <div>
-              <span class="muted">Z:</span> {{ setup.binding_z|default:"—" }}
-              {% if setup.binding_z_photo %}
-              <a href="{{ setup.binding_z_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_z_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка Z" aria-label="Фото привязки Z">
-                📷
-                <span class="binding-photo-hover"><img src="{{ setup.binding_z_photo.url }}" alt="Привязка Z"></span>
-              </a>
-              {% endif %}
-            </div>
-          </div>
-          <div class="product-setup-spec-group">
-            <h5>Заготовка</h5>
-            <div>
-              <span class="muted">Тип:</span> {{ setup.workpiece|default:"—" }}
-              {% if setup.workpiece_photo %}
-              <a href="{{ setup.workpiece_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.workpiece_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Заготовка" aria-label="Фото заготовки">
-                📷
-                <span class="binding-photo-hover"><img src="{{ setup.workpiece_photo.url }}" alt="Заготовка"></span>
-              </a>
-              {% endif %}
-            </div>
-            <div><span class="muted">Материал:</span> {{ setup.material|default:"—" }}</div>
-            <div><span class="muted">Размер:</span> {{ setup.size|default:"—" }}</div>
-          </div>
-          <div class="product-setup-content-grid">
-            <div>
+            <div class="product-setup-notes-row">
               {% if setup.setup_notes %}
               <div class="product-setup-notes muted">{{ setup.setup_notes }}</div>
               {% else %}
               <div class="product-setup-notes muted">Наладка не заполнена.</div>
               {% endif %}
             </div>
-            <div>
-              {% if setup.tool_pdf %}
-              {% with tool_name=setup.tool_pdf.name|lower %}
-              {% if tool_name|slice:"-5:" == ".html" or tool_name|slice:"-4:" == ".htm" %}
-              <div class="product-pdf-frame setup-inline-pdf">
-                <iframe id="setup-tool-frame-{{ setup.pk }}" src="{{ setup.tool_pdf.url }}" title="HTML инструмента {{ setup.name }}" loading="lazy"></iframe>
-              </div>
-              {% else %}
-              <div class="product-pdf-frame setup-inline-pdf">
-                <iframe id="setup-tool-frame-{{ setup.pk }}" src="{{ setup.tool_pdf.url }}#toolbar=1" title="PDF инструмента {{ setup.name }}" loading="lazy"></iframe>
-              </div>
-              {% endif %}
-              <div class="setup-inline-actions">
-                <a href="{{ setup.tool_pdf.url }}" target="_blank" rel="noopener" class="btn btn-ghost">{% if tool_name|slice:"-5:" == ".html" or tool_name|slice:"-4:" == ".htm" %}Открыть HTML{% else %}Открыть файл{% endif %}</a>
-                <button type="button" class="btn btn-ghost js-print-setup-html" data-frame-id="setup-tool-frame-{{ setup.pk }}">Распечатать список инструментов</button>
-              </div>
-              {% endwith %}
-              {% else %}
-              <div class="product-setup-notes muted">Файл инструмента не загружен.</div>
-              {% endif %}
+          </div>
+          <div class="product-setup-tools-col">
+            <div class="table-wrap" style="padding:0;margin:0;">
+              <table class="data-grid setup-tools-view" style="font-size:12px;">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>H</th>
+                    <th>D</th>
+                    <th class="setup-tools-th-rot">Тип</th>
+                    <th class="setup-tools-th-rot">⌀</th>
+                    <th class="setup-tools-th-rot">Вылет</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in setup.tool_display_rows %}
+                  <tr>
+                    <td>{{ row.tool_number }}</td>
+                    <td class="{% if row.kor_n_override %}setup-tool-override{% endif %}">{{ row.kor_n }}</td>
+                    <td class="{% if row.kor_d_override %}setup-tool-override{% endif %}">{{ row.kor_d }}</td>
+                    <td>{% if row.tool_type == "Метчик" and row.tap_hole_type %}{{ row.tool_type }} ({{ row.tap_hole_type }}){% else %}{{ row.tool_type }}{% endif %}</td>
+                    <td>{{ row.diameter }}</td>
+                    <td>{{ row.overhang }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
             </div>
+            {% if setup.tool_pdf %}
+            {% with tool_name=setup.tool_pdf.name|lower %}
+            {% if tool_name|slice:"-5:" == ".html" or tool_name|slice:"-4:" == ".htm" %}
+            <div class="product-pdf-frame setup-inline-pdf">
+              <iframe id="setup-tool-frame-{{ setup.pk }}" src="{{ setup.tool_pdf.url }}" title="HTML инструмента {{ setup.name }}" loading="lazy"></iframe>
+            </div>
+            {% else %}
+            <div class="product-pdf-frame setup-inline-pdf">
+              <iframe id="setup-tool-frame-{{ setup.pk }}" src="{{ setup.tool_pdf.url }}#toolbar=1" title="PDF инструмента {{ setup.name }}" loading="lazy"></iframe>
+            </div>
+            {% endif %}
+            <div class="setup-inline-actions">
+              <a href="{{ setup.tool_pdf.url }}" target="_blank" rel="noopener" class="btn btn-ghost">{% if tool_name|slice:"-5:" == ".html" or tool_name|slice:"-4:" == ".htm" %}Открыть HTML{% else %}Открыть файл{% endif %}</a>
+              <button type="button" class="btn btn-ghost js-print-setup-html" data-frame-id="setup-tool-frame-{{ setup.pk }}">Распечатать список инструментов</button>
+            </div>
+            {% endwith %}
+            {% endif %}
           </div>
         </div>
         {% if setup.photos.all %}
@@ -184,6 +209,16 @@
   </div>
 
   <aside class="product-detail-side" id="product-detail-side">
+    <button
+      type="button"
+      class="btn btn-ghost product-side-toggle"
+      id="product-side-toggle"
+      aria-label="Свернуть/развернуть правую панель"
+      title="Свернуть/развернуть правую панель"
+    >
+      <span class="product-side-toggle-arrow" id="product-side-toggle-arrow" aria-hidden="true">«</span>
+    </button>
+    <div id="product-detail-side-inner">
     {% if product.cad_model or product.preview_stl %}
     <div id="product-cad-block">
     <div id="product-cad-viewport" class="product-cad-viewport"
@@ -221,6 +256,7 @@
       <a href="{{ product.drawing_pdf.url }}" download class="btn product-btn-secondary">Скачать чертёж (PDF)</a>
       {% endif %}
       <a href="#" download class="btn product-btn-program" id="product-program-download" hidden>Скачать программу</a>
+    </div>
     </div>
   </aside>
 </div>
@@ -273,6 +309,11 @@
     width: 100%;
   }
   .product-btn-secondary { background: #2a3656; }
+  .product-btn-edit-mode {
+    background: linear-gradient(180deg, #ef6a6a 0%, #cf4242 100%);
+    border: 1px solid #a93131;
+    color: #fff;
+  }
   .product-btn-program { background: #1a2f1e; border-color: #2a4a38; }
   .product-tabs {
     min-width: 0;
@@ -282,6 +323,7 @@
     flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 12px;
+    align-items: center;
   }
   .product-tab {
     background: #151b28;
@@ -315,6 +357,7 @@
     background: rgba(24, 30, 44, 0.7);
     font-size: 15px;
     min-width: 0;
+    align-items: stretch;
   }
   .product-setup-spec-group {
     border: 1px solid #33415f;
@@ -329,6 +372,16 @@
   .product-setup-spec-group div {
     overflow-wrap: anywhere;
     word-break: break-word;
+  }
+  .setup-spec-split {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .setup-spec-col {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
   }
   .product-setup-spec-group h5 {
     margin: 0 0 3px 0;
@@ -385,19 +438,76 @@
     background: rgba(24, 30, 44, 0.7);
     padding: 10px;
     font-size: 15px;
-    min-height: 210px;
+    min-height: 0;
+    box-sizing: border-box;
     overflow-wrap: anywhere;
     word-break: break-word;
   }
+  .setup-tools-view th, .setup-tools-view td {
+    text-align: center;
+    padding: 4px 6px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .setup-tools-view th.setup-tools-th-rot {
+    height: 72px;
+    min-width: 34px;
+    padding: 0;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    letter-spacing: 0.5px;
+  }
+  .setup-tools-view td.setup-tool-override {
+    border-color: #6f7ef2;
+    box-shadow: inset 0 0 0 1px rgba(111, 126, 242, 0.55);
+    background: rgba(111, 126, 242, 0.16);
+  }
+  .setup-tools-view {
+    min-width: 0;
+  }
   .product-setup-content-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* Левый блок сжимается раньше правого, чтобы таблица справа не вызывала горизонтальный скролл. */
+    grid-template-columns: minmax(190px, 0.92fr) minmax(360px, 1.08fr);
     gap: 12px;
-    align-items: start;
+    align-items: stretch;
     grid-column: 1 / -1;
   }
   .product-setup-content-grid > div {
     min-width: 0;
+  }
+  .product-setup-content-grid .table-wrap {
+    overflow-x: hidden;
+  }
+  .product-setup-content-grid .setup-tools-view {
+    width: 100%;
+    table-layout: fixed;
+  }
+  .product-setup-left-col {
+    min-width: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 12px;
+    align-content: stretch;
+    min-height: 0;
+    height: 100%;
+  }
+  .product-setup-tools-col {
+    min-width: 0;
+  }
+  .product-setup-notes-row {
+    min-width: 0;
+    display: flex;
+    min-height: 0;
+  }
+  .product-setup-notes-row .product-setup-notes {
+    width: 100%;
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 0;
+    overflow: auto;
   }
   .setup-inline-pdf {
     height: 230px;
@@ -409,6 +519,10 @@
     flex-wrap: wrap;
   }
   @media (max-width: 760px) {
+    .setup-spec-split {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
     .product-setup-specs {
       grid-template-columns: 1fr;
     }
@@ -486,6 +600,33 @@
     min-width: 0;
     width: 100%;
   }
+  .product-side-toggle {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: sticky;
+    top: 12px;
+    z-index: 5;
+    align-self: start;
+  }
+  .product-side-toggle-arrow {
+    font-size: 18px;
+    line-height: 1;
+    transition: transform 0.18s ease;
+  }
+  #product-detail-side-inner {
+    width: 100%;
+  }
+  .product-detail-grid.is-side-collapsed #product-detail-side-inner {
+    display: none;
+  }
+  .product-detail-grid.is-side-collapsed {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
   .product-detail-grid.is-drawing-only {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -519,6 +660,53 @@
     margin-top: 12px;
     min-width: 0;
     width: 100%;
+  }
+  .product-downloads-dropdown details {
+    width: 100%;
+  }
+  .product-downloads-dropdown .product-downloads-details summary {
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    width: 100%;
+  }
+  .product-downloads-dropdown .product-downloads-details summary::-webkit-details-marker {
+    display: none;
+  }
+  .product-downloads-dropdown .product-downloads-details[open] .product-downloads {
+    margin-top: 10px;
+  }
+  .product-downloads-collapsible {
+    position: relative;
+    width: 100%;
+  }
+  .product-downloads-toggle {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+  }
+  .product-downloads-toggle-arrow {
+    transition: transform 0.18s ease;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .product-downloads-collapsible.is-collapsed #product-downloads-inner {
+    max-height: 0;
+    opacity: 0;
+    transform: translateX(110%);
+    pointer-events: none;
+    margin-top: 0;
+  }
+  #product-downloads-inner {
+    max-height: 400px;
+    opacity: 1;
+    transform: translateX(0);
+    transition: transform 0.18s ease, opacity 0.18s ease, max-height 0.18s ease, margin-top 0.18s ease;
+  }
+  .product-downloads-collapsible.is-collapsed .product-downloads-toggle-arrow {
+    transform: rotate(180deg);
   }
   .product-downloads .btn {
     width: 100%;
@@ -807,6 +995,15 @@
       programDownloadBtn.hidden = false;
     }
 
+    function setEditModeByTab(tabName) {
+      var editBtn = document.getElementById("setup-edit-mode-btn");
+      if (!editBtn) return;
+      var setupBtn = root.querySelector('.product-tab[data-tab="' + tabName + '"][data-setup-edit-url]');
+      if (!setupBtn) return;
+      var editUrl = setupBtn.getAttribute("data-setup-edit-url") || "";
+      if (editUrl) editBtn.href = editUrl;
+    }
+
     function setSideBlocksByTab(tabName) {
       var hideForDrawing = tabName === "drawing";
       var side = document.getElementById("product-detail-side");
@@ -820,6 +1017,29 @@
       if (!hideForDrawing && typeof window.startProductCadViewer === "function") {
         window.startProductCadViewer();
       }
+    }
+
+    function initProductDownloadsCollapse() {
+      var block = document.getElementById("product-downloads-block");
+      var toggle = document.getElementById("product-downloads-toggle");
+      var inner = document.getElementById("product-downloads-inner");
+      if (!block || !toggle || !inner) return;
+      toggle.addEventListener("click", function () {
+        block.classList.toggle("is-collapsed");
+        var isCollapsed = block.classList.contains("is-collapsed");
+        toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+      });
+    }
+
+    function initProductSideCollapse() {
+      var grid = document.querySelector(".product-detail-grid");
+      var toggle = document.getElementById("product-side-toggle");
+      var arrow = document.getElementById("product-side-toggle-arrow");
+      if (!grid || !toggle) return;
+      toggle.addEventListener("click", function () {
+        var collapsed = grid.classList.toggle("is-side-collapsed");
+        if (arrow) arrow.textContent = collapsed ? "»" : "«";
+      });
     }
 
     function activate(tabName) {
@@ -836,6 +1056,7 @@
         }
       });
       setProgramDownloadByTab(tabName);
+      setEditModeByTab(tabName);
       setSideBlocksByTab(tabName);
     }
     tabButtons.forEach(function (btn) {
@@ -844,14 +1065,19 @@
         if (name) activate(name);
       });
     });
+
+    initProductDownloadsCollapse();
+    initProductSideCollapse();
     var activeBtn = root.querySelector(".product-tab.is-active");
     if (activeBtn) {
       var activeName = activeBtn.getAttribute("data-tab") || "";
       setProgramDownloadByTab(activeName);
+      setEditModeByTab(activeName);
       setSideBlocksByTab(activeName);
     } else if (tabButtons.length) {
       var firstName = tabButtons[0].getAttribute("data-tab") || "";
       setProgramDownloadByTab(firstName);
+      setEditModeByTab(firstName);
       setSideBlocksByTab(firstName);
     }
   })();
