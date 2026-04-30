@@ -158,6 +158,7 @@ class ProductSetupForm(forms.ModelForm):
             "binding_x",
             "binding_y",
             "binding_z",
+            "gcode_system",
             "binding_x_photo",
             "binding_y_photo",
             "binding_z_photo",
@@ -174,6 +175,9 @@ class ProductSetupForm(forms.ModelForm):
             "binding_x": forms.TextInput(attrs={"placeholder": "Например, X0 или -12.5"}),
             "binding_y": forms.TextInput(attrs={"placeholder": "Например, Y0 или 34.2"}),
             "binding_z": forms.TextInput(attrs={"placeholder": "Например, Z0 или +3.0"}),
+            "gcode_system": forms.Select(
+                choices=[("G54", "G54"), ("G55", "G55"), ("G56", "G56"), ("G57", "G57"), ("G58", "G58"), ("G59", "G59")]
+            ),
             "binding_x_photo": forms.FileInput(attrs={"accept": "image/*,.jpg,.jpeg,.png,.webp,.gif"}),
             "binding_y_photo": forms.FileInput(attrs={"accept": "image/*,.jpg,.jpeg,.png,.webp,.gif"}),
             "binding_z_photo": forms.FileInput(attrs={"accept": "image/*,.jpg,.jpeg,.png,.webp,.gif"}),
@@ -646,6 +650,30 @@ def product_detail_view(request, pk: int):
             setup.save(update_fields=["preview_stl", "updated_at"])
             return JsonResponse({"ok": True, "url": setup.preview_stl.url if setup.preview_stl else ""})
 
+        if action == "inline_replace_setup_program":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            program_file = request.FILES.get("program_file")
+            if not program_file:
+                return JsonResponse({"ok": False, "error": "Выберите файл программы."}, status=400)
+            if setup.program_file:
+                try:
+                    setup.program_file.delete(save=False)
+                except Exception:
+                    pass
+            setup.program_file = program_file
+            setup.save(update_fields=["program_file", "updated_at"])
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "program_url": setup.program_file.url if setup.program_file else "",
+                    "program_filename": setup.program_filename or "",
+                }
+            )
+
         if action == "inline_update_setup":
             setup_id_raw = (request.POST.get("setup_id") or "").strip()
             setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
@@ -656,6 +684,7 @@ def product_detail_view(request, pk: int):
                 "binding_x",
                 "binding_y",
                 "binding_z",
+                "gcode_system",
                 "workpiece",
                 "material",
                 "size",
@@ -705,6 +734,7 @@ def product_detail_view(request, pk: int):
                         "binding_x": setup.binding_x or "—",
                         "binding_y": setup.binding_y or "—",
                         "binding_z": setup.binding_z or "—",
+                        "gcode_system": setup.gcode_system or "G54",
                         "workpiece": setup.workpiece or "—",
                         "material": setup.material or "—",
                         "size": setup.size or "—",

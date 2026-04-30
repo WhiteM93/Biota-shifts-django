@@ -312,6 +312,7 @@ class ProductSetup(models.Model):
     binding_x = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка X")
     binding_y = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка Y")
     binding_z = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка Z")
+    gcode_system = models.CharField(max_length=3, blank=True, default="G54", verbose_name="Система координат G")
     binding_x_photo = models.FileField(
         upload_to="products/setup_bindings/",
         blank=True,
