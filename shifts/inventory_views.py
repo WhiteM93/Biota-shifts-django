@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal, InvalidOperation
+import json
 
 from django.contrib import messages
 from django.db import transaction
@@ -15,8 +16,13 @@ from biota_shifts.auth import _is_admin, employees_df_for_nav, nav_permissions_f
 from biota_shifts.schedule import employee_label_row
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
 from .models import (
+    CENTER_DRILL_ANGLES,
+    COUNTERSINK_ANGLES,
+    COUNTERSINK_TYPES,
     COATING_TYPES,
+    CountersinkSpec,
     END_MILL_TYPES,
+    CenterDrillSpec,
     EndMillSpec,
     StockMovement,
     TapSpec,
@@ -88,6 +94,16 @@ def _build_tap_name(size_label: str, thread_standard: str, tap_type: str, hole_t
     ttype_map = dict(TAP_TOOL_TYPES)
     htype_map = dict(TAP_HOLE_TYPES)
     return f"{size_label} / {std_map.get(thread_standard, thread_standard)} / {ttype_map.get(tap_type, tap_type)} / {htype_map.get(hole_type, hole_type)}"
+
+
+def _build_center_drill_name(diameter_mm, angle_deg: str) -> str:
+    return f"Центровка D{_fmt_unknown(diameter_mm)} / {angle_deg or '60'}°"
+
+
+def _build_countersink_name(countersink_type: str, diameter_mm, angle_deg: str, size_label: str) -> str:
+    type_label = dict(COUNTERSINK_TYPES).get(countersink_type, countersink_type or "машинный")
+    size_part = f" / {size_label}" if size_label else ""
+    return f"Зенкер {type_label} D{_fmt_unknown(diameter_mm)} / {angle_deg or '90'}°{size_part}"
 
 
 @biota_login_required
@@ -441,6 +457,238 @@ def inventory_view(request):
         messages.success(request, "Приход сохранен: остаток обновлен (или создана новая позиция).")
         return redirect("inventory")
 
+    if action == "add_arrival_bulk":
+        rows_json = (request.POST.get("rows_json") or "").strip()
+        if not rows_json:
+            messages.error(request, "Добавьте хотя бы одну строку прихода.")
+            return redirect(f"{request.path}?panel=arrival")
+        try:
+            rows = json.loads(rows_json)
+        except Exception:
+            messages.error(request, "Некорректные данные строк прихода.")
+            return redirect(f"{request.path}?panel=arrival")
+        if not isinstance(rows, list) or not rows:
+            messages.error(request, "Добавьте хотя бы одну строку прихода.")
+            return redirect(f"{request.path}?panel=arrival")
+
+        created_count = 0
+        with transaction.atomic():
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                category = (row.get("category") or "").strip()
+                quantity = _to_int(row.get("quantity"), 0)
+                movement_date_raw = (row.get("movement_date") or "").strip()
+                comment = (row.get("comment") or "").strip()
+                supplier_name = (row.get("supplier_name") or "").strip()
+                tool_material = (row.get("tool_material") or "").strip()
+                coating_type = (row.get("coating_type") or "none").strip()
+                work_material = (row.get("work_material") or "").strip()
+                if category not in {"end_mill", "tap", "center_drill", "countersink"} or quantity <= 0:
+                    continue
+                try:
+                    movement_date = date.fromisoformat(movement_date_raw)
+                except ValueError:
+                    movement_date = date.today()
+
+                if category == "end_mill":
+                    mill_type = (row.get("mill_type") or "end").strip()
+                    diameter_mm = _to_decimal_or_none(row.get("em_diameter_mm"))
+                    corner_radius_mm = _to_decimal_or_none(row.get("em_corner_radius_mm"))
+                    overall_length_mm = _to_decimal_or_none(row.get("em_overall_length_mm"))
+                    cutting_length_mm = _to_decimal_or_none(row.get("em_cutting_length_mm"))
+                    flutes_count = _to_int_or_none(row.get("em_flutes_count"))
+                    tool = (
+                        ToolItem.objects.select_for_update()
+                        .filter(
+                            category="end_mill",
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            end_mill_spec__mill_type=mill_type,
+                            end_mill_spec__diameter_mm=diameter_mm,
+                            end_mill_spec__corner_radius_mm=corner_radius_mm,
+                            end_mill_spec__overall_length_mm=overall_length_mm,
+                            end_mill_spec__cutting_length_mm=cutting_length_mm,
+                            end_mill_spec__flutes_count=flutes_count,
+                        )
+                        .first()
+                    )
+                    if tool:
+                        tool.quantity += quantity
+                        tool.save(update_fields=["quantity", "updated_at"])
+                    else:
+                        tool = ToolItem.objects.create(
+                            category="end_mill",
+                            name=_build_end_mill_name(diameter_mm, flutes_count, tool_material, work_material),
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            quantity=quantity,
+                        )
+                        EndMillSpec.objects.create(
+                            tool=tool,
+                            mill_type=mill_type,
+                            diameter_mm=diameter_mm,
+                            corner_radius_mm=corner_radius_mm,
+                            overall_length_mm=overall_length_mm,
+                            cutting_length_mm=cutting_length_mm,
+                            flutes_count=flutes_count,
+                        )
+                elif category == "tap":
+                    thread_standard = (row.get("thread_standard") or "metric").strip()
+                    size_label = (row.get("size_label") or "").strip() or "Размер неизвестен"
+                    pitch_mm = _to_decimal_or_none(row.get("tap_pitch_mm"))
+                    tpi = _to_int_or_none(row.get("tap_tpi"))
+                    hole_type = (row.get("hole_type") or "any").strip()
+                    tap_type = (row.get("tap_type") or "cutting").strip()
+                    overall_length_mm = _to_decimal_or_none(row.get("tap_overall_length_mm"))
+                    cutting_length_mm = _to_decimal_or_none(row.get("tap_cutting_length_mm"))
+                    tool = (
+                        ToolItem.objects.select_for_update()
+                        .filter(
+                            category="tap",
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            tap_spec__thread_standard=thread_standard,
+                            tap_spec__size_label=size_label,
+                            tap_spec__pitch_mm=pitch_mm,
+                            tap_spec__tpi=tpi,
+                            tap_spec__hole_type=hole_type,
+                            tap_spec__tap_type=tap_type,
+                            tap_spec__overall_length_mm=overall_length_mm,
+                            tap_spec__cutting_length_mm=cutting_length_mm,
+                        )
+                        .first()
+                    )
+                    if tool:
+                        tool.quantity += quantity
+                        tool.save(update_fields=["quantity", "updated_at"])
+                    else:
+                        tool = ToolItem.objects.create(
+                            category="tap",
+                            name=_build_tap_name(size_label, thread_standard, tap_type, hole_type),
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            quantity=quantity,
+                        )
+                        TapSpec.objects.create(
+                            tool=tool,
+                            thread_standard=thread_standard,
+                            size_label=size_label,
+                            pitch_mm=pitch_mm,
+                            tpi=tpi,
+                            hole_type=hole_type,
+                            tap_type=tap_type,
+                            overall_length_mm=overall_length_mm,
+                            cutting_length_mm=cutting_length_mm,
+                        )
+                elif category == "center_drill":
+                    diameter_mm = _to_decimal_or_none(row.get("cd_diameter_mm"))
+                    overall_length_mm = _to_decimal_or_none(row.get("cd_overall_length_mm"))
+                    angle_deg = (row.get("cd_angle_deg") or "60").strip()
+                    if angle_deg not in {x[0] for x in CENTER_DRILL_ANGLES}:
+                        angle_deg = "60"
+                    tool = (
+                        ToolItem.objects.select_for_update()
+                        .filter(
+                            category="center_drill",
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            center_drill_spec__diameter_mm=diameter_mm,
+                            center_drill_spec__overall_length_mm=overall_length_mm,
+                            center_drill_spec__angle_deg=angle_deg,
+                        )
+                        .first()
+                    )
+                    if tool:
+                        tool.quantity += quantity
+                        tool.save(update_fields=["quantity", "updated_at"])
+                    else:
+                        tool = ToolItem.objects.create(
+                            category="center_drill",
+                            name=_build_center_drill_name(diameter_mm, angle_deg),
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            quantity=quantity,
+                        )
+                        CenterDrillSpec.objects.create(
+                            tool=tool,
+                            diameter_mm=diameter_mm,
+                            overall_length_mm=overall_length_mm,
+                            angle_deg=angle_deg,
+                        )
+                else:
+                    countersink_type = (row.get("cs_type") or "machine").strip()
+                    if countersink_type not in {x[0] for x in COUNTERSINK_TYPES}:
+                        countersink_type = "machine"
+                    diameter_mm = _to_decimal_or_none(row.get("cs_diameter_mm"))
+                    angle_deg = (row.get("cs_angle_deg") or "90").strip()
+                    if angle_deg not in {x[0] for x in COUNTERSINK_ANGLES}:
+                        angle_deg = "90"
+                    overall_length_mm = _to_decimal_or_none(row.get("cs_overall_length_mm"))
+                    flutes_count = _to_int_or_none(row.get("cs_flutes_count"))
+                    size_label = (row.get("cs_size_label") or "").strip()
+                    tool = (
+                        ToolItem.objects.select_for_update()
+                        .filter(
+                            category="countersink",
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            countersink_spec__countersink_type=countersink_type,
+                            countersink_spec__diameter_mm=diameter_mm,
+                            countersink_spec__angle_deg=angle_deg,
+                            countersink_spec__overall_length_mm=overall_length_mm,
+                            countersink_spec__flutes_count=flutes_count,
+                            countersink_spec__size_label=size_label,
+                        )
+                        .first()
+                    )
+                    if tool:
+                        tool.quantity += quantity
+                        tool.save(update_fields=["quantity", "updated_at"])
+                    else:
+                        tool = ToolItem.objects.create(
+                            category="countersink",
+                            name=_build_countersink_name(countersink_type, diameter_mm, angle_deg, size_label),
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            quantity=quantity,
+                        )
+                        CountersinkSpec.objects.create(
+                            tool=tool,
+                            countersink_type=countersink_type,
+                            diameter_mm=diameter_mm,
+                            angle_deg=angle_deg,
+                            overall_length_mm=overall_length_mm,
+                            flutes_count=flutes_count,
+                            size_label=size_label,
+                        )
+                StockMovement.objects.create(
+                    movement_type="restock",
+                    tool=tool,
+                    quantity=quantity,
+                    movement_date=movement_date,
+                    comment=comment or (
+                        f"Приход инструмента ({supplier_name})"
+                        if supplier_name
+                        else "Приход инструмента"
+                    ),
+                )
+                created_count += 1
+
+        if created_count <= 0:
+            messages.error(request, "Не удалось сохранить строки прихода. Проверьте данные.")
+        else:
+            messages.success(request, f"Оприходовано строк: {created_count}.")
+        return redirect(f"{request.path}?panel=arrival")
+
     if action == "create_purchase_request":
         requested_item = (request.POST.get("requested_item") or "").strip()
         store_link = (request.POST.get("store_link") or "").strip()
@@ -651,7 +899,7 @@ def inventory_view(request):
     if not show_all:
         qs = qs.filter(quantity__gt=0)
     filter_category = (request.GET.get("category") or "end_mill").strip()
-    if filter_category not in {"end_mill", "tap"}:
+    if filter_category not in {"end_mill", "tap", "center_drill", "countersink"}:
         filter_category = "end_mill"
     qs = qs.filter(category=filter_category)
 
@@ -669,6 +917,16 @@ def inventory_view(request):
     tap_tool_type = (request.GET.get("tap_tool_type") or "").strip()
     tap_overall_length_raw = (request.GET.get("tap_overall_length_mm") or "").strip()
     tap_cutting_length_raw = (request.GET.get("tap_cutting_length_mm") or "").strip()
+    center_diameter_raw = (request.GET.get("center_diameter_mm") or "").strip()
+    center_overall_length_raw = (request.GET.get("center_overall_length_mm") or "").strip()
+    center_angle_raw = (request.GET.get("center_angle_deg") or "").strip()
+    countersink_type_raw = (request.GET.get("countersink_type") or "").strip()
+    countersink_diameter_raw = (request.GET.get("countersink_diameter_mm") or "").strip()
+    countersink_angle_raw = (request.GET.get("countersink_angle_deg") or "").strip()
+    countersink_length_raw = (request.GET.get("countersink_overall_length_mm") or "").strip()
+    countersink_flutes_raw = (request.GET.get("countersink_flutes_count") or "").strip()
+    countersink_size_raw = (request.GET.get("countersink_size_label") or "").strip()
+    arrival_supplier = (request.GET.get("arrival_supplier") or "").strip()
 
     tool_material = (request.GET.get("tool_material") or "").strip()
     coating_type = (request.GET.get("coating_type") or "").strip()
@@ -717,6 +975,34 @@ def inventory_view(request):
         tap_cutting_length = _to_decimal(tap_cutting_length_raw, Decimal("0"))
         if tap_cutting_length > 0:
             qs = qs.filter(tap_spec__cutting_length_mm=tap_cutting_length)
+    if center_diameter_raw:
+        center_diameter = _to_decimal(center_diameter_raw, Decimal("0"))
+        if center_diameter > 0:
+            qs = qs.filter(center_drill_spec__diameter_mm=center_diameter)
+    if center_overall_length_raw:
+        center_overall_length = _to_decimal(center_overall_length_raw, Decimal("0"))
+        if center_overall_length > 0:
+            qs = qs.filter(center_drill_spec__overall_length_mm=center_overall_length)
+    if center_angle_raw:
+        qs = qs.filter(center_drill_spec__angle_deg=center_angle_raw)
+    if countersink_type_raw:
+        qs = qs.filter(countersink_spec__countersink_type=countersink_type_raw)
+    if countersink_diameter_raw:
+        countersink_diameter = _to_decimal(countersink_diameter_raw, Decimal("0"))
+        if countersink_diameter > 0:
+            qs = qs.filter(countersink_spec__diameter_mm=countersink_diameter)
+    if countersink_angle_raw:
+        qs = qs.filter(countersink_spec__angle_deg=countersink_angle_raw)
+    if countersink_length_raw:
+        countersink_length = _to_decimal(countersink_length_raw, Decimal("0"))
+        if countersink_length > 0:
+            qs = qs.filter(countersink_spec__overall_length_mm=countersink_length)
+    if countersink_flutes_raw:
+        countersink_flutes = _to_int(countersink_flutes_raw, 0)
+        if countersink_flutes > 0:
+            qs = qs.filter(countersink_spec__flutes_count=countersink_flutes)
+    if countersink_size_raw:
+        qs = qs.filter(countersink_spec__size_label__iexact=countersink_size_raw)
 
     if tool_material:
         qs = qs.filter(tool_material=tool_material)
@@ -724,6 +1010,11 @@ def inventory_view(request):
         qs = qs.filter(coating_type=coating_type)
     if work_material:
         qs = qs.filter(work_material=work_material)
+    if arrival_supplier:
+        qs = qs.filter(
+            movements__movement_type="restock",
+            movements__comment__icontains=arrival_supplier,
+        ).distinct()
 
     option_source_qs = ToolItem.objects.all()
     if not show_all:
@@ -744,9 +1035,18 @@ def inventory_view(request):
     tap_thread_standards = _distinct_text_values(option_source_qs.filter(category="tap"), "tap_spec__thread_standard")
     tap_hole_types = _distinct_text_values(option_source_qs.filter(category="tap"), "tap_spec__hole_type")
     tap_tool_types = _distinct_text_values(option_source_qs.filter(category="tap"), "tap_spec__tap_type")
+    center_diameters = _distinct_numeric_values(option_source_qs.filter(category="center_drill"), "center_drill_spec__diameter_mm")
+    center_overall_lengths = _distinct_numeric_values(option_source_qs.filter(category="center_drill"), "center_drill_spec__overall_length_mm")
+    center_angles = _distinct_text_values(option_source_qs.filter(category="center_drill"), "center_drill_spec__angle_deg")
+    countersink_types = _distinct_text_values(option_source_qs.filter(category="countersink"), "countersink_spec__countersink_type")
+    countersink_diameters = _distinct_numeric_values(option_source_qs.filter(category="countersink"), "countersink_spec__diameter_mm")
+    countersink_angles = _distinct_text_values(option_source_qs.filter(category="countersink"), "countersink_spec__angle_deg")
+    countersink_lengths = _distinct_numeric_values(option_source_qs.filter(category="countersink"), "countersink_spec__overall_length_mm")
+    countersink_flutes = _distinct_numeric_values(option_source_qs.filter(category="countersink"), "countersink_spec__flutes_count")
+    countersink_sizes = _distinct_text_values(option_source_qs.filter(category="countersink"), "countersink_spec__size_label")
     issue_candidates = list(
         StockMovement.objects.filter(movement_type="issue")
-        .select_related("tool", "tool__end_mill_spec", "tool__tap_spec")
+        .select_related("tool", "tool__end_mill_spec", "tool__tap_spec", "tool__center_drill_spec", "tool__countersink_spec")
         .annotate(
             processed_qty=Coalesce(
                 Sum("issue_outcomes__quantity"),
@@ -803,8 +1103,8 @@ def inventory_view(request):
     )
 
     ctx = {
-        "tool_items": qs.select_related("end_mill_spec", "tap_spec"),
-        "movements": StockMovement.objects.select_related("tool")[:50],
+        "tool_items": qs.select_related("end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec"),
+        "movements": StockMovement.objects.select_related("tool", "tool__end_mill_spec", "tool__tap_spec", "tool__center_drill_spec", "tool__countersink_spec")[:50],
         "thread_standards": THREAD_STANDARDS,
         "tap_hole_types": TAP_HOLE_TYPES,
         "tap_tool_types": TAP_TOOL_TYPES,
@@ -823,9 +1123,19 @@ def inventory_view(request):
             "tap_tool_type": tap_tool_type,
             "tap_overall_length_mm": tap_overall_length_raw,
             "tap_cutting_length_mm": tap_cutting_length_raw,
+            "center_diameter_mm": center_diameter_raw,
+            "center_overall_length_mm": center_overall_length_raw,
+            "center_angle_deg": center_angle_raw,
+            "countersink_type": countersink_type_raw,
+            "countersink_diameter_mm": countersink_diameter_raw,
+            "countersink_angle_deg": countersink_angle_raw,
+            "countersink_overall_length_mm": countersink_length_raw,
+            "countersink_flutes_count": countersink_flutes_raw,
+            "countersink_size_label": countersink_size_raw,
             "tool_material": tool_material,
             "coating_type": coating_type,
             "work_material": work_material,
+            "arrival_supplier": arrival_supplier,
             "show_all": show_all,
         },
         "end_mill_filter_options": {
@@ -846,11 +1156,27 @@ def inventory_view(request):
             "hole_types": tap_hole_types,
             "tool_types": tap_tool_types,
         },
+        "center_drill_filter_options": {
+            "diameters": center_diameters,
+            "overall_lengths": center_overall_lengths,
+            "angles": center_angles,
+        },
+        "center_drill_angles": CENTER_DRILL_ANGLES,
+        "countersink_filter_options": {
+            "types": countersink_types,
+            "diameters": countersink_diameters,
+            "angles": countersink_angles,
+            "overall_lengths": countersink_lengths,
+            "flutes": countersink_flutes,
+            "sizes": countersink_sizes,
+        },
+        "countersink_types": COUNTERSINK_TYPES,
+        "countersink_angles": COUNTERSINK_ANGLES,
         "tool_material_types": TOOL_MATERIAL_TYPES,
         "coating_types": COATING_TYPES,
         "work_material_types": WORK_MATERIAL_TYPES,
         "today": date.today().isoformat(),
-        "movement_tool_options": ToolItem.objects.select_related("end_mill_spec", "tap_spec").all().order_by("category", "name"),
+        "movement_tool_options": ToolItem.objects.select_related("end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec").all().order_by("category", "name"),
         "issue_candidates": issue_candidates,
         "purchase_requests": purchase_qs[:300],
         "purchase_statuses": PURCHASE_STATUSES,

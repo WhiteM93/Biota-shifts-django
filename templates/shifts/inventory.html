@@ -27,12 +27,23 @@
       <select name="category">
         <option value="end_mill" {% if filters.category == "end_mill" %}selected{% endif %}>Фрезы</option>
         <option value="tap" {% if filters.category == "tap" %}selected{% endif %}>Резьбовой инструмент</option>
+        <option value="center_drill" {% if filters.category == "center_drill" %}selected{% endif %}>Центровки</option>
+        <option value="countersink" {% if filters.category == "countersink" %}selected{% endif %}>Зенкера</option>
       </select>
     </label>
     <label class="field"><span>Показывать нулевые остатки</span>
       <select name="show_all">
         <option value="0" {% if not filters.show_all %}selected{% endif %}>Нет</option>
         <option value="1" {% if filters.show_all %}selected{% endif %}>Да</option>
+      </select>
+    </label>
+    <label class="field"><span>От кого</span>
+      <select name="arrival_supplier">
+        <option value="" {% if not filters.arrival_supplier %}selected{% endif %}>Все</option>
+        <option value="ООО МВ" {% if filters.arrival_supplier == "ООО МВ" %}selected{% endif %}>ООО МВ</option>
+        <option value="ИП Иванов" {% if filters.arrival_supplier == "ИП Иванов" %}selected{% endif %}>ИП Иванов</option>
+        <option value="ИП Игнатьев" {% if filters.arrival_supplier == "ИП Игнатьев" %}selected{% endif %}>ИП Игнатьев</option>
+        <option value="ИП Ясинов" {% if filters.arrival_supplier == "ИП Ясинов" %}selected{% endif %}>ИП Ясинов</option>
       </select>
     </label>
     {% if filters.category == "end_mill" %}
@@ -147,6 +158,86 @@
         {% endfor %}
       </select>
     </label>
+    {% elif filters.category == "center_drill" %}
+    <label class="field"><span>Диаметр, мм</span>
+      <select name="center_diameter_mm">
+        <option value="">Все</option>
+        {% for v in center_drill_filter_options.diameters %}
+        <option value="{{ v }}" {% if filters.center_diameter_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Длина, мм</span>
+      <select name="center_overall_length_mm">
+        <option value="">Все</option>
+        {% for v in center_drill_filter_options.overall_lengths %}
+        <option value="{{ v }}" {% if filters.center_overall_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Угол, °</span>
+      <select name="center_angle_deg">
+        <option value="">Все</option>
+        {% for key, label in center_drill_angles %}
+          {% if key in center_drill_filter_options.angles %}
+          <option value="{{ key }}" {% if filters.center_angle_deg == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "countersink" %}
+    <label class="field"><span>Тип зенкера</span>
+      <select name="countersink_type">
+        <option value="">Все</option>
+        {% for key, label in countersink_types %}
+          {% if key in countersink_filter_options.types %}
+          <option value="{{ key }}" {% if filters.countersink_type == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Диаметр, мм</span>
+      <select name="countersink_diameter_mm">
+        <option value="">Все</option>
+        {% for v in countersink_filter_options.diameters %}
+        <option value="{{ v }}" {% if filters.countersink_diameter_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Угол, °</span>
+      <select name="countersink_angle_deg">
+        <option value="">Все</option>
+        {% for key, label in countersink_angles %}
+          {% if key in countersink_filter_options.angles %}
+          <option value="{{ key }}" {% if filters.countersink_angle_deg == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Длина, мм</span>
+      <select name="countersink_overall_length_mm">
+        <option value="">Все</option>
+        {% for v in countersink_filter_options.overall_lengths %}
+        <option value="{{ v }}" {% if filters.countersink_overall_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Кромки</span>
+      <select name="countersink_flutes_count">
+        <option value="">Все</option>
+        {% for v in countersink_filter_options.flutes %}
+        <option value="{{ v }}" {% if filters.countersink_flutes_count == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Размер</span>
+      <select name="countersink_size_label">
+        <option value="">Все</option>
+        {% for v in countersink_filter_options.sizes %}
+        <option value="{{ v }}" {% if filters.countersink_size_label == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
     {% endif %}
     <label class="field"><span>Материал инструмента</span>
       <select name="tool_material">
@@ -195,10 +286,10 @@
       <tr>
         <th class="sortable">Тип фрезы</th>
         <th class="sortable">D, мм</th>
-        <th class="sortable">R, мм</th>
-        <th class="sortable">L, мм</th>
-        <th class="sortable">Lc, мм</th>
-        <th class="sortable">Z</th>
+        <th class="sortable hint-cell" data-hint="Радиус инструмента">R, мм</th>
+        <th class="sortable hint-cell" data-hint="Длина инструмента">L, мм</th>
+        <th class="sortable hint-cell" data-hint="Длина режущей части">Lc, мм</th>
+        <th class="sortable hint-cell" data-hint="Количество кромок">Z</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
@@ -209,12 +300,12 @@
       {% for t in tool_items %}
       <tr>
         <td data-sort="{{ t.end_mill_spec.get_mill_type_display|default:'-' }}">{{ t.end_mill_spec.get_mill_type_display|default:"-" }}</td>
-        <td data-sort="{{ t.end_mill_spec.diameter_mm|default:'-1' }}">
+        <td data-sort="{{ t.end_mill_spec.diameter_mm|default:'-1' }}" class="diameter-col">
           {% if t.end_mill_spec.diameter_mm %}Ø{{ t.end_mill_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}
         </td>
-        <td data-sort="{{ t.end_mill_spec.corner_radius_mm|default:'-1' }}">{{ t.end_mill_spec.corner_radius_mm|default:"-" }}</td>
-        <td data-sort="{{ t.end_mill_spec.overall_length_mm|default:'-1' }}">{{ t.end_mill_spec.overall_length_mm|default:"-" }}</td>
-        <td data-sort="{{ t.end_mill_spec.cutting_length_mm|default:'-1' }}">{{ t.end_mill_spec.cutting_length_mm|default:"-" }}</td>
+        <td data-sort="{{ t.end_mill_spec.corner_radius_mm|default:'-1' }}">{% if t.end_mill_spec.corner_radius_mm is not None %}{{ t.end_mill_spec.corner_radius_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.end_mill_spec.overall_length_mm|default:'-1' }}">{% if t.end_mill_spec.overall_length_mm is not None %}{{ t.end_mill_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.end_mill_spec.cutting_length_mm|default:'-1' }}">{% if t.end_mill_spec.cutting_length_mm is not None %}{{ t.end_mill_spec.cutting_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.end_mill_spec.flutes_count|default:'-1' }}">{{ t.end_mill_spec.flutes_count|default:"-" }}</td>
         <td>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}">
@@ -236,18 +327,18 @@
       {% endfor %}
     </tbody>
   </table>
-  {% else %}
+  {% elif filters.category == "tap" %}
   <table class="data-grid js-sortable-table">
     <thead>
       <tr>
         <th class="sortable">Размер</th>
         <th class="sortable">Стандарт</th>
-        <th class="sortable">Шаг, мм</th>
-        <th class="sortable">TPI</th>
+        <th class="sortable hint-cell" data-hint="Шаг резьбы">Шаг, мм</th>
+        <th class="sortable hint-cell" data-hint="Количество витков на дюйм">TPI</th>
         <th class="sortable">Тип отверстия</th>
         <th class="sortable">Тип инструмента</th>
-        <th class="sortable">L, мм</th>
-        <th class="sortable">Lc, мм</th>
+        <th class="sortable hint-cell" data-hint="Длина инструмента">L, мм</th>
+        <th class="sortable hint-cell" data-hint="Длина режущей части">Lc, мм</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
@@ -257,14 +348,14 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
-        <td data-sort="{{ t.tap_spec.size_label|default:'-' }}">{{ t.tap_spec.size_label|default:"-" }}</td>
+        <td data-sort="{{ t.tap_spec.size_label|default:'-' }}" class="tap-size-col">{{ t.tap_spec.size_label|default:"-" }}</td>
         <td data-sort="{{ t.tap_spec.get_thread_standard_display|default:'-' }}">{{ t.tap_spec.get_thread_standard_display|default:"-" }}</td>
         <td data-sort="{{ t.tap_spec.pitch_mm|default:'-1' }}">{{ t.tap_spec.pitch_mm|default:"-" }}</td>
         <td data-sort="{{ t.tap_spec.tpi|default:'-1' }}">{{ t.tap_spec.tpi|default:"-" }}</td>
         <td data-sort="{{ t.tap_spec.get_hole_type_display|default:'-' }}">{{ t.tap_spec.get_hole_type_display|default:"-" }}</td>
         <td data-sort="{{ t.tap_spec.get_tap_type_display|default:'-' }}">{{ t.tap_spec.get_tap_type_display|default:"-" }}</td>
-        <td data-sort="{{ t.tap_spec.overall_length_mm|default:'-1' }}">{{ t.tap_spec.overall_length_mm|default:"-" }}</td>
-        <td data-sort="{{ t.tap_spec.cutting_length_mm|default:'-1' }}">{{ t.tap_spec.cutting_length_mm|default:"-" }}</td>
+        <td data-sort="{{ t.tap_spec.overall_length_mm|default:'-1' }}">{% if t.tap_spec.overall_length_mm is not None %}{{ t.tap_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.tap_spec.cutting_length_mm|default:'-1' }}">{% if t.tap_spec.cutting_length_mm is not None %}{{ t.tap_spec.cutting_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}">
           <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
@@ -282,6 +373,80 @@
       </tr>
       {% empty %}
       <tr><td colspan="12" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% elif filters.category == "center_drill" %}
+  <table class="data-grid js-sortable-table">
+    <thead>
+      <tr>
+        <th class="sortable">D, мм</th>
+        <th class="sortable">L, мм</th>
+        <th class="sortable">Угол, °</th>
+        <th class="sortable">Материал инструмента</th>
+        <th class="sortable">Покрытие</th>
+        <th class="sortable">Материал обработки</th>
+        <th class="sortable">Остаток</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tool_items %}
+      <tr>
+        <td data-sort="{{ t.center_drill_spec.diameter_mm|default:'-1' }}">{% if t.center_drill_spec.diameter_mm is not None %}{{ t.center_drill_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.center_drill_spec.overall_length_mm|default:'-1' }}">{% if t.center_drill_spec.overall_length_mm is not None %}{{ t.center_drill_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.center_drill_spec.angle_deg|default:'-' }}">{{ t.center_drill_spec.angle_deg|default:"-" }}</td>
+        <td>{{ t.get_tool_material_display|default:"-" }}</td>
+        <td data-sort="{{ t.coating_type }}">
+          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
+        </td>
+        <td data-sort="{{ t.work_material|default:'-' }}">
+          {% if t.work_material == "P" %}<span class="wm-badge wm-p">P</span>
+          {% elif t.work_material == "M" %}<span class="wm-badge wm-m">M</span>
+          {% elif t.work_material == "K" %}<span class="wm-badge wm-k">K</span>
+          {% elif t.work_material == "N" %}<span class="wm-badge wm-n">N</span>
+          {% elif t.work_material == "S" %}<span class="wm-badge wm-s">S</span>
+          {% elif t.work_material == "H" %}<span class="wm-badge wm-h">H</span>
+          {% else %}-{% endif %}
+        </td>
+        <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <table class="data-grid js-sortable-table">
+    <thead>
+      <tr>
+        <th class="sortable">Тип</th>
+        <th class="sortable">D, мм</th>
+        <th class="sortable">Угол, °</th>
+        <th class="sortable">L, мм</th>
+        <th class="sortable">Z</th>
+        <th class="sortable">Размер</th>
+        <th class="sortable">Материал инструмента</th>
+        <th class="sortable">Покрытие</th>
+        <th class="sortable">Остаток</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tool_items %}
+      <tr>
+        <td data-sort="{{ t.countersink_spec.get_countersink_type_display|default:'-' }}">{{ t.countersink_spec.get_countersink_type_display|default:"-" }}</td>
+        <td data-sort="{{ t.countersink_spec.diameter_mm|default:'-1' }}">{% if t.countersink_spec.diameter_mm is not None %}{{ t.countersink_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.countersink_spec.angle_deg|default:'-' }}">{{ t.countersink_spec.angle_deg|default:"-" }}</td>
+        <td data-sort="{{ t.countersink_spec.overall_length_mm|default:'-1' }}">{% if t.countersink_spec.overall_length_mm is not None %}{{ t.countersink_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.countersink_spec.flutes_count|default:'-1' }}">{{ t.countersink_spec.flutes_count|default:"-" }}</td>
+        <td data-sort="{{ t.countersink_spec.size_label|default:'-' }}">{{ t.countersink_spec.size_label|default:"-" }}</td>
+        <td>{{ t.get_tool_material_display|default:"-" }}</td>
+        <td data-sort="{{ t.coating_type }}">
+          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
+        </td>
+        <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="9" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -306,6 +471,8 @@
         <option value="">Все</option>
         <option value="end_mill">Фрезы</option>
         <option value="tap">Резьбовой инструмент</option>
+        <option value="center_drill">Центровки</option>
+        <option value="countersink">Зенкера</option>
       </select>
     </label>
     <label class="field"><span>Поиск инструмента</span>
@@ -317,7 +484,7 @@
         {% for t in movement_tool_options %}
         <option value="{{ t.id }}" data-category="{{ t.category }}">
           {{ t.get_category_display }}
-          {% if t.category == "end_mill" and t.end_mill_spec %}| {{ t.end_mill_spec.get_mill_type_display }}{% elif t.category == "tap" and t.tap_spec %}| {{ t.tap_spec.get_tap_type_display }}{% endif %}
+          {% if t.category == "end_mill" and t.end_mill_spec %}| {{ t.end_mill_spec.get_mill_type_display }}{% elif t.category == "tap" and t.tap_spec %}| {{ t.tap_spec.get_tap_type_display }}{% elif t.category == "center_drill" and t.center_drill_spec %}| центровка {{ t.center_drill_spec.angle_deg }}°{% elif t.category == "countersink" and t.countersink_spec %}| зенкер {{ t.countersink_spec.get_countersink_type_display }} {{ t.countersink_spec.angle_deg }}°{% endif %}
           | {{ t.name }} | остаток {{ t.quantity }}
         </option>
         {% endfor %}
@@ -338,102 +505,40 @@
 {% if panel == "arrival" %}
 {% if biota_can_edit %}
 <div class="filter-panel" id="arrival-block">
-  <h3>Приход инструмента (автосовпадение)</h3>
-  <p class="muted" style="margin-top:0;">Укажи параметры пришедшего инструмента: если такая позиция уже есть, остаток увеличится; если нет — создастся новая.</p>
-  <form method="post" class="filter-grid">
-    {% csrf_token %}
-    <input type="hidden" name="action" value="add_arrival_new">
-    <label class="field"><span>Категория инструмента</span>
-      <select class="js-new-arrival-category" name="new_category" required>
+  <h3>Приход инструмента по счёту</h3>
+  <p class="muted" style="margin-top:0;">Выбери категорию, добавь строки кнопкой "+" и заполни таблицу. Все строки оприходуются одной кнопкой.</p>
+  <div class="arrival-bulk-top">
+    <label class="field">
+      <span>Категория инструмента</span>
+      <select class="js-arrival-bulk-category" id="arrival-bulk-category">
         <option value="">Выбрать...</option>
         <option value="end_mill">Фрезы</option>
         <option value="tap">Резьбовой инструмент</option>
+        <option value="center_drill">Центровки</option>
+        <option value="countersink">Зенкера</option>
       </select>
     </label>
-    <label class="field"><span>Количество</span><input type="number" name="quantity" min="1" required></label>
-    <label class="field"><span>Дата</span><input type="date" name="movement_date" value="{{ today }}" required></label>
-    <label class="field"><span>Материал инструмента</span>
-      <select name="tool_material">
-        <option value="">Неизвестно</option>
-        {% for key, label in tool_material_types %}
-        <option value="{{ key }}">{{ label }}</option>
-        {% endfor %}
+    <label class="field">
+      <span>Дата прихода</span>
+      <input type="date" id="arrival-bulk-date" value="{{ today }}">
+    </label>
+    <label class="field">
+      <span>От кого</span>
+      <select id="arrival-bulk-supplier">
+        <option value="">Выбрать...</option>
+        <option value="ООО МВ">ООО МВ</option>
+        <option value="ИП Иванов">ИП Иванов</option>
+        <option value="ИП Игнатьев">ИП Игнатьев</option>
+        <option value="ИП Ясинов">ИП Ясинов</option>
       </select>
     </label>
-    <div class="field">
-      <span>Материал покрытия</span>
-      <div class="coating-picker">
-        {% for key, label in coating_types %}
-        <label class="coating-chip">
-          <input type="radio" name="coating_type" value="{{ key }}" {% if key == "none" %}checked{% endif %}>
-          <span class="swatch swatch-{{ key }}" title="{{ label }}"></span>
-        </label>
-        {% endfor %}
-      </div>
-    </div>
-    <div class="field"><span>Материал обработки</span>
-      <div class="wm-picker">
-        <label class="wm-chip">
-          <input type="radio" name="work_material" value="" checked>
-          <span class="wm-square wm-all">?</span>
-        </label>
-        {% for key, label in work_material_types %}
-        <label class="wm-chip">
-          <input type="radio" name="work_material" value="{{ key }}">
-          <span class="wm-square wm-{{ key|lower }}" title="{{ label }}">{{ key }}</span>
-        </label>
-        {% endfor %}
-      </div>
-    </div>
-    <label class="field"><span>Комментарий</span><input type="text" name="comment" placeholder="Новый приход"></label>
-
-    <div class="arrival-subsection is-hidden" data-new-cat="end_mill">
-      <div class="filter-grid">
-        <label class="field"><span>Тип фрезы</span>
-          <select name="mill_type">
-            {% for key, label in end_mill_types %}
-            <option value="{{ key }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field"><span>Диаметр, мм</span><input type="number" step="0.01" name="em_diameter_mm" placeholder="если неизвестно - пусто"></label>
-        <label class="field"><span>Радиус, мм</span><input type="number" step="0.01" name="em_corner_radius_mm" placeholder="0 или пусто = без радиуса"></label>
-        <label class="field"><span>Длина общая, мм</span><input type="number" step="0.01" name="em_overall_length_mm" placeholder="если неизвестно - пусто"></label>
-        <label class="field"><span>Длина реж. части, мм</span><input type="number" step="0.01" name="em_cutting_length_mm" placeholder="если неизвестно - пусто"></label>
-        <label class="field"><span>Количество кромок</span><input type="number" name="em_flutes_count" placeholder="если неизвестно - пусто"></label>
-      </div>
-    </div>
-
-    <div class="arrival-subsection is-hidden" data-new-cat="tap">
-      <div class="filter-grid">
-        <label class="field"><span>Стандарт резьбы</span>
-          <select name="thread_standard">
-            {% for key, label in thread_standards %}
-            <option value="{{ key }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field"><span>Размер</span><input type="text" name="size_label" placeholder="M2, M2.5...; можно пусто"></label>
-        <label class="field"><span>Шаг, мм</span><input type="number" step="0.001" name="tap_pitch_mm" placeholder="если неизвестно - пусто"></label>
-        <label class="field"><span>TPI</span><input type="number" name="tap_tpi" placeholder="для дюймовой"></label>
-        <label class="field"><span>Тип отверстия</span>
-          <select name="hole_type">
-            {% for key, label in tap_hole_types %}
-            <option value="{{ key }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field"><span>Тип резьбового инструмента</span>
-          <select name="tap_type">
-            {% for key, label in tap_tool_types %}
-            <option value="{{ key }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field"><span>Длина общая, мм</span><input type="number" step="0.01" name="tap_overall_length_mm" placeholder="если неизвестно - пусто"></label>
-        <label class="field"><span>Длина реж. части, мм</span><input type="number" step="0.01" name="tap_cutting_length_mm" placeholder="если неизвестно - пусто"></label>
-      </div>
-    </div>
+    <button type="button" class="btn btn-ghost" id="arrival-bulk-add-row">+</button>
+  </div>
+  <form method="post" id="arrival-bulk-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="add_arrival_bulk">
+    <input type="hidden" name="rows_json" id="arrival-bulk-rows-json">
+    <div id="arrival-bulk-groups"></div>
     <div class="filter-actions"><button type="submit" class="btn">Оприходовать</button></div>
   </form>
 </div>
@@ -459,7 +564,7 @@
         {% for iss in issue_candidates %}
         <option value="{{ iss.id }}">
           #{{ iss.id }} | {{ iss.movement_date }} | {{ iss.tool.get_category_display }}
-          {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% endif %}
+          {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% elif iss.tool.category == "center_drill" and iss.tool.center_drill_spec %}| центровка {{ iss.tool.center_drill_spec.angle_deg }}°{% elif iss.tool.category == "countersink" and iss.tool.countersink_spec %}| зенкер {{ iss.tool.countersink_spec.get_countersink_type_display }} {{ iss.tool.countersink_spec.angle_deg }}°{% endif %}
           | {{ iss.tool.name }} | выдано {{ iss.quantity }} | осталось обработать {{ iss.remaining_qty }}
         </option>
         {% endfor %}
@@ -494,7 +599,7 @@
           <td>{{ iss.movement_date }}</td>
           <td>
             {{ iss.tool.get_category_display }}
-            {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% endif %}
+            {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% elif iss.tool.category == "center_drill" and iss.tool.center_drill_spec %}| центровка {{ iss.tool.center_drill_spec.angle_deg }}°{% elif iss.tool.category == "countersink" and iss.tool.countersink_spec %}| зенкер {{ iss.tool.countersink_spec.get_countersink_type_display }} {{ iss.tool.countersink_spec.angle_deg }}°{% endif %}
             | {{ iss.tool.name }}
           </td>
           <td>{{ iss.quantity }}</td>
@@ -811,7 +916,7 @@
         <td>{{ m.movement_date }}</td>
         <td>{{ m.get_movement_type_display }}</td>
         <td>{{ m.tool.get_category_display }}</td>
-        <td>{% if m.tool.category == "end_mill" and m.tool.end_mill_spec %}{{ m.tool.end_mill_spec.get_mill_type_display }}{% elif m.tool.category == "tap" and m.tool.tap_spec %}{{ m.tool.tap_spec.get_tap_type_display }}{% else %}-{% endif %}</td>
+        <td>{% if m.tool.category == "end_mill" and m.tool.end_mill_spec %}{{ m.tool.end_mill_spec.get_mill_type_display }}{% elif m.tool.category == "tap" and m.tool.tap_spec %}{{ m.tool.tap_spec.get_tap_type_display }}{% elif m.tool.category == "center_drill" and m.tool.center_drill_spec %}Центровка {{ m.tool.center_drill_spec.angle_deg }}°{% elif m.tool.category == "countersink" and m.tool.countersink_spec %}Зенкер {{ m.tool.countersink_spec.get_countersink_type_display }} {{ m.tool.countersink_spec.angle_deg }}°{% else %}-{% endif %}</td>
         <td>{{ m.tool.name }}</td>
         <td>{{ m.quantity }}</td>
         <td>{{ m.employee_name|default:"-" }}</td>
@@ -836,6 +941,294 @@
     filter: brightness(1.1);
   }
   .arrival-subsection.is-hidden { display: none; }
+  .arrival-bulk-top {
+    display: flex;
+    gap: 8px;
+    align-items: end;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .arrival-bulk-top .field {
+    margin: 0;
+    min-width: 260px;
+  }
+  #arrival-bulk-add-row {
+    height: 34px;
+    min-height: 34px;
+    min-width: 42px;
+  }
+  #arrival-bulk-form .filter-actions .btn {
+    height: 30px;
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+  .arrival-group {
+    margin-top: 10px;
+  }
+  .arrival-group h4 {
+    margin: 0 0 6px 0;
+    font-size: 14px;
+    color: #c7d5ef;
+  }
+  .arrival-bulk-table-wrap {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .arrival-bulk-table {
+    width: 100%;
+    min-width: 760px;
+  }
+  .arrival-bulk-table th,
+  .arrival-bulk-table td {
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .arrival-bulk-table input,
+  .arrival-bulk-table select {
+    width: 100%;
+    min-width: 110px;
+    box-sizing: border-box;
+  }
+  .arrival-bulk-table [data-k="quantity"] { min-width: 72px; }
+  .arrival-bulk-table [data-k="movement_date"] { min-width: 140px; }
+  .arrival-bulk-table select[data-k="work_material"],
+  .arrival-bulk-table select[data-k="mill_type"],
+  .arrival-bulk-table select[data-k="coating_type"],
+  .arrival-bulk-table select[data-k="tool_material"],
+  .arrival-bulk-table select[data-k="thread_standard"],
+  .arrival-bulk-table select[data-k="hole_type"],
+  .arrival-bulk-table select[data-k="tap_type"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: none;
+    padding-right: 6px;
+    text-align: center;
+    text-align-last: center;
+  }
+  .arrival-bulk-table select[data-k="work_material"]::-ms-expand,
+  .arrival-bulk-table select[data-k="mill_type"]::-ms-expand,
+  .arrival-bulk-table select[data-k="coating_type"]::-ms-expand,
+  .arrival-bulk-table select[data-k="tool_material"]::-ms-expand,
+  .arrival-bulk-table select[data-k="thread_standard"]::-ms-expand,
+  .arrival-bulk-table select[data-k="hole_type"]::-ms-expand,
+  .arrival-bulk-table select[data-k="tap_type"]::-ms-expand {
+    display: none;
+  }
+  .arrival-bulk-table th.qty-col,
+  .arrival-bulk-table td.qty-col {
+    width: 3ch;
+    min-width: 3ch;
+    text-align: center;
+  }
+  .arrival-bulk-table th.tap-hole-col,
+  .arrival-bulk-table td.tap-hole-col {
+    width: 3ch;
+    min-width: 3ch;
+    text-align: center;
+  }
+  .arrival-bulk-table td.qty-col input[data-k="quantity"] {
+    min-width: 3ch;
+    padding-left: 2px;
+    padding-right: 2px;
+    text-align: center;
+  }
+  .arrival-bulk-table th.short-col,
+  .arrival-bulk-table td.short-col {
+    width: 4.5ch;
+    min-width: 4.5ch;
+    text-align: center;
+  }
+  .arrival-bulk-table th.tap-size-col,
+  .arrival-bulk-table td.tap-size-col { width: 79px; min-width: 79px; text-align: center; }
+  .arrival-bulk-table th.tap-size-col {
+    white-space: nowrap;
+    line-height: 1.05;
+  }
+  .arrival-bulk-table th.tap-std-col,
+  .arrival-bulk-table td.tap-std-col { width: 7ch; min-width: 7ch; }
+  .arrival-bulk-table th.tap-std-col {
+    white-space: nowrap;
+    line-height: 1.05;
+  }
+  .arrival-bulk-table th.tap-step-col,
+  .arrival-bulk-table td.tap-step-col { width: 4ch; min-width: 4ch; text-align: center; }
+  .arrival-bulk-table th.tap-tpi-col,
+  .arrival-bulk-table td.tap-tpi-col { width: 4ch; min-width: 4ch; text-align: center; }
+  .arrival-bulk-table th.tap-l-col,
+  .arrival-bulk-table td.tap-l-col { width: 4ch; min-width: 4ch; text-align: center; }
+  .arrival-bulk-table th.tap-lc-col,
+  .arrival-bulk-table td.tap-lc-col { width: 4ch; min-width: 4ch; text-align: center; }
+  .arrival-bulk-table td.short-col input {
+    min-width: 4.5ch;
+    text-align: center;
+  }
+  .arrival-bulk-table select[data-k="mill_type"] {
+    font-size: clamp(10px, 1.2vw, 13px);
+    line-height: 1.2;
+    padding: 6px 8px;
+  }
+  .arrival-bulk-table select[data-k="thread_standard"],
+  .arrival-bulk-table select[data-k="hole_type"],
+  .arrival-bulk-table select[data-k="tap_type"] {
+    font-size: clamp(10px, 1.2vw, 13px);
+    line-height: 1.2;
+    padding: 6px 8px;
+    text-align: center;
+    text-align-last: center;
+  }
+  .arrival-bulk-table select[data-k="tap_type"] {
+    font-size: clamp(9px, 1.05vw, 12px);
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .arrival-bulk-table td.tap-std-col select[data-k="thread_standard"] {
+    min-width: 5ch !important;
+    width: 100%;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .arrival-bulk-table td.tap-step-col input[data-k="tap_pitch_mm"],
+  .arrival-bulk-table td.tap-tpi-col input[data-k="tap_tpi"],
+  .arrival-bulk-table td.tap-l-col input[data-k="tap_overall_length_mm"],
+  .arrival-bulk-table td.tap-lc-col input[data-k="tap_cutting_length_mm"] {
+    min-width: 100%;
+    width: 100%;
+    padding-left: 2px;
+    padding-right: 2px;
+    text-align: center;
+  }
+  .arrival-bulk-table td.tap-size-col input[data-k="size_label"] {
+    min-width: 100%;
+    width: 100%;
+    padding-left: 2px;
+    padding-right: 2px;
+    text-align: center;
+  }
+  .arrival-bulk-table td.tap-step-col input[type="number"]::-webkit-outer-spin-button,
+  .arrival-bulk-table td.tap-step-col input[type="number"]::-webkit-inner-spin-button,
+  .arrival-bulk-table td.tap-tpi-col input[type="number"]::-webkit-outer-spin-button,
+  .arrival-bulk-table td.tap-tpi-col input[type="number"]::-webkit-inner-spin-button,
+  .arrival-bulk-table td.tap-l-col input[type="number"]::-webkit-outer-spin-button,
+  .arrival-bulk-table td.tap-l-col input[type="number"]::-webkit-inner-spin-button,
+  .arrival-bulk-table td.tap-lc-col input[type="number"]::-webkit-outer-spin-button,
+  .arrival-bulk-table td.tap-lc-col input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .arrival-bulk-table td.tap-step-col input[type="number"],
+  .arrival-bulk-table td.tap-tpi-col input[type="number"],
+  .arrival-bulk-table td.tap-l-col input[type="number"],
+  .arrival-bulk-table td.tap-lc-col input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  .arrival-bulk-table th.stack-words {
+    white-space: normal;
+    line-height: 1.05;
+    text-align: center;
+  }
+  .arrival-bulk-table td.short-col input[type="number"]::-webkit-outer-spin-button,
+  .arrival-bulk-table td.short-col input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .arrival-bulk-table td.short-col input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  .arrival-bulk-table td.qty-col input[type="number"]::-webkit-outer-spin-button,
+  .arrival-bulk-table td.qty-col input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .arrival-bulk-table td.qty-col input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+    text-align: center;
+  }
+  .arrival-inline-coating {
+    display: flex;
+    gap: 3px;
+    flex-wrap: nowrap;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .arrival-bulk-table select.arrival-wm-select {
+    width: 45px;
+    min-width: 45px !important;
+    max-width: 45px;
+    font-weight: 700;
+    text-align: center;
+    color: #fff;
+    border-color: transparent;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .arrival-bulk-table td.wm-cell {
+    width: 45px;
+    min-width: 45px;
+  }
+  .arrival-bulk-table select.arrival-coating-select {
+    min-width: 5ch;
+    font-weight: 700;
+    text-align: center;
+    border-color: transparent;
+    color: #fff;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .arrival-bulk-table td.co-cell {
+    width: 5ch;
+    min-width: 5ch;
+  }
+  .arrival-bulk-table select.arrival-coating-select.coating-none { background: #aab3c7; color: #0f172a; }
+  .arrival-bulk-table select.arrival-coating-select.coating-yellow { background: #f6c343; color: #0f172a; }
+  .arrival-bulk-table select.arrival-coating-select.coating-brown { background: #8b5a2b; color: #fff; }
+  .arrival-bulk-table select.arrival-coating-select.coating-black { background: #151515; color: #fff; }
+  .arrival-bulk-table select.arrival-coating-select.coating-multicolor {
+    background: linear-gradient(120deg, #f44336 0%, #ff9800 20%, #ffeb3b 35%, #4caf50 52%, #2196f3 70%, #9c27b0 100%);
+    color: #fff;
+  }
+  .arrival-bulk-table select.arrival-coating-select.coating-blue { background: #2877f0; color: #fff; }
+  .arrival-bulk-table select.arrival-coating-select.coating-other { background: #2f3b57; color: #fff; }
+  .arrival-bulk-table select.arrival-wm-select.wm-all { background: #8b949e; color: #fff; }
+  .arrival-bulk-table select.arrival-wm-select.wm-p { background: #2f72ff; color: #fff; }
+  .arrival-bulk-table select.arrival-wm-select.wm-m { background: #f6b93b; color: #111; }
+  .arrival-bulk-table select.arrival-wm-select.wm-k { background: #e25a5a; color: #fff; }
+  .arrival-bulk-table select.arrival-wm-select.wm-n { background: #2bb673; color: #fff; }
+  .arrival-bulk-table select.arrival-wm-select.wm-s { background: #8f7cff; color: #fff; }
+  .arrival-bulk-table select.arrival-wm-select.wm-h { background: #6d6d6d; color: #fff; }
+  .arrival-inline-coating .swatch {
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    border-width: 1px;
+  }
+  @media (max-width: 900px) {
+    .arrival-bulk-top .field {
+      min-width: 200px;
+      flex: 1 1 220px;
+    }
+    #arrival-bulk-add-row {
+      flex: 0 0 auto;
+    }
+    .arrival-bulk-table {
+      min-width: 760px;
+      font-size: 12px;
+    }
+    .arrival-bulk-table input,
+    .arrival-bulk-table select {
+      min-width: 88px;
+      font-size: 12px;
+      padding: 5px 6px;
+    }
+  }
   .coating-picker {
     display: flex;
     flex-wrap: wrap;
@@ -957,6 +1350,33 @@
     cursor: pointer;
     user-select: none;
     white-space: nowrap;
+  }
+  .data-grid th.hint-cell {
+    position: relative;
+  }
+  .data-grid th.hint-cell:hover::before {
+    content: attr(data-hint);
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 6px);
+    transform: translateX(-50%);
+    background: #101520;
+    color: #eaf0ff;
+    border: 1px solid #33415f;
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    z-index: 25;
+    pointer-events: none;
+  }
+  .data-grid td.diameter-col {
+    font-size: 1.1em;
+    font-weight: 700;
+  }
+  .data-grid td.tap-size-col {
+    font-weight: 700;
   }
   .data-grid th.sortable::after {
     content: " \2195";
@@ -1201,18 +1621,241 @@
     });
   })();
   (function () {
-    var categorySelect = document.querySelector(".js-new-arrival-category");
-    if (!categorySelect) return;
-    var blocks = document.querySelectorAll(".arrival-subsection");
-    function syncCategory() {
-      var val = categorySelect.value;
-      Array.prototype.forEach.call(blocks, function (b) {
-        b.classList.toggle("is-hidden", b.getAttribute("data-new-cat") !== val);
+    var categorySelect = document.getElementById("arrival-bulk-category");
+    var arrivalDateInput = document.getElementById("arrival-bulk-date");
+    var supplierSelect = document.getElementById("arrival-bulk-supplier");
+    var addBtn = document.getElementById("arrival-bulk-add-row");
+    var groupsWrap = document.getElementById("arrival-bulk-groups");
+    var form = document.getElementById("arrival-bulk-form");
+    var rowsJsonInput = document.getElementById("arrival-bulk-rows-json");
+    if (!categorySelect || !arrivalDateInput || !supplierSelect || !addBtn || !groupsWrap || !form || !rowsJsonInput) return;
+
+    var toolMaterialOptions = [
+      { value: "", label: "Неизвестно" },
+      {% for key, label in tool_material_types %}
+      { value: "{{ key }}", label: "{{ label }}" },
+      {% endfor %}
+    ];
+    var coatingOptions = [
+      {% for key, label in coating_types %}
+      { value: "{{ key }}", label: "{{ label }}" },
+      {% endfor %}
+    ];
+    var coatingSelectOptions = [
+      { value: "yellow", label: "🟨", bg: "#f6c343", color: "#0f172a" },
+      { value: "brown", label: "🟫", bg: "#8b5a2b", color: "#ffffff" },
+      { value: "black", label: "⬛", bg: "#151515", color: "#ffffff" },
+      { value: "none", label: "⬜", bg: "#aab3c7", color: "#0f172a" },
+      { value: "multicolor", label: "🌈", bg: "#4f5d82", color: "#ffffff" },
+      { value: "blue", label: "🟦", bg: "#2877f0", color: "#ffffff" },
+      { value: "other", label: "🟪", bg: "#2f3b57", color: "#ffffff" }
+    ];
+    function buildSelect(options, selected) {
+      var sel = document.createElement("select");
+      options.forEach(function (opt) {
+        var o = document.createElement("option");
+        o.value = opt.value;
+        o.textContent = opt.label;
+        if (opt.bg) o.style.backgroundColor = opt.bg;
+        if (opt.color) o.style.color = opt.color;
+        if ((selected || "") === opt.value) o.selected = true;
+        sel.appendChild(o);
       });
+      return sel;
     }
-    categorySelect.addEventListener("change", syncCategory);
-    syncCategory();
+    var arrivalRowSeq = 0;
+    var wmSelectTheme = {
+      "": { bg: "#8b949e", color: "#fff" },
+      "P": { bg: "#2f72ff", color: "#fff" },
+      "M": { bg: "#f6b93b", color: "#111" },
+      "K": { bg: "#e25a5a", color: "#fff" },
+      "N": { bg: "#2bb673", color: "#fff" },
+      "S": { bg: "#8f7cff", color: "#fff" },
+      "H": { bg: "#6d6d6d", color: "#fff" }
+    };
+    var coatingSelectTheme = {
+      "none": { bg: "#aab3c7", color: "#0f172a" },
+      "yellow": { bg: "#f6c343", color: "#0f172a" },
+      "brown": { bg: "#8b5a2b", color: "#fff" },
+      "black": { bg: "#151515", color: "#fff" },
+      "multicolor": { bgImage: "linear-gradient(120deg, #f44336 0%, #ff9800 20%, #ffeb3b 35%, #4caf50 52%, #2196f3 70%, #9c27b0 100%)", color: "#fff" },
+      "blue": { bg: "#2877f0", color: "#fff" },
+      "other": { bg: "#2f3b57", color: "#fff" }
+    };
+    function applyWmSelectClass(sel) {
+      if (!sel) return;
+      sel.classList.remove("wm-all", "wm-p", "wm-m", "wm-k", "wm-n", "wm-s", "wm-h");
+      var rawValue = sel.value || "";
+      var value = rawValue.toLowerCase();
+      sel.classList.add(value ? ("wm-" + value) : "wm-all");
+      var theme = wmSelectTheme[rawValue] || wmSelectTheme[""];
+      sel.style.backgroundImage = "none";
+      sel.style.backgroundColor = theme.bg;
+      sel.style.color = theme.color;
+    }
+    function buildColoredWmSelect(selected) {
+      var opts = [
+        { value: "", label: "?", bg: "#8b949e", color: "#ffffff" },
+        { value: "P", label: "P", bg: "#2f72ff", color: "#ffffff" },
+        { value: "M", label: "M", bg: "#f6b93b", color: "#111111" },
+        { value: "K", label: "K", bg: "#e25a5a", color: "#ffffff" },
+        { value: "N", label: "N", bg: "#2bb673", color: "#ffffff" },
+        { value: "S", label: "S", bg: "#8f7cff", color: "#ffffff" },
+        { value: "H", label: "H", bg: "#6d6d6d", color: "#ffffff" },
+      ];
+      var sel = buildSelect(opts, selected || "");
+      sel.setAttribute("data-k", "work_material");
+      sel.classList.add("arrival-wm-select");
+      applyWmSelectClass(sel);
+      sel.addEventListener("change", function () {
+        applyWmSelectClass(sel);
+      });
+      return sel;
+    }
+    function applyCoatingSelectClass(sel) {
+      if (!sel) return;
+      coatingOptions.forEach(function (opt) {
+        sel.classList.remove("coating-" + opt.value);
+      });
+      var v = sel.value || "none";
+      sel.classList.add("coating-" + v);
+      var theme = coatingSelectTheme[v] || coatingSelectTheme.none;
+      sel.style.backgroundImage = theme.bgImage || "none";
+      sel.style.backgroundColor = theme.bg || "transparent";
+      sel.style.color = theme.color || "#fff";
+    }
+    function buildColoredCoatingSelect(selected) {
+      var sel = buildSelect(coatingSelectOptions, selected || "none");
+      sel.setAttribute("data-k", "coating_type");
+      sel.classList.add("arrival-coating-select");
+      applyCoatingSelectClass(sel);
+      sel.addEventListener("change", function () {
+        applyCoatingSelectClass(sel);
+      });
+      return sel;
+    }
+
+    function ensureGroup(cat) {
+      var groupId = "arrival-group-" + cat;
+      var group = document.getElementById(groupId);
+      if (group) return group;
+      group = document.createElement("div");
+      group.className = "arrival-group";
+      group.id = groupId;
+      var title = cat === "end_mill" ? "Фрезы" : (cat === "tap" ? "Резьбовой инструмент" : (cat === "center_drill" ? "Центровки" : "Зенкера"));
+      var headHtml = cat === "end_mill"
+        ? '<tr><th>Тип фрезы</th><th class="short-col">D</th><th class="short-col">R</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
+        : (cat === "tap"
+            ? '<tr><th class="tap-size-col">Размер</th><th class="tap-std-col">Стандарт</th><th class="tap-step-col">Шаг</th><th class="tap-tpi-col">TPI</th><th class="tap-l-col">L</th><th class="tap-lc-col">Lc</th><th class="tap-hole-col">Тип</th><th>Тип инструмента</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
+            : (cat === "center_drill"
+                ? '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Угол</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
+                : '<tr><th>Тип</th><th class="short-col">D</th><th class="short-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'));
+      group.innerHTML = '' +
+        '<h4>' + title + '</h4>' +
+        '<div class="table-wrap arrival-bulk-table-wrap">' +
+          '<table class="data-grid arrival-bulk-table">' +
+            '<thead>' + headHtml + '</thead>' +
+            '<tbody class="arrival-group-body"></tbody>' +
+          '</table>' +
+        '</div>';
+      groupsWrap.appendChild(group);
+      return group;
+    }
+
+    function addRow() {
+      var cat = categorySelect.value || "end_mill";
+      if (cat !== "end_mill" && cat !== "tap" && cat !== "center_drill" && cat !== "countersink") return;
+      var group = ensureGroup(cat);
+      var body = group.querySelector(".arrival-group-body");
+      var tr = document.createElement("tr");
+      arrivalRowSeq += 1;
+      tr.setAttribute("data-arrival-row", "1");
+      tr.setAttribute("data-category", cat);
+      var cells = [];
+      if (cat === "end_mill") {
+        cells.push('<td><select data-k="mill_type">{% for key, label in end_mill_types %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_diameter_mm"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_corner_radius_mm"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_overall_length_mm"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_cutting_length_mm"></td>');
+        cells.push('<td class="short-col"><input type="number" data-k="em_flutes_count"></td>');
+        cells.push('<td class="tm-cell"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      } else if (cat === "tap") {
+        cells.push('<td class="tap-size-col"><input type="text" data-k="size_label" placeholder="M2"></td>');
+        cells.push('<td class="tap-std-col"><select data-k="thread_standard">{% for key, label in thread_standards %}<option value="{{ key }}">{% if key == "metric" %}M{% else %}{{ label }}{% endif %}</option>{% endfor %}</select></td>');
+        cells.push('<td class="tap-step-col"><input type="number" step="0.001" data-k="tap_pitch_mm"></td>');
+        cells.push('<td class="tap-tpi-col"><input type="number" data-k="tap_tpi"></td>');
+        cells.push('<td class="tap-l-col"><input type="number" step="0.01" data-k="tap_overall_length_mm"></td>');
+        cells.push('<td class="tap-lc-col"><input type="number" step="0.01" data-k="tap_cutting_length_mm"></td>');
+        cells.push('<td class="tap-hole-col"><select data-k="hole_type">{% for key, label in tap_hole_types %}<option value="{{ key }}">{% if key == "through" %}Скв{% elif key == "blind" %}Глх{% elif key == "universal" %}Унив{% else %}{{ label }}{% endif %}</option>{% endfor %}</select></td>');
+        cells.push('<td><select data-k="tap_type">{% for key, label in tap_tool_types %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></td>');
+        cells.push('<td class="tm-cell"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      } else if (cat === "center_drill") {
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cd_diameter_mm"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cd_overall_length_mm"></td>');
+        cells.push('<td class="short-col"><select data-k="cd_angle_deg">{% for key, label in center_drill_angles %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></td>');
+        cells.push('<td class="tm-cell"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      } else {
+        cells.push('<td><select data-k="cs_type">{% for key, label in countersink_types %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cs_diameter_mm"></td>');
+        cells.push('<td class="short-col"><select data-k="cs_angle_deg">{% for key, label in countersink_angles %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cs_overall_length_mm"></td>');
+        cells.push('<td class="short-col"><input type="number" data-k="cs_flutes_count"></td>');
+        cells.push('<td class="tm-cell"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      }
+      cells.push('<td><button type="button" class="btn btn-ghost js-arrival-row-remove">×</button></td>');
+      tr.innerHTML = cells.join("");
+      tr.querySelector(".tm-cell").appendChild(buildSelect(toolMaterialOptions, ""));
+      tr.querySelector(".tm-cell select").setAttribute("data-k", "tool_material");
+      tr.querySelector(".co-cell").appendChild(buildColoredCoatingSelect("none"));
+      tr.querySelector(".wm-cell").appendChild(buildColoredWmSelect(""));
+      body.appendChild(tr);
+    }
+
+    addBtn.addEventListener("click", addRow);
+    categorySelect.addEventListener("change", function () {
+      // Влияет только на категорию новых строк.
+    });
+    form.addEventListener("submit", function (e) {
+      var rows = [];
+      groupsWrap.querySelectorAll("tr[data-arrival-row]").forEach(function (tr) {
+        var row = { category: tr.getAttribute("data-category") || "" };
+        tr.querySelectorAll("[data-k]").forEach(function (el) {
+          row[el.getAttribute("data-k")] = (el.value || "").trim();
+        });
+        row.movement_date = (arrivalDateInput.value || "").trim();
+        row.supplier_name = (supplierSelect.value || "").trim();
+        rows.push(row);
+      });
+      if (!rows.length) {
+        e.preventDefault();
+        return;
+      }
+      rowsJsonInput.value = JSON.stringify(rows);
+    });
+
+    groupsWrap.addEventListener("click", function (e) {
+      var rm = e.target.closest(".js-arrival-row-remove");
+      if (!rm) return;
+      var row = rm.closest("tr[data-arrival-row]");
+      if (row) row.remove();
+      var grp = rm.closest(".arrival-group");
+      if (grp && !grp.querySelector("tr[data-arrival-row]")) grp.remove();
+    });
   })();
+
   (function () {
     var searchInput = document.getElementById("issue-search-input");
     var issueSelect = document.getElementById("issue-id-select");

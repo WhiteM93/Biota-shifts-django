@@ -31,6 +31,24 @@ END_MILL_TYPES = [
     ("t_slot", "Т-образная фреза"),
 ]
 
+CENTER_DRILL_ANGLES = [
+    ("60", "60"),
+    ("90", "90"),
+    ("120", "120"),
+]
+
+COUNTERSINK_TYPES = [
+    ("hand", "Ручной"),
+    ("machine", "Машинный"),
+]
+
+COUNTERSINK_ANGLES = [
+    ("60", "60"),
+    ("75", "75"),
+    ("90", "90"),
+    ("120", "120"),
+]
+
 COATING_TYPES = [
     ("yellow", "Желтое"),
     ("brown", "Коричневое"),
@@ -67,7 +85,12 @@ PURCHASE_STATUSES = [
 class ToolItem(models.Model):
     category = models.CharField(
         max_length=20,
-        choices=[("end_mill", "Фрезы"), ("tap", "Резьбовой инструмент")],
+        choices=[
+            ("end_mill", "Фрезы"),
+            ("tap", "Резьбовой инструмент"),
+            ("center_drill", "Центровки"),
+            ("countersink", "Зенкера"),
+        ],
         verbose_name="Категория",
     )
     name = models.CharField(max_length=180, verbose_name="Наименование")
@@ -137,6 +160,37 @@ class TapSpec(models.Model):
 
     def __str__(self):
         return f"{self.size_label} ({self.get_thread_standard_display()})"
+
+
+class CenterDrillSpec(models.Model):
+    tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="center_drill_spec")
+    diameter_mm = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="Диаметр, мм", null=True, blank=True)
+    overall_length_mm = models.DecimalField(max_digits=7, decimal_places=2, verbose_name="Длина, мм", null=True, blank=True)
+    angle_deg = models.CharField(max_length=8, choices=CENTER_DRILL_ANGLES, default="60", verbose_name="Угол, °")
+
+    class Meta:
+        verbose_name = "Параметры центровки"
+        verbose_name_plural = "Параметры центровок"
+
+    def __str__(self):
+        return f"Центровка Ø{self.diameter_mm} / {self.angle_deg}°"
+
+
+class CountersinkSpec(models.Model):
+    tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="countersink_spec")
+    countersink_type = models.CharField(max_length=16, choices=COUNTERSINK_TYPES, default="machine", verbose_name="Тип зенкера")
+    diameter_mm = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="Диаметр, мм", null=True, blank=True)
+    angle_deg = models.CharField(max_length=8, choices=COUNTERSINK_ANGLES, default="90", verbose_name="Угол, °")
+    overall_length_mm = models.DecimalField(max_digits=7, decimal_places=2, verbose_name="Длина, мм", null=True, blank=True)
+    flutes_count = models.PositiveSmallIntegerField(verbose_name="Количество кромок", null=True, blank=True)
+    size_label = models.CharField(max_length=32, blank=True, verbose_name="Размер")
+
+    class Meta:
+        verbose_name = "Параметры зенкера"
+        verbose_name_plural = "Параметры зенкеров"
+
+    def __str__(self):
+        return f"Зенкер {self.get_countersink_type_display()} Ø{self.diameter_mm} / {self.angle_deg}°"
 
 
 class StockMovement(models.Model):
