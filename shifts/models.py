@@ -115,6 +115,9 @@ class ToolItem(models.Model):
         choices=WORK_MATERIAL_TYPES,
         verbose_name="Материал обработки",
     )
+    is_deleted = models.BooleanField(default=False, verbose_name="Помечен как удаленный")
+    deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="Удален")
+    deleted_by = models.CharField(max_length=120, blank=True, verbose_name="Удалил")
     quantity = models.PositiveIntegerField(default=0, verbose_name="Количество")
     notes = models.CharField(max_length=300, blank=True, verbose_name="Примечание")
     created_at = models.DateTimeField(auto_now_add=True)

@@ -328,6 +328,7 @@
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
+        {% if is_admin_user %}<th>Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -355,9 +356,19 @@
           {% else %}-{% endif %}
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+        {% if is_admin_user %}
+        <td>
+          <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_tool_item">
+            <input type="hidden" name="tool_id" value="{{ t.id }}">
+            <button type="submit" class="btn">Удалить</button>
+          </form>
+        </td>
+        {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="10" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if is_admin_user %}11{% else %}10{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -377,6 +388,7 @@
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
+        {% if is_admin_user %}<th>Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -404,9 +416,19 @@
           {% else %}-{% endif %}
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+        {% if is_admin_user %}
+        <td>
+          <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_tool_item">
+            <input type="hidden" name="tool_id" value="{{ t.id }}">
+            <button type="submit" class="btn">Удалить</button>
+          </form>
+        </td>
+        {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="12" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if is_admin_user %}13{% else %}12{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -421,6 +443,7 @@
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
+        {% if is_admin_user %}<th>Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -443,9 +466,19 @@
           {% else %}-{% endif %}
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+        {% if is_admin_user %}
+        <td>
+          <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_tool_item">
+            <input type="hidden" name="tool_id" value="{{ t.id }}">
+            <button type="submit" class="btn">Удалить</button>
+          </form>
+        </td>
+        {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="7" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if is_admin_user %}8{% else %}7{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -462,6 +495,7 @@
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
         <th class="sortable">Остаток</th>
+        {% if is_admin_user %}<th>Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -478,9 +512,19 @@
           <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+        {% if is_admin_user %}
+        <td>
+          <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_tool_item">
+            <input type="hidden" name="tool_id" value="{{ t.id }}">
+            <button type="submit" class="btn">Удалить</button>
+          </form>
+        </td>
+        {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="9" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if is_admin_user %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -496,6 +540,7 @@
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
+        {% if is_admin_user %}<th>Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -519,9 +564,19 @@
           {% else %}-{% endif %}
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+        {% if is_admin_user %}
+        <td>
+          <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_tool_item">
+            <input type="hidden" name="tool_id" value="{{ t.id }}">
+            <button type="submit" class="btn">Удалить</button>
+          </form>
+        </td>
+        {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="8" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if is_admin_user %}9{% else %}8{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -994,7 +1049,12 @@
         <td>{{ m.get_movement_type_display }}</td>
         <td>{{ m.tool.get_category_display }}</td>
         <td>{% if m.tool.category == "end_mill" and m.tool.end_mill_spec %}{{ m.tool.end_mill_spec.get_mill_type_display }}{% elif m.tool.category == "tap" and m.tool.tap_spec %}{{ m.tool.tap_spec.get_tap_type_display }}{% elif m.tool.category == "center_drill" and m.tool.center_drill_spec %}Центровка {{ m.tool.center_drill_spec.angle_deg }}°{% elif m.tool.category == "countersink" and m.tool.countersink_spec %}Зенкер {{ m.tool.countersink_spec.get_countersink_type_display }} {{ m.tool.countersink_spec.angle_deg }}°{% elif m.tool.category == "drill" and m.tool.drill_spec %}Сверло {{ m.tool.drill_spec.angle_deg }}°{% else %}-{% endif %}</td>
-        <td>{{ m.tool.name }}</td>
+        <td>
+          {{ m.tool.name }}
+          {% if m.tool.is_deleted %}
+            <span class="muted">(удалено админом{% if m.tool.deleted_by %}: {{ m.tool.deleted_by }}{% endif %})</span>
+          {% endif %}
+        </td>
         <td>{{ m.quantity }}</td>
         <td>{{ m.employee_name|default:"-" }}</td>
         <td>{{ m.comment|default:"-" }}</td>

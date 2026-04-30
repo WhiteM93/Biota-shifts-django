@@ -10,6 +10,7 @@ from django.db.models import Q
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
+from django.utils import timezone
 
 from biota_shifts import db as biota_db
 from biota_shifts.auth import _is_admin, employees_df_for_nav, nav_permissions_for_user
@@ -281,6 +282,28 @@ def inventory_view(request):
             )
         messages.success(request, "Движение склада сохранено.")
         return redirect("inventory")
+
+    if action == "delete_tool_item":
+        if not is_admin_user:
+            messages.error(request, "Удалять позиции склада может только администратор.")
+            return redirect(f"{request.path}?panel=stock")
+        tool_id = _to_int(request.POST.get("tool_id"), 0)
+        if tool_id <= 0:
+            messages.error(request, "Позиция склада не найдена.")
+            return redirect(f"{request.path}?panel=stock")
+        tool = ToolItem.objects.filter(id=tool_id).first()
+        if not tool:
+            messages.error(request, "Позиция склада не найдена.")
+            return redirect(f"{request.path}?panel=stock")
+        if tool.is_deleted:
+            messages.info(request, "Позиция уже помечена как удаленная администратором.")
+            return redirect(f"{request.path}?panel=stock")
+        tool.is_deleted = True
+        tool.deleted_at = timezone.now()
+        tool.deleted_by = username
+        tool.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+        messages.success(request, "Позиция помечена как удаленная администратором.")
+        return redirect(f"{request.path}?panel=stock")
 
     if action == "process_issue_outcome":
         issue_id = _to_int(request.POST.get("issue_id"), 0)
@@ -943,7 +966,7 @@ def inventory_view(request):
         return redirect(f"{request.path}?panel=defects")
 
     show_all = (request.GET.get("show_all") or "1").strip() == "1"
-    qs = ToolItem.objects.all()
+    qs = ToolItem.objects.filter(is_deleted=False)
     if not show_all:
         qs = qs.filter(quantity__gt=0)
     filter_category = (request.GET.get("category") or "end_mill").strip()
@@ -1084,7 +1107,7 @@ def inventory_view(request):
             movements__comment__icontains=arrival_supplier,
         ).distinct()
 
-    option_source_qs = ToolItem.objects.all()
+    option_source_qs = ToolItem.objects.filter(is_deleted=False)
     if not show_all:
         option_source_qs = option_source_qs.filter(quantity__gt=0)
     option_source_qs = option_source_qs.filter(category=filter_category)
@@ -1258,7 +1281,7 @@ def inventory_view(request):
         "coating_types": COATING_TYPES,
         "work_material_types": WORK_MATERIAL_TYPES,
         "today": date.today().isoformat(),
-        "movement_tool_options": ToolItem.objects.select_related("end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec", "drill_spec").all().order_by("category", "name"),
+        "movement_tool_options": ToolItem.objects.select_related("end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec", "drill_spec").filter(is_deleted=False).order_by("category", "name"),
         "issue_candidates": issue_candidates,
         "purchase_requests": purchase_qs[:300],
         "purchase_statuses": PURCHASE_STATUSES,
