@@ -67,6 +67,28 @@ def _read_program_file_for_display(program_file) -> tuple[str | None, bool]:
     return raw.decode("utf-8", errors="replace"), False
 
 
+def _save_setup_program_overwrite(setup: ProductSetup, uploaded_file) -> None:
+    """Сохраняет программу установки с перезаписью одинакового имени файла."""
+    if not uploaded_file:
+        return
+    filename = (getattr(uploaded_file, "name", "") or "").replace("\\", "/").rsplit("/", 1)[-1]
+    if not filename:
+        filename = "program.nc"
+    target_rel = f"products/programs/{filename}"
+    storage = setup.program_file.storage
+    if storage.exists(target_rel):
+        try:
+            storage.delete(target_rel)
+        except Exception:
+            pass
+    if setup.program_file:
+        try:
+            setup.program_file.delete(save=False)
+        except Exception:
+            pass
+    setup.program_file.save(filename, uploaded_file, save=False)
+
+
 def _apply_setup_photo_changes(request, product: Product) -> None:
     for sid in request.POST.getlist("remove_setup_photo"):
         if sid.isdigit():
@@ -659,12 +681,7 @@ def product_detail_view(request, pk: int):
             program_file = request.FILES.get("program_file")
             if not program_file:
                 return JsonResponse({"ok": False, "error": "Выберите файл программы."}, status=400)
-            if setup.program_file:
-                try:
-                    setup.program_file.delete(save=False)
-                except Exception:
-                    pass
-            setup.program_file = program_file
+            _save_setup_program_overwrite(setup, program_file)
             setup.save(update_fields=["program_file", "updated_at"])
             return JsonResponse(
                 {
@@ -811,7 +828,13 @@ def product_setup_create_view(request, pk: int):
                 prefix="tools",
             )
             if tools_formset.is_valid():
+                uploaded_program = request.FILES.get("program_file")
+                if uploaded_program:
+                    setup.program_file = ""
                 setup.save()
+                if uploaded_program:
+                    _save_setup_program_overwrite(setup, uploaded_program)
+                    setup.save(update_fields=["program_file", "updated_at"])
                 # Сначала удаляем (на всякий случай), затем пересоздаём строки.
                 ProductSetupToolRow.objects.filter(setup=setup).delete()
                 for idx, tform in enumerate(tools_formset.forms):
@@ -890,7 +913,11 @@ def product_setup_edit_view(request, pk: int, setup_pk: int):
             prefix="tools",
         )
         if form.is_valid() and tools_formset.is_valid():
+            uploaded_program = request.FILES.get("program_file")
             saved_setup: ProductSetup = form.save()
+            if uploaded_program:
+                _save_setup_program_overwrite(saved_setup, uploaded_program)
+                saved_setup.save(update_fields=["program_file", "updated_at"])
             ProductSetupToolRow.objects.filter(setup=saved_setup).delete()
             for idx, tform in enumerate(tools_formset.forms):
                 cd = tform.cleaned_data
