@@ -237,7 +237,6 @@ class ProductSetupToolRowForm(forms.ModelForm):
             "tool_type": forms.Select(
                 choices=[
                     ("", "—"),
-                    ("Фреза", "Фреза"),
                     ("Метчик", "Метчик"),
                     ("Раскатник", "Раскатник"),
                     ("Резьбофреза", "Резьбофреза"),
@@ -245,9 +244,16 @@ class ProductSetupToolRowForm(forms.ModelForm):
                     ("Зенкер", "Зенкер"),
                     ("Развертка", "Развертка"),
                     ("Сверло", "Сверло"),
+                    ("Сверло твердосплавное", "Сверло твердосплавное"),
                     ("Т-образная фреза", "Т-образная фреза"),
                     ("Радиусная", "Радиусная"),
                     ("Сферическая", "Сферическая"),
+                    ("Фреза обдирочная", "Фреза обдирочная"),
+                    ("Фреза черновая", "Фреза черновая"),
+                    ("Фреза чистовая", "Фреза чистовая"),
+                    ("Фреза профильная", "Фреза профильная"),
+                    ("Фреза фасочная", "Фреза фасочная"),
+                    ("Фреза с СМП", "Фреза с СМП"),
                     ("Датчик привязки", "Датчик привязки"),
                     ("Другое", "Другое"),
                 ]
@@ -275,7 +281,6 @@ ProductSetupToolRowFormSet = inlineformset_factory(
 
 SETUP_TOOL_TYPE_CHOICES = [
     ("", "—"),
-    ("Фреза", "Фреза"),
     ("Метчик", "Метчик"),
     ("Раскатник", "Раскатник"),
     ("Резьбофреза", "Резьбофреза"),
@@ -283,9 +288,16 @@ SETUP_TOOL_TYPE_CHOICES = [
     ("Зенкер", "Зенкер"),
     ("Развертка", "Развертка"),
     ("Сверло", "Сверло"),
+    ("Сверло твердосплавное", "Сверло твердосплавное"),
     ("Т-образная фреза", "Т-образная фреза"),
     ("Радиусная", "Радиусная"),
     ("Сферическая", "Сферическая"),
+    ("Фреза обдирочная", "Фреза обдирочная"),
+    ("Фреза черновая", "Фреза черновая"),
+    ("Фреза чистовая", "Фреза чистовая"),
+    ("Фреза профильная", "Фреза профильная"),
+    ("Фреза фасочная", "Фреза фасочная"),
+    ("Фреза с СМП", "Фреза с СМП"),
     ("Датчик привязки", "Датчик привязки"),
     ("Другое", "Другое"),
 ]
@@ -388,6 +400,7 @@ def _build_display_tool_rows(existing_rows: list[ProductSetupToolRow] | None = N
                     "tap_hole_type": row.tap_hole_type or "",
                     "diameter": row.diameter or "",
                     "overhang": row.overhang or "",
+                    "note": row.name or "",
                     "kor_n_override": bool(exp_h and cur_h and cur_h != exp_h),
                     "kor_d_override": bool(exp_d and cur_d and cur_d != exp_d),
                 }
@@ -401,6 +414,7 @@ def _build_display_tool_rows(existing_rows: list[ProductSetupToolRow] | None = N
             "tap_hole_type": "",
             "diameter": "",
             "overhang": "",
+            "note": "",
             "kor_n_override": False,
             "kor_d_override": False,
         }
@@ -429,6 +443,35 @@ def products_list_view(request):
         {
             "products_page": page,
             "search_q": q,
+            "username": biota_user(request),
+        },
+    )
+
+
+@biota_login_required
+@nav_permission_required("products")
+@require_http_methods(["GET"])
+def product_setup_pdf_export_view(request, pk: int, setup_pk: int, mode: str):
+    product = get_object_or_404(Product, pk=pk)
+    setup = get_object_or_404(ProductSetup.objects.prefetch_related("photos", "tools"), pk=setup_pk, product=product)
+    export_mode = (mode or "").strip().lower()
+    if export_mode not in {"specs", "photos"}:
+        export_mode = "specs"
+    tool_rows = _build_display_tool_rows(list(setup.tools.all()))
+    photos = list(setup.photos.all())
+    photo_slots: list[ProductSetupPhoto | None] = photos[:15]
+    if len(photo_slots) < 15:
+        photo_slots.extend([None] * (15 - len(photo_slots)))
+    return render(
+        request,
+        "shifts/product_setup_pdf_export.html",
+        {
+            "product": product,
+            "setup": setup,
+            "tool_rows": tool_rows,
+            "photos": photos,
+            "photo_slots": photo_slots,
+            "mode": export_mode,
             "username": biota_user(request),
         },
     )
@@ -627,6 +670,38 @@ def product_detail_view(request, pk: int):
                 }
             )
 
+        if action == "inline_reorder_setup_photos":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            raw_ids = (request.POST.get("photo_ids") or "").strip()
+            if not raw_ids:
+                return JsonResponse({"ok": False, "error": "Порядок фото не передан."}, status=400)
+            try:
+                ordered_ids = [int(x) for x in raw_ids.split(",") if x.strip().isdigit()]
+            except Exception:
+                return JsonResponse({"ok": False, "error": "Некорректный список фото."}, status=400)
+            if not ordered_ids:
+                return JsonResponse({"ok": False, "error": "Некорректный список фото."}, status=400)
+            photos_qs = ProductSetupPhoto.objects.filter(
+                product=product,
+                setup=setup,
+                pk__in=ordered_ids,
+            )
+            photos_map = {p.pk: p for p in photos_qs}
+            if len(photos_map) != len(ordered_ids):
+                return JsonResponse({"ok": False, "error": "Часть фото не найдена."}, status=400)
+            for idx, photo_id in enumerate(ordered_ids):
+                photo = photos_map.get(photo_id)
+                if photo is None:
+                    continue
+                if photo.sort_order != idx:
+                    photo.sort_order = idx
+                    photo.save(update_fields=["sort_order"])
+            return JsonResponse({"ok": True})
+
         if action == "inline_replace_binding_photo":
             setup_id_raw = (request.POST.get("setup_id") or "").strip()
             setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
@@ -728,7 +803,8 @@ def product_detail_view(request, pk: int):
                     row_tool_type = str((row.get("tool_type") or "")).strip()
                     row_diameter = str((row.get("diameter") or "")).strip()
                     row_overhang = str((row.get("overhang") or "")).strip()
-                    row_vals = (row_tool_number, row_kor_n, row_kor_d, row_tool_type, row_diameter, row_overhang)
+                    row_note = str((row.get("note") or "")).strip()
+                    row_vals = (row_tool_number, row_kor_n, row_kor_d, row_tool_type, row_diameter, row_overhang, row_note)
                     if all(v == "" for v in row_vals):
                         continue
                     ProductSetupToolRow.objects.create(
@@ -741,7 +817,7 @@ def product_detail_view(request, pk: int):
                         diameter=row_diameter,
                         overhang=row_overhang,
                         tap_hole_type="",
-                        name="",
+                        name=row_note,
                     )
             return JsonResponse(
                 {

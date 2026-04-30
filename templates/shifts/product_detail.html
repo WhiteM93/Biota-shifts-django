@@ -36,6 +36,8 @@
       {% endfor %}
       {% if biota_can_edit and active_setup %}
       <span class="nav-spacer" style="flex:1 1 auto;"></span>
+      <a href="#" class="btn btn-ghost" id="setup-export-specs-btn" target="_blank" rel="noopener" hidden>PDF параметры</a>
+      <a href="#" class="btn btn-ghost" id="setup-export-photos-btn" target="_blank" rel="noopener" hidden>PDF фото 3x5</a>
       <button type="button" class="btn product-btn-edit-mode" id="setup-inline-edit-btn">Быстрое редактирование</button>
       {% endif %}
     </div>
@@ -180,6 +182,7 @@
                     <th class="setup-tools-th-rot">Тип</th>
                     <th class="setup-tools-th-rot setup-tools-th-diameter">⌀</th>
                     <th class="setup-tools-th-rot">Вылет</th>
+                    <th class="setup-tools-th-rot">Примечание</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -191,6 +194,7 @@
                     <td data-tool-col="tool_type" data-tool-type-value="{{ row.tool_type|default:'' }}">{{ row.tool_type }}</td>
                     <td data-tool-col="diameter">{{ row.diameter }}</td>
                     <td data-tool-col="overhang">{{ row.overhang }}</td>
+                    <td data-tool-col="note">{{ row.note }}</td>
                   </tr>
                   {% endfor %}
                 </tbody>
@@ -239,6 +243,7 @@
     <button type="button" class="btn btn-ghost cad-setup-stl-btn" id="cad-setup-stl-btn" hidden>Залить 3D</button>
     <input type="file" id="cad-setup-stl-input" accept=".stl" hidden />
     {% endif %}
+    <div class="muted" style="margin:0 0 8px 0; font-weight:700;">{{ product.name }}</div>
     <div id="product-cad-viewport" class="product-cad-viewport"
       {% if preview_stl_url %}data-stl-url="{{ preview_stl_url }}"{% endif %}
       data-cad-ext="{{ cad_ext }}">
@@ -326,6 +331,17 @@
     padding: 8px;
     background: rgba(17, 24, 39, 0.7);
   }
+  .product-setup-photos.is-inline-edit figure.setup-photo-figure {
+    cursor: grab;
+  }
+  .product-setup-photos.is-inline-edit figure.setup-photo-figure.is-dragging {
+    opacity: 0.55;
+    cursor: grabbing;
+  }
+  .product-setup-photos.is-inline-edit figure.setup-photo-figure.is-drop-target {
+    outline: 2px dashed #6f7ef2;
+    outline-offset: 2px;
+  }
   .product-setup-photos a {
     display: block;
     border: 1px solid #2f3b57;
@@ -347,10 +363,13 @@
     width: 100%;
   }
   .setup-photo-inline-controls {
-    display: flex;
+    display: none;
     gap: 6px;
     width: 100%;
     justify-content: center;
+  }
+  .product-tab-panel[data-inline-edit-mode="1"] .setup-photo-inline-controls {
+    display: flex;
   }
   .setup-photo-inline-controls .btn {
     height: 26px;
@@ -417,6 +436,10 @@
     display: inline-flex;
   }
   #product-tabs:not([data-current-tab="drawing"]) #product-edit-main-btn {
+    display: none !important;
+  }
+  #setup-export-specs-btn[hidden],
+  #setup-export-photos-btn[hidden] {
     display: none !important;
   }
   .product-tab {
@@ -696,6 +719,19 @@
     overflow-wrap: anywhere;
     word-break: break-word;
   }
+  .setup-tools-view th:nth-child(1),
+  .setup-tools-view th:nth-child(2),
+  .setup-tools-view th:nth-child(3),
+  .setup-tools-view td:nth-child(1),
+  .setup-tools-view td:nth-child(2),
+  .setup-tools-view td:nth-child(3) {
+    width: 3ch;
+    min-width: 3ch;
+    max-width: 3ch;
+    white-space: nowrap;
+    padding-left: 2px;
+    padding-right: 2px;
+  }
   .setup-tools-view th.setup-tools-th-rot {
     height: auto;
     min-width: 34px;
@@ -727,6 +763,16 @@
     width: 100%;
     font-size: 12px;
     min-height: 24px;
+    text-align: center;
+    text-align-last: center;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: none;
+    padding-right: 8px;
+  }
+  .setup-tools-view select.js-inline-tool-type::-ms-expand {
+    display: none;
   }
   .product-setup-content-grid {
     display: grid;
@@ -870,7 +916,10 @@
     box-sizing: border-box;
   }
   .product-detail-side[data-current-tab="drawing"] {
-    margin-top: 52px;
+    margin-top: 83px;
+  }
+  .product-detail-side[data-current-tab^="setup-"] {
+    margin-top: 83px;
   }
   [data-field-text].is-inline-edit {
     display: inline-block;
@@ -1349,11 +1398,26 @@
     }
 
     function setTopButtonsByTab(tabName) {
+      var isSetupTab = /^setup-\d+$/.test(tabName || "");
       var isDrawing = tabName === "drawing";
       var fastBtn = document.getElementById("setup-inline-edit-btn");
       var productEditBtn = document.getElementById("product-edit-main-btn");
+      var exportSpecsBtn = document.getElementById("setup-export-specs-btn");
+      var exportPhotosBtn = document.getElementById("setup-export-photos-btn");
       if (fastBtn) fastBtn.hidden = isDrawing;
       if (productEditBtn) productEditBtn.hidden = !isDrawing;
+      if (exportSpecsBtn) exportSpecsBtn.hidden = !isSetupTab;
+      if (exportPhotosBtn) exportPhotosBtn.hidden = !isSetupTab;
+      if (isSetupTab) {
+        var m = (tabName || "").match(/^setup-(\d+)$/);
+        var setupId = m ? m[1] : "";
+        if (setupId) {
+          var specsPattern = "{% url 'product_setup_pdf_export' product.pk 0 'specs' %}";
+          var photosPattern = "{% url 'product_setup_pdf_export' product.pk 0 'photos' %}";
+          if (exportSpecsBtn) exportSpecsBtn.href = specsPattern.replace("/0/pdf/specs/", "/" + setupId + "/pdf/specs/");
+          if (exportPhotosBtn) exportPhotosBtn.href = photosPattern.replace("/0/pdf/photos/", "/" + setupId + "/pdf/photos/");
+        }
+      }
     }
 
     function setSideBlocksByTab(tabName) {
@@ -1583,9 +1647,52 @@
           tool_type: getCellValue("tool_type"),
           diameter: getCellValue("diameter"),
           overhang: getCellValue("overhang"),
+          note: getCellValue("note"),
         });
       });
       return rows;
+    }
+
+    function syncPhotoDnDMode(panel, enabled) {
+      if (!panel) return;
+      var wraps = panel.querySelectorAll(".product-setup-photos");
+      wraps.forEach(function (wrap) {
+        if (enabled) wrap.classList.add("is-inline-edit");
+        else wrap.classList.remove("is-inline-edit");
+      });
+      panel.querySelectorAll(".setup-photo-figure").forEach(function (figure) {
+        var photoId = (figure.getAttribute("data-photo-id") || "").trim();
+        if (enabled && photoId) {
+          figure.setAttribute("draggable", "true");
+        } else {
+          figure.removeAttribute("draggable");
+          figure.classList.remove("is-dragging", "is-drop-target");
+        }
+      });
+    }
+
+    async function persistSetupPhotosOrder(photosWrap, setupId) {
+      if (!photosWrap || !setupId) return;
+      var ids = [];
+      photosWrap.querySelectorAll(".setup-photo-figure[data-photo-id]").forEach(function (figure) {
+        var id = (figure.getAttribute("data-photo-id") || "").trim();
+        if (id) ids.push(id);
+      });
+      if (!ids.length) return;
+      var fd = new FormData();
+      fd.append("action", "inline_reorder_setup_photos");
+      fd.append("setup_id", setupId);
+      fd.append("photo_ids", ids.join(","));
+      var res = await fetch(window.location.href, {
+        method: "POST",
+        headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+        body: fd,
+        credentials: "same-origin",
+      });
+      var data = await res.json();
+      if (!res.ok || !data.ok) {
+        alert(data.error || "Не удалось сохранить порядок фото.");
+      }
     }
 
     function toggleInlineEdit() {
@@ -1597,6 +1704,7 @@
         if (inlineEditMode) toolbar.removeAttribute("hidden");
         else toolbar.setAttribute("hidden", "hidden");
       }
+      panel.setAttribute("data-inline-edit-mode", inlineEditMode ? "1" : "0");
       panel.querySelectorAll("[data-field-text]").forEach(function (node) {
         var field = node.getAttribute("data-field-text");
         if (!field) return;
@@ -1656,6 +1764,7 @@
         else btn.setAttribute("hidden", "hidden");
       });
       setToolsEditMode(panel, inlineEditMode);
+      syncPhotoDnDMode(panel, inlineEditMode);
       editToggleBtn.textContent = inlineEditMode ? "Сохранить изменения" : "Быстрое редактирование";
       window.dispatchEvent(new CustomEvent("setup-inline-edit-mode", { detail: { enabled: inlineEditMode } }));
     }
@@ -1690,7 +1799,9 @@
         sel.setAttribute("hidden", "hidden");
       });
       root.querySelectorAll(".product-tab-panel").forEach(function (panel) {
+        panel.setAttribute("data-inline-edit-mode", "0");
         setToolsEditMode(panel, false);
+        syncPhotoDnDMode(panel, false);
       });
       window.dispatchEvent(new CustomEvent("setup-inline-edit-mode", { detail: { enabled: false } }));
     }
@@ -1946,11 +2057,62 @@
             '<img src="' + ph.image_url + '" alt="' + (ph.caption || "") + '" loading="lazy" />' +
           '</a>' +
           '<figcaption class="muted setup-photo-caption is-inline-edit" data-caption-editable="1" contenteditable="true" spellcheck="true">' + (ph.caption || "") + '</figcaption>' +
-          '<div class="setup-photo-inline-controls">' +
+          '<div class="setup-photo-inline-controls" hidden>' +
             '<button type="button" class="btn btn-ghost js-setup-photo-save-caption" title="Сохранить подпись">Сохранить</button>' +
             '<button type="button" class="btn btn-ghost js-setup-photo-delete" title="Удалить блок">×</button>' +
           '</div>';
+        if (inlineEditMode) {
+          draftFig.setAttribute("draggable", "true");
+        }
       }
+    });
+
+    var draggedPhotoFigure = null;
+    root.addEventListener("dragstart", function (e) {
+      var figure = e.target && e.target.closest ? e.target.closest(".setup-photo-figure[draggable='true']") : null;
+      if (!figure || !inlineEditMode) return;
+      draggedPhotoFigure = figure;
+      figure.classList.add("is-dragging");
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", figure.getAttribute("data-photo-id") || "");
+      }
+    });
+
+    root.addEventListener("dragover", function (e) {
+      var target = e.target && e.target.closest ? e.target.closest(".setup-photo-figure[draggable='true']") : null;
+      if (!draggedPhotoFigure || !target || target === draggedPhotoFigure) return;
+      e.preventDefault();
+      target.classList.add("is-drop-target");
+    });
+
+    root.addEventListener("dragleave", function (e) {
+      var target = e.target && e.target.closest ? e.target.closest(".setup-photo-figure.is-drop-target") : null;
+      if (target) target.classList.remove("is-drop-target");
+    });
+
+    root.addEventListener("drop", async function (e) {
+      var target = e.target && e.target.closest ? e.target.closest(".setup-photo-figure[draggable='true']") : null;
+      if (!draggedPhotoFigure || !target || target === draggedPhotoFigure) return;
+      e.preventDefault();
+      var photosWrap = target.closest(".product-setup-photos");
+      var setupId = target.getAttribute("data-setup-id") || draggedPhotoFigure.getAttribute("data-setup-id") || "";
+      if (!photosWrap || !setupId) return;
+      var rect = target.getBoundingClientRect();
+      var placeBefore = e.clientX < (rect.left + rect.width / 2);
+      if (placeBefore) photosWrap.insertBefore(draggedPhotoFigure, target);
+      else photosWrap.insertBefore(draggedPhotoFigure, target.nextSibling);
+      photosWrap.querySelectorAll(".is-drop-target").forEach(function (el) {
+        el.classList.remove("is-drop-target");
+      });
+      await persistSetupPhotosOrder(photosWrap, setupId);
+    });
+
+    root.addEventListener("dragend", function () {
+      root.querySelectorAll(".setup-photo-figure.is-dragging, .setup-photo-figure.is-drop-target").forEach(function (figure) {
+        figure.classList.remove("is-dragging", "is-drop-target");
+      });
+      draggedPhotoFigure = null;
     });
 
     root.querySelectorAll(".setup-binding-photo-input").forEach(function (input) {

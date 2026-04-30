@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ product.name }} — {{ setup.name }} — PDF</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 10mm;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      color: #111;
+      background: #fff;
+    }
+    .page-title {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .muted { color: #555; }
+    .specs-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1.2fr;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .card {
+      border: 1px solid #999;
+      padding: 8px;
+      border-radius: 4px;
+      break-inside: avoid;
+    }
+    .spec-row {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 6px;
+      margin-bottom: 3px;
+    }
+    .spec-key { font-weight: 700; }
+    .notes {
+      white-space: pre-wrap;
+      border-top: 1px dashed #bbb;
+      margin-top: 6px;
+      padding-top: 6px;
+      min-height: 70px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      margin-top: 8px;
+    }
+    th, td {
+      border: 1px solid #777;
+      padding: 3px 4px;
+      text-align: center;
+      vertical-align: middle;
+      word-wrap: break-word;
+    }
+    .col-small {
+      width: 4ch;
+      min-width: 4ch;
+      max-width: 4ch;
+      white-space: nowrap;
+    }
+    .col-type { width: 23%; }
+    .col-note { width: 30%; text-align: left; }
+    th.col-diameter {
+      font-size: 16px;
+      line-height: 1;
+    }
+    .photos-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 6mm;
+      height: calc(100vh - 44px);
+      box-sizing: border-box;
+      margin-top: 8px;
+    }
+    .photo-cell {
+      border: 1px solid #999;
+      border-radius: 4px;
+      padding: 3mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    .photo-cell img {
+      width: 100%;
+      height: calc(100% - 20px);
+      object-fit: cover;
+      border: 1px solid #ccc;
+    }
+    .photo-caption {
+      width: 100%;
+      font-size: 10px;
+      text-align: center;
+      margin-top: 3px;
+      min-height: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .empty-cell {
+      border: 1px dashed #bbb;
+      background: #fafafa;
+    }
+    @media screen {
+      body { padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+  {% if mode == "photos" %}
+    <h1 class="page-title">{{ product.name }} — {{ setup.name }} — Фото (3x5)</h1>
+    <div class="photos-grid">
+      {% for photo in photo_slots %}
+        <div class="photo-cell {% if not photo %}empty-cell{% endif %}">
+          {% if photo %}
+            <img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'Фото' }}">
+            <div class="photo-caption">{{ photo.caption|default:" " }}</div>
+          {% else %}
+            <div style="height:100%; width:100%;"></div>
+            <div class="photo-caption">&nbsp;</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <h1 class="page-title">{{ product.name }} — {{ setup.name }}</h1>
+    <div class="specs-grid">
+      <div class="card">
+        <div class="spec-row"><div class="spec-key">X</div><div>{{ setup.binding_x|default:"—" }}</div></div>
+        <div class="spec-row"><div class="spec-key">Y</div><div>{{ setup.binding_y|default:"—" }}</div></div>
+        <div class="spec-row"><div class="spec-key">Z</div><div>{{ setup.binding_z|default:"—" }}</div></div>
+        <div class="spec-row"><div class="spec-key">Привязка</div><div>{{ setup.gcode_system|default:"G54" }}</div></div>
+        <div class="spec-row"><div class="spec-key">Тип</div><div>{{ setup.workpiece|default:"—" }}</div></div>
+        <div class="spec-row"><div class="spec-key">Материал</div><div>{{ setup.material|default:"—" }}</div></div>
+        <div class="spec-row"><div class="spec-key">Размер</div><div>{{ setup.size|default:"—" }}</div></div>
+        <div class="spec-row"><div class="spec-key">Программа</div><div>{{ setup.program_filename|default:"—" }}</div></div>
+      </div>
+      <div class="card">
+        <div class="spec-key" style="margin-bottom:4px;">Наладка</div>
+        <div class="notes">{{ setup.setup_notes|safe }}</div>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th class="col-small">№</th>
+          <th class="col-small">H</th>
+          <th class="col-small">D</th>
+          <th class="col-type">Тип</th>
+          <th class="col-diameter">⌀</th>
+          <th>Вылет</th>
+          <th class="col-note">Примечание</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in tool_rows %}
+        <tr>
+          <td>{{ row.tool_number }}</td>
+          <td{% if row.kor_n_override %} style="font-weight:700; text-decoration:underline;"{% endif %}>{{ row.kor_n }}</td>
+          <td{% if row.kor_d_override %} style="font-weight:700; text-decoration:underline;"{% endif %}>{{ row.kor_d }}</td>
+          <td>{{ row.tool_type }}</td>
+          <td>{{ row.diameter }}</td>
+          <td>{{ row.overhang }}</td>
+          <td class="col-note">{{ row.note }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  <script>
+    window.addEventListener("load", function () {
+      setTimeout(function () { window.print(); }, 120);
+    });
+  </script>
+</body>
+</html>

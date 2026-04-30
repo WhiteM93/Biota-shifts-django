@@ -29,6 +29,8 @@ END_MILL_TYPES = [
     ("end", "Концевая фреза"),
     ("roughing", "Обдирочная фреза"),
     ("t_slot", "Т-образная фреза"),
+    ("radius", "Радиусная фреза"),
+    ("ball", "Сферическая фреза"),
 ]
 
 CENTER_DRILL_ANGLES = [
@@ -90,6 +92,7 @@ class ToolItem(models.Model):
             ("tap", "Резьбовой инструмент"),
             ("center_drill", "Центровки"),
             ("countersink", "Зенкера"),
+            ("drill", "Сверла"),
         ],
         verbose_name="Категория",
     )
@@ -191,6 +194,21 @@ class CountersinkSpec(models.Model):
 
     def __str__(self):
         return f"Зенкер {self.get_countersink_type_display()} Ø{self.diameter_mm} / {self.angle_deg}°"
+
+
+class DrillSpec(models.Model):
+    tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="drill_spec")
+    diameter_mm = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="Диаметр, мм", null=True, blank=True)
+    overall_length_mm = models.DecimalField(max_digits=7, decimal_places=2, verbose_name="Длина, мм", null=True, blank=True)
+    cutting_length_mm = models.DecimalField(max_digits=7, decimal_places=2, verbose_name="Длина реж. части, мм", null=True, blank=True)
+    angle_deg = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="Угол, °", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Параметры сверла"
+        verbose_name_plural = "Параметры сверл"
+
+    def __str__(self):
+        return f"Сверло Ø{self.diameter_mm} / {self.angle_deg}°"
 
 
 class StockMovement(models.Model):

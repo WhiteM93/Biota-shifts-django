@@ -21,6 +21,7 @@ from .models import (
     COUNTERSINK_TYPES,
     COATING_TYPES,
     CountersinkSpec,
+    DrillSpec,
     END_MILL_TYPES,
     CenterDrillSpec,
     EndMillSpec,
@@ -104,6 +105,15 @@ def _build_countersink_name(countersink_type: str, diameter_mm, angle_deg: str, 
     type_label = dict(COUNTERSINK_TYPES).get(countersink_type, countersink_type or "машинный")
     size_part = f" / {size_label}" if size_label else ""
     return f"Зенкер {type_label} D{_fmt_unknown(diameter_mm)} / {angle_deg or '90'}°{size_part}"
+
+
+def _build_drill_name(diameter_mm, overall_length_mm, cutting_length_mm, angle_deg) -> str:
+    return (
+        f"Сверло D{_fmt_unknown(diameter_mm)} / "
+        f"L{_fmt_unknown(overall_length_mm)} / "
+        f"Lc{_fmt_unknown(cutting_length_mm)} / "
+        f"{_fmt_unknown(angle_deg)}°"
+    )
 
 
 @biota_login_required
@@ -484,7 +494,7 @@ def inventory_view(request):
                 tool_material = (row.get("tool_material") or "").strip()
                 coating_type = (row.get("coating_type") or "none").strip()
                 work_material = (row.get("work_material") or "").strip()
-                if category not in {"end_mill", "tap", "center_drill", "countersink"} or quantity <= 0:
+                if category not in {"end_mill", "tap", "center_drill", "countersink", "drill"} or quantity <= 0:
                     continue
                 try:
                     movement_date = date.fromisoformat(movement_date_raw)
@@ -622,7 +632,7 @@ def inventory_view(request):
                             overall_length_mm=overall_length_mm,
                             angle_deg=angle_deg,
                         )
-                else:
+                elif category == "countersink":
                     countersink_type = (row.get("cs_type") or "machine").strip()
                     if countersink_type not in {x[0] for x in COUNTERSINK_TYPES}:
                         countersink_type = "machine"
@@ -669,6 +679,44 @@ def inventory_view(request):
                             overall_length_mm=overall_length_mm,
                             flutes_count=flutes_count,
                             size_label=size_label,
+                        )
+                else:
+                    diameter_mm = _to_decimal_or_none(row.get("dr_diameter_mm"))
+                    overall_length_mm = _to_decimal_or_none(row.get("dr_overall_length_mm"))
+                    cutting_length_mm = _to_decimal_or_none(row.get("dr_cutting_length_mm"))
+                    angle_deg = _to_decimal_or_none(row.get("dr_angle_deg"))
+                    tool = (
+                        ToolItem.objects.select_for_update()
+                        .filter(
+                            category="drill",
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            drill_spec__diameter_mm=diameter_mm,
+                            drill_spec__overall_length_mm=overall_length_mm,
+                            drill_spec__cutting_length_mm=cutting_length_mm,
+                            drill_spec__angle_deg=angle_deg,
+                        )
+                        .first()
+                    )
+                    if tool:
+                        tool.quantity += quantity
+                        tool.save(update_fields=["quantity", "updated_at"])
+                    else:
+                        tool = ToolItem.objects.create(
+                            category="drill",
+                            name=_build_drill_name(diameter_mm, overall_length_mm, cutting_length_mm, angle_deg),
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            quantity=quantity,
+                        )
+                        DrillSpec.objects.create(
+                            tool=tool,
+                            diameter_mm=diameter_mm,
+                            overall_length_mm=overall_length_mm,
+                            cutting_length_mm=cutting_length_mm,
+                            angle_deg=angle_deg,
                         )
                 StockMovement.objects.create(
                     movement_type="restock",
@@ -899,7 +947,7 @@ def inventory_view(request):
     if not show_all:
         qs = qs.filter(quantity__gt=0)
     filter_category = (request.GET.get("category") or "end_mill").strip()
-    if filter_category not in {"end_mill", "tap", "center_drill", "countersink"}:
+    if filter_category not in {"end_mill", "tap", "center_drill", "countersink", "drill"}:
         filter_category = "end_mill"
     qs = qs.filter(category=filter_category)
 
@@ -926,6 +974,10 @@ def inventory_view(request):
     countersink_length_raw = (request.GET.get("countersink_overall_length_mm") or "").strip()
     countersink_flutes_raw = (request.GET.get("countersink_flutes_count") or "").strip()
     countersink_size_raw = (request.GET.get("countersink_size_label") or "").strip()
+    drill_diameter_raw = (request.GET.get("drill_diameter_mm") or "").strip()
+    drill_overall_length_raw = (request.GET.get("drill_overall_length_mm") or "").strip()
+    drill_cutting_length_raw = (request.GET.get("drill_cutting_length_mm") or "").strip()
+    drill_angle_raw = (request.GET.get("drill_angle_deg") or "").strip()
     arrival_supplier = (request.GET.get("arrival_supplier") or "").strip()
 
     tool_material = (request.GET.get("tool_material") or "").strip()
@@ -1003,6 +1055,22 @@ def inventory_view(request):
             qs = qs.filter(countersink_spec__flutes_count=countersink_flutes)
     if countersink_size_raw:
         qs = qs.filter(countersink_spec__size_label__iexact=countersink_size_raw)
+    if drill_diameter_raw:
+        drill_diameter = _to_decimal(drill_diameter_raw, Decimal("0"))
+        if drill_diameter > 0:
+            qs = qs.filter(drill_spec__diameter_mm=drill_diameter)
+    if drill_overall_length_raw:
+        drill_overall_length = _to_decimal(drill_overall_length_raw, Decimal("0"))
+        if drill_overall_length > 0:
+            qs = qs.filter(drill_spec__overall_length_mm=drill_overall_length)
+    if drill_cutting_length_raw:
+        drill_cutting_length = _to_decimal(drill_cutting_length_raw, Decimal("0"))
+        if drill_cutting_length > 0:
+            qs = qs.filter(drill_spec__cutting_length_mm=drill_cutting_length)
+    if drill_angle_raw:
+        drill_angle = _to_decimal(drill_angle_raw, Decimal("0"))
+        if drill_angle > 0:
+            qs = qs.filter(drill_spec__angle_deg=drill_angle)
 
     if tool_material:
         qs = qs.filter(tool_material=tool_material)
@@ -1044,9 +1112,13 @@ def inventory_view(request):
     countersink_lengths = _distinct_numeric_values(option_source_qs.filter(category="countersink"), "countersink_spec__overall_length_mm")
     countersink_flutes = _distinct_numeric_values(option_source_qs.filter(category="countersink"), "countersink_spec__flutes_count")
     countersink_sizes = _distinct_text_values(option_source_qs.filter(category="countersink"), "countersink_spec__size_label")
+    drill_diameters = _distinct_numeric_values(option_source_qs.filter(category="drill"), "drill_spec__diameter_mm")
+    drill_overall_lengths = _distinct_numeric_values(option_source_qs.filter(category="drill"), "drill_spec__overall_length_mm")
+    drill_cutting_lengths = _distinct_numeric_values(option_source_qs.filter(category="drill"), "drill_spec__cutting_length_mm")
+    drill_angles = _distinct_numeric_values(option_source_qs.filter(category="drill"), "drill_spec__angle_deg")
     issue_candidates = list(
         StockMovement.objects.filter(movement_type="issue")
-        .select_related("tool", "tool__end_mill_spec", "tool__tap_spec", "tool__center_drill_spec", "tool__countersink_spec")
+        .select_related("tool", "tool__end_mill_spec", "tool__tap_spec", "tool__center_drill_spec", "tool__countersink_spec", "tool__drill_spec")
         .annotate(
             processed_qty=Coalesce(
                 Sum("issue_outcomes__quantity"),
@@ -1103,8 +1175,8 @@ def inventory_view(request):
     )
 
     ctx = {
-        "tool_items": qs.select_related("end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec"),
-        "movements": StockMovement.objects.select_related("tool", "tool__end_mill_spec", "tool__tap_spec", "tool__center_drill_spec", "tool__countersink_spec")[:50],
+        "tool_items": qs.select_related("end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec", "drill_spec"),
+        "movements": StockMovement.objects.select_related("tool", "tool__end_mill_spec", "tool__tap_spec", "tool__center_drill_spec", "tool__countersink_spec", "tool__drill_spec")[:50],
         "thread_standards": THREAD_STANDARDS,
         "tap_hole_types": TAP_HOLE_TYPES,
         "tap_tool_types": TAP_TOOL_TYPES,
@@ -1132,6 +1204,10 @@ def inventory_view(request):
             "countersink_overall_length_mm": countersink_length_raw,
             "countersink_flutes_count": countersink_flutes_raw,
             "countersink_size_label": countersink_size_raw,
+            "drill_diameter_mm": drill_diameter_raw,
+            "drill_overall_length_mm": drill_overall_length_raw,
+            "drill_cutting_length_mm": drill_cutting_length_raw,
+            "drill_angle_deg": drill_angle_raw,
             "tool_material": tool_material,
             "coating_type": coating_type,
             "work_material": work_material,
@@ -1172,11 +1248,17 @@ def inventory_view(request):
         },
         "countersink_types": COUNTERSINK_TYPES,
         "countersink_angles": COUNTERSINK_ANGLES,
+        "drill_filter_options": {
+            "diameters": drill_diameters,
+            "overall_lengths": drill_overall_lengths,
+            "cutting_lengths": drill_cutting_lengths,
+            "angles": drill_angles,
+        },
         "tool_material_types": TOOL_MATERIAL_TYPES,
         "coating_types": COATING_TYPES,
         "work_material_types": WORK_MATERIAL_TYPES,
         "today": date.today().isoformat(),
-        "movement_tool_options": ToolItem.objects.select_related("end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec").all().order_by("category", "name"),
+        "movement_tool_options": ToolItem.objects.select_related("end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec", "drill_spec").all().order_by("category", "name"),
         "issue_candidates": issue_candidates,
         "purchase_requests": purchase_qs[:300],
         "purchase_statuses": PURCHASE_STATUSES,

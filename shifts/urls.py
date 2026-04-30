@@ -28,6 +28,7 @@ urlpatterns = [
     path("products/<int:pk>/edit/", product_views.product_edit_view, name="product_edit"),
     path("products/<int:pk>/setups/new/", product_views.product_setup_create_view, name="product_setup_create"),
     path("products/<int:pk>/setups/<int:setup_pk>/edit/", product_views.product_setup_edit_view, name="product_setup_edit"),
+    path("products/<int:pk>/setups/<int:setup_pk>/pdf/<str:mode>/", product_views.product_setup_pdf_export_view, name="product_setup_pdf_export"),
     path("products/<int:pk>/save-list-preview/", product_views.product_save_list_preview_view, name="product_save_list_preview"),
     path("products/<int:pk>/", product_views.product_detail_view, name="product_detail"),
     path("cabinet/", cabinet_views.cabinet_view, name="cabinet"),

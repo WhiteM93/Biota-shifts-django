@@ -29,6 +29,7 @@
         <option value="tap" {% if filters.category == "tap" %}selected{% endif %}>Резьбовой инструмент</option>
         <option value="center_drill" {% if filters.category == "center_drill" %}selected{% endif %}>Центровки</option>
         <option value="countersink" {% if filters.category == "countersink" %}selected{% endif %}>Зенкера</option>
+        <option value="drill" {% if filters.category == "drill" %}selected{% endif %}>Сверла</option>
       </select>
     </label>
     <label class="field"><span>Показывать нулевые остатки</span>
@@ -238,6 +239,39 @@
         {% endfor %}
       </select>
     </label>
+    {% elif filters.category == "drill" %}
+    <label class="field"><span>Диаметр, мм</span>
+      <select name="drill_diameter_mm">
+        <option value="">Все</option>
+        {% for v in drill_filter_options.diameters %}
+        <option value="{{ v }}" {% if filters.drill_diameter_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Длина, мм</span>
+      <select name="drill_overall_length_mm">
+        <option value="">Все</option>
+        {% for v in drill_filter_options.overall_lengths %}
+        <option value="{{ v }}" {% if filters.drill_overall_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Длина реж. части, мм</span>
+      <select name="drill_cutting_length_mm">
+        <option value="">Все</option>
+        {% for v in drill_filter_options.cutting_lengths %}
+        <option value="{{ v }}" {% if filters.drill_cutting_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Угол, °</span>
+      <select name="drill_angle_deg">
+        <option value="">Все</option>
+        {% for v in drill_filter_options.angles %}
+        <option value="{{ v }}" {% if filters.drill_angle_deg == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
     {% endif %}
     <label class="field"><span>Материал инструмента</span>
       <select name="tool_material">
@@ -415,7 +449,7 @@
       {% endfor %}
     </tbody>
   </table>
-  {% else %}
+  {% elif filters.category == "countersink" %}
   <table class="data-grid js-sortable-table">
     <thead>
       <tr>
@@ -450,6 +484,47 @@
       {% endfor %}
     </tbody>
   </table>
+  {% else %}
+  <table class="data-grid js-sortable-table">
+    <thead>
+      <tr>
+        <th class="sortable">D, мм</th>
+        <th class="sortable">L, мм</th>
+        <th class="sortable">Lc, мм</th>
+        <th class="sortable">Угол, °</th>
+        <th class="sortable">Материал инструмента</th>
+        <th class="sortable">Покрытие</th>
+        <th class="sortable">Материал обработки</th>
+        <th class="sortable">Остаток</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tool_items %}
+      <tr>
+        <td data-sort="{{ t.drill_spec.diameter_mm|default:'-1' }}">{% if t.drill_spec.diameter_mm is not None %}{{ t.drill_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.drill_spec.overall_length_mm|default:'-1' }}">{% if t.drill_spec.overall_length_mm is not None %}{{ t.drill_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.drill_spec.cutting_length_mm|default:'-1' }}">{% if t.drill_spec.cutting_length_mm is not None %}{{ t.drill_spec.cutting_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.drill_spec.angle_deg|default:'-1' }}">{% if t.drill_spec.angle_deg is not None %}{{ t.drill_spec.angle_deg|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td>{{ t.get_tool_material_display|default:"-" }}</td>
+        <td data-sort="{{ t.coating_type }}">
+          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
+        </td>
+        <td data-sort="{{ t.work_material|default:'-' }}">
+          {% if t.work_material == "P" %}<span class="wm-badge wm-p">P</span>
+          {% elif t.work_material == "M" %}<span class="wm-badge wm-m">M</span>
+          {% elif t.work_material == "K" %}<span class="wm-badge wm-k">K</span>
+          {% elif t.work_material == "N" %}<span class="wm-badge wm-n">N</span>
+          {% elif t.work_material == "S" %}<span class="wm-badge wm-s">S</span>
+          {% elif t.work_material == "H" %}<span class="wm-badge wm-h">H</span>
+          {% else %}-{% endif %}
+        </td>
+        <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
   {% endif %}
 </div>
 {% endif %}
@@ -473,6 +548,7 @@
         <option value="tap">Резьбовой инструмент</option>
         <option value="center_drill">Центровки</option>
         <option value="countersink">Зенкера</option>
+        <option value="drill">Сверла</option>
       </select>
     </label>
     <label class="field"><span>Поиск инструмента</span>
@@ -484,7 +560,7 @@
         {% for t in movement_tool_options %}
         <option value="{{ t.id }}" data-category="{{ t.category }}">
           {{ t.get_category_display }}
-          {% if t.category == "end_mill" and t.end_mill_spec %}| {{ t.end_mill_spec.get_mill_type_display }}{% elif t.category == "tap" and t.tap_spec %}| {{ t.tap_spec.get_tap_type_display }}{% elif t.category == "center_drill" and t.center_drill_spec %}| центровка {{ t.center_drill_spec.angle_deg }}°{% elif t.category == "countersink" and t.countersink_spec %}| зенкер {{ t.countersink_spec.get_countersink_type_display }} {{ t.countersink_spec.angle_deg }}°{% endif %}
+          {% if t.category == "end_mill" and t.end_mill_spec %}| {{ t.end_mill_spec.get_mill_type_display }}{% elif t.category == "tap" and t.tap_spec %}| {{ t.tap_spec.get_tap_type_display }}{% elif t.category == "center_drill" and t.center_drill_spec %}| центровка {{ t.center_drill_spec.angle_deg }}°{% elif t.category == "countersink" and t.countersink_spec %}| зенкер {{ t.countersink_spec.get_countersink_type_display }} {{ t.countersink_spec.angle_deg }}°{% elif t.category == "drill" and t.drill_spec %}| сверло {{ t.drill_spec.angle_deg }}°{% endif %}
           | {{ t.name }} | остаток {{ t.quantity }}
         </option>
         {% endfor %}
@@ -516,6 +592,7 @@
         <option value="tap">Резьбовой инструмент</option>
         <option value="center_drill">Центровки</option>
         <option value="countersink">Зенкера</option>
+        <option value="drill">Сверла</option>
       </select>
     </label>
     <label class="field">
@@ -564,7 +641,7 @@
         {% for iss in issue_candidates %}
         <option value="{{ iss.id }}">
           #{{ iss.id }} | {{ iss.movement_date }} | {{ iss.tool.get_category_display }}
-          {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% elif iss.tool.category == "center_drill" and iss.tool.center_drill_spec %}| центровка {{ iss.tool.center_drill_spec.angle_deg }}°{% elif iss.tool.category == "countersink" and iss.tool.countersink_spec %}| зенкер {{ iss.tool.countersink_spec.get_countersink_type_display }} {{ iss.tool.countersink_spec.angle_deg }}°{% endif %}
+          {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% elif iss.tool.category == "center_drill" and iss.tool.center_drill_spec %}| центровка {{ iss.tool.center_drill_spec.angle_deg }}°{% elif iss.tool.category == "countersink" and iss.tool.countersink_spec %}| зенкер {{ iss.tool.countersink_spec.get_countersink_type_display }} {{ iss.tool.countersink_spec.angle_deg }}°{% elif iss.tool.category == "drill" and iss.tool.drill_spec %}| сверло {{ iss.tool.drill_spec.angle_deg }}°{% endif %}
           | {{ iss.tool.name }} | выдано {{ iss.quantity }} | осталось обработать {{ iss.remaining_qty }}
         </option>
         {% endfor %}
@@ -599,7 +676,7 @@
           <td>{{ iss.movement_date }}</td>
           <td>
             {{ iss.tool.get_category_display }}
-            {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% elif iss.tool.category == "center_drill" and iss.tool.center_drill_spec %}| центровка {{ iss.tool.center_drill_spec.angle_deg }}°{% elif iss.tool.category == "countersink" and iss.tool.countersink_spec %}| зенкер {{ iss.tool.countersink_spec.get_countersink_type_display }} {{ iss.tool.countersink_spec.angle_deg }}°{% endif %}
+            {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% elif iss.tool.category == "center_drill" and iss.tool.center_drill_spec %}| центровка {{ iss.tool.center_drill_spec.angle_deg }}°{% elif iss.tool.category == "countersink" and iss.tool.countersink_spec %}| зенкер {{ iss.tool.countersink_spec.get_countersink_type_display }} {{ iss.tool.countersink_spec.angle_deg }}°{% elif iss.tool.category == "drill" and iss.tool.drill_spec %}| сверло {{ iss.tool.drill_spec.angle_deg }}°{% endif %}
             | {{ iss.tool.name }}
           </td>
           <td>{{ iss.quantity }}</td>
@@ -916,7 +993,7 @@
         <td>{{ m.movement_date }}</td>
         <td>{{ m.get_movement_type_display }}</td>
         <td>{{ m.tool.get_category_display }}</td>
-        <td>{% if m.tool.category == "end_mill" and m.tool.end_mill_spec %}{{ m.tool.end_mill_spec.get_mill_type_display }}{% elif m.tool.category == "tap" and m.tool.tap_spec %}{{ m.tool.tap_spec.get_tap_type_display }}{% elif m.tool.category == "center_drill" and m.tool.center_drill_spec %}Центровка {{ m.tool.center_drill_spec.angle_deg }}°{% elif m.tool.category == "countersink" and m.tool.countersink_spec %}Зенкер {{ m.tool.countersink_spec.get_countersink_type_display }} {{ m.tool.countersink_spec.angle_deg }}°{% else %}-{% endif %}</td>
+        <td>{% if m.tool.category == "end_mill" and m.tool.end_mill_spec %}{{ m.tool.end_mill_spec.get_mill_type_display }}{% elif m.tool.category == "tap" and m.tool.tap_spec %}{{ m.tool.tap_spec.get_tap_type_display }}{% elif m.tool.category == "center_drill" and m.tool.center_drill_spec %}Центровка {{ m.tool.center_drill_spec.angle_deg }}°{% elif m.tool.category == "countersink" and m.tool.countersink_spec %}Зенкер {{ m.tool.countersink_spec.get_countersink_type_display }} {{ m.tool.countersink_spec.angle_deg }}°{% elif m.tool.category == "drill" and m.tool.drill_spec %}Сверло {{ m.tool.drill_spec.angle_deg }}°{% else %}-{% endif %}</td>
         <td>{{ m.tool.name }}</td>
         <td>{{ m.quantity }}</td>
         <td>{{ m.employee_name|default:"-" }}</td>
@@ -1742,14 +1819,16 @@
       group = document.createElement("div");
       group.className = "arrival-group";
       group.id = groupId;
-      var title = cat === "end_mill" ? "Фрезы" : (cat === "tap" ? "Резьбовой инструмент" : (cat === "center_drill" ? "Центровки" : "Зенкера"));
+      var title = cat === "end_mill" ? "Фрезы" : (cat === "tap" ? "Резьбовой инструмент" : (cat === "center_drill" ? "Центровки" : (cat === "countersink" ? "Зенкера" : "Сверла")));
       var headHtml = cat === "end_mill"
         ? '<tr><th>Тип фрезы</th><th class="short-col">D</th><th class="short-col">R</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
         : (cat === "tap"
             ? '<tr><th class="tap-size-col">Размер</th><th class="tap-std-col">Стандарт</th><th class="tap-step-col">Шаг</th><th class="tap-tpi-col">TPI</th><th class="tap-l-col">L</th><th class="tap-lc-col">Lc</th><th class="tap-hole-col">Тип</th><th>Тип инструмента</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
             : (cat === "center_drill"
                 ? '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Угол</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
-                : '<tr><th>Тип</th><th class="short-col">D</th><th class="short-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'));
+                : (cat === "countersink"
+                    ? '<tr><th>Тип</th><th class="short-col">D</th><th class="short-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
+                    : '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Угол</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>')));
       group.innerHTML = '' +
         '<h4>' + title + '</h4>' +
         '<div class="table-wrap arrival-bulk-table-wrap">' +
@@ -1764,7 +1843,7 @@
 
     function addRow() {
       var cat = categorySelect.value || "end_mill";
-      if (cat !== "end_mill" && cat !== "tap" && cat !== "center_drill" && cat !== "countersink") return;
+      if (cat !== "end_mill" && cat !== "tap" && cat !== "center_drill" && cat !== "countersink" && cat !== "drill") return;
       var group = ensureGroup(cat);
       var body = group.querySelector(".arrival-group-body");
       var tr = document.createElement("tr");
@@ -1804,12 +1883,21 @@
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
         cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
-      } else {
+      } else if (cat === "countersink") {
         cells.push('<td><select data-k="cs_type">{% for key, label in countersink_types %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cs_diameter_mm"></td>');
         cells.push('<td class="short-col"><select data-k="cs_angle_deg">{% for key, label in countersink_angles %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cs_overall_length_mm"></td>');
         cells.push('<td class="short-col"><input type="number" data-k="cs_flutes_count"></td>');
+        cells.push('<td class="tm-cell"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      } else {
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_diameter_mm"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_overall_length_mm"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_cutting_length_mm"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_angle_deg"></td>');
         cells.push('<td class="tm-cell"></td>');
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
