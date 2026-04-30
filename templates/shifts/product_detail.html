@@ -58,7 +58,7 @@
               <h5>Привязки и заготовка</h5>
               <div class="setup-spec-split">
                 <div class="setup-spec-col">
-                  <div>
+                  <div class="setup-row-photo">
                     <span class="muted">X:</span> <span data-field-text="binding_x">{{ setup.binding_x|default:"—" }}</span>
                     {% if setup.binding_x_photo %}
                     <a href="{{ setup.binding_x_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_x_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка X" aria-label="Открыть фото привязки X">
@@ -71,7 +71,7 @@
                     <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-binding-photo-input" data-photo-field-input="binding_x_photo" data-setup-id="{{ setup.pk }}" hidden />
                     {% endif %}
                   </div>
-                  <div>
+                  <div class="setup-row-photo">
                     <span class="muted">Y:</span> <span data-field-text="binding_y">{{ setup.binding_y|default:"—" }}</span>
                     {% if setup.binding_y_photo %}
                     <a href="{{ setup.binding_y_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_y_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка Y" aria-label="Открыть фото привязки Y">
@@ -84,7 +84,7 @@
                     <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-binding-photo-input" data-photo-field-input="binding_y_photo" data-setup-id="{{ setup.pk }}" hidden />
                     {% endif %}
                   </div>
-                  <div>
+                  <div class="setup-row-photo">
                     <span class="muted">Z:</span> <span data-field-text="binding_z">{{ setup.binding_z|default:"—" }}</span>
                     {% if setup.binding_z_photo %}
                     <a href="{{ setup.binding_z_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_z_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка Z" aria-label="Открыть фото привязки Z">
@@ -113,7 +113,7 @@
                   </div>
                 </div>
                 <div class="setup-spec-col">
-                  <div>
+                  <div class="setup-row-photo">
                     <span class="muted">Тип:</span> <span data-field-text="workpiece">{{ setup.workpiece|default:"—" }}</span>
                     {% if setup.workpiece_photo %}
                     <a href="{{ setup.workpiece_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.workpiece_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Заготовка" aria-label="Открыть фото заготовки">
@@ -178,7 +178,7 @@
                     <th>H</th>
                     <th>D</th>
                     <th class="setup-tools-th-rot">Тип</th>
-                    <th class="setup-tools-th-rot">⌀</th>
+                    <th class="setup-tools-th-rot setup-tools-th-diameter">⌀</th>
                     <th class="setup-tools-th-rot">Вылет</th>
                   </tr>
                 </thead>
@@ -482,15 +482,64 @@
     align-items: center;
     gap: 6px;
     min-height: 24px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    width: 100%;
   }
   .setup-spec-col > div > .muted {
-    min-width: 52px;
+    flex: 0 0 44px;
+    min-width: 44px;
+  }
+  /* Левая колонка: X/Y/Z сделать вдвое уже */
+  .setup-spec-col:first-child > div:nth-child(-n+3) > .muted {
+    flex-basis: 22px;
+    min-width: 22px;
+  }
+  /* Левая колонка: "Привяка:" сделать чуть длиннее (примерно +2 символа) */
+  .setup-spec-col:first-child > div:nth-child(4) > .muted {
+    flex-basis: 68px;
+    min-width: 68px;
+  }
+  /* Правая колонка: "Тип/Материал/Размер/Программа" сделать длиннее (примерно +3 символа) */
+  .setup-spec-col:last-child > div > .muted {
+    flex-basis: 92px;
+    min-width: 92px;
+    text-align: right;
+  }
+  .setup-spec-col .setup-row-photo > [data-field-text] {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 140px;
+  }
+  .setup-spec-col > div > .js-inline-gcode-system {
+    max-width: 120px;
+    width: 100%;
+    min-width: 0;
   }
   .setup-spec-col > div > [data-field-text] {
     display: inline-flex;
     align-items: center;
     min-height: 20px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .setup-spec-col > div > [data-program-filename-text] {
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .setup-spec-col > div > .binding-photo-link,
+  .setup-spec-col > div > .setup-binding-photo-btn,
+  .setup-spec-col > div > .setup-program-upload-btn,
+  .setup-spec-col > div > .js-inline-gcode-system {
+    flex: 0 0 auto;
   }
   .product-setup-spec-group h5 {
     margin: 0 0 3px 0;
@@ -502,32 +551,51 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     margin-left: 6px;
-    border: 1px solid #3b4b6e;
+    border: 0;
     border-radius: 999px;
     text-decoration: none;
     font-size: 12px;
     line-height: 1;
     position: relative;
     vertical-align: middle;
-    background: #1a2438;
+    background: transparent;
     color: #c7d5ef;
+  }
+  .binding-photo-link,
+  .binding-photo-link:hover,
+  .binding-photo-link:focus,
+  .binding-photo-link:active {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
   .setup-binding-photo-btn {
     margin-left: 6px;
     height: 22px;
     min-height: 22px;
-    min-width: 28px;
+    min-width: 22px;
+    width: 22px;
     padding: 0;
     font-size: 12px;
     display: none;
-    text-align: center;
-    line-height: 1;
     color: #c7d5ef;
-    border-color: #3b4b6e;
-    background: #1a2438;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn.setup-binding-photo-btn,
+  .btn.setup-binding-photo-btn:hover,
+  .btn.setup-binding-photo-btn:focus,
+  .btn.setup-binding-photo-btn:active {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
   .setup-binding-photo-btn[hidden] {
     display: none !important;
@@ -538,18 +606,28 @@
   .setup-program-upload-btn {
     height: 22px;
     min-height: 22px;
-    min-width: 28px;
-    width: 28px;
+    min-width: 22px;
+    width: 22px;
     padding: 0;
-    text-align: center;
-    line-height: 1;
     font-size: 12px;
     color: #c7d5ef;
-    border-color: #3b4b6e;
-    background: #1a2438;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn.setup-program-upload-btn,
+  .btn.setup-program-upload-btn:hover,
+  .btn.setup-program-upload-btn:focus,
+  .btn.setup-program-upload-btn:active {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
   .ui-icon {
-    font-size: 13px;
+    font-size: 15px;
     line-height: 1;
     display: flex;
     align-items: center;
@@ -559,6 +637,19 @@
     height: 100%;
     color: inherit;
     transform: translateY(0);
+    margin: 0;
+  }
+  .binding-photo-link .ui-icon,
+  .setup-binding-photo-btn .ui-icon,
+  .setup-program-upload-btn .ui-icon {
+    width: auto;
+    height: auto;
+  }
+  .binding-photo-link .ui-icon::before,
+  .setup-binding-photo-btn .ui-icon::before,
+  .setup-program-upload-btn .ui-icon::before {
+    display: block;
+    line-height: 1;
   }
   .binding-photo-hover {
     display: none;
@@ -613,6 +704,10 @@
     text-orientation: initial;
     transform: none;
     letter-spacing: normal;
+  }
+  .setup-tools-view th.setup-tools-th-diameter {
+    font-size: 2em;
+    line-height: 1;
   }
   .setup-tools-view td.setup-tool-override {
     border-color: #6f7ef2;
