@@ -115,6 +115,13 @@ class ToolItem(models.Model):
         choices=WORK_MATERIAL_TYPES,
         verbose_name="Материал обработки",
     )
+    main_diameter_mm = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Основной диаметр зажима, мм",
+    )
     is_deleted = models.BooleanField(default=False, verbose_name="Помечен как удаленный")
     deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="Удален")
     deleted_by = models.CharField(max_length=120, blank=True, verbose_name="Удалил")
@@ -233,6 +240,7 @@ class StockMovement(models.Model):
     employee_name = models.CharField(max_length=120, blank=True, verbose_name="Сотрудник")
     movement_date = models.DateField(verbose_name="Дата")
     comment = models.CharField(max_length=300, blank=True, verbose_name="Комментарий")
+    created_by_account = models.CharField(max_length=120, blank=True, verbose_name="Кто выполнил")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

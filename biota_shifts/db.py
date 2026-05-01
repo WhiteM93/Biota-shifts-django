@@ -1,5 +1,6 @@
 """Загрузка данных из PostgreSQL (кэш выборок через functools; справочник сотрудников без кэша)."""
 import functools
+import logging
 from datetime import date, datetime
 
 import pandas as pd
@@ -30,6 +31,28 @@ def employee_active_where_suffix() -> str:
     return " and coalesce(e.is_active, true) = true"
 from biota_shifts.emp_codes import normalize_emp_codes_list, sql_emp_code
 from biota_shifts.schedule import available_schedule_years
+
+_log = logging.getLogger(__name__)
+_fallback_warned = False
+
+
+def _fallback_to_local_enabled() -> bool:
+    """Разрешает локальный fallback при недоступности BIOTA_DB."""
+    raw = (_config_str("BIOTA_DB_LOCAL_FALLBACK", "1") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _on_biota_unavailable(exc: Exception):
+    global _fallback_warned
+    if _fallback_to_local_enabled():
+        if not _fallback_warned:
+            _fallback_warned = True
+            _log.warning(
+                "BIOTA_DB unavailable, using local fallback (empty datasets): %s",
+                exc,
+            )
+        return
+    raise exc
 
 
 def db_config() -> dict:
@@ -94,7 +117,11 @@ def _load_employees_uncached(db_key: tuple) -> pd.DataFrame:
 
 
 def load_employees(cfg: dict) -> pd.DataFrame:
-    return _load_employees_uncached(_db_cache_key(cfg))
+    try:
+        return _load_employees_uncached(_db_cache_key(cfg))
+    except Exception as exc:
+        _on_biota_unavailable(exc)
+        return pd.DataFrame()
 
 
 @functools.lru_cache(maxsize=128)
@@ -166,12 +193,16 @@ def load_shifts(cfg: dict, emp_code: str, month_start: date, month_end: date) ->
     ec = sql_emp_code(emp_code)
     if not ec:
         return pd.DataFrame()
-    return _load_shifts_cached(
-        _db_cache_key(cfg),
-        ec,
-        month_start.isoformat(),
-        month_end.isoformat(),
-    )
+    try:
+        return _load_shifts_cached(
+            _db_cache_key(cfg),
+            ec,
+            month_start.isoformat(),
+            month_end.isoformat(),
+        )
+    except Exception as exc:
+        _on_biota_unavailable(exc)
+        return pd.DataFrame()
 
 
 _SHIFTS_BATCH_COLS = [
@@ -274,12 +305,16 @@ def load_shifts_batch(
     if not emp_codes:
         return pd.DataFrame(columns=_SHIFTS_BATCH_COLS)
     key_codes = tuple(sorted(normalize_emp_codes_list(emp_codes)))
-    return _load_shifts_batch_cached(
-        _db_cache_key(cfg),
-        key_codes,
-        month_start.isoformat(),
-        month_end.isoformat(),
-    )
+    try:
+        return _load_shifts_batch_cached(
+            _db_cache_key(cfg),
+            key_codes,
+            month_start.isoformat(),
+            month_end.isoformat(),
+        )
+    except Exception as exc:
+        _on_biota_unavailable(exc)
+        return pd.DataFrame(columns=_SHIFTS_BATCH_COLS)
 
 
 @functools.lru_cache(maxsize=64)
@@ -334,12 +369,16 @@ def load_shifts_hours_batch(
     if not emp_codes:
         return pd.DataFrame(columns=["emp_code", "shift_date", "worked_hours"])
     key_codes = tuple(sorted(normalize_emp_codes_list(emp_codes)))
-    return _load_shifts_hours_batch_cached(
-        _db_cache_key(cfg),
-        key_codes,
-        month_start.isoformat(),
-        month_end.isoformat(),
-    )
+    try:
+        return _load_shifts_hours_batch_cached(
+            _db_cache_key(cfg),
+            key_codes,
+            month_start.isoformat(),
+            month_end.isoformat(),
+        )
+    except Exception as exc:
+        _on_biota_unavailable(exc)
+        return pd.DataFrame(columns=["emp_code", "shift_date", "worked_hours"])
 
 
 @functools.lru_cache(maxsize=256)
@@ -362,7 +401,11 @@ def load_years(cfg: dict, emp_code: str) -> list[int]:
     ec = sql_emp_code(emp_code)
     if not ec:
         return []
-    return _load_years_cached(_db_cache_key(cfg), ec)
+    try:
+        return _load_years_cached(_db_cache_key(cfg), ec)
+    except Exception as exc:
+        _on_biota_unavailable(exc)
+        return []
 
 
 @functools.lru_cache(maxsize=256)
@@ -383,7 +426,11 @@ def load_punch_years(cfg: dict, emp_code: str) -> list[int]:
     ec = sql_emp_code(emp_code)
     if not ec:
         return []
-    return _load_punch_years_cached(_db_cache_key(cfg), ec)
+    try:
+        return _load_punch_years_cached(_db_cache_key(cfg), ec)
+    except Exception as exc:
+        _on_biota_unavailable(exc)
+        return []
 
 
 @functools.lru_cache(maxsize=256)
@@ -419,12 +466,16 @@ def load_iclock_punches(cfg: dict, emp_code: str, day_from: date, day_to: date) 
     ec = sql_emp_code(emp_code)
     if not ec:
         return pd.DataFrame()
-    return _load_iclock_punches_cached(
-        _db_cache_key(cfg),
-        ec,
-        day_from.isoformat(),
-        day_to.isoformat(),
-    )
+    try:
+        return _load_iclock_punches_cached(
+            _db_cache_key(cfg),
+            ec,
+            day_from.isoformat(),
+            day_to.isoformat(),
+        )
+    except Exception as exc:
+        _on_biota_unavailable(exc)
+        return pd.DataFrame()
 
 
 _ICLOCK_BATCH_COLS = [
@@ -482,12 +533,16 @@ def load_iclock_punches_batch(
     if not emp_codes:
         return pd.DataFrame(columns=_ICLOCK_BATCH_COLS)
     key_codes = tuple(sorted(normalize_emp_codes_list(emp_codes)))
-    return _load_iclock_punches_batch_cached(
-        _db_cache_key(cfg),
-        key_codes,
-        day_from.isoformat(),
-        day_to.isoformat(),
-    )
+    try:
+        return _load_iclock_punches_batch_cached(
+            _db_cache_key(cfg),
+            key_codes,
+            day_from.isoformat(),
+            day_to.isoformat(),
+        )
+    except Exception as exc:
+        _on_biota_unavailable(exc)
+        return pd.DataFrame(columns=_ICLOCK_BATCH_COLS)
 
 
 def clear_biota_db_cache() -> None:

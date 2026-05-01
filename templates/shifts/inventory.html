@@ -324,6 +324,7 @@
         <th class="sortable hint-cell" data-hint="Длина инструмента">L, мм</th>
         <th class="sortable hint-cell" data-hint="Длина режущей части">Lc, мм</th>
         <th class="sortable hint-cell" data-hint="Количество кромок">Z</th>
+        <th class="sortable">D осн, мм</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
@@ -334,19 +335,20 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
-        <td data-sort="{{ t.end_mill_spec.get_mill_type_display|default:'-' }}">{{ t.end_mill_spec.get_mill_type_display|default:"-" }}</td>
-        <td data-sort="{{ t.end_mill_spec.diameter_mm|default:'-1' }}" class="diameter-col">
+        <td data-sort="{{ t.end_mill_spec.get_mill_type_display|default:'-' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="mill_type" data-type="select" data-value="{{ t.end_mill_spec.mill_type|default:'' }}"{% endif %}>{{ t.end_mill_spec.get_mill_type_display|default:"-" }}</td>
+        <td data-sort="{{ t.end_mill_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if is_admin_user %} stock-inline-edit{% endif %}" {% if is_admin_user %}data-tool-id="{{ t.id }}" data-field="em_diameter_mm" data-type="number" data-value="{{ t.end_mill_spec.diameter_mm|default:'' }}"{% endif %}>
           {% if t.end_mill_spec.diameter_mm %}Ø{{ t.end_mill_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}
         </td>
-        <td data-sort="{{ t.end_mill_spec.corner_radius_mm|default:'-1' }}">{% if t.end_mill_spec.corner_radius_mm is not None %}{{ t.end_mill_spec.corner_radius_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.end_mill_spec.overall_length_mm|default:'-1' }}">{% if t.end_mill_spec.overall_length_mm is not None %}{{ t.end_mill_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.end_mill_spec.cutting_length_mm|default:'-1' }}">{% if t.end_mill_spec.cutting_length_mm is not None %}{{ t.end_mill_spec.cutting_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.end_mill_spec.flutes_count|default:'-1' }}">{{ t.end_mill_spec.flutes_count|default:"-" }}</td>
-        <td>{{ t.get_tool_material_display|default:"-" }}</td>
-        <td data-sort="{{ t.coating_type }}">
+        <td data-sort="{{ t.end_mill_spec.corner_radius_mm|default:'-1' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="em_corner_radius_mm" data-type="number" data-value="{{ t.end_mill_spec.corner_radius_mm|default:'' }}"{% endif %}>{% if t.end_mill_spec.corner_radius_mm is not None %}{{ t.end_mill_spec.corner_radius_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.end_mill_spec.overall_length_mm|default:'-1' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="em_overall_length_mm" data-type="number" data-value="{{ t.end_mill_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.end_mill_spec.overall_length_mm is not None %}{{ t.end_mill_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.end_mill_spec.cutting_length_mm|default:'-1' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="em_cutting_length_mm" data-type="number" data-value="{{ t.end_mill_spec.cutting_length_mm|default:'' }}"{% endif %}>{% if t.end_mill_spec.cutting_length_mm is not None %}{{ t.end_mill_spec.cutting_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.end_mill_spec.flutes_count|default:'-1' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="em_flutes_count" data-type="int" data-value="{{ t.end_mill_spec.flutes_count|default:'' }}"{% endif %}>{{ t.end_mill_spec.flutes_count|default:"-" }}</td>
+        <td data-sort="{{ t.main_diameter_mm|default:'-1' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="main_diameter_mm" data-type="number" data-value="{{ t.main_diameter_mm|default:'' }}"{% endif %}>{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
+        <td data-sort="{{ t.coating_type }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
           <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
         </td>
-        <td data-sort="{{ t.work_material|default:'-' }}">
+        <td data-sort="{{ t.work_material|default:'-' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
           {% if t.work_material == "P" %}<span class="wm-badge wm-p">P</span>
           {% elif t.work_material == "M" %}<span class="wm-badge wm-m">M</span>
           {% elif t.work_material == "K" %}<span class="wm-badge wm-k">K</span>
@@ -355,7 +357,7 @@
           {% elif t.work_material == "H" %}<span class="wm-badge wm-h">H</span>
           {% else %}-{% endif %}
         </td>
-        <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+        <td data-sort="{{ t.quantity }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if is_admin_user %}
         <td>
           <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
@@ -368,7 +370,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if is_admin_user %}11{% else %}10{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if is_admin_user %}12{% else %}11{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -384,6 +386,7 @@
         <th class="sortable">Тип инструмента</th>
         <th class="sortable hint-cell" data-hint="Длина инструмента">L, мм</th>
         <th class="sortable hint-cell" data-hint="Длина режущей части">Lc, мм</th>
+        <th class="sortable">D осн, мм</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
@@ -402,6 +405,7 @@
         <td data-sort="{{ t.tap_spec.get_tap_type_display|default:'-' }}">{{ t.tap_spec.get_tap_type_display|default:"-" }}</td>
         <td data-sort="{{ t.tap_spec.overall_length_mm|default:'-1' }}">{% if t.tap_spec.overall_length_mm is not None %}{{ t.tap_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.tap_spec.cutting_length_mm|default:'-1' }}">{% if t.tap_spec.cutting_length_mm is not None %}{{ t.tap_spec.cutting_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.main_diameter_mm|default:'-1' }}">{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}">
           <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
@@ -428,7 +432,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if is_admin_user %}13{% else %}12{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if is_admin_user %}14{% else %}13{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -439,6 +443,7 @@
         <th class="sortable">D, мм</th>
         <th class="sortable">L, мм</th>
         <th class="sortable">Угол, °</th>
+        <th class="sortable">D осн, мм</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
@@ -452,104 +457,7 @@
         <td data-sort="{{ t.center_drill_spec.diameter_mm|default:'-1' }}">{% if t.center_drill_spec.diameter_mm is not None %}{{ t.center_drill_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.center_drill_spec.overall_length_mm|default:'-1' }}">{% if t.center_drill_spec.overall_length_mm is not None %}{{ t.center_drill_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.center_drill_spec.angle_deg|default:'-' }}">{{ t.center_drill_spec.angle_deg|default:"-" }}</td>
-        <td>{{ t.get_tool_material_display|default:"-" }}</td>
-        <td data-sort="{{ t.coating_type }}">
-          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
-        </td>
-        <td data-sort="{{ t.work_material|default:'-' }}">
-          {% if t.work_material == "P" %}<span class="wm-badge wm-p">P</span>
-          {% elif t.work_material == "M" %}<span class="wm-badge wm-m">M</span>
-          {% elif t.work_material == "K" %}<span class="wm-badge wm-k">K</span>
-          {% elif t.work_material == "N" %}<span class="wm-badge wm-n">N</span>
-          {% elif t.work_material == "S" %}<span class="wm-badge wm-s">S</span>
-          {% elif t.work_material == "H" %}<span class="wm-badge wm-h">H</span>
-          {% else %}-{% endif %}
-        </td>
-        <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
-        {% if is_admin_user %}
-        <td>
-          <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="submit" class="btn">Удалить</button>
-          </form>
-        </td>
-        {% endif %}
-      </tr>
-      {% empty %}
-      <tr><td colspan="{% if is_admin_user %}8{% else %}7{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% elif filters.category == "countersink" %}
-  <table class="data-grid js-sortable-table">
-    <thead>
-      <tr>
-        <th class="sortable">Тип</th>
-        <th class="sortable">D, мм</th>
-        <th class="sortable">Угол, °</th>
-        <th class="sortable">L, мм</th>
-        <th class="sortable">Z</th>
-        <th class="sortable">Размер</th>
-        <th class="sortable">Материал инструмента</th>
-        <th class="sortable">Покрытие</th>
-        <th class="sortable">Остаток</th>
-        {% if is_admin_user %}<th>Удалить</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in tool_items %}
-      <tr>
-        <td data-sort="{{ t.countersink_spec.get_countersink_type_display|default:'-' }}">{{ t.countersink_spec.get_countersink_type_display|default:"-" }}</td>
-        <td data-sort="{{ t.countersink_spec.diameter_mm|default:'-1' }}">{% if t.countersink_spec.diameter_mm is not None %}{{ t.countersink_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.countersink_spec.angle_deg|default:'-' }}">{{ t.countersink_spec.angle_deg|default:"-" }}</td>
-        <td data-sort="{{ t.countersink_spec.overall_length_mm|default:'-1' }}">{% if t.countersink_spec.overall_length_mm is not None %}{{ t.countersink_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.countersink_spec.flutes_count|default:'-1' }}">{{ t.countersink_spec.flutes_count|default:"-" }}</td>
-        <td data-sort="{{ t.countersink_spec.size_label|default:'-' }}">{{ t.countersink_spec.size_label|default:"-" }}</td>
-        <td>{{ t.get_tool_material_display|default:"-" }}</td>
-        <td data-sort="{{ t.coating_type }}">
-          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
-        </td>
-        <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
-        {% if is_admin_user %}
-        <td>
-          <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="submit" class="btn">Удалить</button>
-          </form>
-        </td>
-        {% endif %}
-      </tr>
-      {% empty %}
-      <tr><td colspan="{% if is_admin_user %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <table class="data-grid js-sortable-table">
-    <thead>
-      <tr>
-        <th class="sortable">D, мм</th>
-        <th class="sortable">L, мм</th>
-        <th class="sortable">Lc, мм</th>
-        <th class="sortable">Угол, °</th>
-        <th class="sortable">Материал инструмента</th>
-        <th class="sortable">Покрытие</th>
-        <th class="sortable">Материал обработки</th>
-        <th class="sortable">Остаток</th>
-        {% if is_admin_user %}<th>Удалить</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in tool_items %}
-      <tr>
-        <td data-sort="{{ t.drill_spec.diameter_mm|default:'-1' }}">{% if t.drill_spec.diameter_mm is not None %}{{ t.drill_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.drill_spec.overall_length_mm|default:'-1' }}">{% if t.drill_spec.overall_length_mm is not None %}{{ t.drill_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.drill_spec.cutting_length_mm|default:'-1' }}">{% if t.drill_spec.cutting_length_mm is not None %}{{ t.drill_spec.cutting_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.drill_spec.angle_deg|default:'-1' }}">{% if t.drill_spec.angle_deg is not None %}{{ t.drill_spec.angle_deg|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.main_diameter_mm|default:'-1' }}">{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}">
           <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
@@ -577,6 +485,108 @@
       </tr>
       {% empty %}
       <tr><td colspan="{% if is_admin_user %}9{% else %}8{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% elif filters.category == "countersink" %}
+  <table class="data-grid js-sortable-table">
+    <thead>
+      <tr>
+        <th class="sortable">Тип</th>
+        <th class="sortable">D, мм</th>
+        <th class="sortable">Угол, °</th>
+        <th class="sortable">L, мм</th>
+        <th class="sortable">Z</th>
+        <th class="sortable">Размер</th>
+        <th class="sortable">D осн, мм</th>
+        <th class="sortable">Материал инструмента</th>
+        <th class="sortable">Покрытие</th>
+        <th class="sortable">Остаток</th>
+        {% if is_admin_user %}<th>Удалить</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tool_items %}
+      <tr>
+        <td data-sort="{{ t.countersink_spec.get_countersink_type_display|default:'-' }}">{{ t.countersink_spec.get_countersink_type_display|default:"-" }}</td>
+        <td data-sort="{{ t.countersink_spec.diameter_mm|default:'-1' }}">{% if t.countersink_spec.diameter_mm is not None %}{{ t.countersink_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.countersink_spec.angle_deg|default:'-' }}">{{ t.countersink_spec.angle_deg|default:"-" }}</td>
+        <td data-sort="{{ t.countersink_spec.overall_length_mm|default:'-1' }}">{% if t.countersink_spec.overall_length_mm is not None %}{{ t.countersink_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.countersink_spec.flutes_count|default:'-1' }}">{{ t.countersink_spec.flutes_count|default:"-" }}</td>
+        <td data-sort="{{ t.countersink_spec.size_label|default:'-' }}">{{ t.countersink_spec.size_label|default:"-" }}</td>
+        <td data-sort="{{ t.main_diameter_mm|default:'-1' }}">{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td>{{ t.get_tool_material_display|default:"-" }}</td>
+        <td data-sort="{{ t.coating_type }}">
+          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
+        </td>
+        <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+        {% if is_admin_user %}
+        <td>
+          <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_tool_item">
+            <input type="hidden" name="tool_id" value="{{ t.id }}">
+            <button type="submit" class="btn">Удалить</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% empty %}
+      <tr><td colspan="{% if is_admin_user %}11{% else %}10{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <table class="data-grid js-sortable-table">
+    <thead>
+      <tr>
+        <th class="sortable">D, мм</th>
+        <th class="sortable">L, мм</th>
+        <th class="sortable">Lc, мм</th>
+        <th class="sortable">Угол, °</th>
+        <th class="sortable">D осн, мм</th>
+        <th class="sortable">Материал инструмента</th>
+        <th class="sortable">Покрытие</th>
+        <th class="sortable">Материал обработки</th>
+        <th class="sortable">Остаток</th>
+        {% if is_admin_user %}<th>Удалить</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tool_items %}
+      <tr>
+        <td data-sort="{{ t.drill_spec.diameter_mm|default:'-1' }}">{% if t.drill_spec.diameter_mm is not None %}{{ t.drill_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.drill_spec.overall_length_mm|default:'-1' }}">{% if t.drill_spec.overall_length_mm is not None %}{{ t.drill_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.drill_spec.cutting_length_mm|default:'-1' }}">{% if t.drill_spec.cutting_length_mm is not None %}{{ t.drill_spec.cutting_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.drill_spec.angle_deg|default:'-1' }}">{% if t.drill_spec.angle_deg is not None %}{{ t.drill_spec.angle_deg|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.main_diameter_mm|default:'-1' }}">{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td>{{ t.get_tool_material_display|default:"-" }}</td>
+        <td data-sort="{{ t.coating_type }}">
+          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
+        </td>
+        <td data-sort="{{ t.work_material|default:'-' }}">
+          {% if t.work_material == "P" %}<span class="wm-badge wm-p">P</span>
+          {% elif t.work_material == "M" %}<span class="wm-badge wm-m">M</span>
+          {% elif t.work_material == "K" %}<span class="wm-badge wm-k">K</span>
+          {% elif t.work_material == "N" %}<span class="wm-badge wm-n">N</span>
+          {% elif t.work_material == "S" %}<span class="wm-badge wm-s">S</span>
+          {% elif t.work_material == "H" %}<span class="wm-badge wm-h">H</span>
+          {% else %}-{% endif %}
+        </td>
+        <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+        {% if is_admin_user %}
+        <td>
+          <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_tool_item">
+            <input type="hidden" name="tool_id" value="{{ t.id }}">
+            <button type="submit" class="btn">Удалить</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% empty %}
+      <tr><td colspan="{% if is_admin_user %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -697,7 +707,7 @@
         <option value="{{ iss.id }}">
           #{{ iss.id }} | {{ iss.movement_date }} | {{ iss.tool.get_category_display }}
           {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% elif iss.tool.category == "center_drill" and iss.tool.center_drill_spec %}| центровка {{ iss.tool.center_drill_spec.angle_deg }}°{% elif iss.tool.category == "countersink" and iss.tool.countersink_spec %}| зенкер {{ iss.tool.countersink_spec.get_countersink_type_display }} {{ iss.tool.countersink_spec.angle_deg }}°{% elif iss.tool.category == "drill" and iss.tool.drill_spec %}| сверло {{ iss.tool.drill_spec.angle_deg }}°{% endif %}
-          | {{ iss.tool.name }} | выдано {{ iss.quantity }} | осталось обработать {{ iss.remaining_qty }}
+          | {{ iss.tool.name }} | кому: {{ iss.employee_name|default:"-" }} | выдано {{ iss.quantity }} | осталось обработать {{ iss.remaining_qty }}
         </option>
         {% endfor %}
       </select>
@@ -718,6 +728,7 @@
         <tr>
           <th>#</th>
           <th>Дата</th>
+          <th>Кому выдали</th>
           <th>Инструмент</th>
           <th>Выдано</th>
           <th>Осталось</th>
@@ -729,10 +740,52 @@
         <tr class="issue-candidate-row" data-issue-id="{{ iss.id }}">
           <td>#{{ iss.id }}</td>
           <td>{{ iss.movement_date }}</td>
-          <td>
-            {{ iss.tool.get_category_display }}
-            {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% elif iss.tool.category == "center_drill" and iss.tool.center_drill_spec %}| центровка {{ iss.tool.center_drill_spec.angle_deg }}°{% elif iss.tool.category == "countersink" and iss.tool.countersink_spec %}| зенкер {{ iss.tool.countersink_spec.get_countersink_type_display }} {{ iss.tool.countersink_spec.angle_deg }}°{% elif iss.tool.category == "drill" and iss.tool.drill_spec %}| сверло {{ iss.tool.drill_spec.angle_deg }}°{% endif %}
-            | {{ iss.tool.name }}
+          <td>{{ iss.employee_name|default:"-" }}</td>
+          <td class="issue-tool-meta">
+            <div class="issue-tool-meta-line">
+              <strong>{{ iss.tool.get_category_display }}</strong>
+              {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}
+                | {{ iss.tool.end_mill_spec.get_mill_type_display }}
+                | D {{ iss.tool.end_mill_spec.diameter_mm|default:"-"|floatformat:"-2" }}
+                | R {{ iss.tool.end_mill_spec.corner_radius_mm|default:"-"|floatformat:"-2" }}
+                | L {{ iss.tool.end_mill_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
+                | Lc {{ iss.tool.end_mill_spec.cutting_length_mm|default:"-"|floatformat:"-2" }}
+                | Z {{ iss.tool.end_mill_spec.flutes_count|default:"-" }}
+              {% elif iss.tool.category == "tap" and iss.tool.tap_spec %}
+                | {{ iss.tool.tap_spec.get_tap_type_display }}
+                | {{ iss.tool.tap_spec.size_label|default:"-" }}
+                | шаг {{ iss.tool.tap_spec.pitch_mm|default:"-" }}
+                | TPI {{ iss.tool.tap_spec.tpi|default:"-" }}
+                | L {{ iss.tool.tap_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
+                | Lc {{ iss.tool.tap_spec.cutting_length_mm|default:"-"|floatformat:"-2" }}
+              {% elif iss.tool.category == "center_drill" and iss.tool.center_drill_spec %}
+                | Центровка {{ iss.tool.center_drill_spec.angle_deg }}°
+                | D {{ iss.tool.center_drill_spec.diameter_mm|default:"-"|floatformat:"-2" }}
+                | L {{ iss.tool.center_drill_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
+              {% elif iss.tool.category == "countersink" and iss.tool.countersink_spec %}
+                | Зенкер {{ iss.tool.countersink_spec.get_countersink_type_display }}
+                | D {{ iss.tool.countersink_spec.diameter_mm|default:"-"|floatformat:"-2" }}
+                | угол {{ iss.tool.countersink_spec.angle_deg|default:"-" }}
+                | L {{ iss.tool.countersink_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
+                | Z {{ iss.tool.countersink_spec.flutes_count|default:"-" }}
+                {% if iss.tool.countersink_spec.size_label %}| {{ iss.tool.countersink_spec.size_label }}{% endif %}
+              {% elif iss.tool.category == "drill" and iss.tool.drill_spec %}
+                | Сверло {{ iss.tool.drill_spec.angle_deg|default:"-"|floatformat:"-2" }}°
+                | D {{ iss.tool.drill_spec.diameter_mm|default:"-"|floatformat:"-2" }}
+                | L {{ iss.tool.drill_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
+                | Lc {{ iss.tool.drill_spec.cutting_length_mm|default:"-"|floatformat:"-2" }}
+              {% endif %}
+              | D осн {{ iss.tool.main_diameter_mm|default:"-"|floatformat:"-2" }}
+              <span style="margin-left:8px;">{{ iss.tool.get_tool_material_display|default:"-" }}</span>
+              <span class="coating-dot swatch-{{ iss.tool.coating_type|default:'none' }}" title="{{ iss.tool.get_coating_type_display }}"></span>
+              {% if iss.tool.work_material == "P" %}<span class="wm-badge wm-p">P</span>
+              {% elif iss.tool.work_material == "M" %}<span class="wm-badge wm-m">M</span>
+              {% elif iss.tool.work_material == "K" %}<span class="wm-badge wm-k">K</span>
+              {% elif iss.tool.work_material == "N" %}<span class="wm-badge wm-n">N</span>
+              {% elif iss.tool.work_material == "S" %}<span class="wm-badge wm-s">S</span>
+              {% elif iss.tool.work_material == "H" %}<span class="wm-badge wm-h">H</span>
+              {% else %}<span class="muted">-</span>{% endif %}
+            </div>
           </td>
           <td>{{ iss.quantity }}</td>
           <td><strong>{{ iss.remaining_qty }}</strong></td>
@@ -743,8 +796,8 @@
               <input type="hidden" name="issue_id" value="{{ iss.id }}">
               <input type="hidden" name="employee_name" value="{{ iss.employee_name|default:'' }}">
               <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                <input type="number" name="returned_qty" min="0" max="{{ iss.remaining_qty }}" value="0" title="Возврат" style="width:80px;">
-                <input type="number" name="writeoff_qty" min="0" max="{{ iss.remaining_qty }}" value="0" title="Списание" style="width:80px;">
+                <input type="number" name="returned_qty" min="0" max="{{ iss.remaining_qty }}" value="0" title="Возврат" placeholder="Возврат" style="width:80px;">
+                <input type="number" name="writeoff_qty" min="0" max="{{ iss.remaining_qty }}" value="0" title="Списание" placeholder="Списание" style="width:80px;">
                 <input type="date" name="movement_date" value="{{ today }}" required style="width:145px;">
                 <input type="text" name="comment" required placeholder="Комментарий" style="min-width:160px; flex:1 1 160px;">
                 <button type="submit" class="btn">Провести</button>
@@ -753,7 +806,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="muted">Нет активных выдач для обработки.</td></tr>
+        <tr><td colspan="7" class="muted">Нет активных выдач для обработки.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -1041,7 +1094,7 @@
 <h3 id="history-block">Последние движения</h3>
 <div class="table-wrap">
   <table class="data-grid">
-    <thead><tr><th>Дата</th><th>Операция</th><th>Категория</th><th>Подтип</th><th>Инструмент</th><th>Количество</th><th>Сотрудник</th><th>Комментарий</th></tr></thead>
+    <thead><tr><th>Дата</th><th>Операция</th><th>Категория</th><th>Подтип</th><th>Инструмент</th><th>Количество</th><th>Сотрудник</th><th>Аккаунт</th><th>Комментарий</th></tr></thead>
     <tbody>
       {% for m in movements %}
       <tr>
@@ -1057,10 +1110,11 @@
         </td>
         <td>{{ m.quantity }}</td>
         <td>{{ m.employee_name|default:"-" }}</td>
+        <td>{{ m.created_by_account|default:"-" }}</td>
         <td>{{ m.comment|default:"-" }}</td>
       </tr>
       {% empty %}
-      <tr><td colspan="8" class="muted">Пока нет движений.</td></tr>
+      <tr><td colspan="9" class="muted">Пока нет движений.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -1107,6 +1161,32 @@
     margin: 0 0 6px 0;
     font-size: 14px;
     color: #c7d5ef;
+  }
+  #issue-outcome-block td.issue-tool-meta {
+    white-space: normal;
+    min-width: 460px;
+    line-height: 1.3;
+  }
+  #issue-outcome-block .issue-tool-meta-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  #issue-outcome-block .issue-inline-form input[name="returned_qty"],
+  #issue-outcome-block .issue-inline-form input[name="writeoff_qty"] {
+    text-align: center;
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  #issue-outcome-block .issue-inline-form input[name="returned_qty"]::-webkit-outer-spin-button,
+  #issue-outcome-block .issue-inline-form input[name="returned_qty"]::-webkit-inner-spin-button,
+  #issue-outcome-block .issue-inline-form input[name="writeoff_qty"]::-webkit-outer-spin-button,
+  #issue-outcome-block .issue-inline-form input[name="writeoff_qty"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
   .arrival-bulk-table-wrap {
     width: 100%;
@@ -1608,6 +1688,20 @@
     }
     .defect-num-input { min-width: 68px; }
   }
+  .stock-inline-edit {
+    cursor: pointer;
+    position: relative;
+  }
+  .stock-inline-edit.is-saving {
+    opacity: 0.6;
+  }
+  .stock-inline-editor {
+    width: 100%;
+    min-width: 52px;
+    box-sizing: border-box;
+    padding: 4px 6px;
+    font-size: 12px;
+  }
 </style>
 <script>
   (function () {
@@ -1881,14 +1975,14 @@
       group.id = groupId;
       var title = cat === "end_mill" ? "Фрезы" : (cat === "tap" ? "Резьбовой инструмент" : (cat === "center_drill" ? "Центровки" : (cat === "countersink" ? "Зенкера" : "Сверла")));
       var headHtml = cat === "end_mill"
-        ? '<tr><th>Тип фрезы</th><th class="short-col">D</th><th class="short-col">R</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
+        ? '<tr><th>Тип фрезы</th><th class="short-col">D</th><th class="short-col">R</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
         : (cat === "tap"
-            ? '<tr><th class="tap-size-col">Размер</th><th class="tap-std-col">Стандарт</th><th class="tap-step-col">Шаг</th><th class="tap-tpi-col">TPI</th><th class="tap-l-col">L</th><th class="tap-lc-col">Lc</th><th class="tap-hole-col">Тип</th><th>Тип инструмента</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
+            ? '<tr><th class="tap-size-col">Размер</th><th class="tap-std-col">Стандарт</th><th class="tap-step-col">Шаг</th><th class="tap-tpi-col">TPI</th><th class="tap-l-col">L</th><th class="tap-lc-col">Lc</th><th class="tap-hole-col">Тип</th><th>Тип инструмента</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
             : (cat === "center_drill"
-                ? '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Угол</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
+                ? '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
                 : (cat === "countersink"
-                    ? '<tr><th>Тип</th><th class="short-col">D</th><th class="short-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
-                    : '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Угол</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>')));
+                    ? '<tr><th>Тип</th><th class="short-col">D</th><th class="short-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
+                    : '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>')));
       group.innerHTML = '' +
         '<h4>' + title + '</h4>' +
         '<div class="table-wrap arrival-bulk-table-wrap">' +
@@ -1918,6 +2012,7 @@
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_overall_length_mm"></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_cutting_length_mm"></td>');
         cells.push('<td class="short-col"><input type="number" data-k="em_flutes_count"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
         cells.push('<td class="tm-cell"></td>');
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
@@ -1931,6 +2026,7 @@
         cells.push('<td class="tap-lc-col"><input type="number" step="0.01" data-k="tap_cutting_length_mm"></td>');
         cells.push('<td class="tap-hole-col"><select data-k="hole_type">{% for key, label in tap_hole_types %}<option value="{{ key }}">{% if key == "through" %}Скв{% elif key == "blind" %}Глх{% elif key == "universal" %}Унив{% else %}{{ label }}{% endif %}</option>{% endfor %}</select></td>');
         cells.push('<td><select data-k="tap_type">{% for key, label in tap_tool_types %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
         cells.push('<td class="tm-cell"></td>');
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
@@ -1939,6 +2035,7 @@
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cd_diameter_mm"></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cd_overall_length_mm"></td>');
         cells.push('<td class="short-col"><select data-k="cd_angle_deg">{% for key, label in center_drill_angles %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
         cells.push('<td class="tm-cell"></td>');
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
@@ -1949,6 +2046,7 @@
         cells.push('<td class="short-col"><select data-k="cs_angle_deg">{% for key, label in countersink_angles %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cs_overall_length_mm"></td>');
         cells.push('<td class="short-col"><input type="number" data-k="cs_flutes_count"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
         cells.push('<td class="tm-cell"></td>');
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
@@ -1958,6 +2056,7 @@
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_overall_length_mm"></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_cutting_length_mm"></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_angle_deg"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
         cells.push('<td class="tm-cell"></td>');
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
@@ -2001,6 +2100,162 @@
       if (row) row.remove();
       var grp = rm.closest(".arrival-group");
       if (grp && !grp.querySelector("tr[data-arrival-row]")) grp.remove();
+    });
+  })();
+  (function () {
+    var editableCells = document.querySelectorAll(".stock-inline-edit");
+    if (!editableCells.length) return;
+    var csrfEl = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    var csrfToken = csrfEl ? csrfEl.value : "";
+    var activeCell = null;
+    var millTypeLabels = {
+      {% for key, label in end_mill_types %}
+      "{{ key }}": "{{ label }}",
+      {% endfor %}
+    };
+    var toolMaterialLabels = {
+      "": "Неизвестно",
+      {% for key, label in tool_material_types %}
+      "{{ key }}": "{{ label }}",
+      {% endfor %}
+    };
+    var coatingLabels = {
+      {% for key, label in coating_types %}
+      "{{ key }}": "{{ label }}",
+      {% endfor %}
+    };
+    var workMaterialLabels = {
+      "": "-",
+      {% for key, label in work_material_types %}
+      "{{ key }}": "{{ key }}",
+      {% endfor %}
+    };
+
+    function escapeHtml(s) {
+      return String(s || "").replace(/[&<>"']/g, function (c) {
+        return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+      });
+    }
+
+    function formatCell(field, value) {
+      var v = (value || "").trim();
+      if (!v) return "-";
+      if (field === "mill_type") return millTypeLabels[v] || v;
+      if (field === "tool_material") return toolMaterialLabels[v] || "Неизвестно";
+      if (field === "coating_type") return '<span class="coating-dot swatch-' + escapeHtml(v) + '" title="' + escapeHtml(coatingLabels[v] || v) + '"></span>';
+      if (field === "work_material") {
+        var cls = v ? ("wm-" + v.toLowerCase()) : "";
+        return v ? ('<span class="wm-badge ' + cls + '">' + escapeHtml(v) + "</span>") : "-";
+      }
+      if (field === "em_diameter_mm") return "Ø" + v.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
+      if (field === "quantity") return "<strong>" + escapeHtml(v) + "</strong>";
+      return escapeHtml(v.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1"));
+    }
+
+    function buildSelect(field, current) {
+      var options = [];
+      if (field === "mill_type") {
+        options = Object.keys(millTypeLabels).map(function (k) { return { value: k, label: millTypeLabels[k] }; });
+      } else if (field === "tool_material") {
+        options = [{ value: "", label: "Неизвестно" }].concat(
+          Object.keys(toolMaterialLabels).filter(function (k) { return k; }).map(function (k) { return { value: k, label: toolMaterialLabels[k] }; })
+        );
+      } else if (field === "coating_type") {
+        options = Object.keys(coatingLabels).map(function (k) { return { value: k, label: coatingLabels[k] }; });
+      } else if (field === "work_material") {
+        options = [{ value: "", label: "-" }].concat(
+          Object.keys(workMaterialLabels).filter(function (k) { return k; }).map(function (k) { return { value: k, label: k }; })
+        );
+      }
+      var sel = document.createElement("select");
+      sel.className = "stock-inline-editor";
+      options.forEach(function (opt) {
+        var o = document.createElement("option");
+        o.value = opt.value;
+        o.textContent = opt.label;
+        if ((current || "") === opt.value) o.selected = true;
+        sel.appendChild(o);
+      });
+      return sel;
+    }
+
+    function saveCell(cell, value, editor) {
+      var toolId = cell.getAttribute("data-tool-id");
+      var field = cell.getAttribute("data-field");
+      var oldValue = cell.getAttribute("data-value") || "";
+      if (value === oldValue) {
+        cell.innerHTML = formatCell(field, oldValue);
+        activeCell = null;
+        return;
+      }
+      cell.classList.add("is-saving");
+      var body = new FormData();
+      body.append("action", "update_tool_cell");
+      body.append("tool_id", toolId);
+      body.append("field", field);
+      body.append("value", value);
+      fetch(window.location.pathname + window.location.search, {
+        method: "POST",
+        headers: { "X-CSRFToken": csrfToken },
+        body: body
+      }).then(function (resp) { return resp.json(); }).then(function (data) {
+        if (!data || !data.ok) throw new Error((data && data.error) || "Ошибка сохранения");
+        cell.setAttribute("data-value", value);
+        cell.innerHTML = formatCell(field, value);
+      }).catch(function (err) {
+        alert(err.message || "Ошибка сохранения");
+        cell.innerHTML = formatCell(field, oldValue);
+      }).finally(function () {
+        cell.classList.remove("is-saving");
+        activeCell = null;
+      });
+    }
+
+    function activate(cell) {
+      if (activeCell === cell) return;
+      if (activeCell) return;
+      var field = cell.getAttribute("data-field");
+      var type = cell.getAttribute("data-type");
+      var current = cell.getAttribute("data-value") || "";
+      var editor = (type === "select") ? buildSelect(field, current) : document.createElement("input");
+      if (type !== "select") {
+        editor.type = "number";
+        editor.className = "stock-inline-editor";
+        editor.step = type === "int" ? "1" : "0.01";
+        editor.value = current;
+        editor.title = "Enter - сохранить, Esc - отменить";
+      }
+      var cancelled = false;
+      function finish(save) {
+        if (!activeCell) return;
+        var newValue = (editor.value || "").trim();
+        if (!save || cancelled) {
+          cell.innerHTML = formatCell(field, current);
+          activeCell = null;
+          return;
+        }
+        saveCell(cell, newValue, editor);
+      }
+      editor.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); finish(true); }
+        if (e.key === "Escape") { cancelled = true; finish(false); }
+      });
+      editor.addEventListener("blur", function () {
+        if (type === "select") finish(true);
+        else finish(false);
+      });
+      editor.addEventListener("change", function () {
+        if (type === "select") finish(true);
+      });
+      cell.innerHTML = "";
+      cell.appendChild(editor);
+      activeCell = cell;
+      editor.focus();
+      if (editor.select) editor.select();
+    }
+
+    editableCells.forEach(function (cell) {
+      cell.addEventListener("click", function () { activate(cell); });
     });
   })();
 

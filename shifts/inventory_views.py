@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import F, IntegerField, Sum, Value
 from django.db.models.functions import Coalesce
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -182,6 +183,7 @@ def inventory_view(request):
         tool_material = (request.POST.get("tool_material") or "").strip()
         coating_type = (request.POST.get("coating_type") or "none").strip()
         work_material = (request.POST.get("work_material") or "").strip()
+        main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
         if diameter_mm <= 0 or overall_length_mm <= 0 or cutting_length_mm <= 0 or flutes_count <= 0 or quantity <= 0:
             messages.error(request, "Для фрезы заполните параметры корректно (числа больше нуля).")
             return redirect("inventory")
@@ -192,6 +194,7 @@ def inventory_view(request):
                 tool_material=tool_material,
                 coating_type=coating_type,
                 work_material=work_material,
+                main_diameter_mm=main_diameter_mm,
                 quantity=quantity,
             )
             EndMillSpec.objects.create(
@@ -217,6 +220,7 @@ def inventory_view(request):
         tool_material = (request.POST.get("tool_material") or "").strip()
         coating_type = (request.POST.get("coating_type") or "none").strip()
         work_material = (request.POST.get("work_material") or "").strip()
+        main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
         if not size_label or overall_length_mm <= 0 or cutting_length_mm <= 0 or quantity <= 0:
             messages.error(request, "Для метчика заполните размер, длины и количество.")
             return redirect("inventory")
@@ -227,6 +231,7 @@ def inventory_view(request):
                 tool_material=tool_material,
                 coating_type=coating_type,
                 work_material=work_material,
+                main_diameter_mm=main_diameter_mm,
                 quantity=quantity,
             )
             TapSpec.objects.create(
@@ -279,6 +284,7 @@ def inventory_view(request):
                 employee_name=employee_name,
                 movement_date=movement_date,
                 comment=comment,
+                created_by_account=username,
             )
         messages.success(request, "Движение склада сохранено.")
         return redirect("inventory")
@@ -304,6 +310,124 @@ def inventory_view(request):
         tool.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
         messages.success(request, "Позиция помечена как удаленная администратором.")
         return redirect(f"{request.path}?panel=stock")
+
+    if action == "update_tool_item":
+        if not is_admin_user:
+            messages.error(request, "Изменять позиции склада может только администратор.")
+            return redirect(f"{request.path}?panel=stock")
+        tool_id = _to_int(request.POST.get("tool_id"), 0)
+        tool = (
+            ToolItem.objects.select_related(
+                "end_mill_spec",
+                "tap_spec",
+                "center_drill_spec",
+                "countersink_spec",
+                "drill_spec",
+            )
+            .filter(id=tool_id, is_deleted=False)
+            .first()
+        )
+        if not tool:
+            messages.error(request, "Позиция склада не найдена.")
+            return redirect(f"{request.path}?panel=stock")
+
+        tool.tool_material = (request.POST.get("tool_material") or "").strip()
+        tool.coating_type = (request.POST.get("coating_type") or "none").strip()
+        tool.work_material = (request.POST.get("work_material") or "").strip()
+        tool.main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
+        tool.quantity = max(0, _to_int(request.POST.get("quantity"), tool.quantity))
+
+        if tool.category == "end_mill" and tool.end_mill_spec:
+            tool.end_mill_spec.mill_type = (request.POST.get("mill_type") or "end").strip()
+            tool.end_mill_spec.diameter_mm = _to_decimal_or_none(request.POST.get("em_diameter_mm"))
+            tool.end_mill_spec.corner_radius_mm = _to_decimal_or_none(request.POST.get("em_corner_radius_mm"))
+            tool.end_mill_spec.overall_length_mm = _to_decimal_or_none(request.POST.get("em_overall_length_mm"))
+            tool.end_mill_spec.cutting_length_mm = _to_decimal_or_none(request.POST.get("em_cutting_length_mm"))
+            tool.end_mill_spec.flutes_count = _to_int_or_none(request.POST.get("em_flutes_count"))
+            tool.end_mill_spec.save()
+        elif tool.category == "tap" and tool.tap_spec:
+            tool.tap_spec.thread_standard = (request.POST.get("thread_standard") or "metric").strip()
+            tool.tap_spec.size_label = (request.POST.get("size_label") or "").strip()
+            tool.tap_spec.pitch_mm = _to_decimal_or_none(request.POST.get("tap_pitch_mm"))
+            tool.tap_spec.tpi = _to_int_or_none(request.POST.get("tap_tpi"))
+            tool.tap_spec.hole_type = (request.POST.get("hole_type") or "any").strip()
+            tool.tap_spec.tap_type = (request.POST.get("tap_type") or "cutting").strip()
+            tool.tap_spec.overall_length_mm = _to_decimal_or_none(request.POST.get("tap_overall_length_mm"))
+            tool.tap_spec.cutting_length_mm = _to_decimal_or_none(request.POST.get("tap_cutting_length_mm"))
+            tool.tap_spec.save()
+        elif tool.category == "center_drill" and tool.center_drill_spec:
+            tool.center_drill_spec.diameter_mm = _to_decimal_or_none(request.POST.get("cd_diameter_mm"))
+            tool.center_drill_spec.overall_length_mm = _to_decimal_or_none(request.POST.get("cd_overall_length_mm"))
+            tool.center_drill_spec.angle_deg = (request.POST.get("cd_angle_deg") or "60").strip()
+            tool.center_drill_spec.save()
+        elif tool.category == "countersink" and tool.countersink_spec:
+            tool.countersink_spec.countersink_type = (request.POST.get("cs_type") or "machine").strip()
+            tool.countersink_spec.diameter_mm = _to_decimal_or_none(request.POST.get("cs_diameter_mm"))
+            tool.countersink_spec.angle_deg = (request.POST.get("cs_angle_deg") or "90").strip()
+            tool.countersink_spec.overall_length_mm = _to_decimal_or_none(request.POST.get("cs_overall_length_mm"))
+            tool.countersink_spec.flutes_count = _to_int_or_none(request.POST.get("cs_flutes_count"))
+            tool.countersink_spec.size_label = (request.POST.get("cs_size_label") or "").strip()
+            tool.countersink_spec.save()
+        elif tool.category == "drill" and tool.drill_spec:
+            tool.drill_spec.diameter_mm = _to_decimal_or_none(request.POST.get("dr_diameter_mm"))
+            tool.drill_spec.overall_length_mm = _to_decimal_or_none(request.POST.get("dr_overall_length_mm"))
+            tool.drill_spec.cutting_length_mm = _to_decimal_or_none(request.POST.get("dr_cutting_length_mm"))
+            tool.drill_spec.angle_deg = _to_decimal_or_none(request.POST.get("dr_angle_deg"))
+            tool.drill_spec.save()
+
+        tool.save()
+        messages.success(request, "Данные инструмента обновлены.")
+        return redirect(f"{request.path}?panel=stock&category={tool.category}")
+
+    if action == "update_tool_cell":
+        if not is_admin_user:
+            return JsonResponse({"ok": False, "error": "Только администратор."}, status=403)
+        tool_id = _to_int(request.POST.get("tool_id"), 0)
+        field = (request.POST.get("field") or "").strip()
+        value_raw = (request.POST.get("value") or "").strip()
+        tool = ToolItem.objects.select_related("end_mill_spec").filter(id=tool_id, is_deleted=False).first()
+        if not tool:
+            return JsonResponse({"ok": False, "error": "Позиция не найдена."}, status=404)
+        if tool.category != "end_mill" or not tool.end_mill_spec:
+            return JsonResponse({"ok": False, "error": "Inline-редактирование пока доступно для фрез."}, status=400)
+
+        if field == "mill_type":
+            tool.end_mill_spec.mill_type = value_raw or "end"
+            tool.end_mill_spec.save(update_fields=["mill_type"])
+        elif field == "em_diameter_mm":
+            tool.end_mill_spec.diameter_mm = _to_decimal_or_none(value_raw)
+            tool.end_mill_spec.save(update_fields=["diameter_mm"])
+        elif field == "em_corner_radius_mm":
+            tool.end_mill_spec.corner_radius_mm = _to_decimal_or_none(value_raw)
+            tool.end_mill_spec.save(update_fields=["corner_radius_mm"])
+        elif field == "em_overall_length_mm":
+            tool.end_mill_spec.overall_length_mm = _to_decimal_or_none(value_raw)
+            tool.end_mill_spec.save(update_fields=["overall_length_mm"])
+        elif field == "em_cutting_length_mm":
+            tool.end_mill_spec.cutting_length_mm = _to_decimal_or_none(value_raw)
+            tool.end_mill_spec.save(update_fields=["cutting_length_mm"])
+        elif field == "em_flutes_count":
+            tool.end_mill_spec.flutes_count = _to_int_or_none(value_raw)
+            tool.end_mill_spec.save(update_fields=["flutes_count"])
+        elif field == "main_diameter_mm":
+            tool.main_diameter_mm = _to_decimal_or_none(value_raw)
+            tool.save(update_fields=["main_diameter_mm", "updated_at"])
+        elif field == "tool_material":
+            tool.tool_material = value_raw
+            tool.save(update_fields=["tool_material", "updated_at"])
+        elif field == "coating_type":
+            tool.coating_type = value_raw or "none"
+            tool.save(update_fields=["coating_type", "updated_at"])
+        elif field == "work_material":
+            tool.work_material = value_raw
+            tool.save(update_fields=["work_material", "updated_at"])
+        elif field == "quantity":
+            tool.quantity = max(0, _to_int(value_raw, tool.quantity))
+            tool.save(update_fields=["quantity", "updated_at"])
+        else:
+            return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+
+        return JsonResponse({"ok": True})
 
     if action == "process_issue_outcome":
         issue_id = _to_int(request.POST.get("issue_id"), 0)
@@ -354,6 +478,7 @@ def inventory_view(request):
                     employee_name=employee_name or issue.employee_name,
                     movement_date=movement_date,
                     comment=f"Возврат по выдаче #{issue.id}. {comment}",
+                    created_by_account=username,
                 )
             if writeoff_qty > 0:
                 StockMovement.objects.create(
@@ -364,6 +489,7 @@ def inventory_view(request):
                     employee_name=employee_name or issue.employee_name,
                     movement_date=movement_date,
                     comment=f"Списание по выдаче #{issue.id}. {comment}",
+                    created_by_account=username,
                 )
         messages.success(request, "Операция по выданному инструменту сохранена.")
         return redirect("inventory")
@@ -376,6 +502,7 @@ def inventory_view(request):
         tool_material = (request.POST.get("tool_material") or "").strip()
         coating_type = (request.POST.get("coating_type") or "none").strip()
         work_material = (request.POST.get("work_material") or "").strip()
+        main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
         if category not in {"end_mill", "tap"} or quantity <= 0:
             messages.error(request, "Укажите тип инструмента и количество для прихода.")
             return redirect("inventory")
@@ -400,6 +527,7 @@ def inventory_view(request):
                         tool_material=tool_material,
                         coating_type=coating_type,
                         work_material=work_material,
+                        main_diameter_mm=main_diameter_mm,
                         end_mill_spec__mill_type=mill_type,
                         end_mill_spec__diameter_mm=diameter_mm,
                         end_mill_spec__corner_radius_mm=corner_radius_mm,
@@ -419,6 +547,7 @@ def inventory_view(request):
                         tool_material=tool_material,
                         coating_type=coating_type,
                         work_material=work_material,
+                        main_diameter_mm=main_diameter_mm,
                         quantity=quantity,
                     )
                     EndMillSpec.objects.create(
@@ -446,6 +575,7 @@ def inventory_view(request):
                         tool_material=tool_material,
                         coating_type=coating_type,
                         work_material=work_material,
+                        main_diameter_mm=main_diameter_mm,
                         tap_spec__thread_standard=thread_standard,
                         tap_spec__size_label=size_label,
                         tap_spec__pitch_mm=pitch_mm,
@@ -467,6 +597,7 @@ def inventory_view(request):
                         tool_material=tool_material,
                         coating_type=coating_type,
                         work_material=work_material,
+                        main_diameter_mm=main_diameter_mm,
                         quantity=quantity,
                     )
                     TapSpec.objects.create(
@@ -486,6 +617,7 @@ def inventory_view(request):
                 quantity=quantity,
                 movement_date=movement_date,
                 comment=comment or "Приход инструмента",
+                created_by_account=username,
             )
         messages.success(request, "Приход сохранен: остаток обновлен (или создана новая позиция).")
         return redirect("inventory")
@@ -517,6 +649,7 @@ def inventory_view(request):
                 tool_material = (row.get("tool_material") or "").strip()
                 coating_type = (row.get("coating_type") or "none").strip()
                 work_material = (row.get("work_material") or "").strip()
+                main_diameter_mm = _to_decimal_or_none(row.get("main_diameter_mm"))
                 if category not in {"end_mill", "tap", "center_drill", "countersink", "drill"} or quantity <= 0:
                     continue
                 try:
@@ -538,6 +671,7 @@ def inventory_view(request):
                             tool_material=tool_material,
                             coating_type=coating_type,
                             work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
                             end_mill_spec__mill_type=mill_type,
                             end_mill_spec__diameter_mm=diameter_mm,
                             end_mill_spec__corner_radius_mm=corner_radius_mm,
@@ -557,6 +691,7 @@ def inventory_view(request):
                             tool_material=tool_material,
                             coating_type=coating_type,
                             work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
                             quantity=quantity,
                         )
                         EndMillSpec.objects.create(
@@ -584,6 +719,7 @@ def inventory_view(request):
                             tool_material=tool_material,
                             coating_type=coating_type,
                             work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
                             tap_spec__thread_standard=thread_standard,
                             tap_spec__size_label=size_label,
                             tap_spec__pitch_mm=pitch_mm,
@@ -605,6 +741,7 @@ def inventory_view(request):
                             tool_material=tool_material,
                             coating_type=coating_type,
                             work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
                             quantity=quantity,
                         )
                         TapSpec.objects.create(
@@ -631,6 +768,7 @@ def inventory_view(request):
                             tool_material=tool_material,
                             coating_type=coating_type,
                             work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
                             center_drill_spec__diameter_mm=diameter_mm,
                             center_drill_spec__overall_length_mm=overall_length_mm,
                             center_drill_spec__angle_deg=angle_deg,
@@ -647,6 +785,7 @@ def inventory_view(request):
                             tool_material=tool_material,
                             coating_type=coating_type,
                             work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
                             quantity=quantity,
                         )
                         CenterDrillSpec.objects.create(
@@ -673,6 +812,7 @@ def inventory_view(request):
                             tool_material=tool_material,
                             coating_type=coating_type,
                             work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
                             countersink_spec__countersink_type=countersink_type,
                             countersink_spec__diameter_mm=diameter_mm,
                             countersink_spec__angle_deg=angle_deg,
@@ -692,6 +832,7 @@ def inventory_view(request):
                             tool_material=tool_material,
                             coating_type=coating_type,
                             work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
                             quantity=quantity,
                         )
                         CountersinkSpec.objects.create(
@@ -715,6 +856,7 @@ def inventory_view(request):
                             tool_material=tool_material,
                             coating_type=coating_type,
                             work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
                             drill_spec__diameter_mm=diameter_mm,
                             drill_spec__overall_length_mm=overall_length_mm,
                             drill_spec__cutting_length_mm=cutting_length_mm,
@@ -732,6 +874,7 @@ def inventory_view(request):
                             tool_material=tool_material,
                             coating_type=coating_type,
                             work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
                             quantity=quantity,
                         )
                         DrillSpec.objects.create(
@@ -751,6 +894,7 @@ def inventory_view(request):
                         if supplier_name
                         else "Приход инструмента"
                     ),
+                    created_by_account=username,
                 )
                 created_count += 1
 
