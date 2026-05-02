@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load inventory_tags %}
 
 {% block content %}
 {% if panel != "defects" %}
@@ -291,7 +292,7 @@
         {% for key, label in coating_types %}
         <label class="coating-chip">
           <input type="radio" name="coating_type" value="{{ key }}" {% if filters.coating_type == key %}checked{% endif %}>
-          <span class="swatch swatch-{{ key }}" title="{{ label }}"></span>
+          <span class="swatch swatch-{{ key }}" title="{{ key|coating_hover_title }}"></span>
         </label>
         {% endfor %}
       </div>
@@ -346,16 +347,10 @@
         <td data-sort="{{ t.main_diameter_mm|default:'-1' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="main_diameter_mm" data-type="number" data-value="{{ t.main_diameter_mm|default:'' }}"{% endif %}>{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
-          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
+          {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
         </td>
         <td data-sort="{{ t.work_material|default:'-' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
-          {% if t.work_material == "P" %}<span class="wm-badge wm-p">P</span>
-          {% elif t.work_material == "M" %}<span class="wm-badge wm-m">M</span>
-          {% elif t.work_material == "K" %}<span class="wm-badge wm-k">K</span>
-          {% elif t.work_material == "N" %}<span class="wm-badge wm-n">N</span>
-          {% elif t.work_material == "S" %}<span class="wm-badge wm-s">S</span>
-          {% elif t.work_material == "H" %}<span class="wm-badge wm-h">H</span>
-          {% else %}-{% endif %}
+          {% if t.work_material %}<span class="wm-badge wm-{{ t.work_material|lower }}" title="{{ t.get_work_material_display }}">{{ t.work_material }}</span>{% else %}-{% endif %}
         </td>
         <td data-sort="{{ t.quantity }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if is_admin_user %}
@@ -408,16 +403,10 @@
         <td data-sort="{{ t.main_diameter_mm|default:'-1' }}">{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}">
-          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
+          {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
         </td>
         <td data-sort="{{ t.work_material|default:'-' }}">
-          {% if t.work_material == "P" %}<span class="wm-badge wm-p">P</span>
-          {% elif t.work_material == "M" %}<span class="wm-badge wm-m">M</span>
-          {% elif t.work_material == "K" %}<span class="wm-badge wm-k">K</span>
-          {% elif t.work_material == "N" %}<span class="wm-badge wm-n">N</span>
-          {% elif t.work_material == "S" %}<span class="wm-badge wm-s">S</span>
-          {% elif t.work_material == "H" %}<span class="wm-badge wm-h">H</span>
-          {% else %}-{% endif %}
+          {% if t.work_material %}<span class="wm-badge wm-{{ t.work_material|lower }}" title="{{ t.get_work_material_display }}">{{ t.work_material }}</span>{% else %}-{% endif %}
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
         {% if is_admin_user %}
@@ -460,16 +449,10 @@
         <td data-sort="{{ t.main_diameter_mm|default:'-1' }}">{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}">
-          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
+          {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
         </td>
         <td data-sort="{{ t.work_material|default:'-' }}">
-          {% if t.work_material == "P" %}<span class="wm-badge wm-p">P</span>
-          {% elif t.work_material == "M" %}<span class="wm-badge wm-m">M</span>
-          {% elif t.work_material == "K" %}<span class="wm-badge wm-k">K</span>
-          {% elif t.work_material == "N" %}<span class="wm-badge wm-n">N</span>
-          {% elif t.work_material == "S" %}<span class="wm-badge wm-s">S</span>
-          {% elif t.work_material == "H" %}<span class="wm-badge wm-h">H</span>
-          {% else %}-{% endif %}
+          {% if t.work_material %}<span class="wm-badge wm-{{ t.work_material|lower }}" title="{{ t.get_work_material_display }}">{{ t.work_material }}</span>{% else %}-{% endif %}
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
         {% if is_admin_user %}
@@ -517,7 +500,7 @@
         <td data-sort="{{ t.main_diameter_mm|default:'-1' }}">{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}">
-          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
+          {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
         {% if is_admin_user %}
@@ -562,16 +545,10 @@
         <td data-sort="{{ t.main_diameter_mm|default:'-1' }}">{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}">
-          <span class="coating-dot swatch-{{ t.coating_type|default:'none' }}" title="{{ t.get_coating_type_display }}"></span>
+          {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
         </td>
         <td data-sort="{{ t.work_material|default:'-' }}">
-          {% if t.work_material == "P" %}<span class="wm-badge wm-p">P</span>
-          {% elif t.work_material == "M" %}<span class="wm-badge wm-m">M</span>
-          {% elif t.work_material == "K" %}<span class="wm-badge wm-k">K</span>
-          {% elif t.work_material == "N" %}<span class="wm-badge wm-n">N</span>
-          {% elif t.work_material == "S" %}<span class="wm-badge wm-s">S</span>
-          {% elif t.work_material == "H" %}<span class="wm-badge wm-h">H</span>
-          {% else %}-{% endif %}
+          {% if t.work_material %}<span class="wm-badge wm-{{ t.work_material|lower }}" title="{{ t.get_work_material_display }}">{{ t.work_material }}</span>{% else %}-{% endif %}
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
         {% if is_admin_user %}
@@ -777,14 +754,8 @@
               {% endif %}
               | D осн {{ iss.tool.main_diameter_mm|default:"-"|floatformat:"-2" }}
               <span style="margin-left:8px;">{{ iss.tool.get_tool_material_display|default:"-" }}</span>
-              <span class="coating-dot swatch-{{ iss.tool.coating_type|default:'none' }}" title="{{ iss.tool.get_coating_type_display }}"></span>
-              {% if iss.tool.work_material == "P" %}<span class="wm-badge wm-p">P</span>
-              {% elif iss.tool.work_material == "M" %}<span class="wm-badge wm-m">M</span>
-              {% elif iss.tool.work_material == "K" %}<span class="wm-badge wm-k">K</span>
-              {% elif iss.tool.work_material == "N" %}<span class="wm-badge wm-n">N</span>
-              {% elif iss.tool.work_material == "S" %}<span class="wm-badge wm-s">S</span>
-              {% elif iss.tool.work_material == "H" %}<span class="wm-badge wm-h">H</span>
-              {% else %}<span class="muted">-</span>{% endif %}
+              {% with ct=iss.tool.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
+              {% if iss.tool.work_material %}<span class="wm-badge wm-{{ iss.tool.work_material|lower }}" title="{{ iss.tool.get_work_material_display }}">{{ iss.tool.work_material }}</span>{% else %}<span class="muted">-</span>{% endif %}
             </div>
           </td>
           <td>{{ iss.quantity }}</td>
@@ -1135,13 +1106,29 @@
   .arrival-bulk-top {
     display: flex;
     gap: 8px;
-    align-items: end;
+    align-items: flex-end;
     margin-bottom: 10px;
     flex-wrap: wrap;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   .arrival-bulk-top .field {
     margin: 0;
-    min-width: 260px;
+    min-width: 0;
+    flex: 1 1 min(260px, 100%);
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .arrival-bulk-top .field input,
+  .arrival-bulk-top .field select {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  #arrival-bulk-date {
+    display: block;
   }
   #arrival-bulk-add-row {
     height: 34px;
@@ -1421,6 +1408,7 @@
   .arrival-bulk-table select.arrival-wm-select.wm-n { background: #2bb673; color: #fff; }
   .arrival-bulk-table select.arrival-wm-select.wm-s { background: #8f7cff; color: #fff; }
   .arrival-bulk-table select.arrival-wm-select.wm-h { background: #6d6d6d; color: #fff; }
+  .arrival-bulk-table select.arrival-wm-select.wm-pw { background: #f0f4f8; color: #1a1d21; border: 1px solid #c5cdd6; }
   .arrival-inline-coating .swatch {
     width: 16px;
     height: 16px;
@@ -1429,8 +1417,9 @@
   }
   @media (max-width: 900px) {
     .arrival-bulk-top .field {
-      min-width: 200px;
-      flex: 1 1 220px;
+      min-width: 0;
+      flex: 1 1 min(100%, 240px);
+      max-width: 100%;
     }
     #arrival-bulk-add-row {
       flex: 0 0 auto;
@@ -1444,6 +1433,21 @@
       min-width: 88px;
       font-size: 12px;
       padding: 5px 6px;
+    }
+  }
+  @media (max-width: 540px) {
+    .arrival-bulk-top {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .arrival-bulk-top .field {
+      flex: 1 1 auto;
+      width: 100%;
+      max-width: 100%;
+    }
+    #arrival-bulk-add-row {
+      width: 100%;
+      flex: 1 1 auto;
     }
   }
   .coating-picker {
@@ -1513,6 +1517,7 @@
   .wm-n { background: #57d07a; }
   .wm-s { background: #9b6a3b; color: #fff; }
   .wm-h { background: #a7aab3; }
+  .wm-pw { background: #f5f8fc; border: 1px solid #c8d0dc; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6); }
   .wm-picker {
     display: flex;
     gap: 8px;
@@ -1549,6 +1554,20 @@
     transform: scale(1.05);
   }
   .wm-all { background: #2a3656; color: #eaf0ff; width: 36px; }
+  .coating-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .coating-inline-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #8b9cbc;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
   .coating-dot {
     width: 18px;
     height: 18px;
@@ -1557,6 +1576,7 @@
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
     display: inline-block;
     vertical-align: middle;
+    flex-shrink: 0;
   }
   .table-wrap .data-grid th,
   .table-wrap .data-grid td {
@@ -1873,13 +1893,13 @@
       {% endfor %}
     ];
     var coatingSelectOptions = [
-      { value: "yellow", label: "🟨", bg: "#f6c343", color: "#0f172a" },
-      { value: "brown", label: "🟫", bg: "#8b5a2b", color: "#ffffff" },
-      { value: "black", label: "⬛", bg: "#151515", color: "#ffffff" },
-      { value: "none", label: "⬜", bg: "#aab3c7", color: "#0f172a" },
-      { value: "multicolor", label: "🌈", bg: "#4f5d82", color: "#ffffff" },
-      { value: "blue", label: "🟦", bg: "#2877f0", color: "#ffffff" },
-      { value: "other", label: "🟪", bg: "#2f3b57", color: "#ffffff" }
+      { value: "none", label: "⬜ Без покрытия", bg: "#aab3c7", color: "#0f172a" },
+      { value: "yellow", label: "🟨 Жёлтое", bg: "#f6c343", color: "#0f172a" },
+      { value: "brown", label: "🟫 Коричн.", bg: "#8b5a2b", color: "#ffffff" },
+      { value: "black", label: "⬛ Чёрное", bg: "#151515", color: "#ffffff" },
+      { value: "multicolor", label: "🌈 Цветн.", bg: "#4f5d82", color: "#ffffff" },
+      { value: "blue", label: "🟦 Синее", bg: "#2877f0", color: "#ffffff" },
+      { value: "other", label: "🟪 Другое", bg: "#2f3b57", color: "#ffffff" }
     ];
     function buildSelect(options, selected) {
       var sel = document.createElement("select");
@@ -1887,6 +1907,7 @@
         var o = document.createElement("option");
         o.value = opt.value;
         o.textContent = opt.label;
+        if (opt.title) o.setAttribute("title", opt.title);
         if (opt.bg) o.style.backgroundColor = opt.bg;
         if (opt.color) o.style.color = opt.color;
         if ((selected || "") === opt.value) o.selected = true;
@@ -1894,6 +1915,17 @@
       });
       return sel;
     }
+    var wmOptionTitles = {
+      "": "?",
+      {% for key, label in work_material_types %}
+      "{{ key }}": "{{ label|escapejs }}",
+      {% endfor %}
+    };
+    var coatingOptionTitles = {
+      {% for key, label in coating_types %}
+      "{{ key }}": "{{ key|coating_hover_title|escapejs }}",
+      {% endfor %}
+    };
     var arrivalRowSeq = 0;
     var wmSelectTheme = {
       "": { bg: "#8b949e", color: "#fff" },
@@ -1902,7 +1934,8 @@
       "K": { bg: "#e25a5a", color: "#fff" },
       "N": { bg: "#2bb673", color: "#fff" },
       "S": { bg: "#8f7cff", color: "#fff" },
-      "H": { bg: "#6d6d6d", color: "#fff" }
+      "H": { bg: "#6d6d6d", color: "#fff" },
+      "PW": { bg: "#eef2f7", color: "#1a1d21" }
     };
     var coatingSelectTheme = {
       "none": { bg: "#aab3c7", color: "#0f172a" },
@@ -1915,7 +1948,7 @@
     };
     function applyWmSelectClass(sel) {
       if (!sel) return;
-      sel.classList.remove("wm-all", "wm-p", "wm-m", "wm-k", "wm-n", "wm-s", "wm-h");
+      sel.classList.remove("wm-all", "wm-p", "wm-m", "wm-k", "wm-n", "wm-s", "wm-h", "wm-pw");
       var rawValue = sel.value || "";
       var value = rawValue.toLowerCase();
       sel.classList.add(value ? ("wm-" + value) : "wm-all");
@@ -1933,8 +1966,13 @@
         { value: "N", label: "N", bg: "#2bb673", color: "#ffffff" },
         { value: "S", label: "S", bg: "#8f7cff", color: "#ffffff" },
         { value: "H", label: "H", bg: "#6d6d6d", color: "#ffffff" },
+        { value: "PW", label: "PW", bg: "#eef2f7", color: "#1a1d21" },
       ];
       var sel = buildSelect(opts, selected || "");
+      Array.prototype.forEach.call(sel.options, function (o) {
+        var t = wmOptionTitles[o.value];
+        if (t) o.setAttribute("title", t);
+      });
       sel.setAttribute("data-k", "work_material");
       sel.classList.add("arrival-wm-select");
       applyWmSelectClass(sel);
@@ -1957,6 +1995,10 @@
     }
     function buildColoredCoatingSelect(selected) {
       var sel = buildSelect(coatingSelectOptions, selected || "none");
+      Array.prototype.forEach.call(sel.options, function (o) {
+        var t = coatingOptionTitles[o.value];
+        if (t) o.setAttribute("title", t);
+      });
       sel.setAttribute("data-k", "coating_type");
       sel.classList.add("arrival-coating-select");
       applyCoatingSelectClass(sel);
@@ -2124,10 +2166,15 @@
       "{{ key }}": "{{ label }}",
       {% endfor %}
     };
+    var coatingFullTitles = {
+      {% for key, label in coating_types %}
+      "{{ key }}": "{{ key|coating_hover_title|escapejs }}",
+      {% endfor %}
+    };
     var workMaterialLabels = {
       "": "-",
       {% for key, label in work_material_types %}
-      "{{ key }}": "{{ key }}",
+      "{{ key }}": "{{ label|escapejs }}",
       {% endfor %}
     };
 
@@ -2142,10 +2189,22 @@
       if (!v) return "-";
       if (field === "mill_type") return millTypeLabels[v] || v;
       if (field === "tool_material") return toolMaterialLabels[v] || "Неизвестно";
-      if (field === "coating_type") return '<span class="coating-dot swatch-' + escapeHtml(v) + '" title="' + escapeHtml(coatingLabels[v] || v) + '"></span>';
+      if (field === "coating_type") {
+        var ct = coatingFullTitles[v] || coatingLabels[v] || v;
+        var inner =
+          '<span class="coating-dot swatch-' + escapeHtml(v) + '" title="' + escapeHtml(ct) + '"></span>';
+        if (v === "none") {
+          inner +=
+            '<span class="coating-inline-label">' +
+            escapeHtml(coatingLabels["none"] || "без покрытия") +
+            "</span>";
+        }
+        return '<span class="coating-cell">' + inner + "</span>";
+      }
       if (field === "work_material") {
         var cls = v ? ("wm-" + v.toLowerCase()) : "";
-        return v ? ('<span class="wm-badge ' + cls + '">' + escapeHtml(v) + "</span>") : "-";
+        var wmLbl = workMaterialLabels[v] || "";
+        return v ? ('<span class="wm-badge ' + cls + '" title="' + escapeHtml(wmLbl) + '">' + escapeHtml(v) + "</span>") : "-";
       }
       if (field === "em_diameter_mm") return "Ø" + v.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
       if (field === "quantity") return "<strong>" + escapeHtml(v) + "</strong>";
@@ -2155,16 +2214,24 @@
     function buildSelect(field, current) {
       var options = [];
       if (field === "mill_type") {
-        options = Object.keys(millTypeLabels).map(function (k) { return { value: k, label: millTypeLabels[k] }; });
+        options = Object.keys(millTypeLabels).map(function (k) {
+          return { value: k, label: millTypeLabels[k], title: millTypeLabels[k] };
+        });
       } else if (field === "tool_material") {
-        options = [{ value: "", label: "Неизвестно" }].concat(
-          Object.keys(toolMaterialLabels).filter(function (k) { return k; }).map(function (k) { return { value: k, label: toolMaterialLabels[k] }; })
+        options = [{ value: "", label: "Неизвестно", title: "" }].concat(
+          Object.keys(toolMaterialLabels).filter(function (k) { return k; }).map(function (k) {
+            return { value: k, label: toolMaterialLabels[k], title: toolMaterialLabels[k] };
+          })
         );
       } else if (field === "coating_type") {
-        options = Object.keys(coatingLabels).map(function (k) { return { value: k, label: coatingLabels[k] }; });
+        options = Object.keys(coatingLabels).map(function (k) {
+          return { value: k, label: coatingLabels[k], title: coatingFullTitles[k] || coatingLabels[k] };
+        });
       } else if (field === "work_material") {
-        options = [{ value: "", label: "-" }].concat(
-          Object.keys(workMaterialLabels).filter(function (k) { return k; }).map(function (k) { return { value: k, label: k }; })
+        options = [{ value: "", label: "-", title: "" }].concat(
+          Object.keys(workMaterialLabels).filter(function (k) { return k; }).map(function (k) {
+            return { value: k, label: workMaterialLabels[k], title: workMaterialLabels[k] };
+          })
         );
       }
       var sel = document.createElement("select");
@@ -2173,6 +2240,7 @@
         var o = document.createElement("option");
         o.value = opt.value;
         o.textContent = opt.label;
+        if (opt.title) o.setAttribute("title", opt.title);
         if ((current || "") === opt.value) o.selected = true;
         sel.appendChild(o);
       });
