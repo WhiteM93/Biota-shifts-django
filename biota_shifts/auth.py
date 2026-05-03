@@ -409,7 +409,18 @@ def _filter_employees_for_user(full_df: pd.DataFrame, username: str) -> pd.DataF
 
 
 # Разделы меню Django (кроме личного кабинета): права в JSON users.*.nav
-NAV_KEYS = ("home", "graph", "hours", "skud", "inventory", "defects", "regulations", "products")
+NAV_KEYS = (
+    "home",
+    "graph",
+    "hours",
+    "skud",
+    "inventory",
+    "defects",
+    "payroll",
+    "employees",
+    "regulations",
+    "products",
+)
 USER_ROLE_MANAGER = "manager"
 USER_ROLE_EXECUTOR = "executor"
 USER_ROLE_CHOICES = (USER_ROLE_MANAGER, USER_ROLE_EXECUTOR)
@@ -420,6 +431,8 @@ NAV_LABELS_RU = {
     "skud": "СКУД",
     "inventory": "Склад",
     "defects": "Учёт брака",
+    "payroll": "Расчёт ЗП",
+    "employees": "Сотрудники",
     "regulations": "Регламенты",
     "products": "Изделия",
 }
@@ -441,6 +454,11 @@ def nav_permissions_for_user(username: str | None) -> dict[str, bool]:
     for k in NAV_KEYS:
         if k in nav:
             out[k] = bool(nav[k])
+    # В store до split не было ключей payroll/employees — наследуем от defects
+    if "payroll" not in nav and "defects" in nav:
+        out["payroll"] = bool(nav["defects"])
+    if "employees" not in nav and "defects" in nav:
+        out["employees"] = bool(nav["defects"])
     return out
 
 
@@ -484,8 +502,41 @@ def _nav_department_filters_map(rec: dict | None) -> dict[str, list[str]]:
     return out
 
 
+def _nav_dep_filters_union_departments(rec: dict) -> list[str] | None:
+    """Объединение отделов из nav_dep_filters по всем включённым разделам (кроме products).
+
+    None — ключа nav_dep_filters нет или словарь пустой (нет явной привязки к отделам в store).
+    Пустой список — в store есть ключи, но ни в одном включённом разделе отделы не отмечены.
+    """
+    if "nav_dep_filters" not in rec:
+        return None
+    raw = rec.get("nav_dep_filters")
+    if not isinstance(raw, dict) or not raw:
+        return None
+    nav = rec.get("nav") if isinstance(rec.get("nav"), dict) else None
+    seen: set[str] = set()
+    out: list[str] = []
+    for k, vals in raw.items():
+        ks = str(k or "").strip()
+        if ks not in NAV_KEYS or ks == "products":
+            continue
+        if nav is not None and not bool(nav.get(ks, True)):
+            continue
+        if not isinstance(vals, list):
+            continue
+        for x in vals:
+            t = _norm_label(x)
+            if not t:
+                continue
+            c = _cmp_str(t)
+            if c not in seen:
+                seen.add(c)
+                out.append(t)
+    return out
+
+
 def employees_df_for_nav(username: str | None, nav_key: str, employees_df: pd.DataFrame) -> pd.DataFrame:
-    """Список сотрудников для конкретного раздела: базовые права + (опционально) фильтр по отделам для раздела."""
+    """Список сотрудников для раздела: nav_dep_filters по разделу; для «Сотрудники» при access_scope «none» не обнуляем список до фильтра отделов из кабинета Django."""
     if employees_df is None or getattr(employees_df, "empty", True):
         return employees_df
     u = (username or "").strip()
@@ -494,13 +545,23 @@ def employees_df_for_nav(username: str | None, nav_key: str, employees_df: pd.Da
     rec = _resolve_registered_user(u)
     if rec is None:
         return employees_df.iloc[0:0].copy()
-    # В Django-интерфейсе доступ к сотрудникам в разделах задаётся через nav_dep_filters.
-    # Глобальный access_scope оставляем для Streamlit/обратной совместимости, но здесь не сужаем базу по нему.
-    base = employees_df
     nk = (nav_key or "").strip()
     if nk == "products":
         return employees_df
+    base = employees_df
+    if nk == "employees":
+        # access_scope "none" у новых регистраций — иначе _filter_employees_for_user даёт пустой df
+        # до применения nav_dep_filters, и список «Сотрудники» пустой при любых отделах в кабинете Django.
+        scope = _user_access_scope_value(rec or {})
+        if scope not in ("none", ""):
+            base = _filter_employees_for_user(employees_df, u)
+            if getattr(base, "empty", True):
+                return base
     filt = _nav_department_filters_map(rec).get(nk)
+    if (filt is None or filt == []) and nk in ("payroll", "employees"):
+        filt = _nav_department_filters_map(rec).get("defects")
+    if (filt is None or filt == []) and nk == "employees":
+        filt = _nav_dep_filters_union_departments(rec)
     if filt is None:
         return base
     if not filt:

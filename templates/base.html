@@ -242,6 +242,109 @@
     .table-wrap { overflow-x: auto; margin-top: 8px; border: 1px solid #2b3650; border-radius: 8px; padding: 8px; }
     .data-grid { min-width: max-content; font-size: 13px; width: 100%; }
     .data-grid th, .data-grid td { padding: 6px 8px; }
+    .btn.btn-sm {
+      padding: 4px 10px;
+      font-size: 12px;
+      line-height: 1.25;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(72, 88, 180, 0.28);
+      font-weight: 600;
+    }
+    .inventory-payroll-table.data-grid {
+      min-width: 0;
+      table-layout: fixed;
+      width: 100%;
+    }
+    .inventory-payroll-table.data-grid th,
+    .inventory-payroll-table.data-grid td {
+      vertical-align: middle;
+    }
+    .inventory-payroll-table .inv-payroll-code { width: 6%; white-space: nowrap; }
+    .inventory-payroll-table .inv-payroll-name { width: 26%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .inventory-payroll-table .inv-payroll-name a {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #eaf0ff;
+      font-weight: 600;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(143, 156, 255, 0.42);
+      padding-bottom: 1px;
+      line-height: 1.35;
+    }
+    .inventory-payroll-table .inv-payroll-name a:hover {
+      color: #fff;
+      border-bottom-color: #a8b9ff;
+    }
+    .inventory-payroll-table .inv-payroll-dept { width: 22%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .inventory-payroll-table .inv-payroll-hours { width: 28%; white-space: nowrap; text-align: right; }
+    .inventory-payroll-table .inv-payroll-action {
+      width: 7rem;
+      min-width: 5.5rem;
+      text-align: center;
+      padding: 6px 4px;
+    }
+    .employees-directory-table.data-grid {
+      min-width: 0;
+      table-layout: fixed;
+      width: 100%;
+    }
+    .employees-directory-table .emp-dir-code {
+      width: 5.25rem;
+      text-align: center;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    .employees-directory-table .emp-dir-code a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2.25rem;
+      padding: 5px 9px;
+      border-radius: 8px;
+      background: rgba(124, 140, 255, 0.1);
+      border: 1px solid rgba(124, 140, 255, 0.38);
+      color: #dce4ff;
+      font-weight: 700;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      text-decoration: none;
+      line-height: 1.2;
+    }
+    .employees-directory-table .emp-dir-code a:hover {
+      background: rgba(124, 140, 255, 0.22);
+      border-color: #8f9cff;
+      color: #fff;
+    }
+    .employees-directory-table .emp-dir-label {
+      width: 18%;
+      min-width: 7rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .employees-directory-table .emp-dir-label a {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #eaf0ff;
+      font-weight: 600;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(143, 156, 255, 0.42);
+      padding-bottom: 1px;
+      line-height: 1.35;
+    }
+    .employees-directory-table .emp-dir-label a:hover {
+      color: #fff;
+      border-bottom-color: #a8b9ff;
+    }
+    .employees-directory-table .emp-dir-cell {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
     .auth-page .container { width: 100%; max-width: 420px; padding: 16px; }
     .auth-card {
@@ -307,6 +410,7 @@
       .check-row > .label { position: sticky; left: 0; background: #141b29; padding-right: 8px; }
       .chk { font-size: 12px; padding: 5px 10px; }
       .btn { min-height: 36px; }
+      .btn.btn-sm { min-height: 0; }
       .table-wrap { padding: 6px; }
       table th, table td { font-size: 12px; }
       .auth-page .container { max-width: 100%; padding: 12px; }
@@ -353,10 +457,16 @@
     <a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
     {% endif %}
     {% if biota_nav.inventory %}
-    <a href="{% url 'inventory' %}" class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel != 'defects' %}active{% endif %}">Склад</a>
+    <a href="{% url 'inventory' %}" class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel != 'defects' and request.GET.panel != 'payroll' and request.GET.panel != 'employees' %}active{% endif %}">Склад</a>
     {% endif %}
     {% if biota_nav.defects %}
     <a href="{% url 'inventory' %}?panel=defects" class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel == 'defects' %}active{% endif %}">Учёт брака</a>
+    {% endif %}
+    {% if biota_nav.payroll %}
+    <a href="{% url 'inventory' %}?panel=payroll" class="{% if request.resolver_match.url_name == 'payroll_settlement' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'payroll' %}active{% endif %}">Расчёт ЗП</a>
+    {% endif %}
+    {% if biota_nav.employees %}
+    <a href="{% url 'inventory' %}?panel=employees" class="{% if request.resolver_match.url_name == 'employee_payroll_detail' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'employees' %}active{% endif %}">Сотрудники</a>
     {% endif %}
     {% if biota_nav.products %}
     <a href="{% url 'products_list' %}" class="{% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_edit' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_setup_create' or request.resolver_match.url_name == 'product_setup_edit' %}active{% endif %}">Наладки</a>

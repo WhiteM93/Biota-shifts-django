@@ -331,6 +331,107 @@ class EmployeeDefectRecord(models.Model):
         return f"{self.defect_date} / {self.employee_name} / брак: {self.defect_quantity}"
 
 
+EMPLOYEE_PAYROLL_SHIFT_HOURS = (
+    (8, "8 часов"),
+    (10, "10 часов"),
+    (12, "12 часов"),
+)
+
+
+class EmployeePayrollProfile(models.Model):
+    """Ставки и параметры смены для расчёта ЗП (привязка к коду сотрудника из Biota)."""
+
+    emp_code = models.CharField(max_length=128, unique=True, db_index=True, verbose_name="Код сотрудника (Biota)")
+    hourly_rate_day = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Ставка дневная, ₽/ч",
+    )
+    hourly_rate_night = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Ставка ночная, ₽/ч",
+    )
+    shift_hours = models.PositiveSmallIntegerField(
+        choices=EMPLOYEE_PAYROLL_SHIFT_HOURS,
+        default=8,
+        verbose_name="Длительность смены, ч",
+    )
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+    updated_by = models.CharField(max_length=200, blank=True, default="", verbose_name="Кем обновлено")
+
+    class Meta:
+        verbose_name = "Параметры ЗП сотрудника"
+        verbose_name_plural = "Параметры ЗП сотрудников"
+
+    def __str__(self):
+        return f"{self.emp_code} (смена {self.shift_hours} ч)"
+
+
+class EmployeePayrollSettlement(models.Model):
+    """Расчёт ЗП за месяц: табель по дням, премии, доли от начисления (поля — выплачиваемый % по линиям)."""
+
+    emp_code = models.CharField(max_length=128, db_index=True, verbose_name="Код сотрудника")
+    year = models.PositiveSmallIntegerField(verbose_name="Год")
+    month = models.PositiveSmallIntegerField(verbose_name="Месяц")
+    tab_by_day = models.JSONField(default=dict, blank=True, verbose_name="Часы по табелю по дням (ISO дата → часы)")
+    bonus_percent = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=0,
+        verbose_name="Премия, % от начисления по табелю",
+    )
+    bonus_rub = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        verbose_name="Премия, ₽",
+    )
+    penalty_quality_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=20,
+        verbose_name="Качество, % от начисления по табелю (макс. 20)",
+    )
+    penalty_result_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=20,
+        verbose_name="Результат, % от начисления по табелю (макс. 20)",
+    )
+    penalty_mode_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=10,
+        verbose_name="Режим, % от начисления по табелю (макс. 10)",
+    )
+    penalty_rub = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        verbose_name="Штраф, ₽",
+    )
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+    updated_by = models.CharField(max_length=200, blank=True, default="", verbose_name="Кем обновлено")
+
+    class Meta:
+        verbose_name = "Расчёт ЗП за месяц"
+        verbose_name_plural = "Расчёты ЗП за месяц"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("emp_code", "year", "month"),
+                name="uniq_employee_payroll_settlement_ym",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.emp_code} {self.year}-{self.month:02d}"
+
+
 class Product(models.Model):
     """Карточка изделия: чертёж, 3D, наладка, программа."""
 

@@ -3,7 +3,9 @@ from django.urls import path
 from . import cabinet_views
 from . import graph_views
 from . import hours_views
+from . import employee_payroll_views
 from . import inventory_views
+from . import payroll_views
 from . import product_views
 from . import skud_views
 from . import views
@@ -21,6 +23,16 @@ urlpatterns = [
     path("skud/stats.xlsx", skud_views.skud_stats_excel, name="skud_stats_excel"),
     path("skud/stats.csv", skud_views.skud_stats_csv, name="skud_stats_csv"),
     path("skud/stats.pdf", skud_views.skud_stats_pdf, name="skud_stats_pdf"),
+    path(
+        "inventory/employees/<str:emp_code>/",
+        employee_payroll_views.employee_payroll_detail_view,
+        name="employee_payroll_detail",
+    ),
+    path(
+        "inventory/payroll/<str:emp_code>/",
+        payroll_views.payroll_settlement_view,
+        name="payroll_settlement",
+    ),
     path("inventory/", inventory_views.inventory_view, name="inventory"),
     path("products/", product_views.products_list_view, name="products_list"),
     path("products/new/", product_views.product_create_view, name="product_create"),

@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  .payroll-settlement-form {
+    margin-top: 12px;
+  }
+  .payroll-settlement-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .payroll-settlement-col-table,
+  .payroll-settlement-col-side {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+  .payroll-table-card.filter-panel,
+  .payroll-side-card.filter-panel {
+    margin: 0;
+    height: fit-content;
+  }
+  .payroll-side-card.filter-panel {
+    width: min(100%, 420px);
+    max-width: 420px;
+  }
+  .payroll-side-card .filter-panel {
+    margin-top: 12px;
+  }
+  .payroll-side-card > h3:first-of-type,
+  .payroll-table-card > h3:first-of-type {
+    margin-top: 0;
+  }
+  @media (max-width: 1000px) {
+    .payroll-settlement-layout {
+      flex-direction: column;
+    }
+  }
+  .payroll-tab-day-input.is-month-locked {
+    opacity: 0.65;
+    pointer-events: none;
+  }
+  .payroll-settlement-col-table .table-wrap.payroll-table-wrap {
+    width: fit-content;
+    max-width: 100%;
+    max-height: none;
+    overflow: visible;
+  }
+  .payroll-day-table.data-grid {
+    width: auto;
+    min-width: 0 !important;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+  .payroll-day-table th,
+  .payroll-day-table td {
+    text-align: center;
+    vertical-align: middle;
+    white-space: normal;
+    padding: 4px 6px;
+  }
+  .payroll-day-table th {
+    font-size: 11px;
+    line-height: 1.25;
+    font-weight: 600;
+  }
+  .payroll-day-table .col-date { width: 7.25rem; }
+  .payroll-day-table .col-dow { width: 2.5rem; }
+  .payroll-day-table .col-graph { width: 3rem; }
+  .payroll-day-table .col-skud { width: 4.25rem; }
+  .payroll-day-table .col-tab { width: 4.75rem; }
+  .payroll-day-table .col-tab input.payroll-tab-day-input {
+    width: 100%;
+    max-width: 4.25rem;
+    margin: 0 auto;
+    display: block;
+    text-align: center;
+  }
+  .payroll-day-table--ro .col-tab { width: 4.25rem; }
+  .payroll-settlement-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    align-items: center;
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .payroll-settlement-nav a {
+    color: #b8c8f5;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .payroll-settlement-nav a:hover {
+    color: #fff;
+    text-decoration: underline;
+  }
+  .payroll-settlement-header-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .payroll-settlement-header-row .payroll-settlement-nav {
+    margin: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .payroll-settlement-header-row .btn-payroll-settings {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+</style>
+
+<div class="filter-panel" style="margin-top:0;">
+  <div class="payroll-settlement-header-row">
+    <nav class="payroll-settlement-nav" aria-label="Навигация по расчёту ЗП">
+      <a href="{% url 'inventory' %}?panel=payroll&year={{ year }}&month={{ month }}">← К списку ЗП</a>
+    </nav>
+    <a class="btn btn-sm btn-payroll-settings" href="{% url 'employee_payroll_detail' employee.emp_code %}">Настройки сотрудника</a>
+  </div>
+  <h2 style="margin-top:0;">{{ employee.label }}</h2>
+  <p class="muted" style="margin-bottom:0;">
+    {{ month_name }} {{ year }} · код {{ employee.emp_code }}
+    {% if employee.department_name %} · {{ employee.department_name }}{% endif %}
+  </p>
+</div>
+
+{% if biota_can_edit %}
+{{ preview_data|json_script:"payroll-preview-data" }}
+<form method="post" class="payroll-settlement-form">
+  {% csrf_token %}
+  <div class="payroll-settlement-layout">
+    <div class="payroll-settlement-col payroll-settlement-col-table">
+      <div class="filter-panel payroll-table-card">
+      <h3 style="margin-top:0;">По дням: табель и СКУД</h3>
+      <div class="table-wrap payroll-table-wrap">
+        <table class="data-grid payroll-day-table">
+          <thead>
+            <tr>
+              <th class="col-date">Дата</th>
+              <th class="col-dow">День</th>
+              <th class="col-graph">График</th>
+              <th class="col-skud">Часы<br>СКУД</th>
+              <th class="col-tab">Табель,<br>ч</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in day_rows %}
+            <tr>
+              <td class="col-date">{{ row.date_iso }}</td>
+              <td class="col-dow">{{ row.weekday }}</td>
+              <td class="col-graph">{{ row.graph }}</td>
+              <td class="col-skud">{{ row.skud_h }}</td>
+              <td class="col-tab">
+                <input type="text" class="payroll-tab-day-input" name="tab_{{ row.date_iso }}" value="{{ row.tab_h }}" inputmode="decimal">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      </div>
+    </div>
+
+    <div class="payroll-settlement-col payroll-settlement-col-side">
+      <div class="filter-panel payroll-side-card">
+      <h3>Часы по табелю за весь месяц</h3>
+      <div class="filter-grid" style="align-items:flex-end;">
+        <label class="field"><span>Всего часов за {{ month_name }} (одной суммой)</span>
+          <input type="text" name="month_tab_total" id="payroll-month-tab-total" inputmode="decimal" placeholder="например 168" value="" autocomplete="off">
+        </label>
+      </div>
+
+      <h3 style="margin-top:18px;">Премии</h3>
+      <div class="filter-grid">
+        <label class="field"><span>Премия, % от начисления по табелю</span>
+          <input type="text" name="bonus_percent" inputmode="decimal" value="{{ settlement.bonus_percent }}" class="payroll-live-field">
+        </label>
+        <label class="field"><span>Премия, ₽ (фикс)</span>
+          <input type="text" name="bonus_rub" inputmode="decimal" value="{{ settlement.bonus_rub }}" class="payroll-live-field">
+        </label>
+      </div>
+
+      <h3 style="margin-top:18px;">Доли от начисления по табелю (качество / результат / режим)</h3>
+      <div class="filter-grid">
+        <label class="field"><span>Качество, % от начисления (0–20)</span>
+          <input type="text" name="penalty_quality_pct" inputmode="decimal" value="{{ settlement.penalty_quality_pct }}" class="payroll-live-field">
+        </label>
+        <label class="field"><span>Результат, % от начисления (0–20)</span>
+          <input type="text" name="penalty_result_pct" inputmode="decimal" value="{{ settlement.penalty_result_pct }}" class="payroll-live-field">
+        </label>
+        <label class="field"><span>Режим, % от начисления (0–10)</span>
+          <input type="text" name="penalty_mode_pct" inputmode="decimal" value="{{ settlement.penalty_mode_pct }}" class="payroll-live-field">
+        </label>
+        <label class="field"><span>Штраф, ₽</span>
+          <input type="text" name="penalty_rub" inputmode="decimal" value="{{ settlement.penalty_rub }}" class="payroll-live-field">
+        </label>
+      </div>
+
+      <div class="filter-panel" style="margin-top:16px;background:rgba(0,0,0,0.15);">
+        <h3 style="margin-top:0;">Итог (в реальном времени)</h3>
+        <ul style="margin:0;padding-left:18px;line-height:1.7;">
+          <li>Начисление по табелю: <strong id="payroll-pl-base">—</strong> ₽</li>
+          <li>По табелю к выплате (50% + три доли %): <strong id="payroll-pl-tab-pay">—</strong> ₽</li>
+          <li>Часы по табелю (сумма): <strong id="payroll-pl-tab-h">—</strong> ч · по СКУД: <strong id="payroll-pl-skud-h">—</strong> ч</li>
+          <li>Ниже максимума по трём строкам (п.п. от начисления): <span id="payroll-pl-pen-pct">—</span> · не выплачено: <strong id="payroll-pl-pen">—</strong> ₽</li>
+          <li>Премия %: <strong id="payroll-pl-bonus-pct">—</strong> ₽ · премия ₽: <strong id="payroll-pl-bonus-rub">—</strong> ₽</li>
+          <li>Штраф ₽: <strong id="payroll-pl-pen-rub">—</strong> ₽</li>
+          <li><strong>К выплате: <span id="payroll-pl-total">—</span> ₽</strong></li>
+        </ul>
+      </div>
+
+      <p class="filter-actions"><button type="submit" class="btn">Сохранить расчёт</button></p>
+      </div>
+    </div>
+  </div>
+</form>
+<script>
+(function () {
+  var dataEl = document.getElementById('payroll-preview-data');
+  var form = document.querySelector('form.payroll-settlement-form');
+  if (!dataEl || !form) return;
+  var PREVIEW = {};
+  try { PREVIEW = JSON.parse(dataEl.textContent); } catch (e) { return; }
+  var rows = PREVIEW.rows || [];
+  var dayRate = parseFloat(PREVIEW.day_rate) || 0;
+  var nightRate = parseFloat(PREVIEW.night_rate) || 0;
+
+  function parseNum(s) {
+    var t = (s == null ? '' : String(s)).trim().replace(',', '.');
+    if (t === '') return null;
+    var n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function round2(x) { return Math.round(x * 100) / 100; }
+
+  function distributeMonthTabHours(monthTotal, rowList) {
+    var skList = rowList.map(function (r) { return Number(r.skud_h) || 0; });
+    var skSum = skList.reduce(function (a, b) { return a + b; }, 0);
+    var days = rowList.map(function (r) { return r.date_iso; });
+    var out = {};
+    var i;
+    if (!(monthTotal > 0)) {
+      for (i = 0; i < days.length; i++) out[days[i]] = 0;
+      return out;
+    }
+    var raw;
+    if (skSum > 0) {
+      raw = skList.map(function (s) { return monthTotal * (s / skSum); });
+    } else {
+      var share = monthTotal / rowList.length;
+      raw = rowList.map(function () { return share; });
+    }
+    var acc = 0;
+    for (i = 0; i < raw.length - 1; i++) {
+      var v = Math.max(0, round2(raw[i]));
+      out[days[i]] = v;
+      acc += v;
+    }
+    out[days[days.length - 1]] = Math.max(0, round2(monthTotal - acc));
+    return out;
+  }
+
+  function getMonthTotalInput() {
+    return form.querySelector('#payroll-month-tab-total');
+  }
+
+  function monthModeActive() {
+    var el = getMonthTotalInput();
+    if (!el) return false;
+    var v = parseNum(el.value);
+    return el.value.trim() !== '' && v !== null && v >= 0;
+  }
+
+  function syncDayInputsLocked() {
+    var locked = monthModeActive();
+    form.querySelectorAll('.payroll-tab-day-input').forEach(function (inp) {
+      if (locked) inp.classList.add('is-month-locked');
+      else inp.classList.remove('is-month-locked');
+    });
+  }
+
+  function tabHoursByDate() {
+    var monthEl = getMonthTotalInput();
+    var monthRaw = monthEl ? monthEl.value : '';
+    var monthVal = parseNum(monthRaw);
+    var byDate = {};
+    var distributed = null;
+    if (monthRaw.trim() !== '' && monthVal !== null && monthVal >= 0) {
+      distributed = distributeMonthTabHours(monthVal, rows);
+    }
+    rows.forEach(function (r) {
+      var iso = r.date_iso;
+      if (distributed) {
+        byDate[iso] = distributed[iso] || 0;
+        return;
+      }
+      var inp = form.querySelector('[name="tab_' + iso + '"]');
+      var raw = inp ? inp.value : '';
+      var t = parseNum(raw);
+      if (raw.trim() === '' || t === null) {
+        byDate[iso] = Number(r.skud_h) || 0;
+      } else {
+        byDate[iso] = round2(t);
+      }
+    });
+    return byDate;
+  }
+
+  function computeTotals() {
+    var byDate = tabHoursByDate();
+    var base = 0;
+    var skudSum = 0;
+    var tabSum = 0;
+    rows.forEach(function (r) {
+      var h = byDate[r.date_iso] || 0;
+      var sk = Number(r.skud_h) || 0;
+      tabSum += h;
+      skudSum += sk;
+      var g = String(r.graph || '').trim().toLowerCase();
+      var rate = g === 'н' ? nightRate : dayRate;
+      base += h * rate;
+    });
+    base = round2(base);
+    skudSum = round2(skudSum);
+    tabSum = round2(tabSum);
+
+    var qMax = 20, rMax = 20, mMax = 10;
+    var pqRaw = parseNum(form.querySelector('[name="penalty_quality_pct"]') && form.querySelector('[name="penalty_quality_pct"]').value) || 0;
+    var prRaw = parseNum(form.querySelector('[name="penalty_result_pct"]') && form.querySelector('[name="penalty_result_pct"]').value) || 0;
+    var pmRaw = parseNum(form.querySelector('[name="penalty_mode_pct"]') && form.querySelector('[name="penalty_mode_pct"]').value) || 0;
+    var qEff = Math.min(qMax, Math.max(0, pqRaw));
+    var rEff = Math.min(rMax, Math.max(0, prRaw));
+    var mEff = Math.min(mMax, Math.max(0, pmRaw));
+    var guaranteed = round2(base * 50 / 100);
+    var qualityPay = round2(base * qEff / 100);
+    var resultPay = round2(base * rEff / 100);
+    var modePay = round2(base * mEff / 100);
+    var tabPayout = round2(guaranteed + qualityPay + resultPay + modePay);
+    var penalties = round2(base - tabPayout);
+    var pctSum = round2((qMax - qEff) + (rMax - rEff) + (mMax - mEff));
+    var bPct = parseNum(form.querySelector('[name="bonus_percent"]') && form.querySelector('[name="bonus_percent"]').value) || 0;
+    if (bPct < 0) bPct = 0;
+    var bonusPctAmt = round2(base * bPct / 100);
+    var bRub = parseNum(form.querySelector('[name="bonus_rub"]') && form.querySelector('[name="bonus_rub"]').value) || 0;
+    if (bRub < 0) bRub = 0;
+    bRub = round2(bRub);
+    var penRub = parseNum(form.querySelector('[name="penalty_rub"]') && form.querySelector('[name="penalty_rub"]').value) || 0;
+    if (penRub < 0) penRub = 0;
+    penRub = round2(penRub);
+    var total = round2(tabPayout + bonusPctAmt + bRub - penRub);
+    if (total < 0) total = 0;
+    return {
+      base_tab: base,
+      tab_payout: tabPayout,
+      total_skud_hours: skudSum,
+      total_tab_hours: tabSum,
+      penalties: penalties,
+      bonus_pct_amount: bonusPctAmt,
+      bonus_rub: bRub,
+      penalty_rub: penRub,
+      total: total,
+      penalty_pct_sum: pctSum
+    };
+  }
+
+  function fmtRu(n) {
+    return (Number(n) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  function renderTotals(t) {
+    var el;
+    el = document.getElementById('payroll-pl-base'); if (el) el.textContent = fmtRu(t.base_tab);
+    el = document.getElementById('payroll-pl-tab-pay'); if (el) el.textContent = fmtRu(t.tab_payout);
+    el = document.getElementById('payroll-pl-tab-h'); if (el) el.textContent = fmtRu(t.total_tab_hours);
+    el = document.getElementById('payroll-pl-skud-h'); if (el) el.textContent = fmtRu(t.total_skud_hours);
+    el = document.getElementById('payroll-pl-pen-pct'); if (el) el.textContent = fmtRu(t.penalty_pct_sum);
+    el = document.getElementById('payroll-pl-pen'); if (el) el.textContent = fmtRu(t.penalties);
+    el = document.getElementById('payroll-pl-bonus-pct'); if (el) el.textContent = fmtRu(t.bonus_pct_amount);
+    el = document.getElementById('payroll-pl-bonus-rub'); if (el) el.textContent = fmtRu(t.bonus_rub);
+    el = document.getElementById('payroll-pl-pen-rub'); if (el) el.textContent = fmtRu(t.penalty_rub);
+    el = document.getElementById('payroll-pl-total'); if (el) el.textContent = fmtRu(t.total);
+  }
+
+  var scheduled = null;
+  function refresh() {
+    syncDayInputsLocked();
+    renderTotals(computeTotals());
+  }
+  function scheduleRefresh() {
+    if (scheduled) clearTimeout(scheduled);
+    scheduled = setTimeout(function () { scheduled = null; refresh(); }, 48);
+  }
+
+  form.addEventListener('input', scheduleRefresh);
+  form.addEventListener('change', scheduleRefresh);
+  var mt = getMonthTotalInput();
+  if (mt) mt.addEventListener('input', scheduleRefresh);
+  refresh();
+})();
+</script>
+{% else %}
+<div class="filter-panel" style="margin-top:12px;">
+  <p class="muted">Роль «исполнитель»: только просмотр.</p>
+  <div class="table-wrap payroll-table-wrap">
+    <table class="data-grid payroll-day-table payroll-day-table--ro">
+      <thead><tr>
+        <th class="col-date">Дата</th>
+        <th class="col-graph">График</th>
+        <th class="col-skud">Часы<br>СКУД</th>
+        <th class="col-tab">Табель,<br>ч</th>
+      </tr></thead>
+      <tbody>
+        {% for row in day_rows %}
+        <tr>
+          <td class="col-date">{{ row.date_iso }}</td>
+          <td class="col-graph">{{ row.graph }}</td>
+          <td class="col-skud">{{ row.skud_h }}</td>
+          <td class="col-tab">{{ row.tab_h }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <ul style="margin:12px 0 0 18px;line-height:1.7;">
+    <li>Начисление по табелю: <strong>{{ totals.base_tab }}</strong> ₽</li>
+    <li>По табелю к выплате: <strong>{{ totals.tab_payout }}</strong> ₽</li>
+    <li>Часы табель / СКУД: <strong>{{ totals.total_tab_hours }}</strong> / <strong>{{ totals.total_skud_hours }}</strong> ч</li>
+    <li>Штраф ₽: <strong>{{ totals.penalty_rub }}</strong> ₽</li>
+    <li>К выплате: <strong>{{ totals.total }}</strong> ₽</li>
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="filter-panel" style="margin-top:0;">
+  <p class="muted" style="margin:0 0 8px 0;"><a href="{% url 'inventory' %}?panel=employees">← К списку сотрудников</a></p>
+  <h2 style="margin-top:0;">{{ employee.label }}</h2>
+  <p class="muted" style="margin-bottom:0;">
+    Код: <strong>{{ employee.emp_code }}</strong>
+    {% if employee.department_name %} · {{ employee.department_name }}{% endif %}
+    {% if employee.position_name %} · {{ employee.position_name }}{% endif %}
+    {% if employee.area_name %} · {{ employee.area_name }}{% endif %}
+  </p>
+</div>
+
+{% if biota_can_edit %}
+<form method="post" class="filter-panel" style="margin-top:12px;">
+  {% csrf_token %}
+  <h3>Ставки и смена</h3>
+  <div class="filter-grid">
+    <label class="field"><span>Дневная ставка, ₽/ч</span>
+      <input type="text" name="hourly_rate_day" inputmode="decimal" placeholder="например 450"
+        value="{% if profile.hourly_rate_day is not None %}{{ profile.hourly_rate_day }}{% endif %}">
+    </label>
+    <label class="field"><span>Ночная ставка, ₽/ч</span>
+      <input type="text" name="hourly_rate_night" inputmode="decimal" placeholder="например 520"
+        value="{% if profile.hourly_rate_night is not None %}{{ profile.hourly_rate_night }}{% endif %}">
+    </label>
+    <label class="field"><span>Длительность смены</span>
+      <select name="shift_hours">
+        {% for h in shift_hours_allowed %}
+        <option value="{{ h }}" {% if profile.shift_hours == h %}selected{% endif %}>{{ h }} ч</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <p class="filter-actions"><button type="submit" class="btn">Сохранить</button></p>
+  {% if profile.updated_at %}
+  <p class="muted" style="margin:10px 0 0 0;font-size:12px;">Последнее сохранение: {{ profile.updated_at|date:"Y-m-d H:i" }}{% if profile.updated_by %} · {{ profile.updated_by }}{% endif %}</p>
+  {% endif %}
+</form>
+{% else %}
+<div class="filter-panel" style="margin-top:12px;">
+  <h3>Ставки и смена</h3>
+  <p class="muted">Роль «исполнитель»: только просмотр.</p>
+  <ul style="margin:8px 0 0 18px;line-height:1.6;">
+    <li>Дневная ставка: {% if profile.hourly_rate_day is not None %}{{ profile.hourly_rate_day }} ₽/ч{% else %}—{% endif %}</li>
+    <li>Ночная ставка: {% if profile.hourly_rate_night is not None %}{{ profile.hourly_rate_night }} ₽/ч{% else %}—{% endif %}</li>
+    <li>Смена: {{ profile.shift_hours }} ч</li>
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

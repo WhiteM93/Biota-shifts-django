@@ -2,7 +2,7 @@
 {% load inventory_tags %}
 
 {% block content %}
-{% if panel != "defects" %}
+{% if panel != "defects" and panel != "payroll" and panel != "employees" %}
 <div class="inventory-top-actions">
   <a class="btn {% if panel == 'stock' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=stock">Склад</a>
   <a class="btn {% if panel == 'history' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=history">История</a>
@@ -14,9 +14,97 @@
   <a class="btn {% if panel == 'purchases' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=purchases">Закупки</a>
 </div>
 {% endif %}
-{% if panel != "defects" %}
+{% if panel != "defects" and panel != "payroll" and panel != "employees" %}
 <h2 style="margin-top:0;">Склад инструмента</h2>
 <p class="muted">Отображается один тип инструмента за раз (по умолчанию: фрезы), только с остатком больше 0.</p>
+{% endif %}
+
+{% if panel == "payroll" %}
+<div class="filter-panel" style="margin-top:0;">
+  <h2 style="margin-top:0;">Расчёт заработной платы</h2>
+  <p class="muted" style="margin-bottom:0;">Сотрудники из отделов, доступных по правам «Расчёт ЗП». Часы СКУД за выбранный месяц — по отметкам (как в «Часы по дням»). Нажмите на сотрудника для расчёта по табелю.</p>
+  <form method="get" class="filter-grid" style="margin-top:12px;align-items:flex-end;">
+    <input type="hidden" name="panel" value="payroll">
+    <label class="field"><span>Год</span>
+      <select name="year">
+        {% for y in payroll_year_options %}
+        <option value="{{ y }}" {% if y == payroll_year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Месяц</span>
+      <select name="month">
+        {% for mm, mname in month_choices_payroll %}
+        <option value="{{ mm }}" {% if mm == payroll_month %}selected{% endif %}>{{ mname }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="filter-actions"><button type="submit" class="btn">Показать</button></div>
+  </form>
+</div>
+<div class="table-wrap">
+  <table class="data-grid inventory-payroll-table">
+    <thead>
+      <tr>
+        <th class="inv-payroll-code">Код</th>
+        <th class="inv-payroll-name">Сотрудник</th>
+        <th class="inv-payroll-dept">Отдел</th>
+        <th class="inv-payroll-hours">Часы СКУД за {{ payroll_month_name }} {{ payroll_year }}</th>
+        <th class="inv-payroll-action"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in payroll_rows %}
+      <tr>
+        <td class="inv-payroll-code">{{ row.emp_code }}</td>
+        <td class="inv-payroll-name"><a href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">{{ row.label }}</a></td>
+        <td class="inv-payroll-dept">{{ row.department_name|default:"—" }}</td>
+        <td class="inv-payroll-hours">{{ row.skud_hours }}</td>
+        <td class="inv-payroll-action"><a class="btn btn-sm" href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">Расчёт</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="muted">Нет сотрудников для расчёта (права по отделам или недоступна БД Biota).</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if panel == "employees" %}
+<div class="filter-panel" style="margin-top:0;">
+  <h2 style="margin-top:0;">Сотрудники</h2>
+  <p class="muted" style="margin-bottom:0;">Список из PostgreSQL Biota (personnel_employee). В таблице только сотрудники отделов, разрешённых для этой учётной записи (видимость цехов/участков и отметки отделов в кабинете).</p>
+</div>
+<div class="table-wrap">
+  <table class="data-grid employees-directory-table">
+    <thead>
+      <tr>
+        <th class="emp-dir-code">Код</th>
+        <th class="emp-dir-label">ФИО (как в справочнике)</th>
+        <th>Фамилия</th>
+        <th>Имя</th>
+        <th>Отдел</th>
+        <th>Должность</th>
+        <th>Участок</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for er in employee_table_rows %}
+      <tr>
+        <td class="emp-dir-code"><a href="{% url 'employee_payroll_detail' er.emp_code %}">{{ er.emp_code }}</a></td>
+        <td class="emp-dir-label"><a href="{% url 'employee_payroll_detail' er.emp_code %}">{{ er.label }}</a></td>
+        <td class="emp-dir-cell">{{ er.last_name|default:"—" }}</td>
+        <td class="emp-dir-cell">{{ er.first_name|default:"—" }}</td>
+        <td class="emp-dir-cell">{{ er.department_name|default:"—" }}</td>
+        <td class="emp-dir-cell">{{ er.position_name|default:"—" }}</td>
+        <td class="emp-dir-cell">{{ er.area_name|default:"—" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="muted">Сотрудники не найдены (нет доступа по отделам, пустая выборка из БД или Biota недоступна).</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endif %}
 
 {% if panel == "stock" %}
@@ -905,6 +993,7 @@
   <h3>Учёт брака сотрудников</h3>
   <form method="post" class="filter-grid">
     {% csrf_token %}
+    <input type="hidden" name="panel" value="defects">
     <input type="hidden" name="action" value="create_defect_record">
     <label class="field"><span>Дата</span><input type="date" name="defect_date" value="{{ today }}" required></label>
     <label class="field"><span>Поиск сотрудника</span>
@@ -1030,6 +1119,7 @@
         {% if biota_can_edit or is_admin_user %}
         <form method="post" id="defect-edit-form-{{ rec.id }}" style="display:none;">
           {% csrf_token %}
+          <input type="hidden" name="panel" value="defects">
           <input type="hidden" name="action" value="update_defect_record">
           <input type="hidden" name="defect_id" value="{{ rec.id }}">
         </form>
@@ -1046,6 +1136,7 @@
           >🔒</button>
           <form method="post" style="margin-top:6px;" onsubmit="return confirm('Удалить эту запись учёта брака?');">
             {% csrf_token %}
+            <input type="hidden" name="panel" value="defects">
             <input type="hidden" name="action" value="delete_defect_record">
             <input type="hidden" name="defect_id" value="{{ rec.id }}">
             <button type="submit" class="btn" style="padding:4px 10px;font-size:12px;">Удалить</button>

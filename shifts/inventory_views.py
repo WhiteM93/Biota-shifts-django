@@ -15,8 +15,15 @@ from django.utils import timezone
 
 from biota_shifts import db as biota_db
 from biota_shifts.auth import _is_admin, employees_df_for_nav, nav_permissions_for_user
+from biota_shifts.constants import MONTH_NAMES_RU
+from biota_shifts.emp_codes import normalize_emp_code
 from biota_shifts.schedule import employee_label_row
-from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
+from .auth_utils import (
+    biota_login_required,
+    biota_user,
+    inventory_route_nav_access_required,
+    write_permission_required,
+)
 from .models import (
     CENTER_DRILL_ANGLES,
     COUNTERSINK_ANGLES,
@@ -119,25 +126,35 @@ def _build_drill_name(diameter_mm, overall_length_mm, cutting_length_mm, angle_d
 
 
 @biota_login_required
-@nav_permission_required("inventory")
+@inventory_route_nav_access_required
 @write_permission_required
 @require_http_methods(["GET", "POST"])
 def inventory_view(request):
     action = request.POST.get("action") if request.method == "POST" else ""
     panel = (request.GET.get("panel") or "stock").strip()
-    if panel not in {"stock", "history", "issue", "arrival", "issue_outcome", "purchases", "defects"}:
+    if panel not in {"stock", "history", "issue", "arrival", "issue_outcome", "purchases", "defects", "payroll", "employees"}:
         panel = "stock"
 
     username = biota_user(request) or "Неизвестный пользователь"
     is_admin_user = _is_admin(username)
-    can_defects = nav_permissions_for_user(username).get("defects", True)
+    perms = nav_permissions_for_user(username)
+    can_defects = perms.get("defects", True)
+    can_payroll = perms.get("payroll", True)
+    can_employees = perms.get("employees", True)
     if is_admin_user:
-        can_defects = True
+        can_defects = can_payroll = can_employees = True
     if panel == "defects" and not can_defects:
         messages.warning(request, "У вас нет доступа к разделу «Учёт брака».")
         return redirect(reverse("inventory"))
+    if panel == "payroll" and not can_payroll:
+        messages.warning(request, "У вас нет доступа к разделу «Расчёт ЗП».")
+        return redirect(reverse("inventory"))
+    if panel == "employees" and not can_employees:
+        messages.warning(request, "У вас нет доступа к разделу «Сотрудники».")
+        return redirect(reverse("inventory"))
     employee_options = []
     employee_department_map = {}
+    employee_table_rows: list[dict] = []
     if panel == "defects" or action in {"create_defect_record", "update_defect_record"}:
         try:
             cfg = biota_db.db_config()
@@ -173,6 +190,31 @@ def inventory_view(request):
         except Exception:
             employee_options = []
             employee_department_map = {}
+
+    if panel == "employees":
+        try:
+            cfg = biota_db.db_config()
+            emp_df = employees_df_for_nav(username, "employees", biota_db.load_employees(cfg))
+            if not emp_df.empty:
+                rows: list[dict] = []
+                for _, row in emp_df.iterrows():
+                    emp_code = str(row.get("emp_code") or "").strip()
+                    if not emp_code:
+                        continue
+                    rows.append(
+                        {
+                            "emp_code": emp_code,
+                            "label": (employee_label_row(row) or "").strip() or "—",
+                            "last_name": str(row.get("last_name") or "").strip(),
+                            "first_name": str(row.get("first_name") or "").strip(),
+                            "department_name": str(row.get("department_name") or "").strip(),
+                            "position_name": str(row.get("position_name") or "").strip(),
+                            "area_name": str(row.get("area_name") or "").strip(),
+                        }
+                    )
+                employee_table_rows = sorted(rows, key=lambda r: (r["label"].lower(), r["emp_code"]))
+        except Exception:
+            employee_table_rows = []
 
     if action == "add_end_mill":
         diameter_mm = _to_decimal(request.POST.get("diameter_mm"), Decimal("0"))
@@ -1341,6 +1383,34 @@ def inventory_view(request):
         }
     )
 
+    payroll_rows: list[dict] = []
+    payroll_year = date.today().year
+    payroll_month = date.today().month
+    payroll_month_name = MONTH_NAMES_RU[payroll_month]
+    payroll_year_options: list[int] = []
+    if panel == "payroll":
+        from .payroll_helpers import build_payroll_employee_rows, parse_payroll_year_month
+
+        payroll_year, payroll_month = parse_payroll_year_month(request)
+        payroll_month_name = MONTH_NAMES_RU[payroll_month]
+        pay_df, skud_totals, payroll_year_options = build_payroll_employee_rows(username, payroll_year, payroll_month)
+        if pay_df is not None and not getattr(pay_df, "empty", True):
+            for _, r in pay_df.iterrows():
+                ec = normalize_emp_code(str(r.get("emp_code") or ""))
+                if not ec:
+                    continue
+                payroll_rows.append(
+                    {
+                        "emp_code": ec,
+                        "label": employee_label_row(r),
+                        "department_name": str(r.get("department_name") or "").strip(),
+                        "skud_hours": round(float(skud_totals.get(ec, 0.0)), 2),
+                    }
+                )
+        if not payroll_year_options:
+            ny = date.today().year
+            payroll_year_options = [ny - 1, ny, ny + 1]
+
     ctx = {
         "tool_items": qs.select_related("end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec", "drill_spec"),
         "movements": StockMovement.objects.select_related("tool", "tool__end_mill_spec", "tool__tap_spec", "tool__center_drill_spec", "tool__countersink_spec", "tool__drill_spec")[:50],
@@ -1445,5 +1515,12 @@ def inventory_view(request):
             "department": defect_department,
         },
         "defect_department_options": defect_department_options,
+        "employee_table_rows": employee_table_rows,
+        "payroll_rows": payroll_rows,
+        "payroll_year": payroll_year,
+        "payroll_month": payroll_month,
+        "payroll_month_name": payroll_month_name,
+        "payroll_year_options": payroll_year_options,
+        "month_choices_payroll": [(mm, MONTH_NAMES_RU[mm]) for mm in range(1, 13)],
     }
     return render(request, "shifts/inventory.html", ctx)
