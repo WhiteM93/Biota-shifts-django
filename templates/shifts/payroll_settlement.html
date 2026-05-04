@@ -3,7 +3,7 @@
 {% block content %}
 <style>
   .payroll-settlement-form {
-    margin-top: 12px;
+    margin-top: 0;
   }
   .payroll-settlement-layout {
     display: grid;
@@ -14,14 +14,15 @@
   }
   .payroll-settlement-editor-outer {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 430px);
     gap: 16px;
-    align-items: start;
+    align-items: stretch;
     width: 100%;
     box-sizing: border-box;
   }
   .payroll-settlement-layout--editor {
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+    align-items: stretch;
   }
   .payroll-settlement-layout--readonly {
     grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
@@ -42,11 +43,18 @@
   .payroll-settlement-col-defect {
     min-width: 0;
   }
+  .payroll-settlement-col-table,
+  .payroll-settlement-col-side {
+    display: flex;
+  }
+  .payroll-settlement-col-defect {
+    display: flex;
+  }
   .payroll-table-card.filter-panel,
   .payroll-side-card.filter-panel,
   .payroll-defect-card.filter-panel {
     margin: 0;
-    height: fit-content;
+    height: 100%;
     width: 100%;
     max-width: 100%;
     min-width: 0;
@@ -54,6 +62,21 @@
   }
   .payroll-side-card.filter-panel {
     max-width: 420px;
+  }
+  .payroll-side-card {
+    text-align: center;
+  }
+  .payroll-side-card .field {
+    align-items: center;
+    text-align: center;
+  }
+  .payroll-side-card .field input,
+  .payroll-side-card .field select {
+    text-align: center;
+  }
+  .payroll-side-card ul {
+    text-align: left;
+    display: inline-block;
   }
   @media (max-width: 1180px) {
     .payroll-side-card.filter-panel {
@@ -235,10 +258,10 @@
     align-items: center;
     margin: 0;
   }
-  .payroll-mark-status {
-    margin: 0;
-    flex: 1 1 auto;
-    min-width: 200px;
+  .payroll-mark-buttons .payroll-mark-btn-on {
+    background: #d6b20a;
+    border-color: #d6b20a;
+    color: #1a1300;
   }
   .payroll-defect-adj-form {
     border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -288,18 +311,14 @@
         {% csrf_token %}
         <input type="hidden" name="mark_year" value="{{ year }}">
         <input type="hidden" name="mark_month" value="{{ month }}">
-        <button type="submit" name="payroll_mark_action" value="toggle_advance" class="btn btn-sm {% if payroll_month_status and payroll_month_status.advance_closed %}btn-ghost{% endif %}">
+        <button type="submit" name="payroll_mark_action" value="toggle_advance" class="btn btn-sm {% if payroll_month_status and payroll_month_status.advance_closed %}payroll-mark-btn-on{% endif %}">
           {% if payroll_month_status and payroll_month_status.advance_closed %}Снять «аванс учтён»{% else %}Аванс учтён{% endif %}
         </button>
-        <button type="submit" name="payroll_mark_action" value="toggle_payroll" class="btn btn-sm {% if payroll_month_status and payroll_month_status.payroll_closed %}btn-ghost{% endif %}">
+        <button type="submit" name="payroll_mark_action" value="toggle_payroll" class="btn btn-sm {% if payroll_month_status and payroll_month_status.payroll_closed %}payroll-mark-btn-on{% endif %}">
           {% if payroll_month_status and payroll_month_status.payroll_closed %}Снять «ЗП закрыта»{% else %}Расчёт ЗП завершён{% endif %}
         </button>
       </form>
       {% endif %}
-      <p class="payroll-mark-status muted">
-        Аванс: {% if payroll_month_status and payroll_month_status.advance_closed %}<strong>учтён</strong>{% else %}не отмечен{% endif %}
-        · ЗП: {% if payroll_month_status and payroll_month_status.payroll_closed %}<strong>закрыта</strong>{% else %}не закрыта{% endif %}
-      </p>
     </div>
   </div>
 </div>
@@ -396,10 +415,10 @@
               <li>По СКУД: <strong id="payroll-pl-skud-h">—</strong> ч</li>
             </ul>
           </li>
-          <li>Ниже максимума по трём строкам (п.п. от начисления): <span id="payroll-pl-pen-pct">—</span> · не выплачено: <strong id="payroll-pl-pen">—</strong> ₽</li>
           <li>Премия %: <strong id="payroll-pl-bonus-pct">—</strong> ₽ · премия ₽: <strong id="payroll-pl-bonus-rub">—</strong> ₽</li>
-          <li>Штраф: <strong id="payroll-pl-pen-rub">—</strong> ₽</li>
+          <li>Штраф: <strong id="payroll-pl-pen-total">—</strong> ₽</li>
           <li><strong>К выплате по расчёту: <span id="payroll-pl-total">—</span> ₽</strong></li>
+          <li class="muted" style="font-size:12px;">К выплате по СКУД: <strong id="payroll-pl-total-skud">—</strong> ₽</li>
         </ul>
       </div>
 
@@ -593,6 +612,37 @@
     };
   }
 
+  function computeTotalsSkud() {
+    var base = 0;
+    rows.forEach(function (r) {
+      var sk = Number(r.skud_h) || 0;
+      var g = String(r.graph || '').trim().toLowerCase();
+      var rate = g === 'н' ? nightRate : dayRate;
+      base += sk * rate;
+    });
+    base = round2(base);
+    var qMax = 20, rMax = 20, mMax = 10;
+    var pqRaw = parseNum(form.querySelector('[name="penalty_quality_pct"]') && form.querySelector('[name="penalty_quality_pct"]').value) || 0;
+    var prRaw = parseNum(form.querySelector('[name="penalty_result_pct"]') && form.querySelector('[name="penalty_result_pct"]').value) || 0;
+    var pmRaw = parseNum(form.querySelector('[name="penalty_mode_pct"]') && form.querySelector('[name="penalty_mode_pct"]').value) || 0;
+    var qEff = Math.min(qMax, Math.max(0, pqRaw));
+    var rEff = Math.min(rMax, Math.max(0, prRaw));
+    var mEff = Math.min(mMax, Math.max(0, pmRaw));
+    var tabPayout = round2(base * 0.5 + base * qEff / 100 + base * rEff / 100 + base * mEff / 100);
+    var bPct = parseNum(form.querySelector('[name="bonus_percent"]') && form.querySelector('[name="bonus_percent"]').value) || 0;
+    if (bPct < 0) bPct = 0;
+    var bonusPctAmt = round2(base * bPct / 100);
+    var bRub = parseNum(form.querySelector('[name="bonus_rub"]') && form.querySelector('[name="bonus_rub"]').value) || 0;
+    if (bRub < 0) bRub = 0;
+    bRub = round2(bRub);
+    var penRub = parseNum(form.querySelector('[name="penalty_rub"]') && form.querySelector('[name="penalty_rub"]').value) || 0;
+    if (penRub < 0) penRub = 0;
+    penRub = round2(penRub);
+    var total = round2(tabPayout + bonusPctAmt + bRub - penRub);
+    if (total < 0) total = 0;
+    return total;
+  }
+
   function computeTotals() {
     return computeTotalsCore({});
   }
@@ -636,12 +686,11 @@
     el = document.getElementById('payroll-pl-tab-pay'); if (el) el.textContent = fmtRu(t.tab_payout);
     el = document.getElementById('payroll-pl-tab-h'); if (el) el.textContent = fmtRu(t.total_tab_hours);
     el = document.getElementById('payroll-pl-skud-h'); if (el) el.textContent = fmtRu(t.total_skud_hours);
-    el = document.getElementById('payroll-pl-pen-pct'); if (el) el.textContent = fmtRu(t.penalty_pct_sum);
-    el = document.getElementById('payroll-pl-pen'); if (el) el.textContent = fmtRu(t.penalties);
     el = document.getElementById('payroll-pl-bonus-pct'); if (el) el.textContent = fmtRu(t.bonus_pct_amount);
     el = document.getElementById('payroll-pl-bonus-rub'); if (el) el.textContent = fmtRu(t.bonus_rub);
-    el = document.getElementById('payroll-pl-pen-rub'); if (el) el.textContent = fmtRu(t.penalty_rub);
+    el = document.getElementById('payroll-pl-pen-total'); if (el) el.textContent = fmtRu(round2((Number(t.penalties) || 0) + (Number(t.penalty_rub) || 0)));
     el = document.getElementById('payroll-pl-total'); if (el) el.textContent = fmtRu(t.total);
+    el = document.getElementById('payroll-pl-total-skud'); if (el) el.textContent = fmtRu(computeTotalsSkud());
     renderAdvanceBalance(t);
   }
 

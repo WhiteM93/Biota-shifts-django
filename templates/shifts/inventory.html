@@ -1003,13 +1003,32 @@
     <label class="field"><span>Поиск сотрудника</span>
       <input type="text" class="js-tool-search" data-target-select="defect-employee-select" placeholder="Введите ФИО">
     </label>
-    <label class="field"><span>Сотрудник / Ответственный</span>
+    <label class="field"><span>Сотрудник</span>
       <select id="defect-employee-select" name="employee_name" required>
         <option value="">Выбрать...</option>
         {% for employee in employee_options %}
         <option value="{{ employee }}">{{ employee }}</option>
         {% endfor %}
       </select>
+    </label>
+    <label class="field"><span>Ответственные (можно несколько)</span>
+      <div class="defect-responsible-picker">
+        <input
+          type="text"
+          class="defect-responsible-search js-defect-responsible-search"
+          data-target-list="defect-responsible-list"
+          placeholder="Поиск по ФИО"
+          autocomplete="off"
+        >
+        <div id="defect-responsible-list" class="defect-responsible-list" role="group" aria-label="Ответственные сотрудники">
+          {% for employee in employee_options %}
+          <label class="defect-responsible-option">
+            <input type="checkbox" name="responsible_names" value="{{ employee }}">
+            <span>{{ employee }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
     </label>
     <label class="field"><span>Кол-во брака</span><input type="number" name="defect_quantity" min="0" value="0"></label>
     <label class="field"><span>Неисправно</span><input type="number" name="bad_quantity" min="0" value="0"></label>
@@ -1737,6 +1756,53 @@
     padding: 6px 8px;
     box-sizing: border-box;
   }
+  .defect-responsible-picker {
+    width: 100%;
+    border: 1px solid #33415f;
+    border-radius: 10px;
+    background: #101520;
+    padding: 8px;
+    box-sizing: border-box;
+  }
+  .defect-responsible-search {
+    width: 100%;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    border: 1px solid #33415f;
+    background: #141b29;
+    color: #eaf0ff;
+    padding: 7px 9px;
+    box-sizing: border-box;
+  }
+  .defect-responsible-list {
+    max-height: 168px;
+    overflow-y: auto;
+    border: 1px solid #2f3b57;
+    border-radius: 8px;
+    background: #141b29;
+    padding: 6px;
+    display: grid;
+    gap: 4px;
+  }
+  .defect-responsible-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #d8e3ff;
+  }
+  .defect-responsible-option:hover {
+    background: rgba(124, 140, 255, 0.14);
+  }
+  .defect-responsible-option input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    flex: 0 0 auto;
+  }
   .defect-cell-input[readonly],
   .defect-cell-input:disabled {
     background: #192235;
@@ -1888,6 +1954,31 @@
         btn.title = editing ? "Выключить редактирование строки" : "Включить редактирование строки";
         btn.setAttribute("aria-label", btn.title);
       });
+    });
+  })();
+  (function () {
+    var searchInputs = document.querySelectorAll(".js-defect-responsible-search");
+    if (!searchInputs.length) return;
+
+    function normalizeText(s) {
+      return String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+    }
+
+    function applyFilter(input) {
+      var listId = input.getAttribute("data-target-list");
+      var list = listId ? document.getElementById(listId) : null;
+      if (!list) return;
+      var q = normalizeText(input.value);
+      var rows = list.querySelectorAll(".defect-responsible-option");
+      rows.forEach(function (row) {
+        var txt = normalizeText(row.textContent);
+        row.style.display = !q || txt.indexOf(q) !== -1 ? "" : "none";
+      });
+    }
+
+    searchInputs.forEach(function (inp) {
+      inp.addEventListener("input", function () { applyFilter(inp); });
+      applyFilter(inp);
     });
   })();
   (function () {

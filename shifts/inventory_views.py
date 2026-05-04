@@ -39,6 +39,7 @@ from .models import (
     ToolItem,
     PurchaseRequest,
     EmployeeDefectRecord,
+    EmployeePayrollMonthStatus,
     TAP_HOLE_TYPES,
     TAP_TOOL_TYPES,
     THREAD_STANDARDS,
@@ -1013,10 +1014,13 @@ def inventory_view(request):
             return redirect(reverse("inventory"))
         defect_date_raw = (request.POST.get("defect_date") or "").strip()
         employee_name = (request.POST.get("employee_name") or "").strip()
-        responsible_name = employee_name
+        responsible_selected = [str(x).strip() for x in request.POST.getlist("responsible_names") if str(x).strip()]
+        responsible_selected = list(dict.fromkeys(responsible_selected))
+        responsible_name = ", ".join(responsible_selected) if responsible_selected else employee_name
         department_name = employee_department_map.get(employee_name, "")
         defect_quantity = _to_int(request.POST.get("defect_quantity"), 0)
         bad_quantity = _to_int(request.POST.get("bad_quantity"), 0)
+        potential_defect_quantity = _to_int(request.POST.get("potential_defect_quantity"), 0)
         product_name = (request.POST.get("product_name") or "").strip()
         defect_reason = (request.POST.get("defect_reason") or "").strip()
         try:
@@ -1033,6 +1037,11 @@ def inventory_view(request):
         if employee_name not in employee_department_map:
             messages.error(request, "Не удалось определить отдел сотрудника — обновите страницу и выберите сотрудника заново.")
             return redirect(f"{request.path}?panel=defects")
+        if responsible_selected:
+            bad_resp = [nm for nm in responsible_selected if employee_options and nm not in employee_options]
+            if bad_resp:
+                messages.error(request, "Выберите ответственных только из списка сотрудников.")
+                return redirect(f"{request.path}?panel=defects")
         if defect_quantity < 0:
             messages.error(request, "Количество брака не может быть отрицательным.")
             return redirect(f"{request.path}?panel=defects")
@@ -1041,6 +1050,9 @@ def inventory_view(request):
             return redirect(f"{request.path}?panel=defects")
         if bad_quantity > defect_quantity:
             messages.error(request, "Неисправно не должно превышать кол-во брака.")
+            return redirect(f"{request.path}?panel=defects")
+        if potential_defect_quantity < 0:
+            messages.error(request, "Потенциальный брак не может быть отрицательным.")
             return redirect(f"{request.path}?panel=defects")
         good_quantity = defect_quantity - bad_quantity
         EmployeeDefectRecord.objects.create(
@@ -1051,6 +1063,7 @@ def inventory_view(request):
             defect_quantity=defect_quantity,
             good_quantity=good_quantity,
             bad_quantity=bad_quantity,
+            potential_defect_quantity=potential_defect_quantity,
             product_name=product_name,
             defect_reason=defect_reason,
         )
@@ -1084,6 +1097,7 @@ def inventory_view(request):
         employee_name = (request.POST.get("employee_name") or "").strip()
         defect_quantity = _to_int(request.POST.get("defect_quantity"), 0)
         bad_quantity = _to_int(request.POST.get("bad_quantity"), 0)
+        potential_defect_quantity = _to_int(request.POST.get("potential_defect_quantity"), 0)
         product_name = (request.POST.get("product_name") or "").strip()
         defect_reason = (request.POST.get("defect_reason") or "").strip()
         try:
@@ -1109,15 +1123,20 @@ def inventory_view(request):
         if bad_quantity > defect_quantity:
             messages.error(request, "Неисправно не должно превышать кол-во брака.")
             return redirect(f"{request.path}?panel=defects")
+        if potential_defect_quantity < 0:
+            messages.error(request, "Потенциальный брак не может быть отрицательным.")
+            return redirect(f"{request.path}?panel=defects")
         good_quantity = defect_quantity - bad_quantity
 
         rec.defect_date = defect_date
         rec.employee_name = employee_name
-        rec.responsible_name = employee_name
+        # В таблице редактируется только основной сотрудник; список ответственных не перезаписываем.
+        rec.responsible_name = rec.responsible_name or employee_name
         rec.department_name = employee_department_map.get(employee_name, "")
         rec.defect_quantity = defect_quantity
         rec.good_quantity = good_quantity
         rec.bad_quantity = bad_quantity
+        rec.potential_defect_quantity = potential_defect_quantity
         rec.product_name = product_name
         rec.defect_reason = defect_reason
         rec.save(
@@ -1129,6 +1148,7 @@ def inventory_view(request):
                 "defect_quantity",
                 "good_quantity",
                 "bad_quantity",
+                "potential_defect_quantity",
                 "product_name",
                 "defect_reason",
             ]
@@ -1407,6 +1427,17 @@ def inventory_view(request):
                         "skud_hours": round(float(skud_totals.get(ec, 0.0)), 2),
                     }
                 )
+            codes = [row["emp_code"] for row in payroll_rows]
+            status_by_code = {
+                s.emp_code: s
+                for s in EmployeePayrollMonthStatus.objects.filter(
+                    year=payroll_year, month=payroll_month, emp_code__in=codes
+                )
+            }
+            for row in payroll_rows:
+                st = status_by_code.get(row["emp_code"])
+                row["payroll_advance_ok"] = bool(st and st.advance_closed)
+                row["payroll_month_ok"] = bool(st and st.payroll_closed)
         if not payroll_year_options:
             ny = date.today().year
             payroll_year_options = [ny - 1, ny, ny + 1]
