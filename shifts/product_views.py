@@ -1,5 +1,6 @@
 """Карточки изделий."""
 import json
+import os
 import uuid
 import re
 
@@ -14,7 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
-from .models import Product, ProductSetup, ProductSetupPhoto, ProductSetupToolRow
+from .models import Product, ProductSetup, ProductSetupPhoto, ProductSetupProgramFile, ProductSetupToolRow
 
 # Ограничение вывода ПП в карточке (страница)
 MAX_PROGRAM_DISPLAY_BYTES = 800_000
@@ -67,26 +68,71 @@ def _read_program_file_for_display(program_file) -> tuple[str | None, bool]:
     return raw.decode("utf-8", errors="replace"), False
 
 
-def _save_setup_program_overwrite(setup: ProductSetup, uploaded_file) -> None:
-    """Сохраняет программу установки с перезаписью одинакового имени файла."""
+def _setup_program_files_qs(setup: ProductSetup):
+    return setup.program_files.order_by("sort_order", "id")
+
+
+def _setup_primary_program_field(setup: ProductSetup):
+    """Первый файл программы (для просмотра G/M и ссылки «скачать»)."""
+    row = _setup_program_files_qs(setup).first()
+    if row and row.file:
+        return row.file
+    if setup.program_file:
+        return setup.program_file
+    return None
+
+
+def _append_setup_program_file(setup: ProductSetup, uploaded_file) -> ProductSetupProgramFile:
+    """Добавляет ещё один файл программы к установке."""
     if not uploaded_file:
-        return
-    filename = (getattr(uploaded_file, "name", "") or "").replace("\\", "/").rsplit("/", 1)[-1]
-    if not filename:
-        filename = "program.nc"
-    target_rel = f"products/programs/{filename}"
-    storage = setup.program_file.storage
-    if storage.exists(target_rel):
-        try:
-            storage.delete(target_rel)
-        except Exception:
-            pass
+        raise ValueError("empty file")
+    last = _setup_program_files_qs(setup).aggregate(m=Max("sort_order"))["m"]
+    n = (last if last is not None else -1) + 1
+    base = (getattr(uploaded_file, "name", "") or "").replace("\\", "/").rsplit("/", 1)[-1]
+    if not base:
+        base = f"program_{uuid.uuid4().hex[:10]}.nc"
+    row = ProductSetupProgramFile(setup=setup, sort_order=n)
+    row.save()
+    row.file.save(base, uploaded_file, save=True)
+    setup.save(update_fields=["updated_at"])
+    return row
+
+
+def _clear_setup_program_files(setup: ProductSetup) -> None:
+    for row in list(_setup_program_files_qs(setup)):
+        if row.file:
+            try:
+                row.file.delete(save=False)
+            except Exception:
+                pass
+        row.delete()
     if setup.program_file:
         try:
             setup.program_file.delete(save=False)
         except Exception:
             pass
-    setup.program_file.save(filename, uploaded_file, save=False)
+        setup.program_file = ""
+        setup.save(update_fields=["program_file", "updated_at"])
+
+
+def _program_files_payload(setup: ProductSetup) -> dict:
+    prim = _setup_primary_program_field(setup)
+    files_out = []
+    for row in _setup_program_files_qs(setup):
+        if not row.file:
+            continue
+        files_out.append(
+            {
+                "id": row.pk,
+                "url": row.file.url,
+                "name": row.display_name,
+            }
+        )
+    return {
+        "program_files": files_out,
+        "program_url": prim.url if prim else "",
+        "program_filename": os.path.basename(prim.name) if prim else "",
+    }
 
 
 def _apply_setup_photo_changes(request, product: Product) -> None:
@@ -189,7 +235,6 @@ class ProductSetupForm(forms.ModelForm):
             "material",
             "size",
             "setup_notes",
-            "program_file",
             "preview_stl",
         )
         widgets = {
@@ -453,11 +498,20 @@ def products_list_view(request):
 @require_http_methods(["GET"])
 def product_setup_pdf_export_view(request, pk: int, setup_pk: int, mode: str):
     product = get_object_or_404(Product, pk=pk)
-    setup = get_object_or_404(ProductSetup.objects.prefetch_related("photos", "tools"), pk=setup_pk, product=product)
+    setup = get_object_or_404(
+        ProductSetup.objects.prefetch_related("photos", "tools", "program_files"),
+        pk=setup_pk,
+        product=product,
+    )
     export_mode = (mode or "").strip().lower()
     if export_mode not in {"specs", "photos"}:
         export_mode = "specs"
     tool_rows = _build_display_tool_rows(list(setup.tools.all()))
+    pfs = list(setup.program_files.order_by("sort_order", "id"))
+    if pfs:
+        setup_program_line = ", ".join(p.display_name for p in pfs if p.display_name)
+    else:
+        setup_program_line = setup.program_filename or "—"
     photos = list(setup.photos.all())
     photo_slots: list[ProductSetupPhoto | None] = photos[:15]
     if len(photo_slots) < 15:
@@ -472,6 +526,7 @@ def product_setup_pdf_export_view(request, pk: int, setup_pk: int, mode: str):
             "photos": photos,
             "photo_slots": photo_slots,
             "mode": export_mode,
+            "setup_program_line": setup_program_line,
             "username": biota_user(request),
         },
     )
@@ -756,15 +811,35 @@ def product_detail_view(request, pk: int):
             program_file = request.FILES.get("program_file")
             if not program_file:
                 return JsonResponse({"ok": False, "error": "Выберите файл программы."}, status=400)
-            _save_setup_program_overwrite(setup, program_file)
-            setup.save(update_fields=["program_file", "updated_at"])
-            return JsonResponse(
-                {
-                    "ok": True,
-                    "program_url": setup.program_file.url if setup.program_file else "",
-                    "program_filename": setup.program_filename or "",
-                }
-            )
+            try:
+                _append_setup_program_file(setup, program_file)
+            except Exception:
+                return JsonResponse({"ok": False, "error": "Не удалось сохранить файл программы."}, status=400)
+            out = _program_files_payload(setup)
+            out["ok"] = True
+            return JsonResponse(out)
+
+        if action == "inline_delete_setup_program_file":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            fid_raw = (request.POST.get("program_file_id") or "").strip()
+            fid = int(fid_raw) if fid_raw.isdigit() else 0
+            row = ProductSetupProgramFile.objects.filter(pk=fid, setup=setup).first()
+            if not row:
+                return JsonResponse({"ok": False, "error": "Файл не найден."}, status=404)
+            if row.file:
+                try:
+                    row.file.delete(save=False)
+                except Exception:
+                    pass
+            row.delete()
+            setup.save(update_fields=["updated_at"])
+            out = _program_files_payload(setup)
+            out["ok"] = True
+            return JsonResponse(out)
 
         if action == "inline_update_setup":
             setup_id_raw = (request.POST.get("setup_id") or "").strip()
@@ -773,6 +848,7 @@ def product_detail_view(request, pk: int):
             if not setup:
                 return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
             editable_fields = (
+                "name",
                 "binding_x",
                 "binding_y",
                 "binding_z",
@@ -824,6 +900,7 @@ def product_detail_view(request, pk: int):
                     "ok": True,
                     "setup": {
                         "id": setup.pk,
+                        "name": setup.name or "",
                         "binding_x": setup.binding_x or "—",
                         "binding_y": setup.binding_y or "—",
                         "binding_z": setup.binding_z or "—",
@@ -837,10 +914,15 @@ def product_detail_view(request, pk: int):
             )
         return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
     setup_photos = list(product.setup_photos.filter(setup__isnull=True))
-    setups = list(product.setups.prefetch_related("tools"))
+    setups = list(product.setups.prefetch_related("tools", "program_files"))
     for setup in setups:
         setup.tab_slug = f"setup-{setup.pk}"
-        setup.program_text, setup.program_too_large = _read_program_file_for_display(setup.program_file)
+        prim_pf = _setup_primary_program_field(setup)
+        setup.program_text, setup.program_too_large = _read_program_file_for_display(prim_pf)
+        setup.program_file_list = list(_setup_program_files_qs(setup))
+        setup.has_any_program = bool(setup.program_file_list) or bool(setup.program_file)
+        setup.primary_program_url = prim_pf.url if prim_pf else ""
+        setup.primary_program_filename = os.path.basename(prim_pf.name) if prim_pf else ""
         setup.tool_rows = list(setup.tools.all())
         setup.tool_display_rows = _build_display_tool_rows(setup.tool_rows)
     has_setup_preview_stl = any(bool(getattr(s, "preview_stl", None)) for s in setups)
@@ -905,12 +987,12 @@ def product_setup_create_view(request, pk: int):
             )
             if tools_formset.is_valid():
                 uploaded_program = request.FILES.get("program_file")
-                if uploaded_program:
-                    setup.program_file = ""
                 setup.save()
                 if uploaded_program:
-                    _save_setup_program_overwrite(setup, uploaded_program)
-                    setup.save(update_fields=["program_file", "updated_at"])
+                    try:
+                        _append_setup_program_file(setup, uploaded_program)
+                    except Exception:
+                        pass
                 # Сначала удаляем (на всякий случай), затем пересоздаём строки.
                 ProductSetupToolRow.objects.filter(setup=setup).delete()
                 for idx, tform in enumerate(tools_formset.forms):
@@ -979,7 +1061,11 @@ def product_setup_create_view(request, pk: int):
 @require_http_methods(["GET", "POST"])
 def product_setup_edit_view(request, pk: int, setup_pk: int):
     product = get_object_or_404(Product, pk=pk)
-    setup = get_object_or_404(ProductSetup, pk=setup_pk, product=product)
+    setup = get_object_or_404(
+        ProductSetup.objects.prefetch_related("program_files", "photos", "tools"),
+        pk=setup_pk,
+        product=product,
+    )
     if request.method == "POST":
         form = ProductSetupForm(request.POST, request.FILES, instance=setup)
         tools_formset = ProductSetupToolRowFormSet(
@@ -992,8 +1078,10 @@ def product_setup_edit_view(request, pk: int, setup_pk: int):
             uploaded_program = request.FILES.get("program_file")
             saved_setup: ProductSetup = form.save()
             if uploaded_program:
-                _save_setup_program_overwrite(saved_setup, uploaded_program)
-                saved_setup.save(update_fields=["program_file", "updated_at"])
+                try:
+                    _append_setup_program_file(saved_setup, uploaded_program)
+                except Exception:
+                    pass
             ProductSetupToolRow.objects.filter(setup=saved_setup).delete()
             for idx, tform in enumerate(tools_formset.forms):
                 cd = tform.cleaned_data
@@ -1023,10 +1111,21 @@ def product_setup_edit_view(request, pk: int, setup_pk: int):
                 )
             remove_program_file = request.POST.get("remove_program_file") == "1"
             if remove_program_file and not request.FILES.get("program_file"):
-                if saved_setup.program_file:
-                    saved_setup.program_file.delete(save=False)
-                saved_setup.program_file = ""
-                saved_setup.save(update_fields=["program_file"])
+                _clear_setup_program_files(saved_setup)
+            elif request.POST.getlist("remove_setup_program_file"):
+                for rid in request.POST.getlist("remove_setup_program_file"):
+                    if not rid.isdigit():
+                        continue
+                    row = ProductSetupProgramFile.objects.filter(pk=int(rid), setup=saved_setup).first()
+                    if not row:
+                        continue
+                    if row.file:
+                        try:
+                            row.file.delete(save=False)
+                        except Exception:
+                            pass
+                    row.delete()
+                saved_setup.save(update_fields=["updated_at"])
             remove_preview_stl = request.POST.get("remove_preview_stl") == "1"
             if remove_preview_stl and not request.FILES.get("preview_stl"):
                 if saved_setup.preview_stl:

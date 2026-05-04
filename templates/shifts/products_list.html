@@ -75,7 +75,7 @@
     flex-direction: column;
     gap: 10px;
     min-width: 0;
-    aspect-ratio: 1 / 1;
+    height: 360px;
   }
   .product-tile-title {
     color: #eaf0ff;
@@ -91,8 +91,9 @@
   }
   .product-tile-title:hover { color: #bcd0ff; }
   .product-tile-3d {
-    flex: 1 1 auto;
-    min-height: 0;
+    flex: 0 0 230px;
+    height: 230px;
+    min-height: 230px;
     border-radius: 10px;
     border: 1px solid #374563;
     background: #d3d7de;
@@ -147,6 +148,12 @@
       border-radius: 12px;
       padding: 8px;
       gap: 8px;
+      height: 270px;
+    }
+    .product-tile-3d {
+      flex-basis: 160px;
+      height: 160px;
+      min-height: 160px;
     }
     .product-tile-title { font-size: 13px; min-height: 2.5em; }
     .product-tile-meta .muted { font-size: 11px; }

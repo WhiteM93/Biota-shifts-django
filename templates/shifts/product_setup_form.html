@@ -173,30 +173,32 @@
       {% if form.setup_notes.errors %}<span class="muted">{{ form.setup_notes.errors }}</span>{% endif %}
     </label>
     <label class="field" style="grid-column:1/-1;">
-      <span>Программа</span>
-      {% if is_edit and setup and setup.program_file %}
-      <div id="program-file-card" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:10px;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
-        <div style="min-width:0;display:grid;gap:4px;">
-          <div class="muted" style="font-size:12px;">Текущий файл программы</div>
-          <a href="{{ setup.program_file.url }}" target="_blank" rel="noopener" style="color:#c9ddff;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-            {{ setup.program_filename }}
+      <span>Программа (несколько файлов)</span>
+      <input type="hidden" name="remove_program_file" id="id_remove_program_file" value="0" />
+      {% if is_edit and setup %}
+      <div id="program-files-block" style="margin-bottom:10px;">
+        {% for pf in setup.program_files.all %}
+        <div class="program-file-row" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:8px;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
+          <a href="{{ pf.file.url }}" target="_blank" rel="noopener" style="color:#c9ddff;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ pf.display_name }}
           </a>
+          <label class="muted" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;">
+            <input type="checkbox" name="remove_setup_program_file" value="{{ pf.pk }}" /> снять при сохранении
+          </label>
         </div>
-        <input type="hidden" name="remove_program_file" id="id_remove_program_file" value="0" />
-        <div style="display:inline-flex;gap:8px;align-items:center;">
-          <label for="id_program_file" class="btn btn-ghost setup-file-action-btn" style="cursor:pointer;">Заменить</label>
-          <button type="button" class="btn btn-ghost setup-file-action-btn" id="program-file-delete-btn" title="Удалить текущий файл">Удалить</button>
-        </div>
+        {% endfor %}
+        {% if setup.program_files.exists %}
+        <p class="muted" style="font-size:12px;margin:6px 0 0 0;">
+          <button type="button" class="btn btn-ghost" id="program-file-delete-all-btn">Удалить все файлы программ</button>
+        </p>
+        {% endif %}
       </div>
       {% endif %}
-      {% if not is_edit or not setup or not setup.program_file %}
-      <div class="setup-file-picker">
-        <label for="id_program_file" class="btn btn-ghost" style="cursor:pointer;">Выбрать файл программы</label>
+      <div class="setup-file-picker" style="margin-top:4px;">
+        <label for="id_program_file" class="btn btn-ghost" style="cursor:pointer;">{% if is_edit and setup and setup.program_files.exists %}Добавить ещё файл{% else %}Выбрать файл программы{% endif %}</label>
         <span class="muted js-setup-file-name" data-for="id_program_file">Файл не выбран</span>
       </div>
-      {% endif %}
       <input type="file" name="program_file" id="id_program_file" style="display:none;" />
-      {% if form.program_file.errors %}<span class="muted">{{ form.program_file.errors }}</span>{% endif %}
     </label>
     <label class="field" style="grid-column:1/-1;">
       <span>STL предпросмотра установки</span>
@@ -286,8 +288,8 @@
 <script>
   (function () {
     var removeInput = document.getElementById("id_remove_program_file");
-    var deleteBtn = document.getElementById("program-file-delete-btn");
-    var card = document.getElementById("program-file-card");
+    var deleteAllBtn = document.getElementById("program-file-delete-all-btn");
+    var programFilesBlock = document.getElementById("program-files-block");
     var removePreviewStlInput = document.getElementById("id_remove_preview_stl");
     var deletePreviewStlBtn = document.getElementById("preview-stl-delete-btn");
     var previewStlCard = document.getElementById("preview-stl-card");
@@ -309,10 +311,11 @@
         nameEl.textContent = f ? f.name : "Файл не выбран";
       });
     }
-    if (removeInput && deleteBtn && card) {
-      deleteBtn.addEventListener("click", function () {
+    if (removeInput && deleteAllBtn) {
+      deleteAllBtn.addEventListener("click", function () {
+        if (!confirm("Удалить все файлы программ этой установки?")) return;
         removeInput.value = "1";
-        card.style.display = "none";
+        if (programFilesBlock) programFilesBlock.style.display = "none";
       });
     }
     if (removePreviewStlInput && deletePreviewStlBtn && previewStlCard) {

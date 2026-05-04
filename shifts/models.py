@@ -678,6 +678,37 @@ class ProductSetup(models.Model):
         return os.path.basename(self.program_file.name or "")
 
 
+class ProductSetupProgramFile(models.Model):
+    """Файл программы (G/M и др.) в составе установки; может быть несколько штук."""
+
+    setup = models.ForeignKey(
+        ProductSetup,
+        on_delete=models.CASCADE,
+        related_name="program_files",
+        verbose_name="Установка",
+    )
+    file = models.FileField(
+        upload_to="products/setup_programs/",
+        verbose_name="Файл программы",
+    )
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Файл программы установки"
+        verbose_name_plural = "Файлы программ установки"
+
+    def __str__(self) -> str:
+        return self.display_name or f"#{self.pk}"
+
+    @property
+    def display_name(self) -> str:
+        if not self.file:
+            return ""
+        return os.path.basename(self.file.name or "")
+
+
 class ProductSetupToolRow(models.Model):
     """
     Строка таблицы инструмента внутри установки.
