@@ -166,19 +166,182 @@ TAB_SLICE_RESULT_PCT = Decimal("20")
 TAB_SLICE_MODE_PCT = Decimal("10")
 
 
+def payroll_gross_tab_skud_through_day(
+    profile,
+    day_rows: list[dict],
+    through_day: int,
+) -> dict[str, Decimal]:
+    """За календарные дни 1…through_day: часы табеля, СКУД и сумма h×ставка (д/н), без премий и штрафов."""
+    D = Decimal
+    day_rate = profile.hourly_rate_day if profile.hourly_rate_day is not None else D("0")
+    night_rate = profile.hourly_rate_night if profile.hourly_rate_night is not None else D("0")
+    tab_sum = D("0")
+    skud_sum = D("0")
+    gross = D("0")
+    for r in day_rows:
+        dd = r.get("date")
+        if not isinstance(dd, date):
+            try:
+                dd = date.fromisoformat(str(r.get("date_iso") or "")[:10])
+            except ValueError:
+                continue
+        if dd.day > through_day:
+            continue
+        h = D(str(r.get("tab_h") or 0))
+        sk = D(str(r.get("skud_h") or 0))
+        tab_sum += h
+        skud_sum += sk
+        g = str(r.get("graph") or "").strip().lower()
+        rate = night_rate if g == "н" else day_rate
+        gross += h * rate
+    return {
+        "total_tab_hours": tab_sum.quantize(D("0.01")),
+        "total_skud_hours": skud_sum.quantize(D("0.01")),
+        "gross_accrual_rub": gross.quantize(D("0.01")),
+    }
+
+
+def sum_defect_payroll_adjustments_for_defects(defect_ids: list[int]) -> dict[str, Decimal]:
+    """Суммы добавок по всем записям брака (по полю adjust_kind) для включения в расчёт ЗП."""
+    from django.db.models import Sum
+
+    from .models import EmployeeDefectPayrollAdjustment
+
+    D = Decimal
+    if not defect_ids:
+        return {}
+    out: dict[str, Decimal] = {}
+    for row in (
+        EmployeeDefectPayrollAdjustment.objects.filter(defect_record_id__in=defect_ids)
+        .values("adjust_kind")
+        .annotate(s=Sum("amount"))
+    ):
+        k = row.get("adjust_kind") or ""
+        s = row.get("s")
+        if k and s is not None:
+            out[k] = D(str(s)).quantize(D("0.01"))
+    return out
+
+
+def _adj_d(d: dict[str, Decimal] | None, key: str, D) -> Decimal:
+    if not d:
+        return D("0")
+    v = d.get(key)
+    if v is None:
+        return D("0")
+    return D(str(v)).quantize(D("0.01"))
+
+
+def effective_side_payroll_fields(
+    settlement, defect_adjust_sum_by_kind: dict[str, Decimal] | None
+) -> dict[str, Decimal]:
+    """Итоговые коэффициенты для полей боковой карточки (сумма сохранённого расчёта и корректировок по браку).
+
+    Должны совпадать с тем, как compute_payroll_totals применяет settlement + defect_adjust.
+    """
+    D = Decimal
+    dadj = defect_adjust_sum_by_kind
+    q = min(
+        max(D(str(settlement.penalty_quality_pct or 0)) + _adj_d(dadj, "penalty_quality_pct", D), D("0")),
+        TAB_SLICE_QUALITY_PCT,
+    )
+    r = min(
+        max(D(str(settlement.penalty_result_pct or 0)) + _adj_d(dadj, "penalty_result_pct", D), D("0")),
+        TAB_SLICE_RESULT_PCT,
+    )
+    m = min(
+        max(D(str(settlement.penalty_mode_pct or 0)) + _adj_d(dadj, "penalty_mode_pct", D), D("0")),
+        TAB_SLICE_MODE_PCT,
+    )
+    b_pct = max(D("0"), D(str(settlement.bonus_percent or 0)) + _adj_d(dadj, "bonus_percent", D))
+    b_rub = D(str(settlement.bonus_rub or 0)).quantize(D("0.01")) + _adj_d(dadj, "bonus_rub", D)
+    if b_rub < 0:
+        b_rub = D("0")
+    pen_rub = D(str(settlement.penalty_rub or 0)).quantize(D("0.01")) + _adj_d(dadj, "penalty_rub", D)
+    if pen_rub < 0:
+        pen_rub = D("0")
+    return {
+        "bonus_percent": b_pct.quantize(D("0.01")),
+        "bonus_rub": b_rub.quantize(D("0.01")),
+        "penalty_quality_pct": q.quantize(D("0.01")),
+        "penalty_result_pct": r.quantize(D("0.01")),
+        "penalty_mode_pct": m.quantize(D("0.01")),
+        "penalty_rub": pen_rub.quantize(D("0.01")),
+    }
+
+
+def stored_side_payroll_fields_from_effective(
+    eff: dict[str, Decimal],
+    defect_adjust_sum_by_kind: dict[str, Decimal] | None,
+) -> dict[str, Decimal]:
+    """Обратное к effective_side_payroll_fields: из значений в форме (итог) получить поля settlement для сохранения."""
+    D = Decimal
+    dadj = defect_adjust_sum_by_kind
+
+    def effv(key: str) -> Decimal:
+        v = eff.get(key)
+        if v is None:
+            return D("0")
+        return D(str(v)).quantize(D("0.01"))
+
+    q_eff = effv("penalty_quality_pct")
+    r_eff = effv("penalty_result_pct")
+    m_eff = effv("penalty_mode_pct")
+    b_pct_eff = effv("bonus_percent")
+    b_rub_eff = effv("bonus_rub")
+    pen_rub_eff = effv("penalty_rub")
+
+    b_pct_st = b_pct_eff - _adj_d(dadj, "bonus_percent", D)
+    if b_pct_st < 0:
+        b_pct_st = D("0")
+    b_rub_st = b_rub_eff - _adj_d(dadj, "bonus_rub", D)
+    if b_rub_st < 0:
+        b_rub_st = D("0")
+    pen_rub_st = pen_rub_eff - _adj_d(dadj, "penalty_rub", D)
+    if pen_rub_st < 0:
+        pen_rub_st = D("0")
+
+    return {
+        "bonus_percent": b_pct_st.quantize(D("0.01")),
+        "bonus_rub": b_rub_st.quantize(D("0.01")),
+        "penalty_quality_pct": (q_eff - _adj_d(dadj, "penalty_quality_pct", D)).quantize(D("0.01")),
+        "penalty_result_pct": (r_eff - _adj_d(dadj, "penalty_result_pct", D)).quantize(D("0.01")),
+        "penalty_mode_pct": (m_eff - _adj_d(dadj, "penalty_mode_pct", D)).quantize(D("0.01")),
+        "penalty_rub": pen_rub_st.quantize(D("0.01")),
+    }
+
+
 def compute_payroll_totals(
     profile,
     settlement,
     day_rows: list[dict],
+    *,
+    through_day: int | None = None,
+    defect_adjust_sum_by_kind: dict[str, Decimal] | None = None,
 ) -> dict[str, Decimal]:
-    """Начисление по табелю (ставка д/н): 50% + доли % от base, премия % и +руб."""
+    """Начисление по табелю (ставка д/н): 50% + доли % от base, премия % и +руб.
+
+    through_day: если задано (например 20), учитываются только дни месяца с 1 по это число
+    (для оценки аванса / табеля до 20-го).
+    defect_adjust_sum_by_kind: добавки из учёта брака (сумма по всем записям месяца) к полям премий/штрафов.
+    """
     D = Decimal
+    dadj = defect_adjust_sum_by_kind
     day_rate = profile.hourly_rate_day if profile.hourly_rate_day is not None else D("0")
     night_rate = profile.hourly_rate_night if profile.hourly_rate_night is not None else D("0")
     base = D("0")
     skud_sum = D("0")
     tab_sum = D("0")
     for r in day_rows:
+        if through_day is not None:
+            dd = r.get("date")
+            if not isinstance(dd, date):
+                try:
+                    dd = date.fromisoformat(str(r.get("date_iso") or "")[:10])
+                except ValueError:
+                    continue
+            if dd.day > through_day:
+                continue
         h = D(str(r.get("tab_h") or 0))
         sk = D(str(r.get("skud_h") or 0))
         tab_sum += h
@@ -187,9 +350,11 @@ def compute_payroll_totals(
         rate = night_rate if g == "н" else day_rate
         base += h * rate
 
-    q = min(max(D(str(settlement.penalty_quality_pct or 0)), D("0")), TAB_SLICE_QUALITY_PCT)
-    r = min(max(D(str(settlement.penalty_result_pct or 0)), D("0")), TAB_SLICE_RESULT_PCT)
-    m = min(max(D(str(settlement.penalty_mode_pct or 0)), D("0")), TAB_SLICE_MODE_PCT)
+    side = effective_side_payroll_fields(settlement, dadj)
+    q = side["penalty_quality_pct"]
+    r = side["penalty_result_pct"]
+    m = side["penalty_mode_pct"]
+    b_pct = side["bonus_percent"]
 
     guaranteed = (base * TAB_GUARANTEED_PCT / D("100")).quantize(D("0.01"))
     quality_pay = (base * q / D("100")).quantize(D("0.01"))
@@ -202,15 +367,12 @@ def compute_payroll_totals(
         (TAB_SLICE_QUALITY_PCT - q) + (TAB_SLICE_RESULT_PCT - r) + (TAB_SLICE_MODE_PCT - m)
     ).quantize(D("0.01"))
 
-    b_pct = D(str(settlement.bonus_percent or 0))
-    if b_pct < 0:
-        b_pct = D("0")
     bonus_pct_amt = (base * b_pct / D("100")).quantize(D("0.01"))
-    b_rub = D(str(settlement.bonus_rub or 0)).quantize(D("0.01"))
-    if b_rub < 0:
+    b_rub = side["bonus_rub"]
+    pen_rub = side["penalty_rub"]
+    if through_day is not None:
+        # Фикс. премия и штраф ₽ задаются на месяц целиком — в срезе 1–N не смешиваем с авансом.
         b_rub = D("0")
-    pen_rub = D(str(settlement.penalty_rub or 0)).quantize(D("0.01"))
-    if pen_rub < 0:
         pen_rub = D("0")
     total_raw = tab_payout + bonus_pct_amt + b_rub - pen_rub
     total = total_raw.quantize(D("0.01"))
@@ -232,23 +394,19 @@ def compute_payroll_totals(
 
 
 def payroll_year_options_for_employees(employees_df: pd.DataFrame) -> list[int]:
+    """Годы для селектора «Расчёт ЗП» без N запросов в Biota на каждого сотрудника.
+
+    Раньше для до 50 сотрудников вызывался merged_year_options → десятки тяжёлых обращений к БД
+    и страница грузилась очень долго. Для выбора месяца ЗП достаточно годов из файлов графика
+    плюс небольшое окно вокруг текущего года.
+    """
+    _ = employees_df  # сигнатура сохранена для вызывающего кода; список годов больше не зависит от Biota по каждому коду
     now_y = datetime.now().year
-    if employees_df is None or getattr(employees_df, "empty", True):
+    ys = set(biota_schedule.available_schedule_years())
+    ys.update({now_y - 1, now_y, now_y + 1})
+    if not ys:
         return [now_y - 1, now_y, now_y + 1]
-    cfg = biota_db.db_config()
-    opts: set[int] = set()
-    for _, r in employees_df.head(50).iterrows():
-        c = normalize_emp_code(str(r.get("emp_code") or ""))
-        if not c:
-            continue
-        try:
-            for y in biota_db.merged_year_options(cfg, c):
-                opts.add(int(y))
-        except Exception:
-            continue
-    if not opts:
-        return [now_y - 1, now_y, now_y + 1]
-    return sorted(opts)
+    return sorted(ys, reverse=True)
 
 
 def build_payroll_employee_rows(

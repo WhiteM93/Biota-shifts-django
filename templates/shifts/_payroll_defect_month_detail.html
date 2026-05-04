@@ -1,0 +1,97 @@
+{% if defect_records %}
+<p class="muted" style="margin:0 0 8px 0;font-size:12px;line-height:1.4;">
+  Отбор по сотруднику «{{ employee.label }}» (как в списке ЗП).
+</p>
+<p class="muted" style="margin:0 0 14px 0;font-size:12px;line-height:1.45;">
+  Итого за {{ month_name }}: записей <strong>{{ defect_month.count }}</strong>;
+  кол-во брака <strong>{{ defect_month.defect_quantity }}</strong>;
+  исправно <strong>{{ defect_month.good_quantity }}</strong>;
+  неисправно <strong>{{ defect_month.bad_quantity }}</strong>;
+  потенциальный брак <strong>{{ defect_month.potential_defect_quantity }}</strong>.
+</p>
+{% for rec in defect_records %}
+<div class="payroll-defect-entry">
+  <h4 class="payroll-defect-entry-title">Запись {{ forloop.counter }} · {{ rec.defect_date|date:"d.m.Y" }}</h4>
+  <dl class="payroll-defect-dl">
+    <dt>Дата</dt>
+    <dd>{{ rec.defect_date|date:"d.m.Y" }}</dd>
+    <dt>Отдел</dt>
+    <dd>{{ rec.department_name|default:"—" }}</dd>
+    <dt>Ответственный</dt>
+    <dd>{{ rec.responsible_name|default:"—" }}</dd>
+    <dt>Сотрудник</dt>
+    <dd>{{ rec.employee_name }}</dd>
+    <dt>Кол-во брака</dt>
+    <dd>{{ rec.defect_quantity }}</dd>
+    <dt>Исправно</dt>
+    <dd>{{ rec.good_quantity }}</dd>
+    <dt>Неисправно</dt>
+    <dd>{{ rec.bad_quantity }}</dd>
+    <dt>Потенциальный брак</dt>
+    <dd>{{ rec.potential_defect_quantity }}</dd>
+    <dt>Изделие</dt>
+    <dd>{{ rec.product_name|default:"—" }}</dd>
+    <dt>Причина брака</dt>
+    <dd>{{ rec.defect_reason }}</dd>
+    <dt>Создано в системе</dt>
+    <dd>{{ rec.created_at|date:"d.m.Y H:i" }}</dd>
+  </dl>
+  {% with adj_list=rec.payroll_adjustments.all %}
+  {% if adj_list %}
+  <div class="payroll-defect-adj-existing" style="margin-top:10px;">
+    {% if biota_can_edit %}
+      {% for a in adj_list %}
+      <form method="post" class="payroll-defect-adj-row-form" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;margin-bottom:10px;">
+        {% csrf_token %}
+        <input type="hidden" name="defect_adjust_action" value="save">
+        <input type="hidden" name="defect_id" value="{{ rec.id }}">
+        <input type="hidden" name="mark_year" value="{{ year }}">
+        <input type="hidden" name="mark_month" value="{{ month }}">
+        <input type="hidden" name="adjust_kind" value="{{ a.adjust_kind }}">
+        <label class="field" style="flex:1 1 160px;min-width:0;"><span>{{ a.get_adjust_kind_display }}</span>
+          <input type="text" name="adjust_amount" class="payroll-live-field" inputmode="decimal" value="{{ a.amount }}" autocomplete="off">
+        </label>
+        <span class="filter-actions" style="margin:0;display:flex;flex-wrap:wrap;gap:6px;">
+          <button type="submit" name="defect_adjust_intent" value="save" class="btn btn-sm">Сохранить</button>
+          <button type="submit" name="defect_adjust_intent" value="delete" class="btn btn-sm btn-ghost">Удалить</button>
+        </span>
+      </form>
+      {% endfor %}
+    {% else %}
+      <ul class="muted" style="margin:0;padding-left:18px;font-size:12px;line-height:1.5;">
+        {% for a in adj_list %}
+        <li>{{ a.get_adjust_kind_display }}: {{ a.amount }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endwith %}
+  {% if biota_can_edit %}
+  <form method="post" class="payroll-defect-adj-form">
+    {% csrf_token %}
+    <input type="hidden" name="defect_adjust_action" value="save">
+    <input type="hidden" name="defect_id" value="{{ rec.id }}">
+    <input type="hidden" name="mark_year" value="{{ year }}">
+    <input type="hidden" name="mark_month" value="{{ month }}">
+    <input type="hidden" name="defect_adjust_intent" value="save">
+    <div class="filter-grid" style="gap:10px;">
+      <label class="field"><span>Поле в расчёте ЗП</span>
+        <select name="adjust_kind" class="payroll-defect-adj-kind">
+          {% for kval, klabel in defect_adjust_kind_choices %}
+          <option value="{{ kval }}">{{ klabel }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field"><span>Добавка (0 — сбросить)</span>
+        <input type="text" name="adjust_amount" class="payroll-live-field" inputmode="decimal" placeholder="напр. 500 или −2" value="" autocomplete="off">
+      </label>
+    </div>
+    <p class="filter-actions" style="margin:10px 0 0 0;"><button type="submit" class="btn btn-sm">Добавить к записи</button></p>
+  </form>
+  {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<p class="muted" style="margin:0;">За этот месяц записей учёта брака по сотруднику «{{ employee.label }}» нет.</p>
+{% endif %}

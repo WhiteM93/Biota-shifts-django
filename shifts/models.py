@@ -318,6 +318,11 @@ class EmployeeDefectRecord(models.Model):
     defect_quantity = models.PositiveIntegerField(verbose_name="Кол-во брака")
     good_quantity = models.PositiveIntegerField(default=0, verbose_name="Исправно")
     bad_quantity = models.PositiveIntegerField(default=0, verbose_name="Неисправно")
+    potential_defect_quantity = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Потенциальный брак",
+        help_text="Количество с потенциальным дефектом (учёт отдельно от подтверждённого брака).",
+    )
     product_name = models.CharField(max_length=300, blank=True, default="", verbose_name="Изделие")
     defect_reason = models.CharField(max_length=500, verbose_name="Причина брака")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
@@ -415,6 +420,13 @@ class EmployeePayrollSettlement(models.Model):
         default=0,
         verbose_name="Штраф, ₽",
     )
+    advance_rub = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        verbose_name="Аванс, ₽",
+        help_text="Уже выплаченный или запланированный аванс за месяц — для сверки с расчётом «к выплате».",
+    )
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
     updated_by = models.CharField(max_length=200, blank=True, default="", verbose_name="Кем обновлено")
 
@@ -430,6 +442,86 @@ class EmployeePayrollSettlement(models.Model):
 
     def __str__(self):
         return f"{self.emp_code} {self.year}-{self.month:02d}"
+
+
+class EmployeePayrollMonthStatus(models.Model):
+    """Отметки по сотруднику за календарный месяц (список ЗП и сверка с бухгалтерией)."""
+
+    emp_code = models.CharField(max_length=128, db_index=True, verbose_name="Код сотрудника")
+    year = models.PositiveSmallIntegerField(verbose_name="Год")
+    month = models.PositiveSmallIntegerField(verbose_name="Месяц")
+    advance_closed = models.BooleanField(
+        default=False,
+        verbose_name="Аванс учтён",
+        help_text="Отметка: аванс за период учтён / сверен.",
+    )
+    payroll_closed = models.BooleanField(
+        default=False,
+        verbose_name="Расчёт ЗП завершён",
+        help_text="Отметка: расчёт заработной платы за месяц по сотруднику закрыт.",
+    )
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+    updated_by = models.CharField(max_length=200, blank=True, default="", verbose_name="Кем обновлено")
+
+    class Meta:
+        verbose_name = "Статус ЗП сотрудника за месяц"
+        verbose_name_plural = "Статусы ЗП по месяцам"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("emp_code", "year", "month"),
+                name="uniq_employee_payroll_month_status_ym",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.emp_code} {self.year}-{self.month:02d}"
+
+
+DEFECT_PAYROLL_ADJUST_KIND_CHOICES = [
+    ("bonus_percent", "Премия, % от начисления по табелю"),
+    ("bonus_rub", "Премия, ₽ (фикс)"),
+    ("penalty_quality_pct", "Качество, % от начисления (0–20)"),
+    ("penalty_result_pct", "Результат, % от начисления (0–20)"),
+    ("penalty_mode_pct", "Режим, % от начисления (0–10)"),
+    ("penalty_rub", "Штраф, ₽"),
+]
+
+
+class EmployeeDefectPayrollAdjustment(models.Model):
+    """Добавка к полям расчёта ЗП за месяц, привязанная к конкретной записи учёта брака."""
+
+    defect_record = models.ForeignKey(
+        EmployeeDefectRecord,
+        on_delete=models.CASCADE,
+        related_name="payroll_adjustments",
+        verbose_name="Запись брака",
+    )
+    adjust_kind = models.CharField(
+        max_length=40,
+        choices=DEFECT_PAYROLL_ADJUST_KIND_CHOICES,
+        verbose_name="Поле в карточке ЗП",
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        verbose_name="Добавка",
+        help_text="Суммируется с соответствующим полем в расчёте; для процентов — п.п.; допускается «−».",
+    )
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+    updated_by = models.CharField(max_length=200, blank=True, default="", verbose_name="Кем обновлено")
+
+    class Meta:
+        verbose_name = "Корректировка ЗП по записи брака"
+        verbose_name_plural = "Корректировки ЗП по браку"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("defect_record", "adjust_kind"),
+                name="uniq_defect_payroll_adj_kind",
+            )
+        ]
+
+    def __str__(self):
+        return f"#{self.defect_record_id} {self.adjust_kind} {self.amount}"
 
 
 class Product(models.Model):

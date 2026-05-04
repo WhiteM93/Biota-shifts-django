@@ -6,49 +6,93 @@
     margin-top: 12px;
   }
   .payroll-settlement-layout {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
     gap: 16px;
-    align-items: flex-start;
+    align-items: start;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .payroll-settlement-editor-outer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+    gap: 16px;
+    align-items: start;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .payroll-settlement-layout--editor {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+  }
+  .payroll-settlement-layout--readonly {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  }
+  @media (max-width: 1180px) {
+    .payroll-settlement-editor-outer {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 900px) {
+    .payroll-settlement-layout--editor,
+    .payroll-settlement-layout--readonly {
+      grid-template-columns: 1fr;
+    }
   }
   .payroll-settlement-col-table,
-  .payroll-settlement-col-side {
-    flex: 0 0 auto;
+  .payroll-settlement-col-side,
+  .payroll-settlement-col-defect {
     min-width: 0;
   }
   .payroll-table-card.filter-panel,
-  .payroll-side-card.filter-panel {
+  .payroll-side-card.filter-panel,
+  .payroll-defect-card.filter-panel {
     margin: 0;
     height: fit-content;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
   .payroll-side-card.filter-panel {
-    width: min(100%, 420px);
     max-width: 420px;
+  }
+  @media (max-width: 1180px) {
+    .payroll-side-card.filter-panel {
+      max-width: none;
+    }
   }
   .payroll-side-card .filter-panel {
     margin-top: 12px;
   }
+  .payroll-advance-panel {
+    padding-bottom: 14px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .payroll-advance-panel > h3:first-child {
+    margin-top: 0;
+  }
   .payroll-side-card > h3:first-of-type,
   .payroll-table-card > h3:first-of-type {
     margin-top: 0;
-  }
-  @media (max-width: 1000px) {
-    .payroll-settlement-layout {
-      flex-direction: column;
-    }
   }
   .payroll-tab-day-input.is-month-locked {
     opacity: 0.65;
     pointer-events: none;
   }
   .payroll-settlement-col-table .table-wrap.payroll-table-wrap {
-    width: fit-content;
+    display: block;
+    width: 100%;
     max-width: 100%;
+    min-width: 0;
     max-height: none;
-    overflow: visible;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
   }
   .payroll-day-table.data-grid {
-    width: auto;
+    width: 100%;
+    max-width: 100%;
     min-width: 0 !important;
     table-layout: fixed;
     border-collapse: collapse;
@@ -78,6 +122,44 @@
     text-align: center;
   }
   .payroll-day-table--ro .col-tab { width: 4.25rem; }
+  .payroll-defect-card {
+    max-height: min(78vh, 960px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .payroll-defect-entry {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .payroll-defect-entry:first-of-type {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+  .payroll-defect-entry-title {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .payroll-defect-dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: minmax(7rem, 42%) 1fr;
+    gap: 6px 12px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .payroll-defect-dl dt {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.55);
+    font-weight: 500;
+  }
+  .payroll-defect-dl dd {
+    margin: 0;
+    word-break: break-word;
+  }
   .payroll-settlement-nav {
     display: flex;
     flex-wrap: wrap;
@@ -113,6 +195,58 @@
     flex: 0 0 auto;
     white-space: nowrap;
   }
+  .payroll-settlement-period-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px 20px;
+    margin-top: 10px;
+  }
+  .payroll-period-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    align-items: flex-end;
+    margin: 0;
+  }
+  .payroll-period-form .field {
+    margin-bottom: 0;
+  }
+  .payroll-period-form select {
+    min-width: 10rem;
+  }
+  .payroll-settlement-period-block {
+    margin-top: 10px;
+  }
+  .payroll-settlement-mark-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .payroll-mark-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 0;
+  }
+  .payroll-mark-status {
+    margin: 0;
+    flex: 1 1 auto;
+    min-width: 200px;
+  }
+  .payroll-defect-adj-form {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 10px;
+  }
+  .payroll-defect-adj-form .field span {
+    font-size: 12px;
+  }
 </style>
 
 <div class="filter-panel" style="margin-top:0;">
@@ -123,19 +257,68 @@
     <a class="btn btn-sm btn-payroll-settings" href="{% url 'employee_payroll_detail' employee.emp_code %}">Настройки сотрудника</a>
   </div>
   <h2 style="margin-top:0;">{{ employee.label }}</h2>
-  <p class="muted" style="margin-bottom:0;">
-    {{ month_name }} {{ year }} · код {{ employee.emp_code }}
-    {% if employee.department_name %} · {{ employee.department_name }}{% endif %}
-  </p>
+  <div class="payroll-settlement-period-block">
+    <div class="payroll-settlement-period-row">
+      <p class="muted" style="margin:0;">
+        <strong>{{ month_name }} {{ year }}</strong>
+        · код {{ employee.emp_code }}
+        {% if employee.department_name %} · {{ employee.department_name }}{% endif %}
+      </p>
+      <form method="get" class="payroll-period-form" aria-label="Выбор месяца расчёта">
+        <label class="field"><span>Месяц</span>
+          <select name="month" onchange="this.form.submit()">
+            {% for mnum, mname in month_choices %}
+            <option value="{{ mnum }}" {% if mnum == month %}selected{% endif %}>{{ mname }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field"><span>Год</span>
+          <select name="year" onchange="this.form.submit()">
+            {% for y in year_choices %}
+            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <noscript><button type="submit" class="btn btn-sm">Показать</button></noscript>
+      </form>
+    </div>
+    <div class="payroll-settlement-mark-row">
+      {% if biota_can_edit %}
+      <form method="post" class="payroll-mark-buttons" aria-label="Отметки по месяцу">
+        {% csrf_token %}
+        <input type="hidden" name="mark_year" value="{{ year }}">
+        <input type="hidden" name="mark_month" value="{{ month }}">
+        <button type="submit" name="payroll_mark_action" value="toggle_advance" class="btn btn-sm {% if payroll_month_status and payroll_month_status.advance_closed %}btn-ghost{% endif %}">
+          {% if payroll_month_status and payroll_month_status.advance_closed %}Снять «аванс учтён»{% else %}Аванс учтён{% endif %}
+        </button>
+        <button type="submit" name="payroll_mark_action" value="toggle_payroll" class="btn btn-sm {% if payroll_month_status and payroll_month_status.payroll_closed %}btn-ghost{% endif %}">
+          {% if payroll_month_status and payroll_month_status.payroll_closed %}Снять «ЗП закрыта»{% else %}Расчёт ЗП завершён{% endif %}
+        </button>
+      </form>
+      {% endif %}
+      <p class="payroll-mark-status muted">
+        Аванс: {% if payroll_month_status and payroll_month_status.advance_closed %}<strong>учтён</strong>{% else %}не отмечен{% endif %}
+        · ЗП: {% if payroll_month_status and payroll_month_status.payroll_closed %}<strong>закрыта</strong>{% else %}не закрыта{% endif %}
+      </p>
+    </div>
+  </div>
 </div>
 
 {% if biota_can_edit %}
 {{ preview_data|json_script:"payroll-preview-data" }}
+<div class="payroll-settlement-editor-outer">
 <form method="post" class="payroll-settlement-form">
   {% csrf_token %}
-  <div class="payroll-settlement-layout">
+  <div class="payroll-settlement-layout payroll-settlement-layout--editor">
     <div class="payroll-settlement-col payroll-settlement-col-table">
       <div class="filter-panel payroll-table-card">
+      <div class="payroll-advance-panel">
+        <h3>До {{ advance_last_day }}-го числа (для табеля / аванса)</h3>
+        <ul style="margin:0;padding-left:18px;line-height:1.65;">
+          <li>Часы по табелю: <strong id="payroll-pl-until20-tab-h">—</strong> ч · по СКУД: <strong id="payroll-pl-until20-skud-h">—</strong> ч</li>
+          <li>Сумма по ставкам (табель × ₽/ч): <strong id="payroll-pl-until20-gross">—</strong> ₽</li>
+        </ul>
+      </div>
       <h3 style="margin-top:0;">По дням: табель и СКУД</h3>
       <div class="table-wrap payroll-table-wrap">
         <table class="data-grid payroll-day-table">
@@ -178,26 +361,27 @@
       <h3 style="margin-top:18px;">Премии</h3>
       <div class="filter-grid">
         <label class="field"><span>Премия, % от начисления по табелю</span>
-          <input type="text" name="bonus_percent" inputmode="decimal" value="{{ settlement.bonus_percent }}" class="payroll-live-field">
+          <input type="text" name="bonus_percent" inputmode="decimal" value="{{ side_effective.bonus_percent }}" class="payroll-live-field">
         </label>
         <label class="field"><span>Премия, ₽ (фикс)</span>
-          <input type="text" name="bonus_rub" inputmode="decimal" value="{{ settlement.bonus_rub }}" class="payroll-live-field">
+          <input type="text" name="bonus_rub" inputmode="decimal" value="{{ side_effective.bonus_rub }}" class="payroll-live-field">
         </label>
       </div>
 
       <h3 style="margin-top:18px;">Доли от начисления по табелю (качество / результат / режим)</h3>
+      <p class="muted" style="margin:0 0 10px 0;font-size:12px;line-height:1.45;">Значения в полях — <strong>итог</strong> (сохранённый расчёт и корректировки по браку справа). Добавки по записям брака меняются только в блоке «Учёт брака».</p>
       <div class="filter-grid">
         <label class="field"><span>Качество, % от начисления (0–20)</span>
-          <input type="text" name="penalty_quality_pct" inputmode="decimal" value="{{ settlement.penalty_quality_pct }}" class="payroll-live-field">
+          <input type="text" name="penalty_quality_pct" inputmode="decimal" value="{{ side_effective.penalty_quality_pct }}" class="payroll-live-field">
         </label>
         <label class="field"><span>Результат, % от начисления (0–20)</span>
-          <input type="text" name="penalty_result_pct" inputmode="decimal" value="{{ settlement.penalty_result_pct }}" class="payroll-live-field">
+          <input type="text" name="penalty_result_pct" inputmode="decimal" value="{{ side_effective.penalty_result_pct }}" class="payroll-live-field">
         </label>
         <label class="field"><span>Режим, % от начисления (0–10)</span>
-          <input type="text" name="penalty_mode_pct" inputmode="decimal" value="{{ settlement.penalty_mode_pct }}" class="payroll-live-field">
+          <input type="text" name="penalty_mode_pct" inputmode="decimal" value="{{ side_effective.penalty_mode_pct }}" class="payroll-live-field">
         </label>
         <label class="field"><span>Штраф, ₽</span>
-          <input type="text" name="penalty_rub" inputmode="decimal" value="{{ settlement.penalty_rub }}" class="payroll-live-field">
+          <input type="text" name="penalty_rub" inputmode="decimal" value="{{ side_effective.penalty_rub }}" class="payroll-live-field">
         </label>
       </div>
 
@@ -205,12 +389,31 @@
         <h3 style="margin-top:0;">Итог (в реальном времени)</h3>
         <ul style="margin:0;padding-left:18px;line-height:1.7;">
           <li>Начисление по табелю: <strong id="payroll-pl-base">—</strong> ₽</li>
-          <li>По табелю к выплате (50% + три доли %): <strong id="payroll-pl-tab-pay">—</strong> ₽</li>
-          <li>Часы по табелю (сумма): <strong id="payroll-pl-tab-h">—</strong> ч · по СКУД: <strong id="payroll-pl-skud-h">—</strong> ч</li>
+          <li>По табелю — сумма: <strong id="payroll-pl-tab-pay">—</strong> ₽</li>
+          <li>Часы:
+            <ul style="margin:4px 0 0 0;padding-left:18px;line-height:1.65;">
+              <li>По табелю: <strong id="payroll-pl-tab-h">—</strong> ч</li>
+              <li>По СКУД: <strong id="payroll-pl-skud-h">—</strong> ч</li>
+            </ul>
+          </li>
           <li>Ниже максимума по трём строкам (п.п. от начисления): <span id="payroll-pl-pen-pct">—</span> · не выплачено: <strong id="payroll-pl-pen">—</strong> ₽</li>
           <li>Премия %: <strong id="payroll-pl-bonus-pct">—</strong> ₽ · премия ₽: <strong id="payroll-pl-bonus-rub">—</strong> ₽</li>
-          <li>Штраф ₽: <strong id="payroll-pl-pen-rub">—</strong> ₽</li>
-          <li><strong>К выплате: <span id="payroll-pl-total">—</span> ₽</strong></li>
+          <li>Штраф: <strong id="payroll-pl-pen-rub">—</strong> ₽</li>
+          <li><strong>К выплате по расчёту: <span id="payroll-pl-total">—</span> ₽</strong></li>
+        </ul>
+      </div>
+
+      <h3 style="margin-top:18px;">Аванс и остаток</h3>
+      <div class="filter-grid" style="align-items:flex-end;">
+        <label class="field"><span>Аванс, ₽</span>
+          <input type="text" name="advance_rub" inputmode="decimal" value="{{ settlement.advance_rub }}" class="payroll-live-field" id="payroll-advance-rub-input">
+        </label>
+      </div>
+      <div class="filter-panel" style="margin-top:12px;background:rgba(0,0,0,0.12);">
+        <h3 style="margin-top:0;">Сверка с авансом</h3>
+        <ul style="margin:0;padding-left:18px;line-height:1.7;">
+          <li>Остаток ко второй выплате: <strong id="payroll-pl-remainder-after">—</strong> ₽</li>
+          <li id="payroll-li-advance-over" style="display:none;">Переплата по авансу (расчёт меньше аванса): <strong id="payroll-pl-advance-over">—</strong> ₽</li>
         </ul>
       </div>
 
@@ -219,6 +422,13 @@
     </div>
   </div>
 </form>
+  <div class="payroll-settlement-col payroll-settlement-col-defect">
+    <div class="filter-panel payroll-defect-card">
+      <h3 style="margin-top:0;">Учёт брака за {{ month_name }} {{ year }}</h3>
+      {% include "shifts/_payroll_defect_month_detail.html" %}
+    </div>
+  </div>
+</div>
 <script>
 (function () {
   var dataEl = document.getElementById('payroll-preview-data');
@@ -229,6 +439,12 @@
   var rows = PREVIEW.rows || [];
   var dayRate = parseFloat(PREVIEW.day_rate) || 0;
   var nightRate = parseFloat(PREVIEW.night_rate) || 0;
+  var advanceLastDay = Math.min(31, Math.max(1, parseInt(PREVIEW.advance_last_day, 10) || 20));
+
+  function dayOkForAdvance(r) {
+    var d = parseInt(String(r.date_iso || '').slice(8, 10), 10);
+    return Number.isFinite(d) && d <= advanceLastDay;
+  }
 
   function parseNum(s) {
     var t = (s == null ? '' : String(s)).trim().replace(',', '.');
@@ -312,12 +528,16 @@
     return byDate;
   }
 
-  function computeTotals() {
+  function computeTotalsCore(options) {
+    options = options || {};
+    var dayPred = options.dayPred;
+    var includeFixedRub = options.includeFixedRub !== false;
     var byDate = tabHoursByDate();
     var base = 0;
     var skudSum = 0;
     var tabSum = 0;
     rows.forEach(function (r) {
+      if (dayPred && !dayPred(r)) return;
       var h = byDate[r.date_iso] || 0;
       var sk = Number(r.skud_h) || 0;
       tabSum += h;
@@ -353,6 +573,10 @@
     var penRub = parseNum(form.querySelector('[name="penalty_rub"]') && form.querySelector('[name="penalty_rub"]').value) || 0;
     if (penRub < 0) penRub = 0;
     penRub = round2(penRub);
+    if (!includeFixedRub) {
+      bRub = 0;
+      penRub = 0;
+    }
     var total = round2(tabPayout + bonusPctAmt + bRub - penRub);
     if (total < 0) total = 0;
     return {
@@ -369,8 +593,41 @@
     };
   }
 
+  function computeTotals() {
+    return computeTotalsCore({});
+  }
+
   function fmtRu(n) {
     return (Number(n) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  function computeGrossThroughAdvanceDay() {
+    var byDate = tabHoursByDate();
+    var tabSum = 0;
+    var skudSum = 0;
+    var gross = 0;
+    rows.forEach(function (r) {
+      if (!dayOkForAdvance(r)) return;
+      var h = byDate[r.date_iso] || 0;
+      var sk = Number(r.skud_h) || 0;
+      tabSum += h;
+      skudSum += sk;
+      var g = String(r.graph || '').trim().toLowerCase();
+      var rate = g === 'н' ? nightRate : dayRate;
+      gross += h * rate;
+    });
+    return {
+      total_tab_hours: round2(tabSum),
+      total_skud_hours: round2(skudSum),
+      gross_accrual_rub: round2(gross)
+    };
+  }
+
+  function renderGrossSlice(s) {
+    var el;
+    el = document.getElementById('payroll-pl-until20-tab-h'); if (el) el.textContent = fmtRu(s.total_tab_hours);
+    el = document.getElementById('payroll-pl-until20-skud-h'); if (el) el.textContent = fmtRu(s.total_skud_hours);
+    el = document.getElementById('payroll-pl-until20-gross'); if (el) el.textContent = fmtRu(s.gross_accrual_rub);
   }
 
   function renderTotals(t) {
@@ -385,12 +642,40 @@
     el = document.getElementById('payroll-pl-bonus-rub'); if (el) el.textContent = fmtRu(t.bonus_rub);
     el = document.getElementById('payroll-pl-pen-rub'); if (el) el.textContent = fmtRu(t.penalty_rub);
     el = document.getElementById('payroll-pl-total'); if (el) el.textContent = fmtRu(t.total);
+    renderAdvanceBalance(t);
+  }
+
+  function renderAdvanceBalance(t) {
+    var inp = form.querySelector('[name="advance_rub"]');
+    var adv = parseNum(inp && inp.value) || 0;
+    if (adv < 0) adv = 0;
+    adv = round2(adv);
+    var rem = round2(t.total - adv);
+    var over = 0;
+    if (rem < 0) {
+      over = round2(-rem);
+      rem = 0;
+    }
+    var el = document.getElementById('payroll-pl-remainder-after');
+    if (el) el.textContent = fmtRu(rem);
+    var liOver = document.getElementById('payroll-li-advance-over');
+    var elOver = document.getElementById('payroll-pl-advance-over');
+    if (liOver && elOver) {
+      if (over > 0) {
+        liOver.style.display = '';
+        elOver.textContent = fmtRu(over);
+      } else {
+        liOver.style.display = 'none';
+        elOver.textContent = '—';
+      }
+    }
   }
 
   var scheduled = null;
   function refresh() {
     syncDayInputsLocked();
     renderTotals(computeTotals());
+    renderGrossSlice(computeGrossThroughAdvanceDay());
   }
   function scheduleRefresh() {
     if (scheduled) clearTimeout(scheduled);
@@ -405,35 +690,66 @@
 })();
 </script>
 {% else %}
-<div class="filter-panel" style="margin-top:12px;">
-  <p class="muted">Роль «исполнитель»: только просмотр.</p>
-  <div class="table-wrap payroll-table-wrap">
-    <table class="data-grid payroll-day-table payroll-day-table--ro">
-      <thead><tr>
-        <th class="col-date">Дата</th>
-        <th class="col-graph">График</th>
-        <th class="col-skud">Часы<br>СКУД</th>
-        <th class="col-tab">Табель,<br>ч</th>
-      </tr></thead>
-      <tbody>
-        {% for row in day_rows %}
-        <tr>
-          <td class="col-date">{{ row.date_iso }}</td>
-          <td class="col-graph">{{ row.graph }}</td>
-          <td class="col-skud">{{ row.skud_h }}</td>
-          <td class="col-tab">{{ row.tab_h }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div class="payroll-settlement-layout payroll-settlement-layout--readonly" style="margin-top:12px;">
+  <div class="payroll-settlement-col payroll-settlement-col-table">
+    <div class="filter-panel payroll-table-card">
+      <p class="muted" style="margin-top:0;">Роль «исполнитель»: только просмотр.</p>
+      <div class="payroll-advance-panel">
+        <h3>До {{ advance_last_day }}-го числа (для табеля / аванса)</h3>
+        <p class="muted" style="margin:0 0 10px 0;font-size:13px;line-height:1.45;">
+          Только часы и сумма по ставкам за 1–{{ advance_last_day }} число, без премий и штрафов.
+        </p>
+        <ul style="margin:0;padding-left:18px;line-height:1.65;">
+          <li>Часы по табелю: <strong>{{ advance_slice.total_tab_hours }}</strong> ч · по СКУД: <strong>{{ advance_slice.total_skud_hours }}</strong> ч</li>
+          <li>Сумма по ставкам (табель × ₽/ч): <strong>{{ advance_slice.gross_accrual_rub }}</strong> ₽</li>
+        </ul>
+      </div>
+      <h3 style="margin-top:0;">По дням: табель и СКУД</h3>
+      <div class="table-wrap payroll-table-wrap">
+        <table class="data-grid payroll-day-table payroll-day-table--ro">
+          <thead><tr>
+            <th class="col-date">Дата</th>
+            <th class="col-graph">График</th>
+            <th class="col-skud">Часы<br>СКУД</th>
+            <th class="col-tab">Табель,<br>ч</th>
+          </tr></thead>
+          <tbody>
+            {% for row in day_rows %}
+            <tr>
+              <td class="col-date">{{ row.date_iso }}</td>
+              <td class="col-graph">{{ row.graph }}</td>
+              <td class="col-skud">{{ row.skud_h }}</td>
+              <td class="col-tab">{{ row.tab_h }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <ul style="margin:14px 0 0 18px;line-height:1.7;">
+        <li>Начисление по табелю (месяц): <strong>{{ totals.base_tab }}</strong> ₽</li>
+        <li>По табелю — сумма: <strong>{{ totals.tab_payout }}</strong> ₽</li>
+        <li>Часы:
+          <ul style="margin:4px 0 0 0;padding-left:18px;line-height:1.65;">
+            <li>По табелю: <strong>{{ totals.total_tab_hours }}</strong> ч</li>
+            <li>По СКУД: <strong>{{ totals.total_skud_hours }}</strong> ч</li>
+          </ul>
+        </li>
+        <li>Штраф: <strong>{{ totals.penalty_rub }}</strong> ₽</li>
+        <li><strong>К выплате по расчёту: {{ totals.total }} ₽</strong></li>
+        <li>Аванс, ₽ (из сохранённого расчёта): <strong>{{ settlement.advance_rub }}</strong> ₽</li>
+        <li>Остаток ко второй выплате: <strong>{{ remainder_after_advance }}</strong> ₽</li>
+        {% if advance_overpayment > 0 %}
+        <li>Переплата по авансу: <strong>{{ advance_overpayment }}</strong> ₽</li>
+        {% endif %}
+      </ul>
+    </div>
   </div>
-  <ul style="margin:12px 0 0 18px;line-height:1.7;">
-    <li>Начисление по табелю: <strong>{{ totals.base_tab }}</strong> ₽</li>
-    <li>По табелю к выплате: <strong>{{ totals.tab_payout }}</strong> ₽</li>
-    <li>Часы табель / СКУД: <strong>{{ totals.total_tab_hours }}</strong> / <strong>{{ totals.total_skud_hours }}</strong> ч</li>
-    <li>Штраф ₽: <strong>{{ totals.penalty_rub }}</strong> ₽</li>
-    <li>К выплате: <strong>{{ totals.total }}</strong> ₽</li>
-  </ul>
+  <div class="payroll-settlement-col payroll-settlement-col-defect">
+    <div class="filter-panel payroll-defect-card">
+      <h3 style="margin-top:0;">Учёт брака за {{ month_name }} {{ year }}</h3>
+      {% include "shifts/_payroll_defect_month_detail.html" %}
+    </div>
+  </div>
 </div>
 {% endif %}
 {% endblock %}
