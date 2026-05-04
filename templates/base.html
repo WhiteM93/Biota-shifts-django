@@ -251,7 +251,8 @@
       font-weight: 600;
     }
     .inventory-payroll-table.data-grid {
-      min-width: 0;
+      /* Не min-width:0 — иначе при table-layout:fixed последние узкие колонки (Аванс/ЗП) схлопываются. */
+      min-width: max-content;
       table-layout: fixed;
       width: 100%;
     }
@@ -284,6 +285,16 @@
       min-width: 5.5rem;
       text-align: center;
       padding: 6px 4px;
+    }
+    .inventory-payroll-table .inv-payroll-st {
+      width: 4.25rem;
+      min-width: 4.25rem;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .inventory-payroll-table .inv-payroll-ok {
+      color: #8fd993;
+      font-weight: 700;
     }
     .employees-directory-table.data-grid {
       min-width: 0;
@@ -459,11 +470,18 @@
     {% if biota_nav.inventory %}
     <a href="{% url 'inventory' %}" class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel != 'defects' and request.GET.panel != 'payroll' and request.GET.panel != 'employees' %}active{% endif %}">Склад</a>
     {% endif %}
-    {% if biota_nav.defects %}
-    <a href="{% url 'inventory' %}?panel=defects" class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel == 'defects' %}active{% endif %}">Учёт брака</a>
-    {% endif %}
-    {% if biota_nav.payroll %}
-    <a href="{% url 'inventory' %}?panel=payroll" class="{% if request.resolver_match.url_name == 'payroll_settlement' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'payroll' %}active{% endif %}">Расчёт ЗП</a>
+    {% if biota_nav.defects or biota_nav.payroll or biota_nav.employees %}
+    <details class="nav-dropdown">
+      <summary class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel == 'defects' or request.resolver_match.url_name == 'payroll_settlement' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'payroll' or request.resolver_match.url_name == 'employee_payroll_detail' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'employees' %}active{% endif %}">Сотрудники</summary>
+      <div class="nav-dropdown-menu">
+        {% if biota_nav.defects %}
+        <a href="{% url 'inventory' %}?panel=defects" class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel == 'defects' %}active{% endif %}">Учёт брака</a>
+        {% endif %}
+        {% if biota_nav.payroll %}
+        <a href="{% url 'inventory' %}?panel=payroll" class="{% if request.resolver_match.url_name == 'payroll_settlement' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'payroll' %}active{% endif %}">Расчёт ЗП</a>
+        {% endif %}
+      </div>
+    </details>
     {% endif %}
     {% if biota_nav.employees %}
     <a href="{% url 'inventory' %}?panel=employees" class="{% if request.resolver_match.url_name == 'employee_payroll_detail' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'employees' %}active{% endif %}">Сотрудники</a>

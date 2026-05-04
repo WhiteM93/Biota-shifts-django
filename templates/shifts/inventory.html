@@ -22,7 +22,7 @@
 {% if panel == "payroll" %}
 <div class="filter-panel" style="margin-top:0;">
   <h2 style="margin-top:0;">Расчёт заработной платы</h2>
-  <p class="muted" style="margin-bottom:0;">Сотрудники из отделов, доступных по правам «Расчёт ЗП». Часы СКУД за выбранный месяц — по отметкам (как в «Часы по дням»). Нажмите на сотрудника для расчёта по табелю.</p>
+  <p class="muted" style="margin-bottom:0;">Сотрудники из отделов, доступных по правам «Расчёт ЗП». Часы СКУД за выбранный месяц — по отметкам (как в «Часы по дням»). Нажмите на сотрудника для расчёта по табелю. Колонки «Аванс» и «ЗП»: отметки ставятся в карточке расчёта сотрудника за этот месяц.</p>
   <form method="get" class="filter-grid" style="margin-top:12px;align-items:flex-end;">
     <input type="hidden" name="panel" value="payroll">
     <label class="field"><span>Год</span>
@@ -50,6 +50,8 @@
         <th class="inv-payroll-name">Сотрудник</th>
         <th class="inv-payroll-dept">Отдел</th>
         <th class="inv-payroll-hours">Часы СКУД за {{ payroll_month_name }} {{ payroll_year }}</th>
+        <th class="inv-payroll-st" title="Аванс за месяц учтён">Аванс</th>
+        <th class="inv-payroll-st" title="Расчёт ЗП за месяц завершён">ЗП</th>
         <th class="inv-payroll-action"></th>
       </tr>
     </thead>
@@ -60,10 +62,12 @@
         <td class="inv-payroll-name"><a href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">{{ row.label }}</a></td>
         <td class="inv-payroll-dept">{{ row.department_name|default:"—" }}</td>
         <td class="inv-payroll-hours">{{ row.skud_hours }}</td>
+        <td class="inv-payroll-st">{% if row.payroll_advance_ok %}<span class="inv-payroll-ok" title="Аванс учтён">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td class="inv-payroll-st">{% if row.payroll_month_ok %}<span class="inv-payroll-ok" title="Расчёт ЗП закрыт">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td class="inv-payroll-action"><a class="btn btn-sm" href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">Расчёт</a></td>
       </tr>
       {% empty %}
-      <tr><td colspan="5" class="muted">Нет сотрудников для расчёта (права по отделам или недоступна БД Biota).</td></tr>
+      <tr><td colspan="7" class="muted">Нет сотрудников для расчёта (права по отделам или недоступна БД Biota).</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -1009,6 +1013,7 @@
     </label>
     <label class="field"><span>Кол-во брака</span><input type="number" name="defect_quantity" min="0" value="0"></label>
     <label class="field"><span>Неисправно</span><input type="number" name="bad_quantity" min="0" value="0"></label>
+    <label class="field"><span>Потенциальный брак</span><input type="number" name="potential_defect_quantity" min="0" value="0"></label>
     <label class="field"><span>Изделие</span><input type="text" name="product_name" placeholder="Название изделия"></label>
     <label class="field"><span>Причина брака</span><input type="text" name="defect_reason" required placeholder="Опишите причину"></label>
     <div class="filter-actions"><button type="submit" class="btn">Добавить запись</button></div>
@@ -1041,6 +1046,7 @@
       <col class="col-qty">
       <col class="col-good">
       <col class="col-bad">
+      <col class="col-potential">
       <col class="col-product">
       <col class="col-reason">
       {% if is_admin_user %}<col class="col-actions">{% endif %}
@@ -1052,6 +1058,7 @@
         <th class="defect-col-qty">Кол-во брака</th>
         <th class="defect-col-good">Исправно</th>
         <th class="defect-col-bad">Неисправно</th>
+        <th class="defect-col-potential">Потенциальный брак</th>
         <th class="defect-col-product">Изделие</th>
         <th class="defect-col-reason">Причина брака</th>
         {% if is_admin_user %}<th class="defect-col-actions">Действия</th>{% endif %}
@@ -1102,6 +1109,13 @@
           {{ rec.bad_quantity }}
           {% endif %}
         </td>
+        <td class="defect-col-potential">
+          {% if biota_can_edit or is_admin_user %}
+          <input class="defect-cell-input defect-num-input" type="number" name="potential_defect_quantity" min="0" value="{{ rec.potential_defect_quantity }}" form="defect-edit-form-{{ rec.id }}" readonly>
+          {% else %}
+          {{ rec.potential_defect_quantity }}
+          {% endif %}
+        </td>
         <td class="defect-col-product">
           {% if biota_can_edit or is_admin_user %}
           <input class="defect-cell-input" type="text" name="product_name" value="{{ rec.product_name }}" form="defect-edit-form-{{ rec.id }}" readonly placeholder="Название изделия">
@@ -1145,7 +1159,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if is_admin_user %}8{% else %}7{% endif %}" class="muted">Записей по браку пока нет.</td></tr>
+      <tr><td colspan="{% if is_admin_user %}9{% else %}8{% endif %}" class="muted">Записей по браку пока нет.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -1735,6 +1749,7 @@
   .defects-table .col-qty { width: 92px; }
   .defects-table .col-good { width: 92px; }
   .defects-table .col-bad { width: 96px; }
+  .defects-table .col-potential { width: 100px; }
   .defects-table .col-product { width: 210px; }
   .defects-table .col-actions { width: 96px; }
   .defects-table th.defect-col-reason,
@@ -1745,9 +1760,11 @@
   .defects-table td.defect-col-good,
   .defects-table td.defect-col-qty,
   .defects-table td.defect-col-bad,
+  .defects-table td.defect-col-potential,
   .defects-table th.defect-col-good,
   .defects-table th.defect-col-qty,
-  .defects-table th.defect-col-bad {
+  .defects-table th.defect-col-bad,
+  .defects-table th.defect-col-potential {
     text-align: center;
   }
   .defects-table td.defect-col-date,
