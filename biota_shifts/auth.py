@@ -558,10 +558,8 @@ def employees_df_for_nav(username: str | None, nav_key: str, employees_df: pd.Da
             if getattr(base, "empty", True):
                 return base
     filt = _nav_department_filters_map(rec).get(nk)
-    if (filt is None or filt == []) and nk in ("payroll", "employees"):
+    if (filt is None or filt == []) and nk == "payroll":
         filt = _nav_department_filters_map(rec).get("defects")
-    if (filt is None or filt == []) and nk == "employees":
-        filt = _nav_dep_filters_union_departments(rec)
     if filt is None:
         return base
     if not filt:

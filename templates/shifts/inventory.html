@@ -90,6 +90,9 @@
         <th>Отдел</th>
         <th>Должность</th>
         <th>Участок</th>
+        <th>Смена, ч</th>
+        <th>Ставка день, ₽/ч</th>
+        <th>Ставка ночь, ₽/ч</th>
       </tr>
     </thead>
     <tbody>
@@ -102,9 +105,12 @@
         <td class="emp-dir-cell">{{ er.department_name|default:"—" }}</td>
         <td class="emp-dir-cell">{{ er.position_name|default:"—" }}</td>
         <td class="emp-dir-cell">{{ er.area_name|default:"—" }}</td>
+        <td class="emp-dir-cell">{{ er.shift_hours|default:"—" }}</td>
+        <td class="emp-dir-cell">{% if er.hourly_rate_day is not None %}{{ er.hourly_rate_day }}{% else %}—{% endif %}</td>
+        <td class="emp-dir-cell">{% if er.hourly_rate_night is not None %}{{ er.hourly_rate_night }}{% else %}—{% endif %}</td>
       </tr>
       {% empty %}
-      <tr><td colspan="7" class="muted">Сотрудники не найдены (нет доступа по отделам, пустая выборка из БД или Biota недоступна).</td></tr>
+      <tr><td colspan="10" class="muted">Сотрудники не найдены (нет доступа по отделам, пустая выборка из БД или Biota недоступна).</td></tr>
       {% endfor %}
     </tbody>
   </table>

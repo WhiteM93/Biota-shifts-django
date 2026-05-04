@@ -196,7 +196,7 @@ def cabinet_view(request):
         ctx["priv_nav_rows"] = []
         for k in NAV_KEYS:
             sel_deps = [d for d in (_ndf.get(k) or []) if d in dep_opts]
-            if ctx["priv_selected"] and k in ("payroll", "employees") and k not in raw_ndf:
+            if ctx["priv_selected"] and k == "payroll" and k not in raw_ndf:
                 sel_deps = [d for d in (_ndf.get("defects") or []) if d in dep_opts]
             ctx["priv_nav_rows"].append(
                 {

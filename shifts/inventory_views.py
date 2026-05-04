@@ -39,6 +39,7 @@ from .models import (
     ToolItem,
     PurchaseRequest,
     EmployeeDefectRecord,
+    EmployeePayrollProfile,
     EmployeePayrollMonthStatus,
     TAP_HOLE_TYPES,
     TAP_TOOL_TYPES,
@@ -197,11 +198,17 @@ def inventory_view(request):
             cfg = biota_db.db_config()
             emp_df = employees_df_for_nav(username, "employees", biota_db.load_employees(cfg))
             if not emp_df.empty:
+                codes = [normalize_emp_code(str(x)) for x in emp_df["emp_code"].tolist() if normalize_emp_code(str(x))]
+                profile_by_code = {
+                    p.emp_code: p
+                    for p in EmployeePayrollProfile.objects.filter(emp_code__in=codes)
+                }
                 rows: list[dict] = []
                 for _, row in emp_df.iterrows():
-                    emp_code = str(row.get("emp_code") or "").strip()
+                    emp_code = normalize_emp_code(str(row.get("emp_code") or ""))
                     if not emp_code:
                         continue
+                    prof = profile_by_code.get(emp_code)
                     rows.append(
                         {
                             "emp_code": emp_code,
@@ -211,6 +218,9 @@ def inventory_view(request):
                             "department_name": str(row.get("department_name") or "").strip(),
                             "position_name": str(row.get("position_name") or "").strip(),
                             "area_name": str(row.get("area_name") or "").strip(),
+                            "shift_hours": prof.shift_hours if prof else None,
+                            "hourly_rate_day": prof.hourly_rate_day if prof and prof.hourly_rate_day is not None else None,
+                            "hourly_rate_night": prof.hourly_rate_night if prof and prof.hourly_rate_night is not None else None,
                         }
                     )
                 employee_table_rows = sorted(rows, key=lambda r: (r["label"].lower(), r["emp_code"]))
