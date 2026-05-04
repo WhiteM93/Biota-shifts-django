@@ -43,10 +43,10 @@ from .payroll_helpers import (
 
 def _advance_balance(total: Decimal, advance: Decimal) -> tuple[Decimal, Decimal]:
     """Остаток ко второй выплате; переплата, если аванс больше расчёта «к выплате»."""
-    tot = total if total is not None else Decimal("0")
+    tot = Decimal(str(total if total is not None else 0))
     if tot < 0:
         tot = Decimal("0")
-    adv = advance if advance is not None else Decimal("0")
+    adv = Decimal(str(advance if advance is not None else 0))
     if adv < 0:
         adv = Decimal("0")
     adv = adv.quantize(Decimal("0.01"))
