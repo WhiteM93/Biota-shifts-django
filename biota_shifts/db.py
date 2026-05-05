@@ -6,7 +6,7 @@ from datetime import date, datetime
 import pandas as pd
 import psycopg
 
-from biota_shifts.config import _config_str
+from biota_shifts.config import _config_str, biota_db_env
 
 
 def employee_active_where_suffix() -> str:
@@ -58,13 +58,13 @@ def _on_biota_unavailable(exc: Exception):
 def db_config() -> dict:
     """Подключение к PostgreSQL Biota. На каждом ПК: скопируйте `.streamlit/secrets.toml` из примера или задайте BIOTA_DB_* в окружении."""
     return {
-        "host": _config_str("BIOTA_DB_HOST", "localhost"),
-        "port": int(_config_str("BIOTA_DB_PORT", "5432") or "5432"),
-        "dbname": _config_str("BIOTA_DB_NAME", "biota_db"),
-        "user": _config_str("BIOTA_DB_USER", "biota_user"),
-        "password": _config_str("BIOTA_DB_PASSWORD", ""),
+        "host": biota_db_env("HOST", "localhost"),
+        "port": int(biota_db_env("PORT", "5432") or "5432"),
+        "dbname": biota_db_env("NAME", "biota_db"),
+        "user": biota_db_env("USER", "biota_user"),
+        "password": biota_db_env("PASSWORD", ""),
         # Keep UI responsive when DB is unreachable.
-        "connect_timeout": int(_config_str("BIOTA_DB_CONNECT_TIMEOUT", "3") or "3"),
+        "connect_timeout": int(biota_db_env("CONNECT_TIMEOUT", "3") or "3"),
     }
 
 

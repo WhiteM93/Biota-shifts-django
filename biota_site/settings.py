@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
+from biota_shifts.config import biota_db_env
 from biota_shifts.env_manual import load_env_file
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -186,12 +187,12 @@ LOGIN_REDIRECT_URL = "/home/"
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 
 # Те же переменные, что и у Streamlit-приложения (PostgreSQL Biota, пароль admin и т.д.)
-BIOTA_DB_HOST = os.getenv("BIOTA_DB_HOST", "localhost")
-BIOTA_DB_PORT = os.getenv("BIOTA_DB_PORT", "5432")
-BIOTA_DB_NAME = os.getenv("BIOTA_DB_NAME", "biota_db")
-BIOTA_DB_USER = os.getenv("BIOTA_DB_USER", "biota_user")
-BIOTA_DB_PASSWORD = os.getenv("BIOTA_DB_PASSWORD", "")
-BIOTA_DB_CONNECT_TIMEOUT = os.getenv("BIOTA_DB_CONNECT_TIMEOUT", "15")
+BIOTA_DB_HOST = biota_db_env("HOST", "localhost")
+BIOTA_DB_PORT = biota_db_env("PORT", "5432")
+BIOTA_DB_NAME = biota_db_env("NAME", "biota_db")
+BIOTA_DB_USER = biota_db_env("USER", "biota_user")
+BIOTA_DB_PASSWORD = biota_db_env("PASSWORD", "")
+BIOTA_DB_CONNECT_TIMEOUT = biota_db_env("CONNECT_TIMEOUT", "15")
 BIOTA_ADMIN_USERNAME = os.getenv("BIOTA_ADMIN_USERNAME", "admin")
 BIOTA_ADMIN_PASSWORD = os.getenv("BIOTA_ADMIN_PASSWORD", "")
 BIOTA_AUTH_COOKIE_SECRET = os.getenv("BIOTA_AUTH_COOKIE_SECRET", "")

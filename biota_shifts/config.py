@@ -35,6 +35,22 @@ def _config_str(key: str, default: str = "") -> str:
     return (default or "").strip()
 
 
+def _profile_env(prefix: str, key: str, default: str = "") -> str:
+    """Вернуть значение с учётом активного профиля (например BIOTA_DB_PROD_HOST)."""
+    profile = (os.getenv(f"{prefix}_PROFILE") or "").strip().upper()
+    if profile:
+        profile_key = f"{prefix}_{profile}_{key}"
+        profile_val = (os.getenv(profile_key) or "").strip()
+        if profile_val:
+            return profile_val
+    return _config_str(f"{prefix}_{key}", default)
+
+
+def biota_db_env(key: str, default: str = "") -> str:
+    """Переменные подключения к Biota DB с optional profile switch."""
+    return _profile_env("BIOTA_DB", key, default)
+
+
 def _schedule_dir() -> Path:
     """Папка с Excel графиками: env BIOTA_SCHEDULE_DIR или ./schedules рядом с app.py."""
     override = (os.getenv("BIOTA_SCHEDULE_DIR") or "").strip()

@@ -1,0 +1,45 @@
+{% if cad_inline_preview and biota_can_edit %}
+<div id="product-save-preview-block" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+  <button type="button" class="btn btn-ghost" id="save-list-preview-btn">Сохранить превью для списка</button>
+  <p class="muted" id="save-list-preview-msg" style="display:none;"></p>
+</div>
+{% endif %}
+{% if setups %}
+<div class="product-side-programs" id="product-side-programs">
+  {% for setup in setups %}
+  <div class="setup-program-files-inline product-side-program-files" data-setup-id="{{ setup.pk }}" data-setup-tab="{{ setup.tab_slug }}" {% if tab_default != setup.tab_slug %}hidden{% endif %}>
+    <div class="setup-program-meta-row">
+      <ul class="setup-program-files-list setup-program-files-list-side">
+        {% for pf in setup.program_file_list %}
+        <li class="setup-program-file-item setup-program-file-item-side" data-program-file-id="{{ pf.pk }}">
+          <a href="{{ pf.file.url }}" download class="btn product-btn-program setup-side-program-download">{{ pf.display_name }}</a>
+          {% if biota_can_edit %}
+          <button type="button" class="btn btn-ghost setup-program-file-delete js-setup-program-file-delete" data-program-file-id="{{ pf.pk }}" data-setup-id="{{ setup.pk }}" title="Удалить файл" aria-label="Удалить файл программы"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
+          {% endif %}
+        </li>
+        {% empty %}
+        <li class="setup-program-file-empty muted">—</li>
+        {% endfor %}
+      </ul>
+      {% if biota_can_edit %}
+      <span class="setup-program-upload-wrap" hidden>
+        <button type="button" class="btn btn-ghost setup-program-upload-btn" data-setup-id="{{ setup.pk }}" title="Добавить файл программы" aria-label="Добавить файл программы" hidden><i class="fi fi-br-plus ui-icon" aria-hidden="true"></i></button>
+        <input type="file" class="setup-program-upload-input" data-setup-program-input="{{ setup.pk }}" hidden />
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+<div class="product-downloads" id="product-downloads-block">
+  {% if product.cad_model %}
+  <a href="{{ product.cad_model.url }}" download class="btn">Скачать 3D-модель{% if cad_ext %} (.{{ cad_ext }}){% endif %}</a>
+  {% endif %}
+  {% if product.preview_stl %}
+  <a href="{{ product.preview_stl.url }}" download class="btn product-btn-secondary">Скачать STL</a>
+  {% endif %}
+  {% if product.drawing_pdf %}
+  <a href="{{ product.drawing_pdf.url }}" download class="btn product-btn-secondary">Скачать чертёж (PDF)</a>
+  {% endif %}
+</div>

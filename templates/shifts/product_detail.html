@@ -69,37 +69,11 @@
           <div class="product-setup-left-col">
             <div class="product-setup-spec-group">
               <h5>Привязки и заготовка</h5>
-              <div class="setup-spec-split">
-                <div class="setup-spec-box setup-spec-box-header">
+              <div class="setup-meta-bindings-layout">
                 <div class="setup-spec-col setup-spec-col-meta">
                   <div class="setup-meta-columns">
                     <div class="setup-meta-col setup-meta-col-left">
                       <div><span class="muted">Размер:</span> <span data-field-text="size">{{ setup.size|default:"—" }}</span></div>
-                      <div class="setup-program-files-inline" data-setup-id="{{ setup.pk }}">
-                        <div class="setup-program-meta-row">
-                          <span class="muted">Программы:</span>
-                          <ul class="setup-program-files-list">
-                            {% for pf in setup.program_file_list %}
-                            <li class="setup-program-file-item" data-program-file-id="{{ pf.pk }}">
-                              <a href="{{ pf.file.url }}" download class="setup-program-file-link">{{ pf.display_name }}</a>
-                              {% if biota_can_edit %}
-                              <button type="button" class="btn btn-ghost setup-program-file-delete js-setup-program-file-delete" data-program-file-id="{{ pf.pk }}" data-setup-id="{{ setup.pk }}" title="Удалить файл" aria-label="Удалить файл программы"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
-                              {% endif %}
-                            </li>
-                            {% empty %}
-                            <li class="setup-program-file-empty muted">—</li>
-                            {% endfor %}
-                          </ul>
-                          {% if biota_can_edit %}
-                          <span class="setup-program-upload-wrap">
-                            <button type="button" class="btn btn-ghost setup-program-upload-btn" data-setup-id="{{ setup.pk }}" title="Добавить файл программы" aria-label="Добавить файл программы" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
-                            <input type="file" class="setup-program-upload-input" data-setup-program-input="{{ setup.pk }}" hidden />
-                          </span>
-                          {% endif %}
-                        </div>
-                      </div>
-                    </div>
-                    <div class="setup-meta-col setup-meta-col-right">
                       <div class="setup-row-photo">
                         <span class="muted">Тип:</span> <span data-field-text="workpiece">{{ setup.workpiece|default:"—" }}</span>
                         {% if setup.workpiece_photo %}
@@ -116,7 +90,7 @@
                     </div>
                   </div>
                 </div>
-                </div>
+                <div class="setup-spec-split">
                 <div class="setup-spec-stack">
                 {% if biota_can_edit %}
                 <div class="setup-spec-actions" hidden>
@@ -196,6 +170,7 @@
                 </div>
                 </div>
                 </div>
+              </div>
               </div>
             </div>
             {% if biota_can_edit %}
@@ -315,38 +290,11 @@
     {% else %}
     <p class="muted">3D не загружен.</p>
     {% endif %}
-    {% if cad_inline_preview and biota_can_edit %}
-    <div id="product-save-preview-block" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
-      <button type="button" class="btn btn-ghost" id="save-list-preview-btn">Сохранить превью для списка</button>
-      <p class="muted" id="save-list-preview-msg" style="display:none;"></p>
-    </div>
-    {% endif %}
-    <div class="product-downloads" id="product-downloads-block">
-      {% if product.cad_model %}
-      <a href="{{ product.cad_model.url }}" download class="btn">Скачать 3D-модель{% if cad_ext %} (.{{ cad_ext }}){% endif %}</a>
-      {% endif %}
-      {% if product.preview_stl %}
-      <a href="{{ product.preview_stl.url }}" download class="btn product-btn-secondary">Скачать STL</a>
-      {% endif %}
-      {% if product.drawing_pdf %}
-      <a href="{{ product.drawing_pdf.url }}" download class="btn product-btn-secondary">Скачать чертёж (PDF)</a>
-      {% endif %}
-      <a href="#" download class="btn product-btn-program" id="product-program-download" hidden>Скачать программу</a>
-    </div>
+    {% include "shifts/_product_detail_side_meta.html" %}
     </div>
   </div>
 </div>
-<div id="setup-photo-modal" class="setup-photo-modal" hidden>
-  <div class="setup-photo-modal-backdrop" data-close-photo-modal="1"></div>
-  <div class="setup-photo-modal-dialog" role="dialog" aria-modal="true" aria-label="Просмотр фото">
-    <button type="button" class="setup-photo-modal-close btn btn-ghost" id="setup-photo-modal-close">×</button>
-    <img id="setup-photo-modal-img" src="" alt="" />
-    <p id="setup-photo-modal-caption" class="muted" style="margin:8px 0 0 0;"></p>
-  </div>
-</div>
-<div id="binding-photo-preview-pop" class="binding-photo-preview-pop" hidden aria-hidden="true">
-  <img src="" alt="" decoding="async" />
-</div>
+{% include "shifts/_product_detail_modals.html" %}
 
 <style>
   @import url("https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css");
@@ -686,16 +634,125 @@
     max-width: 100%;
     gap: 4px;
   }
+  .setup-meta-bindings-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    width: 100%;
+  }
+  .setup-meta-bindings-layout > .setup-spec-col-meta,
+  .setup-meta-bindings-layout > .setup-spec-split {
+    width: 100%;
+    min-width: 0;
+  }
+  .setup-meta-bindings-layout .setup-spec-stack {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    width: 100%;
+  }
   .setup-meta-columns {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
     min-width: 0;
   }
+  .setup-spec-col-meta .setup-meta-columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    width: 100%;
+    align-items: stretch;
+  }
+  .setup-spec-col-meta .setup-meta-col-left {
+    justify-self: stretch;
+    text-align: left;
+    width: 100%;
+    max-width: none;
+  }
+  .setup-spec-col-meta .setup-meta-col-right {
+    justify-self: stretch;
+    text-align: right;
+    width: auto;
+    max-width: none;
+  }
   .setup-meta-col-right {
     padding-left: 14px;
     border-left: 1px dashed #3a4a6a;
     justify-self: stretch;
+  }
+  .setup-spec-col-meta .setup-meta-col {
+    border: 1px solid rgba(58, 74, 106, 0.6);
+    border-radius: 10px;
+    background: rgba(17, 24, 38, 0.5);
+    padding: 6px 8px;
+    gap: 6px;
+    height: 100%;
+    box-sizing: border-box;
+    width: 100%;
+  }
+  .setup-spec-col-meta .setup-meta-col-right {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .setup-spec-col-meta .setup-meta-col > div {
+    min-height: 26px;
+    border-radius: 7px;
+    padding: 2px 4px;
+  }
+  .setup-spec-col-meta .setup-meta-col > div > .muted {
+    flex: 0 0 74px;
+    min-width: 74px;
+    font-size: 12px;
+    color: #b7c4db;
+  }
+  .setup-spec-col-meta .setup-meta-col-right > div {
+    display: grid;
+    grid-template-columns: 74px minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 6px;
+  }
+  .setup-spec-col-meta .setup-meta-col-right > div > .muted {
+    text-align: right;
+    justify-self: end;
+  }
+  .setup-spec-col-meta .setup-meta-col-right > div > [data-field-text] {
+    justify-self: start;
+  }
+  .setup-spec-col-meta .setup-meta-col-right .binding-photo-link,
+  .setup-spec-col-meta .setup-meta-col-right .setup-binding-photo-btn {
+    width: 22px;
+    min-width: 22px;
+    height: 22px;
+    min-height: 22px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .setup-spec-col-meta .setup-meta-col-left > div {
+    display: grid;
+    grid-template-columns: 74px minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 6px;
+  }
+  .setup-spec-col-meta .setup-meta-col-left > div > .muted {
+    text-align: right;
+    justify-self: end;
+  }
+  .setup-spec-col-meta .setup-meta-col-left .binding-photo-link,
+  .setup-spec-col-meta .setup-meta-col-left .setup-binding-photo-btn {
+    width: 22px;
+    min-width: 22px;
+    height: 22px;
+    min-height: 22px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .setup-spec-col-meta .setup-meta-col > div > [data-field-text] {
+    max-width: none;
   }
   .setup-meta-col {
     display: grid;
@@ -872,6 +929,146 @@
     display: inline-flex;
     align-items: center;
     flex: 0 0 auto;
+  }
+  .product-side-programs {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .product-side-program-files[hidden] {
+    display: none !important;
+  }
+  .product-side-program-files .setup-program-meta-row {
+    border: 1px solid #2f3b57;
+    border-radius: 10px;
+    background: rgba(20, 27, 41, 0.85);
+    padding: 8px 10px;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .setup-program-meta-row.is-file-drop-target {
+    border-color: #6f8fd9;
+    box-shadow: inset 0 0 0 1px rgba(111, 143, 217, 0.45), 0 0 0 2px rgba(111, 143, 217, 0.15);
+    background: rgba(30, 44, 72, 0.9);
+  }
+  .setup-program-meta-row.is-file-drop-target .setup-side-program-download {
+    color: #ffe88a;
+  }
+  .product-side-program-files .setup-program-upload-wrap {
+    flex: 0 0 100%;
+    width: 100%;
+    justify-content: center;
+    margin-top: 2px;
+  }
+  .product-side-program-files .setup-program-upload-btn {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    min-height: 24px;
+    padding: 0;
+  }
+  .setup-program-upload-btn-side {
+    width: 22px;
+    min-width: 22px;
+    height: 22px;
+    min-height: 22px;
+    padding: 0;
+    flex: 0 0 22px;
+    margin-right: 2px;
+  }
+  .setup-program-upload-btn-side .ui-icon {
+    font-size: 12px;
+  }
+  .setup-program-files-list-side {
+    gap: 6px;
+    flex: 1 1 100%;
+  }
+  .setup-program-file-item-side {
+    align-items: stretch;
+    gap: 6px;
+    position: relative;
+  }
+  .setup-side-program-download {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 0;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: underline;
+    border: 1px solid #33415f;
+    background: transparent;
+  }
+  .setup-side-program-download:hover,
+  .setup-side-program-download:focus {
+    color: #ffe88a;
+  }
+  .product-side-program-files .setup-side-program-download {
+    background: linear-gradient(180deg, rgba(49, 108, 69, 0.88) 0%, rgba(37, 84, 54, 0.92) 100%);
+    border-color: #65b17c;
+    color: #e5ffe9;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(8, 24, 14, 0.28);
+  }
+  .product-side-program-files .setup-side-program-download:hover,
+  .product-side-program-files .setup-side-program-download:focus {
+    background: linear-gradient(180deg, rgba(61, 124, 81, 0.92) 0%, rgba(45, 96, 64, 0.96) 100%);
+    border-color: #80ca97;
+    color: #ffe88a;
+  }
+  .product-setup-notes .setup-side-program-download {
+    display: inline-flex;
+    max-width: 100%;
+    width: fit-content;
+    margin: 2px 4px 2px 0;
+    vertical-align: middle;
+    border: 0;
+    box-shadow: none;
+    padding: 0 10px;
+    box-sizing: border-box;
+  }
+  .product-side-program-files .js-setup-program-file-delete {
+    display: none !important;
+  }
+  .setup-inline-edit-enabled .product-side-program-files .js-setup-program-file-delete {
+    display: inline-flex !important;
+  }
+  .setup-program-file-item-side .setup-program-file-delete {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 0;
+    z-index: 2;
+  }
+  .setup-program-file-item-draft {
+    border: 1px dashed #3e4f74;
+    border-radius: 8px;
+    padding: 6px;
+    justify-content: flex-start;
+  }
+  .setup-program-file-item-draft .setup-program-upload-btn {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    min-height: 24px;
+    padding: 0;
   }
   .product-tab-panel .js-setup-program-file-delete {
     display: none !important;
@@ -1187,6 +1384,10 @@
     flex-wrap: wrap;
   }
   @media (max-width: 760px) {
+    .setup-meta-bindings-layout {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
     .setup-spec-split {
       grid-template-columns: 1fr;
       gap: 8px;
@@ -1198,6 +1399,10 @@
     .setup-meta-columns {
       grid-template-columns: 1fr;
       gap: 8px;
+    }
+    .setup-spec-col-meta .setup-meta-col > div {
+      padding: 2px 0;
+      border-radius: 0;
     }
     .product-setup-specs {
       grid-template-columns: 1fr;
@@ -1875,14 +2080,12 @@
         return;
       }
       var btn = root.querySelector('.product-tab[data-tab="' + tabName + '"]');
-      var setupName = btn ? (btn.getAttribute("data-setup-name") || "") : "";
       var programUrl = btn ? (btn.getAttribute("data-program-url") || "") : "";
       var programFilename = btn ? (btn.getAttribute("data-program-filename") || "") : "";
       if (!programUrl) {
         if (tabName === "program") {
           programUrl = root.getAttribute("data-product-program-url") || "";
           programFilename = root.getAttribute("data-product-program-filename") || "";
-          setupName = "";
         } else {
           programDownloadBtn.hidden = true;
           return;
@@ -1893,11 +2096,7 @@
         return;
       }
       programDownloadBtn.href = programUrl;
-      if (setupName) {
-        programDownloadBtn.textContent = "Скачать " + setupName + ": " + (programFilename || "программа");
-      } else {
-        programDownloadBtn.textContent = "Скачать: " + (programFilename || "программа");
-      }
+      programDownloadBtn.textContent = programFilename || "программа";
       programDownloadBtn.hidden = false;
     }
 
@@ -1930,11 +2129,18 @@
       var grid = document.querySelector(".product-detail-grid");
       var savePreviewBlock = document.getElementById("product-save-preview-block");
       var downloadsBlock = document.getElementById("product-downloads-block");
+      var sideProgramWrap = document.getElementById("product-side-programs");
       if (side) side.hidden = false;
       if (side) side.setAttribute("data-current-tab", tabName || "");
       if (grid) grid.classList.toggle("is-drawing-only", false);
       if (savePreviewBlock) savePreviewBlock.hidden = false;
       if (downloadsBlock) downloadsBlock.hidden = false;
+      if (sideProgramWrap) {
+        sideProgramWrap.querySelectorAll(".product-side-program-files").forEach(function (el) {
+          var isMatch = el.getAttribute("data-setup-tab") === tabName;
+          el.hidden = !isMatch;
+        });
+      }
       if (typeof window.startProductCadViewer === "function") {
         window.startProductCadViewer();
       }
@@ -2267,6 +2473,7 @@
       var panel = activeSetupPanel();
       if (!panel) return;
       inlineEditMode = !inlineEditMode;
+      document.body.classList.toggle("setup-inline-edit-enabled", inlineEditMode);
       var toolbar = panel.querySelector(".setup-inline-toolbar-block");
       if (toolbar) {
         if (inlineEditMode) toolbar.removeAttribute("hidden");
@@ -2335,7 +2542,7 @@
         if (inlineEditMode) btn.removeAttribute("hidden");
         else btn.setAttribute("hidden", "hidden");
       });
-      root.querySelectorAll(".setup-program-upload-btn").forEach(function (btn) {
+      document.querySelectorAll(".setup-program-upload-btn").forEach(function (btn) {
         if (inlineEditMode) btn.removeAttribute("hidden");
         else btn.setAttribute("hidden", "hidden");
       });
@@ -2348,6 +2555,7 @@
 
     function forceDisableInlineEdit() {
       inlineEditMode = false;
+      document.body.classList.remove("setup-inline-edit-enabled");
       editToggleBtn.textContent = "Быстрое редактирование";
       root.querySelectorAll(".setup-inline-toolbar-block").forEach(function (toolbar) {
         toolbar.setAttribute("hidden", "hidden");
@@ -2372,7 +2580,7 @@
       root.querySelectorAll(".setup-binding-photo-btn").forEach(function (btn) {
         btn.setAttribute("hidden", "hidden");
       });
-      root.querySelectorAll(".setup-program-upload-btn").forEach(function (btn) {
+      document.querySelectorAll(".setup-program-upload-btn").forEach(function (btn) {
         btn.setAttribute("hidden", "hidden");
       });
       root.querySelectorAll(".js-inline-gcode-system").forEach(function (sel) {
@@ -2631,7 +2839,7 @@
       }
     });
 
-    root.addEventListener("click", async function (e) {
+    document.addEventListener("click", async function (e) {
       var btnSaveCaption = e.target.closest(".js-setup-photo-save-caption");
       if (btnSaveCaption) {
         var figure = btnSaveCaption.closest(".setup-photo-figure");
@@ -2761,11 +2969,35 @@
 
       var btnProgramUpload = e.target.closest(".setup-program-upload-btn");
       if (btnProgramUpload) {
+        if (btnProgramUpload.classList.contains("js-side-program-add-block")) {
+          // Handled by side-panel draft block action below.
+        } else {
         var setupIdProgram = btnProgramUpload.getAttribute("data-setup-id") || "";
         if (!setupIdProgram) return;
-        var localProgramScope = btnProgramUpload.closest(".setup-spec-box") || btnProgramUpload.closest(".product-tab-panel") || root;
+        var localProgramScope = btnProgramUpload.closest(".setup-program-files-inline") || btnProgramUpload.closest(".setup-spec-box") || btnProgramUpload.closest(".product-tab-panel") || root;
         var programInput = localProgramScope.querySelector('.setup-program-upload-input[data-setup-program-input="' + setupIdProgram + '"]');
         if (programInput) programInput.click();
+        return;
+        }
+      }
+
+      var btnAddSideProgramBlock = e.target.closest(".js-side-program-add-block");
+      if (btnAddSideProgramBlock) {
+        var sideSetupId = btnAddSideProgramBlock.getAttribute("data-setup-id") || "";
+        if (!sideSetupId) return;
+        addSideProgramDraft(sideSetupId);
+        return;
+      }
+
+      var btnDraftProgramUpload = e.target.closest(".js-side-program-draft-upload");
+      if (btnDraftProgramUpload) {
+        var draftSetupId = btnDraftProgramUpload.getAttribute("data-setup-id") || "";
+        if (!draftSetupId) return;
+        var sideWrap = btnDraftProgramUpload.closest(".setup-program-files-inline");
+        if (!sideWrap) return;
+        var sideInput = sideWrap.querySelector('.setup-program-upload-input[data-setup-program-input="' + draftSetupId + '"]');
+        if (sideInput) sideInput.click();
+        return;
       }
 
       var btnSaveNew = e.target.closest(".js-save-new-photo");
@@ -2937,13 +3169,20 @@
     }
 
     function renderSetupProgramFilesList(panel, setupId, data) {
-      if (!panel || !data) return;
-      var wrap = panel.querySelector('.setup-program-files-inline[data-setup-id="' + setupId + '"]');
+      if (!data) return;
+      var wrap = panel ? panel.querySelector('.setup-program-files-inline[data-setup-id="' + setupId + '"]') : null;
+      if (!wrap) {
+        wrap = document.querySelector('#product-side-programs .setup-program-files-inline[data-setup-id="' + setupId + '"]');
+      }
       if (!wrap) return;
       var ul = wrap.querySelector(".setup-program-files-list");
       if (!ul) return;
       var files = data.program_files || [];
-      var editMode = panel.getAttribute("data-inline-edit-mode") === "1";
+      var isSide = wrap.classList.contains("product-side-program-files");
+      var editMode = !!(panel && panel.getAttribute("data-inline-edit-mode") === "1");
+      if (isSide && !editMode) {
+        editMode = !!root.querySelector('.product-tab-panel[data-inline-edit-mode="1"]');
+      }
       ul.textContent = "";
       if (!files.length) {
         var li0 = document.createElement("li");
@@ -2953,12 +3192,12 @@
       } else {
         files.forEach(function (f) {
           var li = document.createElement("li");
-          li.className = "setup-program-file-item";
+          li.className = "setup-program-file-item" + (isSide ? " setup-program-file-item-side" : "");
           li.setAttribute("data-program-file-id", String(f.id));
           var a = document.createElement("a");
           a.href = f.url || "#";
           a.setAttribute("download", "");
-          a.className = "setup-program-file-link";
+          a.className = isSide ? "btn product-btn-program setup-side-program-download" : "setup-program-file-link";
           a.textContent = f.name || "";
           li.appendChild(a);
           if (editMode) {
@@ -2975,15 +3214,27 @@
           ul.appendChild(li);
         });
       }
-      var emptyMsg = panel.querySelector(".setup-program-tab-empty-msg");
+      var emptyMsg = panel ? panel.querySelector(".setup-program-tab-empty-msg") : null;
       if (emptyMsg) emptyMsg.hidden = files.length > 0;
     }
 
-    async function handleProgramUploadInputChange(input) {
-        var file = input.files && input.files[0];
-        if (!file) return;
-        var setupId = input.getAttribute("data-setup-program-input") || "";
-        if (!setupId) return;
+    function addSideProgramDraft(setupId) {
+      if (!setupId) return;
+      var wrap = document.querySelector('#product-side-programs .setup-program-files-inline[data-setup-id="' + setupId + '"]');
+      if (!wrap) return;
+      var ul = wrap.querySelector(".setup-program-files-list");
+      if (!ul) return;
+      var empty = ul.querySelector(".setup-program-file-empty");
+      if (empty) empty.remove();
+      var draft = document.createElement("li");
+      draft.className = "setup-program-file-item setup-program-file-item-side setup-program-file-item-draft";
+      draft.setAttribute("data-setup-id", setupId);
+      draft.innerHTML = '<button type="button" class="btn btn-ghost setup-program-upload-btn js-side-program-draft-upload" data-setup-id="' + setupId + '" aria-label="Добавить файл программы" title="Добавить файл программы"><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>';
+      ul.appendChild(draft);
+    }
+
+    async function uploadSetupProgramFile(setupId, file, panelHint) {
+        if (!file || !setupId) return;
         var fd = new FormData();
         fd.append("action", "inline_replace_setup_program");
         fd.append("setup_id", setupId);
@@ -2997,20 +3248,30 @@
         var data = await res.json();
         if (!res.ok || !data.ok) {
           alert(data.error || "Не удалось загрузить программу.");
-          input.value = "";
           return;
         }
-        var panel = input.closest(".product-tab-panel");
+        var panel = panelHint || null;
         renderSetupProgramFilesList(panel, setupId, data);
-        var tabBtn = root.querySelector(".product-tab.is-active");
+        var tabBtn = document.getElementById("tab-setup-" + setupId) || root.querySelector(".product-tab.is-active");
         if (tabBtn) {
           tabBtn.setAttribute("data-program-url", data.program_url || "");
           tabBtn.setAttribute("data-program-filename", data.program_filename || file.name || "");
         }
+        var tabNameNow = (root.querySelector(".product-tab.is-active") || {}).getAttribute("data-tab") || "";
+        setProgramDownloadByTab(tabNameNow);
+    }
+
+    async function handleProgramUploadInputChange(input) {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        var setupId = input.getAttribute("data-setup-program-input") || "";
+        if (!setupId) return;
+        var panel = input.closest(".product-tab-panel");
+        await uploadSetupProgramFile(setupId, file, panel);
         input.value = "";
     }
 
-    root.addEventListener("change", function (e) {
+    document.addEventListener("change", function (e) {
       var input = e.target;
       if (!input || !input.classList) return;
       if (input.classList.contains("setup-binding-photo-input")) {
@@ -3020,6 +3281,34 @@
       if (input.classList.contains("setup-program-upload-input")) {
         handleProgramUploadInputChange(input);
       }
+    });
+    document.addEventListener("dragover", function (e) {
+      var row = e.target && e.target.closest ? e.target.closest(".setup-program-meta-row") : null;
+      if (!row) return;
+      if (!e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
+      e.preventDefault();
+      row.classList.add("is-file-drop-target");
+      try { e.dataTransfer.dropEffect = "copy"; } catch (_) {}
+    });
+    document.addEventListener("dragleave", function (e) {
+      var row = e.target && e.target.closest ? e.target.closest(".setup-program-meta-row.is-file-drop-target") : null;
+      if (!row) return;
+      row.classList.remove("is-file-drop-target");
+    });
+    document.addEventListener("drop", async function (e) {
+      var row = e.target && e.target.closest ? e.target.closest(".setup-program-meta-row") : null;
+      if (!row) return;
+      if (!e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
+      e.preventDefault();
+      row.classList.remove("is-file-drop-target");
+      var wrap = row.closest(".setup-program-files-inline");
+      if (!wrap) return;
+      var setupId = wrap.getAttribute("data-setup-id") || "";
+      if (!setupId) return;
+      var file = e.dataTransfer.files[0];
+      if (!file) return;
+      var panelHint = wrap.closest(".product-tab-panel");
+      await uploadSetupProgramFile(setupId, file, panelHint);
     });
   })();
   (function () {
