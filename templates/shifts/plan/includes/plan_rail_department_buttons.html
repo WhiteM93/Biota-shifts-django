@@ -1,0 +1,8 @@
+<div class="plan-rail-dept-grid">
+{% for row in items %}
+  <a
+    href="{% url 'plan_department_planning' slug=row.slug %}"
+    class="btn btn-sm btn-ghost plan-rail-dept-link{% if row.muted %} plan-rail-dept-link--muted{% endif %}"
+  >{{ row.label }}</a>
+{% endfor %}
+</div>

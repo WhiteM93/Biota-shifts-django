@@ -1,0 +1,206 @@
+<style id="plan-section-rails-styles">
+  /*
+    Сообщения (ul.messages) в base.html выше блока контента —
+    отступы, чтобы не заходить под фиксированные plan-rail.
+  */
+  .container:has(.plan-article-rails-root) ul.messages {
+    margin: 0 44px 12px 44px !important;
+    box-sizing: border-box;
+  }
+
+  .plan-article-rails-root { position: relative; }
+  .plan-article-main {
+    box-sizing: border-box;
+    padding-left: 44px;
+    padding-right: 44px;
+    min-width: 0;
+  }
+
+  .plan-rail {
+    --plan-rail-top: 56px;
+    --plan-rail-w: 40px;
+    --plan-rail-sheet: min(260px, calc(100vw - 56px));
+    z-index: 17;
+  }
+  .plan-rail__strip {
+    position: fixed;
+    top: var(--plan-rail-top);
+    bottom: 0;
+    width: var(--plan-rail-w);
+    background: linear-gradient(180deg, rgba(28, 38, 58, 0.97) 0%, rgba(18, 24, 38, 0.98) 100%);
+    border-color: #2f3d5c;
+    border-style: solid;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 0;
+    box-shadow: 4px 0 18px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(8px);
+  }
+  .plan-rail--left .plan-rail__strip {
+    left: 0;
+    border-width: 0 1px 0 0;
+  }
+  .plan-rail--right .plan-rail__strip {
+    right: 0;
+    border-width: 0 0 0 1px;
+    box-shadow: -4px 0 18px rgba(0, 0, 0, 0.2);
+  }
+  .plan-rail__peek {
+    flex: 1;
+    width: 100%;
+    margin: 0;
+    padding: 8px 4px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #c7d4fb;
+    font: inherit;
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+  .plan-rail__peek:hover {
+    background: rgba(79, 97, 144, 0.35);
+    color: #fff;
+  }
+  .plan-rail--open .plan-rail__peek {
+    background: rgba(79, 97, 144, 0.45);
+    color: #fff;
+  }
+  .plan-rail__peek-text {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .plan-rail__sheet {
+    position: fixed;
+    top: var(--plan-rail-top);
+    bottom: 0;
+    width: var(--plan-rail-sheet);
+    padding: 12px;
+    box-sizing: border-box;
+    background: rgba(20, 28, 44, 0.98);
+    border: 1px solid #3a4a72;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 0.22s ease, opacity 0.2s ease, visibility 0.2s ease;
+    overflow: hidden auto;
+    backdrop-filter: blur(10px);
+  }
+  .plan-rail--left .plan-rail__sheet {
+    left: var(--plan-rail-w);
+    transform: translateX(-16px);
+    border-radius: 0 12px 12px 0;
+  }
+  .plan-rail--right .plan-rail__sheet {
+    right: var(--plan-rail-w);
+    transform: translateX(16px);
+    border-radius: 12px 0 0 12px;
+  }
+  .plan-rail--open .plan-rail__sheet {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+
+  .plan-rail__sheet-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #c9d5ff;
+    margin: 0 0 2px 0;
+    letter-spacing: 0.04em;
+  }
+  .plan-rail__sheet-hint {
+    font-size: 11px;
+    color: #7d8fba;
+    line-height: 1.35;
+    margin: 0 0 6px 0;
+  }
+  .plan-rail__btn-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .plan-rail__btn-stack .btn {
+    justify-content: center;
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .plan-rail-dept-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 4px;
+  }
+  .plan-rail-dept-grid .plan-rail-dept-link {
+    font-size: 12px !important;
+    padding: 6px 10px !important;
+    min-height: 0 !important;
+    cursor: pointer;
+    opacity: 0.94;
+    line-height: 1.25 !important;
+    justify-content: center;
+    text-align: center;
+    box-sizing: border-box;
+    text-decoration: none;
+    white-space: normal;
+    color: #c7d5f8;
+    border-width: 1px;
+  }
+  .plan-rail-dept-grid .plan-rail-dept-link:hover {
+    opacity: 1;
+    color: #eef2ff;
+    border-color: rgba(120, 140, 200, 0.55);
+  }
+  /* ПКИ: «серая», отдельная от активных отделов */
+  .plan-rail-dept-grid .plan-rail-dept-link--muted {
+    color: #7f8cae !important;
+    border-color: rgba(90, 105, 140, 0.45);
+    background: rgba(255, 255, 255, 0.02);
+    opacity: 0.88;
+    font-weight: 500;
+  }
+  .plan-rail-dept-grid .plan-rail-dept-link--muted:hover {
+    color: #9aa9c9 !important;
+    border-color: rgba(105, 120, 155, 0.6);
+    background: rgba(255, 255, 255, 0.035);
+    opacity: 1;
+  }
+
+  .plan-rail-dismiss {
+    flex-shrink: 0;
+    align-self: flex-start;
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+    opacity: 0.85;
+  }
+
+  @media (max-width: 720px) {
+    .plan-rail {
+      display: none;
+    }
+    .plan-article-main {
+      padding-left: 0;
+      padding-right: 0;
+    }
+    .container:has(.plan-article-rails-root) ul.messages {
+      margin: 0 0 12px 0 !important;
+    }
+  }
+</style>

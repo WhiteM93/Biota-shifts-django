@@ -1,0 +1,8 @@
+<div class="planned-product-name-stack planned-product-name-stack--h1 {% if not code %}planned-product-name-stack--solo{% endif %}" {% if full %}title="{{ full }}"{% endif %}>
+{% if code %}
+<span class="planned-product-name-stack__code">{{ code }}</span>
+<span class="planned-product-name-stack__primary">{{ title }}</span>
+{% else %}
+<span class="planned-product-name-stack__primary">{{ title }}</span>
+{% endif %}
+</div>

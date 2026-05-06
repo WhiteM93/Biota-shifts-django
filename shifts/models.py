@@ -1,6 +1,17 @@
+import os
+
 from django.core.validators import FileExtensionValidator
 from django.db import models
-import os
+
+from .plan_departments import PLANNED_PRODUCT_DEPARTMENT_CHOICES
+
+# Тип входящей заготовки для позиций плана «изделие» (маршрутизация планирования по отделам).
+PLANNED_PRODUCT_WORKPIECE_TYPE_CHOICES = [
+    ("preparatory", "Заготовительный"),
+    ("laser", "Лазерный"),
+    ("pki", "ПКИ"),
+]
+PLANNED_PRODUCT_WORKPIECE_TYPE_VALUES = frozenset(c[0] for c in PLANNED_PRODUCT_WORKPIECE_TYPE_CHOICES)
 
 
 THREAD_STANDARDS = [
@@ -778,3 +789,179 @@ class ProductSetupPhoto(models.Model):
 
     def __str__(self) -> str:
         return f"{self.product_id} #{self.pk}"
+
+
+class PlannedProduct(models.Model):
+    """Изделие в разделе «План»: название и упорядоченные этапы по отделам."""
+
+    name = models.CharField(max_length=400, verbose_name="Название изделия")
+    is_assembly = models.BooleanField(
+        default=False,
+        verbose_name="Сборочное изделие",
+        help_text="Если да — задаётся состав из других изделий плана.",
+    )
+    is_purchased = models.BooleanField(
+        default=False,
+        verbose_name="Покупное изделие",
+        help_text="Закупная позиция без собственного изготовления на площадке; маршрут по отделам не обязателен.",
+    )
+    workpiece_type = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        choices=PLANNED_PRODUCT_WORKPIECE_TYPE_CHOICES,
+        verbose_name="Тип заготовки",
+        help_text="Только для обычного изделия: с какого направления поступает заготовка (для планирования по отделам).",
+    )
+    laser_sheet_thickness_mm = models.DecimalField(
+        max_digits=8,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        verbose_name="Толщина листа (лазер), мм",
+    )
+    laser_material_marking = models.CharField(
+        max_length=240,
+        blank=True,
+        default="",
+        verbose_name="Маркировка материала (лазер)",
+        help_text="Для заготовки с лазера: маркировка листа/материала.",
+    )
+    naladki_product = models.OneToOneField(
+        "Product",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="plan_piece",
+        verbose_name="Карточка в наладках",
+        help_text="Обычное изделие плана синхронизируется одна-к-одному с карточкой наладки (не ПКИ и не сборка).",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("-updated_at", "-id")
+        verbose_name = "Изделие (план)"
+        verbose_name_plural = "Изделия (план)"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class PlannedAssemblyComponent(models.Model):
+    """Строка состава сборочного изделия в плане."""
+
+    assembly = models.ForeignKey(
+        PlannedProduct,
+        on_delete=models.CASCADE,
+        related_name="assembly_components",
+        verbose_name="Сборочное изделие",
+    )
+    component = models.ForeignKey(
+        PlannedProduct,
+        on_delete=models.CASCADE,
+        related_name="+",
+        verbose_name="Входит в состав",
+    )
+    sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+    quantity = models.PositiveIntegerField(
+        default=1,
+        verbose_name="Кол-во на 1 комплект",
+        help_text="Сколько единиц входящего изделия на одну сборочную единицу.",
+    )
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Позиция состава (план)"
+        verbose_name_plural = "Позиции состава (план)"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("assembly", "component"),
+                name="uniq_planned_assembly_component_pair",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.assembly_id} ← {self.component_id}"
+
+
+class PlannedProductStage(models.Model):
+    """Этап маршрута: отдел + необязательное описание."""
+
+    product = models.ForeignKey(
+        PlannedProduct,
+        on_delete=models.CASCADE,
+        related_name="stages",
+    )
+    sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+    department = models.CharField(
+        max_length=120,
+        choices=PLANNED_PRODUCT_DEPARTMENT_CHOICES,
+        verbose_name="Отдел",
+    )
+    description = models.TextField(blank=True, default="", verbose_name="Описание этапа")
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Этап изделия (план)"
+        verbose_name_plural = "Этапы изделия (план)"
+
+    @property
+    def description_inline(self) -> str:
+        """Описание без переносов — для строки вида «1. Отдел (описание)»."""
+        return " ".join((self.description or "").strip().split())
+
+    def __str__(self) -> str:
+        return f"{self.product_id}: {self.sort_order + 1}. {self.department}"
+
+
+class PlanContract(models.Model):
+    """Контракт плана: дедлайн и объёмы по позициям плана (сборки, изделия, ПКИ)."""
+
+    title = models.CharField(
+        max_length=320,
+        blank=True,
+        default="",
+        verbose_name="Примечание",
+        help_text="Необязательно.",
+    )
+    deadline = models.DateField(verbose_name="Дедлайн")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("deadline", "-id")
+        verbose_name = "Контракт (план)"
+        verbose_name_plural = "Контракты (план)"
+
+    def __str__(self) -> str:
+        if self.title:
+            return self.title[:120]
+        return f"Контракт до {self.deadline.isoformat()} (#{self.pk})"
+
+
+class PlanContractLine(models.Model):
+    """Строка контракта: ссылка на позицию плана и количество; итог контракта = сумма quantity по строкам."""
+
+    contract = models.ForeignKey(
+        PlanContract,
+        on_delete=models.CASCADE,
+        related_name="lines",
+        verbose_name="Контракт",
+    )
+    product = models.ForeignKey(
+        PlannedProduct,
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name="Позиция плана",
+    )
+    quantity = models.PositiveIntegerField(default=1, verbose_name="Количество")
+    sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Строка контракта"
+        verbose_name_plural = "Строки контракта"
+
+    def __str__(self) -> str:
+        return f"{self.contract_id}: {self.product_id} × {self.quantity}"

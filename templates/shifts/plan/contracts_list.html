@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "shifts/plan/includes/plan_rails_styles.html" %}
+<style>
+  .plan-contracts-index-table th,
+  .plan-contracts-index-table td {
+    text-align: center;
+    vertical-align: middle;
+  }
+  .plan-contracts-index-table .plan-contract-row-link {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px dashed rgba(174, 189, 232, 0.35);
+  }
+  .plan-contracts-index-table td.muted .plan-contract-row-link {
+    color: #aebde8;
+  }
+  .plan-contracts-index-table .plan-contract-row-link:hover {
+    color: #eaf0ff;
+    border-bottom-color: rgba(234, 240, 255, 0.45);
+  }
+</style>
+<div class="plan-article-rails-root">
+{% include "shifts/plan/includes/plan_rails_asides.html" %}
+<div class="plan-article-main">
+<h1>Контракты</h1>
+<p class="muted">Ссылка на позиции плана и количества по строкам; сумма по контракту считается из этих количеств.</p>
+
+<div class="page-actions" style="flex-wrap:wrap;">
+  <a href="{% url 'plan' %}" class="btn btn-sm btn-ghost">← К плану (сборки)</a>
+  {% if biota_can_edit %}
+  <a href="{% url 'plan_contract_new' %}" class="btn btn-sm">Новый контракт</a>
+  {% endif %}
+</div>
+
+{% if contracts %}
+<div class="table-wrap" style="margin-top:14px;">
+  <table class="data-grid plan-contracts-index-table">
+    <thead>
+      <tr>
+        <th>Дедлайн</th>
+        <th>Примечание</th>
+        <th>Позиций</th>
+        <th>Σ кол-во</th>
+        <th>Обновлено</th>
+        <th style="width:7rem;">Действие</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in contracts %}
+      <tr>
+        <td><strong>{{ c.deadline|date:"d.m.Y" }}</strong></td>
+        <td class="muted">
+          {% if c.title %}
+          <a href="{% url 'plan_contract_detail' pk=c.pk %}" class="plan-contract-row-link">{{ c.title }}</a>
+          {% else %}
+          <a href="{% url 'plan_contract_detail' pk=c.pk %}" class="plan-contract-row-link" title="Контракт без названия — открыть">—</a>
+          {% endif %}
+        </td>
+        <td>{{ c.line_count }}</td>
+        <td><strong>{{ c.total_qty }}</strong></td>
+        <td class="muted">{{ c.updated_at|date:"d.m.Y H:i" }}</td>
+        <td>
+          <a href="{% url 'plan_contract_detail' pk=c.pk %}" class="btn btn-sm btn-ghost">Открыть</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="muted" style="margin-top:12px;">Контрактов пока нет{% if biota_can_edit %} — создайте первый{% endif %}.</p>
+{% endif %}
+</div>
+</div>
+{% include "shifts/plan/includes/plan_rails_script.html" %}
+{% endblock %}

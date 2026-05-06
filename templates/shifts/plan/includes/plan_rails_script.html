@@ -1,0 +1,50 @@
+<script>
+(function () {
+  function railRoot(el) {
+    return el.closest('[data-plan-rail-box]');
+  }
+  function closeAllRails(exceptEl) {
+    document.querySelectorAll('.plan-rail--open').forEach(function (rail) {
+      if (!exceptEl || rail !== exceptEl) {
+        rail.classList.remove('plan-rail--open');
+        rail.querySelectorAll('[data-plan-rail-toggle]').forEach(function (b) {
+          b.setAttribute('aria-expanded', 'false');
+        });
+      }
+    });
+  }
+
+  document.querySelectorAll('[data-plan-rail-toggle]').forEach(function (btn) {
+    btn.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      var rail = railRoot(btn);
+      if (!rail) return;
+      var open = !rail.classList.contains('plan-rail--open');
+      closeAllRails(open ? rail : null);
+      rail.classList.toggle('plan-rail--open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  });
+
+  document.querySelectorAll('[data-plan-rail-dismiss]').forEach(function (btn) {
+    btn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var rail = railRoot(btn);
+      if (!rail) return;
+      rail.classList.remove('plan-rail--open');
+      rail.querySelectorAll('[data-plan-rail-toggle]').forEach(function (t) {
+        t.setAttribute('aria-expanded', 'false');
+      });
+    });
+  });
+
+  document.documentElement.addEventListener('click', function () {
+    closeAllRails();
+  });
+  document.querySelectorAll('.plan-rail__peek, .plan-rail__sheet').forEach(function (el) {
+    el.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+    });
+  });
+})();
+</script>

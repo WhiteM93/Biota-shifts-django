@@ -138,7 +138,7 @@
     table { border-collapse: collapse; width: 100%; background: #151b27; }
     th, td { border: 1px solid #2b3650; padding: 8px; font-size: 13px; }
     th { background: #202a3c; text-align: left; }
-    input, select {
+    input, select, textarea {
       width: 100%;
       box-sizing: border-box;
       background: #101520;
@@ -147,9 +147,11 @@
       border-radius: 8px;
       padding: 8px 10px;
       transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+      font: inherit;
     }
-    input:hover, select:hover { border-color: #415277; }
-    input:focus, select:focus {
+    textarea { min-height: 64px; resize: vertical; }
+    input:hover, select:hover, textarea:hover { border-color: #415277; }
+    input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: #7c8cff;
       box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.22);
@@ -440,6 +442,11 @@
     {% endif %}
     {% if biota_nav.home %}
     <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">Главная</a>
+    {% endif %}
+    {% if biota_nav.plan %}
+    {% with un=request.resolver_match.url_name %}
+    <a href="{% url 'plan' %}" class="{% if un == 'plan' or un == 'plan_article_new' or un == 'plan_article_detail' or un == 'plan_article_edit' or un == 'plan_article_delete' or un == 'plan_contracts' or un == 'plan_contract_new' or un == 'plan_contract_detail' or un == 'plan_contract_edit' or un == 'plan_contract_delete' or un == 'plan_contract_article_detail' or un == 'plan_department_planning' or un == 'plan_product_name_suggestions' %}active{% endif %}">План</a>
+    {% endwith %}
     {% endif %}
     {% if biota_nav.graph and biota_nav.regulations %}
     <details class="nav-dropdown">

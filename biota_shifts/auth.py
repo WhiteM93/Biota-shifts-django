@@ -411,6 +411,7 @@ def _filter_employees_for_user(full_df: pd.DataFrame, username: str) -> pd.DataF
 # Разделы меню Django (кроме личного кабинета): права в JSON users.*.nav
 NAV_KEYS = (
     "home",
+    "plan",
     "graph",
     "hours",
     "skud",
@@ -426,6 +427,7 @@ USER_ROLE_EXECUTOR = "executor"
 USER_ROLE_CHOICES = (USER_ROLE_MANAGER, USER_ROLE_EXECUTOR)
 NAV_LABELS_RU = {
     "home": "Главная (сводка)",
+    "plan": "План",
     "graph": "График",
     "hours": "Часы по дням",
     "skud": "СКУД",
@@ -454,6 +456,10 @@ def nav_permissions_for_user(username: str | None) -> dict[str, bool]:
     for k in NAV_KEYS:
         if k in nav:
             out[k] = bool(nav[k])
+    # Раздел «План» добавлен в NAV_KEYS позже первых сохранений nav из кабинета:
+    # при любых других уже заданных правах, но без ключа «plan», считаем до выдачи доступа закрытым.
+    if isinstance(nav, dict) and len(nav) > 0 and "plan" not in nav:
+        out["plan"] = False
     # В store до split не было ключей payroll/employees — наследуем от defects
     if "payroll" not in nav and "defects" in nav:
         out["payroll"] = bool(nav["defects"])

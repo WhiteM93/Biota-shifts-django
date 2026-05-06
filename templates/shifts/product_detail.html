@@ -7,6 +7,12 @@
   <a href="{% url 'product_setup_create' product.pk %}" class="btn btn-ghost">+</a>
   {% endif %}
 </div>
+{% if linked_plan_piece %}
+<p style="margin:0 0 14px 0;font-size:0.92rem;color:#aebde8;">
+  <span class="muted">Раздел «План»:</span>
+  <a href="{% url 'plan_article_detail' pk=linked_plan_piece.pk %}">Позиция №{{ linked_plan_piece.pk }}</a>
+</p>
+{% endif %}
 <div class="product-detail-grid">
   <div class="product-detail-main">
   {% if product.description %}

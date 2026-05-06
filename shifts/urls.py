@@ -2,6 +2,8 @@ from django.urls import path
 
 from . import cabinet_views
 from . import graph_views
+from . import plan_contract_views
+from . import plan_views
 from . import hours_views
 from . import employee_payroll_views
 from . import inventory_views
@@ -13,6 +15,27 @@ from . import views
 urlpatterns = [
     path("", views.login_view, name="root"),
     path("home/", views.home_view, name="home"),
+    path("plan/", plan_views.plan_index, name="plan"),
+    path(
+        "plan/by-department/<slug:slug>/",
+        plan_views.plan_department_planning,
+        name="plan_department_planning",
+    ),
+    path("plan/articles/name-suggestions/", plan_views.plan_product_name_suggestions_view, name="plan_product_name_suggestions"),
+    path("plan/articles/new/", plan_views.plan_article_edit, {"pk": None}, name="plan_article_new"),
+    path("plan/articles/<int:pk>/delete/", plan_views.plan_article_delete, name="plan_article_delete"),
+    path("plan/articles/<int:pk>/edit/", plan_views.plan_article_edit, name="plan_article_edit"),
+    path("plan/articles/<int:pk>/", plan_views.plan_article_detail, name="plan_article_detail"),
+    path("plan/contracts/new/", plan_contract_views.plan_contract_edit, {"pk": None}, name="plan_contract_new"),
+    path(
+        "plan/contracts/<int:contract_pk>/articles/<int:product_pk>/",
+        plan_contract_views.plan_contract_article_detail,
+        name="plan_contract_article_detail",
+    ),
+    path("plan/contracts/<int:pk>/delete/", plan_contract_views.plan_contract_delete, name="plan_contract_delete"),
+    path("plan/contracts/<int:pk>/edit/", plan_contract_views.plan_contract_edit, name="plan_contract_edit"),
+    path("plan/contracts/<int:pk>/", plan_contract_views.plan_contract_detail, name="plan_contract_detail"),
+    path("plan/contracts/", plan_contract_views.plan_contract_index, name="plan_contracts"),
     path("graph/", graph_views.graph_view, name="graph"),
     path("graph/download/", graph_views.graph_download, name="graph_download"),
     path("hours/", hours_views.hours_view, name="hours"),

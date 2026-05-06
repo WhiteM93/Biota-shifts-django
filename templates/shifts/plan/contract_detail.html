@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load plan_tags %}
+
+{% block content %}
+{% include "shifts/plan/includes/planned_product_name_styles.html" %}
+{% include "shifts/plan/includes/plan_rails_styles.html" %}
+<div class="plan-article-rails-root">
+{% include "shifts/plan/includes/plan_rails_asides.html" %}
+<div class="plan-article-main">
+<div class="page-actions" style="flex-wrap:wrap;">
+  <a href="{% url 'plan_contracts' %}" class="btn btn-sm btn-ghost">← К контрактам</a>
+  {% if biota_can_edit %}
+  <a href="{% url 'plan_contract_edit' pk=contract.pk %}" class="btn btn-sm">Редактировать</a>
+  <form method="post" action="{% url 'plan_contract_delete' pk=contract.pk %}" style="display:inline;" data-confirm="Удалить контракт?">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-ghost">Удалить</button>
+  </form>
+  {% endif %}
+</div>
+<h1 style="margin:12px 0 8px 0;">
+  {% if contract.title %}{{ contract.title }}{% else %}Контракт{% endif %}
+</h1>
+<p class="muted" style="margin:0 0 4px 0;"><strong style="color:#c9d5ff;">Дедлайн:</strong> {{ contract.deadline|date:"d.m.Y" }}</p>
+<p class="muted" style="margin:0 0 4px 0;font-size:0.92rem;">По строкам (сумма количеств): <strong style="color:#eaf0ff;">{{ contract.total_qty }}</strong> ед.</p>
+<p class="muted" style="font-size:12px;">Обновлено {{ contract.updated_at|date:"d.m.Y H:i" }}</p>
+
+<h3 style="margin:18px 0 8px 0;font-size:1rem;color:#c9d5ff;">Ссылки на позиции плана</h3>
+<p class="muted" style="margin:0 0 10px 0;font-size:12px;">Каждая строка — только ссылка на позицию в плане и количество по контракту; итог сверху пересчитывается из суммы колонки «Кол-во».</p>
+{% if contract.lines.all %}
+<div class="table-wrap">
+  <table class="data-grid">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Наименование</th>
+        <th style="width:100px;text-align:center;">Тип</th>
+        <th style="width:100px;text-align:right;">Кол-во</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in contract.lines.all %}
+      <tr>
+        <td class="muted">{{ forloop.counter }}</td>
+        <td class="planned-product-name-cell">
+          {% url 'plan_contract_article_detail' contract_pk=contract.pk product_pk=line.product_id as pu %}
+          {% planned_product_link url=pu name=line.product.name compact=True %}
+        </td>
+        <td class="muted" style="font-size:12px;text-align:center;">
+          {% if line.product.is_assembly %}сборка{% endif %}{% if line.product.is_assembly and line.product.is_purchased %}, {% endif %}{% if line.product.is_purchased %}ПКИ{% endif %}{% if not line.product.is_assembly and not line.product.is_purchased %}изделие{% endif %}
+        </td>
+        <td style="text-align:right;"><strong>{{ line.quantity }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% if contract.lines.all %}
+    <tfoot>
+      <tr>
+        <td colspan="3" style="text-align:right;font-weight:600;">Итого по контракту</td>
+        <td style="text-align:right;"><strong>{{ contract.total_qty }}</strong></td>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+</div>
+{% else %}
+<p class="muted">Строк контракта нет.</p>
+{% endif %}
+</div>
+</div>
+{% include "shifts/plan/includes/plan_rails_script.html" %}
+<script>
+(function () {
+  document.querySelectorAll('form[data-confirm]').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      if (!window.confirm(form.getAttribute('data-confirm') || 'Удалить?')) e.preventDefault();
+    });
+  });
+})();
+</script>
+{% endblock %}

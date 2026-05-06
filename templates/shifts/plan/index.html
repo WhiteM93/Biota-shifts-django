@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% load plan_tags %}
+
+{% block content %}
+{% include "shifts/plan/includes/planned_product_name_styles.html" %}
+{% include "shifts/plan/includes/plan_rails_styles.html" %}
+<div class="plan-article-rails-root">
+{% include "shifts/plan/includes/plan_rails_asides.html" %}
+<div class="plan-article-main">
+<style>
+  .plan-view-filters {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-left: 4px;
+  }
+  .plan-view-filters a.filter-on {
+    color: #fff;
+    border-color: #6379ab;
+    background: linear-gradient(180deg, #4f6190 0%, #3b4b72 100%);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+  .plan-index-search-row {
+    margin-bottom: 12px;
+    max-width: 360px;
+  }
+  .plan-index-search-row .field { margin-bottom: 0; }
+  .plan-index-search-row input[type="search"] {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  @media (max-width: 720px) {
+    .plan-index-actions {
+      flex-direction: column;
+      align-items: stretch !important;
+    }
+    .plan-view-filters { margin-left: 0; margin-top: 6px; }
+    .plan-index-search-row { max-width: none; }
+  }
+</style>
+
+<h1>План — изделия</h1>
+<p class="muted">Создавайте изделие и задавайте маршрут: отделы по порядку, при необходимости — текст к этапу.</p>
+
+<div class="page-actions plan-index-actions" style="flex-wrap:wrap;align-items:center;">
+  {% if biota_can_edit %}
+  <a href="{% url 'plan_article_new' %}" class="btn btn-sm">Новое изделие</a>
+  {% endif %}
+  <div class="plan-view-filters" role="group" aria-label="Фильтр списка">
+    <a href="{% url 'plan' %}?view=all"
+       class="btn btn-sm btn-ghost {% if plan_view == 'all' %}filter-on{% endif %}">Все</a>
+    <a href="{% url 'plan' %}?view=assembly"
+       class="btn btn-sm btn-ghost {% if plan_view == 'assembly' %}filter-on{% endif %}">Сборки</a>
+    <a href="{% url 'plan' %}?view=purchased"
+       class="btn btn-sm btn-ghost {% if plan_view == 'purchased' %}filter-on{% endif %}"
+       title="Закупные позиции">ПКИ</a>
+    <a href="{% url 'plan' %}?view=made"
+       class="btn btn-sm btn-ghost {% if plan_view == 'made' %}filter-on{% endif %}"
+       title="Без признаков сборки и покупные — свой маршрут">Изделия</a>
+  </div>
+</div>
+
+{% if items %}
+<div class="plan-index-search-row">
+  <label class="field">
+    <span class="muted" style="font-size:11px;font-weight:600;">Поиск по списку</span>
+    <input type="search" id="plan-index-search" autocomplete="off" placeholder="Введите часть названия…" aria-label="Поиск по списку плана">
+  </label>
+</div>
+<div class="table-wrap">
+  <table class="data-grid" id="plan-index-table">
+    <thead>
+      <tr>
+        <th>Название</th>
+        <th>Тип</th>
+        <th>Этапов</th>
+        <th>Обновлено</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr data-plan-search="{{ it.name }}">
+        <td class="planned-product-name-cell">
+          {% url 'plan_article_detail' pk=it.pk as plan_article_url %}
+          {% planned_product_link url=plan_article_url name=it.name compact=True %}
+        </td>
+        <td>
+          {% if it.is_assembly %}сборка{% endif %}{% if it.is_assembly and it.is_purchased %}, {% endif %}{% if it.is_purchased %}ПКИ{% endif %}
+          {% if not it.is_assembly and not it.is_purchased %}
+            {% if it.workpiece_type %}{{ it.get_workpiece_type_display }}{% else %}<span class="muted" title="Для изделия нужен тип заготовки">заготовка не задана</span>{% endif %}
+          {% endif %}
+        </td>
+        <td>{{ it.stage_count }}</td>
+        <td class="muted">{{ it.updated_at|date:"d.m.Y H:i" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+{% if plan_view != 'all' %}
+<p class="muted">Под выбранный фильтр ничего не найдено. <a href="{% url 'plan' %}?view=all">Показать все</a></p>
+{% else %}
+<p class="muted">Пока нет ни одного изделия{% if biota_can_edit %} — нажмите «Новое изделие»{% endif %}.</p>
+{% endif %}
+{% endif %}
+</div>
+</div>
+{% include "shifts/plan/includes/plan_rails_script.html" %}
+<script>
+(function () {
+  var inp = document.getElementById("plan-index-search");
+  var table = document.getElementById("plan-index-table");
+  if (!inp || !table) return;
+  var tbody = table.querySelector("tbody");
+  if (!tbody) return;
+  function norm(s) {
+    return (s || "").toString().trim().toLowerCase();
+  }
+  function sync() {
+    var q = norm(inp.value);
+    var rows = tbody.querySelectorAll("tr[data-plan-search]");
+    rows.forEach(function (tr) {
+      var blob = norm(tr.getAttribute("data-plan-search"));
+      tr.style.display = !q || blob.indexOf(q) !== -1 ? "" : "none";
+    });
+  }
+  inp.addEventListener("input", sync);
+  inp.addEventListener("search", sync);
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "shifts/plan/includes/plan_rails_styles.html" %}
+<div class="plan-article-rails-root">
+{% include "shifts/plan/includes/plan_rails_asides.html" %}
+<div class="plan-article-main">
+<div class="page-actions">
+  {% if item %}
+  <a href="{% url 'plan_article_detail' pk=item.pk %}" class="btn btn-sm btn-ghost">← К изделию</a>
+  {% else %}
+  <a href="{% url 'plan' %}" class="btn btn-sm btn-ghost">← К списку</a>
+  {% endif %}
+</div>
+<h1>{% if item %}Редактирование{% else %}Новое изделие{% endif %}</h1>
+
+{% if item %}
+{% include "shifts/plan/includes/plan_product_usage_summary.html" %}
+{% endif %}
+
+<style>
+  .plan-bom-panel .bom-suggest-list a { color: #aec0ff; text-decoration: underline; }
+  .plan-bom-panel .bom-suggest-list li { margin-bottom: 4px; }
+  .plan-product-type-row {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 18px;
+  }
+  .plan-product-type-row > span.label {
+    color: #aebde8;
+    font-size: 12px;
+    font-weight: 600;
+    width: 100%;
+    flex-basis: 100%;
+  }
+  .plan-product-type-row .chk { margin-top: 0; }
+  .plan-usage-row--highlight td {
+    background: rgba(55, 76, 118, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(120, 155, 220, 0.18);
+  }
+  .plan-workpiece-laser-row {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 14px 18px;
+  }
+  #plan-workpiece-panel { flex: 0 1 420px; max-width: 440px; margin-top: 0 !important; }
+  #plan-laser-sheet-panel {
+    flex: 1 1 260px;
+    min-width: 220px;
+    max-width: 480px;
+  }
+</style>
+
+<form method="post" action="" id="plan-article-form">
+  {% csrf_token %}
+  <div class="filter-panel" style="margin-bottom:14px;">
+    <label class="field" style="max-width:560px;">
+      <span>Название изделия</span>
+      <input type="text" id="plan-product-name" name="name" value="{{ name_value }}" maxlength="400" required placeholder="Например, Корпус Х-12">
+    </label>
+    <div class="plan-product-type-row" role="radiogroup" aria-labelledby="plan-product-type-label">
+      <span class="label" id="plan-product-type-label">Тип</span>
+      <label class="chk">
+        <input type="radio" name="plan_product_type" value="made" {% if plan_product_type == 'made' %}checked{% endif %}>
+        <span>Изделие</span>
+      </label>
+      <label class="chk">
+        <input type="radio" name="plan_product_type" value="assembly" {% if plan_product_type == 'assembly' %}checked{% endif %}>
+        <span>Сборка</span>
+      </label>
+      <label class="chk">
+        <input type="radio" name="plan_product_type" value="pki" {% if plan_product_type == 'pki' %}checked{% endif %} title="Закупная позиция, без производственного изготовления">
+        <span>ПКИ</span>
+      </label>
+    </div>
+    <div class="plan-workpiece-laser-row" id="plan-workpiece-laser-row" style="{% if plan_product_type != 'made' %}display:none;{% endif %}">
+    <div id="plan-workpiece-panel" class="filter-panel">
+      <label class="field" style="max-width:100%;">
+        <span>Тип заготовки</span>
+        <select name="workpiece_type" id="plan-workpiece-type" {% if plan_product_type == 'made' %}required{% endif %}>
+          <option value="">— выберите —</option>
+          {% for val, label in workpiece_type_choices %}
+          <option value="{{ val }}" {% if workpiece_type_value == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <p class="muted" style="margin:8px 0 0 0;font-size:12px;line-height:1.4;">
+        Для изделия обязателен выбор. В дальнейшем от этого будет зависеть стартовый отдел в планировании (заготовка, лазер, ПКИ).
+      </p>
+    </div>
+    <div id="plan-laser-sheet-panel" class="filter-panel" style="{% if plan_product_type != 'made' or workpiece_type_value != 'laser' %}display:none;{% endif %}">
+      <label class="field">
+        <span>Толщина листа, мм</span>
+        <input type="text" name="laser_sheet_thickness_mm" id="plan-laser-thickness" value="{{ laser_sheet_thickness_value }}" inputmode="decimal" autocomplete="off" placeholder="Например, 2 или 1,5">
+      </label>
+      <label class="field" style="margin-top:10px;">
+        <span>Маркировка материала</span>
+        <input type="text" name="laser_material_marking" id="plan-laser-marking" value="{{ laser_material_marking_value }}" maxlength="240" autocomplete="off" placeholder="Выберите из списка или введите новую" list="plan-laser-material-markings">
+        <datalist id="plan-laser-material-markings">
+          {% for m in laser_material_marking_suggestions %}
+          <option value="{{ m }}"></option>
+          {% endfor %}
+        </datalist>
+      </label>
+      <p class="muted" style="margin:8px 0 0 0;font-size:12px;line-height:1.4;">
+        Для лазера: подсказки по маркировке без учёта регистра; сохраняется и отображается так, как ввели (или как в выбранной подсказке).
+      </p>
+    </div>
+    </div>
+  </div>
+
+  <div id="plan-bom-panel" class="plan-bom-panel filter-panel" style="{% if plan_product_type != 'assembly' %}display:none;{% endif %}margin-bottom:14px;">
+    <h3 style="margin:0 0 8px 0;font-size:1rem;color:#c9d5ff;">Состав сборки</h3>
+    <p class="muted" style="margin:0 0 10px 0;">
+      Укажите входящие изделия из плана и количество на <strong>один комплект</strong> этой сборки.
+      Если изделия с таким названием ещё нет — оно будет создано автоматически.
+      По мере набора названия показываются похожие записи (как при создании наладки).
+    </p>
+    <div class="table-wrap">
+      <table class="data-grid">
+        <thead>
+          <tr>
+            <th style="text-align:center;">Входящее изделие (название)</th>
+            <th style="width:100px;text-align:center;">На 1 комплект</th>
+            <th style="width:52px;text-align:center;"></th>
+          </tr>
+        </thead>
+        <tbody id="plan-bom-tbody">
+          {% for row in bom_rows %}
+          <tr class="plan-bom-row">
+            <td style="text-align:center;vertical-align:middle;">
+              <input type="hidden" name="bom_planned_id" value="{{ row.pk }}" class="bom-pk">
+              <input type="text" name="bom_component_name" value="{{ row.name }}" class="bom-name-input" maxlength="400" autocomplete="off" placeholder="Начните вводить название…" style="text-align:center;">
+              <p class="bom-suggest-hint muted" style="display:none;margin:6px 0 0 0;font-size:12px;"></p>
+              <ul class="bom-suggest-list muted" style="display:none;list-style:none;padding:0;margin:4px 0 0 0;font-size:12px;"></ul>
+            </td>
+            <td class="plan-bom-qty-cell" style="text-align:center;vertical-align:middle;">
+              <input type="number" name="bom_component_qty" class="bom-qty-input" value="{{ row.qty|default:'1' }}" min="1" step="1" title="Штук на один комплект сборки" style="max-width:5.5rem;text-align:center;">
+            </td>
+            <td style="text-align:center;vertical-align:middle;"><button type="button" class="btn btn-sm btn-ghost plan-bom-remove" title="Удалить строку">×</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <button type="button" id="plan-bom-add" class="btn btn-sm btn-ghost" style="margin-top:10px;">+ В состав</button>
+  </div>
+
+  <h3 style="margin:0 0 8px 0;font-size:1rem;color:#c9d5ff;">Этапы производства</h3>
+  <p class="muted" style="margin:0 0 10px 0;">
+    По желанию: укажите маршрут по отделам (можно сохранить позицию и без этапов). Пустые строки при сохранении отбрасываются.
+  </p>
+
+  <div class="table-wrap">
+    <table class="data-grid plan-stage-editor">
+      <thead>
+        <tr>
+          <th style="min-width:200px;">Отдел</th>
+          <th>Описание (необязательно)</th>
+          <th style="width:52px;"></th>
+        </tr>
+      </thead>
+      <tbody id="plan-stages-tbody">
+        {% for row in stage_rows %}
+        <tr class="plan-stage-row">
+          <td>
+            <select name="stage_department">
+              <option value="">— выберите —</option>
+              {% for val, label in department_choices %}
+              <option value="{{ val }}" {% if row.dept == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td><textarea name="stage_description" rows="2" placeholder="Комментарий к этапу">{{ row.note }}</textarea></td>
+          <td style="text-align:center;"><button type="button" class="btn btn-sm btn-ghost plan-stage-remove" title="Удалить строку">×</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="page-actions" style="margin-top:12px;">
+    <button type="button" id="plan-stage-add" class="btn btn-sm btn-ghost">+ Этап</button>
+    <button type="submit" class="btn btn-sm">Сохранить</button>
+  </div>
+</form>
+
+<template id="plan-stage-row-tpl">
+  <tr class="plan-stage-row">
+    <td>
+      <select name="stage_department">
+        <option value="">— выберите —</option>
+        {% for val, label in department_choices %}
+        <option value="{{ val }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </td>
+    <td><textarea name="stage_description" rows="2" placeholder="Комментарий к этапу"></textarea></td>
+    <td style="text-align:center;"><button type="button" class="btn btn-sm btn-ghost plan-stage-remove" title="Удалить строку">×</button></td>
+  </tr>
+</template>
+
+<template id="plan-bom-row-tpl">
+  <tr class="plan-bom-row">
+    <td style="text-align:center;vertical-align:middle;">
+      <input type="hidden" name="bom_planned_id" value="" class="bom-pk">
+      <input type="text" name="bom_component_name" value="" class="bom-name-input" maxlength="400" autocomplete="off" placeholder="Начните вводить название…" style="text-align:center;">
+      <p class="bom-suggest-hint muted" style="display:none;margin:6px 0 0 0;font-size:12px;"></p>
+      <ul class="bom-suggest-list muted" style="display:none;list-style:none;padding:0;margin:4px 0 0 0;font-size:12px;"></ul>
+    </td>
+    <td class="plan-bom-qty-cell" style="text-align:center;vertical-align:middle;">
+      <input type="number" name="bom_component_qty" class="bom-qty-input" value="1" min="1" step="1" title="Штук на один комплект сборки" style="max-width:5.5rem;text-align:center;">
+    </td>
+    <td style="text-align:center;vertical-align:middle;"><button type="button" class="btn btn-sm btn-ghost plan-bom-remove" title="Удалить строку">×</button></td>
+  </tr>
+</template>
+
+<script>
+(function () {
+  var suggestUrl = "{% url 'plan_product_name_suggestions' %}";
+  var excludeId = "{% if item %}{{ item.pk }}{% endif %}";
+
+  var tbStages = document.getElementById("plan-stages-tbody");
+  var tplStage = document.getElementById("plan-stage-row-tpl");
+  var addStage = document.getElementById("plan-stage-add");
+  if (tbStages && tplStage && addStage) {
+    function stageRowCount() { return tbStages.querySelectorAll(".plan-stage-row").length; }
+    function bindStageRow(tr) {
+      var rm = tr.querySelector(".plan-stage-remove");
+      if (!rm) return;
+      rm.addEventListener("click", function () {
+        if (stageRowCount() <= 1) return;
+        tr.parentNode.removeChild(tr);
+      });
+    }
+    tbStages.querySelectorAll(".plan-stage-row").forEach(bindStageRow);
+    addStage.addEventListener("click", function () {
+      tbStages.appendChild(tplStage.content.cloneNode(true));
+      var rows = tbStages.querySelectorAll(".plan-stage-row");
+      bindStageRow(rows[rows.length - 1]);
+    });
+  }
+
+  var bomPanel = document.getElementById("plan-bom-panel");
+  var wpRow = document.getElementById("plan-workpiece-laser-row");
+  var laserPanel = document.getElementById("plan-laser-sheet-panel");
+  var laserThickness = document.getElementById("plan-laser-thickness");
+  var laserMarking = document.getElementById("plan-laser-marking");
+  var wpSelect = document.getElementById("plan-workpiece-type");
+  var typeRadios = document.querySelectorAll('input[name="plan_product_type"]');
+  function currentPlanProductType() {
+    var t = "made";
+    typeRadios.forEach(function (r) {
+      if (r.checked) t = r.value;
+    });
+    return t;
+  }
+  function syncPlanTypeUi() {
+    var t = currentPlanProductType();
+    if (bomPanel) bomPanel.style.display = t === "assembly" ? "block" : "none";
+    if (wpRow) wpRow.style.display = t === "made" ? "flex" : "none";
+    if (wpSelect) wpSelect.required = t === "made";
+    var wp = wpSelect ? wpSelect.value : "";
+    var showLaser = t === "made" && wp === "laser";
+    if (laserPanel) laserPanel.style.display = showLaser ? "block" : "none";
+    if (laserThickness) laserThickness.required = !!showLaser;
+    if (laserMarking) laserMarking.required = !!showLaser;
+  }
+  typeRadios.forEach(function (r) {
+    r.addEventListener("change", syncPlanTypeUi);
+  });
+  if (wpSelect) wpSelect.addEventListener("change", syncPlanTypeUi);
+  syncPlanTypeUi();
+
+  function clearBomSuggest(row) {
+    var hint = row.querySelector(".bom-suggest-hint");
+    var list = row.querySelector(".bom-suggest-list");
+    if (hint) { hint.style.display = "none"; hint.textContent = ""; }
+    if (list) { list.style.display = "none"; list.innerHTML = ""; }
+  }
+
+  function renderBomSuggest(row, items, q) {
+    var hint = row.querySelector(".bom-suggest-hint");
+    var list = row.querySelector(".bom-suggest-list");
+    if (!hint || !list) return;
+    if (!items || !items.length) {
+      clearBomSuggest(row);
+      return;
+    }
+    hint.style.display = "block";
+    hint.textContent = "Похожие изделия в плане — можно открыть или выбрать, чтобы не плодить дубли:";
+    list.style.display = "block";
+    list.innerHTML = "";
+    items.forEach(function (it) {
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.href = "#";
+      a.textContent = it.name;
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var pk = row.querySelector(".bom-pk");
+        var inp = row.querySelector(".bom-name-input");
+        if (pk) pk.value = String(it.id);
+        if (inp) inp.value = it.name;
+        clearBomSuggest(row);
+      });
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+    var exact = items.some(function (it) {
+      return (it.name || "").trim().toLowerCase() === (q || "").trim().toLowerCase();
+    });
+    if (exact) {
+      hint.textContent = "Есть полное совпадение названия в плане — лучше выбрать его из списка:";
+    }
+  }
+
+  function bindBomRow(tr) {
+    var inp = tr.querySelector(".bom-name-input");
+    var pk = tr.querySelector(".bom-pk");
+    var timer = null;
+    if (!inp) return;
+    inp.addEventListener("input", function () {
+      if (pk) pk.value = "";
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(function () {
+        var query = (inp.value || "").trim();
+        if (query.length < 2) {
+          clearBomSuggest(tr);
+          return;
+        }
+        var url = suggestUrl + "?q=" + encodeURIComponent(query);
+        if (excludeId) url += "&exclude_id=" + encodeURIComponent(excludeId);
+        fetch(url, { credentials: "same-origin" })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (!j || !j.ok) { clearBomSuggest(tr); return; }
+            renderBomSuggest(tr, j.items || [], query);
+          })
+          .catch(function () { clearBomSuggest(tr); });
+      }, 280);
+    });
+    var rm = tr.querySelector(".plan-bom-remove");
+    if (rm) {
+      rm.addEventListener("click", function () {
+        var tb = document.getElementById("plan-bom-tbody");
+        if (!tb) return;
+        if (tb.querySelectorAll(".plan-bom-row").length <= 1) return;
+        tr.parentNode.removeChild(tr);
+      });
+    }
+  }
+
+  var tbBom = document.getElementById("plan-bom-tbody");
+  var tplBom = document.getElementById("plan-bom-row-tpl");
+  var addBom = document.getElementById("plan-bom-add");
+  if (tbBom && tplBom && addBom) {
+    tbBom.querySelectorAll(".plan-bom-row").forEach(bindBomRow);
+    addBom.addEventListener("click", function () {
+      tbBom.appendChild(tplBom.content.cloneNode(true));
+      var rows = tbBom.querySelectorAll(".plan-bom-row");
+      bindBomRow(rows[rows.length - 1]);
+    });
+  }
+})();
+</script>
+</div>
+</div>
+{% include "shifts/plan/includes/plan_rails_script.html" %}
+{% endblock %}
