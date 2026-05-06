@@ -209,6 +209,7 @@
                 <thead>
                   <tr>
                     <th>№</th>
+                    <th title="Корректор на инструмент включен">Кор.</th>
                     <th>H</th>
                     <th>D</th>
                     <th class="setup-tools-th-rot">Тип</th>
@@ -221,6 +222,9 @@
                   {% for row in setup.tool_display_rows %}
                   <tr data-tool-row-index="{{ forloop.counter0 }}">
                     <td data-tool-col="tool_number">{{ row.tool_number }}</td>
+                    <td data-tool-col="correction_enabled" class="setup-tool-correction-cell" data-correction-enabled="{{ row.correction_enabled|yesno:'1,0' }}">
+                      <span class="setup-tool-correction-box{% if row.correction_enabled %} is-checked{% endif %}" aria-hidden="true"></span>
+                    </td>
                     <td data-tool-col="kor_n" class="{% if row.kor_n_override %}setup-tool-override{% endif %}">{{ row.kor_n }}</td>
                     <td data-tool-col="kor_d" class="{% if row.kor_d_override %}setup-tool-override{% endif %}">{{ row.kor_d }}</td>
                     <td data-tool-col="tool_type" data-tool-type-value="{{ row.tool_type|default:'' }}">{{ row.tool_type }}</td>
@@ -320,14 +324,24 @@
   }
   .product-setup-photos.is-inline-edit figure.setup-photo-figure {
     cursor: grab;
+    transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease, outline-color 160ms ease, background-color 160ms ease;
+    will-change: transform;
   }
   .product-setup-photos.is-inline-edit figure.setup-photo-figure.is-dragging {
-    opacity: 0.55;
+    opacity: 0.72;
     cursor: grabbing;
+    transform: scale(1.02) rotate(-0.4deg);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
+    z-index: 3;
   }
   .product-setup-photos.is-inline-edit figure.setup-photo-figure.is-drop-target {
-    outline: 2px dashed #6f7ef2;
+    outline: 2px dashed #8d9cff;
     outline-offset: 2px;
+    background: rgba(111, 126, 242, 0.14);
+    transform: translateY(-2px);
+  }
+  .product-setup-photos.is-inline-edit figure.setup-photo-figure.is-drop-commit {
+    animation: setupDropCommit 260ms ease-out;
   }
   .product-setup-photos a {
     display: block;
@@ -611,15 +625,59 @@
     padding-right: 36px;
   }
   .setup-spec-stack.is-inline-edit .setup-spec-box {
-    cursor: grab;
+    cursor: default;
+    transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease, outline-color 160ms ease, background-color 160ms ease;
+    will-change: transform;
+    position: relative;
   }
   .setup-spec-stack.is-inline-edit .setup-spec-box.is-dragging {
-    opacity: 0.55;
+    opacity: 0.72;
     cursor: grabbing;
+    transform: scale(1.01);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+    z-index: 3;
   }
   .setup-spec-stack.is-inline-edit .setup-spec-box.is-drop-target {
-    outline: 2px dashed #6f7ef2;
+    outline: 2px solid #9fb0ff;
     outline-offset: 2px;
+    background: rgba(111, 126, 242, 0.18);
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 2px rgba(111, 126, 242, 0.28), 0 10px 24px rgba(35, 54, 106, 0.32);
+  }
+  .setup-spec-stack.is-inline-edit .setup-spec-box.is-drop-before::before,
+  .setup-spec-stack.is-inline-edit .setup-spec-box.is-drop-after::after {
+    content: "";
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    height: 2px;
+    border-radius: 2px;
+    background: #9fb0ff;
+    box-shadow: 0 0 0 2px rgba(111, 126, 242, 0.2);
+    pointer-events: none;
+  }
+  .setup-spec-stack.is-inline-edit .setup-spec-box.is-drop-before::before {
+    top: -6px;
+  }
+  .setup-spec-stack.is-inline-edit .setup-spec-box.is-drop-after::after {
+    bottom: -6px;
+  }
+  .setup-spec-stack.is-inline-edit .setup-spec-box.is-drop-commit {
+    animation: setupDropCommit 260ms ease-out;
+  }
+  @keyframes setupDropCommit {
+    0% {
+      transform: scale(1.015);
+      box-shadow: 0 0 0 0 rgba(111, 126, 242, 0.42);
+    }
+    55% {
+      transform: scale(0.995);
+      box-shadow: 0 0 0 6px rgba(111, 126, 242, 0.18);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(111, 126, 242, 0);
+    }
   }
   .setup-spec-box.setup-spec-box-header {
     background: rgba(22, 31, 49, 0.6);
@@ -883,6 +941,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .product-tab-panel[data-inline-edit-mode="0"] .setup-spec-col > div > [data-field-text][title]:not([title=""]) {
+    cursor: help;
   }
   .setup-spec-col-bindings .setup-gcode-value > [data-field-text="gcode_system"] {
     flex: 0 0 auto;
@@ -1263,9 +1324,11 @@
   .setup-tools-view th:nth-child(1),
   .setup-tools-view th:nth-child(2),
   .setup-tools-view th:nth-child(3),
+  .setup-tools-view th:nth-child(4),
   .setup-tools-view td:nth-child(1),
   .setup-tools-view td:nth-child(2),
-  .setup-tools-view td:nth-child(3) {
+  .setup-tools-view td:nth-child(3),
+  .setup-tools-view td:nth-child(4) {
     width: 3ch;
     min-width: 3ch;
     max-width: 3ch;
@@ -1287,22 +1350,51 @@
     line-height: 1;
   }
   .setup-tools-view td.setup-tool-override {
-    border-color: #6f7ef2;
-    box-shadow: inset 0 0 0 1px rgba(111, 126, 242, 0.55);
-    background: rgba(111, 126, 242, 0.16);
+    border-color: #d94a4a;
+    box-shadow: inset 0 0 0 1px rgba(217, 74, 74, 0.55);
+    background: rgba(217, 74, 74, 0.18);
+    color: #ffd7d7;
+  }
+  .setup-tools-view td[data-tool-col="correction_enabled"] {
+    padding: 0;
+  }
+  .setup-tool-correction-box {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #6d7fa3;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(16, 24, 36, 0.6);
+    color: #fff;
+    font-size: 11px;
+    line-height: 1;
+    user-select: none;
+    pointer-events: none;
+  }
+  .setup-tool-correction-box.is-checked {
+    border-color: #2dbb58;
+    background: rgba(45, 187, 88, 0.22);
+  }
+  .setup-tool-correction-box.is-checked::before {
+    content: "✓";
+  }
+  .product-tab-panel[data-inline-edit-mode="1"] .setup-tools-view td[data-tool-col="correction_enabled"] {
+    cursor: pointer;
   }
   .setup-tools-view {
     min-width: 0;
     table-layout: fixed;
   }
-  .setup-tools-view th:nth-child(4),
-  .setup-tools-view td:nth-child(4) { width: 74px; min-width: 74px; max-width: 74px; }
   .setup-tools-view th:nth-child(5),
-  .setup-tools-view td:nth-child(5) { width: 64px; min-width: 64px; max-width: 64px; }
+  .setup-tools-view td:nth-child(5) { width: 74px; min-width: 74px; max-width: 74px; }
   .setup-tools-view th:nth-child(6),
-  .setup-tools-view td:nth-child(6) { width: 68px; min-width: 68px; max-width: 68px; }
+  .setup-tools-view td:nth-child(6) { width: 64px; min-width: 64px; max-width: 64px; }
   .setup-tools-view th:nth-child(7),
-  .setup-tools-view td:nth-child(7) { width: 120px; min-width: 120px; max-width: 120px; }
+  .setup-tools-view td:nth-child(7) { width: 68px; min-width: 68px; max-width: 68px; }
+  .setup-tools-view th:nth-child(8),
+  .setup-tools-view td:nth-child(8) { width: 120px; min-width: 120px; max-width: 120px; }
   .setup-tools-view td.is-inline-edit {
     border: 1px dashed #6f7ef2;
     background: rgba(111, 126, 242, 0.12);
@@ -1685,6 +1777,29 @@
     overflow-wrap: anywhere;
     word-break: break-word;
     text-align: center;
+  }
+  .product-download-row {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    width: 100%;
+  }
+  .product-download-row .product-download-main-btn {
+    flex: 1 1 auto;
+    width: auto;
+  }
+  .product-download-row .product-download-preview-btn {
+    flex: 0 0 38px;
+    width: 38px;
+    min-width: 38px;
+    max-width: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .product-download-row .product-download-preview-btn .ui-icon {
+    font-size: 16px;
   }
   @media (max-width: 960px) {
     .product-detail-grid {
@@ -2276,6 +2391,11 @@
             cell.removeAttribute("contenteditable");
             return;
           }
+          if (col === "correction_enabled") {
+            cell.classList.remove("is-inline-edit");
+            cell.removeAttribute("contenteditable");
+            return;
+          }
           if (col === "tool_type") {
             if (enabled) {
               var cur = cell.getAttribute("data-tool-type-value") || (cell.textContent || "").trim();
@@ -2336,6 +2456,9 @@
         var getCellValue = function (colName) {
           var cell = row.querySelector('td[data-tool-col="' + colName + '"]');
           if (!cell) return "";
+          if (colName === "correction_enabled") {
+            return cell.getAttribute("data-correction-enabled") === "1";
+          }
           if (colName === "tool_type") {
             var sel = cell.querySelector("select.js-inline-tool-type");
             return (sel ? sel.value : (cell.getAttribute("data-tool-type-value") || cell.textContent || "")).trim();
@@ -2349,6 +2472,7 @@
         };
         rows.push({
           tool_number: getCellValue("tool_number"),
+          correction_enabled: getCellValue("correction_enabled"),
           kor_n: getCellValue("kor_n"),
           kor_d: getCellValue("kor_d"),
           tool_type: getCellValue("tool_type"),
@@ -2390,7 +2514,7 @@
           box.setAttribute("draggable", "true");
         } else {
           box.removeAttribute("draggable");
-          box.classList.remove("is-dragging", "is-drop-target");
+          box.classList.remove("is-dragging", "is-drop-target", "is-drop-before", "is-drop-after", "is-drop-commit");
         }
       });
     }
@@ -2467,6 +2591,24 @@
         });
       }
       return clone;
+    }
+
+    function refreshInlineFieldTitles(scope, isInlineMode) {
+      var wrap = scope || root;
+      wrap.querySelectorAll("[data-field-text]").forEach(function (node) {
+        var field = node.getAttribute("data-field-text") || "";
+        if (!field || field === "setup_notes") return;
+        if (isInlineMode) {
+          node.removeAttribute("title");
+          return;
+        }
+        var txt = (node.textContent || "").replace(/\s+/g, " ").trim();
+        if (!txt || txt === "—") {
+          node.removeAttribute("title");
+          return;
+        }
+        node.setAttribute("title", txt);
+      });
     }
 
     function toggleInlineEdit() {
@@ -2549,6 +2691,7 @@
       setToolsEditMode(panel, inlineEditMode);
       syncPhotoDnDMode(panel, inlineEditMode);
       syncSpecDnDMode(panel, inlineEditMode);
+      refreshInlineFieldTitles(panel, inlineEditMode);
       editToggleBtn.textContent = inlineEditMode ? "Сохранить изменения" : "Быстрое редактирование";
       window.dispatchEvent(new CustomEvent("setup-inline-edit-mode", { detail: { enabled: inlineEditMode } }));
     }
@@ -2591,9 +2734,12 @@
         setToolsEditMode(panel, false);
         syncPhotoDnDMode(panel, false);
         syncSpecDnDMode(panel, false);
+        refreshInlineFieldTitles(panel, false);
       });
       window.dispatchEvent(new CustomEvent("setup-inline-edit-mode", { detail: { enabled: false } }));
     }
+
+    refreshInlineFieldTitles(root, false);
 
     root.addEventListener(
       "paste",
@@ -2686,6 +2832,7 @@
           node.textContent = val || "—";
         }
       });
+      refreshInlineFieldTitles(panel, false);
       var tabName = setupTab.getAttribute("data-tab") || "";
       var setupIndex = setupTab.getAttribute("data-setup-index") || "";
       var setupName = (data.setup && data.setup.name ? data.setup.name : "").trim();
@@ -2703,6 +2850,16 @@
     root.addEventListener("click", function (e) {
       var el = e.target;
       if (!el) return;
+      var correctionCell = el.closest ? el.closest('td[data-tool-col="correction_enabled"]') : null;
+      if (correctionCell) {
+        if (!inlineEditMode) return;
+        var enabled = correctionCell.getAttribute("data-correction-enabled") === "1";
+        var nextEnabled = !enabled;
+        correctionCell.setAttribute("data-correction-enabled", nextEnabled ? "1" : "0");
+        var box = correctionCell.querySelector(".setup-tool-correction-box");
+        if (box) box.classList.toggle("is-checked", nextEnabled);
+        return;
+      }
       if (!inlineEditMode) return;
       if (el.closest(".product-tab") || el.closest("#setup-tab-select")) {
         forceDisableInlineEdit();
@@ -2768,41 +2925,83 @@
       }
     });
 
+    function clearSpecDropHints(scope) {
+      var base = scope || root;
+      base.querySelectorAll(".setup-spec-box.is-drop-target, .setup-spec-box.is-drop-before, .setup-spec-box.is-drop-after").forEach(function (el) {
+        el.classList.remove("is-drop-target", "is-drop-before", "is-drop-after");
+      });
+    }
+
+    function markSpecDropTarget(stack, dragging, clientY) {
+      if (!stack || !dragging) return null;
+      var boxes = Array.from(stack.querySelectorAll(".setup-spec-box:not(.setup-spec-box-header)")).filter(function (b) { return b !== dragging; });
+      if (!boxes.length) return null;
+      var target = boxes[boxes.length - 1];
+      for (var i = 0; i < boxes.length; i++) {
+        var box = boxes[i];
+        var rect = box.getBoundingClientRect();
+        if (clientY < rect.bottom) {
+          target = box;
+          break;
+        }
+      }
+      clearSpecDropHints(stack);
+      target.classList.add("is-drop-target");
+      target.classList.add("is-drop-before");
+      stack.__dropTarget = target;
+      stack.__dropAfter = false;
+      return target;
+    }
+
+    var draggedSpecBox = null;
     root.addEventListener("dragstart", function (e) {
       var box = e.target && e.target.closest ? e.target.closest(".setup-spec-stack.is-inline-edit .setup-spec-box[draggable='true']") : null;
       if (!box) return;
+      draggedSpecBox = box;
       box.classList.add("is-dragging");
-      try { e.dataTransfer.effectAllowed = "move"; } catch (_) {}
+      try {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", box.getAttribute("data-spec-box-id") || "spec-box");
+      } catch (_) {}
     });
     root.addEventListener("dragend", function (e) {
-      var box = e.target && e.target.closest ? e.target.closest(".setup-spec-box") : null;
+      var box = draggedSpecBox || (e.target && e.target.closest ? e.target.closest(".setup-spec-box") : null);
       if (box) box.classList.remove("is-dragging");
-      root.querySelectorAll(".setup-spec-box.is-drop-target").forEach(function (el) {
-        el.classList.remove("is-drop-target");
-      });
+      draggedSpecBox = null;
+      clearSpecDropHints(root);
     });
     root.addEventListener("dragover", function (e) {
-      var target = e.target && e.target.closest ? e.target.closest(".setup-spec-stack.is-inline-edit .setup-spec-box[draggable='true']") : null;
-      var dragging = root.querySelector(".setup-spec-stack.is-inline-edit .setup-spec-box.is-dragging");
-      if (!target || !dragging || target === dragging) return;
+      var stack = e.target && e.target.closest ? e.target.closest(".setup-spec-stack.is-inline-edit") : null;
+      var dragging = draggedSpecBox || root.querySelector(".setup-spec-stack.is-inline-edit .setup-spec-box.is-dragging");
+      if (!stack || !dragging) return;
       e.preventDefault();
-      target.classList.add("is-drop-target");
+      markSpecDropTarget(stack, dragging, e.clientY);
       try { e.dataTransfer.dropEffect = "move"; } catch (_) {}
     });
     root.addEventListener("dragleave", function (e) {
-      var target = e.target && e.target.closest ? e.target.closest(".setup-spec-box.is-drop-target") : null;
-      if (target) target.classList.remove("is-drop-target");
+      var stack = e.target && e.target.closest ? e.target.closest(".setup-spec-stack.is-inline-edit") : null;
+      if (!stack) return;
+      var rel = e.relatedTarget;
+      if (!rel || !stack.contains(rel)) clearSpecDropHints(stack);
     });
     root.addEventListener("drop", function (e) {
-      var target = e.target && e.target.closest ? e.target.closest(".setup-spec-stack.is-inline-edit .setup-spec-box[draggable='true']") : null;
-      var dragging = root.querySelector(".setup-spec-stack.is-inline-edit .setup-spec-box.is-dragging");
-      if (!target || !dragging || target === dragging) return;
+      var stack = e.target && e.target.closest ? e.target.closest(".setup-spec-stack.is-inline-edit") : null;
+      var dragging = draggedSpecBox || root.querySelector(".setup-spec-stack.is-inline-edit .setup-spec-box.is-dragging");
+      if (!stack || !dragging) return;
       e.preventDefault();
-      target.classList.remove("is-drop-target");
-      var rect = target.getBoundingClientRect();
-      var insertAfter = (e.clientY - rect.top) > (rect.height / 2);
-      if (insertAfter) target.after(dragging);
-      else target.before(dragging);
+      var target = stack.__dropTarget || markSpecDropTarget(stack, dragging, e.clientY);
+      if (!target || target === dragging) {
+        clearSpecDropHints(stack);
+        return;
+      }
+      stack.insertBefore(dragging, target);
+      dragging.classList.remove("is-dragging");
+      dragging.classList.add("is-drop-commit");
+      setTimeout(function () { dragging.classList.remove("is-drop-commit"); }, 280);
+      clearSpecDropHints(stack);
+      stack.__dropTarget = null;
+      stack.__dropAfter = null;
+      draggedSpecBox = null;
     });
 
     root.querySelectorAll(".setup-inline-toolbar-block").forEach(function (tb) {
@@ -3070,6 +3269,12 @@
       var target = e.target && e.target.closest ? e.target.closest(".setup-photo-figure[draggable='true']") : null;
       if (!draggedPhotoFigure || !target || target === draggedPhotoFigure) return;
       e.preventDefault();
+      var wrap = target.closest(".product-setup-photos");
+      if (wrap) {
+        wrap.querySelectorAll(".setup-photo-figure.is-drop-target").forEach(function (el) {
+          if (el !== target) el.classList.remove("is-drop-target");
+        });
+      }
       target.classList.add("is-drop-target");
     });
 
@@ -3085,13 +3290,13 @@
       var photosWrap = target.closest(".product-setup-photos");
       var setupId = target.getAttribute("data-setup-id") || draggedPhotoFigure.getAttribute("data-setup-id") || "";
       if (!photosWrap || !setupId) return;
-      var rect = target.getBoundingClientRect();
-      var placeBefore = e.clientX < (rect.left + rect.width / 2);
-      if (placeBefore) photosWrap.insertBefore(draggedPhotoFigure, target);
-      else photosWrap.insertBefore(draggedPhotoFigure, target.nextSibling);
+      photosWrap.insertBefore(draggedPhotoFigure, target);
       photosWrap.querySelectorAll(".is-drop-target").forEach(function (el) {
         el.classList.remove("is-drop-target");
       });
+      draggedPhotoFigure.classList.remove("is-dragging");
+      draggedPhotoFigure.classList.add("is-drop-commit");
+      setTimeout(function () { draggedPhotoFigure.classList.remove("is-drop-commit"); }, 280);
       await persistSetupPhotosOrder(photosWrap, setupId);
     });
 

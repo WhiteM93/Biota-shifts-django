@@ -724,6 +724,7 @@ class ProductSetupToolRow(models.Model):
     sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
 
     tool_number = models.CharField(max_length=20, blank=True, default="", verbose_name="Номер")
+    correction_enabled = models.BooleanField(default=False, verbose_name="Корректор включен")
     kor_n = models.CharField(max_length=20, blank=True, default="", verbose_name="Кор. н")
     kor_d = models.CharField(max_length=20, blank=True, default="", verbose_name="Кор. д")
 

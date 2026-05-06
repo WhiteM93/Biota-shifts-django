@@ -391,6 +391,7 @@ def _build_default_tool_rows(existing_rows: list[ProductSetupToolRow] | None = N
             out.append(
                 {
                     "tool_number": str(int(tool_no[1:])),
+                    "correction_enabled": bool(row.correction_enabled),
                     "kor_n": row.kor_n or "",
                     "kor_d": row.kor_d or "",
                     "tool_type": row.tool_type or "",
@@ -404,6 +405,7 @@ def _build_default_tool_rows(existing_rows: list[ProductSetupToolRow] | None = N
 
         default_row = {
             "tool_number": str(int(tool_no[1:])),
+            "correction_enabled": False,
             "kor_n": "",
             "kor_d": "",
             "tool_type": "",
@@ -439,6 +441,7 @@ def _build_display_tool_rows(existing_rows: list[ProductSetupToolRow] | None = N
             out.append(
                 {
                     "tool_number": tool_no,
+                    "correction_enabled": bool(row.correction_enabled),
                     "kor_n": row.kor_n or "",
                     "kor_d": row.kor_d or "",
                     "tool_type": row.tool_type or "",
@@ -453,6 +456,7 @@ def _build_display_tool_rows(existing_rows: list[ProductSetupToolRow] | None = N
             continue
         default_row = {
             "tool_number": tool_no,
+            "correction_enabled": False,
             "kor_n": "",
             "kor_d": "",
             "tool_type": "",
@@ -874,6 +878,7 @@ def product_detail_view(request, pk: int):
                     if not isinstance(row, dict):
                         continue
                     row_tool_number = str((row.get("tool_number") or "")).strip()
+                    row_correction_enabled = bool(row.get("correction_enabled"))
                     row_kor_n = str((row.get("kor_n") or "")).strip()
                     row_kor_d = str((row.get("kor_d") or "")).strip()
                     row_tool_type = str((row.get("tool_type") or "")).strip()
@@ -881,12 +886,13 @@ def product_detail_view(request, pk: int):
                     row_overhang = str((row.get("overhang") or "")).strip()
                     row_note = str((row.get("note") or "")).strip()
                     row_vals = (row_tool_number, row_kor_n, row_kor_d, row_tool_type, row_diameter, row_overhang, row_note)
-                    if all(v == "" for v in row_vals):
+                    if all(v == "" for v in row_vals) and not row_correction_enabled:
                         continue
                     ProductSetupToolRow.objects.create(
                         setup=setup,
                         sort_order=idx,
                         tool_number=row_tool_number,
+                        correction_enabled=row_correction_enabled,
                         kor_n=row_kor_n,
                         kor_d=row_kor_d,
                         tool_type=row_tool_type,

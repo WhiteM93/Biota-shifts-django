@@ -40,6 +40,11 @@
   <a href="{{ product.preview_stl.url }}" download class="btn product-btn-secondary">Скачать STL</a>
   {% endif %}
   {% if product.drawing_pdf %}
-  <a href="{{ product.drawing_pdf.url }}" download class="btn product-btn-secondary">Скачать чертёж (PDF)</a>
+  <div class="product-download-row">
+    <a href="{{ product.drawing_pdf.url }}" download class="btn product-btn-secondary product-download-main-btn">Скачать чертёж (PDF)</a>
+    <a href="{{ product.drawing_pdf.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost product-download-preview-btn" title="Открыть чертёж в новой вкладке" aria-label="Открыть чертёж в новой вкладке">
+      <i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>
+    </a>
+  </div>
   {% endif %}
 </div>
