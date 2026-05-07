@@ -456,10 +456,8 @@ def nav_permissions_for_user(username: str | None) -> dict[str, bool]:
     for k in NAV_KEYS:
         if k in nav:
             out[k] = bool(nav[k])
-    # Раздел «План» добавлен в NAV_KEYS позже первых сохранений nav из кабинета:
-    # при любых других уже заданных правах, но без ключа «plan», считаем до выдачи доступа закрытым.
-    if isinstance(nav, dict) and len(nav) > 0 and "plan" not in nav:
-        out["plan"] = False
+    # Ключ «plan» мог отсутствовать в старых сохранениях nav — тогда остаётся default True (как для
+    # пустого nav). Явное "plan": false в кабинете по-прежнему закрывает раздел.
     # В store до split не было ключей payroll/employees — наследуем от defects
     if "payroll" not in nav and "defects" in nav:
         out["payroll"] = bool(nav["defects"])
