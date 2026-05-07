@@ -17,7 +17,6 @@ from django.views.decorators.http import require_http_methods
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
 from .models import PlannedProduct, Product, ProductSetup, ProductSetupPhoto, ProductSetupProgramFile, ProductSetupToolRow
-from .plan_naladki_bridge import sync_plan_piece_for_naladki_in_same_transaction
 
 # Ограничение вывода ПП в карточке (страница)
 MAX_PROGRAM_DISPLAY_BYTES = 800_000
@@ -565,8 +564,10 @@ def product_create_view(request):
             with transaction.atomic():
                 obj: Product = form.save()
                 _apply_setup_photo_changes(request, obj)
-                sync_plan_piece_for_naladki_in_same_transaction(obj.pk)
-            messages.success(request, "Изделие создано. Позиция в разделе «План» привязана или создана автоматически.")
+            messages.success(
+                request,
+                "Изделие создано. Позиция в разделе «План» привязывается автоматически при сохранении.",
+            )
             return redirect("product_detail", pk=obj.pk)
         messages.error(request, "Исправьте ошибки в форме.")
     else:
@@ -605,8 +606,7 @@ def product_edit_view(request, pk: int):
                         setattr(obj, field_name, "")
                         obj.save(update_fields=[field_name])
                 _apply_setup_photo_changes(request, obj)
-                sync_plan_piece_for_naladki_in_same_transaction(obj.pk)
-            messages.success(request, "Изделие сохранено. Связь с планом обновлена.")
+            messages.success(request, "Изделие сохранено. Связь с планом обновляется автоматически.")
             return redirect("product_detail", pk=obj.pk)
         messages.error(request, "Исправьте ошибки в форме.")
     else:
