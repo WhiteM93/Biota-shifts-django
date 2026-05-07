@@ -8,8 +8,9 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Count, Q
-from django.http import Http404, JsonResponse
+from django.http import Http404, JsonResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from biota_shifts.auth import _is_admin, user_is_executor
@@ -23,6 +24,7 @@ from .models import (
     PlannedAssemblyComponent,
     PlannedProduct,
     PlannedProductStage,
+    ProductSetup,
 )
 from .plan_departments import (
     PLAN_DEPARTMENT_SLUG_TO_NAME,
@@ -30,7 +32,7 @@ from .plan_departments import (
     PLANNED_PRODUCT_DEPARTMENT_CHOICES,
     PLANNED_PRODUCT_DEPARTMENT_VALUES,
 )
-from .plan_naladki_bridge import finalize_plan_piece_naladki_link
+from .plan_naladki_bridge import finalize_plan_piece_naladki_link, plan_piece_is_linked_type
 from .plan_usage import (
     contract_lines_and_bom_map,
     product_assembly_usage_rows,
@@ -247,6 +249,107 @@ def _plan_product_type_from_item(item: PlannedProduct | None) -> str:
     return "made"
 
 
+def _naladki_specs_post_override(post: QueryDict) -> dict[str, str]:
+    return {
+        "size": (post.get("naladki_setup_size") or ""),
+        "workpiece": (post.get("naladki_setup_workpiece") or ""),
+        "material": (post.get("naladki_setup_material") or ""),
+    }
+
+
+def _naladki_specs_panel_context(
+    item: PlannedProduct | None,
+    *,
+    field_override: dict[str, str] | None = None,
+) -> dict:
+    ovr = field_override or {}
+    base: dict = {
+        "naladki_specs_panel_show": False,
+        "naladki_specs_form": False,
+        "naladki_specs_need_setup": False,
+        "naladki_specs_no_link": False,
+        "naladki_specs_product_url": "",
+        "naladki_setup_name": "",
+        "naladki_setup_size": "",
+        "naladki_setup_workpiece": "",
+        "naladki_setup_material": "",
+        "naladki_specs_extra_setups": 0,
+    }
+    if not item or not item.pk:
+        return base
+    pid = item.naladki_product_id
+    if not pid:
+        return {
+            **base,
+            "naladki_specs_panel_show": True,
+            "naladki_specs_no_link": True,
+        }
+    product_url = reverse("product_detail", kwargs={"pk": pid})
+    setup = (
+        ProductSetup.objects.filter(product_id=pid).order_by("sort_order", "id").first()
+    )
+    total = ProductSetup.objects.filter(product_id=pid).count()
+    if not setup:
+        return {
+            **base,
+            "naladki_specs_panel_show": True,
+            "naladki_specs_need_setup": True,
+            "naladki_specs_product_url": product_url,
+        }
+    return {
+        **base,
+        "naladki_specs_panel_show": True,
+        "naladki_specs_form": True,
+        "naladki_specs_product_url": product_url,
+        "naladki_setup_name": setup.name or "",
+        "naladki_setup_size": ovr.get("size", setup.size or ""),
+        "naladki_setup_workpiece": ovr.get("workpiece", setup.workpiece or ""),
+        "naladki_setup_material": ovr.get("material", setup.material or ""),
+        "naladki_specs_extra_setups": max(0, total - 1),
+    }
+
+
+def _persist_naladki_setup_specs_from_post(item: PlannedProduct, post: QueryDict) -> None:
+    if not plan_piece_is_linked_type(item) or not item.naladki_product_id:
+        return
+    setup = (
+        ProductSetup.objects.select_for_update()
+        .filter(product_id=item.naladki_product_id)
+        .order_by("sort_order", "id")
+        .first()
+    )
+    if not setup:
+        return
+    setup.size = (post.get("naladki_setup_size") or "")[:180]
+    setup.workpiece = (post.get("naladki_setup_workpiece") or "")[:220]
+    setup.material = (post.get("naladki_setup_material") or "")[:180]
+    setup.save(update_fields=["size", "workpiece", "material", "updated_at"])
+
+
+def _naladki_setup_readonly_detail_context(item: PlannedProduct) -> dict:
+    """Первая установка связанной карточки наладки — для просмотра позиции плана."""
+    if not item.naladki_product_id:
+        return {
+            "naladki_detail_first_setup": None,
+            "naladki_detail_setup_extra_count": 0,
+            "naladki_detail_product_has_no_setups": False,
+        }
+    setups = list(
+        ProductSetup.objects.filter(product_id=item.naladki_product_id).order_by("sort_order", "id")
+    )
+    if not setups:
+        return {
+            "naladki_detail_first_setup": None,
+            "naladki_detail_setup_extra_count": 0,
+            "naladki_detail_product_has_no_setups": True,
+        }
+    return {
+        "naladki_detail_first_setup": setups[0],
+        "naladki_detail_setup_extra_count": len(setups) - 1,
+        "naladki_detail_product_has_no_setups": False,
+    }
+
+
 def _edit_form_context(
     *,
     item: PlannedProduct | None,
@@ -257,6 +360,7 @@ def _edit_form_context(
     laser_material_marking_value: str = "",
     stage_rows: list[dict[str, str]],
     bom_rows: list[dict[str, str]],
+    naladki_specs_override: dict[str, str] | None = None,
 ) -> dict:
     if item and item.pk:
         usage_contract_rows, usage_contract_sum = product_contract_usage_rows(item.pk)
@@ -264,7 +368,7 @@ def _edit_form_context(
     else:
         usage_contract_rows, usage_contract_sum, usage_assembly_rows = [], 0, []
 
-    return {
+    ctx = {
         "item": item,
         "name_value": name_value,
         "plan_product_type": _normalize_plan_product_type(plan_product_type),
@@ -282,6 +386,8 @@ def _edit_form_context(
         "usage_assembly_rows": usage_assembly_rows,
         "usage_highlight_contract_pk": None,
     }
+    ctx.update(_naladki_specs_panel_context(item, field_override=naladki_specs_override))
+    return ctx
 
 
 def _stage_rows_for_form(
@@ -299,6 +405,163 @@ def _stage_rows_for_form(
     if stages_initial:
         return [{"dept": s.department, "note": s.description or ""} for s in stages_initial]
     return [{"dept": "", "note": ""}]
+
+
+def _error_edit_form_response(
+    request,
+    *,
+    item: PlannedProduct | None,
+) -> dict[str, object]:
+    """Контекст формы редактирования после ошибки валидации (по текущему POST)."""
+    nal_ov = _naladki_specs_post_override(request.POST)
+    name = (request.POST.get("name") or "").strip()
+    plan_product_type = _normalize_plan_product_type(request.POST.get("plan_product_type"))
+    depts = request.POST.getlist("stage_department")
+    notes = request.POST.getlist("stage_description")
+    bom_rows = _bom_rows_post(request)
+    wp_form_val = _workpiece_type_form_value(plan_product_type, request.POST)
+    laser_form_kw = {
+        "laser_sheet_thickness_value": (request.POST.get("laser_sheet_thickness_mm") or "").strip(),
+        "laser_material_marking_value": (request.POST.get("laser_material_marking") or "").strip(),
+    }
+    rows = _stage_rows_for_form(depts, notes, None)
+    return _edit_form_context(
+        item=item,
+        name_value=name,
+        plan_product_type=plan_product_type,
+        workpiece_type_value=wp_form_val,
+        stage_rows=rows,
+        bom_rows=bom_rows,
+        **laser_form_kw,
+        naladki_specs_override=nal_ov,
+    )
+
+
+def _save_plan_article_from_post(
+    request,
+    item: PlannedProduct | None,
+) -> tuple[PlannedProduct | None, str | None]:
+    """
+    Создать или обновить позицию плана из POST (как plan_article_edit).
+    Возвращает (сохранённый объект, None) либо (None, текст ошибки).
+    """
+    name = (request.POST.get("name") or "").strip()
+    plan_product_type = _normalize_plan_product_type(request.POST.get("plan_product_type"))
+    is_assembly, is_purchased = _flags_from_plan_product_type(plan_product_type)
+    depts = request.POST.getlist("stage_department")
+    notes = request.POST.getlist("stage_description")
+    bom_rows = _bom_rows_post(request)
+    while len(notes) < len(depts):
+        notes.append("")
+
+    wp_raw = (request.POST.get("workpiece_type") or "").strip()
+    laser_form_kw = {
+        "laser_sheet_thickness_value": (request.POST.get("laser_sheet_thickness_mm") or "").strip(),
+        "laser_material_marking_value": (request.POST.get("laser_material_marking") or "").strip(),
+    }
+
+    if not name:
+        return None, "Укажите название изделия."
+
+    if plan_product_type == "made":
+        if wp_raw not in PLANNED_PRODUCT_WORKPIECE_TYPE_VALUES:
+            return (
+                None,
+                "Для изделия выберите тип заготовки: Заготовительный, Лазерный или ПКИ.",
+            )
+
+    workpiece_type_stored = wp_raw if plan_product_type == "made" else ""
+
+    laser_thick_dec: Decimal | None = None
+    laser_mark_stored = ""
+    if workpiece_type_stored == "laser":
+        laser_thick_dec, terr = _parse_laser_sheet_thickness_mm(laser_form_kw["laser_sheet_thickness_value"])
+        if terr:
+            return None, terr
+        if not laser_form_kw["laser_material_marking_value"]:
+            return None, "Укажите маркировку материала для лазерной заготовки."
+        laser_mark_stored = laser_form_kw["laser_material_marking_value"]
+
+    stages_clean: list[tuple[str, str]] = []
+    for d_raw, note in zip(depts, notes):
+        d = (d_raw or "").strip()
+        if not d:
+            continue
+        if d not in PLANNED_PRODUCT_DEPARTMENT_VALUES:
+            return None, "Выбран неизвестный отдел — обновите страницу и попробуйте снова."
+        stages_clean.append((d, (note or "").strip()))
+
+    bom_lines_resolved: list[tuple[PlannedProduct, int]] = []
+    if is_assembly:
+        resolved, bom_err = _resolve_bom_lines(
+            assembly_pk=item.pk if item else None,
+            assembly_name=name,
+            bom_rows=bom_rows,
+        )
+        if bom_err:
+            return None, bom_err
+        assert resolved is not None
+        bom_lines_resolved = resolved
+        if not bom_lines_resolved:
+            return (
+                None,
+                "Для сборочного изделия укажите хотя бы одно входящее изделие в составе.",
+            )
+
+    with transaction.atomic():
+        if item is None:
+            item = PlannedProduct.objects.create(
+                name=name,
+                is_assembly=is_assembly,
+                is_purchased=is_purchased,
+                workpiece_type=workpiece_type_stored,
+                laser_sheet_thickness_mm=laser_thick_dec,
+                laser_material_marking=laser_mark_stored,
+            )
+        else:
+            item.name = name
+            item.is_assembly = is_assembly
+            item.is_purchased = is_purchased
+            item.workpiece_type = workpiece_type_stored
+            item.laser_sheet_thickness_mm = laser_thick_dec
+            item.laser_material_marking = laser_mark_stored
+            item.save(
+                update_fields=(
+                    "name",
+                    "is_assembly",
+                    "is_purchased",
+                    "workpiece_type",
+                    "laser_sheet_thickness_mm",
+                    "laser_material_marking",
+                    "updated_at",
+                )
+            )
+        item.stages.all().delete()
+        PlannedProductStage.objects.bulk_create(
+            [
+                PlannedProductStage(product=item, sort_order=i, department=dep, description=desc)
+                for i, (dep, desc) in enumerate(stages_clean)
+            ]
+        )
+        item.assembly_components.all().delete()
+        if is_assembly and bom_lines_resolved:
+            PlannedAssemblyComponent.objects.bulk_create(
+                [
+                    PlannedAssemblyComponent(
+                        assembly=item,
+                        component=c,
+                        sort_order=i,
+                        quantity=q,
+                    )
+                    for i, (c, q) in enumerate(bom_lines_resolved)
+                ]
+            )
+
+        finalize_plan_piece_naladki_link(item.pk)
+        item.refresh_from_db()
+        _persist_naladki_setup_specs_from_post(item, request.POST)
+
+    return item, None
 
 
 def _redirect_executors_from_edit(request, user: str | None, item: PlannedProduct | None):
@@ -525,9 +788,29 @@ def plan_index(request):
     )
 
 
+def _plan_article_quick_form_context(item: PlannedProduct) -> dict[str, object]:
+    stages_initial = list(item.stages.all())
+    rows = _stage_rows_for_form(None, None, stages_initial if stages_initial else None)
+    bom_init = _bom_rows_initial(item)
+    base: dict[str, object] = {
+        "name_value": item.name,
+        "plan_product_type": _plan_product_type_from_item(item),
+        "workpiece_type_value": _workpiece_type_initial(item),
+        "laser_sheet_thickness_value": _laser_thickness_input_value(item),
+        "laser_material_marking_value": _laser_material_marking_input_value(item),
+        "workpiece_type_choices": PLANNED_PRODUCT_WORKPIECE_TYPE_CHOICES,
+        "laser_material_marking_suggestions": _laser_material_marking_suggestions(),
+        "department_choices": PLANNED_PRODUCT_DEPARTMENT_CHOICES,
+        "stage_rows": rows,
+        "bom_rows": bom_init,
+    }
+    base.update(_naladki_specs_panel_context(item))
+    return base
+
+
 @biota_login_required
 @nav_permission_required("plan")
-@require_http_methods(["GET", "HEAD"])
+@require_http_methods(["GET", "HEAD", "POST"])
 def plan_article_detail(request, pk: int):
     item = get_object_or_404(
         PlannedProduct.objects.select_related("naladki_product").prefetch_related(
@@ -535,20 +818,37 @@ def plan_article_detail(request, pk: int):
         ),
         pk=pk,
     )
+    user = biota_user(request)
+
+    if request.method == "POST":
+        r = _redirect_executors_from_edit(request, user, item)
+        if r is not None:
+            return r
+        if (request.POST.get("action") or "").strip() != "inline_save_plan_article":
+            return JsonResponse({"ok": False, "error": "Неверное действие."}, status=400)
+        if (request.headers.get("X-Requested-With") or "").strip() != "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "Требуется AJAX-запрос."}, status=400)
+        saved, err = _save_plan_article_from_post(request, item)
+        if err:
+            return JsonResponse({"ok": False, "error": err}, status=400)
+        assert saved is not None
+        messages.success(request, "Изделие и маршрут сохранены.")
+        return JsonResponse({"ok": True})
+
     usage_contract_rows, usage_contract_sum = product_contract_usage_rows(item.pk)
     usage_assembly_rows = product_assembly_usage_rows(item.pk)
-    return render(
-        request,
-        "shifts/plan/article_detail.html",
-        {
-            "item": item,
-            "plan_department_choices": PLANNED_PRODUCT_DEPARTMENT_CHOICES,
-            "usage_contract_rows": usage_contract_rows,
-            "usage_contract_sum": usage_contract_sum,
-            "usage_assembly_rows": usage_assembly_rows,
-            "usage_highlight_contract_pk": None,
-        },
-    )
+    ctx: dict[str, object] = {
+        "item": item,
+        "plan_department_choices": PLANNED_PRODUCT_DEPARTMENT_CHOICES,
+        "usage_contract_rows": usage_contract_rows,
+        "usage_contract_sum": usage_contract_sum,
+        "usage_assembly_rows": usage_assembly_rows,
+        "usage_highlight_contract_pk": None,
+        **_naladki_setup_readonly_detail_context(item),
+    }
+    if _is_admin(user or "") or not user_is_executor(user):
+        ctx.update(_plan_article_quick_form_context(item))
+    return render(request, "shifts/plan/article_detail.html", ctx)
 
 
 @biota_login_required
@@ -557,7 +857,9 @@ def plan_article_detail(request, pk: int):
 def plan_article_edit(request, pk: int | None = None):
     user = biota_user(request)
     item = None if pk is None else get_object_or_404(
-        PlannedProduct.objects.prefetch_related("stages", "assembly_components__component"),
+        PlannedProduct.objects.select_related("naladki_product").prefetch_related(
+            "stages", "assembly_components__component"
+        ),
         pk=pk,
     )
 
@@ -570,218 +872,17 @@ def plan_article_edit(request, pk: int | None = None):
         stages_initial = list(item.stages.all())
 
     if request.method == "POST":
-        name = (request.POST.get("name") or "").strip()
-        plan_product_type = _normalize_plan_product_type(request.POST.get("plan_product_type"))
-        is_assembly, is_purchased = _flags_from_plan_product_type(plan_product_type)
-        depts = request.POST.getlist("stage_department")
-        notes = request.POST.getlist("stage_description")
-        bom_rows = _bom_rows_post(request)
-        while len(notes) < len(depts):
-            notes.append("")
-
-        wp_form_val = _workpiece_type_form_value(plan_product_type, request.POST)
-        wp_raw = (request.POST.get("workpiece_type") or "").strip()
-        laser_form_kw = {
-            "laser_sheet_thickness_value": (request.POST.get("laser_sheet_thickness_mm") or "").strip(),
-            "laser_material_marking_value": (request.POST.get("laser_material_marking") or "").strip(),
-        }
-
-        if not name:
-            messages.error(request, "Укажите название изделия.")
-            rows = _stage_rows_for_form(depts, notes, None)
+        saved, err = _save_plan_article_from_post(request, item)
+        if err:
+            messages.error(request, err)
             return render(
                 request,
                 "shifts/plan/article_edit.html",
-                _edit_form_context(
-                    item=item,
-                    name_value=name,
-                    plan_product_type=plan_product_type,
-                    workpiece_type_value=wp_form_val,
-                    stage_rows=rows,
-                    bom_rows=bom_rows,
-                    **laser_form_kw,
-                ),
+                _error_edit_form_response(request, item=item),
             )
-
-        if plan_product_type == "made":
-            if wp_raw not in PLANNED_PRODUCT_WORKPIECE_TYPE_VALUES:
-                messages.error(
-                    request,
-                    "Для изделия выберите тип заготовки: Заготовительный, Лазерный или ПКИ.",
-                )
-                rows = _stage_rows_for_form(depts, notes, None)
-                return render(
-                    request,
-                    "shifts/plan/article_edit.html",
-                    _edit_form_context(
-                        item=item,
-                        name_value=name,
-                        plan_product_type=plan_product_type,
-                        workpiece_type_value=wp_form_val,
-                        stage_rows=rows,
-                        bom_rows=bom_rows,
-                        **laser_form_kw,
-                    ),
-                )
-
-        workpiece_type_stored = wp_raw if plan_product_type == "made" else ""
-
-        laser_thick_dec: Decimal | None = None
-        laser_mark_stored = ""
-        if workpiece_type_stored == "laser":
-            laser_thick_dec, terr = _parse_laser_sheet_thickness_mm(laser_form_kw["laser_sheet_thickness_value"])
-            if terr:
-                messages.error(request, terr)
-                rows = _stage_rows_for_form(depts, notes, None)
-                return render(
-                    request,
-                    "shifts/plan/article_edit.html",
-                    _edit_form_context(
-                        item=item,
-                        name_value=name,
-                        plan_product_type=plan_product_type,
-                        workpiece_type_value=wp_form_val,
-                        stage_rows=rows,
-                        bom_rows=bom_rows,
-                        **laser_form_kw,
-                    ),
-                )
-            if not laser_form_kw["laser_material_marking_value"]:
-                messages.error(request, "Укажите маркировку материала для лазерной заготовки.")
-                rows = _stage_rows_for_form(depts, notes, None)
-                return render(
-                    request,
-                    "shifts/plan/article_edit.html",
-                    _edit_form_context(
-                        item=item,
-                        name_value=name,
-                        plan_product_type=plan_product_type,
-                        workpiece_type_value=wp_form_val,
-                        stage_rows=rows,
-                        bom_rows=bom_rows,
-                        **laser_form_kw,
-                    ),
-                )
-            laser_mark_stored = laser_form_kw["laser_material_marking_value"]
-
-        stages_clean: list[tuple[str, str]] = []
-        for d_raw, note in zip(depts, notes):
-            d = (d_raw or "").strip()
-            if not d:
-                continue
-            if d not in PLANNED_PRODUCT_DEPARTMENT_VALUES:
-                messages.error(request, "Выбран неизвестный отдел — обновите страницу и попробуйте снова.")
-                rows = _stage_rows_for_form(depts, notes, None)
-                return render(
-                    request,
-                    "shifts/plan/article_edit.html",
-                    _edit_form_context(
-                        item=item,
-                        name_value=name,
-                        plan_product_type=plan_product_type,
-                        workpiece_type_value=wp_form_val,
-                        stage_rows=rows,
-                        bom_rows=bom_rows,
-                        **laser_form_kw,
-                    ),
-                )
-            stages_clean.append((d, (note or "").strip()))
-
-        bom_lines_resolved: list[tuple[PlannedProduct, int]] = []
-        if is_assembly:
-            resolved, bom_err = _resolve_bom_lines(
-                assembly_pk=item.pk if item else None,
-                assembly_name=name,
-                bom_rows=bom_rows,
-            )
-            if bom_err:
-                messages.error(request, bom_err)
-                rows = _stage_rows_for_form(depts, notes, None)
-                return render(
-                    request,
-                    "shifts/plan/article_edit.html",
-                    _edit_form_context(
-                        item=item,
-                        name_value=name,
-                        plan_product_type=plan_product_type,
-                        workpiece_type_value=wp_form_val,
-                        stage_rows=rows,
-                        bom_rows=bom_rows,
-                        **laser_form_kw,
-                    ),
-                )
-            assert resolved is not None
-            bom_lines_resolved = resolved
-            if not bom_lines_resolved:
-                messages.error(request, "Для сборочного изделия укажите хотя бы одно входящее изделие в составе.")
-                rows = _stage_rows_for_form(depts, notes, None)
-                return render(
-                    request,
-                    "shifts/plan/article_edit.html",
-                    _edit_form_context(
-                        item=item,
-                        name_value=name,
-                        plan_product_type=plan_product_type,
-                        workpiece_type_value=wp_form_val,
-                        stage_rows=rows,
-                        bom_rows=bom_rows,
-                        **laser_form_kw,
-                    ),
-                )
-
-        with transaction.atomic():
-            if item is None:
-                item = PlannedProduct.objects.create(
-                    name=name,
-                    is_assembly=is_assembly,
-                    is_purchased=is_purchased,
-                    workpiece_type=workpiece_type_stored,
-                    laser_sheet_thickness_mm=laser_thick_dec,
-                    laser_material_marking=laser_mark_stored,
-                )
-            else:
-                item.name = name
-                item.is_assembly = is_assembly
-                item.is_purchased = is_purchased
-                item.workpiece_type = workpiece_type_stored
-                item.laser_sheet_thickness_mm = laser_thick_dec
-                item.laser_material_marking = laser_mark_stored
-                item.save(
-                    update_fields=(
-                        "name",
-                        "is_assembly",
-                        "is_purchased",
-                        "workpiece_type",
-                        "laser_sheet_thickness_mm",
-                        "laser_material_marking",
-                        "updated_at",
-                    )
-                )
-            item.stages.all().delete()
-            PlannedProductStage.objects.bulk_create(
-                [
-                    PlannedProductStage(product=item, sort_order=i, department=dep, description=desc)
-                    for i, (dep, desc) in enumerate(stages_clean)
-                ]
-            )
-            item.assembly_components.all().delete()
-            if is_assembly and bom_lines_resolved:
-                PlannedAssemblyComponent.objects.bulk_create(
-                    [
-                        PlannedAssemblyComponent(
-                            assembly=item,
-                            component=c,
-                            sort_order=i,
-                            quantity=q,
-                        )
-                        for i, (c, q) in enumerate(bom_lines_resolved)
-                    ]
-                )
-
-            finalize_plan_piece_naladki_link(item.pk)
-
+        assert saved is not None
         messages.success(request, "Изделие и маршрут сохранены.")
-        return redirect("plan_article_detail", pk=item.pk)
+        return redirect("plan_article_detail", pk=saved.pk)
 
     rows = _stage_rows_for_form(None, None, stages_initial if stages_initial else None)
     bom_init = _bom_rows_initial(item)

@@ -1,69 +1,47 @@
-{% extends "base.html" %}
-
-{% block content %}
-{% include "shifts/plan/includes/plan_rails_styles.html" %}
-<div class="plan-article-rails-root">
-{% include "shifts/plan/includes/plan_rails_asides.html" %}
-<div class="plan-article-main">
-<div class="page-actions">
-  {% if item %}
-  <a href="{% url 'plan_article_detail' pk=item.pk %}" class="btn btn-sm btn-ghost">← К изделию</a>
-  {% else %}
-  <a href="{% url 'plan' %}" class="btn btn-sm btn-ghost">← К списку</a>
-  {% endif %}
-</div>
-<h1>{% if item %}Редактирование{% else %}Новое изделие{% endif %}</h1>
-
-{% if item %}
-{% include "shifts/plan/includes/plan_product_usage_summary.html" %}
-{% endif %}
-
+{# Форма быстрого редактирования на карточке плана (article_detail). Контекст: как в article_edit + item #}
 <style>
-  .plan-bom-panel .bom-suggest-list a { color: #aec0ff; text-decoration: underline; }
-  .plan-bom-panel .bom-suggest-list li { margin-bottom: 4px; }
-  .plan-product-type-row {
+  .plan-article-quick-panel .plan-bom-panel .bom-suggest-list a { color: #aec0ff; text-decoration: underline; }
+  .plan-article-quick-panel .plan-bom-panel .bom-suggest-list li { margin-bottom: 4px; }
+  .plan-article-quick-panel .plan-product-type-row {
     margin-top: 14px;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 10px 18px;
   }
-  .plan-product-type-row > span.label {
+  .plan-article-quick-panel .plan-product-type-row > span.label {
     color: #aebde8;
     font-size: 12px;
     font-weight: 600;
     width: 100%;
     flex-basis: 100%;
   }
-  .plan-product-type-row .chk { margin-top: 0; }
-  .plan-usage-row--highlight td {
-    background: rgba(55, 76, 118, 0.28);
-    box-shadow: inset 0 0 0 1px rgba(120, 155, 220, 0.18);
-  }
-  .plan-workpiece-laser-row {
+  .plan-article-quick-panel .plan-product-type-row .chk { margin-top: 0; }
+  .plan-article-quick-panel .plan-workpiece-laser-row {
     margin-top: 12px;
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
     gap: 14px 18px;
   }
-  #plan-workpiece-panel { flex: 0 1 420px; max-width: 440px; margin-top: 0 !important; }
-  #plan-laser-sheet-panel {
+  .plan-article-quick-panel #plan-quick-workpiece-panel { flex: 0 1 420px; max-width: 440px; margin-top: 0 !important; }
+  .plan-article-quick-panel #plan-quick-laser-sheet-panel {
     flex: 1 1 260px;
     min-width: 220px;
     max-width: 480px;
   }
 </style>
 
-<form method="post" action="" id="plan-article-form">
+<form method="post" action="{% url 'plan_article_detail' pk=item.pk %}" id="plan-article-inline-form" autocomplete="off">
   {% csrf_token %}
+  <input type="hidden" name="action" value="inline_save_plan_article" />
   <div class="filter-panel" style="margin-bottom:14px;">
     <label class="field" style="max-width:560px;">
       <span>Название изделия</span>
-      <input type="text" id="plan-product-name" name="name" value="{{ name_value }}" maxlength="400" required placeholder="Например, Корпус Х-12">
+      <input type="text" id="plan-quick-product-name" name="name" value="{{ name_value }}" maxlength="400" required placeholder="Например, Корпус Х-12">
     </label>
-    <div class="plan-product-type-row" role="radiogroup" aria-labelledby="plan-product-type-label">
-      <span class="label" id="plan-product-type-label">Тип</span>
+    <div class="plan-product-type-row" role="radiogroup" aria-labelledby="plan-quick-product-type-label">
+      <span class="label" id="plan-quick-product-type-label">Тип</span>
       <label class="chk">
         <input type="radio" name="plan_product_type" value="made" {% if plan_product_type == 'made' %}checked{% endif %}>
         <span>Изделие</span>
@@ -77,11 +55,11 @@
         <span>ПКИ</span>
       </label>
     </div>
-    <div class="plan-workpiece-laser-row" id="plan-workpiece-laser-row" style="{% if plan_product_type != 'made' %}display:none;{% endif %}">
-    <div id="plan-workpiece-panel" class="filter-panel">
+    <div class="plan-workpiece-laser-row" id="plan-quick-workpiece-laser-row" style="{% if plan_product_type != 'made' %}display:none;{% endif %}">
+    <div id="plan-quick-workpiece-panel" class="filter-panel">
       <label class="field" style="max-width:100%;">
         <span>Тип заготовки</span>
-        <select name="workpiece_type" id="plan-workpiece-type" {% if plan_product_type == 'made' %}required{% endif %}>
+        <select name="workpiece_type" id="plan-quick-workpiece-type" {% if plan_product_type == 'made' %}required{% endif %}>
           <option value="">— выберите —</option>
           {% for val, label in workpiece_type_choices %}
           <option value="{{ val }}" {% if workpiece_type_value == val %}selected{% endif %}>{{ label }}</option>
@@ -92,15 +70,15 @@
         Для изделия обязателен выбор. В дальнейшем от этого будет зависеть стартовый отдел в планировании (заготовка, лазер, ПКИ).
       </p>
     </div>
-    <div id="plan-laser-sheet-panel" class="filter-panel" style="{% if plan_product_type != 'made' or workpiece_type_value != 'laser' %}display:none;{% endif %}">
+    <div id="plan-quick-laser-sheet-panel" class="filter-panel" style="{% if plan_product_type != 'made' or workpiece_type_value != 'laser' %}display:none;{% endif %}">
       <label class="field">
         <span>Толщина листа, мм</span>
-        <input type="text" name="laser_sheet_thickness_mm" id="plan-laser-thickness" value="{{ laser_sheet_thickness_value }}" inputmode="decimal" autocomplete="off" placeholder="Например, 2 или 1,5">
+        <input type="text" name="laser_sheet_thickness_mm" id="plan-quick-laser-thickness" value="{{ laser_sheet_thickness_value }}" inputmode="decimal" autocomplete="off" placeholder="Например, 2 или 1,5">
       </label>
       <label class="field" style="margin-top:10px;">
         <span>Маркировка материала</span>
-        <input type="text" name="laser_material_marking" id="plan-laser-marking" value="{{ laser_material_marking_value }}" maxlength="240" autocomplete="off" placeholder="Выберите из списка или введите новую" list="plan-laser-material-markings">
-        <datalist id="plan-laser-material-markings">
+        <input type="text" name="laser_material_marking" id="plan-quick-laser-marking" value="{{ laser_material_marking_value }}" maxlength="240" autocomplete="off" placeholder="Выберите из списка или введите новую" list="plan-quick-laser-material-markings">
+        <datalist id="plan-quick-laser-material-markings">
           {% for m in laser_material_marking_suggestions %}
           <option value="{{ m }}"></option>
           {% endfor %}
@@ -151,7 +129,7 @@
     {% endif %}
   </div>
 
-  <div id="plan-bom-panel" class="plan-bom-panel filter-panel" style="{% if plan_product_type != 'assembly' %}display:none;{% endif %}margin-bottom:14px;">
+  <div id="plan-quick-bom-panel" class="plan-bom-panel filter-panel" style="{% if plan_product_type != 'assembly' %}display:none;{% endif %}margin-bottom:14px;">
     <h3 style="margin:0 0 8px 0;font-size:1rem;color:#c9d5ff;">Состав сборки</h3>
     <p class="muted" style="margin:0 0 10px 0;">
       Укажите входящие изделия из плана и количество на <strong>один комплект</strong> этой сборки.
@@ -167,7 +145,7 @@
             <th style="width:52px;text-align:center;"></th>
           </tr>
         </thead>
-        <tbody id="plan-bom-tbody">
+        <tbody id="plan-quick-bom-tbody">
           {% for row in bom_rows %}
           <tr class="plan-bom-row">
             <td style="text-align:center;vertical-align:middle;">
@@ -185,7 +163,7 @@
         </tbody>
       </table>
     </div>
-    <button type="button" id="plan-bom-add" class="btn btn-sm btn-ghost" style="margin-top:10px;">+ В состав</button>
+    <button type="button" id="plan-quick-bom-add" class="btn btn-sm btn-ghost" style="margin-top:10px;">+ В состав</button>
   </div>
 
   <h3 style="margin:0 0 8px 0;font-size:1rem;color:#c9d5ff;">Этапы производства</h3>
@@ -202,7 +180,7 @@
           <th style="width:52px;"></th>
         </tr>
       </thead>
-      <tbody id="plan-stages-tbody">
+      <tbody id="plan-quick-stages-tbody">
         {% for row in stage_rows %}
         <tr class="plan-stage-row">
           <td>
@@ -221,12 +199,13 @@
     </table>
   </div>
   <div class="page-actions" style="margin-top:12px;">
-    <button type="button" id="plan-stage-add" class="btn btn-sm btn-ghost">+ Этап</button>
-    <button type="submit" class="btn btn-sm">Сохранить</button>
+    <button type="button" id="plan-quick-stage-add" class="btn btn-sm btn-ghost">+ Этап</button>
+    <button type="button" class="btn btn-sm" id="plan-article-inline-save">Сохранить</button>
+    <button type="button" class="btn btn-sm btn-ghost" id="plan-article-inline-cancel">Отмена</button>
   </div>
 </form>
 
-<template id="plan-stage-row-tpl">
+<template id="plan-quick-stage-row-tpl">
   <tr class="plan-stage-row">
     <td>
       <select name="stage_department">
@@ -241,7 +220,7 @@
   </tr>
 </template>
 
-<template id="plan-bom-row-tpl">
+<template id="plan-quick-bom-row-tpl">
   <tr class="plan-bom-row">
     <td style="text-align:center;vertical-align:middle;">
       <input type="hidden" name="bom_planned_id" value="" class="bom-pk">
@@ -258,12 +237,44 @@
 
 <script>
 (function () {
-  var suggestUrl = "{% url 'plan_product_name_suggestions' %}";
-  var excludeId = "{% if item %}{{ item.pk }}{% endif %}";
+  var root = document.getElementById("plan-article-detail-root");
+  var panel = document.getElementById("plan-article-quick-panel");
+  var toggleBtn = document.getElementById("plan-article-toggle-quick-edit");
+  var form = document.getElementById("plan-article-inline-form");
+  var saveBtn = document.getElementById("plan-article-inline-save");
+  var cancelBtn = document.getElementById("plan-article-inline-cancel");
+  if (!root || !panel || !toggleBtn || !form) return;
 
-  var tbStages = document.getElementById("plan-stages-tbody");
-  var tplStage = document.getElementById("plan-stage-row-tpl");
-  var addStage = document.getElementById("plan-stage-add");
+  function getCookie(name) {
+    var m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));
+    return m ? decodeURIComponent(m[2]) : "";
+  }
+
+  function setQuickEditing(on) {
+    root.classList.toggle("plan-article-quick-editing", on);
+    panel.hidden = !on;
+    toggleBtn.textContent = on ? "Свернуть правку" : "Быстрое редактирование";
+  }
+
+  toggleBtn.addEventListener("click", function () {
+    var willShow = panel.hidden;
+    setQuickEditing(willShow);
+    if (willShow) syncPlanTypeUi();
+  });
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", function () {
+      form.reset();
+      syncPlanTypeUi();
+      setQuickEditing(false);
+    });
+  }
+
+  var suggestUrl = "{% url 'plan_product_name_suggestions' %}";
+  var excludeId = "{{ item.pk }}";
+
+  var tbStages = document.getElementById("plan-quick-stages-tbody");
+  var tplStage = document.getElementById("plan-quick-stage-row-tpl");
+  var addStage = document.getElementById("plan-quick-stage-add");
   if (tbStages && tplStage && addStage) {
     function stageRowCount() { return tbStages.querySelectorAll(".plan-stage-row").length; }
     function bindStageRow(tr) {
@@ -282,13 +293,13 @@
     });
   }
 
-  var bomPanel = document.getElementById("plan-bom-panel");
-  var wpRow = document.getElementById("plan-workpiece-laser-row");
-  var laserPanel = document.getElementById("plan-laser-sheet-panel");
-  var laserThickness = document.getElementById("plan-laser-thickness");
-  var laserMarking = document.getElementById("plan-laser-marking");
-  var wpSelect = document.getElementById("plan-workpiece-type");
-  var typeRadios = document.querySelectorAll('input[name="plan_product_type"]');
+  var bomPanel = document.getElementById("plan-quick-bom-panel");
+  var wpRow = document.getElementById("plan-quick-workpiece-laser-row");
+  var laserPanel = document.getElementById("plan-quick-laser-sheet-panel");
+  var laserThickness = document.getElementById("plan-quick-laser-thickness");
+  var laserMarking = document.getElementById("plan-quick-laser-marking");
+  var wpSelect = document.getElementById("plan-quick-workpiece-type");
+  var typeRadios = form.querySelectorAll('input[name="plan_product_type"]');
   function currentPlanProductType() {
     var t = "made";
     typeRadios.forEach(function (r) {
@@ -384,7 +395,7 @@
     var rm = tr.querySelector(".plan-bom-remove");
     if (rm) {
       rm.addEventListener("click", function () {
-        var tb = document.getElementById("plan-bom-tbody");
+        var tb = document.getElementById("plan-quick-bom-tbody");
         if (!tb) return;
         if (tb.querySelectorAll(".plan-bom-row").length <= 1) return;
         tr.parentNode.removeChild(tr);
@@ -392,9 +403,9 @@
     }
   }
 
-  var tbBom = document.getElementById("plan-bom-tbody");
-  var tplBom = document.getElementById("plan-bom-row-tpl");
-  var addBom = document.getElementById("plan-bom-add");
+  var tbBom = document.getElementById("plan-quick-bom-tbody");
+  var tplBom = document.getElementById("plan-quick-bom-row-tpl");
+  var addBom = document.getElementById("plan-quick-bom-add");
   if (tbBom && tplBom && addBom) {
     tbBom.querySelectorAll(".plan-bom-row").forEach(bindBomRow);
     addBom.addEventListener("click", function () {
@@ -403,9 +414,34 @@
       bindBomRow(rows[rows.length - 1]);
     });
   }
+
+  if (saveBtn) {
+    saveBtn.addEventListener("click", async function () {
+      if (typeof form.reportValidity === "function" && !form.reportValidity()) return;
+      var fd = new FormData(form);
+      fd.set("action", "inline_save_plan_article");
+      var res = await fetch(form.action, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": getCookie("csrftoken"),
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: fd,
+        credentials: "same-origin",
+      });
+      var data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        alert("Не удалось разобрать ответ сервера.");
+        return;
+      }
+      if (!res.ok || !data.ok) {
+        alert(data.error || "Не удалось сохранить.");
+        return;
+      }
+      window.location.reload();
+    });
+  }
 })();
 </script>
-</div>
-</div>
-{% include "shifts/plan/includes/plan_rails_script.html" %}
-{% endblock %}

@@ -23,41 +23,120 @@
     background: rgba(55, 76, 118, 0.32);
     box-shadow: inset 0 0 0 1px rgba(120, 155, 220, 0.2);
   }
+  .plan-article-naladki-cta {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+  }
+  .plan-article-naladki-cta__meta {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #8fa4c8;
+    font-weight: 600;
+  }
+  .plan-article-naladki-cta__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #eaf0ff !important;
+    text-decoration: none;
+    border: 1px solid rgba(101, 140, 210, 0.55);
+    background: linear-gradient(180deg, rgba(52, 78, 128, 0.55) 0%, rgba(36, 52, 88, 0.75) 100%);
+    box-shadow: 0 2px 8px rgba(8, 14, 28, 0.35);
+    transition: border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .plan-article-naladki-cta__link:hover,
+  .plan-article-naladki-cta__link:focus {
+    border-color: rgba(180, 205, 255, 0.75);
+    color: #fff !important;
+    box-shadow: 0 4px 14px rgba(12, 22, 48, 0.45);
+  }
+  .plan-article-naladki-cta__link span:last-child {
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.88;
+  }
+  .plan-article-rails-root.plan-article-quick-editing .plan-article-title-view,
+  .plan-article-rails-root.plan-article-quick-editing .plan-article-readonly-specs {
+    display: none !important;
+  }
+  .plan-article-quick-panel {
+    margin-top: 12px;
+    padding: 14px 16px;
+    border: 1px solid rgba(58, 74, 106, 0.75);
+    border-radius: 12px;
+    background: rgba(17, 24, 38, 0.55);
+  }
 </style>
 {% include "shifts/plan/includes/plan_rails_styles.html" %}
 
-<div class="plan-article-rails-root">
+<div class="plan-article-rails-root" id="plan-article-detail-root">
 {% include "shifts/plan/includes/plan_rails_asides.html" %}
 
   <div class="plan-article-main">
 <div class="page-actions">
   <a href="{% url 'plan' %}" class="btn btn-sm btn-ghost">← К списку</a>
   {% if biota_can_edit %}
-  <a href="{% url 'plan_article_edit' pk=item.pk %}" class="btn btn-sm">Редактировать</a>
+  <button type="button" class="btn btn-sm" id="plan-article-toggle-quick-edit">Быстрое редактирование</button>
   <form method="post" action="{% url 'plan_article_delete' pk=item.pk %}" style="display:inline;" data-confirm="Удалить это изделие из плана?">
     {% csrf_token %}
     <button type="submit" class="btn btn-sm btn-ghost">Удалить</button>
   </form>
   {% endif %}
 </div>
-<h1 style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px;line-height:1.25;margin:10px 0 8px 0;">
+<h1 class="plan-article-title-view" style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px;line-height:1.25;margin:10px 0 8px 0;">
   {% planned_product_heading item.name %}
   <span style="display:inline-flex;flex-wrap:wrap;gap:6px 10px;align-items:center;">
     {% if item.is_assembly %}<span class="muted" style="font-size:0.85rem;font-weight:600;">(сборка)</span>{% endif %}
     {% if item.is_purchased %}<span class="muted" style="font-size:0.85rem;font-weight:600;">(ПКИ)</span>{% endif %}
   </span>
 </h1>
-<p class="muted">{% if item.is_purchased %}ПКИ (закупка). {% endif %}Маршрут по отделам — при наличии; позицию можно сохранять и без этапов.</p>
+<p class="muted plan-article-readonly-specs" style="margin:8px 0 0 0;font-size:13px;line-height:1.4;">{% if item.is_purchased %}ПКИ (закупка). {% endif %}Маршрут по отделам необязателен.</p>
+{% if biota_can_edit %}
+<div id="plan-article-quick-panel" class="plan-article-quick-panel" hidden>
+{% include "shifts/plan/includes/plan_article_quick_edit_panel.html" %}
+</div>
+{% endif %}
 {% if item.naladki_product %}
-<p style="margin:10px 0 0 0;font-size:0.92rem;color:#c9d5ff;">
-  <span class="muted">Наладка:</span>
-  <a href="{% url 'product_detail' pk=item.naladki_product.pk %}">Карточка изделия №{{ item.naladki_product.pk }}</a>
-</p>
+<div class="plan-article-naladki-cta plan-article-readonly-specs">
+  <span class="plan-article-naladki-cta__meta">Карточка в цеху</span>
+  <a href="{% url 'product_detail' pk=item.naladki_product.pk %}" class="plan-article-naladki-cta__link">
+    <span>Открыть наладку</span>
+    <span>#{{ item.naladki_product.pk }}</span>
+  </a>
+</div>
+{% if naladki_detail_first_setup %}
+<div class="filter-panel plan-article-readonly-specs" style="margin-top:12px;padding:12px 14px;max-width:52rem;">
+  <h3 style="margin:0 0 8px 0;font-size:0.95rem;color:#c9d5ff;">Параметры плана и наладки</h3>
+  {% if not item.is_assembly and not item.is_purchased %}
+  <p style="margin:0 0 8px 0;font-size:0.92rem;line-height:1.45;color:#c9d5ff;"><span class="muted">Тип заготовки (план):</span> {% if item.workpiece_type %}<strong>{{ item.get_workpiece_type_display }}</strong>{% else %}<span class="muted">не задан{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</p>
+  {% if item.workpiece_type == 'laser' %}
+  <p style="margin:0 0 14px 0;font-size:0.92rem;line-height:1.45;color:#aebde8;">Лазер — толщина листа: {% if item.laser_sheet_thickness_mm is not None %}<strong>{{ item.laser_sheet_thickness_mm }} мм</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %} · Маркировка материала: {% if item.laser_material_marking %}<strong>{{ item.laser_material_marking }}</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</p>
+  {% endif %}
+  {% endif %}
+  <p style="margin:12px 0 4px 0;padding-top:12px;border-top:1px solid rgba(58,74,106,0.65);font-size:0.92rem;line-height:1.45;"><span class="muted">Размер:</span> {% if naladki_detail_first_setup.size %}<strong>{{ naladki_detail_first_setup.size }}</strong>{% else %}—{% endif %}</p>
+  <p style="margin:4px 0;font-size:0.92rem;line-height:1.45;"><span class="muted">Тип (установка):</span> {% if naladki_detail_first_setup.workpiece %}<strong>{{ naladki_detail_first_setup.workpiece }}</strong>{% else %}—{% endif %}</p>
+  <p style="margin:4px 0;font-size:0.92rem;line-height:1.45;"><span class="muted">Материал:</span> {% if naladki_detail_first_setup.material %}<strong>{{ naladki_detail_first_setup.material }}</strong>{% else %}—{% endif %}</p>
+</div>
+{% elif naladki_detail_product_has_no_setups %}
+<p class="muted plan-article-readonly-specs" style="margin:10px 0 0 0;font-size:13px;line-height:1.45;">В карточке наладки пока нет установок — поля «Размер», «Тип» и «Материал» появятся после добавления установки.</p>
+{% endif %}
 {% endif %}
 {% if not item.is_assembly and not item.is_purchased %}
-<p style="margin:6px 0 0 0;font-size:0.92rem;color:#c9d5ff;">Тип заготовки: {% if item.workpiece_type %}<strong>{{ item.get_workpiece_type_display }}</strong>{% else %}<span class="muted">не задан{% if biota_can_edit %} — укажите при редактировании{% endif %}</span>{% endif %}</p>
+{% if not item.naladki_product or not naladki_detail_first_setup %}
+<div class="plan-article-readonly-specs">
+<p style="margin:6px 0 0 0;font-size:0.92rem;color:#c9d5ff;">Тип заготовки: {% if item.workpiece_type %}<strong>{{ item.get_workpiece_type_display }}</strong>{% else %}<span class="muted">не задан{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</p>
 {% if item.workpiece_type == 'laser' %}
-<p style="margin:6px 0 0 0;font-size:0.92rem;color:#aebde8;">Лазер — толщина листа: {% if item.laser_sheet_thickness_mm is not None %}<strong>{{ item.laser_sheet_thickness_mm }} мм</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в карточке редактирования{% endif %}</span>{% endif %} · Маркировка материала: {% if item.laser_material_marking %}<strong>{{ item.laser_material_marking }}</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в карточке редактирования{% endif %}</span>{% endif %}</p>
+<p style="margin:6px 0 0 0;font-size:0.92rem;color:#aebde8;">Лазер — толщина листа: {% if item.laser_sheet_thickness_mm is not None %}<strong>{{ item.laser_sheet_thickness_mm }} мм</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %} · Маркировка материала: {% if item.laser_material_marking %}<strong>{{ item.laser_material_marking }}</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</p>
+{% endif %}
+</div>
 {% endif %}
 {% endif %}
 
@@ -101,7 +180,7 @@
 {% endif %}
 
 {% if item.stages.all %}
-<div class="table-wrap plan-stages-compact-wrap">
+<div class="table-wrap plan-stages-compact-wrap plan-article-readonly-specs">
   <div class="plan-stages-compact">
     {% for st in item.stages.all %}
     <div class="plan-stage-line">{{ forloop.counter }}. <strong>{{ st.get_department_display }}</strong>{% if st.description_inline %} <span class="muted">({{ st.description_inline }})</span>{% endif %}</div>
@@ -109,7 +188,7 @@
   </div>
 </div>
 {% else %}
-<p class="muted">Этапы не заданы.{% if biota_can_edit %} При необходимости задайте маршрут при редактировании.{% endif %}</p>
+<p class="muted plan-article-readonly-specs">Этапов нет.{% if biota_can_edit %} Задайте маршрут в <strong>быстром редактировании</strong> (кнопка сверху).{% endif %}</p>
 {% endif %}
 
   </div>

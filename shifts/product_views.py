@@ -21,6 +21,7 @@ from .product_plan_sync import (
     apply_product_plan_post,
     plan_card_summary,
     plan_form_context,
+    plan_inline_state_payload,
     plan_piece_for_naladki_card,
     validate_product_plan_post,
 )
@@ -750,7 +751,12 @@ def product_detail_view(request, pk: int):
                 return JsonResponse({"ok": False, "error": err}, status=400)
             pp = plan_piece_for_naladki_card(product)
             return JsonResponse(
-                {"ok": True, "plan_summary": plan_card_summary(pp), "plan_pk": pp.pk if pp else None}
+                {
+                    "ok": True,
+                    "plan_summary": plan_card_summary(pp),
+                    "plan_pk": pp.pk if pp else None,
+                    "plan_inline_state": plan_inline_state_payload(product),
+                }
             )
         if action == "inline_update_setup_photo_caption":
             photo_id_raw = (request.POST.get("photo_id") or "").strip()
@@ -981,23 +987,33 @@ def product_detail_view(request, pk: int):
                         tap_hole_type="",
                         name=row_note,
                     )
-            return JsonResponse(
-                {
-                    "ok": True,
-                    "setup": {
-                        "id": setup.pk,
-                        "name": setup.name or "",
-                        "binding_x": setup.binding_x or "—",
-                        "binding_y": setup.binding_y or "—",
-                        "binding_z": setup.binding_z or "—",
-                        "gcode_system": setup.gcode_system or "G54",
-                        "workpiece": setup.workpiece or "—",
-                        "material": setup.material or "—",
-                        "size": setup.size or "—",
-                        "setup_notes": (setup.setup_notes or "").strip(),
-                    },
-                }
-            )
+            out: dict = {
+                "ok": True,
+                "setup": {
+                    "id": setup.pk,
+                    "name": setup.name or "",
+                    "binding_x": setup.binding_x or "—",
+                    "binding_y": setup.binding_y or "—",
+                    "binding_z": setup.binding_z or "—",
+                    "gcode_system": setup.gcode_system or "G54",
+                    "workpiece": setup.workpiece or "—",
+                    "material": setup.material or "—",
+                    "size": setup.size or "—",
+                    "setup_notes": (setup.setup_notes or "").strip(),
+                },
+            }
+            if (request.POST.get("sync_plan_from_inline") or "").strip() == "1":
+                plan_err = validate_product_plan_post(request.POST)
+                if plan_err:
+                    return JsonResponse({"ok": False, "error": plan_err}, status=400)
+                perr = apply_product_plan_post(product, request.POST)
+                if perr:
+                    return JsonResponse({"ok": False, "error": perr}, status=400)
+                pp = plan_piece_for_naladki_card(product)
+                out["plan_summary"] = plan_card_summary(pp)
+                out["plan_pk"] = pp.pk if pp else None
+                out["plan_inline_state"] = plan_inline_state_payload(product)
+            return JsonResponse(out)
         return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
     setup_photos = list(product.setup_photos.filter(setup__isnull=True))
     setups = list(product.setups.prefetch_related("tools", "program_files"))

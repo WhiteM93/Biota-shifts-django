@@ -1,6 +1,61 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+  .product-plan-piece-cta {
+    margin: 0 0 16px 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+  }
+  .product-plan-piece-cta__label {
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #8fa4c8;
+    font-weight: 600;
+  }
+  .product-plan-piece-cta__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-size: 0.94rem;
+    font-weight: 600;
+    color: #eaf0ff !important;
+    text-decoration: none;
+    border: 1px solid rgba(101, 140, 210, 0.55);
+    background: linear-gradient(180deg, rgba(52, 78, 128, 0.5) 0%, rgba(36, 52, 88, 0.72) 100%);
+    box-shadow: 0 2px 10px rgba(8, 14, 28, 0.35);
+    max-width: min(100%, 44rem);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+  }
+  .product-plan-piece-cta__link:hover,
+  .product-plan-piece-cta__link:focus {
+    border-color: rgba(180, 205, 255, 0.72);
+    color: #fff !important;
+    box-shadow: 0 4px 16px rgba(12, 22, 48, 0.4);
+  }
+  .product-plan-piece-cta__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .product-plan-piece-cta__badge {
+    flex: 0 0 auto;
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.92;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+</style>
 <div class="page-actions" style="margin-bottom:10px;">
   <a href="{% url 'products_list' %}" class="btn btn-ghost">← К списку наладок</a>
   {% if biota_can_edit %}
@@ -8,10 +63,13 @@
   {% endif %}
 </div>
 {% if plan_piece %}
-<p style="margin:0 0 14px 0;font-size:0.92rem;color:#aebde8;">
-  <span class="muted">Раздел «План»:</span>
-  <a href="{% url 'plan_article_detail' pk=plan_piece.pk %}">Позиция №{{ plan_piece.pk }} — {{ plan_piece.name|truncatechars:60 }}</a>
-</p>
+<div class="product-plan-piece-cta">
+  <span class="product-plan-piece-cta__label">Позиция в плане</span>
+  <a class="product-plan-piece-cta__link" href="{% url 'plan_article_detail' pk=plan_piece.pk %}">
+    <span class="product-plan-piece-cta__title">{{ plan_piece.name|truncatechars:56 }}</span>
+    <span class="product-plan-piece-cta__badge">№{{ plan_piece.pk }}</span>
+  </a>
+</div>
 {% endif %}
 <div class="product-detail-grid">
   <div class="product-detail-main">
@@ -19,7 +77,7 @@
   <p class="muted" style="white-space:pre-wrap; margin:0 0 14px 0;">{{ product.description }}</p>
   {% endif %}
 
-  <div class="product-tabs" id="product-tabs" {% if product.program_file %}data-product-program-url="{{ product.program_file.url }}" data-product-program-filename="{{ product.program_filename|escape }}"{% endif %}>
+  <div class="product-tabs" id="product-tabs" {% if setups %}data-inline-setup-ids="{% for setup in setups %}{{ setup.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"{% endif %} {% if product.program_file %}data-product-program-url="{{ product.program_file.url }}" data-product-program-filename="{{ product.program_filename|escape }}"{% endif %}>
     <div class="product-tabs-nav" role="tablist" aria-label="Документация и наладка">
       {% if setups %}
       {% if biota_can_edit %}
@@ -40,7 +98,7 @@
       {% for setup in setups %}
       <button type="button" class="product-tab{% if tab_default == setup.tab_slug %} is-active{% endif %}" role="tab" data-tab="{{ setup.tab_slug }}" data-setup-index="{{ forloop.counter }}" id="tab-setup-{{ setup.pk }}" aria-controls="panel-setup-{{ setup.pk }}" aria-selected="{% if tab_default == setup.tab_slug %}true{% else %}false{% endif %}" {% if setup.has_any_program %}data-program-url="{{ setup.primary_program_url }}" data-program-filename="{{ setup.primary_program_filename|escape }}"{% endif %} data-setup-name="{{ setup.name|escape }}" data-setup-edit-url="{% url 'product_setup_edit' product.pk setup.pk %}" hidden>Уст. {{ forloop.counter }}</button>
       {% endfor %}
-      {% if biota_can_edit and active_setup %}
+      {% if biota_can_edit and setups %}
       <span class="nav-spacer" style="flex:1 1 auto;"></span>
       <a href="#" class="btn btn-ghost" id="setup-export-specs-btn" target="_blank" rel="noopener" hidden>PDF параметры</a>
       <a href="#" class="btn btn-ghost" id="setup-export-photos-btn" target="_blank" rel="noopener" hidden>PDF фото 3x5</a>
@@ -49,22 +107,98 @@
     </div>
     <div class="product-tab-panels">
       <section class="product-tab-panel" id="panel-drawing" data-panel="drawing" role="tabpanel" aria-labelledby="tab-drawing" {% if tab_default != 'drawing' %}hidden{% endif %}>
-        {% if product.drawing_pdf %}
-        <div class="product-pdf-frame">
-          <iframe
-            class="product-pdf-iframe"
-            src="{{ product.drawing_pdf.url }}#toolbar=1"
-            title="Чертёж PDF"
-            loading="lazy"
-          ></iframe>
-          <p class="muted product-pdf-hint" style="margin-top:8px;font-size:12px;">
-            Не отображается? <a href="{{ product.drawing_pdf.url }}" target="_blank" rel="noopener">Откройте в новой вкладке</a>.
-          </p>
+        <p class="muted" style="margin:0 0 14px 0;font-size:13px;">
+          {% if product.drawing_pdf %}
+          <a href="{{ product.drawing_pdf.url }}" target="_blank" rel="noopener">Чертёж (PDF) — открыть</a>
+          {% else %}
+          Чертёж (PDF) не загружен. Можно добавить в <a href="{% url 'product_edit' product.pk %}">редактировании изделия</a>.
+          {% endif %}
+        </p>
+        {% if setups %}
+        <div class="product-drawing-plan-section filter-panel" style="margin-bottom:16px;padding:14px;">
+          <h5 style="margin:0 0 10px 0;font-size:0.95rem;color:#c9d5ff;">Позиция в разделе «План»</h5>
+          <div class="setup-meta-plan-block">
+            <div class="setup-plan-summary-wrap" data-product-plan-summary>
+              <div class="setup-plan-quick-readonly">
+                <div class="setup-plan-summary-line setup-plan-line--position-type">
+                  <span class="muted">План — тип:</span>
+                  <div class="setup-plan-summary-cell">
+                    <span class="setup-plan-summary-value" data-plan-type-line>{{ plan_display_type_line }}</span>
+                    {% if biota_can_edit %}
+                    <div class="setup-plan-inline-fields">
+                      <select class="js-plan-inline-product-type" autocomplete="off" aria-label="Тип позиции в плане">
+                        <option value="made" {% if plan_product_type == 'made' %}selected{% endif %}>Изделие</option>
+                        <option value="assembly" {% if plan_product_type == 'assembly' %}selected{% endif %}>Сборка</option>
+                        <option value="pki" {% if plan_product_type == 'pki' %}selected{% endif %}>ПКИ</option>
+                      </select>
+                    </div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="setup-plan-summary-line setup-plan-line--workpiece">
+                  <span class="muted">Заготовка (план):</span>
+                  <div class="setup-plan-summary-cell">
+                    <span class="setup-plan-summary-value" data-plan-workpiece-line>{{ plan_display_workpiece_line }}</span>
+                    {% if biota_can_edit %}
+                    <div class="setup-plan-inline-fields">
+                      <select class="js-plan-inline-workpiece" autocomplete="off" aria-label="Тип заготовки в плане">
+                        <option value="">— выберите —</option>
+                        {% for val, label in plan_workpiece_type_choices %}
+                        <option value="{{ val }}" {% if plan_workpiece_type_value == val %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                      </select>
+                      <input type="text" class="js-plan-inline-laser-thick" inputmode="decimal" placeholder="Толщина, мм" value="{{ plan_laser_sheet_thickness_value }}" autocomplete="off" aria-label="Толщина листа, мм">
+                    </div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="setup-plan-summary-line setup-plan-line--material">
+                  <span class="muted">Материал (план):</span>
+                  <div class="setup-plan-summary-cell">
+                    <span class="setup-plan-summary-value" data-plan-material-line>{{ plan_display_material_line }}</span>
+                    {% if biota_can_edit %}
+                    <div class="setup-plan-inline-fields">
+                      <input type="text" class="js-plan-inline-laser-mark" value="{{ plan_laser_material_marking_value }}" maxlength="240" list="drawing-inline-plan-laser-dl" placeholder="Маркировка материала" autocomplete="off" aria-label="Маркировка материала для лазера">
+                      <datalist id="drawing-inline-plan-laser-dl">
+                        {% for m in plan_laser_material_marking_suggestions %}
+                        <option value="{{ m }}"></option>
+                        {% endfor %}
+                      </datalist>
+                    </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        {% else %}
-        <p class="muted">Чертёж (PDF) не загружен. Можно добавить в <a href="{% url 'product_edit' product.pk %}">редактировании изделия</a>.</p>
+        <div class="product-drawing-naladki-section">
+          <h5 style="margin:0 0 10px 0;font-size:0.95rem;color:#c9d5ff;">Заготовка (наладка)</h5>
+          {% for setup in setups %}
+          <div class="product-drawing-setup-block filter-panel" data-drawing-setup-root="{{ setup.pk }}" style="margin-bottom:14px;padding:12px 14px;border:1px solid rgba(58,74,106,0.6);border-radius:10px;background:rgba(17,24,38,0.5);">
+            <p class="muted" style="margin:0 0 8px 0;font-size:12px;font-weight:600;">
+              Уст. {{ forloop.counter }}{% if setup.name %} — {{ setup.name }}{% endif %}
+            </p>
+            <div class="setup-meta-naladki-block">
+              <div><span class="muted">Размер:</span> <span data-field-text="size">{{ setup.size|default:"—" }}</span></div>
+              <div class="setup-row-photo">
+                <span class="muted">Тип:</span> <span data-field-text="workpiece">{{ setup.workpiece|default:"—" }}</span>
+                {% if setup.workpiece_photo %}
+                <a href="{{ setup.workpiece_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.workpiece_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Заготовка" aria-label="Открыть фото заготовки">
+                  <i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>
+                </a>
+                {% endif %}
+                {% if biota_can_edit %}
+                <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="workpiece_photo" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото заготовки" aria-label="Загрузить или заменить фото заготовки" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+                <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-binding-photo-input" data-photo-field-input="workpiece_photo" data-setup-id="{{ setup.pk }}" hidden />
+                {% endif %}
+              </div>
+              <div><span class="muted">Материал:</span> <span data-field-text="material">{{ setup.material|default:"—" }}</span></div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
         {% endif %}
-        {% include "shifts/product_plan_drawer_include.html" %}
       </section>
       {% for setup in setups %}
       <section class="product-tab-panel" id="panel-setup-{{ setup.pk }}" data-panel="{{ setup.tab_slug }}" role="tabpanel" aria-labelledby="tab-setup-{{ setup.pk }}" {% if tab_default != setup.tab_slug %}hidden{% endif %}>
@@ -75,33 +209,8 @@
         <div class="product-setup-specs">
           <div class="product-setup-left-col">
             <div class="product-setup-spec-group">
-              <h5>Привязки и заготовка</h5>
+              <h5>Привязки</h5>
               <div class="setup-meta-bindings-layout">
-                <div class="setup-spec-col setup-spec-col-meta">
-                  <div class="setup-meta-columns">
-                    <div class="setup-meta-col setup-meta-col-left">
-                      <div class="setup-plan-summary-lines" data-product-plan-summary style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #2f3b57;font-size:13px;line-height:1.45;">
-                        <div><span class="muted">План — тип:</span> <span data-plan-type-line>{{ plan_display_type_line }}</span></div>
-                        <div><span class="muted">Заготовка (план):</span> <span data-plan-workpiece-line>{{ plan_display_workpiece_line }}</span></div>
-                        <div><span class="muted">Материал (план):</span> <span data-plan-material-line>{{ plan_display_material_line }}</span></div>
-                      </div>
-                      <div><span class="muted">Размер:</span> <span data-field-text="size">{{ setup.size|default:"—" }}</span></div>
-                      <div class="setup-row-photo">
-                        <span class="muted">Тип:</span> <span data-field-text="workpiece">{{ setup.workpiece|default:"—" }}</span>
-                        {% if setup.workpiece_photo %}
-                        <a href="{{ setup.workpiece_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.workpiece_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Заготовка" aria-label="Открыть фото заготовки">
-                          <i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>
-                        </a>
-                        {% endif %}
-                        {% if biota_can_edit %}
-                        <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="workpiece_photo" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото заготовки" aria-label="Загрузить или заменить фото заготовки" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
-                        <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-binding-photo-input" data-photo-field-input="workpiece_photo" data-setup-id="{{ setup.pk }}" hidden />
-                        {% endif %}
-                      </div>
-                      <div><span class="muted">Материал:</span> <span data-field-text="material">{{ setup.material|default:"—" }}</span></div>
-                    </div>
-                  </div>
-                </div>
                 <div class="setup-spec-split">
                 <div class="setup-spec-stack">
                 {% if biota_can_edit %}
@@ -799,13 +908,112 @@
     justify-content: center;
     line-height: 1;
   }
-  .setup-spec-col-meta .setup-meta-col-left > div {
+  .setup-spec-col-meta .setup-meta-naladki-plan-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+    width: 100%;
+    min-width: 0;
+  }
+  .setup-spec-col-meta .setup-meta-naladki-block,
+  .setup-spec-col-meta .setup-meta-plan-block {
+    min-width: 0;
+  }
+  .setup-spec-col-meta .setup-meta-plan-block {
+    border-left: 1px solid rgba(58, 74, 106, 0.75);
+    padding-left: 14px;
+  }
+  .setup-spec-col-meta .setup-meta-plan-block .setup-plan-summary-wrap {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .setup-spec-col-meta .setup-plan-quick-readonly > .setup-plan-summary-line {
+    display: grid;
+    grid-template-columns: 74px minmax(0, 1fr);
+    align-items: start;
+    column-gap: 6px;
+    padding: 2px 0;
+  }
+  .setup-spec-col-meta .setup-plan-quick-readonly > .setup-plan-summary-line > .muted {
+    text-align: right;
+    justify-self: end;
+    font-size: 12px;
+    color: #b7c4db;
+  }
+  .setup-plan-summary-cell {
+    min-width: 0;
+  }
+  .setup-plan-summary-wrap .setup-plan-inline-fields {
+    display: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+  }
+  .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-product-type,
+  .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-workpiece {
+    max-width: 100%;
+    min-width: 0;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #3e4f74;
+    background: rgba(12, 18, 30, 0.92);
+    color: #eaf0ff;
+  }
+  .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-laser-thick {
+    width: 6.5rem;
+    max-width: 100%;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #3e4f74;
+    background: rgba(12, 18, 30, 0.92);
+    color: #eaf0ff;
+  }
+  .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-laser-mark {
+    flex: 1 1 140px;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #3e4f74;
+    background: rgba(12, 18, 30, 0.92);
+    color: #eaf0ff;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-line--position-type .setup-plan-summary-value {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-line--position-type .setup-plan-inline-fields {
+    display: inline-flex !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-workpiece .setup-plan-line--workpiece .setup-plan-summary-value {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-workpiece .setup-plan-line--workpiece .setup-plan-inline-fields {
+    display: inline-flex !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .setup-plan-summary-value {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .setup-plan-inline-fields {
+    display: inline-flex !important;
+  }
+  .setup-plan-line--workpiece .setup-plan-inline-fields .js-plan-inline-laser-thick {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-thick .setup-plan-line--workpiece .js-plan-inline-laser-thick {
+    display: inline-block !important;
+  }
+  .setup-spec-col-meta .setup-meta-naladki-block > div {
     display: grid;
     grid-template-columns: 74px minmax(0, 1fr) auto auto;
     align-items: center;
     column-gap: 6px;
   }
-  .setup-spec-col-meta .setup-meta-col-left > div > .muted {
+  .setup-spec-col-meta .setup-meta-naladki-block > div > .muted {
     text-align: right;
     justify-self: end;
   }
@@ -820,6 +1028,9 @@
     align-items: center;
     justify-content: center;
     line-height: 1;
+  }
+  .setup-spec-col-meta .setup-meta-naladki-block [data-field-text] {
+    max-width: none;
   }
   .setup-spec-col-meta .setup-meta-col > div > [data-field-text] {
     max-width: none;
@@ -1503,6 +1714,16 @@
     .setup-meta-columns {
       grid-template-columns: 1fr;
       gap: 8px;
+    }
+    .setup-spec-col-meta .setup-meta-naladki-plan-split {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .setup-spec-col-meta .setup-meta-plan-block {
+      border-left: none;
+      padding-left: 0;
+      border-top: 1px solid rgba(58, 74, 106, 0.65);
+      padding-top: 12px;
     }
     .setup-spec-col-meta .setup-meta-col > div {
       padding: 2px 0;
@@ -2234,7 +2455,6 @@
       var productEditBtn = document.getElementById("product-edit-main-btn");
       var exportSpecsBtn = document.getElementById("setup-export-specs-btn");
       var exportPhotosBtn = document.getElementById("setup-export-photos-btn");
-      if (fastBtn) fastBtn.hidden = isDrawing;
       if (productEditBtn) productEditBtn.hidden = !isDrawing;
       if (exportSpecsBtn) exportSpecsBtn.hidden = !isSetupTab;
       if (exportPhotosBtn) exportPhotosBtn.hidden = !isSetupTab;
@@ -2353,10 +2573,79 @@
       return m ? decodeURIComponent(m[2]) : "";
     }
 
-    function activeSetupPanel() {
+    function syncProductPlanSummaryBlocks(summary) {
+      if (!summary) return;
+      document.querySelectorAll("[data-product-plan-summary]").forEach(function (wrap) {
+        var a = wrap.querySelector("[data-plan-type-line]");
+        var b = wrap.querySelector("[data-plan-workpiece-line]");
+        var c = wrap.querySelector("[data-plan-material-line]");
+        if (a) a.textContent = summary.type_line || "—";
+        if (b) b.textContent = summary.workpiece_line || "—";
+        if (c) c.textContent = summary.material_line || "—";
+      });
+    }
+
+    function syncSetupPlanInlineVisibility(wrap) {
+      if (!wrap) return;
+      var pt = wrap.querySelector(".js-plan-inline-product-type");
+      if (!pt) return;
+      var ptype = pt.value || "made";
+      var wp = wrap.querySelector(".js-plan-inline-workpiece");
+      var wpv = wp ? wp.value : "";
+      var showMade = ptype === "made";
+      var showLaser = showMade && wpv === "laser";
+      wrap.classList.toggle("plan-summary-editing-workpiece", showMade);
+      wrap.classList.toggle("plan-summary-editing-laser-material", showLaser);
+      wrap.classList.toggle("plan-summary-editing-laser-thick", showLaser);
+    }
+
+    function applyPlanInlineStateToQuickEdits(state) {
+      if (!state) return;
+      document.querySelectorAll("[data-plan-fields-root]").forEach(function (pr) {
+        var typeVal = state.plan_product_type || "made";
+        pr.querySelectorAll(".js-product-plan-type").forEach(function (r) {
+          r.checked = r.value === typeVal;
+        });
+        var wp = pr.querySelector(".js-product-plan-workpiece");
+        if (wp) wp.value = state.workpiece_type || "";
+        var thick = pr.querySelector(".js-product-plan-laser-thick");
+        if (thick) thick.value = state.laser_sheet_thickness_mm || "";
+        var mark = pr.querySelector(".js-product-plan-laser-mark");
+        if (mark) mark.value = state.laser_material_marking || "";
+        var wrap = pr.querySelector("[data-workpiece-laser-wrap]");
+        var laser = pr.querySelector("[data-laser-panel]");
+        var t = pr.querySelector(".js-product-plan-type:checked");
+        var ptype = t ? t.value : "made";
+        if (wrap) wrap.style.display = ptype === "made" ? "" : "none";
+        if (laser && wp) {
+          laser.style.display = ptype === "made" && wp.value === "laser" ? "" : "none";
+        }
+      });
+      document.querySelectorAll("[data-product-plan-summary]").forEach(function (wrap) {
+        var pt = wrap.querySelector(".js-plan-inline-product-type");
+        if (pt) pt.value = state.plan_product_type || "made";
+        var wp = wrap.querySelector(".js-plan-inline-workpiece");
+        if (wp) wp.value = state.workpiece_type || "";
+        var thick = wrap.querySelector(".js-plan-inline-laser-thick");
+        if (thick) thick.value = state.laser_sheet_thickness_mm || "";
+        var mark = wrap.querySelector(".js-plan-inline-laser-mark");
+        if (mark) mark.value = state.laser_material_marking || "";
+        syncSetupPlanInlineVisibility(wrap);
+      });
+    }
+
+    window.biotaSyncProductPlanSummaries = syncProductPlanSummaryBlocks;
+    window.biotaApplyPlanInlineStateToQuickEdits = applyPlanInlineStateToQuickEdits;
+
+    function getCurrentTabName() {
+      var sel = document.getElementById("setup-tab-select");
+      if (sel && sel.value) return sel.value;
       var activeTab = root.querySelector(".product-tab.is-active");
-      if (!activeTab) return null;
-      var tabName = activeTab.getAttribute("data-tab") || "";
+      return activeTab ? (activeTab.getAttribute("data-tab") || "") : "";
+    }
+
+    function activeSetupPanel() {
+      var tabName = getCurrentTabName();
       if (!tabName || tabName === "drawing") return null;
       return root.querySelector('.product-tab-panel[data-panel="' + tabName + '"]');
     }
@@ -2624,86 +2913,93 @@
     }
 
     function toggleInlineEdit() {
-      var panel = activeSetupPanel();
-      if (!panel) return;
       inlineEditMode = !inlineEditMode;
       document.body.classList.toggle("setup-inline-edit-enabled", inlineEditMode);
-      var toolbar = panel.querySelector(".setup-inline-toolbar-block");
-      if (toolbar) {
-        if (inlineEditMode) toolbar.removeAttribute("hidden");
-        else toolbar.setAttribute("hidden", "hidden");
-      }
-      panel.setAttribute("data-inline-edit-mode", inlineEditMode ? "1" : "0");
-      panel.querySelectorAll("[data-field-text]").forEach(function (node) {
-        var field = node.getAttribute("data-field-text");
-        if (!field) return;
-        if (field === "gcode_system") {
-          var wrap = node.closest(".setup-gcode-value");
-          var gSel = wrap ? wrap.querySelector(".js-inline-gcode-system") : null;
-          if (inlineEditMode) {
-            node.setAttribute("hidden", "hidden");
-            if (gSel) {
-              gSel.value = (node.textContent || "G54").trim() || "G54";
-              gSel.removeAttribute("hidden");
+      root.querySelectorAll(".product-tab-panel").forEach(function (panel) {
+        var isDrawingPanel = panel.id === "panel-drawing";
+        var toolbar = panel.querySelector(".setup-inline-toolbar-block");
+        if (toolbar) {
+          if (inlineEditMode && !isDrawingPanel) toolbar.removeAttribute("hidden");
+          else toolbar.setAttribute("hidden", "hidden");
+        }
+        panel.setAttribute("data-inline-edit-mode", inlineEditMode ? "1" : "0");
+        panel.querySelectorAll("[data-field-text]").forEach(function (node) {
+          var field = node.getAttribute("data-field-text");
+          if (!field) return;
+          if (field === "gcode_system") {
+            var wrap = node.closest(".setup-gcode-value");
+            var gSel = wrap ? wrap.querySelector(".js-inline-gcode-system") : null;
+            if (inlineEditMode) {
+              node.setAttribute("hidden", "hidden");
+              if (gSel) {
+                gSel.value = (node.textContent || "G54").trim() || "G54";
+                gSel.removeAttribute("hidden");
+              }
+            } else {
+              node.removeAttribute("hidden");
+              if (gSel) {
+                node.textContent = gSel.value || node.textContent || "G54";
+                gSel.setAttribute("hidden", "hidden");
+              }
             }
-          } else {
-            node.removeAttribute("hidden");
-            if (gSel) {
-              node.textContent = gSel.value || node.textContent || "G54";
-              gSel.setAttribute("hidden", "hidden");
-            }
+            node.classList.remove("is-inline-edit");
+            node.removeAttribute("contenteditable");
+            return;
           }
-          node.classList.remove("is-inline-edit");
-          node.removeAttribute("contenteditable");
-          return;
+          if (inlineEditMode) {
+            node.classList.add("is-inline-edit");
+            node.setAttribute("contenteditable", "true");
+            node.setAttribute("spellcheck", field === "setup_notes" ? "true" : "false");
+          } else {
+            node.classList.remove("is-inline-edit");
+            node.removeAttribute("contenteditable");
+          }
+        });
+        if (!isDrawingPanel) {
+          panel.querySelectorAll(".setup-photo-inline-controls").forEach(function (row) {
+            if (inlineEditMode) row.removeAttribute("hidden");
+            else row.setAttribute("hidden", "hidden");
+          });
+          panel.querySelectorAll(".setup-spec-actions").forEach(function (row) {
+            if (inlineEditMode) row.removeAttribute("hidden");
+            else row.setAttribute("hidden", "hidden");
+          });
+          panel.querySelectorAll(".setup-photo-caption").forEach(function (cap) {
+            if (inlineEditMode) {
+              cap.classList.add("is-inline-edit");
+              cap.setAttribute("contenteditable", "true");
+              cap.setAttribute("spellcheck", "true");
+            } else {
+              cap.classList.remove("is-inline-edit");
+              cap.removeAttribute("contenteditable");
+            }
+          });
+          panel.querySelectorAll(".setup-photo-add-row").forEach(function (row) {
+            if (inlineEditMode) row.removeAttribute("hidden");
+            else row.setAttribute("hidden", "hidden");
+          });
+          setToolsEditMode(panel, inlineEditMode);
+          syncPhotoDnDMode(panel, inlineEditMode);
+          syncSpecDnDMode(panel, inlineEditMode);
         }
-        if (inlineEditMode) {
-          node.classList.add("is-inline-edit");
-          node.setAttribute("contenteditable", "true");
-          node.setAttribute("spellcheck", field === "setup_notes" ? "true" : "false");
-        } else {
-          node.classList.remove("is-inline-edit");
-          node.removeAttribute("contenteditable");
-        }
-      });
-      panel.querySelectorAll(".setup-photo-inline-controls").forEach(function (row) {
-        if (inlineEditMode) row.removeAttribute("hidden");
-        else row.setAttribute("hidden", "hidden");
-      });
-      panel.querySelectorAll(".setup-spec-actions").forEach(function (row) {
-        if (inlineEditMode) row.removeAttribute("hidden");
-        else row.setAttribute("hidden", "hidden");
-      });
-      panel.querySelectorAll(".setup-photo-caption").forEach(function (cap) {
-        if (inlineEditMode) {
-          cap.classList.add("is-inline-edit");
-          cap.setAttribute("contenteditable", "true");
-          cap.setAttribute("spellcheck", "true");
-        } else {
-          cap.classList.remove("is-inline-edit");
-          cap.removeAttribute("contenteditable");
-        }
-      });
-      panel.querySelectorAll(".setup-photo-add-row").forEach(function (row) {
-        if (inlineEditMode) row.removeAttribute("hidden");
-        else row.setAttribute("hidden", "hidden");
-      });
-      panel.querySelectorAll(".setup-binding-photo-btn").forEach(function (btn) {
-        if (inlineEditMode) btn.removeAttribute("hidden");
-        else btn.setAttribute("hidden", "hidden");
-      });
-      panel.querySelectorAll(".setup-program-upload-btn").forEach(function (btn) {
-        if (inlineEditMode) btn.removeAttribute("hidden");
-        else btn.setAttribute("hidden", "hidden");
+        panel.querySelectorAll(".setup-binding-photo-btn").forEach(function (btn) {
+          if (inlineEditMode) btn.removeAttribute("hidden");
+          else btn.setAttribute("hidden", "hidden");
+        });
+        panel.querySelectorAll(".setup-program-upload-btn").forEach(function (btn) {
+          if (inlineEditMode) btn.removeAttribute("hidden");
+          else btn.setAttribute("hidden", "hidden");
+        });
       });
       document.querySelectorAll(".setup-program-upload-btn").forEach(function (btn) {
         if (inlineEditMode) btn.removeAttribute("hidden");
         else btn.setAttribute("hidden", "hidden");
       });
-      setToolsEditMode(panel, inlineEditMode);
-      syncPhotoDnDMode(panel, inlineEditMode);
-      syncSpecDnDMode(panel, inlineEditMode);
-      refreshInlineFieldTitles(panel, inlineEditMode);
+      var planSumAll = root.querySelector("#panel-drawing [data-product-plan-summary]");
+      if (planSumAll) syncSetupPlanInlineVisibility(planSumAll);
+      root.querySelectorAll(".product-tab-panel").forEach(function (panel) {
+        refreshInlineFieldTitles(panel, inlineEditMode);
+      });
       editToggleBtn.textContent = inlineEditMode ? "Сохранить изменения" : "Быстрое редактирование";
       window.dispatchEvent(new CustomEvent("setup-inline-edit-mode", { detail: { enabled: inlineEditMode } }));
     }
@@ -2753,6 +3049,17 @@
 
     refreshInlineFieldTitles(root, false);
 
+    root.querySelectorAll("[data-product-plan-summary]").forEach(function (wrap) {
+      var pt = wrap.querySelector(".js-plan-inline-product-type");
+      var wp = wrap.querySelector(".js-plan-inline-workpiece");
+      function onPlanInlineChange() {
+        syncSetupPlanInlineVisibility(wrap);
+      }
+      if (pt) pt.addEventListener("change", onPlanInlineChange);
+      if (wp) wp.addEventListener("change", onPlanInlineChange);
+      syncSetupPlanInlineVisibility(wrap);
+    });
+
     root.addEventListener(
       "paste",
       function (e) {
@@ -2785,69 +3092,57 @@
       true
     );
 
-    editToggleBtn.addEventListener("click", async function () {
-      if (!inlineEditMode) {
-        toggleInlineEdit();
-        return;
-      }
-      var panel = activeSetupPanel();
-      if (!panel) return;
-      var setupTab = root.querySelector('.product-tab.is-active[data-setup-edit-url]');
-      if (!setupTab) return;
-      var setupIdMatch = (setupTab.id || "").match(/tab-setup-(\d+)/);
-      if (!setupIdMatch) return;
+    function getInlineSetupIds() {
+      var raw = (root.getAttribute("data-inline-setup-ids") || "").trim();
+      if (!raw) return [];
+      return raw.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    }
 
-      var payload = new FormData();
-      payload.append("action", "inline_update_setup");
-      payload.append("setup_id", setupIdMatch[1]);
-      ["name", "binding_x", "binding_y", "binding_z", "workpiece", "material", "size"].forEach(function (name) {
-        var el = panel.querySelector('[data-field-text="' + name + '"]');
-        var txt = el ? (el.textContent || "").trim() : "";
-        payload.append(name, txt === "—" ? "" : txt);
-      });
-      var mainBoxForGcode = panel.querySelector(".setup-spec-stack .setup-spec-box:not(.setup-spec-box-extra)");
-      var gcodeSelect = mainBoxForGcode
-        ? mainBoxForGcode.querySelector(".js-inline-gcode-system:not([hidden])") || mainBoxForGcode.querySelector(".js-inline-gcode-system")
-        : panel.querySelector(".js-inline-gcode-system:not([hidden])") || panel.querySelector(".js-inline-gcode-system");
-      payload.append("gcode_system", (gcodeSelect && gcodeSelect.value ? gcodeSelect.value : "G54"));
-      var notesEl = panel.querySelector('[data-field-text="setup_notes"]');
-      var notesText = notesEl ? (notesEl.innerHTML || "").trim() : "";
-      payload.append("setup_notes", notesText === "Наладка не заполнена." ? "" : notesText);
-      payload.append("rows_json", JSON.stringify(collectToolsRows(panel)));
+    function appendPlanFieldsToPayload(payload, planWrap) {
+      var planTypeEl = planWrap ? planWrap.querySelector(".js-plan-inline-product-type") : null;
+      if (!planWrap || !planTypeEl) return;
+      payload.append("sync_plan_from_inline", "1");
+      payload.append("plan_product_type", planTypeEl.value || "made");
+      var wpSel = planWrap.querySelector(".js-plan-inline-workpiece");
+      payload.append("workpiece_type", wpSel ? wpSel.value || "" : "");
+      var thickIn = planWrap.querySelector(".js-plan-inline-laser-thick");
+      payload.append("laser_sheet_thickness_mm", thickIn ? (thickIn.value || "").trim() : "");
+      var markIn = planWrap.querySelector(".js-plan-inline-laser-mark");
+      payload.append("laser_material_marking", markIn ? (markIn.value || "").trim() : "");
+    }
 
-      var res = await fetch(window.location.href, {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": getCookie("csrftoken"),
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: payload,
-        credentials: "same-origin",
+    function applyInlineUpdateResponseToDom(setupId, data) {
+      if (!data || !data.setup) return;
+      var scopes = [];
+      var pSetup = root.querySelector("#panel-setup-" + setupId);
+      var pDraw = root.querySelector('#panel-drawing [data-drawing-setup-root="' + setupId + '"]');
+      if (pSetup) scopes.push(pSetup);
+      if (pDraw) scopes.push(pDraw);
+      scopes.forEach(function (panel) {
+        panel.querySelectorAll("[data-field-text]").forEach(function (node) {
+          if (node.closest(".setup-spec-box-extra")) return;
+          var k = node.getAttribute("data-field-text");
+          if (!k || !Object.prototype.hasOwnProperty.call(data.setup, k)) return;
+          var val = data.setup[k];
+          if (k === "setup_notes") {
+            node.innerHTML = val ? val : "Наладка не заполнена.";
+          } else if (k === "gcode_system") {
+            node.textContent = val || "G54";
+          } else if (k === "name") {
+            node.textContent = val || "";
+          } else {
+            node.textContent = val || "—";
+          }
+        });
+        refreshInlineFieldTitles(panel, false);
       });
-      var data = await res.json();
-      if (!res.ok || !data.ok) {
-        alert(data.error || "Не удалось сохранить.");
-        return;
-      }
-      panel.querySelectorAll("[data-field-text]").forEach(function (node) {
-        if (node.closest(".setup-spec-box-extra")) return;
-        var k = node.getAttribute("data-field-text");
-        if (!k || !Object.prototype.hasOwnProperty.call(data.setup, k)) return;
-        var val = data.setup[k];
-        if (k === "setup_notes") {
-          node.innerHTML = val ? val : "Наладка не заполнена.";
-        } else if (k === "gcode_system") {
-          node.textContent = val || "G54";
-        } else if (k === "name") {
-          node.textContent = val || "";
-        } else {
-          node.textContent = val || "—";
-        }
-      });
-      refreshInlineFieldTitles(panel, false);
+    }
+
+    function updateSetupTabLabelFromResponse(setupTab, data) {
+      if (!setupTab || !data || !data.setup) return;
       var tabName = setupTab.getAttribute("data-tab") || "";
       var setupIndex = setupTab.getAttribute("data-setup-index") || "";
-      var setupName = (data.setup && data.setup.name ? data.setup.name : "").trim();
+      var setupName = (data.setup.name ? data.setup.name : "").trim();
       if (setupName) {
         setupTab.setAttribute("data-setup-name", setupName);
         if (setupIndex) setupTab.textContent = "Уст. " + setupIndex;
@@ -2856,6 +3151,124 @@
           setupOption.textContent = setupIndex ? ("Уст. " + setupIndex + " — " + setupName) : setupName;
         }
       }
+    }
+
+    function buildInlineSetupPayload(setupId, panelSetup, includePlan) {
+      var payload = new FormData();
+      payload.append("action", "inline_update_setup");
+      payload.append("setup_id", setupId);
+      var drawingSec = root.querySelector('#panel-drawing [data-drawing-setup-root="' + setupId + '"]');
+      ["size", "workpiece", "material"].forEach(function (name) {
+        var el = drawingSec ? drawingSec.querySelector('[data-field-text="' + name + '"]') : null;
+        var txt = el ? (el.textContent || "").trim() : "";
+        payload.append(name, txt === "—" ? "" : txt);
+      });
+      if (panelSetup) {
+        ["name", "binding_x", "binding_y", "binding_z"].forEach(function (name) {
+          var el = panelSetup.querySelector('[data-field-text="' + name + '"]');
+          var txt = el ? (el.textContent || "").trim() : "";
+          payload.append(name, txt === "—" ? "" : txt);
+        });
+        var mainBoxForGcode = panelSetup.querySelector(".setup-spec-stack .setup-spec-box:not(.setup-spec-box-extra)");
+        var gcodeSelect = mainBoxForGcode
+          ? mainBoxForGcode.querySelector(".js-inline-gcode-system:not([hidden])") || mainBoxForGcode.querySelector(".js-inline-gcode-system")
+          : panelSetup.querySelector(".js-inline-gcode-system:not([hidden])") || panelSetup.querySelector(".js-inline-gcode-system");
+        payload.append("gcode_system", gcodeSelect && gcodeSelect.value ? gcodeSelect.value : "G54");
+        var notesEl = panelSetup.querySelector('[data-field-text="setup_notes"]');
+        var notesText = notesEl ? (notesEl.innerHTML || "").trim() : "";
+        payload.append("setup_notes", notesText === "Наладка не заполнена." ? "" : notesText);
+        payload.append("rows_json", JSON.stringify(collectToolsRows(panelSetup)));
+      } else {
+        payload.append("gcode_system", "G54");
+        payload.append("setup_notes", "");
+        payload.append("rows_json", "[]");
+      }
+      if (includePlan) {
+        appendPlanFieldsToPayload(payload, root.querySelector("#panel-drawing [data-product-plan-summary]"));
+      }
+      return payload;
+    }
+
+    editToggleBtn.addEventListener("click", async function () {
+      if (!inlineEditMode) {
+        toggleInlineEdit();
+        return;
+      }
+      var currentTab = getCurrentTabName();
+      if (currentTab === "drawing") {
+        var ids = getInlineSetupIds();
+        if (!ids.length) {
+          toggleInlineEdit();
+          return;
+        }
+        var planSummaryOut = null;
+        var planInlineOut = null;
+        for (var i = 0; i < ids.length; i++) {
+          var sid = ids[i];
+          var panelSetup = root.querySelector("#panel-setup-" + sid);
+          var includePlan = i === 0;
+          var payload = buildInlineSetupPayload(sid, panelSetup, includePlan);
+          var res = await fetch(window.location.href, {
+            method: "POST",
+            headers: {
+              "X-CSRFToken": getCookie("csrftoken"),
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            body: payload,
+            credentials: "same-origin",
+          });
+          var data = await res.json();
+          if (!res.ok || !data.ok) {
+            alert(data.error || "Не удалось сохранить.");
+            return;
+          }
+          applyInlineUpdateResponseToDom(sid, data);
+          var tabEl = root.querySelector("#tab-setup-" + sid);
+          if (tabEl) updateSetupTabLabelFromResponse(tabEl, data);
+          if (data.plan_summary) planSummaryOut = data.plan_summary;
+          if (data.plan_inline_state) planInlineOut = data.plan_inline_state;
+        }
+        if (planSummaryOut) syncProductPlanSummaryBlocks(planSummaryOut);
+        if (planInlineOut) applyPlanInlineStateToQuickEdits(planInlineOut);
+        toggleInlineEdit();
+        return;
+      }
+
+      var panel = activeSetupPanel();
+      if (!panel) {
+        toggleInlineEdit();
+        return;
+      }
+      var setupTab = root.querySelector('.product-tab.is-active[data-setup-edit-url]');
+      if (!setupTab) {
+        toggleInlineEdit();
+        return;
+      }
+      var setupIdMatch = (setupTab.id || "").match(/tab-setup-(\d+)/);
+      if (!setupIdMatch) {
+        toggleInlineEdit();
+        return;
+      }
+      var sidOne = setupIdMatch[1];
+      var payloadOne = buildInlineSetupPayload(sidOne, panel, true);
+      var resOne = await fetch(window.location.href, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": getCookie("csrftoken"),
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: payloadOne,
+        credentials: "same-origin",
+      });
+      var dataOne = await resOne.json();
+      if (!resOne.ok || !dataOne.ok) {
+        alert(dataOne.error || "Не удалось сохранить.");
+        return;
+      }
+      applyInlineUpdateResponseToDom(sidOne, dataOne);
+      updateSetupTabLabelFromResponse(setupTab, dataOne);
+      if (dataOne.plan_summary) syncProductPlanSummaryBlocks(dataOne.plan_summary);
+      if (dataOne.plan_inline_state) applyPlanInlineStateToQuickEdits(dataOne.plan_inline_state);
       toggleInlineEdit();
     });
 
@@ -3351,11 +3764,12 @@
         var label = rowFieldMap[fieldName] || "Фото";
         var panel = input.closest(".product-tab-panel");
         var box = input.closest(".setup-spec-box");
+        var drawingBlock = input.closest("[data-drawing-setup-root]");
+        var scope = box || drawingBlock || panel;
         var setupName = "";
         var activeBtn = root.querySelector(".product-tab.is-active");
         if (activeBtn) setupName = activeBtn.getAttribute("data-setup-name") || "";
         if (panel) {
-          var scope = box || panel;
           var existingLink = scope.querySelector('[data-photo-caption*="' + label + '"]');
           if (existingLink && existingLink.classList.contains("binding-photo-link")) {
             existingLink.href = data.url;
@@ -3379,7 +3793,7 @@
               }
             }
           }
-          var editBtn = (box || panel).querySelector('.setup-binding-photo-btn[data-photo-field="' + fieldName + '"]');
+          var editBtn = scope.querySelector('.setup-binding-photo-btn[data-photo-field="' + fieldName + '"]');
           if (editBtn) editBtn.innerHTML = '<i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i>';
         }
         input.value = "";

@@ -51,6 +51,9 @@
         }
         if (st) st.textContent = "Сохранено.";
         syncSummaries(data.plan_summary);
+        if (data.plan_inline_state && window.biotaApplyPlanInlineStateToQuickEdits) {
+          window.biotaApplyPlanInlineStateToQuickEdits(data.plan_inline_state);
+        }
       } catch (e) {
         if (st) st.textContent = "Сеть или сервер недоступны.";
       }

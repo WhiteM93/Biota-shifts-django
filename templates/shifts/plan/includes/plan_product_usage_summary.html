@@ -1,9 +1,6 @@
 {% load plan_tags %}
 <h3 style="margin:18px 0 8px 0;font-size:1rem;color:#c9d5ff;">Сводка использования</h3>
-<p class="muted" style="margin:0 0 10px 0;font-size:12px;line-height:1.4;">
-  Контракты — полное количество позиции по каждому контракту с учётом входа через составы сборок (как в разделе отделов и ПКИ).
-  Сборки — родительские изделия плана, где эта позиция указана в составе, и норма «на 1 комплект».
-</p>
+<p class="muted" style="margin:0 0 10px 0;font-size:12px;line-height:1.4;">Контракты и сборки, где фигурирует эта позиция.</p>
 
 {% if usage_contract_rows %}
 <h4 style="margin:12px 0 6px 0;font-size:0.92rem;color:#aebde8;font-weight:600;">Контракты</h4>
@@ -79,5 +76,5 @@
 {% endif %}
 
 {% if not usage_contract_rows and not usage_assembly_rows %}
-<p class="muted" style="margin:0 0 6px 0;">Позиция не привязана к контрактам и не указана в составе других сборок.</p>
+<p class="muted" style="margin:0 0 6px 0;font-size:12px;">Нет привязок к контрактам и составам сборок.</p>
 {% endif %}

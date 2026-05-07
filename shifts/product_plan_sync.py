@@ -91,6 +91,17 @@ def plan_piece_for_naladki_card(product: Product) -> PlannedProduct | None:
     return PlannedProduct.objects.filter(name__iexact=nm).order_by("-updated_at", "-id").first()
 
 
+def plan_inline_state_payload(product: Product | None) -> dict[str, str]:
+    """Состояние полей плана после сохранения (для инлайна / синхронизации форм)."""
+    ctx = plan_form_context(product)
+    return {
+        "plan_product_type": ctx.get("plan_product_type") or "made",
+        "workpiece_type": ctx.get("plan_workpiece_type_value") or "",
+        "laser_sheet_thickness_mm": ctx.get("plan_laser_sheet_thickness_value") or "",
+        "laser_material_marking": ctx.get("plan_laser_material_marking_value") or "",
+    }
+
+
 def plan_card_summary(pp: PlannedProduct | None) -> dict[str, str]:
     """Короткие строки для карточки наладки (тип / заготовка / материал)."""
     summary = {"type_line": "—", "workpiece_line": "—", "material_line": "—"}
