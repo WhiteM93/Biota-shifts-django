@@ -73,14 +73,17 @@ def cabinet_view(request):
                 nav_map = {k: (k in sel_nav) for k in NAV_KEYS}
                 dep_opts = sorted(employees_full["department_name"].unique().tolist()) if not employees_full.empty else []
                 allowed_dep_set = set(dep_opts)
-                nav_dep_filters: dict[str, list[str]] = {}
-                for k in NAV_KEYS:
-                    if not nav_map.get(k, True):
-                        continue
-                    if k == "products":
-                        continue
-                    picked = [d for d in request.POST.getlist(f"priv_nav_dep__{k}") if d in allowed_dep_set]
-                    nav_dep_filters[k] = picked
+                if dep_opts:
+                    nav_dep_filters: dict[str, list[str]] = {}
+                    for k in NAV_KEYS:
+                        if not nav_map.get(k, True):
+                            continue
+                        if k == "products":
+                            continue
+                        picked = [d for d in request.POST.getlist(f"priv_nav_dep__{k}") if d in allowed_dep_set]
+                        nav_dep_filters[k] = picked
+                else:
+                    nav_dep_filters = None
                 ok, err = _set_user_privileges(
                     target,
                     None,

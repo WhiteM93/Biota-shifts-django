@@ -138,9 +138,15 @@
   </p>
   <p class="muted">
     Разделы меню: снимите галочку, чтобы скрыть раздел.
+    {% if dep_opts %}
     Ниже для каждого включённого раздела отметьте отделы: в разделе будут видны только они. Если ни одной галочки не стоит — по этому разделу не будет видно сотрудников ни из одного отдела.
+    {% else %}
+    Сейчас нет списка цехов из Biota — доступны только переключатели разделов. После появления отделов в справочнике можно будет настроить фильтр по цехам.
+    {% endif %}
   </p>
-  {% if dep_opts %}
+  {% if not dep_opts %}
+  <p class="muted" style="margin-bottom:10px;">Нет цехов в справочнике — сетка отделов скрыта; при сохранении привязка разделов к отделам не меняется.</p>
+  {% endif %}
   {% for row in priv_nav_rows %}
   <div class="cab-nav-block">
     <div class="cab-nav-head">
@@ -148,7 +154,7 @@
         <input type="checkbox" name="priv_nav" value="{{ row.key }}" {% if row.on %}checked{% endif %}>
         <span><strong>{{ row.label }}</strong></span>
       </label>
-      {% if row.key != "products" %}
+      {% if dep_opts and row.key != "products" %}
       <span class="cab-nav-bulk">
         <button type="button" class="btn js-cab-dep-all" data-nav-key="{{ row.key }}">Все</button>
         <button type="button" class="btn js-cab-dep-none" data-nav-key="{{ row.key }}">Снять всё</button>
@@ -158,20 +164,19 @@
     <div class="cab-check-grid" style="padding-left: 10px;">
       {% if row.key == "products" %}
       <p class="muted" style="margin:4px 0 0 0;">Раздел «Наладки» не привязан к отделам.</p>
-      {% else %}
+      {% elif dep_opts %}
       {% for d in dep_opts %}
       <label class="chk">
         <input type="checkbox" name="priv_nav_dep__{{ row.key }}" value="{{ d }}" {% if d in row.dep_selected %}checked{% endif %}>
         {{ d }}
       </label>
       {% endfor %}
+      {% else %}
+      <p class="muted" style="margin:4px 0 0 0;">Цеха из Biota не загружены — отметки отделов недоступны.</p>
       {% endif %}
     </div>
   </div>
   {% endfor %}
-  {% else %}
-  <p class="muted">Нет цехов в справочнике — настройка отделов по разделам недоступна.</p>
-  {% endif %}
   <p><button type="submit" class="btn">Сохранить права</button></p>
 </form>
 {% endif %}
