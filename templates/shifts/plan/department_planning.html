@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load plan_tags %}
+
+{% block content %}
+{% include "shifts/plan/includes/planned_product_name_styles.html" %}
+{% include "shifts/plan/includes/plan_rails_styles.html" %}
+<style>
+  .plan-dept-block { margin-bottom: 22px; }
+  .plan-dept-block h3 { margin: 0 0 6px 0; font-size: 1rem; color: #c9d5ff; font-weight: 600; }
+  .plan-dept-block .muted-deadline { font-size: 12px; color: #7d8fba; margin: 2px 0 8px 0; }
+</style>
+<div class="plan-article-rails-root">
+{% include "shifts/plan/includes/plan_rails_asides.html" %}
+
+<div class="plan-article-main">
+  <div class="page-actions" style="flex-wrap:wrap;">
+    <a href="{% url 'plan' %}" class="btn btn-sm btn-ghost">← К плану</a>
+    <a href="{% url 'plan_contracts' %}" class="btn btn-sm btn-ghost">Контракты</a>
+  </div>
+  {% if planning_mode == "dept" %}
+    <h1 style="margin:12px 0 6px 0;line-height:1.25;">Отдел «{{ plan_scope_title }}»</h1>
+    <p class="muted" style="margin:0 0 14px 0;font-size:13px;max-width:52rem;">
+      Учитываются позиции с хотя бы одним этапом этого отдела, в том числе как входящие в состав сборок по строкам контрактов —
+      количество пересчитывается по цепочке «на комплект» до этой позиции. Если одна позиция фигурирует в контракте несколько раз
+      (разные сборки или дубль строки), вклады суммируются.
+    </p>
+    {% if not contract_blocks %}
+      <p class="muted">Нет строк контрактов или этапов в этом отделе.</p>
+    {% endif %}
+    {% for block in contract_blocks %}
+      <section class="plan-dept-block" id="contract-{{ block.contract.pk }}">
+        <h3>
+          <a href="{% url 'plan_contract_detail' pk=block.contract.pk %}">{{ block.contract.title|default:"Контракт" }}</a>
+          <span class="muted" style="font-size:12px;margin-left:6px;font-weight:500;">#{{ block.contract.pk }}</span>
+        </h3>
+        <p class="muted-deadline">Дедлайн {{ block.contract.deadline|date:"d.m.Y" }} · строк в подборке: {{ block.lines|length }}</p>
+        <div class="table-wrap">
+          <table class="data-grid">
+            <thead>
+              <tr>
+                <th>Позиция плана</th>
+                <th style="width:110px;text-align:right;">Σ кол-во</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in block.lines %}
+              <tr>
+                <td class="planned-product-name-cell">
+                  {% url 'plan_article_detail' pk=row.product.pk as art_url %}
+                  {% planned_product_link url=art_url name=row.product.name compact=True %}
+                </td>
+                <td style="text-align:right;"><strong>{{ row.qty }}</strong></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endfor %}
+  {% elif planning_mode == "pki" %}
+    <h1 style="margin:12px 0 6px 0;line-height:1.25;">Закупные позиции (ПКИ)</h1>
+    <p class="muted" style="margin:0 0 14px 0;font-size:13px;max-width:52rem;">
+      Прямые строки контрактов по ПКИ плюс закупочные позиции внутри состава сборок (включая вложенные сборки): количество по цепочке до ПКИ = кол-во по контракту × множители «на комплект». Одна строка таблицы — одна позиция плана, без дублей, с суммой по всем контрактам.
+    </p>
+    {% if not pki_rows %}
+      <p class="muted">Строк контрактов по ПКИ нет.</p>
+    {% else %}
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Позиция (ПКИ)</th>
+              <th style="width:120px;text-align:right;">Σ по контрактам</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in pki_rows %}
+            <tr>
+              <td class="planned-product-name-cell">
+                {% url 'plan_article_detail' pk=row.product.pk as art_url %}
+                {% planned_product_link url=art_url name=row.product.name compact=True %}
+              </td>
+              <td style="text-align:right;"><strong>{{ row.qty }}</strong></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+</div>
+
+{% include "shifts/plan/includes/plan_rails_script.html" %}
+{% endblock %}

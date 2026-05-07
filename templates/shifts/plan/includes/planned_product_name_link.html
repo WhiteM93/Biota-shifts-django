@@ -1,0 +1,10 @@
+<a href="{{ url }}" class="planned-product-name-stack planned-product-name-stack--href {% if compact %}planned-product-name-stack--compact{% elif not code %}planned-product-name-stack--solo{% endif %}" title="{{ full }}">
+{% if compact %}
+<span class="planned-product-name-stack__compact">{{ full }}</span>
+{% elif code %}
+<span class="planned-product-name-stack__code">{{ code }}</span>
+<span class="planned-product-name-stack__primary">{{ title }}</span>
+{% else %}
+<span class="planned-product-name-stack__primary">{{ title }}</span>
+{% endif %}
+</a>

@@ -9,13 +9,15 @@ from django.forms import inlineformset_factory
 from django.contrib import messages
 from django.core.files.base import ContentFile
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Max, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
-from .models import Product, ProductSetup, ProductSetupPhoto, ProductSetupProgramFile, ProductSetupToolRow
+from .models import PlannedProduct, Product, ProductSetup, ProductSetupPhoto, ProductSetupProgramFile, ProductSetupToolRow
+from .plan_naladki_bridge import sync_plan_piece_for_naladki_in_same_transaction
 
 # Ограничение вывода ПП в карточке (страница)
 MAX_PROGRAM_DISPLAY_BYTES = 800_000
@@ -560,9 +562,11 @@ def product_create_view(request):
                             "product": None,
                         },
                     )
-            obj: Product = form.save()
-            _apply_setup_photo_changes(request, obj)
-            messages.success(request, "Изделие создано.")
+            with transaction.atomic():
+                obj: Product = form.save()
+                _apply_setup_photo_changes(request, obj)
+                sync_plan_piece_for_naladki_in_same_transaction(obj.pk)
+            messages.success(request, "Изделие создано. Позиция в разделе «План» привязана или создана автоматически.")
             return redirect("product_detail", pk=obj.pk)
         messages.error(request, "Исправьте ошибки в форме.")
     else:
@@ -588,19 +592,21 @@ def product_edit_view(request, pk: int):
     if request.method == "POST":
         form = ProductForm(request.POST, request.FILES, instance=product)
         if form.is_valid():
-            obj: Product = form.save()
-            removable_file_fields = ("drawing_pdf", "cad_model", "preview_stl")
-            for field_name in removable_file_fields:
-                remove_flag = request.POST.get(f"remove_{field_name}") == "1"
-                has_new_file = bool(request.FILES.get(field_name))
-                if remove_flag and not has_new_file:
-                    f = getattr(obj, field_name)
-                    if f:
-                        f.delete(save=False)
-                    setattr(obj, field_name, "")
-                    obj.save(update_fields=[field_name])
-            _apply_setup_photo_changes(request, obj)
-            messages.success(request, "Изделие сохранено.")
+            with transaction.atomic():
+                obj: Product = form.save()
+                removable_file_fields = ("drawing_pdf", "cad_model", "preview_stl")
+                for field_name in removable_file_fields:
+                    remove_flag = request.POST.get(f"remove_{field_name}") == "1"
+                    has_new_file = bool(request.FILES.get(field_name))
+                    if remove_flag and not has_new_file:
+                        f = getattr(obj, field_name)
+                        if f:
+                            f.delete(save=False)
+                        setattr(obj, field_name, "")
+                        obj.save(update_fields=[field_name])
+                _apply_setup_photo_changes(request, obj)
+                sync_plan_piece_for_naladki_in_same_transaction(obj.pk)
+            messages.success(request, "Изделие сохранено. Связь с планом обновлена.")
             return redirect("product_detail", pk=obj.pk)
         messages.error(request, "Исправьте ошибки в форме.")
     else:
@@ -951,11 +957,13 @@ def product_detail_view(request, pk: int):
                 break
     if active_setup is None and setups:
         active_setup = setups[0]
+    linked_plan_piece = PlannedProduct.objects.filter(naladki_product_id=product.pk).first()
     return render(
         request,
         "shifts/product_detail.html",
         {
             "product": product,
+            "linked_plan_piece": linked_plan_piece,
             "setup_photos": setup_photos,
             "setups": setups,
             "cad_ext": cad_ext,

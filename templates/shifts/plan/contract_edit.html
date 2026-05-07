@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "shifts/plan/includes/plan_rails_styles.html" %}
+<div class="plan-article-rails-root">
+{% include "shifts/plan/includes/plan_rails_asides.html" %}
+<div class="plan-article-main">
+<div class="page-actions">
+  {% if contract %}
+  <a href="{% url 'plan_contract_detail' pk=contract.pk %}" class="btn btn-sm btn-ghost">← К контракту</a>
+  {% else %}
+  <a href="{% url 'plan_contracts' %}" class="btn btn-sm btn-ghost">← К контрактам</a>
+  {% endif %}
+</div>
+<h1>{% if contract %}Редактирование контракта{% else %}Новый контракт{% endif %}</h1>
+
+<style>
+  .plan-contract-bom .bom-suggest-list a { color: #aec0ff; text-decoration: underline; }
+  .plan-contract-bom .bom-suggest-list li { margin-bottom: 4px; }
+</style>
+
+<form method="post" action="" id="plan-contract-form">
+  {% csrf_token %}
+  <div class="filter-panel" style="margin-bottom:14px;max-width:560px;">
+    <label class="field">
+      <span>Примечание (необязательно)</span>
+      <input type="text" name="title" value="{{ title_value }}" maxlength="320" placeholder="Например, Заказ ООО «…»">
+    </label>
+    <label class="field" style="margin-top:12px;">
+      <span>Дедлайн</span>
+      <input type="date" name="deadline" value="{{ deadline_value }}" required>
+    </label>
+  </div>
+
+  <h3 style="margin:0 0 8px 0;font-size:1rem;color:#c9d5ff;">Позиции плана и количество</h3>
+  <p class="muted" style="margin:0 0 10px 0;">
+    Строки — только ссылки на позиции плана и количество по контракту. Сводный объём контракта пересчитывается как сумма количеств по строкам (на карточке контракта и в списке).
+    Подсказки по названию — из плана; новые позиции здесь не создаются.
+  </p>
+  <div class="table-wrap plan-contract-bom">
+    <table class="data-grid">
+      <thead>
+        <tr>
+          <th>Позиция (название в плане)</th>
+          <th style="width:110px;text-align:center;">Кол-во</th>
+          <th style="width:52px;"></th>
+        </tr>
+      </thead>
+      <tbody id="contract-lines-tbody">
+        {% for row in line_rows %}
+        <tr class="contract-line-row">
+          <td>
+            <input type="hidden" name="line_planned_id" value="{{ row.pk }}" class="line-pk">
+            <input type="text" name="line_product_name" value="{{ row.name }}" class="line-name-input" maxlength="400" autocomplete="off" placeholder="Начните вводить название из плана…">
+            <p class="bom-suggest-hint muted" style="display:none;margin:6px 0 0 0;font-size:12px;"></p>
+            <ul class="bom-suggest-list muted" style="display:none;list-style:none;padding:0;margin:4px 0 0 0;font-size:12px;"></ul>
+          </td>
+          <td style="text-align:center;">
+            <input type="number" name="line_qty" class="line-qty-input" value="{{ row.qty|default:'1' }}" min="1" step="1" style="max-width:5.5rem;text-align:center;">
+          </td>
+          <td style="text-align:center;"><button type="button" class="btn btn-sm btn-ghost contract-line-remove" title="Удалить строку">×</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <button type="button" id="contract-line-add" class="btn btn-sm btn-ghost" style="margin-top:10px;">+ Строка</button>
+
+  <div class="page-actions" style="margin-top:14px;">
+    <button type="submit" class="btn btn-sm">Сохранить контракт</button>
+  </div>
+</form>
+
+<template id="contract-line-tpl">
+  <tr class="contract-line-row">
+    <td>
+      <input type="hidden" name="line_planned_id" value="" class="line-pk">
+      <input type="text" name="line_product_name" value="" class="line-name-input" maxlength="400" autocomplete="off" placeholder="Начните вводить название из плана…">
+      <p class="bom-suggest-hint muted" style="display:none;margin:6px 0 0 0;font-size:12px;"></p>
+      <ul class="bom-suggest-list muted" style="display:none;list-style:none;padding:0;margin:4px 0 0 0;font-size:12px;"></ul>
+    </td>
+    <td style="text-align:center;">
+      <input type="number" name="line_qty" class="line-qty-input" value="1" min="1" step="1" style="max-width:5.5rem;text-align:center;">
+    </td>
+    <td style="text-align:center;"><button type="button" class="btn btn-sm btn-ghost contract-line-remove" title="Удалить строку">×</button></td>
+  </tr>
+</template>
+
+{% include "shifts/plan/includes/plan_rails_script.html" %}
+<script>
+(function () {
+  var suggestUrl = "{% url 'plan_product_name_suggestions' %}";
+
+  function clearSuggest(row) {
+    var hint = row.querySelector(".bom-suggest-hint");
+    var list = row.querySelector(".bom-suggest-list");
+    if (hint) { hint.style.display = "none"; hint.textContent = ""; }
+    if (list) { list.style.display = "none"; list.innerHTML = ""; }
+  }
+
+  function renderSuggest(row, items, q) {
+    var hint = row.querySelector(".bom-suggest-hint");
+    var list = row.querySelector(".bom-suggest-list");
+    if (!hint || !list) return;
+    if (!items || !items.length) { clearSuggest(row); return; }
+    hint.style.display = "block";
+    hint.textContent = "Похожие позиции в плане — выберите, чтобы подставить id:";
+    list.style.display = "block";
+    list.innerHTML = "";
+    items.forEach(function (it) {
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.href = "#";
+      a.textContent = it.name;
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var pk = row.querySelector(".line-pk");
+        var inp = row.querySelector(".line-name-input");
+        if (pk) pk.value = String(it.id);
+        if (inp) inp.value = it.name;
+        clearSuggest(row);
+      });
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+  }
+
+  function bindLineRow(tr) {
+    var inp = tr.querySelector(".line-name-input");
+    var pk = tr.querySelector(".line-pk");
+    var timer = null;
+    if (!inp) return;
+    inp.addEventListener("input", function () {
+      if (pk) pk.value = "";
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(function () {
+        var query = (inp.value || "").trim();
+        if (query.length < 2) {
+          clearSuggest(tr);
+          return;
+        }
+        var url = suggestUrl + "?q=" + encodeURIComponent(query);
+        fetch(url, { credentials: "same-origin" })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (!j || !j.ok) { clearSuggest(tr); return; }
+            renderSuggest(tr, j.items || [], query);
+          })
+          .catch(function () { clearSuggest(tr); });
+      }, 280);
+    });
+    var rm = tr.querySelector(".contract-line-remove");
+    if (rm) {
+      rm.addEventListener("click", function () {
+        var tb = document.getElementById("contract-lines-tbody");
+        if (!tb || tb.querySelectorAll(".contract-line-row").length <= 1) return;
+        tr.parentNode.removeChild(tr);
+      });
+    }
+  }
+
+  var tb = document.getElementById("contract-lines-tbody");
+  var tpl = document.getElementById("contract-line-tpl");
+  var addBtn = document.getElementById("contract-line-add");
+  if (tb && tpl && addBtn) {
+    tb.querySelectorAll(".contract-line-row").forEach(bindLineRow);
+    addBtn.addEventListener("click", function () {
+      tb.appendChild(tpl.content.cloneNode(true));
+      var rows = tb.querySelectorAll(".contract-line-row");
+      bindLineRow(rows[rows.length - 1]);
+    });
+  }
+})();
+</script>
+</div>
+</div>
+{% endblock %}

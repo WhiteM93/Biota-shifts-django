@@ -1,0 +1,83 @@
+{% load plan_tags %}
+<h3 style="margin:18px 0 8px 0;font-size:1rem;color:#c9d5ff;">Сводка использования</h3>
+<p class="muted" style="margin:0 0 10px 0;font-size:12px;line-height:1.4;">
+  Контракты — полное количество позиции по каждому контракту с учётом входа через составы сборок (как в разделе отделов и ПКИ).
+  Сборки — родительские изделия плана, где эта позиция указана в составе, и норма «на 1 комплект».
+</p>
+
+{% if usage_contract_rows %}
+<h4 style="margin:12px 0 6px 0;font-size:0.92rem;color:#aebde8;font-weight:600;">Контракты</h4>
+<div class="table-wrap">
+  <table class="data-grid">
+    <thead>
+      <tr>
+        <th>Контракт</th>
+        <th style="width:110px;">Дедлайн</th>
+        <th style="width:108px;text-align:right;">Σ кол-во</th>
+        <th style="width:150px;font-size:11px;">Учёт</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in usage_contract_rows %}
+      <tr{% if usage_highlight_contract_pk and row.contract.pk == usage_highlight_contract_pk %} class="plan-usage-row--highlight"{% endif %}>
+        <td>
+          <a href="{% url 'plan_contract_detail' pk=row.contract.pk %}">{{ row.contract.title|default:"Без названия" }}</a>
+          <span class="muted" style="font-size:11px;margin-left:6px;">#{{ row.contract.pk }}</span>
+        </td>
+        <td class="muted">{{ row.contract.deadline|date:"d.m.Y" }}</td>
+        <td style="text-align:right;">
+          <a href="{% url 'plan_contract_article_detail' contract_pk=row.contract.pk product_pk=item.pk %}"><strong>{{ row.qty_total }}</strong></a>
+        </td>
+        <td class="muted" style="font-size:11px;line-height:1.35;vertical-align:middle;">
+          {% if row.qty_direct and row.qty_via_assemblies %}
+            строка: {{ row.qty_direct }}, через состав: {{ row.qty_via_assemblies }}
+          {% elif row.qty_direct %}
+            только в строках контракта
+          {% elif row.qty_via_assemblies %}
+            только через составы
+          {% else %}
+            —
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2" style="text-align:right;font-weight:600;">Σ по всем контрактам</td>
+        <td style="text-align:right;"><strong>{{ usage_contract_sum }}</strong></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{% endif %}
+
+{% if usage_assembly_rows %}
+<h4 style="margin:14px 0 6px 0;font-size:0.92rem;color:#aebde8;font-weight:600;">Входит в состав сборок</h4>
+<div class="table-wrap">
+  <table class="data-grid">
+    <thead>
+      <tr>
+        <th>Сборка (позиция плана)</th>
+        <th style="width:130px;text-align:center;">На 1 комплект</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in usage_assembly_rows %}
+      <tr>
+        <td class="planned-product-name-cell">
+          {% url 'plan_article_detail' pk=row.assembly.pk as asm_url %}
+          {% planned_product_link url=asm_url name=row.assembly.name compact=True %}
+        </td>
+        <td style="text-align:center;"><strong>{{ row.qty_per_kit }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if not usage_contract_rows and not usage_assembly_rows %}
+<p class="muted" style="margin:0 0 6px 0;">Позиция не привязана к контрактам и не указана в составе других сборок.</p>
+{% endif %}

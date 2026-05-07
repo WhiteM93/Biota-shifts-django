@@ -1,0 +1,30 @@
+{% load plan_tags %}
+<aside class="plan-rail plan-rail--left" data-plan-rail-box="left">
+    <div class="plan-rail__strip" aria-hidden="false">
+      <button type="button" class="plan-rail__peek" data-plan-rail-toggle aria-controls="plan-rail-sheet-left" aria-expanded="false" title="Меню раздела «План»">
+        <span class="plan-rail__peek-text">План</span>
+      </button>
+    </div>
+    <div id="plan-rail-sheet-left" class="plan-rail__sheet" role="dialog" aria-label="Меню плана">
+      <button type="button" class="btn btn-sm btn-ghost plan-rail-dismiss" data-plan-rail-dismiss>Скрыть</button>
+      <p class="plan-rail__sheet-title">Раздел «План»</p>
+      <p class="plan-rail__sheet-hint">Изделия плана и контракты.</p>
+      <div class="plan-rail__btn-stack">
+        <a href="{% url 'plan' %}?view=made" class="btn btn-sm">Изделия</a>
+        <a href="{% url 'plan_contracts' %}" class="btn btn-sm btn-ghost">Контракты</a>
+      </div>
+    </div>
+</aside>
+
+<aside class="plan-rail plan-rail--right" data-plan-rail-box="right">
+    <div class="plan-rail__strip">
+      <button type="button" class="plan-rail__peek" data-plan-rail-toggle aria-controls="plan-rail-sheet-right" aria-expanded="false" title="Показать отделы (планирование)">
+        <span class="plan-rail__peek-text">Отделы</span>
+      </button>
+    </div>
+    <div id="plan-rail-sheet-right" class="plan-rail__sheet" role="dialog" aria-label="Отделы для планирования">
+      <button type="button" class="btn btn-sm btn-ghost plan-rail-dismiss" data-plan-rail-dismiss>Скрыть</button>
+      <p class="plan-rail__sheet-title">Планирование по отделам</p>
+      <p class="plan-rail__sheet-hint">Отдел — нагрузка по контрактам; ПКИ — суммарные закупочные позиции без повторов строк.</p>
+      {% plan_rail_department_buttons %}    </div>
+</aside>

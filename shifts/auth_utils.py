@@ -26,6 +26,8 @@ def _nav_key_for_url_name(url_name: str) -> str | None:
         return None
     if n == "home":
         return "home"
+    if n == "plan" or n.startswith("plan_article"):
+        return "plan"
     if n.startswith("graph"):
         return "graph"
     if n.startswith("hours"):
@@ -83,6 +85,7 @@ def post_login_redirect(username: str | None, next_path: str | None = None) -> s
 
     order = (
         "home",
+        "plan",
         "graph",
         "hours",
         "skud",
