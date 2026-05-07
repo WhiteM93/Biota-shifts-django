@@ -1,0 +1,67 @@
+{# Карточка «План» на вкладке «Изделие» + скрипт сохранения #}
+<div class="product-plan-drawer filter-panel" style="margin-top:14px;">
+  <h5 style="margin:0 0 8px 0;color:#c9d5ff;">Позиция в разделе «План»</h5>
+  {% if biota_can_edit %}
+  <form id="product-plan-inline-form" autocomplete="off">
+    {% csrf_token %}
+    {% include "shifts/includes/product_plan_fields.html" with id_prefix="pinline" show_plan_fields_title=False %}
+    <p style="margin-top:12px;">
+      <button type="button" class="btn btn-sm" id="product-plan-inline-save-btn">Сохранить в план</button>
+      <span class="muted" id="product-plan-inline-save-status" style="margin-left:8px;"></span>
+    </p>
+  </form>
+  <script>
+  (function () {
+    var btn = document.getElementById("product-plan-inline-save-btn");
+    var form = document.getElementById("product-plan-inline-form");
+    var st = document.getElementById("product-plan-inline-save-status");
+    if (!btn || !form) return;
+    function getCookie(name) {
+      var v = document.cookie.match("(^|;) ?" + name + "=([^;]*)(;|$)");
+      return v ? decodeURIComponent(v[2]) : "";
+    }
+    function syncSummaries(summary) {
+      if (!summary) return;
+      document.querySelectorAll("[data-product-plan-summary]").forEach(function (root) {
+        var a = root.querySelector("[data-plan-type-line]");
+        var b = root.querySelector("[data-plan-workpiece-line]");
+        var c = root.querySelector("[data-plan-material-line]");
+        if (a) a.textContent = summary.type_line || "—";
+        if (b) b.textContent = summary.workpiece_line || "—";
+        if (c) c.textContent = summary.material_line || "—";
+      });
+    }
+    btn.addEventListener("click", async function () {
+      if (st) st.textContent = "";
+      var fd = new FormData(form);
+      fd.set("action", "inline_save_product_plan");
+      try {
+        var res = await fetch(window.location.href, {
+          method: "POST",
+          body: fd,
+          headers: {
+            "X-CSRFToken": getCookie("csrftoken"),
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        });
+        var data = await res.json().catch(function () { return null; });
+        if (!res.ok || !data || !data.ok) {
+          if (st) st.textContent = (data && data.error) ? data.error : "Ошибка сохранения";
+          return;
+        }
+        if (st) st.textContent = "Сохранено.";
+        syncSummaries(data.plan_summary);
+      } catch (e) {
+        if (st) st.textContent = "Сеть или сервер недоступны.";
+      }
+    });
+  })();
+  </script>
+  {% else %}
+  <div class="muted" style="font-size:13px;line-height:1.5;">
+    <div><strong>Тип (план):</strong> {{ plan_display_type_line }}</div>
+    <div><strong>Заготовка:</strong> {{ plan_display_workpiece_line }}</div>
+    <div><strong>Материал:</strong> {{ plan_display_material_line }}</div>
+  </div>
+  {% endif %}
+</div>

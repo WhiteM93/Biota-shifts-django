@@ -7,10 +7,10 @@
   <a href="{% url 'product_setup_create' product.pk %}" class="btn btn-ghost">+</a>
   {% endif %}
 </div>
-{% if linked_plan_piece %}
+{% if plan_piece %}
 <p style="margin:0 0 14px 0;font-size:0.92rem;color:#aebde8;">
   <span class="muted">Раздел «План»:</span>
-  <a href="{% url 'plan_article_detail' pk=linked_plan_piece.pk %}">Позиция №{{ linked_plan_piece.pk }}</a>
+  <a href="{% url 'plan_article_detail' pk=plan_piece.pk %}">Позиция №{{ plan_piece.pk }} — {{ plan_piece.name|truncatechars:60 }}</a>
 </p>
 {% endif %}
 <div class="product-detail-grid">
@@ -64,6 +64,7 @@
         {% else %}
         <p class="muted">Чертёж (PDF) не загружен. Можно добавить в <a href="{% url 'product_edit' product.pk %}">редактировании изделия</a>.</p>
         {% endif %}
+        {% include "shifts/product_plan_drawer_include.html" %}
       </section>
       {% for setup in setups %}
       <section class="product-tab-panel" id="panel-setup-{{ setup.pk }}" data-panel="{{ setup.tab_slug }}" role="tabpanel" aria-labelledby="tab-setup-{{ setup.pk }}" {% if tab_default != setup.tab_slug %}hidden{% endif %}>
@@ -79,6 +80,11 @@
                 <div class="setup-spec-col setup-spec-col-meta">
                   <div class="setup-meta-columns">
                     <div class="setup-meta-col setup-meta-col-left">
+                      <div class="setup-plan-summary-lines" data-product-plan-summary style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #2f3b57;font-size:13px;line-height:1.45;">
+                        <div><span class="muted">План — тип:</span> <span data-plan-type-line>{{ plan_display_type_line }}</span></div>
+                        <div><span class="muted">Заготовка (план):</span> <span data-plan-workpiece-line>{{ plan_display_workpiece_line }}</span></div>
+                        <div><span class="muted">Материал (план):</span> <span data-plan-material-line>{{ plan_display_material_line }}</span></div>
+                      </div>
                       <div><span class="muted">Размер:</span> <span data-field-text="size">{{ setup.size|default:"—" }}</span></div>
                       <div class="setup-row-photo">
                         <span class="muted">Тип:</span> <span data-field-text="workpiece">{{ setup.workpiece|default:"—" }}</span>

@@ -25,6 +25,9 @@
       {% if form.name.errors %}<span class="muted">{{ form.name.errors }}</span>{% endif %}
     </label>
     <label class="field" style="grid-column:1/-1;"><span>Описание</span>{{ form.description }}{% if form.description.errors %}<span class="muted">{{ form.description.errors }}</span>{% endif %}</label>
+    <div style="grid-column:1/-1;">
+    {% include "shifts/includes/product_plan_fields.html" with id_prefix="pform" %}
+    </div>
     <label class="field" style="grid-column:1/-1;">
       <span>Чертёж (PDF)</span>
       {% if is_edit and product and product.drawing_pdf %}

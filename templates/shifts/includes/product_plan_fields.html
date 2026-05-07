@@ -1,0 +1,66 @@
+{# Поля «как в плане»: тип позиции, заготовка, лазер. id_prefix — префикс id для инлайна. #}
+{% with pfx=id_prefix|default:"prodplan" %}
+<div class="product-plan-fields-root filter-panel" style="margin-top:0;padding:14px;" data-plan-fields-root>
+  {% if show_plan_fields_title != False %}
+  <h4 style="margin:0 0 12px 0;font-size:0.95rem;color:#c9d5ff;">Позиция в разделе «План»</h4>
+  <p class="muted" style="margin:0 0 12px 0;font-size:12px;line-height:1.45;">
+    Тип, заготовка и маркировка совпадают с карточкой в плане и синхронизируются с ней. Для сборки состав и маршрут задаются в «Плане».
+  </p>
+  {% endif %}
+  <div class="plan-product-type-row" role="radiogroup" aria-label="Тип позиции плана" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin-bottom:12px;">
+    <span class="muted" style="font-size:12px;font-weight:600;width:100%;">Тип</span>
+    <label class="chk"><input type="radio" name="plan_product_type" value="made" class="js-product-plan-type" id="{{ pfx }}-type-made" {% if plan_product_type == 'made' %}checked{% endif %}><span>Изделие</span></label>
+    <label class="chk"><input type="radio" name="plan_product_type" value="assembly" class="js-product-plan-type" id="{{ pfx }}-type-asm" {% if plan_product_type == 'assembly' %}checked{% endif %}><span>Сборка</span></label>
+    <label class="chk"><input type="radio" name="plan_product_type" value="pki" class="js-product-plan-type" id="{{ pfx }}-type-pki" {% if plan_product_type == 'pki' %}checked{% endif %} title="Закупная позиция"><span>ПКИ</span></label>
+  </div>
+  <div class="product-plan-workpiece-laser" data-workpiece-laser-wrap style="{% if plan_product_type != 'made' %}display:none;{% endif %}">
+    <div class="filter-panel" style="margin-bottom:12px;padding:12px;">
+      <label class="field" style="max-width:100%;">
+        <span>Тип заготовки</span>
+        <select name="workpiece_type" id="{{ pfx }}-workpiece-type" class="js-product-plan-workpiece">
+          <option value="">— выберите —</option>
+          {% for val, label in plan_workpiece_type_choices %}
+          <option value="{{ val }}" {% if plan_workpiece_type_value == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="filter-panel product-plan-laser-panel" data-laser-panel style="padding:12px;{% if plan_workpiece_type_value != 'laser' %}display:none;{% endif %}">
+      <label class="field">
+        <span>Толщина листа, мм</span>
+        <input type="text" name="laser_sheet_thickness_mm" id="{{ pfx }}-laser-thick" value="{{ plan_laser_sheet_thickness_value }}" inputmode="decimal" autocomplete="off" placeholder="Например, 2 или 1,5" class="js-product-plan-laser-thick">
+      </label>
+      <label class="field" style="margin-top:10px;">
+        <span>Маркировка материала</span>
+        <input type="text" name="laser_material_marking" id="{{ pfx }}-laser-mark" value="{{ plan_laser_material_marking_value }}" maxlength="240" autocomplete="off" placeholder="Как в плане" list="{{ pfx }}-laser-datalist" class="js-product-plan-laser-mark">
+        <datalist id="{{ pfx }}-laser-datalist">
+          {% for m in plan_laser_material_marking_suggestions %}
+          <option value="{{ m }}"></option>
+          {% endfor %}
+        </datalist>
+      </label>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var root = document.currentScript && document.currentScript.previousElementSibling;
+  if (!root || !root.querySelector) return;
+  function sync() {
+    var t = root.querySelector(".js-product-plan-type:checked");
+    var type = t ? t.value : "made";
+    var wrap = root.querySelector("[data-workpiece-laser-wrap]");
+    var laser = root.querySelector("[data-laser-panel]");
+    var wp = root.querySelector(".js-product-plan-workpiece");
+    if (wrap) wrap.style.display = type === "made" ? "" : "none";
+    if (laser && wp) {
+      laser.style.display = type === "made" && wp.value === "laser" ? "" : "none";
+    }
+  }
+  root.querySelectorAll(".js-product-plan-type").forEach(function (r) { r.addEventListener("change", sync); });
+  var wps = root.querySelector(".js-product-plan-workpiece");
+  if (wps) wps.addEventListener("change", sync);
+  sync();
+})();
+</script>
+{% endwith %}

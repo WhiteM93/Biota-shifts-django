@@ -16,7 +16,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
-from .models import PlannedProduct, Product, ProductSetup, ProductSetupPhoto, ProductSetupProgramFile, ProductSetupToolRow
+from .models import Product, ProductSetup, ProductSetupPhoto, ProductSetupProgramFile, ProductSetupToolRow
+from .product_plan_sync import (
+    apply_product_plan_post,
+    plan_card_summary,
+    plan_form_context,
+    plan_piece_for_naladki_card,
+    validate_product_plan_post,
+)
 
 # Ограничение вывода ПП в карточке (страница)
 MAX_PROGRAM_DISPLAY_BYTES = 800_000
@@ -545,6 +552,20 @@ def product_create_view(request):
     if request.method == "POST":
         form = ProductForm(request.POST, request.FILES)
         if form.is_valid():
+            plan_err = validate_product_plan_post(request.POST)
+            if plan_err:
+                messages.error(request, plan_err)
+                return render(
+                    request,
+                    "shifts/product_form.html",
+                    {
+                        "form": form,
+                        "username": biota_user(request),
+                        "is_edit": False,
+                        "product": None,
+                        **plan_form_context(None),
+                    },
+                )
             name_raw = (form.cleaned_data.get("name") or "").strip()
             if name_raw:
                 exact_exists = Product.objects.filter(name__iexact=name_raw).exists()
@@ -559,17 +580,29 @@ def product_create_view(request):
                             "username": biota_user(request),
                             "is_edit": False,
                             "product": None,
+                            **plan_form_context(None),
                         },
                     )
             with transaction.atomic():
                 obj: Product = form.save()
                 _apply_setup_photo_changes(request, obj)
-            messages.success(
-                request,
-                "Изделие создано. Позиция в разделе «План» привязывается автоматически при сохранении.",
-            )
+            pe = apply_product_plan_post(obj, request.POST)
+            if pe:
+                messages.warning(request, pe)
+            messages.success(request, "Изделие создано.")
             return redirect("product_detail", pk=obj.pk)
         messages.error(request, "Исправьте ошибки в форме.")
+        return render(
+            request,
+            "shifts/product_form.html",
+            {
+                "form": form,
+                "username": biota_user(request),
+                "is_edit": False,
+                "product": None,
+                **plan_form_context(None),
+            },
+        )
     else:
         form = ProductForm()
     return render(
@@ -580,6 +613,7 @@ def product_create_view(request):
             "username": biota_user(request),
             "is_edit": False,
             "product": None,
+            **plan_form_context(None),
         },
     )
 
@@ -593,6 +627,20 @@ def product_edit_view(request, pk: int):
     if request.method == "POST":
         form = ProductForm(request.POST, request.FILES, instance=product)
         if form.is_valid():
+            plan_err = validate_product_plan_post(request.POST)
+            if plan_err:
+                messages.error(request, plan_err)
+                return render(
+                    request,
+                    "shifts/product_form.html",
+                    {
+                        "form": form,
+                        "username": biota_user(request),
+                        "is_edit": True,
+                        "product": product,
+                        **plan_form_context(product),
+                    },
+                )
             with transaction.atomic():
                 obj: Product = form.save()
                 removable_file_fields = ("drawing_pdf", "cad_model", "preview_stl")
@@ -606,9 +654,23 @@ def product_edit_view(request, pk: int):
                         setattr(obj, field_name, "")
                         obj.save(update_fields=[field_name])
                 _apply_setup_photo_changes(request, obj)
-            messages.success(request, "Изделие сохранено. Связь с планом обновляется автоматически.")
+            pe = apply_product_plan_post(obj, request.POST)
+            if pe:
+                messages.warning(request, pe)
+            messages.success(request, "Изделие сохранено.")
             return redirect("product_detail", pk=obj.pk)
         messages.error(request, "Исправьте ошибки в форме.")
+        return render(
+            request,
+            "shifts/product_form.html",
+            {
+                "form": form,
+                "username": biota_user(request),
+                "is_edit": True,
+                "product": product,
+                **plan_form_context(product),
+            },
+        )
     else:
         form = ProductForm(instance=product)
     return render(
@@ -619,6 +681,7 @@ def product_edit_view(request, pk: int):
             "username": biota_user(request),
             "is_edit": True,
             "product": product,
+            **plan_form_context(product),
         },
     )
 
@@ -678,6 +741,17 @@ def product_detail_view(request, pk: int):
     product = get_object_or_404(Product, pk=pk)
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
+        if action == "inline_save_product_plan":
+            plan_err = validate_product_plan_post(request.POST)
+            if plan_err:
+                return JsonResponse({"ok": False, "error": plan_err}, status=400)
+            err = apply_product_plan_post(product, request.POST)
+            if err:
+                return JsonResponse({"ok": False, "error": err}, status=400)
+            pp = plan_piece_for_naladki_card(product)
+            return JsonResponse(
+                {"ok": True, "plan_summary": plan_card_summary(pp), "plan_pk": pp.pk if pp else None}
+            )
         if action == "inline_update_setup_photo_caption":
             photo_id_raw = (request.POST.get("photo_id") or "").strip()
             photo_id = int(photo_id_raw) if photo_id_raw.isdigit() else 0
@@ -957,13 +1031,12 @@ def product_detail_view(request, pk: int):
                 break
     if active_setup is None and setups:
         active_setup = setups[0]
-    linked_plan_piece = PlannedProduct.objects.filter(naladki_product_id=product.pk).first()
     return render(
         request,
         "shifts/product_detail.html",
         {
             "product": product,
-            "linked_plan_piece": linked_plan_piece,
+            **plan_form_context(product),
             "setup_photos": setup_photos,
             "setups": setups,
             "cad_ext": cad_ext,
