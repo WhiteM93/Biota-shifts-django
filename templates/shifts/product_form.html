@@ -14,7 +14,7 @@
 <form method="post" enctype="multipart/form-data" class="filter-panel product-form-panel" style="margin-top:16px;">
   {% csrf_token %}
   {% if form.non_field_errors %}
-  <p style="color:#ffb8b8;">{{ form.non_field_errors }}</p>
+  <p style="color:var(--bio-error-soft);">{{ form.non_field_errors }}</p>
   {% endif %}
   <div class="filter-grid product-form-grid">
     <label class="field">
@@ -116,19 +116,19 @@
     min-height: 110px;
     resize: vertical;
     line-height: 1.45;
-    border-radius: 10px;
-    background: #101520;
-    color: #eaf0ff;
-    border: 1px solid #33415f;
+    border-radius: 5px;
+    background: var(--bio-input-bg);
+    color: var(--bio-body-fg);
+    border: 1px solid var(--bio-input-border);
   }
   .product-form-panel #id_description:hover {
-    border-color: #415277;
+    border-color: var(--bio-input-hover-border);
   }
   .product-form-panel #id_description:focus {
     outline: none;
-    border-color: #7c8cff;
+    border-color: var(--bio-input-focus-border);
     box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.22);
-    background: #121a2a;
+    background: var(--bio-input-focus-bg);
   }
   .product-file-row {
     display: grid;
@@ -136,8 +136,8 @@
     gap: 8px;
     align-items: center;
     padding: 10px;
-    border: 1px solid #2f3b57;
-    border-radius: 10px;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 5px;
     background: #111827;
   }
   .product-file-actions {

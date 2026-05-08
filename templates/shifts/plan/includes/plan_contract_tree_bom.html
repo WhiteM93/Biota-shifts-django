@@ -1,0 +1,57 @@
+{% load plan_tags %}
+{% if bom_nodes %}
+<ul class="plan-contract-bom-ul">
+{% for node in bom_nodes %}
+  {% with cmp=node.component %}
+  <li class="plan-contract-bom-li">
+    {% if cmp.is_assembly %}
+    <details class="plan-contract-folder plan-contract-folder-bom">
+      <summary class="plan-contract-folder-sum plan-contract-sum-bom">
+        <span class="plan-contract-sum-twist plan-contract-sum-twist--bom" aria-hidden="true"></span>
+        <span class="plan-contract-sum-meta">
+          {% if cmp.pk in contracted_product_ids %}
+          {% url 'plan_contract_article_detail' contract_pk=contract_pk product_pk=cmp.pk as cmp_open %}
+          {% else %}
+          {% url 'plan_article_detail' pk=cmp.pk as cmp_open %}
+          {% endif %}
+          <span class="plan-contract-stop-toggle" onclick="event.stopPropagation()">{% planned_product_link url=cmp_open name=cmp.name compact=True %}</span>
+          <span class="plan-contract-sum-chip muted" style="font-size:11px;">
+            {% if cmp.is_assembly %}сборка{% endif %}{% if cmp.is_assembly and cmp.is_purchased %},{% endif %}{% if cmp.is_purchased %}ПКИ{% endif %}{% if not cmp.is_assembly and not cmp.is_purchased %}изделие{% endif %}
+          </span>
+          <span class="plan-contract-sum-kit muted">{{ node.per_kit }} / к.</span>
+          <strong class="plan-contract-sum-ic">{{ node.in_contract }}</strong>
+          <a href="{{ cmp_open }}" class="btn btn-sm btn-ghost plan-contract-sum-open" onclick="event.stopPropagation()">Открыть</a>
+        </span>
+      </summary>
+      <div class="plan-contract-folder-sub">
+        {% if node.children %}
+        {% include "shifts/plan/includes/plan_contract_tree_bom.html" with bom_nodes=node.children contract_pk=contract_pk contracted_product_ids=contracted_product_ids %}
+        {% else %}
+        <p class="muted plan-contract-empty-bom" style="margin:8px 0 8px 10px;font-size:12px;">Состав не заполнен.</p>
+        {% endif %}
+      </div>
+    </details>
+    {% else %}
+    <div class="plan-contract-bom-leaf">
+      {% if cmp.pk in contracted_product_ids %}
+      {% url 'plan_contract_article_detail' contract_pk=contract_pk product_pk=cmp.pk as cmp_open %}
+      {% else %}
+      {% url 'plan_article_detail' pk=cmp.pk as cmp_open %}
+      {% endif %}
+      <span class="plan-contract-sum-twist plan-contract-sum-twist--spacer" aria-hidden="true"></span>
+      <span class="plan-contract-sum-meta">
+        <span class="plan-contract-stop-toggle" onclick="event.stopPropagation()">{% planned_product_link url=cmp_open name=cmp.name compact=True %}</span>
+        <span class="plan-contract-sum-chip muted" style="font-size:11px;">
+          {% if cmp.is_assembly %}сборка{% endif %}{% if cmp.is_assembly and cmp.is_purchased %},{% endif %}{% if cmp.is_purchased %}ПКИ{% endif %}{% if not cmp.is_assembly and not cmp.is_purchased %}изделие{% endif %}
+        </span>
+        <span class="plan-contract-sum-kit muted">{{ node.per_kit }} / к.</span>
+        <strong class="plan-contract-sum-ic">{{ node.in_contract }}</strong>
+        <a href="{{ cmp_open }}" class="btn btn-sm btn-ghost plan-contract-sum-open">Открыть</a>
+      </span>
+    </div>
+    {% endif %}
+  </li>
+  {% endwith %}
+{% endfor %}
+</ul>
+{% endif %}

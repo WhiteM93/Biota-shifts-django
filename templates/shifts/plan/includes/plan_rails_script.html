@@ -46,5 +46,129 @@
       ev.stopPropagation();
     });
   });
+
+  (function syncPlanRailContractSelect() {
+    var STORAGE_KEY = 'planDeptContractPk';
+    var sel = document.querySelector('[data-plan-rail-contract-select]');
+    if (!sel) return;
+
+    var blockDeptLinkClicksUntil = 0;
+    document.addEventListener(
+      'click',
+      function (ev) {
+        if (Date.now() >= blockDeptLinkClicksUntil) return;
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        if (t.closest('a.plan-rail-dept-link')) {
+          ev.preventDefault();
+          ev.stopPropagation();
+        }
+      },
+      true
+    );
+
+    function contractQs(pk) {
+      return pk ? '?contract=' + encodeURIComponent(pk) : '';
+    }
+    function deptLinksRewrite(pk) {
+      document.querySelectorAll('a.plan-rail-dept-link[data-plan-dept-path]').forEach(function (a) {
+        var base = a.getAttribute('data-plan-dept-path') || '';
+        a.setAttribute('href', base + contractQs(pk));
+      });
+    }
+    function persist(pk) {
+      if (pk) {
+        sessionStorage.setItem(STORAGE_KEY, pk);
+      } else {
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+    }
+
+    function pathLooksLikeDeptPlanning(p) {
+      return (p || '').indexOf('/plan/by-department/') !== -1;
+    }
+    function normalizedPathSegments(p) {
+      var raw = String(p || '');
+      if (!raw.length) return '';
+      if (raw.length > 1 && raw.slice(-1) === '/') {
+        raw = raw.slice(0, -1);
+      }
+      return raw;
+    }
+    function pathIsPlanDashboard(p) {
+      return normalizedPathSegments(p || '') === '/plan';
+    }
+
+    var urlPk = '';
+    try {
+      var u = new URL(window.location.href);
+      urlPk = String(u.searchParams.get('contract') || '').trim();
+    } catch (_e) {
+      urlPk = '';
+    }
+    var validFromUrl = /^\d+$/.test(urlPk);
+    var storedPk = String(sessionStorage.getItem(STORAGE_KEY) || '').trim();
+    var hasOption = function (val) {
+      return Array.prototype.some.call(sel.options, function (opt) {
+        return String(opt.value) === String(val);
+      });
+    };
+
+    if (validFromUrl && hasOption(urlPk)) {
+      sel.value = urlPk;
+      persist(urlPk);
+    } else if (storedPk && hasOption(storedPk)) {
+      sel.value = storedPk;
+    }
+
+    /* На странице отдела без ?contract применить выбор из памяти (один переход для сервера). */
+    var pathNow = window.location.pathname || '';
+    if ((pathLooksLikeDeptPlanning(pathNow) || pathIsPlanDashboard(pathNow)) && !validFromUrl) {
+      var rv = String(sel.value || '').trim();
+      if (rv && hasOption(rv)) {
+        try {
+          var uR = new URL(window.location.href);
+          if (!(String(uR.searchParams.get('contract') || '').trim())) {
+            uR.searchParams.set('contract', rv);
+            window.location.replace(uR.toString());
+            return;
+          }
+        } catch (_eR) {}
+      }
+    }
+
+    deptLinksRewrite(String(sel.value || '').trim());
+
+    sel.addEventListener('change', function () {
+      var v = String(sel.value || '').trim();
+      blockDeptLinkClicksUntil = Date.now() + 450;
+      persist(v);
+      deptLinksRewrite(v);
+
+      try {
+        var path = window.location.pathname || '';
+        if (!(pathLooksLikeDeptPlanning(path) || pathIsPlanDashboard(path))) return;
+
+        /*
+          Сразу не делаем location.assign — после нативного <select>
+          возможен «фантомный» клик по первой ссылке отдела (откроется лишний отдел).
+          Через таймер обновляем только текущую страницу планирования / сводку плана с новым contract=.
+        */
+        setTimeout(function () {
+          try {
+            var u2 = new URL(window.location.href);
+            if (v) {
+              u2.searchParams.set('contract', v);
+            } else {
+              u2.searchParams.delete('contract');
+            }
+            window.location.replace(u2.toString());
+          } catch (_e3) {}
+        }, 380);
+      } catch (_e2) {
+        /* ignore */
+      }
+    });
+  })();
 })();
 </script>

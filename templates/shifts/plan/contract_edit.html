@@ -7,7 +7,7 @@
 <div class="plan-article-main">
 <div class="page-actions">
   {% if contract %}
-  <a href="{% url 'plan_contract_detail' pk=contract.pk %}" class="btn btn-sm btn-ghost">← К контракту</a>
+  <a href="{% url 'plan_contracts' %}#plan-contract-{{ contract.pk }}" class="btn btn-sm btn-ghost">← К контракту</a>
   {% else %}
   <a href="{% url 'plan_contracts' %}" class="btn btn-sm btn-ghost">← К контрактам</a>
   {% endif %}
@@ -32,7 +32,7 @@
     </label>
   </div>
 
-  <h3 style="margin:0 0 8px 0;font-size:1rem;color:#c9d5ff;">Позиции плана и количество</h3>
+  <h3 style="margin:0 0 8px 0;font-size:1rem;color:var(--bio-heading-accent);">Позиции плана и количество</h3>
   <p class="muted" style="margin:0 0 10px 0;">
     Строки — только ссылки на позиции плана и количество по контракту. Сводный объём контракта пересчитывается как сумма количеств по строкам (на карточке контракта и в списке).
     Подсказки по названию — из плана; новые позиции здесь не создаются.

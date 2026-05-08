@@ -1,0 +1,1896 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "shifts/plan/includes/plan_rails_styles.html" %}
+<style>
+  /*
+    Темы сайта: html[data-theme] (night | dawn), переключатель в шапке; блок ниже — только стили лаборатории.
+    Переключатель меняет атрибут и localStorage без перезагрузки.
+  */
+  .admin-test-lab {
+    /* Ночь: те же токены, что и у сайта — лаборатория следует html[data-theme] через --bio-* */
+    --at-body-text: var(--bio-body-fg);
+    --at-h1: var(--bio-body-fg);
+    --at-strong: var(--bio-heading-accent);
+    --at-lead: var(--bio-muted);
+    --at-muted: var(--bio-muted);
+    --at-caption: var(--bio-caption-soft);
+    --at-body-link: var(--bio-nav-link);
+    --at-card-border: var(--bio-filter-border);
+    --at-card-bg1: var(--bio-filter-bg1);
+    --at-card-bg2: var(--bio-filter-bg2);
+    --at-card-shadow: var(--bio-shadow-card);
+    --at-h2: var(--bio-heading-accent);
+    --at-h3: var(--bio-field-label);
+    --at-preview-border: var(--bio-table-cell-border);
+    --at-preview-bg: var(--bio-table-bg);
+    --at-preview-inner: var(--bio-input-bg);
+    --at-hint: var(--bio-muted);
+    --at-code-bg: var(--bio-input-bg);
+    --at-code-border: var(--bio-input-border);
+    --at-code-text: var(--bio-filter-h3);
+    --at-toc: var(--bio-muted);
+    --at-toc-hover: var(--bio-body-fg);
+    --at-toc-dash: var(--bio-check-row-border);
+    --at-nav-dash: var(--bio-check-row-border);
+    --at-rail-bg: var(--bio-surface-item);
+    --at-rail-kicker: var(--bio-heading-accent);
+    --at-field-label: var(--bio-field-label);
+    --at-input-bg: var(--bio-input-bg);
+    --at-input-border: var(--bio-input-border);
+    --at-input-color: var(--bio-input-fg);
+    --at-input-focus: var(--bio-input-focus-border);
+    --at-fieldset-border: var(--bio-chk-border);
+    --at-check-border: var(--bio-chk-border);
+    --at-check-bg: var(--bio-chk-bg);
+    --at-check-hover-border: var(--bio-chk-hover-border);
+    --at-check-hover-bg: var(--bio-chk-hover-bg);
+    --at-check-label: var(--bio-field-label);
+    --at-check-row-border: var(--bio-check-row-border);
+    --at-filter-bg1: var(--bio-filter-bg1);
+    --at-filter-bg2: var(--bio-filter-bg2);
+    --at-filter-border: var(--bio-filter-border);
+    --at-filter-h3: var(--bio-filter-h3);
+    --at-filter-shadow: var(--bio-filter-shadow);
+    --at-table-wrap-border: var(--bio-table-wrap-border);
+    --at-table-bg: var(--bio-table-bg);
+    --at-table-th-bg: var(--bio-table-th-bg);
+    --at-table-cell-border: var(--bio-table-cell-border);
+    --at-table-text: var(--bio-body-fg);
+    --at-table-link: var(--bio-body-fg);
+    --at-empty-border: var(--bio-chk-border);
+    --at-msg-s-bg: var(--bio-msg-success-bg);
+    --at-msg-s-fg: var(--bio-msg-success-fg);
+    --at-msg-e-bg: var(--bio-msg-error-bg);
+    --at-msg-e-fg: var(--bio-msg-error-fg);
+    --at-msg-n-bg: var(--bio-msg-info-bg);
+    --at-msg-n-fg: var(--bio-msg-info-fg);
+    --at-switch-track: var(--bio-graph-muted-btn-border);
+    --at-switch-thumb: #f0f4ff;
+    --at-switch-on: var(--bio-btn-primary-bg2);
+    --at-theme-label: var(--bio-field-label);
+    --at-theme-active: var(--bio-heading-accent);
+    --at-theme-inactive: var(--bio-caption-soft);
+    --at-nav-clone-bg: var(--bio-nav-bg);
+    --at-nav-clone-border: var(--bio-nav-border);
+    --at-nav-clone-link: var(--bio-nav-link);
+    --at-nav-clone-link-hover-bg: var(--bio-nav-link-hover-bg);
+    --at-nav-clone-link-hover-border: var(--bio-nav-link-hover-border);
+    --at-nav-clone-user-bg: var(--bio-nav-user-bg);
+    --at-nav-clone-logout: var(--bio-nav-logout);
+    --at-rail-strip-bg1: var(--bio-card-gradient1);
+    --at-rail-strip-bg2: var(--bio-card-gradient2);
+    --at-rail-sheet-bg: var(--bio-nav-menu-bg);
+    --at-rail-sheet-border: var(--bio-nav-menu-border);
+    --at-rail-title: var(--bio-heading-accent);
+    --at-details-summary: var(--bio-nav-link);
+    --at-details-menu-bg: var(--bio-nav-menu-bg);
+    --at-details-menu-border: var(--bio-nav-menu-border);
+    --at-details-menu-link: var(--bio-nav-link);
+    --at-themebar-bg1: var(--at-card-bg1);
+    --at-themebar-bg2: var(--at-card-bg2);
+    --at-file-input-bg: var(--bio-input-focus-bg);
+    --at-file-border: var(--bio-input-hover-border);
+    --at-file-button-bg: var(--bio-btn-ghost-bg);
+    --at-file-button-color: var(--bio-body-fg);
+    --at-file-button-border: var(--bio-btn-ghost-border);
+    --at-file-button-hover-bg: var(--bio-nav-link-hover-bg);
+    --at-demo-dd-bg: var(--bio-theme-btn-bg);
+    --at-demo-dd-border: var(--bio-theme-btn-border);
+    --at-demo-dd-hover-bg: var(--bio-nav-link-hover-bg);
+    --at-demo-dd-hover-color: var(--bio-nav-link-hover-fg);
+    --at-demo-dd-hover-border: var(--bio-nav-link-hover-border);
+    --at-demo-dd-open-bg: var(--bio-nav-active-bg2);
+    --at-demo-dd-open-color: #ffffff;
+    --at-demo-dd-open-border: var(--bio-nav-active-border);
+    max-width: 72rem;
+    margin: 0 auto;
+    padding-bottom: 24px;
+    color: var(--at-body-text);
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+  }
+  /* Рассвет: тёплые бумажные тона и бирюза — не «светлая ночь», а отдельная палитра */
+  html[data-theme="dawn"] .admin-test-lab {
+    --at-body-text: #3c362f;
+    --at-h1: #2d2640;
+    --at-strong: #1f1a24;
+    --at-lead: #5c534a;
+    --at-muted: #6b6258;
+    --at-caption: #8a8177;
+    --at-body-link: #0f766e;
+    --at-card-border: #ebe3da;
+    --at-card-bg1: #fffafd;
+    --at-card-bg2: #f5ebe3;
+    --at-card-shadow: rgba(55, 42, 36, 0.075);
+    --at-h2: #4a6672;
+    --at-h3: #5c6d8a;
+    --at-preview-border: #ddd0c2;
+    --at-preview-bg: #fffefb;
+    --at-preview-inner: #faf5ee;
+    --at-hint: #6b6258;
+    --at-code-bg: #f3ede4;
+    --at-code-border: #d8cdc0;
+    --at-code-text: #292524;
+    --at-toc: #6b5b8e;
+    --at-toc-hover: #3d2f55;
+    --at-toc-dash: rgba(107, 91, 142, 0.4);
+    --at-nav-dash: rgba(150, 110, 80, 0.38);
+    --at-rail-bg: rgba(255, 247, 237, 0.88);
+    --at-rail-kicker: #134e4a;
+    --at-field-label: #44403c;
+    --at-input-bg: #fffefb;
+    --at-input-border: #d6c9b8;
+    --at-input-color: #292524;
+    --at-input-focus: #0d9488;
+    --at-fieldset-border: #d0c4b4;
+    --at-check-border: #cfc3b2;
+    --at-check-bg: rgba(255, 254, 251, 0.96);
+    --at-check-hover-border: #0d9488;
+    --at-check-hover-bg: rgba(240, 253, 250, 0.96);
+    --at-check-label: #44403c;
+    --at-check-row-border: rgba(180, 150, 170, 0.45);
+    --at-filter-bg1: rgba(255, 252, 247, 0.95);
+    --at-filter-bg2: rgba(241, 233, 222, 0.98);
+    --at-filter-border: #e0d4c6;
+    --at-filter-h3: #134e4a;
+    --at-filter-shadow: var(--bio-filter-shadow);
+    --at-table-wrap-border: #d0c4b4;
+    --at-table-bg: #fffefb;
+    --at-table-th-bg: #efe8de;
+    --at-table-cell-border: #e5dcd0;
+    --at-table-text: #292524;
+    --at-table-link: #0d9488;
+    --at-empty-border: #cfc3b2;
+    --at-msg-s-bg: #ccfbf1;
+    --at-msg-s-fg: #115e59;
+    --at-msg-e-bg: #ffe4e6;
+    --at-msg-e-fg: #9f1239;
+    --at-msg-n-bg: #efe8de;
+    --at-msg-n-fg: #292524;
+    --at-switch-track: #d0c4b4;
+    --at-switch-thumb: #fffefb;
+    --at-switch-on: #0d9488;
+    --at-theme-label: #57534e;
+    --at-theme-active: #134e4a;
+    --at-theme-inactive: #a8a29e;
+    --at-nav-clone-bg: rgba(255, 254, 251, 0.98);
+    --at-nav-clone-border: #e0d4c6;
+    --at-nav-clone-link: #1c1917;
+    --at-nav-clone-link-hover-bg: #f5f0e8;
+    --at-nav-clone-link-hover-border: #d6c9b8;
+    --at-nav-clone-user-bg: #e7f2ef;
+    --at-nav-clone-logout: #c2410c;
+    --at-rail-strip-bg1: rgba(255, 250, 245, 0.99);
+    --at-rail-strip-bg2: rgba(236, 226, 214, 0.99);
+    --at-rail-sheet-bg: rgba(255, 254, 251, 0.99);
+    --at-rail-sheet-border: #d0c4b4;
+    --at-rail-title: #134e4a;
+    --at-details-summary: #44403c;
+    --at-details-menu-bg: rgba(255, 254, 251, 0.99);
+    --at-details-menu-border: #e0d4c6;
+    --at-details-menu-link: #0f766e;
+    --at-themebar-bg1: #faf8ff;
+    --at-themebar-bg2: #fff1f2;
+    --at-file-input-bg: #fefcfe;
+    --at-file-border: #e4d4f0;
+    --at-file-button-bg: #ede9fe;
+    --at-file-button-color: #57406f;
+    --at-file-button-border: #ddd6fe;
+    --at-file-button-hover-bg: #e0d7fc;
+    --at-upload-row-bg: linear-gradient(135deg, #f0f9ff 0%, #f5f3ff 55%, #fdf4ff 100%);
+    --at-upload-row-border: #c7e8f5;
+    --at-ribbon-chrome: #bae6fd;
+    --at-ribbon-buttons: #fde68a;
+    --at-ribbon-typography: #fce7f3;
+    --at-ribbon-forms: #bbf7d0;
+    --at-ribbon-choice: #fbcfe8;
+    --at-ribbon-filter: #fecdd3;
+    --at-ribbon-table: #ddd6fe;
+    --at-ribbon-messages: #a5f3fc;
+    --at-ribbon-details: #fed7aa;
+    --at-ribbon-uploads: #e9d5ff;
+    --at-demo-dd-bg: rgba(255, 255, 255, 0.65);
+    --at-demo-dd-border: #ead8e8;
+    --at-demo-dd-hover-bg: #fdf2f8;
+    --at-demo-dd-hover-color: #4f4258;
+    --at-demo-dd-hover-border: #ebb8d6;
+    --at-demo-dd-open-bg: #fce7f3;
+    --at-demo-dd-open-color: #3d2f4a;
+    --at-demo-dd-open-border: #f0a8d8;
+  }
+
+  .admin-test-theme-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    margin: 0 0 16px 0;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--at-card-border);
+    background: linear-gradient(165deg, var(--at-themebar-bg1) 0%, var(--at-themebar-bg2) 100%);
+    box-shadow: 0 6px 18px var(--at-card-shadow);
+  }
+  .admin-test-theme-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--at-theme-label);
+    letter-spacing: 0.04em;
+  }
+  .admin-test-theme-names {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+  }
+  .admin-test-theme-name {
+    color: var(--at-theme-inactive);
+    font-weight: 500;
+    transition: color 0.15s ease, font-weight 0.15s ease;
+  }
+  html[data-theme="night"] .admin-test-lab .admin-test-theme-name[data-theme-name="night"],
+  html[data-theme="dawn"] .admin-test-lab .admin-test-theme-name[data-theme-name="dawn"] {
+    color: var(--at-theme-active);
+    font-weight: 800;
+  }
+  .admin-test-switch {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 26px;
+    flex-shrink: 0;
+  }
+  .admin-test-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  }
+  .admin-test-switch-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--at-switch-track);
+    border-radius: 999px;
+    transition: background 0.2s ease;
+    border: 1px solid var(--at-card-border);
+    box-sizing: border-box;
+  }
+  .admin-test-switch-slider::before {
+    content: "";
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 4px;
+    top: 50%;
+    margin-top: -9px;
+    background: var(--at-switch-thumb);
+    border-radius: 50%;
+    transition: transform 0.22s ease;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  }
+  .admin-test-switch input:checked + .admin-test-switch-slider {
+    background: var(--at-switch-on);
+    border-color: transparent;
+  }
+  .admin-test-switch input:checked + .admin-test-switch-slider::before {
+    transform: translateX(20px);
+  }
+  .admin-test-switch input:focus-visible + .admin-test-switch-slider {
+    outline: 2px solid var(--at-input-focus);
+    outline-offset: 2px;
+  }
+
+  .admin-test-lab h1 {
+    margin: 0 0 8px 0;
+    font-size: 1.35rem;
+    line-height: 1.25;
+    color: var(--at-h1);
+  }
+  .admin-test-lab .muted-lead {
+    margin: 0 0 18px 0;
+    font-size: 13px;
+    color: var(--at-lead);
+    line-height: 1.45;
+    max-width: 48rem;
+  }
+  .admin-test-lab .muted {
+    color: var(--at-muted) !important;
+  }
+  .admin-test-lab strong {
+    color: var(--at-strong);
+  }
+  .admin-test-card a:not(.btn) {
+    color: var(--at-body-link);
+  }
+  .admin-test-caption {
+    color: var(--at-caption) !important;
+  }
+  .admin-test-rail-kicker {
+    color: var(--at-rail-kicker) !important;
+  }
+
+  .admin-test-card {
+    border: 1px solid var(--at-card-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    background: linear-gradient(180deg, var(--at-card-bg1) 0%, var(--at-card-bg2) 100%);
+    box-shadow: 0 8px 22px var(--at-card-shadow);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .admin-test-card h2 {
+    margin: 0 0 10px 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--at-h2);
+    letter-spacing: 0.03em;
+  }
+  .admin-test-card h3 {
+    margin: 14px 0 8px 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--at-h3);
+  }
+  .admin-test-card h3:first-child {
+    margin-top: 0;
+  }
+  .admin-test-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .admin-test-preview-box {
+    margin-top: 10px;
+    border: 1px solid var(--at-preview-border);
+    border-radius: 6px;
+    background: var(--at-preview-bg);
+    min-height: 200px;
+    overflow: hidden;
+    position: relative;
+  }
+  .admin-test-file-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px;
+    text-align: center;
+    box-sizing: border-box;
+    background: color-mix(in srgb, var(--at-preview-bg) 72%, transparent);
+    backdrop-filter: blur(4px);
+  }
+  .admin-test-preview-box.is-loading .admin-test-file-loading,
+  .admin-test-3d-wrap.is-loading > .admin-test-file-loading {
+    display: flex;
+  }
+  .admin-test-preview-box.is-loading .admin-test-preview-media {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .admin-test-preview-media {
+    opacity: 1;
+    transition: opacity 0.22s ease;
+  }
+  @keyframes admin-test-spin {
+    to { transform: rotate(360deg); }
+  }
+  .admin-test-spinner {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 3px solid rgba(120, 140, 200, 0.28);
+    border-top-color: var(--at-input-focus);
+    animation: admin-test-spin 0.75s linear infinite;
+  }
+  html[data-theme="dawn"] .admin-test-lab .admin-test-spinner {
+    border-color: rgba(13, 148, 136, 0.22);
+    border-top-color: var(--at-input-focus);
+  }
+  .admin-test-file-loading-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--at-hint);
+    max-width: 16rem;
+    line-height: 1.4;
+  }
+  .admin-test-3d-wrap {
+    position: relative;
+    min-height: 280px;
+    margin-top: 0;
+  }
+  .admin-test-3d-wrap > .admin-test-file-loading {
+    border-radius: 6px;
+  }
+  .admin-test-preview-box iframe,
+  .admin-test-preview-box img {
+    display: block;
+    width: 100%;
+    min-height: 220px;
+    border: 0;
+    object-fit: contain;
+    background: var(--at-preview-inner);
+  }
+  .admin-test-preview-box--pdf iframe {
+    min-height: 420px;
+  }
+  .admin-test-3d-host {
+    min-height: 280px;
+    width: 100%;
+    position: relative;
+    background: transparent;
+  }
+  .admin-test-3d-host canvas {
+    display: block;
+    width: 100%;
+    height: 280px;
+    background: transparent;
+  }
+  .admin-test-3d-hint {
+    padding: 12px 14px;
+    font-size: 12px;
+    color: var(--at-hint);
+    line-height: 1.45;
+  }
+  .admin-test-file-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 8px;
+  }
+  .admin-test-lab input[type="file"] {
+    max-width: 100%;
+    flex: 1 1 220px;
+    min-width: 0;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    font: inherit;
+    cursor: pointer;
+    border-radius: 8px;
+    border: 1px solid var(--at-file-border);
+    background: var(--at-file-input-bg);
+    color: var(--at-input-color);
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  }
+  .admin-test-lab input[type="file"]::file-selector-button,
+  .admin-test-lab input[type="file"]::-webkit-file-upload-button {
+    font: inherit;
+    font-weight: 600;
+    font-size: 12px;
+    margin-right: 12px;
+    padding: 7px 14px;
+    border-radius: 5px;
+    border: 1px solid var(--at-file-button-border);
+    background: var(--at-file-button-bg);
+    color: var(--at-file-button-color);
+    cursor: pointer;
+    transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+  }
+  .admin-test-lab input[type="file"]:hover::file-selector-button,
+  .admin-test-lab input[type="file"]:hover::-webkit-file-upload-button {
+    background: var(--at-file-button-hover-bg);
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-uploads .admin-test-file-row {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--at-upload-row-border);
+    background: var(--at-upload-row-bg);
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-chrome.admin-test-card {
+    box-shadow: inset 3px 0 0 var(--at-ribbon-chrome), 0 8px 22px var(--at-card-shadow);
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-buttons.admin-test-card {
+    box-shadow: inset 3px 0 0 var(--at-ribbon-buttons), 0 8px 22px var(--at-card-shadow);
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-typography.admin-test-card {
+    box-shadow: inset 3px 0 0 var(--at-ribbon-typography), 0 8px 22px var(--at-card-shadow);
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-forms.admin-test-card {
+    box-shadow: inset 3px 0 0 var(--at-ribbon-forms), 0 8px 22px var(--at-card-shadow);
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-choice.admin-test-card {
+    box-shadow: inset 3px 0 0 var(--at-ribbon-choice), 0 8px 22px var(--at-card-shadow);
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-filter.admin-test-card {
+    box-shadow: inset 3px 0 0 var(--at-ribbon-filter), 0 8px 22px var(--at-card-shadow);
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-table.admin-test-card {
+    box-shadow: inset 3px 0 0 var(--at-ribbon-table), 0 8px 22px var(--at-card-shadow);
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-messages.admin-test-card {
+    box-shadow: inset 3px 0 0 var(--at-ribbon-messages), 0 8px 22px var(--at-card-shadow);
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-details.admin-test-card {
+    box-shadow: inset 3px 0 0 var(--at-ribbon-details), 0 8px 22px var(--at-card-shadow);
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-uploads.admin-test-card {
+    box-shadow: inset 3px 0 0 var(--at-ribbon-uploads), 0 8px 22px var(--at-card-shadow);
+  }
+  .admin-test-code {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    padding: 8px 10px;
+    background: var(--at-code-bg);
+    border: 1px solid var(--at-code-border);
+    border-radius: 4px;
+    color: var(--at-code-text);
+    overflow-x: auto;
+  }
+  .admin-test-toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-bottom: 16px;
+    font-size: 12px;
+  }
+  .admin-test-toc a {
+    color: var(--at-toc);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--at-toc-dash);
+  }
+  .admin-test-toc a:hover {
+    color: var(--at-toc-hover);
+  }
+  .admin-test-lab .check-row {
+    border-top: 1px dashed var(--at-check-row-border);
+  }
+  .admin-test-lab input[type="color"].admin-test-color {
+    width: 3rem;
+    height: 2rem;
+    padding: 3px;
+    cursor: pointer;
+    box-sizing: border-box;
+    border-radius: 8px;
+    border: 2px solid var(--at-input-border) !important;
+    background: var(--at-input-bg) !important;
+  }
+  .admin-test-lab input[type="range"].admin-test-range {
+    width: auto;
+    min-width: 140px;
+    height: 1.35rem;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    accent-color: var(--at-input-focus);
+  }
+  .admin-test-meter-wrap {
+    margin-top: 8px;
+  }
+  .admin-test-lab meter.admin-test-meter {
+    width: 100%;
+    max-width: 240px;
+    height: 10px;
+    accent-color: var(--at-input-focus);
+  }
+  .admin-test-lab progress {
+    width: 160px;
+    max-width: 100%;
+    height: 12px;
+    accent-color: var(--at-input-focus);
+    vertical-align: middle;
+  }
+  .admin-test-lab .chk input[type="checkbox"],
+  .admin-test-lab .chk input[type="radio"] {
+    width: auto !important;
+    margin: 0 !important;
+    accent-color: var(--at-input-focus);
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    vertical-align: middle;
+  }
+
+  .admin-test-lab input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]),
+  .admin-test-lab select,
+  .admin-test-lab textarea {
+    background: var(--at-input-bg) !important;
+    color: var(--at-input-color) !important;
+    border-color: var(--at-input-border) !important;
+  }
+  .admin-test-lab input:focus,
+  .admin-test-lab select:focus,
+  .admin-test-lab textarea:focus {
+    border-color: var(--at-input-focus) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--at-input-focus) 28%, transparent) !important;
+  }
+  .admin-test-lab .field > span {
+    color: var(--at-field-label) !important;
+  }
+  .admin-test-lab .filter-panel {
+    border-color: var(--at-filter-border) !important;
+    background: linear-gradient(180deg, var(--at-filter-bg1) 0%, var(--at-filter-bg2) 100%) !important;
+    box-shadow: var(--at-filter-shadow) !important;
+  }
+  .admin-test-lab .filter-panel h3 {
+    color: var(--at-filter-h3) !important;
+  }
+  .admin-test-lab .table-wrap {
+    border-color: var(--at-table-wrap-border) !important;
+  }
+  .admin-test-lab table.data-grid {
+    background: var(--at-table-bg) !important;
+  }
+  .admin-test-lab table.data-grid th,
+  .admin-test-lab table.data-grid td {
+    border-color: var(--at-table-cell-border) !important;
+    color: var(--at-table-text);
+  }
+  .admin-test-lab table.data-grid th {
+    background: var(--at-table-th-bg) !important;
+  }
+  .admin-test-lab table.data-grid a {
+    color: var(--at-table-link) !important;
+  }
+  .admin-test-bordered {
+    border: 1px dashed var(--at-empty-border);
+    border-radius: 4px;
+  }
+  .admin-test-lab .check-row > .label {
+    color: var(--at-field-label) !important;
+  }
+  .admin-test-lab .chk {
+    border-color: var(--at-check-border) !important;
+    background: var(--at-check-bg) !important;
+    color: var(--at-check-label) !important;
+  }
+  .admin-test-lab .chk:hover {
+    border-color: var(--at-check-hover-border) !important;
+    background: var(--at-check-hover-bg) !important;
+  }
+  .admin-test-msg {
+    padding: 8px 12px;
+    border-radius: 3px;
+    margin-bottom: 6px;
+  }
+  .admin-test-msg--success {
+    background: var(--at-msg-s-bg);
+    color: var(--at-msg-s-fg);
+  }
+  .admin-test-msg--error {
+    background: var(--at-msg-e-bg);
+    color: var(--at-msg-e-fg);
+  }
+  .admin-test-msg--neutral {
+    background: var(--at-msg-n-bg);
+    color: var(--at-msg-n-fg);
+  }
+  .admin-test-lab .btn.btn-ghost {
+    background: var(--at-input-bg) !important;
+    border-color: var(--at-input-border) !important;
+    color: var(--at-input-color) !important;
+    box-shadow: none !important;
+    opacity: 0.98;
+  }
+  .admin-test-lab .btn.btn-ghost:hover {
+    filter: brightness(1.04);
+  }
+  html[data-theme="dawn"] .admin-test-lab .btn:not(.btn-ghost) {
+    background: linear-gradient(180deg, #2dd4bf 0%, #0d9488 100%);
+    color: #fff;
+    box-shadow: 0 5px 14px rgba(13, 148, 136, 0.32);
+  }
+  html[data-theme="dawn"] .admin-test-lab .btn.btn-sm:not(.btn-ghost) {
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.26);
+  }
+  /* Демо-dropdown на карточке: не тянуть hover «шапки» (.nav-dropdown из base) */
+  .admin-test-lab details.nav-dropdown.admin-test-dropdown-demo > summary {
+    color: var(--at-details-summary) !important;
+    background: var(--at-demo-dd-bg) !important;
+    border: 1px solid var(--at-demo-dd-border) !important;
+    border-radius: 6px;
+    transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+  }
+  .admin-test-lab details.nav-dropdown.admin-test-dropdown-demo > summary:hover {
+    color: var(--at-demo-dd-hover-color) !important;
+    background: var(--at-demo-dd-hover-bg) !important;
+    border-color: var(--at-demo-dd-hover-border) !important;
+  }
+  .admin-test-lab details.nav-dropdown.admin-test-dropdown-demo[open] > summary {
+    color: var(--at-demo-dd-open-color) !important;
+    background: var(--at-demo-dd-open-bg) !important;
+    border-color: var(--at-demo-dd-open-border) !important;
+  }
+  .admin-test-lab .nav-dropdown-menu {
+    background: var(--at-details-menu-bg) !important;
+    border-color: var(--at-details-menu-border) !important;
+  }
+  .admin-test-lab .nav-dropdown-menu a {
+    color: var(--at-details-menu-link) !important;
+  }
+  /* Копия шапки: без второго sticky под реальной навигацией */
+  .admin-test-nav-clone {
+    margin-bottom: 4px;
+    border: 1px dashed var(--at-nav-dash);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .admin-test-nav-clone .nav {
+    position: relative !important;
+    top: auto !important;
+    z-index: 1;
+    background: var(--at-nav-clone-bg) !important;
+    border-bottom-color: var(--at-nav-clone-border) !important;
+  }
+  .admin-test-nav-clone .nav a,
+  .admin-test-nav-clone .nav-dropdown > summary {
+    color: var(--at-nav-clone-link) !important;
+  }
+  .admin-test-nav-clone .nav a:hover,
+  .admin-test-nav-clone .nav-dropdown > summary:hover {
+    background: var(--at-nav-clone-link-hover-bg) !important;
+    border-color: var(--at-nav-clone-link-hover-border) !important;
+  }
+  .admin-test-nav-clone .nav a.nav-user {
+    background: var(--at-nav-clone-user-bg) !important;
+    color: var(--at-nav-clone-link) !important;
+  }
+  .admin-test-nav-clone .nav a.nav-logout {
+    color: var(--at-nav-clone-logout) !important;
+  }
+  .admin-test-nav-clone .nav-dropdown-menu {
+    background: var(--at-details-menu-bg) !important;
+    border-color: var(--at-details-menu-border) !important;
+  }
+  .admin-test-nav-clone .nav-dropdown-menu a {
+    color: var(--at-details-menu-link) !important;
+  }
+  html[data-theme="dawn"] .admin-test-lab .admin-test-nav-clone .nav a.active {
+    color: #fff !important;
+    background: linear-gradient(180deg, #14b8a6 0%, #0d9488 100%) !important;
+    border-color: #0f766e !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  }
+  html[data-theme="dawn"] .admin-test-lab .admin-test-nav-clone .nav-dropdown[open] > summary {
+    color: #fff !important;
+    background: #115e59 !important;
+    border-color: #0d9488 !important;
+  }
+  html[data-theme="dawn"] .admin-test-lab .admin-test-nav-clone .nav .nav-refresh-btn {
+    background: linear-gradient(180deg, #2dd4bf 0%, #0d9488 100%) !important;
+    border-color: #0f766e !important;
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.32) !important;
+    color: #fff !important;
+  }
+  /* Макет как на плане: правый рейл внутри песочницы, не fixed к окну */
+  .admin-test-rail-sandbox {
+    position: relative;
+    margin-top: 10px;
+    border: 1px dashed var(--at-nav-dash);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--at-rail-bg);
+    --plan-rail-top: 0px;
+  }
+  .admin-test-rail-sandbox .plan-rail--right .plan-rail__strip {
+    background: linear-gradient(180deg, var(--at-rail-strip-bg1) 0%, var(--at-rail-strip-bg2) 100%) !important;
+    border-color: var(--at-card-border) !important;
+  }
+  .admin-test-rail-sandbox .plan-rail__peek {
+    color: var(--at-nav-clone-link) !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    min-width: 0 !important;
+    align-self: stretch !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 8px 0 !important;
+  }
+  .admin-test-rail-sandbox .plan-rail__sheet {
+    background: var(--at-rail-sheet-bg) !important;
+    border-color: var(--at-rail-sheet-border) !important;
+  }
+  .admin-test-rail-sandbox .plan-rail__sheet-title {
+    color: var(--at-rail-title) !important;
+  }
+  .admin-test-rail-sandbox .plan-article-rails-root {
+    position: relative;
+    min-height: 380px;
+  }
+  .admin-test-rail-sandbox .plan-article-main {
+    padding: 14px 52px 18px 18px !important;
+    min-height: 380px;
+    box-sizing: border-box;
+  }
+  .admin-test-rail-sandbox .plan-rail.plan-rail--right {
+    display: block !important;
+  }
+  .admin-test-rail-sandbox .plan-rail--right .plan-rail__strip {
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: auto !important;
+    width: 40px !important;
+    box-sizing: border-box;
+    z-index: 6;
+    padding: 0 !important;
+    border-width: 0 !important;
+    box-shadow: inset 1px 0 0 var(--at-card-border), -4px 0 18px rgba(0, 0, 0, 0.22) !important;
+  }
+  .admin-test-rail-sandbox .plan-rail--right .plan-rail__sheet {
+    position: absolute !important;
+    top: 0 !important;
+    right: 40px !important;
+    bottom: 0 !important;
+    left: auto !important;
+    height: auto !important;
+    max-height: 100%;
+    z-index: 5;
+  }
+  @media (max-width: 720px) {
+    .admin-test-rail-sandbox .plan-rail.plan-rail--right {
+      display: block !important;
+    }
+  }
+
+  @keyframes admin-test-dawn-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes admin-test-dawn-theme-sheen {
+    0%,
+    100% {
+      transform: translateX(-42%) skewX(-14deg);
+    }
+    50% {
+      transform: translateX(42%) skewX(-14deg);
+    }
+  }
+
+  html[data-theme="dawn"] .admin-test-lab > h1 {
+    animation: admin-test-dawn-fade-up 0.62s cubic-bezier(0.16, 1, 0.3, 1) both;
+    letter-spacing: -0.02em;
+  }
+  html[data-theme="dawn"] .admin-test-lab > .admin-test-theme-bar {
+    animation: admin-test-dawn-fade-up 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.72) inset,
+      0 8px 26px rgba(55, 42, 36, 0.07);
+    transition: box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  html[data-theme="dawn"] .admin-test-lab > .admin-test-theme-bar:hover {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.78) inset,
+      0 12px 32px rgba(55, 42, 36, 0.09);
+  }
+  html[data-theme="dawn"] .admin-test-lab > .admin-test-theme-bar::before {
+    content: "";
+    position: absolute;
+    inset: -55% -20%;
+    width: 55%;
+    background: linear-gradient(106deg, transparent 0%, rgba(255, 255, 255, 0.58) 50%, transparent 100%);
+    animation: admin-test-dawn-theme-sheen 7.5s ease-in-out infinite;
+    pointer-events: none;
+    opacity: 0.5;
+  }
+  html[data-theme="dawn"] .admin-test-lab > .admin-test-theme-bar > * {
+    position: relative;
+    z-index: 1;
+  }
+  html[data-theme="dawn"] .admin-test-lab > .muted-lead {
+    animation: admin-test-dawn-fade-up 0.54s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+  }
+  html[data-theme="dawn"] .admin-test-lab > .admin-test-toc {
+    animation: admin-test-dawn-fade-up 0.54s cubic-bezier(0.16, 1, 0.3, 1) 0.13s both;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card {
+    animation: admin-test-dawn-fade-up 0.58s cubic-bezier(0.16, 1, 0.3, 1) both;
+    border-radius: 12px;
+    transition:
+      transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+      filter 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 0.32s ease;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:nth-of-type(1) {
+    animation-delay: 0.14s;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:nth-of-type(2) {
+    animation-delay: 0.168s;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:nth-of-type(3) {
+    animation-delay: 0.196s;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:nth-of-type(4) {
+    animation-delay: 0.224s;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:nth-of-type(5) {
+    animation-delay: 0.252s;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:nth-of-type(6) {
+    animation-delay: 0.28s;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:nth-of-type(7) {
+    animation-delay: 0.308s;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:nth-of-type(8) {
+    animation-delay: 0.336s;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:nth-of-type(9) {
+    animation-delay: 0.364s;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:nth-of-type(10) {
+    animation-delay: 0.392s;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:nth-of-type(11) {
+    animation-delay: 0.42s;
+  }
+  html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:hover {
+    transform: translateY(-4px);
+    filter: drop-shadow(0 20px 40px rgba(55, 42, 38, 0.12)) drop-shadow(0 6px 14px rgba(55, 42, 38, 0.06));
+    border-color: color-mix(in srgb, var(--at-card-border) 78%, var(--at-input-focus));
+  }
+  html[data-theme="dawn"] .admin-test-lab .admin-test-theme-name {
+    transition: color 0.32s cubic-bezier(0.16, 1, 0.3, 1), font-weight 0.2s ease;
+  }
+  html[data-theme="dawn"] .admin-test-lab .admin-test-switch-slider {
+    transition: background 0.34s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.26s ease, box-shadow 0.3s ease;
+  }
+  html[data-theme="dawn"] .admin-test-lab .admin-test-switch-slider::before {
+    transition: transform 0.4s cubic-bezier(0.34, 1.45, 0.64, 1), box-shadow 0.28s ease;
+    box-shadow: 0 2px 8px rgba(55, 42, 36, 0.12);
+  }
+  html[data-theme="dawn"] .admin-test-lab .admin-test-switch input:checked + .admin-test-switch-slider::before {
+    box-shadow: 0 2px 10px rgba(13, 148, 136, 0.35);
+  }
+  html[data-theme="dawn"] .admin-test-lab .admin-test-toc a:not(:first-child) {
+    border-bottom: none;
+    text-decoration: none;
+    padding-bottom: 3px;
+    background-image: linear-gradient(90deg, var(--at-toc) 0%, var(--at-body-link) 100%);
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 2px;
+    transition:
+      color 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+      background-size 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  html[data-theme="dawn"] .admin-test-lab .admin-test-toc a:not(:first-child):hover {
+    background-size: 100% 2px;
+    color: var(--at-toc-hover);
+  }
+  html[data-theme="dawn"] .admin-test-lab .admin-test-card a:not(.btn) {
+    text-decoration: none;
+    background-image: linear-gradient(currentColor, currentColor);
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    background-size: 0% 1px;
+    transition: color 0.26s cubic-bezier(0.16, 1, 0.3, 1), background-size 0.36s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  html[data-theme="dawn"] .admin-test-lab .admin-test-card a:not(.btn):hover {
+    background-size: 100% 1px;
+  }
+  html[data-theme="dawn"] .admin-test-lab .btn {
+    transition: transform 0.22s cubic-bezier(0.34, 1.45, 0.64, 1), filter 0.2s ease, box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  html[data-theme="dawn"] .admin-test-lab .btn:not(.btn-ghost):active {
+    transform: scale(0.98);
+  }
+  html[data-theme="dawn"] .admin-test-lab .btn.btn-ghost:active {
+    transform: scale(0.99);
+  }
+  html[data-theme="dawn"] .admin-test-lab .chk {
+    transition:
+      background 0.24s ease,
+      border-color 0.24s ease,
+      transform 0.32s cubic-bezier(0.34, 1.45, 0.64, 1),
+      box-shadow 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  html[data-theme="dawn"] .admin-test-lab .chk:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(90, 60, 80, 0.09);
+  }
+  html[data-theme="dawn"] .admin-test-lab details.nav-dropdown.admin-test-dropdown-demo > summary {
+    transition: background 0.26s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.26s ease, color 0.22s ease;
+  }
+  html[data-theme="dawn"] .admin-test-lab .nav-dropdown-menu a {
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+  html[data-theme="dawn"] .admin-test-lab .nav-dropdown-menu a:hover {
+    background: color-mix(in srgb, var(--at-input-focus) 12%, transparent) !important;
+    border-radius: 4px;
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-uploads .admin-test-file-row {
+    transition: box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  html[data-theme="dawn"] .admin-test-lab #admin-test-uploads .admin-test-file-row:hover {
+    box-shadow: 0 8px 22px rgba(55, 42, 38, 0.07);
+    transform: translateY(-1px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html[data-theme="dawn"] .admin-test-lab > h1,
+    html[data-theme="dawn"] .admin-test-lab > .admin-test-theme-bar,
+    html[data-theme="dawn"] .admin-test-lab > .muted-lead,
+    html[data-theme="dawn"] .admin-test-lab > .admin-test-toc,
+    html[data-theme="dawn"] .admin-test-lab > section.admin-test-card {
+      animation: none !important;
+    }
+    html[data-theme="dawn"] .admin-test-lab > .admin-test-theme-bar::before {
+      animation: none !important;
+      opacity: 0 !important;
+    }
+    html[data-theme="dawn"] .admin-test-lab > section.admin-test-card {
+      transition: border-color 0.16s ease, filter 0.16s ease !important;
+    }
+    html[data-theme="dawn"] .admin-test-lab > section.admin-test-card:hover {
+      transform: none !important;
+      filter: none !important;
+    }
+    html[data-theme="dawn"] .admin-test-lab .admin-test-toc a:not(:first-child) {
+      transition: color 0.15s ease !important;
+      background-size: 100% 1px !important;
+    }
+    html[data-theme="dawn"] .admin-test-lab .admin-test-card a:not(.btn) {
+      transition: color 0.15s ease !important;
+      background-size: 100% 1px !important;
+    }
+    html[data-theme="dawn"] .admin-test-lab .btn,
+    html[data-theme="dawn"] .admin-test-lab .chk,
+    html[data-theme="dawn"] .admin-test-lab .admin-test-switch-slider,
+    html[data-theme="dawn"] .admin-test-lab .admin-test-switch-slider::before {
+      transition-duration: 0.01ms !important;
+    }
+    html[data-theme="dawn"] .admin-test-lab .btn:not(.btn-ghost):active,
+    html[data-theme="dawn"] .admin-test-lab .btn.btn-ghost:active,
+    html[data-theme="dawn"] .admin-test-lab .chk:hover,
+    html[data-theme="dawn"] .admin-test-lab #admin-test-uploads .admin-test-file-row:hover {
+      transform: none !important;
+    }
+  }
+</style>
+
+<div class="admin-test-lab" id="admin-test-lab-root">
+  <h1>Тест</h1>
+  <div class="admin-test-theme-bar" role="group" aria-label="Тема оформления тестовой страницы">
+    <span class="admin-test-theme-label">Тема</span>
+    <span class="admin-test-theme-name" data-theme-name="night">Ночь</span>
+    <label class="admin-test-switch" title="Светлая тема «Рассвет»">
+      <input type="checkbox" id="admin-test-theme-toggle" autocomplete="off" aria-label="Переключить на тему «Рассвет»" />
+      <span class="admin-test-switch-slider"></span>
+    </label>
+    <span class="admin-test-theme-name" data-theme-name="dawn">Рассвет</span>
+  </div>
+  <p class="muted-lead">
+    Все типовые элементы интерфейса и локальный предпросмотр файлов (ничего на сервер не отправляется).
+    3D: STL и GLB/GLTF через three.js; STEP/STP — только имя файла.
+  </p>
+
+  <nav class="admin-test-toc" aria-label="Разделы страницы">
+    <a href="#admin-test-toc-end" class="muted" style="border:0;">↓ вниз</a>
+    <a href="#admin-test-buttons">Кнопки</a>
+    <a href="#admin-test-typography">Текст</a>
+    <a href="#admin-test-forms">Поля</a>
+    <a href="#admin-test-choice">Выбор</a>
+    <a href="#admin-test-filter">Панель фильтра</a>
+    <a href="#admin-test-table">Таблицы</a>
+    <a href="#admin-test-messages">Сообщения</a>
+    <a href="#admin-test-details">Аккордеон</a>
+    <a href="#admin-test-uploads">PDF · изображения · 3D</a>
+    <a href="#admin-test-chrome">Шапка · рейл</a>
+  </nav>
+
+  <section class="admin-test-card" id="admin-test-chrome" aria-labelledby="admin-test-h-chrome">
+    <h2 id="admin-test-h-chrome">Шапка и правый рейл (эталон DOM)</h2>
+    <p class="muted" style="margin:0 0 10px 0;font-size:12px;line-height:1.45;">
+      Ниже — та же разметка, что в <code>base.html</code> (<code>div.nav</code>) и на сводке плана
+      (<code>plan-article-rails-root</code> + <code>aside.plan-rail--right</code> + <code>plan-rail__peek</code>).
+      Рейл открывается кнопкой «Отделы»; скрипт — общий с разделом плана.
+    </p>
+    <h3 class="muted" style="margin:0 0 6px 0;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">div.nav</h3>
+    <div class="admin-test-nav-clone">
+      <div class="nav">{% include "shifts/includes/biota_nav_fragment.html" %}</div>
+    </div>
+    <h3 class="muted" style="margin:14px 0 6px 0;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;">plan-article-rails-root + правый рейл</h3>
+    <div class="admin-test-rail-sandbox">
+      <div class="plan-article-rails-root plan-article-rails-root--no-left-rail">
+        <aside class="plan-rail plan-rail--right" data-plan-rail-box="right-test">
+          <div class="plan-rail__strip">
+            <button type="button" class="plan-rail__peek" data-plan-rail-toggle aria-controls="plan-rail-sheet-right-test" aria-expanded="false" title="Показать отделы (планирование)">
+              <span class="plan-rail__peek-text">Отделы</span>
+            </button>
+          </div>
+          <div id="plan-rail-sheet-right-test" class="plan-rail__sheet" role="dialog" aria-label="Отделы для планирования (демо)">
+            <p class="plan-rail__sheet-title">Планирование по отделам</p>
+            <p class="muted" style="font-size:11px;margin:0 0 8px 0;line-height:1.35;">Демо-панель: те же классы, что у рейла на <a href="{% url 'plan' %}">/plan/</a>.</p>
+            <div class="plan-rail__btn-stack">
+              <a href="{% url 'plan' %}" class="btn btn-sm">На сводку плана</a>
+              <a href="{% url 'plan_department_planning' slug='pki' %}" class="btn btn-sm btn-ghost">ПКИ (пример)</a>
+            </div>
+          </div>
+        </aside>
+        <div class="plan-article-main">
+          <p class="admin-test-rail-kicker" style="margin:0 0 8px 0;font-size:13px;font-weight:600;">Область контента</p>
+          <p class="muted" style="margin:0;font-size:12px;line-height:1.45;">
+            Справа полоса <code>plan-rail__strip</code> с вертикальной подписью; панель меню уезжает за край и выезжает с края вместе с визуальным стыком к полосе.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="admin-test-card" id="admin-test-buttons" aria-labelledby="admin-test-h-buttons">
+    <h2 id="admin-test-h-buttons">Кнопки и действия</h2>
+    <div class="admin-test-row">
+      <button type="button" class="btn">Обычная</button>
+      <button type="button" class="btn btn-ghost">Ghost</button>
+      <button type="button" class="btn btn-sm">Маленькая</button>
+      <button type="button" class="btn btn-sm btn-ghost">Ghost sm</button>
+      <button type="button" class="btn" disabled>Disabled</button>
+      <button type="button" class="btn btn-ghost nav-refresh-btn" title="Как кнопка обновления">↻</button>
+    </div>
+    <h3>page-actions</h3>
+    <div class="page-actions">
+      <button type="button" class="btn btn-sm">Сохранить</button>
+      <button type="button" class="btn btn-sm btn-ghost">Отмена</button>
+      <a href="{% url 'home' %}" class="btn btn-sm btn-ghost">Ссылка</a>
+    </div>
+  </section>
+
+  <section class="admin-test-card" id="admin-test-typography" aria-labelledby="admin-test-h-typography">
+    <h2 id="admin-test-h-typography">Текст и ссылки</h2>
+    <p style="margin:0 0 8px 0;">Обычный абзац с <a href="#">ссылкой</a> и <strong>жирным</strong>, <em>курсивом</em>.</p>
+    <p class="muted" style="margin:0 0 8px 0;">Класс <code>.muted</code> для подписей.</p>
+    <p class="admin-test-caption" style="margin:0 0 8px 0;font-size:11px;">Мелкий второстепенный текст.</p>
+    <pre class="admin-test-code" style="margin:0;">GET /test/ HTTP/1.1
+Host: example</pre>
+  </section>
+
+  <section class="admin-test-card" id="admin-test-forms" aria-labelledby="admin-test-h-forms">
+    <h2 id="admin-test-h-forms">Поля ввода</h2>
+    <div class="filter-grid">
+      <label class="field">
+        <span>Текст</span>
+        <input type="text" name="demo_text" autocomplete="off" placeholder="Placeholder" value="Значение" />
+      </label>
+      <label class="field">
+        <span>Поиск</span>
+        <input type="search" name="demo_search" autocomplete="off" placeholder="Поиск…" />
+      </label>
+      <label class="field">
+        <span>Email</span>
+        <input type="email" name="demo_email" autocomplete="off" placeholder="user@example.com" />
+      </label>
+      <label class="field">
+        <span>Пароль</span>
+        <input type="password" name="demo_pw" autocomplete="new-password" value="secret" />
+      </label>
+      <label class="field">
+        <span>Число</span>
+        <input type="number" name="demo_num" min="0" max="100" step="1" value="7" />
+      </label>
+      <label class="field">
+        <span>Дата</span>
+        <input type="date" name="demo_date" />
+      </label>
+      <label class="field">
+        <span>Время</span>
+        <input type="time" name="demo_time" />
+      </label>
+      <label class="field">
+        <span>Дата и время</span>
+        <input type="datetime-local" name="demo_dt" />
+      </label>
+      <label class="field">
+        <span>Телефон</span>
+        <input type="tel" name="demo_tel" placeholder="+7 …" />
+      </label>
+      <label class="field">
+        <span>URL</span>
+        <input type="url" name="demo_url" placeholder="https://" />
+      </label>
+      <label class="field">
+        <span>Только чтение</span>
+        <input type="text" value="read-only" readonly />
+      </label>
+      <label class="field">
+        <span>Datalist</span>
+        <input type="text" name="demo_list" list="admin-test-datalist" placeholder="Начните ввод…" />
+        <datalist id="admin-test-datalist">
+          <option value="Вариант А"></option>
+          <option value="Вариант Б"></option>
+          <option value="Другое"></option>
+        </datalist>
+      </label>
+      <label class="field">
+        <span>Цвет</span>
+        <input type="color" class="admin-test-color" name="demo_color" value="#6f7ef2" />
+      </label>
+      <label class="field">
+        <span>Диапазон <output id="admin-test-range-out">50</output></span>
+        <input type="range" class="admin-test-range" id="admin-test-range" min="0" max="100" value="50" />
+      </label>
+    </div>
+    <label class="field" style="margin-top:12px;">
+      <span>Многострочный текст</span>
+      <textarea name="demo_ta" rows="3" placeholder="Текстarea…">Первая строка
+Вторая строка</textarea>
+    </label>
+    <div class="admin-test-meter-wrap">
+      <span class="muted" style="font-size:12px;font-weight:600;">meter / progress</span>
+      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
+        <meter class="admin-test-meter" min="0" max="100" low="33" high="66" optimum="80" value="72">72</meter>
+        <progress max="100" value="40">40%</progress>
+      </div>
+    </div>
+    <fieldset disabled class="admin-test-bordered" style="margin-top:14px;border-radius:6px;padding:10px 12px;">
+      <legend class="muted" style="font-size:12px;padding:0 6px;">fieldset disabled</legend>
+      <label class="field">
+        <span>Недоступное поле</span>
+        <input type="text" value="неактивно" />
+      </label>
+    </fieldset>
+  </section>
+
+  <section class="admin-test-card" id="admin-test-choice" aria-labelledby="admin-test-h-choice">
+    <h2 id="admin-test-h-choice">Радио, чекбоксы, select</h2>
+    <div class="check-row">
+      <span class="label">Радио</span>
+      <label class="chk"><input type="radio" name="admin_test_radio" value="a" checked /> А</label>
+      <label class="chk"><input type="radio" name="admin_test_radio" value="b" /> Б</label>
+    </div>
+    <div class="check-row" style="border-top:0;margin-top:6px;padding-top:0;">
+      <span class="label">Чекбоксы</span>
+      <label class="chk"><input type="checkbox" checked /> Вкл</label>
+      <label class="chk"><input type="checkbox" /> Выкл</label>
+      <label class="chk"><input type="checkbox" disabled /> disabled</label>
+    </div>
+    <div class="filter-grid" style="margin-top:12px;">
+      <label class="field">
+        <span>Select</span>
+        <select name="demo_sel">
+          <option>Первый</option>
+          <option selected>Второй</option>
+          <optgroup label="Группа">
+            <option>Внутри A</option>
+            <option>Внутри B</option>
+          </optgroup>
+        </select>
+      </label>
+      <label class="field">
+        <span>Multiple</span>
+        <select name="demo_multi" multiple size="3">
+          <option selected>Один</option>
+          <option>Два</option>
+          <option selected>Три</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section class="admin-test-card" id="admin-test-filter" aria-labelledby="admin-test-h-filter">
+    <h2 id="admin-test-h-filter">Панель как filter-panel</h2>
+    <div class="filter-panel">
+      <h3>Заголовок панели</h3>
+      <div class="filter-grid">
+        <label class="field">
+          <span>Поле 1</span>
+          <input type="text" placeholder="…" />
+        </label>
+        <label class="field">
+          <span>Поле 2</span>
+          <select><option>Да</option><option>Нет</option></select>
+        </label>
+        <div class="filter-actions">
+          <button type="button" class="btn btn-sm">Применить</button>
+          <button type="button" class="btn btn-sm btn-ghost">Сброс</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="admin-test-card" id="admin-test-table" aria-labelledby="admin-test-h-table">
+    <h2 id="admin-test-h-table">Таблицы</h2>
+    <div class="table-wrap">
+      <table class="data-grid">
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th style="width:100px;text-align:right;">Кол-во</th>
+            <th style="width:90px;">Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a href="#">Позиция с ссылкой</a></td>
+            <td style="text-align:right;"><strong>12</strong></td>
+            <td><span class="muted">ОК</span></td>
+          </tr>
+          <tr>
+            <td>Вторая строка</td>
+            <td style="text-align:right;">1</td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" style="margin:10px 0 0 0;font-size:12px;">Пустое состояние ниже:</p>
+    <p class="muted admin-test-bordered" style="margin:8px 0 0 0;padding:12px;">Нет данных для отображения.</p>
+  </section>
+
+  <section class="admin-test-card" id="admin-test-messages" aria-labelledby="admin-test-h-messages">
+    <h2 id="admin-test-h-messages">Сообщения (как messages)</h2>
+    <ul class="messages" style="list-style:none;padding:0;margin:0;">
+      <li class="admin-test-msg admin-test-msg--success">success — сохранено</li>
+      <li class="admin-test-msg admin-test-msg--error">error — что-то пошло не так</li>
+      <li class="admin-test-msg admin-test-msg--neutral">info / warning — нейтральное</li>
+    </ul>
+  </section>
+
+  <section class="admin-test-card" id="admin-test-details" aria-labelledby="admin-test-h-details">
+    <h2 id="admin-test-h-details">details / summary</h2>
+    <details class="nav-dropdown admin-test-dropdown-demo" style="position:relative;display:inline-block;">
+      <summary>Раскрыть меню</summary>
+      <div class="nav-dropdown-menu" style="position:absolute;">
+        <a href="{% url 'home' %}">Главная</a>
+        <a href="{% url 'plan' %}">План</a>
+      </div>
+    </details>
+  </section>
+
+  <section class="admin-test-card" id="admin-test-uploads" aria-labelledby="admin-test-h-uploads">
+    <h2 id="admin-test-h-uploads">Загрузка и предпросмотр (локально)</h2>
+    <p class="muted" style="margin:0 0 12px 0;font-size:12px;line-height:1.45;">
+      Файлы обрабатываются только в браузере (blob URL). Для 3D используйте <strong>.stl</strong> или <strong>.glb</strong> / <strong>.gltf</strong>.
+      Форматы STEP/STP здесь не рендерятся — только подпись к выбранному файлу.
+    </p>
+
+    <h3>PDF</h3>
+    <div class="admin-test-file-row">
+      <input type="file" id="admin-test-pdf-input" accept="application/pdf,.pdf" />
+      <button type="button" class="btn btn-sm btn-ghost" id="admin-test-pdf-clear">Очистить</button>
+    </div>
+    <div class="admin-test-preview-box admin-test-preview-box--pdf" id="admin-test-pdf-preview" hidden>
+      <div class="admin-test-file-loading" id="admin-test-pdf-loading" aria-live="polite">
+        <div class="admin-test-spinner" aria-hidden="true"></div>
+        <span class="admin-test-file-loading-text">Чтение PDF и подготовка предпросмотра…</span>
+      </div>
+      <iframe id="admin-test-pdf-iframe" class="admin-test-preview-media" title="Предпросмотр PDF"></iframe>
+    </div>
+
+    <h3>Изображение</h3>
+    <div class="admin-test-file-row">
+      <input type="file" id="admin-test-img-input" accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.svg,.bmp" />
+      <button type="button" class="btn btn-sm btn-ghost" id="admin-test-img-clear">Очистить</button>
+    </div>
+    <div class="admin-test-preview-box" id="admin-test-img-preview" hidden>
+      <div class="admin-test-file-loading" id="admin-test-img-loading" aria-live="polite">
+        <div class="admin-test-spinner" aria-hidden="true"></div>
+        <span class="admin-test-file-loading-text">Декодирование изображения…</span>
+      </div>
+      <img id="admin-test-img-el" class="admin-test-preview-media" alt="Предпросмотр изображения" />
+    </div>
+
+    <h3>3D (STL / GLB / GLTF)</h3>
+    <div class="admin-test-file-row">
+      <input type="file" id="admin-test-3d-input" accept=".stl,.glb,.gltf,.stp,.step,.STP,.STEP" />
+      <button type="button" class="btn btn-sm btn-ghost" id="admin-test-3d-clear">Очистить</button>
+    </div>
+    <div class="admin-test-3d-wrap" id="admin-test-3d-wrap">
+      <div class="admin-test-file-loading" id="admin-test-3d-loading" aria-live="polite">
+        <div class="admin-test-spinner" aria-hidden="true"></div>
+        <span class="admin-test-file-loading-text" id="admin-test-3d-loading-text">Загрузка и разбор модели…</span>
+      </div>
+      <div class="admin-test-3d-host" id="admin-test-3d-host">
+        <p class="admin-test-3d-hint" id="admin-test-3d-placeholder">
+          Выберите файл — предпросмотр появится здесь (вращение мышью).
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <p id="admin-test-toc-end" class="muted" style="font-size:12px;margin-top:8px;">Конец страницы теста.</p>
+</div>
+
+<script>
+(function () {
+  var themeToggle = document.getElementById("admin-test-theme-toggle");
+  function syncAdminTestThemeToggle() {
+    if (!themeToggle) return;
+    var v = document.documentElement.getAttribute("data-theme") || "night";
+    themeToggle.checked = v === "dawn";
+  }
+  if (themeToggle) {
+    syncAdminTestThemeToggle();
+    window.addEventListener("biota-theme-change", syncAdminTestThemeToggle);
+    themeToggle.addEventListener("change", function () {
+      if (typeof window.biotaSetSiteTheme === "function") {
+        window.biotaSetSiteTheme(themeToggle.checked ? "dawn" : "night");
+      }
+    });
+  }
+
+  var range = document.getElementById("admin-test-range");
+  var rangeOut = document.getElementById("admin-test-range-out");
+  if (range && rangeOut) {
+    range.addEventListener("input", function () {
+      rangeOut.textContent = range.value;
+    });
+  }
+
+  var pdfInput = document.getElementById("admin-test-pdf-input");
+  var pdfIframe = document.getElementById("admin-test-pdf-iframe");
+  var pdfBox = document.getElementById("admin-test-pdf-preview");
+  var pdfClear = document.getElementById("admin-test-pdf-clear");
+  var pdfUrl = null;
+  var pdfSafetyTimer = null;
+  function clearPdfSafetyTimer() {
+    if (pdfSafetyTimer) {
+      clearTimeout(pdfSafetyTimer);
+      pdfSafetyTimer = null;
+    }
+  }
+  function pdfPreviewLoadingEnd() {
+    clearPdfSafetyTimer();
+    if (pdfBox) {
+      pdfBox.classList.remove("is-loading");
+      pdfBox.removeAttribute("aria-busy");
+    }
+    if (pdfIframe) pdfIframe.style.opacity = "1";
+  }
+  function pdfPreviewLoadingStart() {
+    clearPdfSafetyTimer();
+    if (!pdfBox || !pdfIframe) return;
+    pdfBox.classList.add("is-loading");
+    pdfBox.setAttribute("aria-busy", "true");
+    pdfIframe.style.opacity = "0";
+    pdfSafetyTimer = setTimeout(pdfPreviewLoadingEnd, 120000);
+  }
+  function revokePdf() {
+    clearPdfSafetyTimer();
+    if (pdfBox) {
+      pdfBox.classList.remove("is-loading");
+      pdfBox.removeAttribute("aria-busy");
+    }
+    if (pdfIframe) {
+      pdfIframe.onload = null;
+      pdfIframe.onerror = null;
+      pdfIframe.removeAttribute("src");
+      pdfIframe.style.opacity = "1";
+    }
+    if (pdfUrl) {
+      try { URL.revokeObjectURL(pdfUrl); } catch (e) {}
+      pdfUrl = null;
+    }
+    if (pdfBox) pdfBox.hidden = true;
+  }
+  if (pdfInput && pdfIframe && pdfBox) {
+    pdfInput.addEventListener("change", function () {
+      revokePdf();
+      var f = pdfInput.files && pdfInput.files[0];
+      if (!f) return;
+      pdfPreviewLoadingStart();
+      pdfUrl = URL.createObjectURL(f);
+      pdfIframe.onload = function () {
+        pdfPreviewLoadingEnd();
+      };
+      pdfIframe.onerror = function () {
+        pdfPreviewLoadingEnd();
+      };
+      pdfIframe.src = pdfUrl;
+      pdfBox.hidden = false;
+    });
+  }
+  if (pdfClear) pdfClear.addEventListener("click", function () {
+    revokePdf();
+    if (pdfInput) pdfInput.value = "";
+  });
+
+  var imgInput = document.getElementById("admin-test-img-input");
+  var imgEl = document.getElementById("admin-test-img-el");
+  var imgBox = document.getElementById("admin-test-img-preview");
+  var imgClear = document.getElementById("admin-test-img-clear");
+  var imgUrl = null;
+  var imgSafetyTimer = null;
+  function clearImgSafetyTimer() {
+    if (imgSafetyTimer) {
+      clearTimeout(imgSafetyTimer);
+      imgSafetyTimer = null;
+    }
+  }
+  function imgPreviewLoadingEnd() {
+    clearImgSafetyTimer();
+    if (imgBox) {
+      imgBox.classList.remove("is-loading");
+      imgBox.removeAttribute("aria-busy");
+    }
+    if (imgEl) imgEl.style.opacity = "1";
+  }
+  function imgPreviewLoadingStart() {
+    clearImgSafetyTimer();
+    if (!imgBox || !imgEl) return;
+    imgBox.classList.add("is-loading");
+    imgBox.setAttribute("aria-busy", "true");
+    imgEl.style.opacity = "0";
+    imgSafetyTimer = setTimeout(imgPreviewLoadingEnd, 90000);
+  }
+  function revokeImg() {
+    clearImgSafetyTimer();
+    if (imgBox) {
+      imgBox.classList.remove("is-loading");
+      imgBox.removeAttribute("aria-busy");
+    }
+    if (imgEl) {
+      imgEl.onload = null;
+      imgEl.onerror = null;
+      imgEl.removeAttribute("src");
+      imgEl.style.opacity = "1";
+    }
+    if (imgUrl) {
+      try { URL.revokeObjectURL(imgUrl); } catch (e) {}
+      imgUrl = null;
+    }
+    if (imgBox) imgBox.hidden = true;
+  }
+  if (imgInput && imgEl && imgBox) {
+    imgInput.addEventListener("change", function () {
+      revokeImg();
+      var f = imgInput.files && imgInput.files[0];
+      if (!f) return;
+      imgPreviewLoadingStart();
+      imgUrl = URL.createObjectURL(f);
+      imgEl.onload = function () {
+        imgPreviewLoadingEnd();
+      };
+      imgEl.onerror = function () {
+        imgPreviewLoadingEnd();
+      };
+      imgEl.src = imgUrl;
+      imgBox.hidden = false;
+    });
+  }
+  if (imgClear) imgClear.addEventListener("click", function () {
+    revokeImg();
+    if (imgInput) imgInput.value = "";
+  });
+})();
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+  import * as THREE from "three";
+  import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+  import { STLLoader } from "three/addons/loaders/STLLoader.js";
+  import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+  const host = document.getElementById("admin-test-3d-host");
+  const wrap3d = document.getElementById("admin-test-3d-wrap");
+  const loading3dText = document.getElementById("admin-test-3d-loading-text");
+  const input = document.getElementById("admin-test-3d-input");
+  const clearBtn = document.getElementById("admin-test-3d-clear");
+
+  let blobUrl = null;
+  let state = null;
+  let safety3dTimer = null;
+
+  function clear3dSafetyTimer() {
+    if (safety3dTimer) {
+      clearTimeout(safety3dTimer);
+      safety3dTimer = null;
+    }
+  }
+
+  function hide3dLoading() {
+    clear3dSafetyTimer();
+    if (wrap3d) {
+      wrap3d.classList.remove("is-loading");
+      wrap3d.removeAttribute("aria-busy");
+    }
+  }
+
+  function show3dLoading(message) {
+    clear3dSafetyTimer();
+    if (!wrap3d) return;
+    if (loading3dText && message) loading3dText.textContent = message;
+    wrap3d.classList.add("is-loading");
+    wrap3d.setAttribute("aria-busy", "true");
+    safety3dTimer = setTimeout(hide3dLoading, 180000);
+  }
+
+  function revokeBlob() {
+    if (blobUrl) {
+      try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+      blobUrl = null;
+    }
+  }
+
+  function dispose() {
+    if (!state) return;
+    try {
+      if (state.anim) state.anim.alive = false;
+    } catch (e) {}
+    try {
+      if (state.onResize) window.removeEventListener("resize", state.onResize);
+    } catch (e) {}
+    try {
+      if (state.controls) state.controls.dispose();
+    } catch (e) {}
+    try {
+      if (state.root) {
+        state.root.traverse((obj) => {
+          if (obj.geometry) obj.geometry.dispose();
+          const m = obj.material;
+          if (m) {
+            if (Array.isArray(m)) m.forEach((x) => x && x.dispose && x.dispose());
+            else if (m.dispose) m.dispose();
+          }
+        });
+      }
+    } catch (e) {}
+    try {
+      if (state.renderer) state.renderer.dispose();
+    } catch (e) {}
+    state = null;
+    if (host) {
+      host.querySelectorAll("canvas").forEach((c) => c.remove());
+    }
+  }
+
+  function fitCamera(camera, controls, object3d) {
+    const box = new THREE.Box3().setFromObject(object3d);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z, 1e-6);
+    camera.position.set(center.x + maxDim * 1.2, center.y + maxDim * 0.85, center.z + maxDim * 1.35);
+    controls.target.copy(center);
+    camera.lookAt(controls.target);
+    controls.update();
+  }
+
+  function showHint(text) {
+    hide3dLoading();
+    if (!host) return;
+    dispose();
+    host.innerHTML = "";
+    const p = document.createElement("p");
+    p.className = "admin-test-3d-hint";
+    p.id = "admin-test-3d-placeholder";
+    p.textContent = text;
+    host.appendChild(p);
+  }
+
+  function mountViewer() {
+    if (!host) return null;
+    dispose();
+    const ph = host.querySelector("#admin-test-3d-placeholder");
+    if (ph) ph.remove();
+    host.querySelectorAll("canvas").forEach((c) => c.remove());
+
+    const scene = new THREE.Scene();
+    scene.background = null;
+    const h = 280;
+    const w = Math.max(host.clientWidth || 320, 200);
+    const camera = new THREE.PerspectiveCamera(50, w / h, 0.005, 1e7);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+    renderer.setClearColor(0x000000, 0);
+    renderer.setSize(w, h);
+    if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+    if ("toneMapping" in renderer) {
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.08;
+    }
+    host.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.38));
+    scene.add(new THREE.HemisphereLight(0xdde4ff, 0x1a1e28, 0.55));
+    const key = new THREE.DirectionalLight(0xffffff, 0.85);
+    key.position.set(6, 10, 8);
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xb8c8ff, 0.35);
+    fill.position.set(-8, 2, -6);
+    scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.28);
+    rim.position.set(0, -6, 10);
+    scene.add(rim);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    /* Без ограничений по азимуту и полярному углу — вращение дальше «полюсов» и >360° вокруг цели */
+    controls.minAzimuthAngle = -Infinity;
+    controls.maxAzimuthAngle = Infinity;
+    controls.minPolarAngle = -Infinity;
+    controls.maxPolarAngle = Infinity;
+
+    const root = new THREE.Group();
+    scene.add(root);
+
+    const anim = { alive: true };
+    function tick() {
+      if (!anim.alive || !state) return;
+      requestAnimationFrame(tick);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(tick);
+
+    const st = {
+      scene,
+      camera,
+      renderer,
+      controls,
+      root,
+      anim,
+      onResize: null,
+    };
+
+    st.onResize = function () {
+      if (!host || !state || state !== st) return;
+      const nw = Math.max(host.clientWidth || 320, 200);
+      camera.aspect = nw / h;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+      renderer.setSize(nw, h);
+    };
+    window.addEventListener("resize", st.onResize);
+    state = st;
+    return st;
+  }
+
+  function addCreasedEdges(mesh, geometry, angleDeg) {
+    try {
+      const edgeGeo = new THREE.EdgesGeometry(geometry, angleDeg);
+      const lines = new THREE.LineSegments(
+        edgeGeo,
+        new THREE.LineBasicMaterial({ color: 0x1e2436, depthTest: true, transparent: true, opacity: 0.92 })
+      );
+      mesh.add(lines);
+    } catch (_e) {}
+  }
+
+  function loadStl(url) {
+    const st = mountViewer();
+    if (!st) {
+      hide3dLoading();
+      return;
+    }
+    new STLLoader().load(
+      url,
+      function (geometry) {
+        geometry.center();
+        geometry.computeVertexNormals();
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0xc4cef0,
+          metalness: 0.06,
+          roughness: 0.28,
+          flatShading: true,
+        });
+        const mesh = new THREE.Mesh(geometry, mat);
+        addCreasedEdges(mesh, geometry, 12);
+        st.root.add(mesh);
+        fitCamera(st.camera, st.controls, st.root);
+        hide3dLoading();
+      },
+      undefined,
+      function () {
+        showHint("Не удалось прочитать STL.");
+      }
+    );
+  }
+
+  function loadGltf(url) {
+    const st = mountViewer();
+    if (!st) {
+      hide3dLoading();
+      return;
+    }
+    new GLTFLoader().load(
+      url,
+      function (gltf) {
+        const model = gltf.scene;
+        model.traverse(function (obj) {
+          if (!obj.isMesh || !obj.geometry) return;
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach(function (m) {
+            if (!m) return;
+            if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+              m.flatShading = true;
+              m.roughness = Math.min(typeof m.roughness === "number" ? m.roughness : 0.5, 0.32);
+              m.metalness = Math.min(typeof m.metalness === "number" ? m.metalness : 0, 0.15);
+              m.needsUpdate = true;
+            }
+          });
+          addCreasedEdges(obj, obj.geometry, 18);
+        });
+        st.root.add(model);
+        fitCamera(st.camera, st.controls, st.root);
+        hide3dLoading();
+      },
+      undefined,
+      function () {
+        showHint("Не удалось загрузить GLTF/GLB (для .gltf с внешними ресурсами используйте .glb).");
+      }
+    );
+  }
+
+  function onFile(file) {
+    hide3dLoading();
+    revokeBlob();
+    dispose();
+    if (!file) {
+      showHint("Выберите файл — предпросмотр появится здесь (вращение мышью).");
+      return;
+    }
+    const name = (file.name || "").toLowerCase();
+    const ext = name.includes(".") ? name.split(".").pop() : "";
+
+    if (ext === "stp" || ext === "step") {
+      showHint("STEP/STP: предпросмотр в браузере не поддерживается. Файл: " + (file.name || "без имени"));
+      return;
+    }
+
+    blobUrl = URL.createObjectURL(file);
+    if (ext === "stl") {
+      show3dLoading("Загрузка STL и построение сцены…");
+      loadStl(blobUrl);
+    } else if (ext === "glb" || ext === "gltf") {
+      show3dLoading("Разбор GLB/GLTF и построение сцены…");
+      loadGltf(blobUrl);
+    } else {
+      showHint("Расширение ." + (ext || "?") + " — ожидаются stl, glb или gltf.");
+    }
+  }
+
+  if (input) {
+    input.addEventListener("change", function () {
+      const f = input.files && input.files[0];
+      onFile(f || null);
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", function () {
+      hide3dLoading();
+      revokeBlob();
+      dispose();
+      if (input) input.value = "";
+      showHint("Выберите файл — предпросмотр появится здесь (вращение мышью).");
+    });
+  }
+</script>
+{% include "shifts/plan/includes/plan_rails_script.html" %}
+{% endblock %}

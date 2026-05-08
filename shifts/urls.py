@@ -10,11 +10,13 @@ from . import inventory_views
 from . import payroll_views
 from . import product_views
 from . import skud_views
+from . import admin_lab_views
 from . import views
 
 urlpatterns = [
     path("", views.login_view, name="root"),
     path("home/", views.home_view, name="home"),
+    path("test/", admin_lab_views.admin_test_lab, name="admin_test_lab"),
     path("plan/", plan_views.plan_index, name="plan"),
     path(
         "plan/by-department/<slug:slug>/",

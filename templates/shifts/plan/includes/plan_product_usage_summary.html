@@ -18,7 +18,7 @@
       {% for row in usage_contract_rows %}
       <tr{% if usage_highlight_contract_pk and row.contract.pk == usage_highlight_contract_pk %} class="plan-usage-row--highlight"{% endif %}>
         <td>
-          <a href="{% url 'plan_contract_detail' pk=row.contract.pk %}">{{ row.contract.title|default:"Без названия" }}</a>
+          <a href="{% url 'plan_contracts' %}#plan-contract-{{ row.contract.pk }}">{{ row.contract.title|default:"Без названия" }}</a>
           <span class="muted" style="font-size:11px;margin-left:6px;">#{{ row.contract.pk }}</span>
         </td>
         <td class="muted">{{ row.contract.deadline|date:"d.m.Y" }}</td>

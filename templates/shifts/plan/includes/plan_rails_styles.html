@@ -9,6 +9,12 @@
   }
 
   .plan-article-rails-root { position: relative; }
+  .plan-article-rails-root--no-left-rail .plan-article-main {
+    padding-left: 18px;
+  }
+  .container:has(.plan-article-rails-root--no-left-rail) ul.messages {
+    margin-left: 18px !important;
+  }
   .plan-article-main {
     box-sizing: border-box;
     padding-left: 44px;
@@ -24,6 +30,7 @@
   }
   .plan-rail__strip {
     position: fixed;
+    z-index: 2;
     top: var(--plan-rail-top);
     bottom: 0;
     width: var(--plan-rail-w);
@@ -83,6 +90,7 @@
 
   .plan-rail__sheet {
     position: fixed;
+    z-index: 1;
     top: var(--plan-rail-top);
     bottom: 0;
     width: var(--plan-rail-sheet);
@@ -90,26 +98,28 @@
     box-sizing: border-box;
     background: rgba(20, 28, 44, 0.98);
     border: 1px solid #3a4a72;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
     display: flex;
     flex-direction: column;
     gap: 10px;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transition: transform 0.22s ease, opacity 0.2s ease, visibility 0.2s ease;
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease, visibility 0.22s ease;
     overflow: hidden auto;
     backdrop-filter: blur(10px);
+    border-radius: 0;
   }
   .plan-rail--left .plan-rail__sheet {
     left: var(--plan-rail-w);
-    transform: translateX(-16px);
-    border-radius: 0 12px 12px 0;
+    transform: translateX(calc(-100% - 2px));
+    border-left: none;
+    box-shadow: 10px 0 28px rgba(0, 0, 0, 0.28);
   }
   .plan-rail--right .plan-rail__sheet {
     right: var(--plan-rail-w);
-    transform: translateX(16px);
-    border-radius: 12px 0 0 12px;
+    transform: translateX(calc(100% + 2px));
+    border-right: none;
+    box-shadow: -10px 0 28px rgba(0, 0, 0, 0.28);
   }
   .plan-rail--open .plan-rail__sheet {
     opacity: 1;
@@ -141,6 +151,39 @@
     text-align: center;
     width: 100%;
     box-sizing: border-box;
+  }
+  .plan-rail-contract-wrap {
+    margin: 10px 0 14px 0;
+    padding-bottom: 2px;
+  }
+  .plan-rail-contract-label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin: 0;
+  }
+  .plan-rail-contract-label-span {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--bio-field-label);
+    letter-spacing: 0.04em;
+  }
+  .plan-rail-contract-select {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 12px;
+    padding: 6px 8px;
+    background: var(--bio-input-bg);
+    color: var(--bio-input-fg);
+    border: 1px solid var(--bio-input-border);
+    border-radius: 4px;
+    font: inherit;
+    cursor: pointer;
+  }
+  .plan-rail-contract-select:focus {
+    outline: none;
+    border-color: var(--bio-input-focus-border);
+    box-shadow: 0 0 0 2px var(--bio-input-focus-ring);
   }
   .plan-rail-dept-grid {
     display: flex;
@@ -191,6 +234,12 @@
     opacity: 0.85;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .plan-rail__sheet {
+      transition: none;
+    }
+  }
+
   @media (max-width: 720px) {
     .plan-rail {
       display: none;
@@ -202,5 +251,58 @@
     .container:has(.plan-article-rails-root) ul.messages {
       margin: 0 0 12px 0 !important;
     }
+  }
+
+  /* Светлая тема сайта: рейлы плана */
+  html[data-theme="dawn"] .plan-rail__strip {
+    background: linear-gradient(180deg, rgba(255, 250, 245, 0.98) 0%, rgba(236, 226, 214, 0.99) 100%) !important;
+    border-color: #e0d4c6 !important;
+    box-shadow: -4px 0 18px rgba(55, 42, 36, 0.08) !important;
+  }
+  html[data-theme="dawn"] .plan-rail--left .plan-rail__strip {
+    box-shadow: 4px 0 18px rgba(55, 42, 36, 0.08) !important;
+  }
+  html[data-theme="dawn"] .plan-rail__peek {
+    color: #44403c !important;
+  }
+  html[data-theme="dawn"] .plan-rail__peek:hover {
+    background: rgba(13, 148, 136, 0.12) !important;
+    color: #134e4a !important;
+  }
+  html[data-theme="dawn"] .plan-rail--open .plan-rail__peek {
+    background: rgba(13, 148, 136, 0.2) !important;
+    color: #0f172a !important;
+  }
+  html[data-theme="dawn"] .plan-rail__sheet {
+    background: rgba(255, 254, 251, 0.98) !important;
+    border-color: #d0c4b4 !important;
+    box-shadow: -10px 0 28px rgba(55, 42, 36, 0.1) !important;
+  }
+  html[data-theme="dawn"] .plan-rail__sheet-title {
+    color: #134e4a !important;
+  }
+  html[data-theme="dawn"] .plan-rail__sheet-hint {
+    color: #6b6258 !important;
+  }
+  html[data-theme="dawn"] .plan-rail-contract-label-span {
+    color: #57534e !important;
+  }
+  html[data-theme="dawn"] .plan-rail-contract-select {
+    background: #fffefb !important;
+    color: #292524 !important;
+    border-color: #d6c9b8 !important;
+  }
+  html[data-theme="dawn"] .plan-rail-dept-grid .plan-rail-dept-link {
+    color: #115e59 !important;
+    border-color: rgba(13, 148, 136, 0.35) !important;
+  }
+  html[data-theme="dawn"] .plan-rail-dept-grid .plan-rail-dept-link:hover {
+    color: #042f2a !important;
+    border-color: rgba(13, 148, 136, 0.55) !important;
+  }
+  html[data-theme="dawn"] .plan-rail-dept-grid .plan-rail-dept-link--muted {
+    color: #78716c !important;
+    border-color: rgba(120, 113, 108, 0.35) !important;
+    background: rgba(255, 255, 255, 0.5) !important;
   }
 </style>

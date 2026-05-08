@@ -13,7 +13,7 @@
     font-size: 11px;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: #8fa4c8;
+    color: var(--bio-field-label);
     font-weight: 600;
   }
   .product-plan-piece-cta__link {
@@ -21,22 +21,26 @@
     align-items: center;
     gap: 10px;
     padding: 9px 16px;
-    border-radius: 10px;
+    border-radius: 5px;
     font-size: 0.94rem;
     font-weight: 600;
-    color: #eaf0ff !important;
+    color: var(--bio-body-fg);
     text-decoration: none;
-    border: 1px solid rgba(101, 140, 210, 0.55);
-    background: linear-gradient(180deg, rgba(52, 78, 128, 0.5) 0%, rgba(36, 52, 88, 0.72) 100%);
-    box-shadow: 0 2px 10px rgba(8, 14, 28, 0.35);
+    border: 1px solid var(--bio-filter-border);
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow);
     max-width: min(100%, 44rem);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      color 0.2s ease,
+      background 0.25s ease;
   }
   .product-plan-piece-cta__link:hover,
   .product-plan-piece-cta__link:focus {
-    border-color: rgba(180, 205, 255, 0.72);
-    color: #fff !important;
-    box-shadow: 0 4px 16px rgba(12, 22, 48, 0.4);
+    border-color: var(--bio-input-focus-border);
+    color: var(--bio-heading-accent);
+    box-shadow: var(--bio-filter-shadow);
   }
   .product-plan-piece-cta__title {
     flex: 1 1 auto;
@@ -49,11 +53,20 @@
     flex: 0 0 auto;
     font-size: 11px;
     font-weight: 600;
-    opacity: 0.92;
     padding: 2px 8px;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.22);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+    background: var(--bio-surface-item);
+    border: 1px solid var(--bio-surface-item-border);
+    color: var(--bio-muted);
+  }
+  .product-drawing-plan-section.filter-panel {
+    margin-bottom: 16px;
+    padding: 14px;
+  }
+  .product-drawing-setup-block.filter-panel {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border-radius: 5px;
   }
 </style>
 <div class="page-actions" style="margin-bottom:10px;">
@@ -115,8 +128,8 @@
           {% endif %}
         </p>
         {% if setups %}
-        <div class="product-drawing-plan-section filter-panel" style="margin-bottom:16px;padding:14px;">
-          <h5 style="margin:0 0 10px 0;font-size:0.95rem;color:#c9d5ff;">Позиция в разделе «План»</h5>
+        <div class="product-drawing-plan-section filter-panel">
+          <h5 style="margin:0 0 10px 0;font-size:0.95rem;color:var(--bio-heading-accent);">Позиция в разделе «План»</h5>
           <div class="setup-meta-plan-block">
             <div class="setup-plan-summary-wrap" data-product-plan-summary>
               <div class="setup-plan-quick-readonly">
@@ -173,9 +186,9 @@
           </div>
         </div>
         <div class="product-drawing-naladki-section">
-          <h5 style="margin:0 0 10px 0;font-size:0.95rem;color:#c9d5ff;">Заготовка (наладка)</h5>
+          <h5 style="margin:0 0 10px 0;font-size:0.95rem;color:var(--bio-heading-accent);">Заготовка (наладка)</h5>
           {% for setup in setups %}
-          <div class="product-drawing-setup-block filter-panel" data-drawing-setup-root="{{ setup.pk }}" style="margin-bottom:14px;padding:12px 14px;border:1px solid rgba(58,74,106,0.6);border-radius:10px;background:rgba(17,24,38,0.5);">
+          <div class="product-drawing-setup-block filter-panel" data-drawing-setup-root="{{ setup.pk }}">
             <p class="muted" style="margin:0 0 8px 0;font-size:12px;font-weight:600;">
               Уст. {{ forloop.counter }}{% if setup.name %} — {{ setup.name }}{% endif %}
             </p>
@@ -401,7 +414,7 @@
       {% if preview_stl_url %}data-stl-url="{{ preview_stl_url }}"{% endif %}
       data-cad-ext="{{ cad_ext }}">
       {% if cad_inline_preview %}
-      <p class="muted product-cad-loading" style="padding:12px;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;background:rgba(211,215,222,0.78);z-index:1;">Загрузка предпросмотра…</p>
+      <p class="muted product-cad-loading">Загрузка предпросмотра…</p>
       {% elif product.cad_model and cad_is_step %}
       <p class="muted" style="padding:12px;">В браузере показывается только STL. Загрузите <strong>STL для предпросмотра</strong> в <a href="{% url 'product_edit' product.pk %}">редактировании изделия</a> (экспорт из CAD из вашего STEP) или скачайте STEP ниже.</p>
       {% elif product.cad_model %}
@@ -438,10 +451,11 @@
     align-items: center;
     justify-content: flex-start;
     gap: 6px;
-    border: 1px solid #2f3b57;
-    border-radius: 10px;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 5px;
     padding: 8px;
-    background: rgba(17, 24, 39, 0.7);
+    background: var(--bio-surface-item);
+    transition: background 0.22s ease, border-color 0.22s ease;
   }
   .product-setup-photos.is-inline-edit figure.setup-photo-figure {
     cursor: grab;
@@ -466,8 +480,8 @@
   }
   .product-setup-photos a {
     display: block;
-    border: 1px solid #2f3b57;
-    border-radius: 8px;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 4px;
     overflow: hidden;
     background: #0a0c12;
     cursor: zoom-in;
@@ -500,7 +514,7 @@
   }
   .setup-photo-caption.is-inline-edit {
     border: 1px dashed #6f7ef2;
-    border-radius: 6px;
+    border-radius: 3px;
     padding: 2px 6px;
     background: rgba(111, 126, 242, 0.12);
     min-height: 18px;
@@ -510,15 +524,39 @@
     margin-top: 10px;
   }
   .setup-photo-draft {
-    border: 1px dashed #4a5f87;
+    border: 1px dashed var(--bio-input-hover-border);
   }
-  .product-btn-secondary { background: #2a3656; }
+  /* Вторичные ссылки скачивания: те же поверхности/контраст, что и .btn.btn-ghost */
+  .btn.product-btn-secondary {
+    background: var(--bio-btn-ghost-bg);
+    box-shadow: none;
+    border: 1px solid var(--bio-btn-ghost-border);
+    color: var(--bio-body-fg);
+    transition: filter 0.14s ease, border-color 0.16s ease, color 0.2s ease;
+  }
+  html[data-theme="dawn"] .btn.product-btn-secondary {
+    color: var(--bio-input-fg);
+  }
+  .btn.product-btn-secondary:hover {
+    filter: brightness(1.06);
+    border-color: var(--bio-input-hover-border);
+  }
   .product-btn-edit-mode {
     background: linear-gradient(180deg, #ef6a6a 0%, #cf4242 100%);
     border: 1px solid #a93131;
     color: #fff;
   }
-  .product-btn-program { background: #1a2f1e; border-color: #2a4a38; }
+  .btn.product-btn-program {
+    background: linear-gradient(180deg, var(--bio-btn-primary-bg1) 0%, var(--bio-btn-primary-bg2) 100%);
+    border: 1px solid var(--bio-nav-refresh-border);
+    color: #fff;
+    box-shadow: var(--bio-btn-sm-shadow);
+  }
+  .btn.product-btn-program:hover,
+  .btn.product-btn-program:focus {
+    filter: brightness(1.05);
+    color: #fff;
+  }
   .product-tabs {
     min-width: 0;
   }
@@ -565,23 +603,24 @@
     display: none !important;
   }
   .product-tab {
-    background: #151b28;
-    border: 1px solid #2f3b57;
-    color: #9bb0d8;
-    border-radius: 8px;
+    background: var(--bio-tab-pill-bg);
+    border: 1px solid var(--bio-filter-border);
+    color: var(--bio-muted);
+    border-radius: 4px;
     padding: 8px 14px;
     font-size: 14px;
     cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   }
   .product-tab:hover {
-    background: #1a2233;
-    color: #c4d4ec;
+    background: var(--bio-surface-item);
+    color: var(--bio-body-fg);
+    border-color: var(--bio-input-hover-border);
   }
   .product-tab.is-active {
-    background: #24314a;
-    border-color: #4a6fa5;
-    color: #e8eef8;
+    background: linear-gradient(180deg, var(--bio-nav-active-bg1) 0%, var(--bio-nav-active-bg2) 100%);
+    border-color: var(--bio-nav-active-border);
+    color: var(--bio-nav-active-fg);
   }
   .product-tab-panels {
     min-width: 0;
@@ -591,22 +630,26 @@
     grid-template-columns: minmax(0, 1fr) minmax(272px, 1fr);
     gap: 12px 20px;
     padding: 10px;
-    border: 1px solid #2f3b57;
-    border-radius: 10px;
-    background: rgba(24, 30, 44, 0.7);
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 5px;
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow);
     font-size: 15px;
     min-width: 0;
     align-items: stretch;
+    transition: border-color 0.22s ease, background 0.28s ease;
   }
   .product-setup-spec-group {
-    border: 1px solid #33415f;
-    border-radius: 8px;
+    border: 1px solid var(--bio-input-border);
+    border-radius: 4px;
     padding: 8px 10px;
-    background: rgba(14, 19, 30, 0.55);
+    background: var(--bio-surface-item);
     display: grid;
     gap: 5px;
     line-height: 1.55;
     min-width: 0;
+    color: var(--bio-body-fg);
+    transition: background 0.22s ease, border-color 0.22s ease;
   }
   .product-setup-panel-title {
     display: flex;
@@ -655,7 +698,7 @@
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    color: #c7d5ef;
+    color: var(--bio-subheading);
   }
   .setup-spec-actions .btn.btn-ghost:hover,
   .setup-spec-actions .btn.btn-ghost:focus,
@@ -666,16 +709,16 @@
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    color: #e8eef8;
+    color: var(--bio-body-fg);
   }
   .product-tab-panel[data-inline-edit-mode="1"] .setup-spec-actions {
     display: flex;
   }
   .setup-spec-box {
-    border: 1px solid #33415f;
-    border-radius: 8px;
+    border: 1px solid var(--bio-input-border);
+    border-radius: 4px;
     padding: 7px 8px;
-    background: rgba(16, 22, 34, 0.5);
+    background: var(--bio-surface-item);
     min-width: 0;
     height: fit-content;
     align-self: start;
@@ -772,7 +815,7 @@
     left: 6px;
     right: 6px;
     height: 2px;
-    border-radius: 2px;
+    border-radius: 1px;
     background: #9fb0ff;
     box-shadow: 0 0 0 2px rgba(111, 126, 242, 0.2);
     pointer-events: none;
@@ -860,8 +903,8 @@
   }
   .setup-spec-col-meta .setup-meta-col {
     border: 1px solid rgba(58, 74, 106, 0.6);
-    border-radius: 10px;
-    background: rgba(17, 24, 38, 0.5);
+    border-radius: 5px;
+    background: var(--bio-surface-item);
     padding: 6px 8px;
     gap: 6px;
     height: 100%;
@@ -874,7 +917,7 @@
   }
   .setup-spec-col-meta .setup-meta-col > div {
     min-height: 26px;
-    border-radius: 7px;
+    border-radius: 3.5px;
     padding: 2px 4px;
   }
   .setup-spec-col-meta .setup-meta-col > div > .muted {
@@ -957,20 +1000,20 @@
     min-width: 0;
     font-size: 13px;
     padding: 4px 8px;
-    border-radius: 6px;
+    border-radius: 3px;
     border: 1px solid #3e4f74;
     background: rgba(12, 18, 30, 0.92);
-    color: #eaf0ff;
+    color: var(--bio-body-fg);
   }
   .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-laser-thick {
     width: 6.5rem;
     max-width: 100%;
     font-size: 13px;
     padding: 4px 8px;
-    border-radius: 6px;
+    border-radius: 3px;
     border: 1px solid #3e4f74;
     background: rgba(12, 18, 30, 0.92);
-    color: #eaf0ff;
+    color: var(--bio-body-fg);
   }
   .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-laser-mark {
     flex: 1 1 140px;
@@ -978,10 +1021,10 @@
     max-width: 100%;
     font-size: 13px;
     padding: 4px 8px;
-    border-radius: 6px;
+    border-radius: 3px;
     border: 1px solid #3e4f74;
     background: rgba(12, 18, 30, 0.92);
-    color: #eaf0ff;
+    color: var(--bio-body-fg);
   }
   body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-line--position-type .setup-plan-summary-value {
     display: none !important;
@@ -1201,12 +1244,12 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
-    color: #c7d5ef;
+    color: var(--bio-subheading);
     text-decoration: none;
     font-size: 13px;
   }
   .setup-program-file-link:hover {
-    color: #e8eef8;
+    color: var(--bio-body-fg);
     text-decoration: underline;
   }
   .setup-program-upload-wrap {
@@ -1224,22 +1267,26 @@
     display: none !important;
   }
   .product-side-program-files .setup-program-meta-row {
-    border: 1px solid #2f3b57;
-    border-radius: 10px;
-    background: rgba(20, 27, 41, 0.85);
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 5px;
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow);
     padding: 8px 10px;
     box-sizing: border-box;
     width: 100%;
     min-width: 0;
     overflow: hidden;
+    transition: border-color 0.2s ease, background 0.25s ease;
   }
   .setup-program-meta-row.is-file-drop-target {
-    border-color: #6f8fd9;
-    box-shadow: inset 0 0 0 1px rgba(111, 143, 217, 0.45), 0 0 0 2px rgba(111, 143, 217, 0.15);
-    background: rgba(30, 44, 72, 0.9);
+    border-color: var(--bio-input-focus-border);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--bio-input-focus-border) 45%, transparent),
+      0 0 0 2px var(--bio-input-focus-ring);
+    background: var(--bio-input-focus-bg);
   }
   .setup-program-meta-row.is-file-drop-target .setup-side-program-download {
-    color: #ffe88a;
+    color: #fff;
   }
   .product-side-program-files .setup-program-upload-wrap {
     flex: 0 0 100%;
@@ -1289,17 +1336,17 @@
     font-size: 14px;
     font-weight: 700;
     text-decoration: underline;
-    border: 1px solid #33415f;
+    border: 1px solid var(--bio-input-border);
     background: transparent;
   }
   .setup-side-program-download:hover,
   .setup-side-program-download:focus {
-    color: #ffe88a;
+    color: var(--bio-body-fg);
   }
   .product-side-program-files .setup-side-program-download {
-    background: linear-gradient(180deg, rgba(49, 108, 69, 0.88) 0%, rgba(37, 84, 54, 0.92) 100%);
-    border-color: #65b17c;
-    color: #e5ffe9;
+    background: linear-gradient(180deg, var(--bio-btn-primary-bg1) 0%, var(--bio-btn-primary-bg2) 100%);
+    border: 1px solid var(--bio-nav-refresh-border);
+    color: #fff;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1307,14 +1354,15 @@
     font-size: 13px;
     font-weight: 600;
     text-decoration: none;
-    border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(8, 24, 14, 0.28);
+    border-radius: 5px;
+    box-shadow: var(--bio-btn-sm-shadow);
+    transition: filter 0.14s ease, border-color 0.16s ease;
   }
   .product-side-program-files .setup-side-program-download:hover,
   .product-side-program-files .setup-side-program-download:focus {
-    background: linear-gradient(180deg, rgba(61, 124, 81, 0.92) 0%, rgba(45, 96, 64, 0.96) 100%);
-    border-color: #80ca97;
-    color: #ffe88a;
+    filter: brightness(1.06);
+    border-color: var(--bio-nav-active-border);
+    color: #fff;
   }
   .product-setup-notes .setup-side-program-download {
     display: inline-flex;
@@ -1342,8 +1390,8 @@
     z-index: 2;
   }
   .setup-program-file-item-draft {
-    border: 1px dashed #3e4f74;
-    border-radius: 8px;
+    border: 1px dashed var(--bio-input-hover-border);
+    border-radius: 4px;
     padding: 6px;
     justify-content: flex-start;
   }
@@ -1375,7 +1423,7 @@
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    color: #c7d5ef;
+    color: var(--bio-subheading);
   }
   .setup-program-file-delete.btn.btn-ghost:hover,
   .setup-program-file-delete.btn.btn-ghost:focus,
@@ -1413,7 +1461,7 @@
     margin: 0 0 3px 0;
     font-size: 12px;
     letter-spacing: 0.2px;
-    color: #c7d5ef;
+    color: var(--bio-subheading);
   }
   .binding-photo-link {
     display: inline-flex;
@@ -1430,7 +1478,7 @@
     position: relative;
     vertical-align: middle;
     background: transparent;
-    color: #c7d5ef;
+    color: var(--bio-subheading);
   }
   .binding-photo-link,
   .binding-photo-link:hover,
@@ -1449,7 +1497,7 @@
     padding: 0;
     font-size: 12px;
     display: none;
-    color: #c7d5ef;
+    color: var(--bio-subheading);
     border: 0 !important;
     background: transparent !important;
     box-shadow: none;
@@ -1478,7 +1526,7 @@
     width: 22px;
     padding: 0;
     font-size: 12px;
-    color: #c7d5ef;
+    color: var(--bio-subheading);
     border: 0 !important;
     background: transparent !important;
     box-shadow: none;
@@ -1527,15 +1575,18 @@
   .product-setup-notes {
     white-space: pre-wrap;
     line-height: 1.55;
-    border: 1px solid #2f3b57;
-    border-radius: 10px;
-    background: rgba(24, 30, 44, 0.7);
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 5px;
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow);
     padding: 10px;
     font-size: 15px;
     min-height: 0;
     box-sizing: border-box;
     overflow-wrap: anywhere;
     word-break: break-word;
+    color: var(--bio-body-fg);
+    transition: border-color 0.22s ease, background 0.28s ease, color 0.2s ease;
   }
   .setup-tools-view th, .setup-tools-view td {
     text-align: center;
@@ -1584,21 +1635,23 @@
   .setup-tool-correction-box {
     width: 14px;
     height: 14px;
-    border: 1px solid #6d7fa3;
-    border-radius: 3px;
+    border: 1px solid var(--bio-input-border);
+    border-radius: 1.5px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(16, 24, 36, 0.6);
-    color: #fff;
+    background: var(--bio-chk-bg);
+    color: var(--bio-input-fg);
     font-size: 11px;
     line-height: 1;
     user-select: none;
     pointer-events: none;
+    transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
   }
   .setup-tool-correction-box.is-checked {
-    border-color: #2dbb58;
-    background: rgba(45, 187, 88, 0.22);
+    border-color: var(--bio-inv-ok);
+    background: color-mix(in srgb, var(--bio-inv-ok) 22%, var(--bio-table-bg));
+    color: var(--bio-inv-ok);
   }
   .setup-tool-correction-box.is-checked::before {
     content: "✓";
@@ -1621,7 +1674,7 @@
   .setup-tools-view td.is-inline-edit {
     border: 1px dashed #6f7ef2;
     background: rgba(111, 126, 242, 0.12);
-    border-radius: 6px;
+    border-radius: 3px;
     outline: none;
   }
   .setup-tools-view td[data-tool-col="diameter"],
@@ -1722,7 +1775,7 @@
     .setup-spec-col-meta .setup-meta-plan-block {
       border-left: none;
       padding-left: 0;
-      border-top: 1px solid rgba(58, 74, 106, 0.65);
+      border-top: 1px solid var(--bio-table-cell-border);
       padding-top: 12px;
     }
     .setup-spec-col-meta .setup-meta-col > div {
@@ -1750,8 +1803,8 @@
     tab-size: 4;
     white-space: pre;
     background: #0a0d12;
-    border: 1px solid #2f3b57;
-    border-radius: 12px;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 6px;
     color: #b8c5d9;
   }
   .program-gcode-pre .gc-comment { color: #7fb089; }
@@ -1775,7 +1828,7 @@
   .program-gcode-pre mark.gc-search-hit {
     background: #fff29a;
     color: #161616;
-    border-radius: 2px;
+    border-radius: 1px;
     padding: 0 1px;
   }
   .program-gcode-pre mark.gc-search-hit.is-current {
@@ -1785,7 +1838,7 @@
   .program-gcode-pre mark.gc-tool-hit {
     background: rgba(135, 183, 255, 0.25);
     color: inherit;
-    border-radius: 2px;
+    border-radius: 1px;
     padding: 0 1px;
   }
   .program-gcode-pre mark.gc-tool-hit.is-current-tool {
@@ -1805,14 +1858,15 @@
   .product-detail-side {
     min-width: 0;
     width: 100%;
-    background: rgba(20, 28, 44, 0.92);
-    backdrop-filter: blur(6px);
-    border: 1px solid #2a3651;
-    border-radius: 12px;
+    background: var(--bio-nav-bg);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--bio-nav-border);
+    border-radius: 6px;
     padding: 8px;
     margin-top: 48px;
     margin-left: 0;
     box-sizing: border-box;
+    transition: background 0.25s ease, border-color 0.25s ease;
   }
   .product-detail-side[data-current-tab="drawing"] {
     margin-top: 83px;
@@ -1824,9 +1878,9 @@
     display: inline-block;
     min-width: 28px;
     padding: 1px 6px;
-    border: 1px dashed #6f7ef2;
-    border-radius: 6px;
-    background: rgba(111, 126, 242, 0.12);
+    border: 1px dashed var(--bio-input-focus-border);
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--bio-input-focus-border) 14%, transparent);
     outline: none;
   }
   .product-setup-notes.is-inline-edit {
@@ -1837,9 +1891,9 @@
   .setup-inline-toolbar-block {
     margin: 8px 0 0 0;
     padding: 4px 6px;
-    border: 1px solid #33415f;
-    border-radius: 8px;
-    background: rgba(14, 19, 30, 0.55);
+    border: 1px solid var(--bio-input-border);
+    border-radius: 4px;
+    background: var(--bio-surface-item);
     align-self: start;
   }
   .setup-inline-toolbar {
@@ -1909,8 +1963,8 @@
     display: flex;
     flex-direction: column;
     height: min(72vh, 760px);
-    border: 1px solid #2f3b57;
-    border-radius: 12px;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 6px;
     overflow: hidden;
     background: #0a0d14;
   }
@@ -1925,11 +1979,36 @@
   .product-cad-viewport {
     width: 100%;
     height: 260px;
-    border-radius: 12px;
-    border: 1px solid #3d4045;
-    background: #d3d7de;
+    border-radius: 6px;
+    border: 1px solid var(--bio-filter-border);
+    background: radial-gradient(
+      circle at 30% 20%,
+      var(--bio-schedule-alt-col2) 0%,
+      var(--bio-input-bg) 55%
+    );
     overflow: hidden;
     position: relative;
+    transition: border-color 0.25s ease, background 0.3s ease;
+  }
+  .product-cad-viewport .product-cad-loading {
+    padding: 12px;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    background: color-mix(in srgb, var(--bio-table-bg) 78%, transparent);
+    backdrop-filter: blur(4px);
+    z-index: 1;
+    transition: background 0.25s ease;
+  }
+  .product-cad-viewport canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    touch-action: none;
   }
   #product-cad-block {
     position: relative;
@@ -2055,8 +2134,8 @@
     z-index: 1400;
     width: 220px;
     max-width: min(220px, calc(100vw - 16px));
-    border: 1px solid #2f3b57;
-    border-radius: 10px;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 5px;
     overflow: hidden;
     background: #0a0d14;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
@@ -2096,7 +2175,7 @@
     width: 100vw;
     height: 100vh;
     max-height: 100vh;
-    border: 1px solid #2f3b57;
+    border: 1px solid var(--bio-filter-border);
     border-radius: 0;
     background: #111827;
     padding: 6px;
@@ -3570,7 +3649,7 @@
         var draft = document.createElement("figure");
         draft.className = "setup-photo-figure setup-photo-draft";
         draft.innerHTML = '' +
-          '<div class="muted" style="width:100%;text-align:center;padding:8px 6px;border:1px dashed #2f3b57;border-radius:8px;">Новый блок</div>' +
+          '<div class="muted" style="width:100%;text-align:center;padding:8px 6px;border:1px dashed var(--bio-filter-border);border-radius:4px;">Новый блок</div>' +
           '<input type="file" class="js-new-photo-file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" />' +
           '<figcaption class="muted"><input type="text" class="js-new-photo-caption" placeholder="Описание" style="width:100%;"/></figcaption>' +
           '<div class="setup-photo-inline-controls">' +
@@ -4222,9 +4301,6 @@
   import * as THREE from "three";
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
   import { STLLoader } from "three/addons/loaders/STLLoader.js";
-  import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
-  import { LineMaterial } from "three/addons/lines/LineMaterial.js";
-  import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 
   const host = document.getElementById("product-cad-viewport");
   const tabsRoot = document.getElementById("product-tabs");
@@ -4268,9 +4344,6 @@
       if (cadViewerState.controls) cadViewerState.controls.dispose();
     } catch (e) {}
     try {
-      if (cadViewerState.lineMaterial) cadViewerState.lineMaterial.dispose();
-    } catch (e) {}
-    try {
       if (cadViewerState.root) {
         cadViewerState.root.traverse((obj) => {
           if (obj && obj.geometry && typeof obj.geometry.dispose === "function") obj.geometry.dispose();
@@ -4310,10 +4383,22 @@
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z, 1e-6);
-    camera.position.set(center.x + maxDim * 1.2, center.y + maxDim * 0.9, center.z + maxDim * 1.4);
+    camera.position.set(center.x + maxDim * 1.2, center.y + maxDim * 0.85, center.z + maxDim * 1.35);
     controls.target.copy(center);
     camera.lookAt(controls.target);
     controls.update();
+  }
+
+  /** Как на странице /test/: контур граней + flat shading на меше */
+  function addProductStlEdges(mesh, geometry, angleDeg) {
+    try {
+      const edgeGeo = new THREE.EdgesGeometry(geometry, angleDeg);
+      const lines = new THREE.LineSegments(
+        edgeGeo,
+        new THREE.LineBasicMaterial({ color: 0x1e2436, depthTest: true, transparent: true, opacity: 0.92 })
+      );
+      mesh.add(lines);
+    } catch (_e) {}
   }
 
   function mountMiniStlViewer(targetHost, url) {
@@ -4321,57 +4406,55 @@
     if (targetHost.querySelector("canvas")) return;
     targetHost.innerHTML = "";
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xd3d7de);
-    const camera = new THREE.PerspectiveCamera(45, targetHost.clientWidth / (targetHost.clientHeight || 220), 0.1, 1e7);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(targetHost.clientWidth, targetHost.clientHeight || 220);
+    scene.background = null;
+    const h = targetHost.clientHeight || 220;
+    const w = Math.max(targetHost.clientWidth || 200, 120);
+    const camera = new THREE.PerspectiveCamera(50, w / h, 0.005, 1e7);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+    renderer.setClearColor(0x000000, 0);
+    renderer.setSize(w, h);
+    if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+    if ("toneMapping" in renderer) {
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.08;
+    }
     targetHost.appendChild(renderer.domElement);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-    const dFar = 800;
-    const dInt = 0.18;
-    const axes = [
-      [1, 0, 0], [-1, 0, 0],
-      [0, 1, 0], [0, -1, 0],
-      [0, 0, 1], [0, 0, -1],
-    ];
-    axes.forEach((ax) => {
-      const l = new THREE.DirectionalLight(0xffffff, dInt);
-      l.position.set(ax[0] * dFar, ax[1] * dFar, ax[2] * dFar);
-      scene.add(l);
-    });
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.38));
+    scene.add(new THREE.HemisphereLight(0xdde4ff, 0x1a1e28, 0.55));
+    const key = new THREE.DirectionalLight(0xffffff, 0.85);
+    key.position.set(6, 10, 8);
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xb8c8ff, 0.35);
+    fill.position.set(-8, 2, -6);
+    scene.add(fill);
+
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    let edgeLineMaterial = null;
+    controls.minAzimuthAngle = -Infinity;
+    controls.maxAzimuthAngle = Infinity;
+    controls.minPolarAngle = -Infinity;
+    controls.maxPolarAngle = Infinity;
+
     new STLLoader().load(
       new URL(url, window.location.origin).href,
       function (geometry) {
         geometry.computeBoundingSphere();
         geometry.center();
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-          color: 0x7f8790,
-          metalness: 0.06,
-          roughness: 0.48,
-          transparent: true,
-          opacity: 0.86,
-          depthWrite: true,
-        }));
-        const edgePos = new THREE.EdgesGeometry(geometry, 22);
-        const posAttr = edgePos.getAttribute("position");
-        const lineGeo = new LineSegmentsGeometry();
-        lineGeo.setPositions(posAttr.array);
-        edgeLineMaterial = new LineMaterial({
-          color: 0x14181c,
-          linewidth: 2.6,
-          worldUnits: false,
-          resolution: new THREE.Vector2(targetHost.clientWidth, targetHost.clientHeight || 130),
-          depthTest: true,
-          depthWrite: true,
-        });
-        const thickEdges = new LineSegments2(lineGeo, edgeLineMaterial);
+        geometry.computeVertexNormals();
+        const mesh = new THREE.Mesh(
+          geometry,
+          new THREE.MeshStandardMaterial({
+            color: 0xc4cef0,
+            metalness: 0.06,
+            roughness: 0.28,
+            flatShading: true,
+          })
+        );
+        addProductStlEdges(mesh, geometry, 12);
         const root = new THREE.Group();
         root.add(mesh);
-        root.add(thickEdges);
         scene.add(root);
         fitCameraToObject(camera, controls, root);
       },
@@ -4381,12 +4464,12 @@
       }
     );
     function onResize() {
-      const w = targetHost.clientWidth;
-      const h = targetHost.clientHeight || 220;
-      camera.aspect = w / h;
+      const rw = targetHost.clientWidth;
+      const rh = targetHost.clientHeight || 220;
+      camera.aspect = rw / rh;
       camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-      if (edgeLineMaterial) edgeLineMaterial.resolution.set(w, h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+      renderer.setSize(rw, rh);
     }
     window.addEventListener("resize", onResize);
     (function tick() {
@@ -4403,42 +4486,48 @@
     cadViewerStarted = true;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xd3d7de);
-    const camera = new THREE.PerspectiveCamera(45, host.clientWidth / host.clientHeight, 0.1, 1e7);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(host.clientWidth, host.clientHeight);
+    scene.background = null;
+    const h0 = host.clientHeight || 260;
+    const w0 = Math.max(host.clientWidth || 200, 200);
+    const camera = new THREE.PerspectiveCamera(50, w0 / h0, 0.005, 1e7);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+    renderer.setClearColor(0x000000, 0);
+    renderer.setSize(w0, h0);
+    if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+    if ("toneMapping" in renderer) {
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.08;
+    }
     cadRenderer = renderer;
     host.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-    const dFar = 800;
-    const dInt = 0.18;
-    const axes = [
-      [1, 0, 0], [-1, 0, 0],
-      [0, 1, 0], [0, -1, 0],
-      [0, 0, 1], [0, 0, -1],
-    ];
-    axes.forEach((ax) => {
-      const l = new THREE.DirectionalLight(0xffffff, dInt);
-      l.position.set(ax[0] * dFar, ax[1] * dFar, ax[2] * dFar);
-      scene.add(l);
-    });
+    scene.add(new THREE.AmbientLight(0xffffff, 0.38));
+    scene.add(new THREE.HemisphereLight(0xdde4ff, 0x1a1e28, 0.55));
+    const key = new THREE.DirectionalLight(0xffffff, 0.85);
+    key.position.set(6, 10, 8);
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xb8c8ff, 0.35);
+    fill.position.set(-8, 2, -6);
+    scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.28);
+    rim.position.set(0, -6, 10);
+    scene.add(rim);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-
-    let edgeLineMaterial = null;
+    controls.minAzimuthAngle = -Infinity;
+    controls.maxAzimuthAngle = Infinity;
+    controls.minPolarAngle = -Infinity;
+    controls.maxPolarAngle = Infinity;
 
     function onResize() {
       const w = host.clientWidth;
       const h = host.clientHeight || 260;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
       renderer.setSize(w, h);
-      if (edgeLineMaterial) {
-        edgeLineMaterial.resolution.set(w, h);
-      }
     }
     window.addEventListener("resize", onResize);
 
@@ -4453,7 +4542,6 @@
       renderer: renderer,
       controls: controls,
       onResize: onResize,
-      lineMaterial: null,
       root: null,
       rafId: null,
       loadToken: myToken,
@@ -4470,41 +4558,22 @@
         clearCadLoading();
         geometry.computeBoundingSphere();
         geometry.center();
+        geometry.computeVertexNormals();
 
         const mat = new THREE.MeshStandardMaterial({
-          color: 0x7f8790,
+          color: 0xc4cef0,
           metalness: 0.06,
-          roughness: 0.48,
-          transparent: true,
-          opacity: 0.86,
-          depthWrite: true,
+          roughness: 0.28,
+          flatShading: true,
         });
         const mesh = new THREE.Mesh(geometry, mat);
-        mesh.renderOrder = 0;
 
-        const edgePos = new THREE.EdgesGeometry(geometry, 22);
-        const posAttr = edgePos.getAttribute("position");
-        const lineGeo = new LineSegmentsGeometry();
-        lineGeo.setPositions(posAttr.array);
-        const w0 = host.clientWidth;
-        const h0 = host.clientHeight || 260;
-        edgeLineMaterial = new LineMaterial({
-          color: 0x14181c,
-          linewidth: 2.6,
-          worldUnits: false,
-          resolution: new THREE.Vector2(w0, h0),
-          depthTest: true,
-          depthWrite: true,
-        });
-        const thickEdges = new LineSegments2(lineGeo, edgeLineMaterial);
-        thickEdges.renderOrder = 1;
+        addProductStlEdges(mesh, geometry, 12);
 
         const root = new THREE.Group();
         root.add(mesh);
-        root.add(thickEdges);
         scene.add(root);
         if (cadViewerState && cadViewerState.loadToken === myToken) {
-          cadViewerState.lineMaterial = edgeLineMaterial;
           cadViewerState.root = root;
         }
         fitCameraToObject(camera, controls, root);
@@ -4533,7 +4602,7 @@
     stlUrl = nextUrl ? new URL(nextUrl, window.location.origin).href : "";
     host.dataset.stlUrl = stlUrl;
     disposeCadViewer();
-    host.innerHTML = '<p class="muted product-cad-loading" style="padding:12px;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;background:rgba(211,215,222,0.78);z-index:1;">Загрузка предпросмотра…</p>';
+    host.innerHTML = '<p class="muted product-cad-loading">Загрузка предпросмотра…</p>';
     cadViewerStarted = false;
     if (cadRenderer) {
       try { cadRenderer.dispose(); } catch (e) {}

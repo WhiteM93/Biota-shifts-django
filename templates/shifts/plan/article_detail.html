@@ -6,10 +6,10 @@
 <style>
   .plan-stages-compact .plan-stage-line {
     padding: 9px 10px;
-    border-bottom: 1px solid #2b3650;
+    border-bottom: 1px solid var(--bio-table-cell-border);
     font-size: 14px;
     line-height: 1.45;
-    color: #eaf0ff;
+    color: var(--bio-body-fg);
   }
   .plan-stages-compact .plan-stage-line:last-child { border-bottom: 0; }
 
@@ -42,10 +42,10 @@
     align-items: center;
     gap: 8px;
     padding: 8px 14px;
-    border-radius: 10px;
+    border-radius: 5px;
     font-size: 0.92rem;
     font-weight: 600;
-    color: #eaf0ff !important;
+    color: var(--bio-body-fg) !important;
     text-decoration: none;
     border: 1px solid rgba(101, 140, 210, 0.55);
     background: linear-gradient(180deg, rgba(52, 78, 128, 0.55) 0%, rgba(36, 52, 88, 0.75) 100%);
@@ -71,7 +71,7 @@
     margin-top: 12px;
     padding: 14px 16px;
     border: 1px solid rgba(58, 74, 106, 0.75);
-    border-radius: 12px;
+    border-radius: 6px;
     background: rgba(17, 24, 38, 0.55);
   }
 </style>
@@ -114,11 +114,11 @@
 </div>
 {% if naladki_detail_first_setup %}
 <div class="filter-panel plan-article-readonly-specs" style="margin-top:12px;padding:12px 14px;max-width:52rem;">
-  <h3 style="margin:0 0 8px 0;font-size:0.95rem;color:#c9d5ff;">Параметры плана и наладки</h3>
+  <h3 style="margin:0 0 8px 0;font-size:0.95rem;color:var(--bio-heading-accent);">Параметры плана и наладки</h3>
   {% if not item.is_assembly and not item.is_purchased %}
-  <p style="margin:0 0 8px 0;font-size:0.92rem;line-height:1.45;color:#c9d5ff;"><span class="muted">Тип заготовки (план):</span> {% if item.workpiece_type %}<strong>{{ item.get_workpiece_type_display }}</strong>{% else %}<span class="muted">не задан{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</p>
+  <p style="margin:0 0 8px 0;font-size:0.92rem;line-height:1.45;color:var(--bio-heading-accent);"><span class="muted">Тип заготовки (план):</span> {% if item.workpiece_type %}<strong>{{ item.get_workpiece_type_display }}</strong>{% else %}<span class="muted">не задан{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</p>
   {% if item.workpiece_type == 'laser' %}
-  <p style="margin:0 0 14px 0;font-size:0.92rem;line-height:1.45;color:#aebde8;">Лазер — толщина листа: {% if item.laser_sheet_thickness_mm is not None %}<strong>{{ item.laser_sheet_thickness_mm }} мм</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %} · Маркировка материала: {% if item.laser_material_marking %}<strong>{{ item.laser_material_marking }}</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</p>
+  <p style="margin:0 0 14px 0;font-size:0.92rem;line-height:1.45;color:var(--bio-field-label);">Лазер — толщина листа: {% if item.laser_sheet_thickness_mm is not None %}<strong>{{ item.laser_sheet_thickness_mm }} мм</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %} · Маркировка материала: {% if item.laser_material_marking %}<strong>{{ item.laser_material_marking }}</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</p>
   {% endif %}
   {% endif %}
   <p style="margin:12px 0 4px 0;padding-top:12px;border-top:1px solid rgba(58,74,106,0.65);font-size:0.92rem;line-height:1.45;"><span class="muted">Размер:</span> {% if naladki_detail_first_setup.size %}<strong>{{ naladki_detail_first_setup.size }}</strong>{% else %}—{% endif %}</p>
@@ -132,9 +132,9 @@
 {% if not item.is_assembly and not item.is_purchased %}
 {% if not item.naladki_product or not naladki_detail_first_setup %}
 <div class="plan-article-readonly-specs">
-<p style="margin:6px 0 0 0;font-size:0.92rem;color:#c9d5ff;">Тип заготовки: {% if item.workpiece_type %}<strong>{{ item.get_workpiece_type_display }}</strong>{% else %}<span class="muted">не задан{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</p>
+<p style="margin:6px 0 0 0;font-size:0.92rem;color:var(--bio-heading-accent);">Тип заготовки: {% if item.workpiece_type %}<strong>{{ item.get_workpiece_type_display }}</strong>{% else %}<span class="muted">не задан{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</p>
 {% if item.workpiece_type == 'laser' %}
-<p style="margin:6px 0 0 0;font-size:0.92rem;color:#aebde8;">Лазер — толщина листа: {% if item.laser_sheet_thickness_mm is not None %}<strong>{{ item.laser_sheet_thickness_mm }} мм</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %} · Маркировка материала: {% if item.laser_material_marking %}<strong>{{ item.laser_material_marking }}</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</p>
+<p style="margin:6px 0 0 0;font-size:0.92rem;color:var(--bio-field-label);">Лазер — толщина листа: {% if item.laser_sheet_thickness_mm is not None %}<strong>{{ item.laser_sheet_thickness_mm }} мм</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %} · Маркировка материала: {% if item.laser_material_marking %}<strong>{{ item.laser_material_marking }}</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</p>
 {% endif %}
 </div>
 {% endif %}
@@ -143,7 +143,7 @@
 {% include "shifts/plan/includes/plan_product_usage_summary.html" %}
 
 {% if item.is_assembly %}
-<h3 style="margin:16px 0 8px 0;font-size:1rem;color:#c9d5ff;">Состав сборки</h3>
+<h3 style="margin:16px 0 8px 0;font-size:1rem;color:var(--bio-heading-accent);">Состав сборки</h3>
 {% if item.assembly_components.all %}
 <div class="table-wrap">
   <table class="data-grid plan-assembly-bom">

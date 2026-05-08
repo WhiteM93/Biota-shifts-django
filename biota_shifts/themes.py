@@ -221,7 +221,7 @@ def build_app_theme_css(theme: dict[str, Any]) -> str:
     }}
     [data-testid="stDataFrame"], div.stDataFrame {{
         border: 1px solid {r_border} !important;
-        border-radius: 10px !important;
+        border-radius: 5px !important;
         overflow: hidden !important;
     }}
     {de} button,
@@ -287,10 +287,10 @@ def build_app_theme_css(theme: dict[str, Any]) -> str:
         gap: 8px;
         background: {r3};
         padding: 6px 8px;
-        border-radius: 10px;
+        border-radius: 5px;
     }}
     div[data-testid="stTabs"] button[data-baseweb="tab"] {{
-        border-radius: 8px;
+        border-radius: 4px;
         padding: 10px 20px;
         font-weight: 600;
     }}

@@ -1,7 +1,9 @@
 <div class="plan-rail-dept-grid">
 {% for row in items %}
+  {% url 'plan_department_planning' slug=row.slug as dept_plan_url %}
   <a
-    href="{% url 'plan_department_planning' slug=row.slug %}"
+    href="{% if plan_rail_selected_contract_pk %}{{ dept_plan_url }}?contract={{ plan_rail_selected_contract_pk }}{% else %}{{ dept_plan_url }}{% endif %}"
+    data-plan-dept-path="{{ dept_plan_url }}"
     class="btn btn-sm btn-ghost plan-rail-dept-link{% if row.muted %} plan-rail-dept-link--muted{% endif %}"
   >{{ row.label }}</a>
 {% endfor %}

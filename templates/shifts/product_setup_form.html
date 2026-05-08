@@ -14,10 +14,10 @@
   {% endif %}
 </h2>
 
-<form method="post" enctype="multipart/form-data" class="filter-panel" style="margin-top:16px;">
+<form method="post" enctype="multipart/form-data" class="filter-panel product-setup-form" style="margin-top:16px;">
   {% csrf_token %}
   {% if form.non_field_errors %}
-  <p style="color:#ffb8b8;">{{ form.non_field_errors }}</p>
+  <p style="color:var(--bio-error-soft);">{{ form.non_field_errors }}</p>
   {% endif %}
   <div class="filter-grid">
     <label class="field">
@@ -178,8 +178,8 @@
       {% if is_edit and setup %}
       <div id="program-files-block" style="margin-bottom:10px;">
         {% for pf in setup.program_files.all %}
-        <div class="program-file-row" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:8px;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
-          <a href="{{ pf.file.url }}" target="_blank" rel="noopener" style="color:#c9ddff;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        <div class="program-file-row">
+          <a href="{{ pf.file.url }}" target="_blank" rel="noopener" class="program-file-row__link">
             {{ pf.display_name }}
           </a>
           <label class="muted" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;">
@@ -198,20 +198,20 @@
         <label for="id_program_file" class="btn btn-ghost" style="cursor:pointer;">{% if is_edit and setup and setup.program_files.exists %}Добавить ещё файл{% else %}Выбрать файл программы{% endif %}</label>
         <span class="muted js-setup-file-name" data-for="id_program_file">Файл не выбран</span>
       </div>
-      <input type="file" name="program_file" id="id_program_file" style="display:none;" />
+      <input type="file" name="program_file" id="id_program_file" class="setup-file-input-hidden" hidden />
     </label>
     <label class="field" style="grid-column:1/-1;">
       <span>STL предпросмотра установки</span>
       {% if is_edit and setup and setup.preview_stl %}
-      <div id="preview-stl-card" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:10px;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
-        <div style="min-width:0;display:grid;gap:4px;">
+      <div id="preview-stl-card" class="setup-asset-card">
+        <div class="setup-asset-card__main">
           <div class="muted" style="font-size:12px;">Текущий STL установки</div>
-          <a href="{{ setup.preview_stl.url }}" target="_blank" rel="noopener" style="color:#c9ddff;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          <a href="{{ setup.preview_stl.url }}" target="_blank" rel="noopener" class="program-file-row__link">
             {{ setup.preview_stl.name|default:"preview.stl" }}
           </a>
         </div>
         <input type="hidden" name="remove_preview_stl" id="id_remove_preview_stl" value="0" />
-        <div style="display:inline-flex;gap:8px;align-items:center;">
+        <div class="setup-asset-card__actions">
           <label for="id_preview_stl" class="btn btn-ghost setup-file-action-btn" style="cursor:pointer;">Заменить</label>
           <button type="button" class="btn btn-ghost setup-file-action-btn" id="preview-stl-delete-btn" title="Удалить текущий STL">Удалить</button>
         </div>
@@ -223,24 +223,24 @@
         <span class="muted js-setup-file-name" data-for="id_preview_stl">Файл не выбран</span>
       </div>
       {% endif %}
-      <input type="file" name="preview_stl" id="id_preview_stl" style="display:none;" accept=".stl" />
+      <input type="file" name="preview_stl" id="id_preview_stl" class="setup-file-input-hidden" hidden accept=".stl" />
       {% if form.preview_stl.errors %}<span class="muted">{{ form.preview_stl.errors }}</span>{% endif %}
     </label>
   </div>
-  <div style="margin-top:14px;padding-top:12px;border-top:1px solid #2f3b57;">
+  <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bio-filter-border);">
   </div>
-  <div style="margin-top:14px;padding-top:12px;border-top:1px solid #2f3b57;">
-    <h3 style="margin:0 0 8px 0;font-size:14px;color:#9bb0d8;">Фото установки</h3>
-    <div id="setup-photo-blocks" style="display:grid;gap:10px;">
+  <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bio-filter-border);">
+    <h3 style="margin:0 0 8px 0;font-size:14px;color:var(--bio-muted);">Фото установки</h3>
+    <div id="setup-photo-blocks" class="setup-photo-blocks">
       {% if is_edit and setup and setup.photos.all %}
         {% for sp in setup.photos.all %}
-        <div class="setup-photo-block" data-block-key="existing-{{ sp.id }}" style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
+        <div class="setup-photo-block" data-block-key="existing-{{ sp.id }}">
           <input type="hidden" name="photo_block_keys" value="existing-{{ sp.id }}" />
           <input type="hidden" name="photo_remove__existing-{{ sp.id }}" value="0" class="photo-remove-hidden" />
           <div>
-            <img src="{{ sp.image.url }}" alt="" class="setup-photo-preview" style="width:140px;height:100px;object-fit:cover;border-radius:6px;border:1px solid #2f3b57;display:block;background:#0a0c12;" />
+            <img src="{{ sp.image.url }}" alt="" class="setup-photo-preview setup-photo-preview--thumb" />
           </div>
-          <div style="display:grid;gap:8px;">
+          <div class="setup-photo-block__fields">
             <label class="field" style="margin:0;">
               <span>Подпись</span>
               <input type="text" name="photo_caption__existing-{{ sp.id }}" value="{{ sp.caption }}" />
@@ -265,14 +265,14 @@
   </p>
 </form>
 <template id="setup-photo-block-template">
-  <div class="setup-photo-block" style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px;border:1px solid #2f3b57;border-radius:10px;background:#111827;">
+  <div class="setup-photo-block">
     <input type="hidden" name="photo_block_keys" value="" />
     <input type="hidden" name="" value="0" class="photo-remove-hidden" />
     <div>
-      <img src="" alt="" class="setup-photo-preview" style="width:140px;height:100px;object-fit:cover;border-radius:6px;border:1px solid #2f3b57;display:none;background:#0a0c12;" />
-      <div class="muted setup-photo-empty" style="height:100px;display:flex;align-items:center;justify-content:center;border:1px dashed #2f3b57;border-radius:6px;">Без фото</div>
+      <img src="" alt="" class="setup-photo-preview setup-photo-preview--thumb" style="display:none;" />
+      <div class="muted setup-photo-empty">Без фото</div>
     </div>
-    <div style="display:grid;gap:8px;">
+    <div class="setup-photo-block__fields">
       <label class="field" style="margin:0;">
         <span>Подпись</span>
         <input type="text" name="" />
@@ -483,6 +483,139 @@
   })();
 </script>
 <style>
+  .product-setup-form #setup-photo-blocks.setup-photo-blocks {
+    display: grid;
+    gap: 10px;
+  }
+  .product-setup-form .setup-photo-block,
+  #setup-photo-block-template .setup-photo-block {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 12px;
+    align-items: start;
+    padding: 10px;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 5px;
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow);
+    transition: border-color 0.2s ease, background 0.25s ease;
+  }
+  .product-setup-form .setup-photo-block__fields {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+  .product-setup-form .setup-photo-preview--thumb {
+    width: 140px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 3px;
+    border: 1px solid var(--bio-filter-border);
+    display: block;
+    background: var(--bio-input-bg);
+    box-sizing: border-box;
+  }
+  .product-setup-form .setup-photo-empty {
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--bio-input-border);
+    border-radius: 3px;
+    box-sizing: border-box;
+    background: var(--bio-surface-item);
+  }
+  .product-setup-form .program-file-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 10px;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 5px;
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow);
+  }
+  .product-setup-form .program-file-row__link {
+    color: var(--bio-heading-accent);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    font-weight: 600;
+  }
+  .product-setup-form .program-file-row__link:hover {
+    color: var(--bio-body-fg);
+    text-decoration: underline;
+  }
+  .product-setup-form .setup-asset-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 5px;
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow);
+  }
+  .product-setup-form .setup-asset-card__main {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+  }
+  .product-setup-form .setup-asset-card__actions {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+  }
+  /* Как в admin test lab: нативный file с оформленной кнопкой «Выбрать файл» */
+  .product-setup-form input[type="file"] {
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    font: inherit;
+    cursor: pointer;
+    border-radius: 8px;
+    border: 1px solid var(--bio-input-hover-border);
+    background: var(--bio-input-focus-bg);
+    color: var(--bio-input-fg);
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  }
+  .product-setup-form input[type="file"]:hover {
+    border-color: var(--bio-input-focus-border);
+  }
+  .product-setup-form input[type="file"]::file-selector-button,
+  .product-setup-form input[type="file"]::-webkit-file-upload-button {
+    font: inherit;
+    font-weight: 600;
+    font-size: 12px;
+    margin-right: 12px;
+    padding: 7px 14px;
+    border-radius: 5px;
+    border: 1px solid var(--bio-btn-ghost-border);
+    background: var(--bio-btn-ghost-bg);
+    color: var(--bio-body-fg);
+    cursor: pointer;
+    transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+  }
+  html[data-theme="dawn"] .product-setup-form input[type="file"]::file-selector-button,
+  html[data-theme="dawn"] .product-setup-form input[type="file"]::-webkit-file-upload-button {
+    color: var(--bio-input-fg);
+  }
+  .product-setup-form input[type="file"]:hover::file-selector-button,
+  .product-setup-form input[type="file"]:hover::-webkit-file-upload-button {
+    background: var(--bio-nav-link-hover-bg);
+    border-color: var(--bio-nav-link-hover-border);
+  }
+  .product-setup-form input[type="file"].setup-file-input-hidden,
+  .product-setup-form input.setup-file-input-hidden {
+    display: none !important;
+  }
   .setup-form-action-btn {
     height: 36px;
     min-height: 36px;
@@ -516,16 +649,17 @@
     gap: 8px;
     margin-bottom: 8px;
     padding: 8px;
-    border: 1px solid #2f3b57;
-    border-radius: 10px;
-    background: #111827;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 5px;
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow);
   }
   .binding-photo-card img {
     width: 100%;
     max-height: 160px;
     object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid #2f3b57;
+    border-radius: 4px;
+    border: 1px solid var(--bio-filter-border);
     display: block;
   }
   .binding-photo-actions {
@@ -548,26 +682,26 @@
     padding: 6px 8px;
   }
   .setup-tools-editor .tool-auto-override {
-    border-color: #6f7ef2 !important;
-    box-shadow: 0 0 0 2px rgba(111, 126, 242, 0.28);
-    background: rgba(111, 126, 242, 0.14);
+    border-color: var(--bio-input-focus-border) !important;
+    box-shadow: 0 0 0 2px var(--bio-input-focus-ring);
+    background: color-mix(in srgb, var(--bio-input-focus-border) 14%, transparent);
   }
   #id_setup_notes {
-    background: #101520;
-    color: #eaf0ff;
-    border: 1px solid #33415f;
-    border-radius: 10px;
+    background: var(--bio-input-bg);
+    color: var(--bio-body-fg);
+    border: 1px solid var(--bio-input-border);
+    border-radius: 5px;
     line-height: 1.45;
     resize: vertical;
   }
   #id_setup_notes:hover {
-    border-color: #415277;
+    border-color: var(--bio-input-hover-border);
   }
   #id_setup_notes:focus {
     outline: none;
-    border-color: #7c8cff;
-    box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.22);
-    background: #121a2a;
+    border-color: var(--bio-input-focus-border);
+    box-shadow: 0 0 0 3px var(--bio-input-focus-ring);
+    background: var(--bio-input-focus-bg);
   }
   @media (max-width: 720px) {
     #preview-stl-card,
@@ -592,7 +726,7 @@
       grid-template-columns: 1fr !important;
       gap: 8px !important;
     }
-    .setup-photo-preview {
+    .setup-photo-preview--thumb {
       width: 100% !important;
       height: 180px !important;
     }

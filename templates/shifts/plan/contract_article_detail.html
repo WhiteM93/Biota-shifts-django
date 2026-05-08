@@ -6,10 +6,10 @@
 <style>
   .plan-stages-compact .plan-stage-line {
     padding: 9px 10px;
-    border-bottom: 1px solid #2b3650;
+    border-bottom: 1px solid var(--bio-table-cell-border);
     font-size: 14px;
     line-height: 1.45;
-    color: #eaf0ff;
+    color: var(--bio-body-fg);
   }
   .plan-stages-compact .plan-stage-line:last-child { border-bottom: 0; }
 
@@ -23,7 +23,7 @@
     margin: 0 0 16px 0;
     padding: 12px 14px;
     border: 1px solid #344064;
-    border-radius: 8px;
+    border-radius: 4px;
     background: rgba(30, 40, 64, 0.45);
   }
   .plan-usage-row--highlight td {
@@ -38,7 +38,7 @@
 
   <div class="plan-article-main">
 <div class="page-actions" style="flex-wrap:wrap;">
-  <a href="{% url 'plan_contract_detail' pk=contract.pk %}" class="btn btn-sm btn-ghost">← К контракту</a>
+  <a href="{% url 'plan_contracts' %}#plan-contract-{{ contract.pk }}" class="btn btn-sm btn-ghost">← К контрактам</a>
   <a href="{% url 'plan_article_detail' pk=item.pk %}" class="btn btn-sm btn-ghost">Карточка в плане</a>
   {% if biota_can_edit %}
   <a href="{% url 'plan_article_edit' pk=item.pk %}" class="btn btn-sm">Редактировать позицию</a>
@@ -48,11 +48,11 @@
 <div class="contract-article-scope">
   <p class="muted" style="margin:0 0 4px 0;font-size:12px;">Просмотр в контексте контракта</p>
   <p style="margin:0 0 6px 0;line-height:1.3;">
-    <a href="{% url 'plan_contract_detail' pk=contract.pk %}">{% if contract.title %}{{ contract.title }}{% else %}Контракт #{{ contract.pk }}{% endif %}</a>
+    <a href="{% url 'plan_contracts' %}#plan-contract-{{ contract.pk }}">{% if contract.title %}{{ contract.title }}{% else %}Контракт #{{ contract.pk }}{% endif %}</a>
     <span class="muted" style="font-size:11px;margin-left:6px;">#{{ contract.pk }}</span>
   </p>
-  <p class="muted" style="margin:0 0 8px 0;"><strong style="color:#c9d5ff;">Дедлайн:</strong> {{ contract.deadline|date:"d.m.Y" }}</p>
-  <p style="margin:0;font-size:1rem;color:#eaf0ff;">Количество по контракту для этой позиции: <strong>{{ contract_line.quantity }}</strong> {% if item.is_assembly %}компл.{% else %}ед.{% endif %}</p>
+  <p class="muted" style="margin:0 0 8px 0;"><strong style="color:var(--bio-heading-accent);">Дедлайн:</strong> {{ contract.deadline|date:"d.m.Y" }}</p>
+  <p style="margin:0;font-size:1rem;color:var(--bio-body-fg);">Количество по контракту для этой позиции: <strong>{{ contract_line.quantity }}</strong> {% if item.is_assembly %}компл.{% else %}ед.{% endif %}</p>
   {% if item.is_assembly %}
   <p class="muted" style="margin:8px 0 0 0;font-size:12px;">В составе ниже столбец «по контракту» = («на 1 комплект») × {{ contract_line.quantity }}.</p>
   {% endif %}
@@ -67,22 +67,22 @@
 </h1>
 <p class="muted">{% if item.is_purchased %}ПКИ (закупка). {% endif %}Маршрут по отделам — при наличии; изменение состава и этапов — в общей карточке плана.</p>
 {% if item.naladki_product %}
-<p style="margin:10px 0 0 0;font-size:0.92rem;color:#c9d5ff;">
+<p style="margin:10px 0 0 0;font-size:0.92rem;color:var(--bio-heading-accent);">
   <span class="muted">Наладка:</span>
   <a href="{% url 'product_detail' pk=item.naladki_product.pk %}">Карточка изделия №{{ item.naladki_product.pk }}</a>
 </p>
 {% endif %}
 {% if not item.is_assembly and not item.is_purchased %}
-<p style="margin:6px 0 0 0;font-size:0.92rem;color:#c9d5ff;">Тип заготовки: {% if item.workpiece_type %}<strong>{{ item.get_workpiece_type_display }}</strong>{% else %}<span class="muted">не задан{% if biota_can_edit %} — укажите при редактировании{% endif %}</span>{% endif %}</p>
+<p style="margin:6px 0 0 0;font-size:0.92rem;color:var(--bio-heading-accent);">Тип заготовки: {% if item.workpiece_type %}<strong>{{ item.get_workpiece_type_display }}</strong>{% else %}<span class="muted">не задан{% if biota_can_edit %} — укажите при редактировании{% endif %}</span>{% endif %}</p>
 {% if item.workpiece_type == 'laser' %}
-<p style="margin:6px 0 0 0;font-size:0.92rem;color:#aebde8;">Лазер — толщина листа: {% if item.laser_sheet_thickness_mm is not None %}<strong>{{ item.laser_sheet_thickness_mm }} мм</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в карточке редактирования{% endif %}</span>{% endif %} · Маркировка материала: {% if item.laser_material_marking %}<strong>{{ item.laser_material_marking }}</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в карточке редактирования{% endif %}</span>{% endif %}</p>
+<p style="margin:6px 0 0 0;font-size:0.92rem;color:var(--bio-field-label);">Лазер — толщина листа: {% if item.laser_sheet_thickness_mm is not None %}<strong>{{ item.laser_sheet_thickness_mm }} мм</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в карточке редактирования{% endif %}</span>{% endif %} · Маркировка материала: {% if item.laser_material_marking %}<strong>{{ item.laser_material_marking }}</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в карточке редактирования{% endif %}</span>{% endif %}</p>
 {% endif %}
 {% endif %}
 
 {% include "shifts/plan/includes/plan_product_usage_summary.html" %}
 
 {% if item.is_assembly %}
-<h3 style="margin:16px 0 8px 0;font-size:1rem;color:#c9d5ff;">Состав сборки (пересчёт по объёму контракта)</h3>
+<h3 style="margin:16px 0 8px 0;font-size:1rem;color:var(--bio-heading-accent);">Состав сборки (пересчёт по объёму контракта)</h3>
 {% if bom_scaled %}
 <div class="table-wrap">
   <table class="data-grid plan-assembly-bom">

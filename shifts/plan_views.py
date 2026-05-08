@@ -7,7 +7,8 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, IntegerField, Q, Sum, Value
+from django.db.models.functions import Coalesce
 from django.http import Http404, JsonResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -618,16 +619,22 @@ def plan_product_name_suggestions_view(request):
     return JsonResponse({"ok": True, "items": scored})
 
 
-_PLAN_INDEX_VIEWS = frozenset({"all", "assembly", "purchased", "made"})
+def _contract_filter_from_request(request) -> PlanContract | None:
+    raw = (request.GET.get("contract") or "").strip()
+    if not raw.isdigit():
+        return None
+    return PlanContract.objects.filter(pk=int(raw)).first()
 
 
-def _pki_totals_via_contract_lines() -> dict[int, int]:
+def _pki_totals_via_contract_lines(contract: PlanContract | None = None) -> dict[int, int]:
     """
     Суммарное количество ПКИ по всем строкам контрактов:
     — прямой учёт строк, где позиция = ПКИ;
     — если строка указывает на сборку, обход BOM (рекурсивно), количество умножается цепочкой на комплект.
     """
     lines, bom_map = contract_lines_and_bom_map()
+    if contract is not None:
+        lines = [ln for ln in lines if ln.contract_id == contract.pk]
     if not lines:
         return {}
 
@@ -658,23 +665,33 @@ def _pki_totals_via_contract_lines() -> dict[int, int]:
 @require_http_methods(["GET", "HEAD"])
 def plan_department_planning(request, slug: str):
     slug_l = str(slug or "").strip().lower()
+    contract_filter = _contract_filter_from_request(request)
     if slug_l == PLAN_RAIL_PKI_SLUG:
-        pid_to_qty = _pki_totals_via_contract_lines()
+        pid_to_qty = _pki_totals_via_contract_lines(contract=contract_filter)
         if not pid_to_qty:
             rows = []
         else:
             products = PlannedProduct.objects.filter(pk__in=pid_to_qty.keys()).order_by("name")
             rows = [{"product": p, "qty": pid_to_qty[p.pk]} for p in products]
+        if contract_filter is None:
+            pki_heading = "Закупные позиции (ПКИ)"
+        else:
+            label = contract_filter.title or f"контракт №{contract_filter.pk}"
+            pki_heading = f"Закупные позиции (ПКИ) — {label}"
         return render(
             request,
             "shifts/plan/department_planning.html",
             {
-                "plan_scope_title": "ПКИ по всем контрактам",
+                "plan_scope_title": "ПКИ по всем контрактам"
+                if contract_filter is None
+                else f"ПКИ · {contract_filter.title or 'без названия'}",
                 "planning_mode": "pki",
                 "department_label": "",
                 "pki_rows": rows,
                 "contract_blocks": [],
                 "plan_department_choices": PLANNED_PRODUCT_DEPARTMENT_CHOICES,
+                "plan_contract_filter": contract_filter,
+                "plan_pki_page_heading": pki_heading,
             },
         )
 
@@ -690,6 +707,8 @@ def plan_department_planning(request, slug: str):
     contract_blocks: list[dict] = []
     if pids_with_dept:
         lines, bom_map = contract_lines_and_bom_map()
+        if contract_filter is not None:
+            lines = [ln for ln in lines if ln.contract_id == contract_filter.pk]
         cmap: dict[int, dict[int, int]] = defaultdict(lambda: defaultdict(int))
 
         def walk_department(contract_id: int, product_id: int, mult: int) -> None:
@@ -756,6 +775,8 @@ def plan_department_planning(request, slug: str):
             "pki_rows": [],
             "contract_blocks": contract_blocks,
             "plan_department_choices": PLANNED_PRODUCT_DEPARTMENT_CHOICES,
+            "plan_contract_filter": contract_filter,
+            "plan_pki_page_heading": None,
         },
     )
 
@@ -764,25 +785,37 @@ def plan_department_planning(request, slug: str):
 @nav_permission_required("plan")
 @require_http_methods(["GET", "HEAD"])
 def plan_index(request):
-    view = (request.GET.get("view") or "assembly").strip().lower()
-    if view not in _PLAN_INDEX_VIEWS:
-        view = "assembly"
-
+    contract_filter = _contract_filter_from_request(request)
     qs = PlannedProduct.objects.annotate(stage_count=Count("stages"))
-    if view == "assembly":
-        qs = qs.filter(is_assembly=True)
-    elif view == "purchased":
-        qs = qs.filter(is_purchased=True)
-    elif view == "made":
-        qs = qs.filter(is_assembly=False, is_purchased=False)
+    ord_spec = ["-updated_at", "-id"]
 
-    items = list(qs.order_by("-updated_at", "-id"))
+    scoped_q = qs
+    if contract_filter is not None:
+        line_product_ids = PlanContractLine.objects.filter(
+            contract_id=contract_filter.pk
+        ).values_list("product_id", flat=True).distinct()
+        scoped_q = scoped_q.filter(pk__in=line_product_ids)
+
+    items_assembly = list(scoped_q.filter(is_assembly=True).order_by(*ord_spec))
+    items_made = list(scoped_q.filter(is_assembly=False, is_purchased=False).order_by(*ord_spec))
+    items_pki = list(scoped_q.filter(is_purchased=True).order_by(*ord_spec))
+
+    contracts_qs = PlanContract.objects.annotate(
+        line_count=Count("lines"),
+        total_qty=Coalesce(Sum("lines__quantity"), Value(0, output_field=IntegerField())),
+    ).order_by("deadline", "-id")
+    if contract_filter is not None:
+        contracts_qs = contracts_qs.filter(pk=contract_filter.pk)
+    plan_contracts_summary = list(contracts_qs)
     return render(
         request,
         "shifts/plan/index.html",
         {
-            "items": items,
-            "plan_view": view,
+            "items_assembly": items_assembly,
+            "items_made": items_made,
+            "items_pki": items_pki,
+            "plan_contracts_summary": plan_contracts_summary,
+            "plan_hide_left_rail": True,
             "plan_department_choices": PLANNED_PRODUCT_DEPARTMENT_CHOICES,
         },
     )
@@ -886,13 +919,19 @@ def plan_article_edit(request, pk: int | None = None):
 
     rows = _stage_rows_for_form(None, None, stages_initial if stages_initial else None)
     bom_init = _bom_rows_initial(item)
+    if item is not None:
+        plan_type_initial = _plan_product_type_from_item(item)
+    else:
+        plan_type_initial = _normalize_plan_product_type(
+            request.GET.get("plan_product_type") or request.GET.get("type")
+        )
     return render(
         request,
         "shifts/plan/article_edit.html",
         _edit_form_context(
             item=item,
             name_value=item.name if item else "",
-            plan_product_type=_plan_product_type_from_item(item),
+            plan_product_type=plan_type_initial,
             workpiece_type_value=_workpiece_type_initial(item),
             laser_sheet_thickness_value=_laser_thickness_input_value(item),
             laser_material_marking_value=_laser_material_marking_input_value(item),

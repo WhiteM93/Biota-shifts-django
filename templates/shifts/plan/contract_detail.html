@@ -20,11 +20,11 @@
 <h1 style="margin:12px 0 8px 0;">
   {% if contract.title %}{{ contract.title }}{% else %}Контракт{% endif %}
 </h1>
-<p class="muted" style="margin:0 0 4px 0;"><strong style="color:#c9d5ff;">Дедлайн:</strong> {{ contract.deadline|date:"d.m.Y" }}</p>
-<p class="muted" style="margin:0 0 4px 0;font-size:0.92rem;">По строкам (сумма количеств): <strong style="color:#eaf0ff;">{{ contract.total_qty }}</strong> ед.</p>
+<p class="muted" style="margin:0 0 4px 0;"><strong style="color:var(--bio-heading-accent);">Дедлайн:</strong> {{ contract.deadline|date:"d.m.Y" }}</p>
+<p class="muted" style="margin:0 0 4px 0;font-size:0.92rem;">По строкам (сумма количеств): <strong style="color:var(--bio-body-fg);">{{ contract.total_qty }}</strong> ед.</p>
 <p class="muted" style="font-size:12px;">Обновлено {{ contract.updated_at|date:"d.m.Y H:i" }}</p>
 
-<h3 style="margin:18px 0 8px 0;font-size:1rem;color:#c9d5ff;">Ссылки на позиции плана</h3>
+<h3 style="margin:18px 0 8px 0;font-size:1rem;color:var(--bio-heading-accent);">Ссылки на позиции плана</h3>
 <p class="muted" style="margin:0 0 10px 0;font-size:12px;">Каждая строка — только ссылка на позицию в плане и количество по контракту; итог сверху пересчитывается из суммы колонки «Кол-во».</p>
 {% if contract.lines.all %}
 <div class="table-wrap">

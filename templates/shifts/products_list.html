@@ -67,10 +67,10 @@
     align-items: stretch;
   }
   .product-tile {
-    border: 1px solid #2f3b57;
-    border-radius: 14px;
-    background: linear-gradient(180deg, rgba(30, 41, 64, 0.8) 0%, rgba(20, 27, 41, 0.94) 100%);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24);
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 7px;
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: 0 8px 20px var(--bio-shadow-card);
     padding: 12px;
     display: flex;
     flex-direction: column;
@@ -79,7 +79,7 @@
     height: 360px;
   }
   .product-tile-title {
-    color: #eaf0ff;
+    color: var(--bio-body-fg);
     text-decoration: none;
     font-weight: 700;
     line-height: 1.35;
@@ -90,14 +90,14 @@
     overflow: hidden;
     min-height: 2.7em;
   }
-  .product-tile-title:hover { color: #bcd0ff; }
+  .product-tile-title:hover { color: var(--bio-heading-accent); }
   .product-tile-3d {
     flex: 0 0 230px;
     height: 230px;
     min-height: 230px;
-    border-radius: 10px;
-    border: 1px solid #374563;
-    background: #d3d7de;
+    border-radius: 5px;
+    border: 1px solid var(--bio-preview-canvas-border);
+    background: var(--bio-preview-canvas-bg);
     overflow: hidden;
     position: relative;
     display: flex;
@@ -105,12 +105,12 @@
     justify-content: center;
   }
   .product-tile-3d-empty {
-    background: #cfd3da;
+    background: var(--bio-preview-canvas-bg-empty);
   }
   .product-tile-preview-image-wrap {
     padding: 0;
-    border: 1px solid #aeb6c4;
-    background: #dde1e8;
+    border: 1px solid var(--bio-preview-image-border);
+    background: var(--bio-preview-image-bg);
   }
   .product-tile-preview-image {
     width: 100%;
@@ -146,7 +146,7 @@
       gap: 10px;
     }
     .product-tile {
-      border-radius: 12px;
+      border-radius: 6px;
       padding: 8px;
       gap: 8px;
       height: 270px;
@@ -174,6 +174,17 @@
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
   import { STLLoader } from "three/addons/loaders/STLLoader.js";
 
+  function readBiotaPreviewCanvasBg() {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue("--bio-preview-canvas-bg").trim();
+    const c = new THREE.Color();
+    try {
+      c.setStyle(raw);
+    } catch (_) {
+      c.setHex(0xd3d7de);
+    }
+    return c;
+  }
+
   const hosts = Array.from(document.querySelectorAll(".product-tile-3d[data-stl-url]"));
   if (!hosts.length) {
     // Nothing to render.
@@ -189,7 +200,10 @@
       if (!stlUrl) return;
 
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xd3d7de);
+      scene.background = readBiotaPreviewCanvasBg();
+      document.addEventListener("biota-theme-change", () => {
+        scene.background.copy(readBiotaPreviewCanvasBg());
+      });
       const camera = new THREE.PerspectiveCamera(40, host.clientWidth / Math.max(host.clientHeight, 1), 0.1, 1e7);
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));

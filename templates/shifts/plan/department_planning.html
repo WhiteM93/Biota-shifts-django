@@ -6,7 +6,7 @@
 {% include "shifts/plan/includes/plan_rails_styles.html" %}
 <style>
   .plan-dept-block { margin-bottom: 22px; }
-  .plan-dept-block h3 { margin: 0 0 6px 0; font-size: 1rem; color: #c9d5ff; font-weight: 600; }
+  .plan-dept-block h3 { margin: 0 0 6px 0; font-size: 1rem; color: var(--bio-heading-accent); font-weight: 600; }
   .plan-dept-block .muted-deadline { font-size: 12px; color: #7d8fba; margin: 2px 0 8px 0; }
 </style>
 <div class="plan-article-rails-root">
@@ -17,20 +17,39 @@
     <a href="{% url 'plan' %}" class="btn btn-sm btn-ghost">← К плану</a>
     <a href="{% url 'plan_contracts' %}" class="btn btn-sm btn-ghost">Контракты</a>
   </div>
+  <div style="max-width:min(340px,100%);margin:10px 0 12px 0;">
+    {% plan_contract_scope_select %}
+  </div>
   {% if planning_mode == "dept" %}
     <h1 style="margin:12px 0 6px 0;line-height:1.25;">Отдел «{{ plan_scope_title }}»</h1>
+    {% if plan_contract_filter %}
+    <p class="muted" style="margin:-4px 0 10px 0;font-size:12px;max-width:52rem;line-height:1.35;">
+      Показано по контракту:
+      <strong style="color:var(--bio-heading-accent);">
+        {% if plan_contract_filter.title %}{{ plan_contract_filter.title }}{% else %}без названия{% endif %}
+      </strong>
+      <span style="opacity:0.85;">· до {{ plan_contract_filter.deadline|date:"d.m.Y" }} · #{{ plan_contract_filter.pk }}</span>
+      · <a href="{{ request.path }}">все контракты</a>
+    </p>
+    {% endif %}
     <p class="muted" style="margin:0 0 14px 0;font-size:13px;max-width:52rem;">
       Учитываются позиции с хотя бы одним этапом этого отдела, в том числе как входящие в состав сборок по строкам контрактов —
       количество пересчитывается по цепочке «на комплект» до этой позиции. Если одна позиция фигурирует в контракте несколько раз
       (разные сборки или дубль строки), вклады суммируются.
     </p>
     {% if not contract_blocks %}
-      <p class="muted">Нет строк контрактов или этапов в этом отделе.</p>
+      <p class="muted">
+        {% if plan_contract_filter %}
+          Нет позиций по этому контракту и отделу (или строк контрактов нет).
+        {% else %}
+          Нет строк контрактов или этапов в этом отделе.
+        {% endif %}
+      </p>
     {% endif %}
     {% for block in contract_blocks %}
       <section class="plan-dept-block" id="contract-{{ block.contract.pk }}">
         <h3>
-          <a href="{% url 'plan_contract_detail' pk=block.contract.pk %}">{{ block.contract.title|default:"Контракт" }}</a>
+          <a href="{% url 'plan_contracts' %}#plan-contract-{{ block.contract.pk }}">{{ block.contract.title|default:"Контракт" }}</a>
           <span class="muted" style="font-size:12px;margin-left:6px;font-weight:500;">#{{ block.contract.pk }}</span>
         </h3>
         <p class="muted-deadline">Дедлайн {{ block.contract.deadline|date:"d.m.Y" }} · строк в подборке: {{ block.lines|length }}</p>
@@ -58,19 +77,31 @@
       </section>
     {% endfor %}
   {% elif planning_mode == "pki" %}
-    <h1 style="margin:12px 0 6px 0;line-height:1.25;">Закупные позиции (ПКИ)</h1>
+    <h1 style="margin:12px 0 6px 0;line-height:1.25;">{{ plan_pki_page_heading }}</h1>
+    {% if plan_contract_filter %}
+    <p class="muted" style="margin:-6px 0 10px 0;font-size:12px;">
+      Только строки выбранного контракта.
+      · <a href="{{ request.path }}">все контракты</a>
+    </p>
+    {% endif %}
     <p class="muted" style="margin:0 0 14px 0;font-size:13px;max-width:52rem;">
-      Прямые строки контрактов по ПКИ плюс закупочные позиции внутри состава сборок (включая вложенные сборки): количество по цепочке до ПКИ = кол-во по контракту × множители «на комплект». Одна строка таблицы — одна позиция плана, без дублей, с суммой по всем контрактам.
+      Прямые строки контрактов по ПКИ плюс закупочные позиции внутри состава сборок (включая вложенные сборки): количество по цепочке до ПКИ = кол-во по контракту × множители «на комплект». Одна строка таблицы — одна позиция плана, без дублей{% if plan_contract_filter %}.{% else %}, с суммой по всем контрактам.{% endif %}
     </p>
     {% if not pki_rows %}
-      <p class="muted">Строк контрактов по ПКИ нет.</p>
+      <p class="muted">
+        {% if plan_contract_filter %}
+          У выбранного контракта нет ПКИ в строках и составах.
+        {% else %}
+          Строк контрактов по ПКИ нет.
+        {% endif %}
+      </p>
     {% else %}
       <div class="table-wrap">
         <table class="data-grid">
           <thead>
             <tr>
               <th>Позиция (ПКИ)</th>
-              <th style="width:120px;text-align:right;">Σ по контрактам</th>
+              <th style="width:120px;text-align:right;">{% if plan_contract_filter %}Количество{% else %}Σ по контрактам{% endif %}</th>
             </tr>
           </thead>
           <tbody>

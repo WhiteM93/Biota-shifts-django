@@ -1,0 +1,75 @@
+{% if biota_username and biota_can_edit %}
+<form method="post" action="{% url 'refresh_cache' %}" class="nav-refresh-form">
+  {% csrf_token %}
+  <button class="nav-refresh-btn" type="submit" title="Обновить кэш данных из БД" aria-label="Обновить кэш данных из БД">↻</button>
+</form>
+{% endif %}
+{% if biota_nav.home %}
+<a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">Главная</a>
+{% endif %}
+{% if biota_nav.plan %}
+{% with un=request.resolver_match.url_name %}
+<a href="{% url 'plan' %}" class="{% if un == 'plan' or un == 'plan_article_new' or un == 'plan_article_detail' or un == 'plan_article_edit' or un == 'plan_article_delete' or un == 'plan_contracts' or un == 'plan_contract_new' or un == 'plan_contract_detail' or un == 'plan_contract_edit' or un == 'plan_contract_delete' or un == 'plan_contract_article_detail' or un == 'plan_department_planning' or un == 'plan_product_name_suggestions' %}active{% endif %}">План</a>
+{% endwith %}
+{% endif %}
+{% if biota_nav.graph and biota_nav.regulations %}
+<details class="nav-dropdown">
+  <summary class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' or request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">График и регламенты</summary>
+  <div class="nav-dropdown-menu">
+    <a href="{% url 'graph' %}" class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' %}active{% endif %}">График</a>
+    <a href="{% url 'regulations_page' %}" class="{% if request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">Регламенты</a>
+  </div>
+</details>
+{% elif biota_nav.graph %}
+<a href="{% url 'graph' %}" class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' %}active{% endif %}">График</a>
+{% elif biota_nav.regulations %}
+<a href="{% url 'regulations_page' %}" class="{% if request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">Регламенты</a>
+{% endif %}
+{% if biota_nav.hours and biota_nav.skud %}
+<details class="nav-dropdown">
+  <summary class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' or request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">Часы и СКУД</summary>
+  <div class="nav-dropdown-menu">
+    <a href="{% url 'hours' %}" class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' %}active{% endif %}">Часы по дням</a>
+    <a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
+  </div>
+</details>
+{% elif biota_nav.hours %}
+<a href="{% url 'hours' %}" class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' %}active{% endif %}">Часы по дням</a>
+{% elif biota_nav.skud %}
+<a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
+{% endif %}
+{% if biota_nav.inventory %}
+<a href="{% url 'inventory' %}" class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel != 'defects' and request.GET.panel != 'payroll' and request.GET.panel != 'employees' %}active{% endif %}">Склад</a>
+{% endif %}
+{% if biota_nav.defects or biota_nav.payroll or biota_nav.employees %}
+<details class="nav-dropdown">
+  <summary class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel == 'defects' or request.resolver_match.url_name == 'payroll_settlement' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'payroll' or request.resolver_match.url_name == 'employee_payroll_detail' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'employees' %}active{% endif %}">Кадры и ЗП</summary>
+  <div class="nav-dropdown-menu">
+    {% if biota_nav.defects %}
+    <a href="{% url 'inventory' %}?panel=defects" class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel == 'defects' %}active{% endif %}">Учёт брака</a>
+    {% endif %}
+    {% if biota_nav.payroll %}
+    <a href="{% url 'inventory' %}?panel=payroll" class="{% if request.resolver_match.url_name == 'payroll_settlement' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'payroll' %}active{% endif %}">Расчёт ЗП</a>
+    {% endif %}
+  </div>
+</details>
+{% endif %}
+{% if biota_nav.employees %}
+<a href="{% url 'inventory' %}?panel=employees" class="{% if request.resolver_match.url_name == 'employee_payroll_detail' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'employees' %}active{% endif %}">Сотрудники</a>
+{% endif %}
+{% if biota_nav.products %}
+<a href="{% url 'products_list' %}" class="{% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_edit' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_setup_create' or request.resolver_match.url_name == 'product_setup_edit' %}active{% endif %}">Наладки</a>
+{% endif %}
+{% if biota_is_admin %}
+<a href="{% url 'admin_test_lab' %}" class="{% if request.resolver_match.url_name == 'admin_test_lab' %}active{% endif %}">Тест</a>
+{% endif %}
+<div class="nav-theme-wrap">
+  <button type="button" class="nav-theme-btn" id="biota-theme-toggle" aria-pressed="false" title="Тема «Рассвет» (светлая)">☾</button>
+</div>
+<span class="nav-spacer"></span>
+{% if biota_username %}
+<a href="{% url 'cabinet' %}" class="nav-user {% if request.resolver_match.url_name == 'cabinet' %}active{% endif %}">{{ biota_username }}</a>
+<a href="{% url 'logout' %}" class="nav-logout">Выйти</a>
+{% else %}
+<a href="{% url 'login' %}">Войти</a>
+{% endif %}

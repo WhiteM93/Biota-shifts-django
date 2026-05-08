@@ -29,7 +29,7 @@
     gap: 10px 18px;
   }
   .plan-product-type-row > span.label {
-    color: #aebde8;
+    color: var(--bio-field-label);
     font-size: 12px;
     font-weight: 600;
     width: 100%;
@@ -113,7 +113,7 @@
     </div>
     {% if naladki_specs_panel_show %}
     <div class="plan-naladki-specs-panel filter-panel" style="margin-top:14px;padding:14px;">
-      <h3 style="margin:0 0 8px 0;font-size:0.95rem;color:#c9d5ff;">Параметры карточки наладки</h3>
+      <h3 style="margin:0 0 8px 0;font-size:0.95rem;color:var(--bio-heading-accent);">Параметры карточки наладки</h3>
       {% if naladki_specs_no_link %}
       <p class="muted" style="margin:0;font-size:13px;line-height:1.45;">
         К изделию в цеху позиция ещё не привязана. Сохраните как «Изделие» — при совпадении названия связь создастся автоматически.
@@ -152,7 +152,7 @@
   </div>
 
   <div id="plan-bom-panel" class="plan-bom-panel filter-panel" style="{% if plan_product_type != 'assembly' %}display:none;{% endif %}margin-bottom:14px;">
-    <h3 style="margin:0 0 8px 0;font-size:1rem;color:#c9d5ff;">Состав сборки</h3>
+    <h3 style="margin:0 0 8px 0;font-size:1rem;color:var(--bio-heading-accent);">Состав сборки</h3>
     <p class="muted" style="margin:0 0 10px 0;">
       Укажите входящие изделия из плана и количество на <strong>один комплект</strong> этой сборки.
       Если изделия с таким названием ещё нет — оно будет создано автоматически.
@@ -188,7 +188,7 @@
     <button type="button" id="plan-bom-add" class="btn btn-sm btn-ghost" style="margin-top:10px;">+ В состав</button>
   </div>
 
-  <h3 style="margin:0 0 8px 0;font-size:1rem;color:#c9d5ff;">Этапы производства</h3>
+  <h3 style="margin:0 0 8px 0;font-size:1rem;color:var(--bio-heading-accent);">Этапы производства</h3>
   <p class="muted" style="margin:0 0 10px 0;">
     По желанию: укажите маршрут по отделам (можно сохранить позицию и без этапов). Пустые строки при сохранении отбрасываются.
   </p>

@@ -30,7 +30,7 @@
   <p><button type="submit" class="btn">Сохранить имя</button></p>
 </form>
 
-<hr style="border-color:#2b3650;margin:28px 0;">
+<hr style="border-color:var(--bio-table-cell-border);margin:28px 0;">
 
 <h3>Подтверждение регистраций</h3>
 <p class="muted">Пользователь не сможет войти в приложение, пока вы не подтвердите его учётную запись.</p>
@@ -52,7 +52,7 @@
 <p class="muted">Нет учётных записей, ожидающих подтверждения.</p>
 {% endif %}
 
-<hr style="border-color:#2b3650;margin:28px 0;">
+<hr style="border-color:var(--bio-table-cell-border);margin:28px 0;">
 
 <h3>Порядок отделов (для Графика)</h3>
 <p class="muted">Сотрудники в «Графике» сортируются: сначала по отделу, затем по фамилии А-Я. Расставьте отделы в нужном порядке (по одному в строке).</p>
@@ -77,7 +77,7 @@
   <p><button type="submit" class="btn">Сохранить порядок отделов</button></p>
 </form>
 
-<hr style="border-color:#2b3650;margin:28px 0;">
+<hr style="border-color:var(--bio-table-cell-border);margin:28px 0;">
 
 <h3>Порядок должностей (для Графика)</h3>
 <p class="muted">При сортировке «Сначала должность» строки упорядочиваются по этому списку, затем по отделу и фамилии.</p>
@@ -102,7 +102,7 @@
   <p><button type="submit" class="btn">Сохранить порядок должностей</button></p>
 </form>
 
-<hr style="border-color:#2b3650;margin:28px 0;">
+<hr style="border-color:var(--bio-table-cell-border);margin:28px 0;">
 
 <h3>Права пользователей</h3>
 <p class="muted">Новые аккаунты по умолчанию ждут подтверждения администратором. Ниже настраиваются доступы к разделам и (опционально) фильтр по отделам внутри каждого раздела.</p>
@@ -185,15 +185,15 @@
 .admin-health-bar {
   margin-bottom: 22px;
   padding: 14px 16px;
-  border-radius: 12px;
-  border: 1px solid #2f3b57;
-  background: linear-gradient(180deg, rgba(28, 38, 58, 0.95) 0%, rgba(18, 24, 38, 0.98) 100%);
+  border-radius: 6px;
+  border: 1px solid var(--bio-filter-border);
+  background: linear-gradient(180deg, var(--bio-card-gradient1) 0%, var(--bio-card-gradient2) 100%);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.2);
 }
 .admin-health-bar__title {
   font-weight: 700;
   font-size: 14px;
-  color: #c9d5ff;
+  color: var(--bio-heading-accent);
   margin-bottom: 10px;
   letter-spacing: 0.02em;
 }
@@ -213,9 +213,9 @@
   font-size: 12px;
   line-height: 1.4;
   padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(12, 16, 26, 0.55);
-  border: 1px solid #2a3550;
+  border-radius: 4px;
+  background: var(--bio-surface-item);
+  border: 1px solid var(--bio-surface-item-border);
 }
 .admin-health-dot {
   width: 10px;
@@ -228,16 +228,16 @@
 .admin-health-item--warn .admin-health-dot { background: #f0c14a; box-shadow: 0 0 8px rgba(240, 193, 74, 0.4); }
 .admin-health-item--err .admin-health-dot { background: #ff6b6b; box-shadow: 0 0 8px rgba(255, 107, 107, 0.45); }
 .admin-health-label { font-weight: 600; color: #e4ecff; }
-.admin-health-detail { color: #9bb0d8; word-break: break-word; }
+.admin-health-detail { color: var(--bio-muted); word-break: break-word; }
 .admin-health-item--warn .admin-health-detail { color: #f5d99a; }
-.admin-health-item--err .admin-health-detail { color: #ffb8b8; }
+.admin-health-item--err .admin-health-detail { color: var(--bio-error-soft); }
 .cab-multi { min-height: 140px; width: 100%; max-width: 520px; }
 .cab-check-group {
   margin: 10px 0 14px 0;
   max-width: 780px;
 }
 .cab-check-title {
-  color: #aebde8;
+  color: var(--bio-field-label);
   font-size: 13px;
   font-weight: 700;
   margin-bottom: 8px;
@@ -250,9 +250,9 @@
 .cab-nav-block {
   margin: 12px 0 14px 0;
   padding: 10px 10px 8px 10px;
-  border: 1px solid #2f3b57;
-  border-radius: 12px;
-  background: rgba(16, 23, 36, 0.55);
+  border: 1px solid var(--bio-filter-border);
+  border-radius: 6px;
+  background: var(--bio-surface-item);
 }
 .cab-nav-head {
   margin-bottom: 8px;
@@ -275,9 +275,9 @@
 .dept-order-box {
   width: 100%;
   max-width: 620px;
-  border: 1px solid #2f3b57;
-  border-radius: 10px;
-  background: rgba(16, 23, 36, 0.88);
+  border: 1px solid var(--bio-filter-border);
+  border-radius: 5px;
+  background: var(--bio-surface-panel);
   padding: 8px;
 }
 .dept-order-list {
@@ -295,21 +295,21 @@
   gap: 10px;
   padding: 8px 10px;
   border: 1px solid #394766;
-  border-radius: 8px;
+  border-radius: 4px;
   background: rgba(23, 31, 48, 0.92);
   cursor: grab;
 }
 .dept-item:active { cursor: grabbing; }
 .dept-item.dragging {
   opacity: 0.5;
-  border-color: #7c8cff;
+  border-color: var(--bio-input-focus-border);
 }
 .dept-item.drag-over {
-  border-color: #7c8cff;
+  border-color: var(--bio-input-focus-border);
   box-shadow: 0 0 0 2px rgba(124, 140, 255, 0.2);
 }
 .dept-drag-handle {
-  color: #9bb0d8;
+  color: var(--bio-muted);
   letter-spacing: -1px;
   user-select: none;
 }
@@ -416,7 +416,7 @@
 {% else %}
 
 {% if profile_missing %}
-<p style="color:#ffb8b8;">Данные профиля не найдены.</p>
+<p style="color:var(--bio-error-soft);">Данные профиля не найдены.</p>
 {% else %}
 <p class="muted">Роль: <strong>{{ profile_role }}</strong>. Логин: <code>{{ profile_login }}</code></p>
 <p class="muted">Регистрация: {{ profile_created }}</p>

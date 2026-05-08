@@ -1,18 +1,26 @@
 """Контракты раздела «План»: дедлайн и объёмы по позициям."""
 
+from typing import Any
+
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Count, IntegerField, Sum, Value
+from django.db.models import Count, IntegerField, Prefetch, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST, require_http_methods
 
 from biota_shifts.auth import _is_admin, user_is_executor
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required
-from .models import PlanContract, PlanContractLine, PlannedProduct
+from .models import (
+    PlanContract,
+    PlanContractLine,
+    PlannedAssemblyComponent,
+    PlannedProduct,
+)
 from .plan_departments import PLANNED_PRODUCT_DEPARTMENT_CHOICES
 from .plan_usage import product_assembly_usage_rows, product_contract_usage_rows
 
@@ -26,8 +34,73 @@ def _executor_write_block(request, user: str | None, contract: PlanContract | No
         return None
     messages.info(request, "Редактирование контрактов плана доступно только руководителям.")
     if contract:
-        return redirect("plan_contract_detail", pk=contract.pk)
+        return redirect(reverse("plan_contracts") + f"#plan-contract-{contract.pk}")
     return redirect("plan_contracts")
+
+
+def _planned_ac_prefetch_tree(depth: int) -> Any:
+    """Рекурсивный prefetch состава сборок (до `depth` уровней), без N+1 в дереве."""
+    qs = PlannedAssemblyComponent.objects.order_by("sort_order", "id").select_related(
+        "component",
+    )
+    if depth > 1:
+        qs = qs.prefetch_related(
+            Prefetch(
+                "component__assembly_components",
+                queryset=_planned_ac_prefetch_tree(depth - 1),
+            )
+        )
+    return qs
+
+
+def _bom_tree_nodes(
+    product: PlannedProduct,
+    assembly_kits: int,
+    contracted_product_ids: frozenset[int],
+) -> list[dict[str, Any]]:
+    """Узлы дерева BOM с пересчётом количества по контракту (рекурсивно)."""
+    if not product.is_assembly:
+        return []
+    ac_list = sorted(
+        product.assembly_components.all(),
+        key=lambda ac: (ac.sort_order, ac.pk),
+    )
+    out: list[dict[str, Any]] = []
+    for ac in ac_list:
+        comp = ac.component
+        in_contract = ac.quantity * assembly_kits
+        children = (
+            _bom_tree_nodes(comp, in_contract, contracted_product_ids)
+            if comp.is_assembly
+            else []
+        )
+        out.append(
+            {
+                "ac": ac,
+                "component": comp,
+                "per_kit": ac.quantity,
+                "in_contract": in_contract,
+                "children": children,
+            }
+        )
+    return out
+
+
+def _attach_contract_tree(contract: PlanContract) -> None:
+    line_iter = sorted(
+        contract.lines.all(),
+        key=lambda ln: (ln.sort_order, ln.pk),
+    )
+    cpids_fs = frozenset(ln.product_id for ln in line_iter)
+    # Имена без ведущего «_»: в шаблонах Django недоступны атрибуты с «_».
+    contract.contracted_product_ids = sorted(cpids_fs)  # type: ignore[attr-defined]
+    contract.plan_tree_lines = [  # type: ignore[attr-defined]
+        {
+            "line": ln,
+            "bom": _bom_tree_nodes(ln.product, ln.quantity, cpids_fs),
+        }
+        for ln in line_iter
+    ]
 
 
 def _contract_rows_post(request) -> list[dict[str, str]]:
@@ -186,12 +259,27 @@ def plan_contract_article_detail(request, contract_pk: int, product_pk: int):
 @nav_permission_required("plan")
 @require_http_methods(["GET", "HEAD"])
 def plan_contract_index(request):
-    contracts = list(
+    lines_qs = (
+        PlanContractLine.objects.order_by("sort_order", "id")
+        .select_related("product")
+        .prefetch_related(
+            Prefetch(
+                "product__assembly_components",
+                queryset=_planned_ac_prefetch_tree(12),
+            )
+        )
+    )
+    qs = (
         PlanContract.objects.annotate(
             line_count=Count("lines"),
             total_qty=Coalesce(Sum("lines__quantity"), Value(0, output_field=IntegerField())),
-        ).order_by("deadline", "-id")
+        )
+        .order_by("deadline", "-id")
+        .prefetch_related(Prefetch("lines", queryset=lines_qs))
     )
+    contracts = list(qs)
+    for contract in contracts:
+        _attach_contract_tree(contract)
     return render(
         request,
         "shifts/plan/contracts_list.html",
@@ -203,17 +291,8 @@ def plan_contract_index(request):
 @nav_permission_required("plan")
 @require_http_methods(["GET", "HEAD"])
 def plan_contract_detail(request, pk: int):
-    c = get_object_or_404(
-        PlanContract.objects.annotate(
-            total_qty=Coalesce(Sum("lines__quantity"), Value(0, output_field=IntegerField())),
-        ).prefetch_related("lines__product"),
-        pk=pk,
-    )
-    return render(
-        request,
-        "shifts/plan/contract_detail.html",
-        {**_rail_ctx(), "contract": c},
-    )
+    get_object_or_404(PlanContract.objects.only("pk"), pk=pk)
+    return redirect(reverse("plan_contracts") + f"#plan-contract-{pk}")
 
 
 @biota_login_required
@@ -297,7 +376,7 @@ def plan_contract_edit(request, pk: int | None = None):
             )
 
         messages.success(request, "Контракт сохранён.")
-        return redirect("plan_contract_detail", pk=contract.pk)
+        return redirect(reverse("plan_contracts") + f"#plan-contract-{contract.pk}")
 
     init_rows = _rows_initial(contract)
     deadline_init = ""
