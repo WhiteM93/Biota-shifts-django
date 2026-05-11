@@ -34,6 +34,7 @@ from .plan_departments import (
     PLANNED_PRODUCT_DEPARTMENT_VALUES,
 )
 from .plan_naladki_bridge import finalize_plan_piece_naladki_link, plan_piece_is_linked_type
+from .product_plan_sync import plan_card_summary
 from .plan_usage import (
     contract_lines_and_bom_map,
     product_assembly_usage_rows,
@@ -870,6 +871,7 @@ def plan_article_detail(request, pk: int):
 
     usage_contract_rows, usage_contract_sum = product_contract_usage_rows(item.pk)
     usage_assembly_rows = product_assembly_usage_rows(item.pk)
+    _plan_card = plan_card_summary(item)
     ctx: dict[str, object] = {
         "item": item,
         "plan_department_choices": PLANNED_PRODUCT_DEPARTMENT_CHOICES,
@@ -877,6 +879,9 @@ def plan_article_detail(request, pk: int):
         "usage_contract_sum": usage_contract_sum,
         "usage_assembly_rows": usage_assembly_rows,
         "usage_highlight_contract_pk": None,
+        "plan_display_product_kind_line": _plan_card["product_kind_line"],
+        "plan_display_workpiece_line": _plan_card["workpiece_line"],
+        "plan_display_material_line": _plan_card["material_line"],
         **_naladki_setup_readonly_detail_context(item),
     }
     if _is_admin(user or "") or not user_is_executor(user):

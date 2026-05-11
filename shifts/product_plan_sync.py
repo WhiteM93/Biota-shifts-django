@@ -103,33 +103,48 @@ def plan_inline_state_payload(product: Product | None) -> dict[str, str]:
 
 
 def plan_card_summary(pp: PlannedProduct | None) -> dict[str, str]:
-    """Короткие строки для карточки наладки (тип / заготовка / материал)."""
-    summary = {"type_line": "—", "workpiece_line": "—", "material_line": "—"}
+    """Короткие строки для карточки наладки (тип изделия / заготовка / материал)."""
+    summary = {
+        "product_kind_line": "—",
+        "type_line": "—",
+        "workpiece_line": "—",
+        "material_line": "—",
+    }
     if not pp:
         return summary
     if pp.is_assembly:
+        summary["product_kind_line"] = "Сборка"
         summary["type_line"] = "Сборка"
+        summary["workpiece_line"] = "—"
+        summary["material_line"] = "—"
         return summary
     if pp.is_purchased:
+        summary["product_kind_line"] = "ПКИ"
         summary["type_line"] = "ПКИ"
+        summary["workpiece_line"] = "—"
+        summary["material_line"] = "—"
         return summary
+    summary["product_kind_line"] = "Изделие"
     if pp.workpiece_type == "laser":
         summary["type_line"] = "Лазер"
         thick = ""
         if pp.laser_sheet_thickness_mm is not None:
             d = pp.laser_sheet_thickness_mm
             thick = format(d, "f").rstrip("0").rstrip(".")
-        summary["workpiece_line"] = f"Лист {thick} мм" if thick else "Лазер"
+        summary["workpiece_line"] = f"Лазерный · лист {thick} мм" if thick else "Лазерный"
         summary["material_line"] = (pp.laser_material_marking or "").strip() or "—"
     elif pp.workpiece_type == "preparatory":
         summary["type_line"] = "Заготовительный"
-        summary["workpiece_line"] = "Заготовка"
+        summary["workpiece_line"] = "Заготовительный"
+        summary["material_line"] = "—"
     elif pp.workpiece_type == "pki":
         summary["type_line"] = "ПКИ (заготовка)"
         summary["workpiece_line"] = "ПКИ"
+        summary["material_line"] = "—"
     else:
         summary["type_line"] = "Изделие"
         summary["workpiece_line"] = pp.get_workpiece_type_display() if pp.workpiece_type else "—"
+        summary["material_line"] = "—"
     return summary
 
 
@@ -165,6 +180,7 @@ def plan_form_context(product: Product | None) -> dict[str, Any]:
         "plan_laser_material_marking_value": laser_material_marking_value,
         "plan_laser_material_marking_suggestions": laser_material_marking_suggestions(),
         "plan_display_type_line": card["type_line"],
+        "plan_display_product_kind_line": card["product_kind_line"],
         "plan_display_workpiece_line": card["workpiece_line"],
         "plan_display_material_line": card["material_line"],
     }

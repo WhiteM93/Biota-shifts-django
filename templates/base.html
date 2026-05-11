@@ -69,6 +69,9 @@
     (function () {
       var canEdit = document.body && document.body.getAttribute("data-biota-can-edit") === "1";
       if (canEdit) return;
+      /* Раздел «План»: не блокируем POST на клиенте — права проверяются на сервере (исполнитель иначе не видит реакции на «Сохранить»). */
+      var path = window.location.pathname || "";
+      if (path === "/plan" || path.indexOf("/plan/") === 0) return;
       document.querySelectorAll('form').forEach(function (form) {
         var method = (form.getAttribute("method") || "get").toLowerCase();
         if (method !== "post") return;

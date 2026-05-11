@@ -49,6 +49,16 @@
       <input type="file" name="drawing_pdf" id="id_drawing_pdf" accept=".pdf,application/pdf" style="display:none;" />
       {% if form.drawing_pdf.errors %}<span class="muted">{{ form.drawing_pdf.errors }}</span>{% endif %}
     </label>
+    <label class="field">
+      <span>Размер заготовки (по чертежу, изделие)</span>
+      {{ form.drawing_blank_size }}
+      {% if form.drawing_blank_size.errors %}<span class="muted">{{ form.drawing_blank_size.errors }}</span>{% endif %}
+    </label>
+    <label class="field">
+      <span>Тип заготовки (по чертежу, изделие)</span>
+      {{ form.drawing_blank_type }}
+      {% if form.drawing_blank_type.errors %}<span class="muted">{{ form.drawing_blank_type.errors }}</span>{% endif %}
+    </label>
     <label class="field" style="grid-column:1/-1;">
       <span>3D-модель (STL / STP / STEP)</span>
       {% if is_edit and product and product.cad_model %}

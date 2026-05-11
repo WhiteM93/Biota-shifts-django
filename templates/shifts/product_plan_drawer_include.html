@@ -23,10 +23,10 @@
     function syncSummaries(summary) {
       if (!summary) return;
       document.querySelectorAll("[data-product-plan-summary]").forEach(function (root) {
-        var a = root.querySelector("[data-plan-type-line]");
+        var kind = root.querySelector("[data-plan-product-kind-line]");
         var b = root.querySelector("[data-plan-workpiece-line]");
         var c = root.querySelector("[data-plan-material-line]");
-        if (a) a.textContent = summary.type_line || "—";
+        if (kind) kind.textContent = summary.product_kind_line || summary.type_line || "—";
         if (b) b.textContent = summary.workpiece_line || "—";
         if (c) c.textContent = summary.material_line || "—";
       });

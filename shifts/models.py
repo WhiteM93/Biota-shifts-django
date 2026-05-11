@@ -573,6 +573,20 @@ class Product(models.Model):
         verbose_name="Наладка (текст)",
         help_text="Заготовка, привязка, инструмент, прочее.",
     )
+    drawing_blank_size = models.CharField(
+        max_length=180,
+        blank=True,
+        default="",
+        verbose_name="Размер заготовки (изделие)",
+        help_text="Общий размер заготовки по изделию; отображается на вкладке «Изделие».",
+    )
+    drawing_blank_type = models.CharField(
+        max_length=220,
+        blank=True,
+        default="",
+        verbose_name="Тип заготовки (изделие)",
+        help_text="Общее описание типа заготовки по изделию; отображается на вкладке «Изделие».",
+    )
     program_file = models.FileField(
         upload_to="products/programs/",
         blank=True,

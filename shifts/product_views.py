@@ -216,6 +216,8 @@ class ProductForm(forms.ModelForm):
         fields = (
             "name",
             "description",
+            "drawing_blank_size",
+            "drawing_blank_type",
             "drawing_pdf",
             "cad_model",
             "preview_stl",
@@ -223,6 +225,8 @@ class ProductForm(forms.ModelForm):
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Например, Корпус А-12"}),
             "description": forms.Textarea(attrs={"rows": 4, "placeholder": "Опционально"}),
+            "drawing_blank_size": forms.TextInput(attrs={"placeholder": "Например, 50×120 мм"}),
+            "drawing_blank_type": forms.TextInput(attrs={"placeholder": "Например, круг D50 L120"}),
         }
 
 
@@ -329,7 +333,7 @@ ProductSetupToolRowFormSet = inlineformset_factory(
     ProductSetup,
     ProductSetupToolRow,
     form=ProductSetupToolRowForm,
-    extra=26,
+    extra=32,
     can_delete=False,
 )
 
@@ -367,22 +371,56 @@ def _normalize_tool_number(raw: str) -> str:
     src = (raw or "").strip().upper()
     if not src:
         return ""
-    m = re.match(r"^(?:T\s*)?(\d{1,2})$", src)
+    m = re.match(r"^(?:T\s*)?(\d{1,4})$", src)
     if not m:
         return src
-    return f"T{int(m.group(1)):02d}"
+    n = int(m.group(1), 10)
+    if n < 100:
+        return f"T{n:02d}"
+    return f"T{n}"
 
 
 def _default_tool_number_list() -> list[str]:
-    return [f"T{n:02d}" for n in range(25)] + ["T99"]
+    """Слоты по умолчанию на карточке и в форме: T01–T24 (без T00 / T99)."""
+    return [f"T{n:02d}" for n in range(1, 25)]
 
 
 def _expected_correctors(tool_no: str) -> tuple[str, str]:
     norm = _normalize_tool_number(tool_no)
-    if not norm.startswith("T") or len(norm) < 3:
+    if not norm.startswith("T") or len(norm) < 2:
         return "", ""
     suffix = norm[1:].zfill(2)
     return f"H{suffix}", f"D{suffix}"
+
+
+def _formset_initial_dict_from_db_row(row: ProductSetupToolRow) -> dict:
+    raw_tn = (row.tool_number or "").strip()
+    norm = _normalize_tool_number(raw_tn)
+    if norm.startswith("T"):
+        rest = norm[1:]
+        if rest.isdigit():
+            form_tn = str(int(rest, 10))
+        else:
+            form_tn = raw_tn
+    else:
+        form_tn = raw_tn
+    return {
+        "tool_number": form_tn,
+        "kor_n": row.kor_n or "",
+        "kor_d": row.kor_d or "",
+        "tool_type": row.tool_type or "",
+        "tap_hole_type": row.tap_hole_type or "",
+        "name": row.name or "",
+        "diameter": row.diameter or "",
+        "overhang": row.overhang or "",
+    }
+
+
+def _build_formset_initial_for_setup_edit(existing_rows: list[ProductSetupToolRow]) -> list[dict]:
+    ordered = sorted(existing_rows, key=lambda r: (r.sort_order, r.id))
+    if not ordered:
+        return _build_default_tool_rows(None)
+    return [_formset_initial_dict_from_db_row(r) for r in ordered]
 
 
 def _build_default_tool_rows(existing_rows: list[ProductSetupToolRow] | None = None) -> list[dict]:
@@ -432,57 +470,55 @@ def _build_default_tool_rows(existing_rows: list[ProductSetupToolRow] | None = N
     return out
 
 
+def _display_dict_from_tool_row(row: ProductSetupToolRow) -> dict:
+    raw_tn = (row.tool_number or "").strip()
+    norm = _normalize_tool_number(raw_tn)
+    display_tn = norm if norm else raw_tn
+    exp_h, exp_d = _expected_correctors(display_tn)
+    cur_h = (row.kor_n or "").strip().upper()
+    cur_d = (row.kor_d or "").strip().upper()
+    return {
+        "tool_number": display_tn,
+        "correction_enabled": bool(row.correction_enabled),
+        "kor_n": row.kor_n or "",
+        "kor_d": row.kor_d or "",
+        "tool_type": row.tool_type or "",
+        "tap_hole_type": row.tap_hole_type or "",
+        "diameter": row.diameter or "",
+        "overhang": row.overhang or "",
+        "note": row.name or "",
+        "kor_n_override": bool(exp_h and cur_h and cur_h != exp_h),
+        "kor_d_override": bool(exp_d and cur_d and cur_d != exp_d),
+    }
+
+
 def _build_display_tool_rows(existing_rows: list[ProductSetupToolRow] | None = None) -> list[dict]:
     existing_rows = existing_rows or []
-    mapped: dict[str, ProductSetupToolRow] = {}
-    for row in existing_rows:
-        key = _normalize_tool_number(row.tool_number)
-        if key:
-            mapped[key] = row
-
-    out = []
-    for tool_no in _default_tool_number_list():
-        row = mapped.get(tool_no)
-        if row:
-            exp_h, exp_d = _expected_correctors(tool_no)
-            cur_h = (row.kor_n or "").strip().upper()
-            cur_d = (row.kor_d or "").strip().upper()
-            out.append(
-                {
-                    "tool_number": tool_no,
-                    "correction_enabled": bool(row.correction_enabled),
-                    "kor_n": row.kor_n or "",
-                    "kor_d": row.kor_d or "",
-                    "tool_type": row.tool_type or "",
-                    "tap_hole_type": row.tap_hole_type or "",
-                    "diameter": row.diameter or "",
-                    "overhang": row.overhang or "",
-                    "note": row.name or "",
-                    "kor_n_override": bool(exp_h and cur_h and cur_h != exp_h),
-                    "kor_d_override": bool(exp_d and cur_d and cur_d != exp_d),
-                }
-            )
-            continue
-        default_row = {
-            "tool_number": tool_no,
-            "correction_enabled": False,
-            "kor_n": "",
-            "kor_d": "",
-            "tool_type": "",
-            "tap_hole_type": "",
-            "diameter": "",
-            "overhang": "",
-            "note": "",
-            "kor_n_override": False,
-            "kor_d_override": False,
-        }
-        if tool_no == "T20":
-            default_row["tool_type"] = "Датчик привязки"
-            default_row["kor_n"] = "H20"
-            default_row["kor_d"] = "D20"
-            default_row["diameter"] = "Шарик ⌀6 мм"
-        out.append(default_row)
-    return out
+    ordered = sorted(existing_rows, key=lambda r: (r.sort_order, r.id))
+    if not ordered:
+        out: list[dict] = []
+        for tool_no in _default_tool_number_list():
+            default_row = {
+                "tool_number": tool_no,
+                "correction_enabled": False,
+                "kor_n": "",
+                "kor_d": "",
+                "tool_type": "",
+                "tap_hole_type": "",
+                "diameter": "",
+                "overhang": "",
+                "note": "",
+                "kor_n_override": False,
+                "kor_d_override": False,
+            }
+            if tool_no == "T20":
+                default_row["tool_type"] = "Датчик привязки"
+                default_row["kor_n"] = "H20"
+                default_row["kor_d"] = "D20"
+                default_row["diameter"] = "Шарик ⌀6 мм"
+            out.append(default_row)
+        return out
+    return [_display_dict_from_tool_row(r) for r in ordered]
 
 
 @biota_login_required
@@ -948,9 +984,22 @@ def product_detail_view(request, pk: int):
                 "size",
                 "setup_notes",
             )
+            changed_setup_fields: list[str] = []
             for field in editable_fields:
+                if field not in request.POST:
+                    continue
                 setattr(setup, field, (request.POST.get(field) or "").strip())
-            setup.save(update_fields=list(editable_fields) + ["updated_at"])
+                changed_setup_fields.append(field)
+            setup.save(update_fields=list(changed_setup_fields) + ["updated_at"])
+            product_drawing_update: list[str] = []
+            if "drawing_blank_size" in request.POST:
+                product.drawing_blank_size = (request.POST.get("drawing_blank_size") or "").strip()[:180]
+                product_drawing_update.append("drawing_blank_size")
+            if "drawing_blank_type" in request.POST:
+                product.drawing_blank_type = (request.POST.get("drawing_blank_type") or "").strip()[:220]
+                product_drawing_update.append("drawing_blank_type")
+            if product_drawing_update:
+                product.save(update_fields=list(product_drawing_update) + ["updated_at"])
             rows_json = (request.POST.get("rows_json") or "").strip()
             if rows_json:
                 try:
@@ -1000,6 +1049,10 @@ def product_detail_view(request, pk: int):
                     "material": setup.material or "—",
                     "size": setup.size or "—",
                     "setup_notes": (setup.setup_notes or "").strip(),
+                },
+                "product_drawing": {
+                    "drawing_blank_size": (product.drawing_blank_size or "").strip() or "—",
+                    "drawing_blank_type": (product.drawing_blank_type or "").strip() or "—",
                 },
             }
             if (request.POST.get("sync_plan_from_inline") or "").strip() == "1":
@@ -1253,7 +1306,7 @@ def product_setup_edit_view(request, pk: int, setup_pk: int):
         tools_formset_bad = ProductSetupToolRowFormSet(
             instance=setup,
             queryset=ProductSetupToolRow.objects.none(),
-            initial=_build_default_tool_rows(list(setup.tools.all())),
+            initial=_build_formset_initial_for_setup_edit(list(setup.tools.all())),
             prefix="tools",
         )
     return render(

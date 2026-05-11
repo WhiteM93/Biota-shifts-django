@@ -417,23 +417,33 @@
 
   if (saveBtn) {
     saveBtn.addEventListener("click", async function () {
-      if (typeof form.reportValidity === "function" && !form.reportValidity()) return;
+      syncPlanTypeUi();
+      if (typeof form.reportValidity === "function" && !form.reportValidity()) {
+        alert("Проверьте обязательные поля (название, тип изделия, заготовка для «Изделие», поля лазера при типе «Лазер»).");
+        return;
+      }
       var fd = new FormData(form);
       fd.set("action", "inline_save_plan_article");
-      var res = await fetch(form.action, {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": getCookie("csrftoken"),
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: fd,
-        credentials: "same-origin",
-      });
+      var res;
+      try {
+        res = await fetch(form.action, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": getCookie("csrftoken"),
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          body: fd,
+          credentials: "same-origin",
+        });
+      } catch (e) {
+        alert("Сеть или браузер прервали запрос. Проверьте соединение и попробуйте снова.");
+        return;
+      }
       var data;
       try {
         data = await res.json();
       } catch (e) {
-        alert("Не удалось разобрать ответ сервера.");
+        alert("Не удалось разобрать ответ сервера (ожидался JSON). Обновите страницу.");
         return;
       }
       if (!res.ok || !data.ok) {
