@@ -15,8 +15,10 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
+from biota_shifts.auth import _is_admin
+
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
-from .models import Product, ProductSetup, ProductSetupPhoto, ProductSetupProgramFile, ProductSetupToolRow
+from .models import Product, ProductNote, ProductSetup, ProductSetupPhoto, ProductSetupProgramFile, ProductSetupToolRow
 from .product_plan_sync import (
     apply_product_plan_post,
     plan_card_summary,
@@ -657,70 +659,11 @@ def product_create_view(request):
 
 @biota_login_required
 @nav_permission_required("products")
-@write_permission_required
-@require_http_methods(["GET", "POST"])
+@require_http_methods(["GET", "HEAD", "POST"])
 def product_edit_view(request, pk: int):
-    product = get_object_or_404(Product, pk=pk)
-    if request.method == "POST":
-        form = ProductForm(request.POST, request.FILES, instance=product)
-        if form.is_valid():
-            plan_err = validate_product_plan_post(request.POST)
-            if plan_err:
-                messages.error(request, plan_err)
-                return render(
-                    request,
-                    "shifts/product_form.html",
-                    {
-                        "form": form,
-                        "username": biota_user(request),
-                        "is_edit": True,
-                        "product": product,
-                        **plan_form_context(product),
-                    },
-                )
-            with transaction.atomic():
-                obj: Product = form.save()
-                removable_file_fields = ("drawing_pdf", "cad_model", "preview_stl")
-                for field_name in removable_file_fields:
-                    remove_flag = request.POST.get(f"remove_{field_name}") == "1"
-                    has_new_file = bool(request.FILES.get(field_name))
-                    if remove_flag and not has_new_file:
-                        f = getattr(obj, field_name)
-                        if f:
-                            f.delete(save=False)
-                        setattr(obj, field_name, "")
-                        obj.save(update_fields=[field_name])
-                _apply_setup_photo_changes(request, obj)
-            pe = apply_product_plan_post(obj, request.POST)
-            if pe:
-                messages.warning(request, pe)
-            messages.success(request, "Изделие сохранено.")
-            return redirect("product_detail", pk=obj.pk)
-        messages.error(request, "Исправьте ошибки в форме.")
-        return render(
-            request,
-            "shifts/product_form.html",
-            {
-                "form": form,
-                "username": biota_user(request),
-                "is_edit": True,
-                "product": product,
-                **plan_form_context(product),
-            },
-        )
-    else:
-        form = ProductForm(instance=product)
-    return render(
-        request,
-        "shifts/product_form.html",
-        {
-            "form": form,
-            "username": biota_user(request),
-            "is_edit": True,
-            "product": product,
-            **plan_form_context(product),
-        },
-    )
+    """Отдельная форма редактирования изделия отключена — редирект на карточку наладки."""
+    get_object_or_404(Product, pk=pk)
+    return redirect("product_detail", pk=pk)
 
 
 @biota_login_required
@@ -778,6 +721,73 @@ def product_detail_view(request, pk: int):
     product = get_object_or_404(Product, pk=pk)
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
+        if action == "add_product_note":
+            body = (request.POST.get("body") or "").strip()
+            if not body:
+                return JsonResponse({"ok": False, "error": "Введите текст заметки."}, status=400)
+            if len(body) > 4000:
+                return JsonResponse({"ok": False, "error": "Не более 4000 символов."}, status=400)
+            author = (biota_user(request) or "").strip() or "?"
+            setup = None
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            if setup_id_raw.isdigit():
+                setup = ProductSetup.objects.filter(pk=int(setup_id_raw), product=product).first()
+                if not setup:
+                    return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=400)
+            ProductNote.objects.create(
+                product=product,
+                setup=setup,
+                author_username=author[:150],
+                body=body,
+            )
+            return JsonResponse({"ok": True})
+
+        if action == "delete_product_note":
+            who = (biota_user(request) or "").strip()
+            if not who:
+                return JsonResponse({"ok": False, "error": "Не авторизован."}, status=401)
+            note_id_raw = (request.POST.get("note_id") or "").strip()
+            note_id = int(note_id_raw) if note_id_raw.isdigit() else 0
+            if note_id <= 0:
+                return JsonResponse({"ok": False, "error": "Не указана заметка."}, status=400)
+            note = ProductNote.objects.filter(pk=note_id, product=product).first()
+            if not note:
+                return JsonResponse({"ok": False, "error": "Заметка не найдена."}, status=404)
+            if not _is_admin(who) and (note.author_username or "").strip() != who:
+                return JsonResponse({"ok": False, "error": "Нет прав на удаление."}, status=403)
+            note.delete()
+            return JsonResponse({"ok": True})
+
+        if action == "inline_replace_product_asset":
+            field_name = (request.POST.get("field_name") or "").strip()
+            allowed = {"drawing_pdf", "cad_model", "preview_stl"}
+            if field_name not in allowed:
+                return JsonResponse({"ok": False, "error": "Некорректное поле файла."}, status=400)
+            upload = request.FILES.get("file")
+            if not upload:
+                return JsonResponse({"ok": False, "error": "Выберите файл."}, status=400)
+            raw_name = (upload.name or "").strip()
+            ext = raw_name.rsplit(".", 1)[-1].lower() if "." in raw_name else ""
+            if field_name == "drawing_pdf" and ext != "pdf":
+                return JsonResponse({"ok": False, "error": "Для чертежа нужен файл PDF."}, status=400)
+            if field_name == "cad_model" and ext not in ("stl", "stp", "step"):
+                return JsonResponse(
+                    {"ok": False, "error": "Для 3D-модели допустимы расширения STL, STP или STEP."},
+                    status=400,
+                )
+            if field_name == "preview_stl" and ext != "stl":
+                return JsonResponse({"ok": False, "error": "Для предпросмотра нужен файл STL."}, status=400)
+            old = getattr(product, field_name)
+            if old:
+                try:
+                    old.delete(save=False)
+                except Exception:
+                    pass
+            setattr(product, field_name, upload)
+            product.save(update_fields=[field_name, "updated_at"])
+            new_f = getattr(product, field_name)
+            return JsonResponse({"ok": True, "field": field_name, "url": new_f.url if new_f else ""})
+
         if action == "inline_save_product_plan":
             plan_err = validate_product_plan_post(request.POST)
             if plan_err:
@@ -789,7 +799,7 @@ def product_detail_view(request, pk: int):
             return JsonResponse(
                 {
                     "ok": True,
-                    "plan_summary": plan_card_summary(pp),
+                    "plan_summary": plan_card_summary(pp, product),
                     "plan_pk": pp.pk if pp else None,
                     "plan_inline_state": plan_inline_state_payload(product),
                 }
@@ -1063,7 +1073,7 @@ def product_detail_view(request, pk: int):
                 if perr:
                     return JsonResponse({"ok": False, "error": perr}, status=400)
                 pp = plan_piece_for_naladki_card(product)
-                out["plan_summary"] = plan_card_summary(pp)
+                out["plan_summary"] = plan_card_summary(pp, product)
                 out["plan_pk"] = pp.pk if pp else None
                 out["plan_inline_state"] = plan_inline_state_payload(product)
             return JsonResponse(out)
@@ -1072,6 +1082,9 @@ def product_detail_view(request, pk: int):
     setups = list(product.setups.prefetch_related("tools", "program_files"))
     for setup in setups:
         setup.tab_slug = f"setup-{setup.pk}"
+        setup.side_notes = list(
+            ProductNote.objects.filter(product=product, setup=setup).order_by("created_at", "id")
+        )
         prim_pf = _setup_primary_program_field(setup)
         setup.program_text, setup.program_too_large = _read_program_file_for_display(prim_pf)
         setup.program_file_list = list(_setup_program_files_qs(setup))
@@ -1091,15 +1104,16 @@ def product_detail_view(request, pk: int):
         preview_stl_url = product.cad_model.url
     cad_inline_preview = bool(preview_stl_url)
     program_text, program_too_large = _read_program_file_for_display(product.program_file)
-    tab_default = "drawing"
+    tab_default = (request.GET.get("tab") or "drawing").strip() or "drawing"
+    setup_slugs = {s.tab_slug for s in setups}
+    if tab_default not in ({"drawing"} | setup_slugs):
+        tab_default = "drawing"
     active_setup = None
     if tab_default.startswith("setup-"):
         for setup in setups:
             if setup.tab_slug == tab_default:
                 active_setup = setup
                 break
-    if active_setup is None and setups:
-        active_setup = setups[0]
     return render(
         request,
         "shifts/product_detail.html",
@@ -1120,6 +1134,9 @@ def product_detail_view(request, pk: int):
             "active_setup": active_setup,
             "tool_type_choices": SETUP_TOOL_TYPE_CHOICES,
             "username": biota_user(request),
+            "product_notes": list(
+                product.notes.filter(setup__isnull=True).order_by("created_at", "id")
+            ),
         },
     )
 

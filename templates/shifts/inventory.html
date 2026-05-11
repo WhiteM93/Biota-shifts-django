@@ -159,7 +159,7 @@
       <select name="diameter_mm">
         <option value="">Все</option>
         {% for v in end_mill_filter_options.diameters %}
-        <option value="{{ v }}" {% if filters.diameter_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.diameter_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -167,7 +167,7 @@
       <select name="mill_corner_radius_mm">
         <option value="">Все</option>
         {% for v in end_mill_filter_options.corner_radii %}
-        <option value="{{ v }}" {% if filters.mill_corner_radius_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.mill_corner_radius_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -175,7 +175,7 @@
       <select name="mill_overall_length_mm">
         <option value="">Все</option>
         {% for v in end_mill_filter_options.overall_lengths %}
-        <option value="{{ v }}" {% if filters.mill_overall_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.mill_overall_length_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -183,7 +183,7 @@
       <select name="mill_cutting_length_mm">
         <option value="">Все</option>
         {% for v in end_mill_filter_options.cutting_lengths %}
-        <option value="{{ v }}" {% if filters.mill_cutting_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.mill_cutting_length_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -191,7 +191,7 @@
       <select name="mill_flutes_count">
         <option value="">Все</option>
         {% for v in end_mill_filter_options.flutes %}
-        <option value="{{ v }}" {% if filters.mill_flutes_count == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.mill_flutes_count == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -208,7 +208,7 @@
       <select name="tap_pitch">
         <option value="">Все</option>
         {% for v in tap_filter_options.pitches %}
-        <option value="{{ v }}" {% if filters.tap_pitch == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.tap_pitch == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -246,7 +246,7 @@
       <select name="tap_overall_length_mm">
         <option value="">Все</option>
         {% for v in tap_filter_options.overall_lengths %}
-        <option value="{{ v }}" {% if filters.tap_overall_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.tap_overall_length_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -254,7 +254,7 @@
       <select name="tap_cutting_length_mm">
         <option value="">Все</option>
         {% for v in tap_filter_options.cutting_lengths %}
-        <option value="{{ v }}" {% if filters.tap_cutting_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.tap_cutting_length_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -263,7 +263,7 @@
       <select name="center_diameter_mm">
         <option value="">Все</option>
         {% for v in center_drill_filter_options.diameters %}
-        <option value="{{ v }}" {% if filters.center_diameter_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.center_diameter_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -271,7 +271,7 @@
       <select name="center_overall_length_mm">
         <option value="">Все</option>
         {% for v in center_drill_filter_options.overall_lengths %}
-        <option value="{{ v }}" {% if filters.center_overall_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.center_overall_length_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -300,7 +300,7 @@
       <select name="countersink_diameter_mm">
         <option value="">Все</option>
         {% for v in countersink_filter_options.diameters %}
-        <option value="{{ v }}" {% if filters.countersink_diameter_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.countersink_diameter_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -318,7 +318,7 @@
       <select name="countersink_overall_length_mm">
         <option value="">Все</option>
         {% for v in countersink_filter_options.overall_lengths %}
-        <option value="{{ v }}" {% if filters.countersink_overall_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.countersink_overall_length_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -326,7 +326,7 @@
       <select name="countersink_flutes_count">
         <option value="">Все</option>
         {% for v in countersink_filter_options.flutes %}
-        <option value="{{ v }}" {% if filters.countersink_flutes_count == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.countersink_flutes_count == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -343,7 +343,7 @@
       <select name="drill_diameter_mm">
         <option value="">Все</option>
         {% for v in drill_filter_options.diameters %}
-        <option value="{{ v }}" {% if filters.drill_diameter_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.drill_diameter_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -351,7 +351,7 @@
       <select name="drill_overall_length_mm">
         <option value="">Все</option>
         {% for v in drill_filter_options.overall_lengths %}
-        <option value="{{ v }}" {% if filters.drill_overall_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.drill_overall_length_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -359,7 +359,7 @@
       <select name="drill_cutting_length_mm">
         <option value="">Все</option>
         {% for v in drill_filter_options.cutting_lengths %}
-        <option value="{{ v }}" {% if filters.drill_cutting_length_mm == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.drill_cutting_length_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -367,7 +367,7 @@
       <select name="drill_angle_deg">
         <option value="">Все</option>
         {% for v in drill_filter_options.angles %}
-        <option value="{{ v }}" {% if filters.drill_angle_deg == v|stringformat:"s" %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.drill_angle_deg == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -1793,17 +1793,17 @@
     margin-bottom: 8px;
     border-radius: 4px;
     border: 1px solid var(--bio-input-border);
-    background: #141b29;
-    color: var(--bio-body-fg);
+    background: var(--bio-input-bg);
+    color: var(--bio-input-fg);
     padding: 7px 9px;
     box-sizing: border-box;
   }
   .defect-responsible-list {
     max-height: 168px;
     overflow-y: auto;
-    border: 1px solid var(--bio-filter-border);
+    border: 1px solid var(--bio-input-border);
     border-radius: 4px;
-    background: #141b29;
+    background: var(--bio-input-bg);
     padding: 6px;
     display: grid;
     gap: 4px;
@@ -1816,10 +1816,10 @@
     border-radius: 3.5px;
     cursor: pointer;
     font-size: 13px;
-    color: #d8e3ff;
+    color: var(--bio-body-fg);
   }
   .defect-responsible-option:hover {
-    background: rgba(124, 140, 255, 0.14);
+    background: var(--bio-surface-item);
   }
   .defect-responsible-option input[type="checkbox"] {
     width: 15px;
@@ -1829,10 +1829,11 @@
   }
   .defect-cell-input[readonly],
   .defect-cell-input:disabled {
-    background: #192235;
-    color: #b7c5e6;
+    background: var(--bio-surface-deep);
+    color: var(--bio-muted);
     border-color: var(--bio-input-border);
     cursor: default;
+    opacity: 0.98;
   }
   .defects-table .col-date { width: 132px; }
   .defects-table .col-employee { width: 240px; }

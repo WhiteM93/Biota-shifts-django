@@ -319,6 +319,28 @@ body {
   transition: background 0.35s ease, color 0.28s ease;
 }
 
+@keyframes navItemReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes navDropdownMenuReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .nav {
   display: flex;
   gap: 8px;
@@ -331,10 +353,63 @@ body {
   z-index: 20;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  transition: background 0.28s ease, border-color 0.28s ease;
+  transition:
+    background 0.28s ease,
+    border-color 0.28s ease,
+    box-shadow 0.32s ease;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+html[data-theme="dawn"] .nav {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.nav > * {
+  animation: navItemReveal 0.44s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.nav > *:nth-child(1) {
+  animation-delay: 0.02s;
+}
+.nav > *:nth-child(2) {
+  animation-delay: 0.05s;
+}
+.nav > *:nth-child(3) {
+  animation-delay: 0.08s;
+}
+.nav > *:nth-child(4) {
+  animation-delay: 0.11s;
+}
+.nav > *:nth-child(5) {
+  animation-delay: 0.14s;
+}
+.nav > *:nth-child(6) {
+  animation-delay: 0.17s;
+}
+.nav > *:nth-child(7) {
+  animation-delay: 0.2s;
+}
+.nav > *:nth-child(8) {
+  animation-delay: 0.23s;
+}
+.nav > *:nth-child(9) {
+  animation-delay: 0.26s;
+}
+.nav > *:nth-child(10) {
+  animation-delay: 0.29s;
+}
+.nav > *:nth-child(11) {
+  animation-delay: 0.32s;
+}
+.nav > *:nth-child(12) {
+  animation-delay: 0.35s;
+}
+.nav > *:nth-child(n + 13) {
+  animation-delay: 0.38s;
 }
 
 .nav a {
+  position: relative;
   color: var(--bio-nav-link);
   text-decoration: none;
   font-weight: 600;
@@ -343,20 +418,60 @@ body {
   padding: 6px 10px;
   border: 1px solid transparent;
   border-radius: 6px;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  transition:
+    background 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.2s ease,
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.24s ease;
 }
 
 .nav a:hover {
   color: var(--bio-nav-link-hover-fg);
   background: var(--bio-nav-link-hover-bg);
   border-color: var(--bio-nav-link-hover-border);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="dawn"] .nav a:hover {
+  box-shadow: 0 6px 18px rgba(55, 42, 36, 0.1);
+}
+
+.nav a:focus-visible {
+  outline: 2px solid var(--bio-input-focus-border);
+  outline-offset: 2px;
+}
+
+.nav a:active {
+  transform: translateY(0);
+  transition-duration: 0.1s;
 }
 
 .nav a.active {
   color: var(--bio-nav-active-fg);
   background: linear-gradient(180deg, var(--bio-nav-active-bg1) 0%, var(--bio-nav-active-bg2) 100%);
   border-color: var(--bio-nav-active-border);
-  box-shadow: inset 0 0 0 1px var(--bio-nav-active-inset);
+  box-shadow:
+    inset 0 0 0 1px var(--bio-nav-active-inset),
+    0 4px 14px rgba(0, 0, 0, 0.2);
+  transition:
+    background 0.22s ease,
+    border-color 0.22s ease,
+    color 0.2s ease,
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.24s ease;
+}
+
+html[data-theme="dawn"] .nav a.active {
+  box-shadow:
+    inset 0 0 0 1px var(--bio-nav-active-inset),
+    0 4px 14px rgba(13, 148, 136, 0.22);
+}
+
+.nav a.active:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
 }
 
 .nav-theme-wrap {
@@ -379,16 +494,26 @@ body {
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
+  transition:
+    background 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.22s ease,
+    transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.24s ease;
 }
 
 .nav-theme-btn:hover {
   background: var(--bio-theme-btn-hover-bg);
-  transform: translateY(-1px);
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+}
+
+html[data-theme="dawn"] .nav-theme-btn:hover {
+  box-shadow: 0 8px 20px rgba(55, 42, 36, 0.1);
 }
 
 .nav-theme-btn:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
+  transition-duration: 0.12s;
 }
 
 .nav-theme-btn:focus-visible {
@@ -411,7 +536,12 @@ body {
   padding: 6px 10px;
   border: 1px solid transparent;
   border-radius: 6px;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  transition:
+    background 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.2s ease,
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.24s ease;
   user-select: none;
 }
 
@@ -421,34 +551,59 @@ body {
 
 .nav-dropdown > summary::after {
   content: "▾";
+  display: inline-block;
   margin-left: 5px;
   font-size: 9px;
   opacity: 0.75;
+  transform-origin: 50% 55%;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+}
+
+.nav-dropdown[open] > summary::after {
+  transform: rotate(-180deg);
+  opacity: 0.95;
 }
 
 .nav-dropdown > summary:hover {
   color: var(--bio-nav-link-hover-fg);
   background: var(--bio-nav-link-hover-bg);
   border-color: var(--bio-nav-link-hover-border);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="dawn"] .nav-dropdown > summary:hover {
+  box-shadow: 0 6px 18px rgba(55, 42, 36, 0.1);
 }
 
 .nav-dropdown > summary.active {
   color: var(--bio-nav-active-fg);
   background: linear-gradient(180deg, var(--bio-nav-active-bg1) 0%, var(--bio-nav-active-bg2) 100%);
   border-color: var(--bio-nav-active-border);
-  box-shadow: inset 0 0 0 1px var(--bio-nav-active-inset);
+  box-shadow:
+    inset 0 0 0 1px var(--bio-nav-active-inset),
+    0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme="dawn"] .nav-dropdown > summary.active {
+  box-shadow:
+    inset 0 0 0 1px var(--bio-nav-active-inset),
+    0 4px 14px rgba(13, 148, 136, 0.22);
 }
 
 .nav-dropdown[open] > summary {
   color: var(--bio-nav-link-hover-fg);
   background: var(--bio-nav-link-hover-bg);
   border-color: var(--bio-nav-link-hover-border);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
 }
 
 html[data-theme="dawn"] .nav-dropdown[open] > summary {
   color: #fff;
   background: linear-gradient(180deg, var(--bio-nav-active-bg1) 0%, var(--bio-nav-active-bg2) 100%);
   border-color: var(--bio-nav-active-border);
+  box-shadow: 0 6px 18px rgba(55, 42, 36, 0.08);
 }
 
 .nav-dropdown-menu {
@@ -465,12 +620,24 @@ html[data-theme="dawn"] .nav-dropdown[open] > summary {
   border-radius: 6px;
   box-shadow: var(--bio-nav-menu-shadow);
   z-index: 40;
+  transform-origin: top center;
   transition: background 0.22s ease, border-color 0.22s ease;
+}
+
+.nav-dropdown[open] > .nav-dropdown-menu {
+  animation: navDropdownMenuReveal 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .nav-dropdown-menu a {
   border-radius: 4px;
-  transition: background 0.14s ease, color 0.14s ease;
+  transition:
+    background 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.18s ease,
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nav-dropdown-menu a:hover {
+  transform: translateX(2px);
 }
 
 html[data-theme="dawn"] .nav-dropdown-menu a:hover {
@@ -500,16 +667,29 @@ html[data-theme="dawn"] .nav-dropdown-menu a:hover {
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
-  transition: filter 0.14s ease, transform 0.14s ease, box-shadow 0.2s ease;
+  transition:
+    filter 0.2s ease,
+    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.26s ease;
 }
 
 .nav .nav-refresh-btn:hover {
-  filter: brightness(1.07);
-  transform: translateY(-1px);
+  filter: brightness(1.08) saturate(1.05);
+  transform: translateY(-2px) scale(1.04);
+  box-shadow:
+    var(--bio-nav-refresh-shadow),
+    0 0 0 3px rgba(143, 156, 255, 0.22);
+}
+
+html[data-theme="dawn"] .nav .nav-refresh-btn:hover {
+  box-shadow:
+    var(--bio-nav-refresh-shadow),
+    0 0 0 3px rgba(45, 212, 191, 0.28);
 }
 
 .nav .nav-refresh-btn:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
+  transition-duration: 0.12s;
 }
 
 .nav .nav-refresh-btn.is-loading {
@@ -1127,7 +1307,12 @@ html[data-theme="dawn"] .chk {
 @media (prefers-reduced-motion: reduce) {
   body,
   .nav,
+  .nav > *,
   .nav a,
+  .nav-dropdown > summary,
+  .nav-dropdown[open] > .nav-dropdown-menu,
+  .nav-dropdown-menu a,
+  .nav-theme-btn,
   .chk,
   input,
   select,
@@ -1135,6 +1320,25 @@ html[data-theme="dawn"] .chk {
   .btn,
   .message,
   .filter-panel {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .nav .nav-refresh-btn {
+    transition: none !important;
+  }
+
+  .nav a:hover,
+  .nav a.active:hover,
+  .nav-dropdown > summary:hover,
+  .nav-dropdown[open] > summary,
+  .nav-dropdown-menu a:hover,
+  .nav-theme-btn:hover,
+  .nav .nav-refresh-btn:hover {
+    transform: none !important;
+  }
+
+  .nav-dropdown > summary::after {
     transition: none !important;
   }
 }

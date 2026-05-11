@@ -1,12 +1,12 @@
-{# Карточка «План» на вкладке «Изделие» + скрипт сохранения #}
+{# Поля производственной позиции на вкладке «Изделие» + сохранение #}
 <div class="product-plan-drawer filter-panel" style="margin-top:14px;">
-  <h5 style="margin:0 0 8px 0;color:#c9d5ff;">Позиция в разделе «План»</h5>
+  <h5 style="margin:0 0 8px 0;color:#c9d5ff;">Производственная позиция</h5>
   {% if biota_can_edit %}
   <form id="product-plan-inline-form" autocomplete="off">
     {% csrf_token %}
     {% include "shifts/includes/product_plan_fields.html" with id_prefix="pinline" show_plan_fields_title=False %}
     <p style="margin-top:12px;">
-      <button type="button" class="btn btn-sm" id="product-plan-inline-save-btn">Сохранить в план</button>
+      <button type="button" class="btn btn-sm" id="product-plan-inline-save-btn">Сохранить позицию</button>
       <span class="muted" id="product-plan-inline-save-status" style="margin-left:8px;"></span>
     </p>
   </form>

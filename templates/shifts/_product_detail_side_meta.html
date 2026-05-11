@@ -34,17 +34,93 @@
 {% endif %}
 <div class="product-downloads" id="product-downloads-block">
   {% if product.cad_model %}
-  <a href="{{ product.cad_model.url }}" download class="btn">Скачать 3D-модель{% if cad_ext %} (.{{ cad_ext }}){% endif %}</a>
-  {% endif %}
-  {% if product.preview_stl %}
-  <a href="{{ product.preview_stl.url }}" download class="btn product-btn-secondary">Скачать STL</a>
-  {% endif %}
-  {% if product.drawing_pdf %}
-  <div class="product-download-row">
-    <a href="{{ product.drawing_pdf.url }}" download class="btn product-btn-secondary product-download-main-btn">Скачать чертёж (PDF)</a>
-    <a href="{{ product.drawing_pdf.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost product-download-preview-btn" title="Открыть чертёж в новой вкладке" aria-label="Открыть чертёж в новой вкладке">
-      <i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>
-    </a>
+  <div class="product-download-row" data-product-asset-row="cad_model">
+    <a href="{{ product.cad_model.url }}" download class="btn product-download-main-btn">Скачать 3D-модель{% if cad_ext %} (.{{ cad_ext }}){% endif %}</a>
+    {% if biota_can_edit %}
+    <div class="product-download-row-actions">
+      <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Заменить 3D-модель" aria-label="Заменить 3D-модель">
+        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+      </button>
+    </div>
+    <input type="file" class="js-product-asset-file-input" data-field-name="cad_model" accept=".stl,.stp,.step" hidden />
+    {% endif %}
+  </div>
+  {% elif biota_can_edit %}
+  <div class="product-download-row" data-product-asset-row="cad_model">
+    <span class="muted product-download-placeholder">3D-модель не загружена</span>
+    <div class="product-download-row-actions">
+      <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Загрузить 3D-модель" aria-label="Загрузить 3D-модель">
+        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+      </button>
+    </div>
+    <input type="file" class="js-product-asset-file-input" data-field-name="cad_model" accept=".stl,.stp,.step" hidden />
   </div>
   {% endif %}
+
+  {% if product.preview_stl %}
+  <div class="product-download-row" data-product-asset-row="preview_stl">
+    <a href="{{ product.preview_stl.url }}" download class="btn product-btn-secondary product-download-main-btn">Скачать STL</a>
+    {% if biota_can_edit %}
+    <div class="product-download-row-actions">
+      <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Заменить STL" aria-label="Заменить STL">
+        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+      </button>
+    </div>
+    <input type="file" class="js-product-asset-file-input" data-field-name="preview_stl" accept=".stl" hidden />
+    {% endif %}
+  </div>
+  {% elif cad_is_step and biota_can_edit %}
+  <div class="product-download-row" data-product-asset-row="preview_stl">
+    <span class="muted product-download-placeholder">STL для предпросмотра не загружен</span>
+    <div class="product-download-row-actions">
+      <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Загрузить STL" aria-label="Загрузить STL">
+        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+      </button>
+    </div>
+    <input type="file" class="js-product-asset-file-input" data-field-name="preview_stl" accept=".stl" hidden />
+  </div>
+  {% endif %}
+
+  {% if product.drawing_pdf %}
+  <div class="product-download-row" data-product-asset-row="drawing_pdf">
+    <a href="{{ product.drawing_pdf.url }}" download class="btn product-btn-secondary product-download-main-btn">Скачать чертёж (PDF)</a>
+    <div class="product-download-row-actions">
+      <a href="{{ product.drawing_pdf.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost product-download-preview-btn" title="Открыть в новой вкладке" aria-label="Открыть чертёж в новой вкладке">
+        <i class="fi fi-rr-window ui-icon" aria-hidden="true"></i>
+      </a>
+      {% if biota_can_edit %}
+      <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Заменить PDF" aria-label="Заменить PDF">
+        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+      </button>
+      {% endif %}
+    </div>
+    {% if biota_can_edit %}
+    <input type="file" class="js-product-asset-file-input" data-field-name="drawing_pdf" accept=".pdf,application/pdf" hidden />
+    {% endif %}
+  </div>
+  {% elif biota_can_edit %}
+  <div class="product-download-row" data-product-asset-row="drawing_pdf">
+    <span class="muted product-download-placeholder">Чертёж (PDF) не загружен</span>
+    <div class="product-download-row-actions">
+      <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Загрузить PDF" aria-label="Загрузить PDF">
+        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+      </button>
+    </div>
+    <input type="file" class="js-product-asset-file-input" data-field-name="drawing_pdf" accept=".pdf,application/pdf" hidden />
+  </div>
+  {% endif %}
+</div>
+<div id="product-side-notes-stack" class="product-side-notes-stack">
+  {% if tab_default == "drawing" %}
+  {% include "shifts/includes/product_side_notes_panel.html" with notes_panel_tab="drawing" notes_list=product_notes notes_setup_id="" notes_title="Заметки (изделие)" notes_hidden=False %}
+  {% else %}
+  {% include "shifts/includes/product_side_notes_panel.html" with notes_panel_tab="drawing" notes_list=product_notes notes_setup_id="" notes_title="Заметки (изделие)" notes_hidden=True %}
+  {% endif %}
+  {% for setup in setups %}
+  {% if tab_default == setup.tab_slug %}
+  {% include "shifts/includes/product_side_notes_panel.html" with notes_panel_tab=setup.tab_slug notes_list=setup.side_notes notes_setup_id=setup.pk|stringformat:"s" notes_title="Заметки: "|add:setup.name notes_hidden=False %}
+  {% else %}
+  {% include "shifts/includes/product_side_notes_panel.html" with notes_panel_tab=setup.tab_slug notes_list=setup.side_notes notes_setup_id=setup.pk|stringformat:"s" notes_title="Заметки: "|add:setup.name notes_hidden=True %}
+  {% endif %}
+  {% endfor %}
 </div>

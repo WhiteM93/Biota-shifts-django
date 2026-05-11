@@ -2,69 +2,7 @@
 
 {% block content %}
 <style>
-  .product-plan-piece-cta {
-    margin: 0 0 16px 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px 16px;
-  }
-  .product-plan-piece-cta__label {
-    font-size: 11px;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--bio-field-label);
-    font-weight: 600;
-  }
-  .product-plan-piece-cta__link {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 16px;
-    border-radius: 5px;
-    font-size: 0.94rem;
-    font-weight: 600;
-    color: var(--bio-body-fg);
-    text-decoration: none;
-    border: 1px solid var(--bio-filter-border);
-    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
-    box-shadow: var(--bio-filter-shadow);
-    max-width: min(100%, 44rem);
-    transition:
-      border-color 0.2s ease,
-      box-shadow 0.2s ease,
-      color 0.2s ease,
-      background 0.25s ease;
-  }
-  .product-plan-piece-cta__link:hover,
-  .product-plan-piece-cta__link:focus {
-    border-color: var(--bio-input-focus-border);
-    color: var(--bio-heading-accent);
-    box-shadow: var(--bio-filter-shadow);
-  }
-  .product-plan-piece-cta__title {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .product-plan-piece-cta__badge {
-    flex: 0 0 auto;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 3px;
-    background: var(--bio-surface-item);
-    border: 1px solid var(--bio-surface-item-border);
-    color: var(--bio-muted);
-  }
-  {% include "shifts/plan/includes/plan_card_specs_styles.html" %}
-  .product-drawing-setup-block.filter-panel {
-    margin-bottom: 14px;
-    padding: 12px 14px;
-    border-radius: 5px;
-  }
+  {% include "shifts/includes/plan_card_specs_styles.html" %}
 </style>
 <div class="page-actions" style="margin-bottom:10px;">
   <a href="{% url 'products_list' %}" class="btn btn-ghost">← К списку наладок</a>
@@ -72,16 +10,7 @@
   <a href="{% url 'product_setup_create' product.pk %}" class="btn btn-ghost">+</a>
   {% endif %}
 </div>
-{% if plan_piece %}
-<div class="product-plan-piece-cta">
-  <span class="product-plan-piece-cta__label">Позиция в плане</span>
-  <a class="product-plan-piece-cta__link" href="{% url 'plan_article_detail' pk=plan_piece.pk %}">
-    <span class="product-plan-piece-cta__title">{{ plan_piece.name|truncatechars:56 }}</span>
-    <span class="product-plan-piece-cta__badge">№{{ plan_piece.pk }}</span>
-  </a>
-</div>
-{% endif %}
-<div class="product-detail-grid">
+<div class="product-detail-grid"{% if setups %} data-product-has-setups="1"{% endif %}>
   <div class="product-detail-main">
   {% if product.description %}
   <p class="muted" style="white-space:pre-wrap; margin:0 0 14px 0;">{{ product.description }}</p>
@@ -101,9 +30,6 @@
           {% endfor %}
         </select>
       </label>
-      {% if biota_can_edit %}
-      <a href="{% url 'product_edit' product.pk %}" class="btn btn-ghost product-edit-product-inline" id="product-edit-main-btn" title="Редактировать изделие">Редактировать наладку</a>
-      {% endif %}
       {% endif %}
       {% for setup in setups %}
       <button type="button" class="product-tab{% if tab_default == setup.tab_slug %} is-active{% endif %}" role="tab" data-tab="{{ setup.tab_slug }}" data-setup-index="{{ forloop.counter }}" id="tab-setup-{{ setup.pk }}" aria-controls="panel-setup-{{ setup.pk }}" aria-selected="{% if tab_default == setup.tab_slug %}true{% else %}false{% endif %}" {% if setup.has_any_program %}data-program-url="{{ setup.primary_program_url }}" data-program-filename="{{ setup.primary_program_filename|escape }}"{% endif %} data-setup-name="{{ setup.name|escape }}" data-setup-edit-url="{% url 'product_setup_edit' product.pk setup.pk %}" hidden>Уст. {{ forloop.counter }}</button>
@@ -116,46 +42,13 @@
       {% endif %}
     </div>
     <div class="product-tab-panels">
-      <section class="product-tab-panel" id="panel-drawing" data-panel="drawing" role="tabpanel" aria-labelledby="tab-drawing" {% if tab_default != 'drawing' %}hidden{% endif %}>
-        <p class="muted" style="margin:0 0 14px 0;font-size:13px;">
-          {% if product.drawing_pdf %}
-          <a href="{{ product.drawing_pdf.url }}" target="_blank" rel="noopener">Чертёж (PDF) — открыть</a>
-          {% else %}
-          Чертёж (PDF) не загружен. Можно добавить в <a href="{% url 'product_edit' product.pk %}">редактировании изделия</a>.
-          {% endif %}
-        </p>
+      <section class="product-tab-panel" id="panel-drawing" data-panel="drawing" data-inline-edit-mode="0" role="tabpanel" aria-labelledby="tab-drawing" {% if tab_default != 'drawing' %}hidden{% endif %}>
         {% if setups %}
-        {% include "shifts/plan/includes/plan_card_specs_unified.html" with plan_specs_variant="product" %}
-        <div class="product-drawing-naladki-section">
-          <h5 style="margin:0 0 10px 0;font-size:0.95rem;color:var(--bio-heading-accent);">Заготовка (наладка)</h5>
-          {% for setup in setups %}
-          <div class="product-drawing-setup-block filter-panel" data-drawing-setup-root="{{ setup.pk }}">
-            <p class="muted" style="margin:0 0 8px 0;font-size:12px;font-weight:600;">
-              Уст. {{ forloop.counter }}{% if setup.name %} — {{ setup.name }}{% endif %}
-            </p>
-            <div class="setup-meta-naladki-block">
-              <div><span class="muted">Размер:</span> <span data-drawing-naladki-field="size">{{ setup.size|default:"—" }}</span></div>
-              <div class="setup-row-photo">
-                <span class="muted">Тип (наладка):</span> <span class="muted" data-drawing-naladki-field="workpiece">{{ setup.workpiece|default:"—" }}</span>
-                {% if setup.workpiece_photo %}
-                <a href="{{ setup.workpiece_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.workpiece_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Заготовка" aria-label="Открыть фото заготовки">
-                  <i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>
-                </a>
-                {% endif %}
-                {% if biota_can_edit %}
-                <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="workpiece_photo" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото заготовки" aria-label="Загрузить или заменить фото заготовки" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
-                <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-binding-photo-input" data-photo-field-input="workpiece_photo" data-setup-id="{{ setup.pk }}" hidden />
-                {% endif %}
-              </div>
-              <div><span class="muted">Материал:</span> <span data-drawing-naladki-field="material">{{ setup.material|default:"—" }}</span></div>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
+        {% include "shifts/includes/plan_card_specs_unified.html" with plan_specs_variant="product" %}
         {% endif %}
       </section>
       {% for setup in setups %}
-      <section class="product-tab-panel" id="panel-setup-{{ setup.pk }}" data-panel="{{ setup.tab_slug }}" role="tabpanel" aria-labelledby="tab-setup-{{ setup.pk }}" {% if tab_default != setup.tab_slug %}hidden{% endif %}>
+      <section class="product-tab-panel" id="panel-setup-{{ setup.pk }}" data-panel="{{ setup.tab_slug }}" data-inline-edit-mode="0" role="tabpanel" aria-labelledby="tab-setup-{{ setup.pk }}" {% if tab_default != setup.tab_slug %}hidden{% endif %}>
         <div class="product-setup-panel-title">
           <span class="muted">Название установки:</span>
           <span class="product-setup-name" data-field-text="name">{{ setup.name }}</span>
@@ -270,7 +163,7 @@
               </div>
             </div>
             {% endif %}
-            <div class="product-setup-notes-row">
+            <div class="product-setup-notes-row" data-setup-id="{{ setup.pk }}">
               {% if setup.setup_notes %}
               <div class="product-setup-notes muted" data-field-text="setup_notes">{{ setup.setup_notes|safe }}</div>
               {% else %}
@@ -334,7 +227,7 @@
             <a href="{{ sp.image.url }}" class="setup-photo-open" data-photo-url="{{ sp.image.url }}" data-photo-caption="{% if sp.caption %}{{ sp.caption|escape }}{% else %}{{ setup.name }} — фото {{ forloop.counter }}{% endif %}">
               <img src="{{ sp.image.url }}" alt="{% if sp.caption %}{{ sp.caption }}{% else %}{{ setup.name }} — фото {{ forloop.counter }}{% endif %}" loading="lazy" />
             </a>
-            <figcaption class="muted setup-photo-caption" data-caption-editable="1">{% if sp.caption %}{{ sp.caption }}{% endif %}</figcaption>
+            <figcaption class="muted setup-photo-caption" data-caption-editable="1"{% if biota_can_edit %} title="Двойной щелчок — открыть фото (в режиме правки подписи)"{% endif %}>{% if sp.caption %}{{ sp.caption }}{% endif %}</figcaption>
             {% if biota_can_edit %}
             <div class="setup-photo-inline-controls" hidden>
               <button type="button" class="btn btn-ghost js-setup-photo-save-caption" title="Сохранить подпись">Сохранить</button>
@@ -371,7 +264,7 @@
       {% if cad_inline_preview %}
       <p class="muted product-cad-loading">Загрузка предпросмотра…</p>
       {% elif product.cad_model and cad_is_step %}
-      <p class="muted" style="padding:12px;">В браузере показывается только STL. Загрузите <strong>STL для предпросмотра</strong> в <a href="{% url 'product_edit' product.pk %}">редактировании изделия</a> (экспорт из CAD из вашего STEP) или скачайте STEP ниже.</p>
+      <p class="muted" style="padding:12px;">В браузере показывается только STL. {% if biota_can_edit %}Загрузите <strong>STL для предпросмотра</strong> кнопкой с иконкой загрузки справа в блоке «Файлы»{% else %}Нужен файл STL для предпросмотра{% endif %} (экспорт из CAD из вашего STEP) или скачайте STEP ниже.</p>
       {% elif product.cad_model %}
       <p class="muted" style="padding:12px;">Предпросмотр{% if cad_ext %} для .{{ cad_ext }}{% else %} этого файла{% endif %} в браузере не поддерживается. Скачайте файл ниже или добавьте STL для предпросмотра.</p>
       {% else %}
@@ -521,37 +414,53 @@
     gap: 8px;
     margin-bottom: 12px;
     align-items: center;
+    --product-nav-control-h: 40px;
+    min-height: 41px;
   }
   .product-setup-select-wrap {
     margin: 0;
     min-width: 220px;
-  }
-  .product-add-setup-inline {
-    height: 34px;
-    min-height: 34px;
-    padding: 0 12px;
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    justify-content: center;
-    line-height: 1;
+    align-self: center;
   }
-  .product-edit-product-inline {
-    width: 220px;
-    min-width: 220px;
-    height: 34px;
-    min-height: 34px;
+  .product-setup-select-wrap select,
+  #setup-tab-select {
+    height: var(--product-nav-control-h);
+    min-height: var(--product-nav-control-h);
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     padding: 0 12px;
+    font-size: 14px;
+    line-height: 1.25;
+    border-radius: 4px;
+    border: 1px solid var(--bio-input-border);
+    background: var(--bio-surface-item);
+    color: var(--bio-body-fg);
+  }
+  .product-tabs-nav > .btn,
+  .product-tabs-nav > a.btn {
+    height: var(--product-nav-control-h);
+    min-height: var(--product-nav-control-h);
     box-sizing: border-box;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     line-height: 1.2;
+    padding-top: 0;
+    padding-bottom: 0;
   }
-  #product-tabs[data-current-tab="drawing"] #product-edit-main-btn {
+  .product-add-setup-inline {
+    flex: 0 0 var(--product-nav-control-h);
+    width: var(--product-nav-control-h);
+    min-width: var(--product-nav-control-h);
+    max-width: var(--product-nav-control-h);
+    padding: 0;
     display: inline-flex;
-  }
-  #product-tabs:not([data-current-tab="drawing"]) #product-edit-main-btn {
-    display: none !important;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
   }
   #setup-export-specs-btn[hidden],
   #setup-export-photos-btn[hidden] {
@@ -604,7 +513,11 @@
     line-height: 1.55;
     min-width: 0;
     color: var(--bio-body-fg);
-    transition: background 0.22s ease, border-color 0.22s ease;
+    transition:
+      transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.28s ease,
+      background 0.22s ease,
+      border-color 0.22s ease;
   }
   .product-setup-panel-title {
     display: flex;
@@ -798,6 +711,67 @@
       box-shadow: 0 0 0 0 rgba(111, 126, 242, 0);
     }
   }
+  @keyframes setupNaladkaReveal {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes setupNotesDropBreath {
+    0%,
+    100% {
+      box-shadow: var(--bio-filter-shadow), 0 0 0 0 rgba(124, 140, 255, 0);
+    }
+    50% {
+      box-shadow: var(--bio-filter-shadow), 0 0 0 7px rgba(124, 140, 255, 0.14);
+    }
+  }
+  @keyframes setupNotesDropBreathDawn {
+    0%,
+    100% {
+      box-shadow: var(--bio-filter-shadow), 0 0 0 0 rgba(13, 148, 136, 0);
+    }
+    50% {
+      box-shadow: var(--bio-filter-shadow), 0 0 0 7px rgba(13, 148, 136, 0.12);
+    }
+  }
+  .product-tab-panel[data-panel^="setup-"]:not([hidden]) > .product-setup-panel-title {
+    animation: setupNaladkaReveal 0.46s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: 0.03s;
+  }
+  .product-tab-panel[data-panel^="setup-"]:not([hidden]) .product-setup-specs > .product-setup-left-col,
+  .product-tab-panel[data-panel^="setup-"]:not([hidden]) .product-setup-specs > .product-setup-tools-col {
+    animation: setupNaladkaReveal 0.52s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .product-tab-panel[data-panel^="setup-"]:not([hidden]) .product-setup-specs > .product-setup-left-col {
+    animation-delay: 0.07s;
+  }
+  .product-tab-panel[data-panel^="setup-"]:not([hidden]) .product-setup-specs > .product-setup-tools-col {
+    animation-delay: 0.12s;
+  }
+  .product-tab-panel[data-panel^="setup-"]:not([hidden]) > .product-setup-photos,
+  .product-tab-panel[data-panel^="setup-"]:not([hidden]) > .setup-photo-add-row {
+    animation: setupNaladkaReveal 0.52s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: 0.16s;
+  }
+  .product-tab-panel[data-panel^="setup-"] .product-setup-spec-group:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px var(--bio-shadow-card);
+  }
+  .product-tab-panel[data-panel^="setup-"] .product-setup-photos figure.setup-photo-figure {
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+  }
+  .product-tab-panel[data-panel^="setup-"] .product-setup-photos figure.setup-photo-figure:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.38);
+  }
+  html[data-theme="dawn"] .product-tab-panel[data-panel^="setup-"] .product-setup-photos figure.setup-photo-figure:hover {
+    box-shadow: 0 14px 32px rgba(55, 42, 36, 0.12);
+  }
   .setup-spec-box.setup-spec-box-header {
     background: rgba(22, 31, 49, 0.6);
   }
@@ -956,9 +930,9 @@
     font-size: 13px;
     padding: 4px 8px;
     border-radius: 3px;
-    border: 1px solid #3e4f74;
-    background: rgba(12, 18, 30, 0.92);
-    color: var(--bio-body-fg);
+    border: 1px solid var(--bio-input-border);
+    background: var(--bio-input-bg);
+    color: var(--bio-input-fg);
   }
   .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-laser-thick {
     width: 6.5rem;
@@ -966,9 +940,9 @@
     font-size: 13px;
     padding: 4px 8px;
     border-radius: 3px;
-    border: 1px solid #3e4f74;
-    background: rgba(12, 18, 30, 0.92);
-    color: var(--bio-body-fg);
+    border: 1px solid var(--bio-input-border);
+    background: var(--bio-input-bg);
+    color: var(--bio-input-fg);
   }
   .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-laser-mark {
     flex: 1 1 140px;
@@ -977,9 +951,9 @@
     font-size: 13px;
     padding: 4px 8px;
     border-radius: 3px;
-    border: 1px solid #3e4f74;
-    background: rgba(12, 18, 30, 0.92);
-    color: var(--bio-body-fg);
+    border: 1px solid var(--bio-input-border);
+    background: var(--bio-input-bg);
+    color: var(--bio-input-fg);
   }
   body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-line--position-type .setup-plan-summary-value {
     display: none !important;
@@ -998,6 +972,31 @@
   }
   body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .setup-plan-inline-fields {
     display: inline-flex !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-made-material .setup-plan-line--material .setup-plan-summary-value {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-made-material .setup-plan-line--material .setup-plan-inline-fields {
+    display: inline-flex !important;
+  }
+  .setup-plan-line--material .setup-plan-inline-fields .js-plan-inline-made-material,
+  .setup-plan-line--material .setup-plan-inline-fields .js-plan-inline-laser-mark {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-made-material .setup-plan-line--material .js-plan-inline-made-material {
+    display: inline-block !important;
+    flex: 1 1 140px;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--bio-input-border);
+    background: var(--bio-input-bg);
+    color: var(--bio-input-fg);
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .js-plan-inline-laser-mark {
+    display: inline-block !important;
   }
   .setup-plan-line--workpiece .setup-plan-inline-fields .js-plan-inline-laser-thick {
     display: none !important;
@@ -1543,6 +1542,128 @@
     color: var(--bio-body-fg);
     transition: border-color 0.22s ease, background 0.28s ease, color 0.2s ease;
   }
+  .product-setup-notes p.setup-notes-photo-ref-wrap {
+    margin: 0.45em 0;
+    line-height: 1.5;
+  }
+  .product-setup-notes a.setup-notes-photo-ref {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    vertical-align: middle;
+    position: relative;
+    margin: 3px 2px 3px 0;
+    padding: 6px 14px 6px 11px;
+    max-width: 100%;
+    box-sizing: border-box;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.25;
+    text-decoration: none;
+    color: var(--bio-inv-name-link);
+    word-break: break-word;
+    cursor: pointer;
+    border: 1px solid var(--bio-inv-name-link-border);
+    background: linear-gradient(
+      155deg,
+      color-mix(in srgb, var(--bio-input-focus-border) 26%, transparent) 0%,
+      color-mix(in srgb, var(--bio-surface-item) 94%, transparent) 48%,
+      color-mix(in srgb, var(--bio-filter-bg2) 88%, transparent) 100%
+    );
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.07),
+      0 10px 26px rgba(0, 0, 0, 0.22);
+    transition:
+      transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.28s ease,
+      border-color 0.22s ease,
+      color 0.2s ease,
+      background 0.28s ease,
+      filter 0.24s ease;
+  }
+  .product-setup-notes a.setup-notes-photo-ref::before {
+    content: "";
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    opacity: 0.92;
+    background-color: currentColor;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zm9-7.2h-3.17L15 5H9L6.17 8H3c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h18c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zm9-7.2h-3.17L15 5H9L6.17 8H3c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h18c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1z'/%3E%3C/svg%3E");
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+  }
+  .product-setup-notes a.setup-notes-photo-ref:hover {
+    color: var(--bio-inv-name-link-hover-fg);
+    border-color: var(--bio-inv-name-link-hover-border);
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.1),
+      0 14px 34px rgba(72, 88, 180, 0.35);
+    filter: saturate(1.08);
+  }
+  .product-setup-notes a.setup-notes-photo-ref:active {
+    transform: translateY(0);
+    transition-duration: 0.12s;
+  }
+  .product-setup-notes a.setup-notes-photo-ref:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 3px var(--bio-input-focus-ring),
+      0 10px 26px rgba(0, 0, 0, 0.22);
+  }
+  html[data-theme="dawn"] .product-setup-notes a.setup-notes-photo-ref {
+    color: var(--bio-inv-name-link);
+    border-color: var(--bio-inv-name-link-border);
+    background: linear-gradient(
+      155deg,
+      color-mix(in srgb, var(--bio-input-focus-border) 14%, rgba(255, 255, 255, 0.96)) 0%,
+      color-mix(in srgb, var(--bio-surface-item) 70%, rgba(255, 255, 255, 0.98)) 100%
+    );
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.85),
+      0 8px 22px rgba(55, 42, 36, 0.08);
+  }
+  html[data-theme="dawn"] .product-setup-notes a.setup-notes-photo-ref:hover {
+    color: var(--bio-inv-name-link-hover-fg);
+    border-color: var(--bio-inv-name-link-hover-border);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.95),
+      0 12px 28px rgba(13, 148, 136, 0.18);
+    filter: saturate(1.05);
+  }
+  html[data-theme="dawn"] .product-setup-notes a.setup-notes-photo-ref:focus-visible {
+    box-shadow:
+      0 0 0 3px var(--bio-input-focus-ring),
+      0 8px 22px rgba(55, 42, 36, 0.08);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .product-tab-panel[data-panel^="setup-"]:not([hidden]) > .product-setup-panel-title,
+    .product-tab-panel[data-panel^="setup-"]:not([hidden]) .product-setup-specs > .product-setup-left-col,
+    .product-tab-panel[data-panel^="setup-"]:not([hidden]) .product-setup-specs > .product-setup-tools-col,
+    .product-tab-panel[data-panel^="setup-"]:not([hidden]) > .product-setup-photos,
+    .product-tab-panel[data-panel^="setup-"]:not([hidden]) > .setup-photo-add-row {
+      animation: none !important;
+    }
+    .product-setup-notes.is-inline-edit.is-photo-drop-target {
+      animation: none !important;
+    }
+    .product-tab-panel[data-panel^="setup-"] .product-setup-spec-group:hover,
+    .product-tab-panel[data-panel^="setup-"] .product-setup-photos figure.setup-photo-figure:hover {
+      transform: none !important;
+    }
+    .product-tab-panel[data-panel^="setup-"] .product-setup-spec-group,
+    .product-tab-panel[data-panel^="setup-"] .product-setup-photos figure.setup-photo-figure,
+    .product-setup-notes a.setup-notes-photo-ref {
+      transition-duration: 0.01ms !important;
+    }
+  }
   .setup-tools-view th, .setup-tools-view td {
     text-align: center;
     padding: 4px 6px;
@@ -1591,6 +1712,12 @@
     background: rgba(217, 74, 74, 0.18);
     color: #ffd7d7;
   }
+  html[data-theme="dawn"] .setup-tools-view td.setup-tool-override {
+    border-color: #dc2626;
+    box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.32);
+    background: var(--bio-msg-error-bg);
+    color: var(--bio-msg-error-fg);
+  }
   .setup-tools-view td[data-tool-col="correction_enabled"] {
     padding: 0;
   }
@@ -1633,12 +1760,25 @@
   .setup-tools-view td:nth-child(7) { width: 68px; min-width: 68px; max-width: 68px; }
   .setup-tools-view th:nth-child(8),
   .setup-tools-view td:nth-child(8) { width: 120px; min-width: 120px; max-width: 120px; }
+  /* Колонка ↑↓ только в режиме быстрого редактирования (без атрибута или «0» — не занимает места) */
   .setup-tools-view.has-tool-row-move th:nth-child(9),
   .setup-tools-view.has-tool-row-move td:nth-child(9) {
-    width: 40px;
-    min-width: 40px;
-    max-width: 40px;
-    padding: 2px;
+    display: none;
+    width: 0;
+    min-width: 0;
+    max-width: 0;
+    padding: 0;
+    margin: 0;
+    border: none;
+    overflow: hidden;
+  }
+  .product-tab-panel[data-inline-edit-mode="1"] .setup-tools-view.has-tool-row-move th:nth-child(9),
+  .product-tab-panel[data-inline-edit-mode="1"] .setup-tools-view.has-tool-row-move td:nth-child(9) {
+    display: table-cell;
+    width: 26px;
+    min-width: 26px;
+    max-width: 26px;
+    padding: 1px;
     vertical-align: middle;
   }
   .setup-tools-move-btns {
@@ -1647,31 +1787,46 @@
     align-items: center;
     justify-content: center;
     gap: 0;
+    max-width: 100%;
   }
-  .setup-tools-move-btn {
-    min-height: 22px;
-    padding: 0 2px;
-    font-size: 13px;
+  .setup-tools-view button.setup-tools-move-btn {
+    min-height: 0;
+    height: auto;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+    font-size: 10px;
     line-height: 1;
-  }
-  .product-tab-panel[data-inline-edit-mode="0"] .setup-tools-view.has-tool-row-move .setup-tools-th-move,
-  .product-tab-panel[data-inline-edit-mode="0"] .setup-tools-view.has-tool-row-move .setup-tools-move-cell {
-    width: 0 !important;
-    min-width: 0 !important;
-    max-width: 0 !important;
-    padding: 0 !important;
-    border: none;
-    overflow: hidden;
-    visibility: hidden;
+    font-weight: 700;
+    border-radius: 2px;
+    box-sizing: border-box;
   }
   .setup-tools-add-row {
     margin-top: 6px;
   }
+  /* Как у блока наладки (.product-setup-notes): одна палитра в ночи и в «Рассвет» */
   .setup-tools-view td.is-inline-edit {
-    border: 1px dashed #6f7ef2;
-    background: rgba(111, 126, 242, 0.12);
-    border-radius: 3px;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 5px;
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow);
+    color: var(--bio-body-fg);
     outline: none;
+    transition: border-color 0.22s ease, background 0.28s ease, color 0.2s ease;
+  }
+  .setup-tools-view td.setup-tool-override.is-inline-edit {
+    border-color: #d94a4a;
+    box-shadow: inset 0 0 0 1px rgba(217, 74, 74, 0.55);
+    background: rgba(217, 74, 74, 0.18);
+    color: #ffd7d7;
+  }
+  html[data-theme="dawn"] .setup-tools-view td.setup-tool-override.is-inline-edit {
+    border-color: #dc2626;
+    box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.32);
+    background: var(--bio-msg-error-bg);
+    color: var(--bio-msg-error-fg);
   }
   .setup-tools-view td[data-tool-col="diameter"],
   .setup-tools-view td[data-tool-col="overhang"] {
@@ -1883,6 +2038,18 @@
     border-style: solid;
     min-height: 220px;
     cursor: text;
+  }
+  .product-setup-notes.is-inline-edit.is-photo-drop-target {
+    outline: 2px dashed var(--bio-input-focus-border);
+    outline-offset: 2px;
+    background: color-mix(in srgb, var(--bio-input-focus-border) 14%, transparent);
+    animation: setupNotesDropBreath 1.45s ease-in-out infinite;
+  }
+  html[data-theme="dawn"] .product-setup-notes.is-inline-edit.is-photo-drop-target {
+    animation-name: setupNotesDropBreathDawn;
+  }
+  .setup-photo-caption:not([contenteditable="true"]) {
+    cursor: pointer;
   }
   .setup-inline-toolbar-block {
     margin: 8px 0 0 0;
@@ -2108,6 +2275,172 @@
   }
   .product-download-row .product-download-preview-btn .ui-icon {
     font-size: 16px;
+  }
+  .product-download-row .product-download-placeholder {
+    flex: 1 1 auto;
+    align-self: center;
+    text-align: left;
+    font-size: 13px;
+    padding: 0 4px;
+    min-width: 0;
+  }
+  .product-download-row .product-download-row-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    align-items: stretch;
+  }
+  .product-download-row .product-download-row-actions .product-download-preview-btn {
+    flex: 0 0 38px;
+    width: 38px;
+    min-width: 38px;
+    max-width: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Замена CAD/STL/PDF — только в режиме «Быстрое редактирование» (при наличии установок) */
+  body:not(.setup-inline-edit-enabled) .product-detail-grid[data-product-has-setups] #product-downloads-block .js-product-asset-replace {
+    display: none !important;
+  }
+  .product-drawing-notes {
+    margin-top: 14px;
+  }
+  .product-drawing-notes__title {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .product-side-notes-stack {
+    margin-top: 12px;
+  }
+  #product-detail-side .product-drawing-notes__list {
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .product-drawing-notes__list {
+    list-style: none;
+    margin: 0 0 16px 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .product-drawing-notes__item {
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 6px;
+    background: var(--bio-surface-item);
+  }
+  .product-drawing-notes__item-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .product-drawing-notes__item-top .product-drawing-notes__meta {
+    margin-bottom: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .product-drawing-notes__delete {
+    flex: 0 0 auto;
+    padding: 2px 8px;
+    min-width: 32px;
+    line-height: 1;
+    opacity: 0.82;
+  }
+  .product-drawing-notes__delete:hover {
+    opacity: 1;
+    color: var(--bio-error-soft);
+  }
+  html[data-theme="dawn"] .product-drawing-notes__delete:hover {
+    color: #b91c1c;
+  }
+  .product-drawing-notes__meta {
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+  .product-drawing-notes__author {
+    font-weight: 600;
+    color: var(--bio-body-fg);
+  }
+  .product-drawing-notes__body {
+    font-size: 14px;
+    word-break: break-word;
+  }
+  .product-drawing-notes__form {
+    margin-top: 4px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--bio-check-row-border);
+  }
+  .product-drawing-notes__label {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .product-drawing-notes__label-text {
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--bio-field-label);
+  }
+  .product-drawing-notes__textarea {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    min-height: 96px;
+    max-height: 280px;
+    padding: 11px 13px;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--bio-input-fg);
+    background: var(--bio-input-bg);
+    border: 1px solid var(--bio-input-border);
+    border-radius: 10px;
+    resize: vertical;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+    transition: border-color 0.18s ease, box-shadow 0.2s ease, background 0.18s ease;
+  }
+  html[data-theme="dawn"] .product-drawing-notes__textarea {
+    box-shadow: inset 0 1px 2px rgba(55, 42, 36, 0.04);
+  }
+  .product-drawing-notes__textarea::placeholder {
+    color: var(--bio-caption-soft);
+    opacity: 0.88;
+  }
+  .product-drawing-notes__textarea:hover {
+    border-color: var(--bio-input-hover-border);
+  }
+  .product-drawing-notes__textarea:focus {
+    outline: none;
+    border-color: var(--bio-input-focus-border);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 3px var(--bio-input-focus-ring);
+    background: var(--bio-input-focus-bg);
+  }
+  .product-drawing-notes__actions {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+  }
+  .product-drawing-notes__submit {
+    font-weight: 600;
+    min-width: 108px;
+  }
+  .product-drawing-notes__form-msg {
+    font-size: 12px;
+    display: none;
+    flex: 1 1 120px;
+    min-width: 0;
+    line-height: 1.35;
   }
   @media (max-width: 960px) {
     .product-detail-grid {
@@ -2496,6 +2829,11 @@
     var panels = root.querySelectorAll(".product-tab-panel");
     var programDownloadBtn = document.getElementById("product-program-download");
 
+    function getCookie(name) {
+      var m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));
+      return m ? decodeURIComponent(m[2]) : "";
+    }
+
     function setProgramDownloadByTab(tabName) {
       if (!programDownloadBtn) return;
       if (tabName === "drawing") {
@@ -2525,12 +2863,8 @@
 
     function setTopButtonsByTab(tabName) {
       var isSetupTab = /^setup-\d+$/.test(tabName || "");
-      var isDrawing = tabName === "drawing";
-      var fastBtn = document.getElementById("setup-inline-edit-btn");
-      var productEditBtn = document.getElementById("product-edit-main-btn");
       var exportSpecsBtn = document.getElementById("setup-export-specs-btn");
       var exportPhotosBtn = document.getElementById("setup-export-photos-btn");
-      if (productEditBtn) productEditBtn.hidden = !isDrawing;
       if (exportSpecsBtn) exportSpecsBtn.hidden = !isSetupTab;
       if (exportPhotosBtn) exportPhotosBtn.hidden = !isSetupTab;
       if (isSetupTab) {
@@ -2563,6 +2897,10 @@
           el.hidden = !isMatch;
         });
       }
+      document.querySelectorAll(".product-side-notes-panel").forEach(function (el) {
+        var isMatch = el.getAttribute("data-notes-for-tab") === tabName;
+        el.hidden = !isMatch;
+      });
       if (typeof window.startProductCadViewer === "function") {
         window.startProductCadViewer();
       }
@@ -2612,6 +2950,143 @@
     });
 
     initProductDownloadsCollapse();
+
+    function initProductAssetReplace() {
+      document.querySelectorAll(".js-product-asset-replace").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var row = btn.closest("[data-product-asset-row]");
+          var inp = row ? row.querySelector(".js-product-asset-file-input") : null;
+          if (inp) inp.click();
+        });
+      });
+      document.querySelectorAll(".js-product-asset-file-input").forEach(function (inp) {
+        inp.addEventListener("change", async function () {
+          var file = inp.files && inp.files[0];
+          if (!file) return;
+          var fieldName = inp.getAttribute("data-field-name") || "";
+          if (!fieldName) return;
+          var fd = new FormData();
+          fd.append("action", "inline_replace_product_asset");
+          fd.append("field_name", fieldName);
+          fd.append("file", file);
+          try {
+            var res = await fetch(window.location.href, {
+              method: "POST",
+              headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+              body: fd,
+              credentials: "same-origin",
+            });
+            var data = await res.json().catch(function () { return {}; });
+            if (!res.ok || !data.ok) {
+              alert(data.error || "Не удалось сохранить файл.");
+              inp.value = "";
+              return;
+            }
+            window.location.reload();
+          } catch (e) {
+            alert("Ошибка сети при загрузке файла.");
+            inp.value = "";
+          }
+        });
+      });
+    }
+    initProductAssetReplace();
+
+    function initProductDrawingNotes() {
+      document.querySelectorAll(".js-product-note-form").forEach(function (form) {
+        form.addEventListener("submit", async function (e) {
+          e.preventDefault();
+          var ta = form.querySelector(".js-product-note-body");
+          var msg = form.querySelector(".js-product-note-form-msg");
+          var body = (ta && ta.value || "").trim();
+          if (!body) return;
+          if (msg) {
+            msg.style.display = "none";
+            msg.textContent = "";
+          }
+          var fd = new FormData();
+          fd.append("action", "add_product_note");
+          fd.append("body", body);
+          var sid = (form.getAttribute("data-note-setup-id") || "").trim();
+          if (sid) fd.append("setup_id", sid);
+          try {
+            var res = await fetch(window.location.href, {
+              method: "POST",
+              headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+              body: fd,
+              credentials: "same-origin",
+            });
+            var data = await res.json().catch(function () { return {}; });
+            if (!res.ok || !data.ok) {
+              if (msg) {
+                msg.style.display = "";
+                msg.textContent = data.error || "Не удалось сохранить заметку.";
+              }
+              return;
+            }
+            var tabSlug = "drawing";
+            var tabsRoot = document.getElementById("product-tabs");
+            if (tabsRoot) {
+              var cur = (tabsRoot.getAttribute("data-current-tab") || "").trim();
+              if (cur) tabSlug = cur;
+            }
+            try {
+              var u = new URL(window.location.href);
+              if (tabSlug && tabSlug !== "drawing") u.searchParams.set("tab", tabSlug);
+              else u.searchParams.delete("tab");
+              window.location.href = u.toString();
+            } catch (_e2) {
+              window.location.reload();
+            }
+          } catch (err) {
+            if (msg) {
+              msg.style.display = "";
+              msg.textContent = "Ошибка сети.";
+            }
+          }
+        });
+      });
+    }
+    initProductDrawingNotes();
+
+    function initProductNoteDeletes() {
+      document.addEventListener("click", async function (ev) {
+        var btn = ev.target && ev.target.closest && ev.target.closest(".js-product-note-delete");
+        if (!btn) return;
+        ev.preventDefault();
+        var id = (btn.getAttribute("data-note-id") || "").trim();
+        if (!id || !window.confirm("Удалить эту заметку?")) return;
+        var fd = new FormData();
+        fd.append("action", "delete_product_note");
+        fd.append("note_id", id);
+        try {
+          var res = await fetch(window.location.href, {
+            method: "POST",
+            headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+            body: fd,
+            credentials: "same-origin",
+          });
+          var data = await res.json().catch(function () { return {}; });
+          if (!res.ok || !data.ok) {
+            alert(data.error || "Не удалось удалить заметку.");
+            return;
+          }
+          var li = btn.closest(".product-drawing-notes__item");
+          var ul = li && li.parentElement;
+          if (li) li.remove();
+          if (ul && !ul.querySelector(".product-drawing-notes__item")) {
+            var empty = document.createElement("li");
+            empty.className = "product-drawing-notes__empty muted";
+            empty.textContent = "Пока нет заметок.";
+            ul.appendChild(empty);
+          }
+        } catch (_err) {
+          alert("Ошибка сети.");
+        }
+      });
+    }
+    initProductNoteDeletes();
+
     var setupSelect = document.getElementById("setup-tab-select");
     if (setupSelect) {
       setupSelect.addEventListener("change", function () {
@@ -2634,7 +3109,7 @@
   (function () {
     var editToggleBtn = document.getElementById("setup-inline-edit-btn");
     var root = document.getElementById("product-tabs");
-    if (!editToggleBtn || !root) return;
+    if (!root) return;
     var inlineEditMode = false;
     var notesSelection = null;
     var TOOL_TYPE_OPTIONS = [
@@ -2669,9 +3144,11 @@
       var wpv = wp ? wp.value : "";
       var showMade = ptype === "made";
       var showLaser = showMade && wpv === "laser";
+      var showMadeNonLaser = showMade && wpv && wpv !== "laser";
       wrap.classList.toggle("plan-summary-editing-workpiece", showMade);
       wrap.classList.toggle("plan-summary-editing-laser-material", showLaser);
       wrap.classList.toggle("plan-summary-editing-laser-thick", showLaser);
+      wrap.classList.toggle("plan-summary-editing-made-material", showMadeNonLaser);
     }
 
     function applyPlanInlineStateToQuickEdits(state) {
@@ -2687,13 +3164,20 @@
         if (thick) thick.value = state.laser_sheet_thickness_mm || "";
         var mark = pr.querySelector(".js-product-plan-laser-mark");
         if (mark) mark.value = state.laser_material_marking || "";
+        var made = pr.querySelector(".js-product-plan-made-material");
+        if (made) made.value = state.made_material || "";
         var wrap = pr.querySelector("[data-workpiece-laser-wrap]");
         var laser = pr.querySelector("[data-laser-panel]");
+        var madePanel = pr.querySelector("[data-made-material-panel]");
         var t = pr.querySelector(".js-product-plan-type:checked");
         var ptype = t ? t.value : "made";
         if (wrap) wrap.style.display = ptype === "made" ? "" : "none";
         if (laser && wp) {
           laser.style.display = ptype === "made" && wp.value === "laser" ? "" : "none";
+        }
+        if (madePanel && wp) {
+          madePanel.style.display =
+            ptype === "made" && wp.value && wp.value !== "laser" ? "" : "none";
         }
       });
       document.querySelectorAll("[data-product-plan-summary]").forEach(function (wrap) {
@@ -2705,6 +3189,8 @@
         if (thick) thick.value = state.laser_sheet_thickness_mm || "";
         var mark = wrap.querySelector(".js-plan-inline-laser-mark");
         if (mark) mark.value = state.laser_material_marking || "";
+        var made = wrap.querySelector(".js-plan-inline-made-material");
+        if (made) made.value = state.made_material || "";
         syncSetupPlanInlineVisibility(wrap);
       });
     }
@@ -3115,6 +3601,10 @@
       });
     }
 
+    function exitInlineEditAfterSave() {
+      if (inlineEditMode) toggleInlineEdit();
+    }
+
     function toggleInlineEdit() {
       inlineEditMode = !inlineEditMode;
       document.body.classList.toggle("setup-inline-edit-enabled", inlineEditMode);
@@ -3210,14 +3700,18 @@
       root.querySelectorAll(".product-tab-panel").forEach(function (panel) {
         refreshInlineFieldTitles(panel, inlineEditMode);
       });
-      editToggleBtn.textContent = inlineEditMode ? "Сохранить изменения" : "Быстрое редактирование";
+      if (editToggleBtn) {
+        editToggleBtn.textContent = inlineEditMode ? "Сохранить изменения" : "Быстрое редактирование";
+      }
       window.dispatchEvent(new CustomEvent("setup-inline-edit-mode", { detail: { enabled: inlineEditMode } }));
     }
 
     function forceDisableInlineEdit() {
       inlineEditMode = false;
       document.body.classList.remove("setup-inline-edit-enabled");
-      editToggleBtn.textContent = "Быстрое редактирование";
+      if (editToggleBtn) {
+        editToggleBtn.textContent = "Быстрое редактирование";
+      }
       root.querySelectorAll(".setup-inline-toolbar-block").forEach(function (toolbar) {
         toolbar.setAttribute("hidden", "hidden");
       });
@@ -3311,14 +3805,22 @@
     function appendPlanFieldsToPayload(payload, planWrap) {
       var planTypeEl = planWrap ? planWrap.querySelector(".js-plan-inline-product-type") : null;
       if (!planWrap || !planTypeEl) return;
-      payload.append("sync_plan_from_inline", "1");
-      payload.append("plan_product_type", planTypeEl.value || "made");
+      var ptype = (planTypeEl.value || "made").trim();
       var wpSel = planWrap.querySelector(".js-plan-inline-workpiece");
-      payload.append("workpiece_type", wpSel ? wpSel.value || "" : "");
+      var wpVal = wpSel ? (wpSel.value || "").trim() : "";
+      /* Без типа заготовки для «Изделие» сервер отклонит sync_plan; сохраняем только наладку, план не трогаем. */
+      if (ptype === "made" && !wpVal) {
+        return;
+      }
+      payload.append("sync_plan_from_inline", "1");
+      payload.append("plan_product_type", ptype);
+      payload.append("workpiece_type", wpVal);
       var thickIn = planWrap.querySelector(".js-plan-inline-laser-thick");
       payload.append("laser_sheet_thickness_mm", thickIn ? (thickIn.value || "").trim() : "");
       var markIn = planWrap.querySelector(".js-plan-inline-laser-mark");
       payload.append("laser_material_marking", markIn ? (markIn.value || "").trim() : "");
+      var madeIn = planWrap.querySelector(".js-plan-inline-made-material");
+      payload.append("made_material", madeIn ? (madeIn.value || "").trim() : "");
     }
 
     function applyInlineUpdateResponseToDom(setupId, data) {
@@ -3336,9 +3838,6 @@
       }
       var scopes = [];
       var pSetup = root.querySelector("#panel-setup-" + setupId);
-      root.querySelectorAll('#panel-drawing [data-drawing-setup-root="' + setupId + '"]').forEach(function (el) {
-        scopes.push(el);
-      });
       if (pSetup) scopes.push(pSetup);
       scopes.forEach(function (panel) {
         panel.querySelectorAll("[data-field-text]").forEach(function (node) {
@@ -3348,6 +3847,7 @@
           var val = data.setup[k];
           if (k === "setup_notes") {
             node.innerHTML = val ? val : "Наладка не заполнена.";
+            if (val) normalizeSetupNotesImages(node);
           } else if (k === "gcode_system") {
             node.textContent = val || "G54";
           } else if (k === "name") {
@@ -3358,18 +3858,6 @@
         });
         refreshInlineFieldTitles(panel, false);
       });
-      var nalBlk = root.querySelector(
-        '#panel-drawing .product-drawing-setup-block[data-drawing-setup-root="' + setupId + '"]'
-      );
-      if (nalBlk && data.setup) {
-        ["size", "material", "workpiece"].forEach(function (fname) {
-          if (!Object.prototype.hasOwnProperty.call(data.setup, fname)) return;
-          var el = nalBlk.querySelector('[data-drawing-naladki-field="' + fname + '"]');
-          if (!el) return;
-          var v = data.setup[fname];
-          el.textContent = v && v !== "—" ? v : "—";
-        });
-      }
     }
 
     function updateSetupTabLabelFromResponse(setupTab, data) {
@@ -3435,16 +3923,49 @@
       return payload;
     }
 
-    editToggleBtn.addEventListener("click", async function () {
+    async function readJsonInlineSaveResponse(res) {
+      var ct = (res.headers.get("content-type") || "").toLowerCase();
+      if (ct.indexOf("application/json") === -1) {
+        var snippet = "";
+        try {
+          snippet = (await res.text()).replace(/\s+/g, " ").trim().slice(0, 160);
+        } catch (_) {}
+        alert(
+          "Сервер вернул не JSON (HTTP " +
+            res.status +
+            "). Обычно это редирект из‑за прав или истекшей сессии — обновите страницу и войдите снова." +
+            (snippet ? "\n\nФрагмент ответа:\n" + snippet : "")
+        );
+        return null;
+      }
+      try {
+        return await res.json();
+      } catch (e) {
+        alert("Не удалось разобрать JSON в ответе сервера. Обновите страницу.");
+        return null;
+      }
+    }
+
+    if (editToggleBtn) {
+    editToggleBtn.addEventListener(
+      "click",
+      async function (e) {
       if (!inlineEditMode) {
         toggleInlineEdit();
+        return;
+      }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      try {
+      if (!(getCookie("csrftoken") || "").trim()) {
+        alert("Не найден CSRF-токен в cookies (csrftoken). Обновите страницу или проверьте настройки браузера для этого сайта.");
         return;
       }
       var currentTab = getCurrentTabName();
       if (currentTab === "drawing") {
         var ids = getInlineSetupIds();
         if (!ids.length) {
-          toggleInlineEdit();
+          alert("Нет установок для сохранения. Если установки должны быть — обновите страницу.");
           return;
         }
         var planSummaryOut = null;
@@ -3463,12 +3984,17 @@
             body: payload,
             credentials: "same-origin",
           });
-          var data = await res.json();
+          var data = await readJsonInlineSaveResponse(res);
+          if (!data) return;
           if (!res.ok || !data.ok) {
             alert(data.error || "Не удалось сохранить.");
             return;
           }
-          applyInlineUpdateResponseToDom(sid, data);
+          try {
+            applyInlineUpdateResponseToDom(sid, data);
+          } catch (domErr) {
+            console.error(domErr);
+          }
           var tabEl = root.querySelector("#tab-setup-" + sid);
           if (tabEl) updateSetupTabLabelFromResponse(tabEl, data);
           if (data.plan_summary) planSummaryOut = data.plan_summary;
@@ -3476,26 +4002,23 @@
         }
         if (planSummaryOut) syncProductPlanSummaryBlocks(planSummaryOut);
         if (planInlineOut) applyPlanInlineStateToQuickEdits(planInlineOut);
-        toggleInlineEdit();
+        exitInlineEditAfterSave();
         return;
       }
 
-      var panel = activeSetupPanel();
-      if (!panel) {
-        toggleInlineEdit();
+      var tabSlug = getCurrentTabName();
+      var panel = root.querySelector('.product-tab-panel[data-panel="' + tabSlug + '"]');
+      var slugMatch = (tabSlug || "").match(/^setup-(\d+)$/);
+      if (!panel || !slugMatch) {
+        alert(
+          "Не удалось определить активную установку. В списке «Изделие / Уст. …» выберите нужную установку и снова нажмите «Сохранить изменения».\n(Сейчас в списке: «" +
+            (tabSlug || "(пусто)") +
+            "».)"
+        );
         return;
       }
-      var setupTab = root.querySelector('.product-tab.is-active[data-setup-edit-url]');
-      if (!setupTab) {
-        toggleInlineEdit();
-        return;
-      }
-      var setupIdMatch = (setupTab.id || "").match(/tab-setup-(\d+)/);
-      if (!setupIdMatch) {
-        toggleInlineEdit();
-        return;
-      }
-      var sidOne = setupIdMatch[1];
+      var sidOne = slugMatch[1];
+      var setupTab = root.querySelector('.product-tab[data-tab="' + tabSlug + '"]');
       var payloadOne = buildInlineSetupPayload(sidOne, panel, true);
       var resOne = await fetch(window.location.href, {
         method: "POST",
@@ -3506,17 +4029,29 @@
         body: payloadOne,
         credentials: "same-origin",
       });
-      var dataOne = await resOne.json();
+      var dataOne = await readJsonInlineSaveResponse(resOne);
+      if (!dataOne) return;
       if (!resOne.ok || !dataOne.ok) {
         alert(dataOne.error || "Не удалось сохранить.");
         return;
       }
-      applyInlineUpdateResponseToDom(sidOne, dataOne);
-      updateSetupTabLabelFromResponse(setupTab, dataOne);
+      try {
+        applyInlineUpdateResponseToDom(sidOne, dataOne);
+        if (setupTab) updateSetupTabLabelFromResponse(setupTab, dataOne);
+      } catch (domErr2) {
+        console.error(domErr2);
+      }
       if (dataOne.plan_summary) syncProductPlanSummaryBlocks(dataOne.plan_summary);
       if (dataOne.plan_inline_state) applyPlanInlineStateToQuickEdits(dataOne.plan_inline_state);
-      toggleInlineEdit();
-    });
+      exitInlineEditAfterSave();
+      } catch (e) {
+        console.error(e);
+        alert("Ошибка при сохранении: " + (e && e.message ? e.message : String(e)));
+      }
+    },
+      true
+    );
+    }
 
     root.addEventListener("click", function (e) {
       var el = e.target;
@@ -3552,7 +4087,7 @@
         return;
       }
       if (!inlineEditMode) return;
-      if (el.closest(".product-tab") || el.closest("#setup-tab-select")) {
+      if (el.closest && el.closest(".product-tab")) {
         forceDisableInlineEdit();
       }
     });
@@ -3933,7 +4468,7 @@
           '<a href="' + ph.image_url + '" class="setup-photo-open" data-photo-url="' + ph.image_url + '" data-photo-caption="' + (ph.caption || "") + '">' +
             '<img src="' + ph.image_url + '" alt="' + (ph.caption || "") + '" loading="lazy" />' +
           '</a>' +
-          '<figcaption class="muted setup-photo-caption is-inline-edit" data-caption-editable="1" contenteditable="true" spellcheck="true">' + (ph.caption || "") + '</figcaption>' +
+          '<figcaption class="muted setup-photo-caption is-inline-edit" data-caption-editable="1" contenteditable="true" spellcheck="true" title="Двойной щелчок — открыть фото">' + (ph.caption || "") + '</figcaption>' +
           '<div class="setup-photo-inline-controls" hidden>' +
             '<button type="button" class="btn btn-ghost js-setup-photo-save-caption" title="Сохранить подпись">Сохранить</button>' +
             '<button type="button" class="btn btn-ghost js-setup-photo-delete" title="Удалить блок">×</button>' +
@@ -3944,22 +4479,115 @@
       }
     });
 
+    function escapeHtmlAttr(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function escapeHtml(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function normalizeSetupNotesImages(el) {
+      if (!el || !el.querySelectorAll) return;
+      el.querySelectorAll("img").forEach(function (img) {
+        var src = (img.getAttribute("src") || "").trim();
+        if (!src) {
+          img.remove();
+          return;
+        }
+        var alt = (img.getAttribute("alt") || "").trim();
+        var label = alt || "Фото";
+        var a = document.createElement("a");
+        a.href = src;
+        a.className = "setup-notes-photo-ref setup-photo-open";
+        a.setAttribute("data-photo-url", src);
+        a.setAttribute("data-photo-caption", label);
+        a.title = "Открыть изображение";
+        a.textContent = label;
+        var parent = img.parentNode;
+        img.replaceWith(a);
+        if (parent && parent.tagName === "P") {
+          parent.classList.add("setup-notes-photo-ref-wrap");
+        } else if (parent) {
+          var wrap = document.createElement("p");
+          wrap.className = "setup-notes-photo-ref-wrap";
+          parent.insertBefore(wrap, a);
+          wrap.appendChild(a);
+        }
+      });
+    }
+
     var draggedPhotoFigure = null;
+    root.addEventListener("click", function (e) {
+      var cap = e.target && e.target.closest ? e.target.closest(".setup-photo-caption") : null;
+      if (!cap) return;
+      if (e.target.closest && e.target.closest(".setup-photo-inline-controls")) return;
+      if (cap.isContentEditable) return;
+      var fig = cap.closest(".setup-photo-figure");
+      if (!fig) return;
+      var link = fig.querySelector("a.setup-photo-open");
+      if (!link) return;
+      e.preventDefault();
+      e.stopPropagation();
+      link.click();
+    });
+    root.addEventListener("dblclick", function (e) {
+      var cap = e.target && e.target.closest ? e.target.closest(".setup-photo-caption") : null;
+      if (!cap || !cap.isContentEditable) return;
+      if (e.target.closest && e.target.closest(".setup-photo-inline-controls")) return;
+      var fig = cap.closest(".setup-photo-figure");
+      if (!fig) return;
+      var link = fig.querySelector("a.setup-photo-open");
+      if (!link) return;
+      e.preventDefault();
+      e.stopPropagation();
+      link.click();
+    });
+
     root.addEventListener("dragstart", function (e) {
       var figure = e.target && e.target.closest ? e.target.closest(".setup-photo-figure[draggable='true']") : null;
       if (!figure || !inlineEditMode) return;
       draggedPhotoFigure = figure;
       figure.classList.add("is-dragging");
       if (e.dataTransfer) {
-        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.effectAllowed = "copyMove";
         e.dataTransfer.setData("text/plain", figure.getAttribute("data-photo-id") || "");
       }
     });
 
     root.addEventListener("dragover", function (e) {
+      if (!draggedPhotoFigure || !inlineEditMode) return;
+      var notesEl = e.target && e.target.closest ? e.target.closest(".product-setup-notes.is-inline-edit") : null;
+      if (notesEl) {
+        var pNotes = notesEl.closest(".product-tab-panel");
+        var pFig = draggedPhotoFigure.closest(".product-tab-panel");
+        if (pNotes && pFig && pNotes === pFig) {
+          e.preventDefault();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+          notesEl.classList.add("is-photo-drop-target");
+          root.querySelectorAll(".product-setup-notes.is-photo-drop-target").forEach(function (n) {
+            if (n !== notesEl) n.classList.remove("is-photo-drop-target");
+          });
+          root.querySelectorAll(".setup-photo-figure.is-drop-target").forEach(function (f) {
+            f.classList.remove("is-drop-target");
+          });
+          return;
+        }
+      }
+      root.querySelectorAll(".product-setup-notes.is-photo-drop-target").forEach(function (n) {
+        n.classList.remove("is-photo-drop-target");
+      });
       var target = e.target && e.target.closest ? e.target.closest(".setup-photo-figure[draggable='true']") : null;
       if (!draggedPhotoFigure || !target || target === draggedPhotoFigure) return;
       e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
       var wrap = target.closest(".product-setup-photos");
       if (wrap) {
         wrap.querySelectorAll(".setup-photo-figure.is-drop-target").forEach(function (el) {
@@ -3970,28 +4598,78 @@
     });
 
     root.addEventListener("dragleave", function (e) {
+      var notesLeave = e.target && e.target.closest ? e.target.closest(".product-setup-notes.is-photo-drop-target") : null;
+      if (notesLeave && (!e.relatedTarget || !notesLeave.contains(e.relatedTarget))) {
+        notesLeave.classList.remove("is-photo-drop-target");
+      }
       var target = e.target && e.target.closest ? e.target.closest(".setup-photo-figure.is-drop-target") : null;
       if (target) target.classList.remove("is-drop-target");
     });
 
     root.addEventListener("drop", async function (e) {
+      var notesEl = e.target && e.target.closest ? e.target.closest(".product-setup-notes.is-inline-edit") : null;
+      if (notesEl && draggedPhotoFigure && inlineEditMode) {
+        var pNotes = notesEl.closest(".product-tab-panel");
+        var pFig = draggedPhotoFigure.closest(".product-tab-panel");
+        if (pNotes && pFig && pNotes === pFig) {
+          e.preventDefault();
+          notesEl.classList.remove("is-photo-drop-target");
+          var link = draggedPhotoFigure.querySelector("a.setup-photo-open");
+          var imgUrl = link ? (link.getAttribute("data-photo-url") || link.getAttribute("href") || "") : "";
+          var capEl = draggedPhotoFigure.querySelector(".setup-photo-caption");
+          var alt = capEl ? (capEl.textContent || "").trim() : "";
+          if (imgUrl) {
+            notesEl.focus();
+            var capLabel = alt || "Фото";
+            var html =
+              '<p class="setup-notes-photo-ref-wrap">' +
+              '<a href="' +
+              escapeHtmlAttr(imgUrl) +
+              '" class="setup-notes-photo-ref setup-photo-open" data-photo-url="' +
+              escapeHtmlAttr(imgUrl) +
+              '" data-photo-caption="' +
+              escapeHtmlAttr(capLabel) +
+              '" title="Открыть изображение">' +
+              escapeHtml(capLabel) +
+              "</a></p>";
+            var ok = false;
+            if (typeof document.execCommand === "function") {
+              try {
+                ok = document.execCommand("insertHTML", false, html);
+              } catch (errIns) {}
+            }
+            if (!ok) {
+              notesEl.insertAdjacentHTML("beforeend", html);
+            }
+          }
+          draggedPhotoFigure.classList.remove("is-dragging");
+          draggedPhotoFigure = null;
+          return;
+        }
+      }
       var target = e.target && e.target.closest ? e.target.closest(".setup-photo-figure[draggable='true']") : null;
       if (!draggedPhotoFigure || !target || target === draggedPhotoFigure) return;
       e.preventDefault();
       var photosWrap = target.closest(".product-setup-photos");
       var setupId = target.getAttribute("data-setup-id") || draggedPhotoFigure.getAttribute("data-setup-id") || "";
       if (!photosWrap || !setupId) return;
-      photosWrap.insertBefore(draggedPhotoFigure, target);
+      var movedFig = draggedPhotoFigure;
+      photosWrap.insertBefore(movedFig, target);
       photosWrap.querySelectorAll(".is-drop-target").forEach(function (el) {
         el.classList.remove("is-drop-target");
       });
-      draggedPhotoFigure.classList.remove("is-dragging");
-      draggedPhotoFigure.classList.add("is-drop-commit");
-      setTimeout(function () { draggedPhotoFigure.classList.remove("is-drop-commit"); }, 280);
+      movedFig.classList.remove("is-dragging");
+      movedFig.classList.add("is-drop-commit");
+      setTimeout(function () {
+        movedFig.classList.remove("is-drop-commit");
+      }, 280);
       await persistSetupPhotosOrder(photosWrap, setupId);
     });
 
     root.addEventListener("dragend", function () {
+      root.querySelectorAll(".product-setup-notes.is-photo-drop-target").forEach(function (n) {
+        n.classList.remove("is-photo-drop-target");
+      });
       root.querySelectorAll(".setup-photo-figure.is-dragging, .setup-photo-figure.is-drop-target").forEach(function (figure) {
         figure.classList.remove("is-dragging", "is-drop-target");
       });
@@ -4030,8 +4708,7 @@
         var label = rowFieldMap[fieldName] || "Фото";
         var panel = input.closest(".product-tab-panel");
         var box = input.closest(".setup-spec-box");
-        var drawingBlock = input.closest("[data-drawing-setup-root]");
-        var scope = box || drawingBlock || panel;
+        var scope = box || panel;
         var setupName = "";
         var activeBtn = root.querySelector(".product-tab.is-active");
         if (activeBtn) setupName = activeBtn.getAttribute("data-setup-name") || "";
@@ -4472,6 +5149,10 @@
     }
 
     document.querySelectorAll(".program-search-input").forEach(bindSearchInput);
+
+    root.querySelectorAll('[data-field-text="setup_notes"]').forEach(function (n) {
+      normalizeSetupNotesImages(n);
+    });
   })();
 </script>
 

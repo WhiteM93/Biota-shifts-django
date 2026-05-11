@@ -488,6 +488,21 @@ class EmployeePayrollMonthStatus(models.Model):
         return f"{self.emp_code} {self.year}-{self.month:02d}"
 
 
+class UserInventoryStockFilterPrefs(models.Model):
+    """Последние GET-параметры фильтра «Фильтр наличия» (страница склада), на аккаунт Biota."""
+
+    username = models.CharField(max_length=200, unique=True, db_index=True, verbose_name="Аккаунт")
+    params = models.JSONField(default=dict, blank=True, verbose_name="Параметры фильтра")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        verbose_name = "Фильтр наличия (сохранённые параметры)"
+        verbose_name_plural = "Фильтры наличия (сохранённые параметры)"
+
+    def __str__(self) -> str:
+        return self.username
+
+
 DEFECT_PAYROLL_ADJUST_KIND_CHOICES = [
     ("bonus_percent", "Премия, % от начисления по табелю"),
     ("bonus_rub", "Премия, ₽ (фикс)"),
@@ -620,6 +635,37 @@ class Product(models.Model):
         if self.cad_filename_endswith_stl():
             return "из основного"
         return "—"
+
+
+class ProductNote(models.Model):
+    """Заметки: вкладка «Изделие» (setup пустой) или отдельная история по каждой установке."""
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="notes",
+        verbose_name="Изделие",
+    )
+    setup = models.ForeignKey(
+        "ProductSetup",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notes",
+        verbose_name="Установка",
+        help_text="Пусто — заметки ко вкладке «Изделие»; иначе — к указанной установке.",
+    )
+    author_username = models.CharField(max_length=150, verbose_name="Автор (логин)")
+    body = models.TextField(max_length=4000, verbose_name="Текст")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+
+    class Meta:
+        ordering = ("created_at", "id")
+        verbose_name = "Заметка к изделию / установке"
+        verbose_name_plural = "Заметки к изделию / установкам"
+
+    def __str__(self) -> str:
+        return f"{self.product_id} s={self.setup_id} {self.author_username} @ {self.created_at}"
 
 
 class ProductSetup(models.Model):

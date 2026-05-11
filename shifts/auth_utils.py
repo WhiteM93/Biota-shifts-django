@@ -4,6 +4,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 from django.conf import settings
 from django.contrib import messages
+from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import NoReverseMatch, resolve, reverse
 
@@ -26,8 +27,6 @@ def _nav_key_for_url_name(url_name: str) -> str | None:
         return None
     if n == "home":
         return "home"
-    if n == "plan" or n.startswith("plan_article"):
-        return "plan"
     if n.startswith("graph"):
         return "graph"
     if n.startswith("hours"):
@@ -85,7 +84,6 @@ def post_login_redirect(username: str | None, next_path: str | None = None) -> s
 
     order = (
         "home",
-        "plan",
         "graph",
         "hours",
         "skud",
@@ -194,6 +192,17 @@ def write_permission_required(view_func):
     def _wrapped(request, *args, **kwargs):
         u = biota_user(request)
         if request.method not in {"GET", "HEAD", "OPTIONS"} and not _is_admin(u) and user_is_executor(u):
+            action = (request.POST.get("action") or "").strip() if request.method == "POST" else ""
+            if action in {"add_product_note", "delete_product_note"}:
+                return view_func(request, *args, **kwargs)
+            if (request.headers.get("X-Requested-With") or "").strip() == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": False,
+                        "error": "У вас роль «исполнитель»: доступны только просмотр и скачивание.",
+                    },
+                    status=403,
+                )
             messages.warning(
                 request,
                 "У вас роль «исполнитель»: доступны только просмотр и скачивание.",

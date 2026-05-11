@@ -490,6 +490,60 @@
     white-space: nowrap;
   }
   .reg-inline input { width: auto; margin: 0; }
+  html[data-theme="dawn"] #reg-page-root .reg-inline {
+    background: #fffefb;
+    border-color: #cfc3b2;
+    color: #292524;
+  }
+  html[data-theme="dawn"] #reg-page-root .reg-mode-label {
+    color: var(--bio-field-label);
+  }
+  html[data-theme="dawn"] #reg-page-root .reg-shift-tabs {
+    background: var(--bio-surface-panel);
+    border-color: var(--bio-nav-menu-border);
+  }
+  html[data-theme="dawn"] #reg-page-root .reg-shift-tab {
+    color: var(--bio-field-label);
+    border-right-color: var(--bio-table-cell-border);
+  }
+  html[data-theme="dawn"] #reg-page-root .reg-shift-tab:hover {
+    color: var(--bio-nav-link-hover-fg);
+    background: var(--bio-nav-link-hover-bg);
+  }
+  html[data-theme="dawn"] #reg-page-root .filter-panel.reg-toolbar {
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    border-color: var(--bio-filter-border);
+    box-shadow: var(--bio-filter-shadow);
+  }
+  html[data-theme="dawn"] #reg-page-root .reg-toolbar-meta .muted {
+    color: var(--bio-muted);
+  }
+  html[data-theme="dawn"] #reg-page-root .reg-toolbar-form input,
+  html[data-theme="dawn"] #reg-page-root .reg-toolbar-form select {
+    background: var(--bio-input-bg);
+    color: var(--bio-input-fg);
+    border-color: var(--bio-input-border);
+  }
+  html[data-theme="dawn"] #reg-page-root .reg-hours {
+    color: #57534e;
+    border-right-color: #a8a29e;
+  }
+  html[data-theme="dawn"] #reg-page-root .reg-hours span {
+    border-left-color: #d6d3d1;
+  }
+  html[data-theme="dawn"] #reg-page-root .reg-hours .reg-h-hour {
+    color: #134e4a;
+    border-left-color: #94a3b8;
+  }
+  html[data-theme="dawn"] #reg-page-root .reg-name {
+    color: var(--bio-body-fg);
+  }
+  html[data-theme="dawn"] #reg-page-root .emp-name {
+    color: var(--bio-body-fg);
+  }
+  html[data-theme="dawn"] #reg-page-root #reg-save-status {
+    color: var(--bio-muted);
+  }
   .reg-check-row {
     display: flex;
     flex-wrap: wrap;
@@ -556,8 +610,9 @@
     position: sticky;
     top: 48px;
     z-index: 12;
-    background: #121722;
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+    background: var(--bio-surface-deep);
+    box-shadow: 0 6px 14px var(--bio-shadow-card);
+    border-bottom: 1px solid var(--bio-table-cell-border);
   }
   .reg-name.emp-cell {
     text-align: left;
@@ -609,7 +664,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .reg-name--ovl { color: #ff8a8a; font-weight: 600; }
+  .reg-name--ovl { color: var(--bio-error-soft); font-weight: 600; }
   .reg-name--ovl-controls {
     flex-direction: column;
     align-items: flex-start;
@@ -620,7 +675,7 @@
   .reg-ovl-limit-label {
     font-size: 12px;
     font-weight: 500;
-    color: #e8b8b8;
+    color: var(--bio-muted);
     display: flex;
     align-items: center;
     gap: 4px;
@@ -631,8 +686,8 @@
     padding: 4px 6px;
     font-size: 13px;
     background: var(--bio-input-bg);
-    color: var(--bio-body-fg);
-    border: 1px solid #4a5c82;
+    color: var(--bio-input-fg);
+    border: 1px solid var(--bio-input-border);
     border-radius: 2px;
   }
   .reg-ovl-input:focus {
@@ -666,7 +721,7 @@
   }
   .reg-track--ovl {
     height: 28px;
-    background: #151a24;
+    background: var(--bio-table-th-bg);
   }
   .reg-ovl-seg {
     position: absolute;

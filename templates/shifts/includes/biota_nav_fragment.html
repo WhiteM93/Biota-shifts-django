@@ -7,11 +7,6 @@
 {% if biota_nav.home %}
 <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">Главная</a>
 {% endif %}
-{% if biota_nav.plan %}
-{% with un=request.resolver_match.url_name %}
-<a href="{% url 'plan' %}" class="{% if un == 'plan' or un == 'plan_article_new' or un == 'plan_article_detail' or un == 'plan_article_edit' or un == 'plan_article_delete' or un == 'plan_contracts' or un == 'plan_contract_new' or un == 'plan_contract_detail' or un == 'plan_contract_edit' or un == 'plan_contract_delete' or un == 'plan_contract_article_detail' or un == 'plan_department_planning' or un == 'plan_product_name_suggestions' %}active{% endif %}">План</a>
-{% endwith %}
-{% endif %}
 {% if biota_nav.graph and biota_nav.regulations %}
 <details class="nav-dropdown">
   <summary class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' or request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">График и регламенты</summary>
@@ -51,14 +46,14 @@
     {% if biota_nav.payroll %}
     <a href="{% url 'inventory' %}?panel=payroll" class="{% if request.resolver_match.url_name == 'payroll_settlement' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'payroll' %}active{% endif %}">Расчёт ЗП</a>
     {% endif %}
+    {% if biota_nav.employees %}
+    <a href="{% url 'inventory' %}?panel=employees" class="{% if request.resolver_match.url_name == 'employee_payroll_detail' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'employees' %}active{% endif %}">Сотрудники</a>
+    {% endif %}
   </div>
 </details>
 {% endif %}
-{% if biota_nav.employees %}
-<a href="{% url 'inventory' %}?panel=employees" class="{% if request.resolver_match.url_name == 'employee_payroll_detail' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'employees' %}active{% endif %}">Сотрудники</a>
-{% endif %}
 {% if biota_nav.products %}
-<a href="{% url 'products_list' %}" class="{% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_edit' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_setup_create' or request.resolver_match.url_name == 'product_setup_edit' %}active{% endif %}">Наладки</a>
+<a href="{% url 'products_list' %}" class="{% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_setup_create' or request.resolver_match.url_name == 'product_setup_edit' %}active{% endif %}">Наладки</a>
 {% endif %}
 {% if biota_is_admin %}
 <a href="{% url 'admin_test_lab' %}" class="{% if request.resolver_match.url_name == 'admin_test_lab' %}active{% endif %}">Тест</a>

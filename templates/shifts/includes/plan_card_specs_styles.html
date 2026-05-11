@@ -1,0 +1,196 @@
+  .plan-unified-specs-card {
+    margin-bottom: 16px;
+    padding: 14px;
+  }
+  .plan-unified-specs-grid__left .setup-meta-plan-block,
+  .plan-unified-specs-grid__left .setup-plan-summary-wrap,
+  .plan-unified-specs-grid__left .setup-plan-quick-readonly,
+  .plan-unified-specs-grid__left .setup-plan-quick-readonly > .setup-plan-summary-line {
+    width: 260px;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .plan-unified-specs-grid__left .setup-plan-summary-cell {
+    width: 135px;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .plan-unified-specs-grid__left .setup-plan-quick-readonly > .setup-plan-summary-line {
+    display: grid;
+    grid-template-columns: minmax(112px, 34%) minmax(0, 1fr);
+    column-gap: 10px;
+    align-items: start;
+    padding: 3px 0;
+  }
+  .plan-unified-specs-grid__left .setup-plan-quick-readonly > .setup-plan-summary-line > .muted {
+    text-align: right;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--bio-field-label, #8fa4c8);
+  }
+  .plan-unified-specs-grid {
+    display: grid;
+    grid-template-columns: 260px 260px;
+    gap: 14px 22px;
+    align-items: start;
+  }
+  .plan-unified-specs-grid__left,
+  .plan-unified-specs-grid__right {
+    width: 260px;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  @media (max-width: 720px) {
+    .plan-unified-specs-grid {
+      grid-template-columns: 1fr;
+    }
+    .plan-unified-specs-grid__left,
+    .plan-unified-specs-grid__right {
+      width: 100%;
+    }
+    .plan-unified-specs-grid__left .setup-meta-plan-block,
+    .plan-unified-specs-grid__left .setup-plan-summary-wrap,
+    .plan-unified-specs-grid__left .setup-plan-quick-readonly,
+    .plan-unified-specs-grid__left .setup-plan-quick-readonly > .setup-plan-summary-line {
+      width: 100%;
+    }
+  }
+  .plan-unified-specs-grid__right .setup-plan-summary-line.setup-plan-line--blank-size {
+    display: grid;
+    grid-template-columns: minmax(112px, 38%) minmax(0, 1fr);
+    column-gap: 10px;
+    align-items: start;
+    padding: 3px 0;
+  }
+  .plan-unified-specs-grid__right .setup-plan-line--blank-size + .setup-plan-line--blank-size {
+    text-align: left;
+  }
+  .plan-unified-specs-grid__right .setup-plan-summary-line.setup-plan-line--blank-size > .setup-plan-blank-size-label {
+    display: flex;
+    flex-flow: row;
+    justify-content: center;
+    align-items: center;
+    font-weight: 600;
+    color: var(--bio-field-label, #8fa4c8);
+  }
+  #plan-product-drawing-blank-size-label {
+    align-items: flex-end;
+    text-align: right;
+    font-size: 13px;
+  }
+  #plan-product-drawing-blank-type-label {
+    font-size: 14px;
+  }
+  .plan-unified-specs-grid__right .setup-plan-summary-line {
+    margin-bottom: 8px;
+  }
+  .plan-unified-specs-grid__right .setup-plan-summary-line:last-child {
+    margin-bottom: 0;
+  }
+  .plan-unified-specs-grid__right .setup-plan-line--blank-size .setup-plan-summary-cell {
+    width: 135px;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin-top: 0;
+    font-weight: normal;
+  }
+  #plan-product-drawing-blank-size,
+  #plan-product-drawing-blank-type {
+    font-weight: normal;
+    font-style: italic;
+  }
+  output.setup-drawing-workpiece-mirror,
+  .setup-drawing-workpiece-mirror {
+    display: inline;
+    font-style: normal;
+    font-weight: 600;
+  }
+  .setup-plan-summary-wrap .setup-plan-inline-fields {
+    display: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+  }
+  .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-product-type,
+  .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-workpiece {
+    max-width: 100%;
+    min-width: 0;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--bio-input-border);
+    background: var(--bio-input-bg);
+    color: var(--bio-input-fg);
+  }
+  .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-laser-thick {
+    width: 6.5rem;
+    max-width: 100%;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--bio-input-border);
+    background: var(--bio-input-bg);
+    color: var(--bio-input-fg);
+  }
+  .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-laser-mark {
+    flex: 1 1 140px;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--bio-input-border);
+    background: var(--bio-input-bg);
+    color: var(--bio-input-fg);
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-line--position-type .setup-plan-summary-value {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-line--position-type .setup-plan-inline-fields {
+    display: inline-flex !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-workpiece .setup-plan-line--workpiece .setup-plan-summary-value {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-workpiece .setup-plan-line--workpiece .setup-plan-inline-fields {
+    display: inline-flex !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .setup-plan-summary-value {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .setup-plan-inline-fields {
+    display: inline-flex !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-made-material .setup-plan-line--material .setup-plan-summary-value {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-made-material .setup-plan-line--material .setup-plan-inline-fields {
+    display: inline-flex !important;
+  }
+  .setup-plan-line--material .setup-plan-inline-fields .js-plan-inline-made-material,
+  .setup-plan-line--material .setup-plan-inline-fields .js-plan-inline-laser-mark {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-made-material .setup-plan-line--material .js-plan-inline-made-material {
+    display: inline-block !important;
+    flex: 1 1 140px;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--bio-input-border);
+    background: var(--bio-input-bg);
+    color: var(--bio-input-fg);
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .js-plan-inline-laser-mark {
+    display: inline-block !important;
+  }
+  .setup-plan-line--workpiece .setup-plan-inline-fields .js-plan-inline-laser-thick {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-thick .setup-plan-line--workpiece .js-plan-inline-laser-thick {
+    display: inline-block !important;
+  }

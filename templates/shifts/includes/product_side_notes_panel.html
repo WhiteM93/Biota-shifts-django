@@ -1,0 +1,34 @@
+<div class="product-drawing-notes filter-panel product-side-notes-panel" data-notes-for-tab="{{ notes_panel_tab }}" {% if notes_hidden %}hidden{% endif %}>
+  <h4 class="product-drawing-notes__title">{{ notes_title }}</h4>
+  <ul class="product-drawing-notes__list">
+    {% for note in notes_list %}
+    <li class="product-drawing-notes__item" data-note-id="{{ note.pk }}">
+      <div class="product-drawing-notes__item-top">
+        <div class="product-drawing-notes__meta muted">
+          <span class="product-drawing-notes__author">{{ note.author_username }}</span>
+          <span class="product-drawing-notes__sep">·</span>
+          <time class="product-drawing-notes__time" datetime="{{ note.created_at|date:'c' }}">{{ note.created_at|date:"d.m.Y H:i" }}</time>
+        </div>
+        {% if username and biota_is_admin or note.author_username == username %}
+        <button type="button" class="btn btn-ghost product-drawing-notes__delete js-product-note-delete" data-note-id="{{ note.pk }}" title="Удалить заметку" aria-label="Удалить заметку"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
+        {% endif %}
+      </div>
+      <div class="product-drawing-notes__body">{{ note.body|linebreaksbr }}</div>
+    </li>
+    {% empty %}
+    <li class="product-drawing-notes__empty muted">Пока нет заметок.</li>
+    {% endfor %}
+  </ul>
+  {% if username %}
+  <form class="product-drawing-notes__form js-product-note-form" method="post" action="#" data-note-setup-id="{{ notes_setup_id }}">
+    <label class="field product-drawing-notes__label">
+      <span class="product-drawing-notes__label-text">Новая заметка</span>
+      <textarea name="body" rows="4" maxlength="4000" placeholder="Короткий комментарий к чертежу или наладке…" class="product-drawing-notes__textarea js-product-note-body" required></textarea>
+    </label>
+    <div class="product-drawing-notes__actions">
+      <button type="submit" class="btn btn-sm product-drawing-notes__submit">Добавить</button>
+      <span class="muted js-product-note-form-msg product-drawing-notes__form-msg" aria-live="polite"></span>
+    </div>
+  </form>
+  {% endif %}
+</div>

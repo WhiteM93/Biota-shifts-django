@@ -550,6 +550,30 @@
   border-color: #4f6ad4;
   box-shadow: 0 0 0 2px rgba(79, 106, 212, 0.2);
 }
+/* Сайт «Рассвет»: те же элементы, что в локальном theme-light графика — без переключателя */
+html[data-theme="dawn"] #graph-page-root .schedule-table th.prev-month-col,
+html[data-theme="dawn"] #graph-page-root .schedule-table td.prev-month-col {
+  background: #e8e4dc;
+  color: #44403c;
+}
+html[data-theme="dawn"] #graph-page-root .shift-count-cell {
+  color: #292524;
+}
+html[data-theme="dawn"] #graph-page-root .day-num-th.prev-month-col {
+  color: #44403c;
+}
+html[data-theme="dawn"] #graph-page-root .schedule-table th.today-col,
+html[data-theme="dawn"] #graph-page-root .schedule-table td.today-col {
+  box-shadow: inset 0 0 0 2px rgba(13, 148, 136, 0.75);
+}
+html[data-theme="dawn"] #graph-page-root .schedule-table th.non-work-col,
+html[data-theme="dawn"] #graph-page-root .schedule-table td.non-work-col {
+  background: var(--bio-schedule-alt-col2);
+  color: var(--bio-body-fg);
+}
+html[data-theme="dawn"] #graph-page-root .emp-cell {
+  color: var(--bio-body-fg);
+}
 @media (max-width: 900px) {
   .graph-body { flex-direction: column; }
   .graph-side-toolbar {

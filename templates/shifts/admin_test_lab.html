@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-{% include "shifts/plan/includes/plan_rails_styles.html" %}
+{% include "shifts/includes/plan_rails_styles.html" %}
 <style>
   /*
     Темы сайта: html[data-theme] (night | dawn), переключатель в шапке; блок ниже — только стили лаборатории.
@@ -1129,10 +1129,10 @@
           </div>
           <div id="plan-rail-sheet-right-test" class="plan-rail__sheet" role="dialog" aria-label="Отделы для планирования (демо)">
             <p class="plan-rail__sheet-title">Планирование по отделам</p>
-            <p class="muted" style="font-size:11px;margin:0 0 8px 0;line-height:1.35;">Демо-панель: те же классы, что у рейла на <a href="{% url 'plan' %}">/plan/</a>.</p>
+            <p class="muted" style="font-size:11px;margin:0 0 8px 0;line-height:1.35;">Демо-панель: стили бокового рейла (без отдельного раздела плана).</p>
             <div class="plan-rail__btn-stack">
-              <a href="{% url 'plan' %}" class="btn btn-sm">На сводку плана</a>
-              <a href="{% url 'plan_department_planning' slug='pki' %}" class="btn btn-sm btn-ghost">ПКИ (пример)</a>
+              <a href="{% url 'products_list' %}" class="btn btn-sm">К наладкам</a>
+              <a href="{% url 'home' %}" class="btn btn-sm btn-ghost">На главную</a>
             </div>
           </div>
         </aside>
@@ -1360,7 +1360,7 @@ Host: example</pre>
       <summary>Раскрыть меню</summary>
       <div class="nav-dropdown-menu" style="position:absolute;">
         <a href="{% url 'home' %}">Главная</a>
-        <a href="{% url 'plan' %}">План</a>
+        <a href="{% url 'products_list' %}">Наладки</a>
       </div>
     </details>
   </section>
@@ -1892,5 +1892,5 @@ Host: example</pre>
     });
   }
 </script>
-{% include "shifts/plan/includes/plan_rails_script.html" %}
+{% include "shifts/includes/plan_rails_script.html" %}
 {% endblock %}

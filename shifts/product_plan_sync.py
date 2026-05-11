@@ -1,4 +1,4 @@
-"""Поля позиции плана при редактировании из карточки наладки (как в plan_views)."""
+"""Поля связанной позиции PlannedProduct при редактировании из карточки наладки."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from .models import (
     PLANNED_PRODUCT_WORKPIECE_TYPE_VALUES,
     PlannedProduct,
     Product,
+    ProductSetup,
 )
 from .plan_naladki_bridge import ensure_plan_piece_for_naladki_product, finalize_plan_piece_naladki_link
 
@@ -81,6 +82,17 @@ def validate_product_plan_post(post: Any) -> str | None:
     return None
 
 
+def _first_setup_material(product: Product | None) -> str:
+    if not product or not getattr(product, "pk", None):
+        return ""
+    setup = (
+        ProductSetup.objects.filter(product_id=product.pk)
+        .order_by("sort_order", "id")
+        .first()
+    )
+    return (setup.material or "").strip() if setup else ""
+
+
 def plan_piece_for_naladki_card(product: Product) -> PlannedProduct | None:
     pp = PlannedProduct.objects.filter(naladki_product_id=product.pk).first()
     if pp:
@@ -99,10 +111,11 @@ def plan_inline_state_payload(product: Product | None) -> dict[str, str]:
         "workpiece_type": ctx.get("plan_workpiece_type_value") or "",
         "laser_sheet_thickness_mm": ctx.get("plan_laser_sheet_thickness_value") or "",
         "laser_material_marking": ctx.get("plan_laser_material_marking_value") or "",
+        "made_material": ctx.get("plan_made_material_value") or "",
     }
 
 
-def plan_card_summary(pp: PlannedProduct | None) -> dict[str, str]:
+def plan_card_summary(pp: PlannedProduct | None, product: Product | None = None) -> dict[str, str]:
     """Короткие строки для карточки наладки (тип изделия / заготовка / материал)."""
     summary = {
         "product_kind_line": "—",
@@ -145,6 +158,11 @@ def plan_card_summary(pp: PlannedProduct | None) -> dict[str, str]:
         summary["type_line"] = "Изделие"
         summary["workpiece_line"] = pp.get_workpiece_type_display() if pp.workpiece_type else "—"
         summary["material_line"] = "—"
+    if product and not pp.is_assembly and not pp.is_purchased:
+        wpv = (pp.workpiece_type or "").strip()
+        if wpv != "laser":
+            mat = _first_setup_material(product)
+            summary["material_line"] = mat or "—"
     return summary
 
 
@@ -170,7 +188,8 @@ def plan_form_context(product: Product | None) -> dict[str, Any]:
                 s = format(d, "f").rstrip("0").rstrip(".")
                 laser_sheet_thickness_value = s if s else "0"
             laser_material_marking_value = (plan_piece.laser_material_marking or "").strip()
-    card = plan_card_summary(plan_piece)
+    plan_made_material_value = _first_setup_material(product) if product is not None and getattr(product, "pk", None) else ""
+    card = plan_card_summary(plan_piece, product)
     return {
         "plan_piece": plan_piece,
         "plan_product_type": plan_product_type,
@@ -178,6 +197,7 @@ def plan_form_context(product: Product | None) -> dict[str, Any]:
         "plan_workpiece_type_choices": PLANNED_PRODUCT_WORKPIECE_TYPE_CHOICES,
         "plan_laser_sheet_thickness_value": laser_sheet_thickness_value,
         "plan_laser_material_marking_value": laser_material_marking_value,
+        "plan_made_material_value": plan_made_material_value,
         "plan_laser_material_marking_suggestions": laser_material_marking_suggestions(),
         "plan_display_type_line": card["type_line"],
         "plan_display_product_kind_line": card["product_kind_line"],
@@ -245,5 +265,17 @@ def apply_product_plan_post(product: Product, post: Any) -> str | None:
                 "updated_at",
             ]
         )
+        if t == "made":
+            wp = (post.get("workpiece_type") or "").strip()
+            if wp and wp != "laser":
+                sheet_mat = (post.get("made_material") or "").strip()[:180]
+                setup0 = (
+                    ProductSetup.objects.filter(product_id=product.pk)
+                    .order_by("sort_order", "id")
+                    .first()
+                )
+                if setup0 and setup0.material != sheet_mat:
+                    setup0.material = sheet_mat
+                    setup0.save(update_fields=["material", "updated_at"])
         finalize_plan_piece_naladki_link(pp.pk)
     return None

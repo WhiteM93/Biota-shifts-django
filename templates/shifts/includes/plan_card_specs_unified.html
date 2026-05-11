@@ -1,7 +1,7 @@
 {% comment %}
   plan_specs_variant: "product" | "article"
   product: setups, biota_can_edit, plan_* (plan_form_context), data-product-plan-summary; справа — поля изделия drawing_blank_* (размер и тип заготовки по чертежу)
-  article: item, biota_can_edit, naladki_detail_first_setup (optional), plan_display_*
+  article: только сборка/ПКИ (компактные строки), если когда-либо понадобится отдельная карточка без product.
 {% endcomment %}
 <div class="plan-unified-specs-card filter-panel product-drawing-plan-section plan-article-readonly-specs">
   <div class="plan-unified-specs-grid">
@@ -48,6 +48,7 @@
                 <span class="setup-plan-summary-value" data-plan-material-line>{{ plan_display_material_line }}</span>
                 {% if biota_can_edit %}
                 <div class="setup-plan-inline-fields">
+                  <input type="text" class="js-plan-inline-made-material" value="{{ plan_made_material_value|default:'' }}" maxlength="180" placeholder="Материал заготовки" autocomplete="off" aria-label="Материал заготовки (первая наладка)">
                   <input type="text" class="js-plan-inline-laser-mark" value="{{ plan_laser_material_marking_value }}" maxlength="240" list="drawing-inline-plan-laser-dl" placeholder="Маркировка материала" autocomplete="off" aria-label="Маркировка материала для лазера">
                   <datalist id="drawing-inline-plan-laser-dl">
                     {% for m in plan_laser_material_marking_suggestions %}
@@ -91,24 +92,6 @@
               <span class="muted">Материал:</span>
               <div class="setup-plan-summary-cell"><span class="muted">—</span></div>
             </div>
-            {% else %}
-            <div class="setup-plan-summary-line">
-              <span class="muted">Тип изделия:</span>
-              <div class="setup-plan-summary-cell"><strong>{{ plan_display_product_kind_line }}</strong></div>
-            </div>
-            <div class="setup-plan-summary-line">
-              <span class="muted">Тип заготовки:</span>
-              <div class="setup-plan-summary-cell">
-                {% if item.workpiece_type %}<strong>{{ item.get_workpiece_type_display }}</strong>{% else %}<span class="muted">не задан{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}
-                {% if item.workpiece_type == 'laser' %}
-                <div class="muted" style="font-size:0.88rem;margin-top:6px;line-height:1.45;">Толщина листа: {% if item.laser_sheet_thickness_mm is not None %}<strong>{{ item.laser_sheet_thickness_mm }} мм</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}</div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="setup-plan-summary-line">
-              <span class="muted">Материал:</span>
-              <div class="setup-plan-summary-cell">{% if item.workpiece_type == 'laser' %}{% if item.laser_material_marking %}<strong>{{ item.laser_material_marking }}</strong>{% else %}<span class="muted">не задана{% if biota_can_edit %} — в быстром редактировании{% endif %}</span>{% endif %}{% else %}<strong>{{ plan_display_material_line }}</strong>{% endif %}</div>
-            </div>
             {% endif %}
           </div>
         </div>
@@ -130,12 +113,20 @@
           </div>
         </div>
       {% else %}
+        {% with nprod=item.naladki_product %}
         <div class="setup-plan-summary-line setup-plan-line--blank-size">
-          <span class="muted">Размер заготовки</span>
+          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-size-label">Размер заготовки</span>
           <div class="setup-plan-summary-cell">
-            {% if naladki_detail_first_setup and naladki_detail_first_setup.size %}<strong>{{ naladki_detail_first_setup.size }}</strong>{% else %}<span class="muted">—</span>{% endif %}
+            <span id="plan-product-drawing-blank-size" data-field-text="drawing_blank_size" aria-labelledby="plan-product-drawing-blank-size-label">{% if nprod and nprod.drawing_blank_size %}{{ nprod.drawing_blank_size }}{% else %}—{% endif %}</span>
           </div>
         </div>
+        <div class="setup-plan-summary-line setup-plan-line--blank-size">
+          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-type-label">Тип заготовки</span>
+          <div class="setup-plan-summary-cell">
+            <span id="plan-product-drawing-blank-type" data-field-text="drawing_blank_type" aria-labelledby="plan-product-drawing-blank-type-label">{% if nprod and nprod.drawing_blank_type %}{{ nprod.drawing_blank_type }}{% else %}—{% endif %}</span>
+          </div>
+        </div>
+        {% endwith %}
       {% endif %}
     </div>
   </div>
