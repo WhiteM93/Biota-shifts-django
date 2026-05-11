@@ -81,12 +81,36 @@
   </div>
   {% endif %}
 
+  {% if product.cad_step_model %}
+  <div class="product-download-row" data-product-asset-row="cad_step_model">
+    <a href="{{ product.cad_step_model.url }}" download class="btn product-btn-secondary product-download-main-btn">Скачать STP/STEP{% if cad_step_ext %} (.{{ cad_step_ext }}){% endif %}</a>
+    {% if biota_can_edit %}
+    <div class="product-download-row-actions">
+      <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Заменить STP/STEP" aria-label="Заменить STP/STEP">
+        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+      </button>
+    </div>
+    <input type="file" class="js-product-asset-file-input" data-field-name="cad_step_model" accept=".stp,.step" hidden />
+    {% endif %}
+  </div>
+  {% elif biota_can_edit %}
+  <div class="product-download-row" data-product-asset-row="cad_step_model">
+    <span class="muted product-download-placeholder">STP/STEP не загружен</span>
+    <div class="product-download-row-actions">
+      <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Загрузить STP/STEP" aria-label="Загрузить STP/STEP">
+        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+      </button>
+    </div>
+    <input type="file" class="js-product-asset-file-input" data-field-name="cad_step_model" accept=".stp,.step" hidden />
+  </div>
+  {% endif %}
+
   {% if product.drawing_pdf %}
   <div class="product-download-row" data-product-asset-row="drawing_pdf">
     <a href="{{ product.drawing_pdf.url }}" download class="btn product-btn-secondary product-download-main-btn">Скачать чертёж (PDF)</a>
     <div class="product-download-row-actions">
-      <a href="{{ product.drawing_pdf.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost product-download-preview-btn" title="Открыть в новой вкладке" aria-label="Открыть чертёж в новой вкладке">
-        <i class="fi fi-rr-window ui-icon" aria-hidden="true"></i>
+      <a href="{{ product.drawing_pdf.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost product-download-preview-btn" title="Открыть чертёж в новой вкладке" aria-label="Открыть чертёж в новой вкладке">
+        <i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>
       </a>
       {% if biota_can_edit %}
       <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Заменить PDF" aria-label="Заменить PDF">

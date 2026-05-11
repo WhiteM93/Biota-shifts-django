@@ -118,7 +118,7 @@
 {% endif %}
 
 {% if panel == "stock" %}
-<form method="get" class="filter-panel auto-submit-form">
+<form method="get" class="filter-panel auto-submit-form" id="inventory-stock-filter-form">
   <input type="hidden" name="panel" value="stock">
   <h3>Фильтр наличия</h3>
   <div class="filter-grid">
@@ -373,12 +373,17 @@
     </label>
     {% endif %}
     <label class="field"><span>Материал инструмента</span>
-      <select name="tool_material">
+      <select name="tool_material" class="js-stock-filter-tool-material">
         <option value="">Все</option>
         {% for key, label in tool_material_types %}
-        <option value="{{ key }}" {% if filters.tool_material == key %}selected{% endif %}>{{ label }}</option>
+        <option value="{{ key }}" {% if filters.tool_material_select == key %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
+        {% for v in tool_material_extra_options %}
+        <option value="{{ v }}" {% if filters.tool_material_select == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+        <option value="{{ tool_material_filter_other }}" {% if filters.tool_material_select == tool_material_filter_other %}selected{% endif %}>Другое</option>
       </select>
+      <input type="text" name="tool_material_custom" maxlength="80" class="js-stock-filter-tool-material-custom" placeholder="Свой вариант, до 80 символов" value="{{ filters.tool_material_custom }}" autocomplete="off" {% if filters.tool_material_select != tool_material_filter_other %}style="display:none;margin-top:6px;max-width:100%;"{% else %}style="margin-top:6px;max-width:100%;"{% endif %} />
     </label>
     <div class="field">
       <span>Материал покрытия</span>
@@ -411,6 +416,22 @@
     </div>
   </div>
 </form>
+<script>
+  (function () {
+    var form = document.getElementById("inventory-stock-filter-form");
+    if (!form) return;
+    var sel = form.querySelector(".js-stock-filter-tool-material");
+    var inp = form.querySelector(".js-stock-filter-tool-material-custom");
+    if (!sel || !inp) return;
+    function sync(fromUserChange) {
+      var isOther = sel.value === "{{ tool_material_filter_other|escapejs }}";
+      inp.style.display = isOther ? "block" : "none";
+      if (!isOther && fromUserChange) inp.value = "";
+    }
+    sel.addEventListener("change", function () { sync(true); });
+    sync(false);
+  })();
+</script>
 
 <div class="table-wrap">
   {% if filters.category == "end_mill" %}
@@ -428,30 +449,30 @@
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
-        {% if is_admin_user %}<th>Удалить</th>{% endif %}
+        {% if can_manage_stock %}<th>Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
       {% for t in tool_items %}
       <tr>
-        <td data-sort="{{ t.end_mill_spec.get_mill_type_display|default:'-' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="mill_type" data-type="select" data-value="{{ t.end_mill_spec.mill_type|default:'' }}"{% endif %}>{{ t.end_mill_spec.get_mill_type_display|default:"-" }}</td>
-        <td data-sort="{{ t.end_mill_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if is_admin_user %} stock-inline-edit{% endif %}" {% if is_admin_user %}data-tool-id="{{ t.id }}" data-field="em_diameter_mm" data-type="number" data-value="{{ t.end_mill_spec.diameter_mm|default:'' }}"{% endif %}>
+        <td data-sort="{{ t.end_mill_spec.get_mill_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="mill_type" data-type="select" data-value="{{ t.end_mill_spec.mill_type|default:'' }}"{% endif %}>{{ t.end_mill_spec.get_mill_type_display|default:"-" }}</td>
+        <td data-sort="{{ t.end_mill_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="em_diameter_mm" data-type="number" data-value="{{ t.end_mill_spec.diameter_mm|default:'' }}"{% endif %}>
           {% if t.end_mill_spec.diameter_mm %}Ø{{ t.end_mill_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}
         </td>
-        <td data-sort="{{ t.end_mill_spec.corner_radius_mm|default:'-1' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="em_corner_radius_mm" data-type="number" data-value="{{ t.end_mill_spec.corner_radius_mm|default:'' }}"{% endif %}>{% if t.end_mill_spec.corner_radius_mm is not None %}{{ t.end_mill_spec.corner_radius_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.end_mill_spec.overall_length_mm|default:'-1' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="em_overall_length_mm" data-type="number" data-value="{{ t.end_mill_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.end_mill_spec.overall_length_mm is not None %}{{ t.end_mill_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.end_mill_spec.cutting_length_mm|default:'-1' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="em_cutting_length_mm" data-type="number" data-value="{{ t.end_mill_spec.cutting_length_mm|default:'' }}"{% endif %}>{% if t.end_mill_spec.cutting_length_mm is not None %}{{ t.end_mill_spec.cutting_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.end_mill_spec.flutes_count|default:'-1' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="em_flutes_count" data-type="int" data-value="{{ t.end_mill_spec.flutes_count|default:'' }}"{% endif %}>{{ t.end_mill_spec.flutes_count|default:"-" }}</td>
-        <td data-sort="{{ t.main_diameter_mm|default:'-1' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="main_diameter_mm" data-type="number" data-value="{{ t.main_diameter_mm|default:'' }}"{% endif %}>{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
-        <td {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
-        <td data-sort="{{ t.coating_type }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
+        <td data-sort="{{ t.end_mill_spec.corner_radius_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="em_corner_radius_mm" data-type="number" data-value="{{ t.end_mill_spec.corner_radius_mm|default:'' }}"{% endif %}>{% if t.end_mill_spec.corner_radius_mm is not None %}{{ t.end_mill_spec.corner_radius_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.end_mill_spec.overall_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="em_overall_length_mm" data-type="number" data-value="{{ t.end_mill_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.end_mill_spec.overall_length_mm is not None %}{{ t.end_mill_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.end_mill_spec.cutting_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="em_cutting_length_mm" data-type="number" data-value="{{ t.end_mill_spec.cutting_length_mm|default:'' }}"{% endif %}>{% if t.end_mill_spec.cutting_length_mm is not None %}{{ t.end_mill_spec.cutting_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.end_mill_spec.flutes_count|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="em_flutes_count" data-type="int" data-value="{{ t.end_mill_spec.flutes_count|default:'' }}"{% endif %}>{{ t.end_mill_spec.flutes_count|default:"-" }}</td>
+        <td data-sort="{{ t.main_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="main_diameter_mm" data-type="number" data-value="{{ t.main_diameter_mm|default:'' }}"{% endif %}>{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
+        <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
         </td>
-        <td data-sort="{{ t.work_material|default:'-' }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
+        <td data-sort="{{ t.work_material|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
           {% if t.work_material %}<span class="wm-badge wm-{{ t.work_material|lower }}" title="{{ t.get_work_material_display }}">{{ t.work_material }}</span>{% else %}-{% endif %}
         </td>
-        <td data-sort="{{ t.quantity }}" {% if is_admin_user %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
-        {% if is_admin_user %}
+        <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
+        {% if can_manage_stock %}
         <td>
           <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
             {% csrf_token %}
@@ -463,7 +484,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if is_admin_user %}12{% else %}11{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}12{% else %}11{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -484,7 +505,7 @@
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
-        {% if is_admin_user %}<th>Удалить</th>{% endif %}
+        {% if can_manage_stock %}<th>Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -507,7 +528,7 @@
           {% if t.work_material %}<span class="wm-badge wm-{{ t.work_material|lower }}" title="{{ t.get_work_material_display }}">{{ t.work_material }}</span>{% else %}-{% endif %}
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
-        {% if is_admin_user %}
+        {% if can_manage_stock %}
         <td>
           <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
             {% csrf_token %}
@@ -519,7 +540,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if is_admin_user %}14{% else %}13{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}14{% else %}13{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -535,7 +556,7 @@
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
-        {% if is_admin_user %}<th>Удалить</th>{% endif %}
+        {% if can_manage_stock %}<th>Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -553,7 +574,7 @@
           {% if t.work_material %}<span class="wm-badge wm-{{ t.work_material|lower }}" title="{{ t.get_work_material_display }}">{{ t.work_material }}</span>{% else %}-{% endif %}
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
-        {% if is_admin_user %}
+        {% if can_manage_stock %}
         <td>
           <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
             {% csrf_token %}
@@ -565,7 +586,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if is_admin_user %}9{% else %}8{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}9{% else %}8{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -583,7 +604,7 @@
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
         <th class="sortable">Остаток</th>
-        {% if is_admin_user %}<th>Удалить</th>{% endif %}
+        {% if can_manage_stock %}<th>Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -601,7 +622,7 @@
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
-        {% if is_admin_user %}
+        {% if can_manage_stock %}
         <td>
           <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
             {% csrf_token %}
@@ -613,7 +634,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if is_admin_user %}11{% else %}10{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}11{% else %}10{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -630,7 +651,7 @@
         <th class="sortable">Покрытие</th>
         <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
-        {% if is_admin_user %}<th>Удалить</th>{% endif %}
+        {% if can_manage_stock %}<th>Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -649,7 +670,7 @@
           {% if t.work_material %}<span class="wm-badge wm-{{ t.work_material|lower }}" title="{{ t.get_work_material_display }}">{{ t.work_material }}</span>{% else %}-{% endif %}
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
-        {% if is_admin_user %}
+        {% if can_manage_stock %}
         <td>
           <form method="post" onsubmit="return confirm('Удалить эту позицию склада?');">
             {% csrf_token %}
@@ -661,7 +682,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if is_admin_user %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -1192,30 +1213,81 @@
 {% endif %}
 
 {% if panel == "history" %}
-<h3 id="history-block">Последние движения</h3>
+<h3 id="history-block">История склада</h3>
+<p class="muted" style="margin-top:-6px;">Движения остатков, правки и удаления позиций, выдача права на склад, откаты.</p>
 <div class="table-wrap">
   <table class="data-grid">
-    <thead><tr><th>Дата</th><th>Операция</th><th>Категория</th><th>Подтип</th><th>Инструмент</th><th>Количество</th><th>Сотрудник</th><th>Аккаунт</th><th>Комментарий</th></tr></thead>
-    <tbody>
-      {% for m in movements %}
+    <thead>
       <tr>
-        <td>{{ m.movement_date }}</td>
-        <td>{{ m.get_movement_type_display }}</td>
-        <td>{{ m.tool.get_category_display }}</td>
-        <td>{% if m.tool.category == "end_mill" and m.tool.end_mill_spec %}{{ m.tool.end_mill_spec.get_mill_type_display }}{% elif m.tool.category == "tap" and m.tool.tap_spec %}{{ m.tool.tap_spec.get_tap_type_display }}{% elif m.tool.category == "center_drill" and m.tool.center_drill_spec %}Центровка {{ m.tool.center_drill_spec.angle_deg }}°{% elif m.tool.category == "countersink" and m.tool.countersink_spec %}Зенкер {{ m.tool.countersink_spec.get_countersink_type_display }} {{ m.tool.countersink_spec.angle_deg }}°{% elif m.tool.category == "drill" and m.tool.drill_spec %}Сверло {{ m.tool.drill_spec.angle_deg }}°{% else %}-{% endif %}</td>
+        <th>Когда</th>
+        <th>Тип</th>
+        <th>Инструмент / запись</th>
+        <th>Кол-во / сотрудник / аккаунт</th>
+        <th>Комментарий / детали</th>
+        {% if can_rollback_stock %}<th style="width:1%;white-space:nowrap;"></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in inventory_history %}
+      {% if row.kind == "movement" %}
+      {% with m=row.movement %}
+      <tr{% if m.is_reverted %} class="muted"{% endif %}>
         <td>
-          {{ m.tool.name }}
-          {% if m.tool.is_deleted %}
-            <span class="muted">(удалено админом{% if m.tool.deleted_by %}: {{ m.tool.deleted_by }}{% endif %})</span>
+          {{ m.created_at|date:"d.m.Y H:i" }}
+          <div class="muted" style="font-size:12px;">дата операции: {{ m.movement_date }}</div>
+        </td>
+        <td>
+          {{ m.get_movement_type_display }}
+          {% if m.is_reverted %}
+            <div class="muted" style="font-size:12px;">откат{% if m.reverted_at %}: {{ m.reverted_at|date:"d.m.Y H:i" }}{% endif %}{% if m.reverted_by %} · {{ m.reverted_by }}{% endif %}</div>
           {% endif %}
         </td>
-        <td>{{ m.quantity }}</td>
-        <td>{{ m.employee_name|default:"-" }}</td>
-        <td>{{ m.created_by_account|default:"-" }}</td>
-        <td>{{ m.comment|default:"-" }}</td>
+        <td>
+          <div>{{ m.tool.get_category_display }}</div>
+          <div class="muted" style="font-size:12px;">
+            {% if m.tool.category == "end_mill" and m.tool.end_mill_spec %}{{ m.tool.end_mill_spec.get_mill_type_display }}{% elif m.tool.category == "tap" and m.tool.tap_spec %}{{ m.tool.tap_spec.get_tap_type_display }}{% elif m.tool.category == "center_drill" and m.tool.center_drill_spec %}Центровка {{ m.tool.center_drill_spec.angle_deg }}°{% elif m.tool.category == "countersink" and m.tool.countersink_spec %}Зенкер {{ m.tool.countersink_spec.get_countersink_type_display }} {{ m.tool.countersink_spec.angle_deg }}°{% elif m.tool.category == "drill" and m.tool.drill_spec %}Сверло {{ m.tool.drill_spec.angle_deg }}°{% else %}-{% endif %}
+          </div>
+          <div>{{ m.tool.name }}{% if m.tool.is_deleted %} <span class="muted">(удалено{% if m.tool.deleted_by %}: {{ m.tool.deleted_by }}{% endif %})</span>{% endif %}</div>
+        </td>
+        <td>
+          <strong>{{ m.quantity }}</strong> шт.
+          <div class="muted" style="font-size:12px;">{{ m.employee_name|default:"—" }}</div>
+          <div class="muted" style="font-size:12px;">{{ m.created_by_account|default:"—" }}</div>
+        </td>
+        <td>{{ m.comment|default:"—"|linebreaksbr }}</td>
+        {% if can_rollback_stock %}
+        <td>
+          {% if row.show_rollback %}
+          <form method="post" action="{% url 'inventory' %}" style="margin:0;" onsubmit="return confirm('Откатить это движение? Склад будет скорректирован.');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="rollback_stock_movement">
+            <input type="hidden" name="movement_id" value="{{ m.id }}">
+            <button type="submit" class="btn btn-sm">Откатить</button>
+          </form>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+        {% endif %}
       </tr>
+      {% endwith %}
+      {% else %}
+      {% with e=row.event %}
+      <tr>
+        <td>{{ e.created_at|date:"d.m.Y H:i" }}</td>
+        <td>{{ e.get_event_type_display }}</td>
+        <td>
+          {{ e.summary }}
+          {% if e.tool %}<div class="muted" style="font-size:12px;">{{ e.tool.name }}</div>{% endif %}
+        </td>
+        <td><span class="muted">{{ e.actor_username|default:"—" }}</span></td>
+        <td>{% if e.details %}<code style="font-size:11px;word-break:break-all;">{{ e.details }}</code>{% else %}—{% endif %}</td>
+        {% if can_rollback_stock %}<td></td>{% endif %}
+      </tr>
+      {% endwith %}
+      {% endif %}
       {% empty %}
-      <tr><td colspan="9" class="muted">Пока нет движений.</td></tr>
+      <tr><td colspan="{% if can_rollback_stock %}6{% else %}5{% endif %}" class="muted">Пока нет записей в истории.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -1922,6 +1994,7 @@
     font-size: 12px;
   }
 </style>
+<script type="application/json" id="stock-tool-material-extras-json">{{ stock_tool_material_extra_json|default:"[]" }}</script>
 <script>
   (function () {
     var inputs = document.querySelectorAll(".defect-cell-input");
@@ -2109,11 +2182,13 @@
       return (getComputedStyle(document.documentElement).getPropertyValue(name) || "").trim();
     }
 
+    var toolMaterialFilterOther = "{{ tool_material_filter_other|escapejs }}";
     var toolMaterialOptions = [
       { value: "", label: "Неизвестно" },
       {% for key, label in tool_material_types %}
       { value: "{{ key }}", label: "{{ label }}" },
       {% endfor %}
+      { value: toolMaterialFilterOther, label: "Другое" },
     ];
     var coatingOptions = [
       {% for key, label in coating_types %}
@@ -2293,7 +2368,7 @@
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_cutting_length_mm"></td>');
         cells.push('<td class="short-col"><input type="number" data-k="em_flutes_count"></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
-        cells.push('<td class="tm-cell"></td>');
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
         cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
@@ -2307,7 +2382,7 @@
         cells.push('<td class="tap-hole-col"><select data-k="hole_type">{% for key, label in tap_hole_types %}<option value="{{ key }}">{% if key == "through" %}Скв{% elif key == "blind" %}Глх{% elif key == "universal" %}Унив{% else %}{{ label }}{% endif %}</option>{% endfor %}</select></td>');
         cells.push('<td><select data-k="tap_type">{% for key, label in tap_tool_types %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
-        cells.push('<td class="tm-cell"></td>');
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
         cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
@@ -2316,7 +2391,7 @@
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cd_overall_length_mm"></td>');
         cells.push('<td class="short-col"><select data-k="cd_angle_deg">{% for key, label in center_drill_angles %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
-        cells.push('<td class="tm-cell"></td>');
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
         cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
@@ -2327,7 +2402,7 @@
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cs_overall_length_mm"></td>');
         cells.push('<td class="short-col"><input type="number" data-k="cs_flutes_count"></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
-        cells.push('<td class="tm-cell"></td>');
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
         cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
@@ -2337,15 +2412,32 @@
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_cutting_length_mm"></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_angle_deg"></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
-        cells.push('<td class="tm-cell"></td>');
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
         cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       }
       cells.push('<td><button type="button" class="btn btn-ghost js-arrival-row-remove">×</button></td>');
       tr.innerHTML = cells.join("");
-      tr.querySelector(".tm-cell").appendChild(buildSelect(toolMaterialOptions, ""));
-      tr.querySelector(".tm-cell select").setAttribute("data-k", "tool_material");
+      var tmCell = tr.querySelector(".tm-cell-tool-material");
+      tmCell.appendChild(buildSelect(toolMaterialOptions, ""));
+      var tmSel = tmCell.querySelector("select");
+      tmSel.setAttribute("data-k", "tool_material");
+      var tmCustom = document.createElement("input");
+      tmCustom.type = "text";
+      tmCustom.maxLength = 80;
+      tmCustom.className = "tm-tool-material-custom";
+      tmCustom.setAttribute("data-k", "tool_material_custom");
+      tmCustom.style.display = "none";
+      tmCustom.style.marginTop = "4px";
+      tmCustom.style.maxWidth = "100%";
+      tmCustom.placeholder = "Свой материал";
+      tmCell.appendChild(tmCustom);
+      tmSel.addEventListener("change", function () {
+        var isO = tmSel.value === toolMaterialFilterOther;
+        tmCustom.style.display = isO ? "block" : "none";
+        if (!isO) tmCustom.value = "";
+      });
       tr.querySelector(".co-cell").appendChild(buildColoredCoatingSelect("none"));
       tr.querySelector(".wm-cell").appendChild(buildColoredWmSelect(""));
       body.appendChild(tr);
@@ -2360,7 +2452,14 @@
       groupsWrap.querySelectorAll("tr[data-arrival-row]").forEach(function (tr) {
         var row = { category: tr.getAttribute("data-category") || "" };
         tr.querySelectorAll("[data-k]").forEach(function (el) {
-          row[el.getAttribute("data-k")] = (el.value || "").trim();
+          var k = el.getAttribute("data-k");
+          if (k === "tool_material_custom") return;
+          if (k === "tool_material" && (el.value || "") === toolMaterialFilterOther) {
+            var cin = tr.querySelector('[data-k="tool_material_custom"]');
+            row.tool_material = (cin && cin.value || "").trim();
+          } else {
+            row[k] = (el.value || "").trim();
+          }
         });
         row.movement_date = (arrivalDateInput.value || "").trim();
         row.supplier_name = (supplierSelect.value || "").trim();
@@ -2417,6 +2516,17 @@
       "{{ key }}": "{{ label }}",
       {% endfor %}
     };
+    var toolMaterialFilterOtherStock = "{{ tool_material_filter_other|escapejs }}";
+    try {
+      var _tmJsonEl = document.getElementById("stock-tool-material-extras-json");
+      var _tmParsed = _tmJsonEl ? JSON.parse(_tmJsonEl.textContent || "[]") : [];
+      if (Array.isArray(_tmParsed)) {
+        _tmParsed.forEach(function (x) {
+          if (x && !Object.prototype.hasOwnProperty.call(toolMaterialLabels, x)) toolMaterialLabels[x] = x;
+        });
+      }
+    } catch (_tmErr) {}
+    toolMaterialLabels[toolMaterialFilterOtherStock] = "Другое";
     var coatingLabels = {
       {% for key, label in coating_types %}
       "{{ key }}": "{{ label }}",
@@ -2444,7 +2554,7 @@
       var v = (value || "").trim();
       if (!v) return "-";
       if (field === "mill_type") return millTypeLabels[v] || v;
-      if (field === "tool_material") return toolMaterialLabels[v] || "Неизвестно";
+      if (field === "tool_material") return toolMaterialLabels[v] || escapeHtml(v);
       if (field === "coating_type") {
         var ct = coatingFullTitles[v] || coatingLabels[v] || v;
         var inner =
@@ -2479,6 +2589,10 @@
             return { value: k, label: toolMaterialLabels[k], title: toolMaterialLabels[k] };
           })
         );
+        if (current && !options.some(function (o) { return o.value === current; })) {
+          options.splice(1, 0, { value: current, label: current, title: current });
+          if (!Object.prototype.hasOwnProperty.call(toolMaterialLabels, current)) toolMaterialLabels[current] = current;
+        }
       } else if (field === "coating_type") {
         options = Object.keys(coatingLabels).map(function (k) {
           return { value: k, label: coatingLabels[k], title: coatingFullTitles[k] || coatingLabels[k] };
@@ -2535,12 +2649,82 @@
       });
     }
 
+    function activateToolMaterialCell(cell, current) {
+      var editor = buildSelect("tool_material", current);
+      cell.innerHTML = "";
+      cell.appendChild(editor);
+      activeCell = cell;
+      editor.focus();
+      var cancelled = false;
+      function revert() {
+        cancelled = true;
+        cell.innerHTML = formatCell("tool_material", cell.getAttribute("data-value") || "");
+        activeCell = null;
+      }
+      function saveTm(val) {
+        saveCell(cell, val, editor);
+      }
+      editor.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          revert();
+        }
+      });
+      editor.addEventListener("change", function () {
+        if (editor.value === toolMaterialFilterOtherStock) {
+          var inp = document.createElement("input");
+          inp.type = "text";
+          inp.className = "stock-inline-editor";
+          inp.maxLength = 80;
+          inp.value = "";
+          inp.placeholder = "Материал, до 80 символов";
+          cell.innerHTML = "";
+          cell.appendChild(inp);
+          activeCell = cell;
+          inp.focus();
+          inp.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              var nv = (inp.value || "").trim();
+              if (nv) saveTm(nv);
+              else revert();
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              revert();
+            }
+          });
+          inp.addEventListener("blur", function () {
+            if (cancelled) return;
+            var nv = (inp.value || "").trim();
+            if (nv) saveTm(nv);
+            else revert();
+          });
+          return;
+        }
+        saveTm((editor.value || "").trim());
+      });
+      editor.addEventListener("blur", function () {
+        if (cancelled) return;
+        setTimeout(function () {
+          if (activeCell !== cell) return;
+          if (!cell.contains(document.activeElement) && editor.parentNode && editor.value !== toolMaterialFilterOtherStock) {
+            saveTm((editor.value || "").trim());
+          }
+        }, 0);
+      });
+    }
+
     function activate(cell) {
       if (activeCell === cell) return;
       if (activeCell) return;
       var field = cell.getAttribute("data-field");
       var type = cell.getAttribute("data-type");
       var current = cell.getAttribute("data-value") || "";
+      if (field === "tool_material" && type === "select") {
+        activateToolMaterialCell(cell, current);
+        return;
+      }
       var editor = (type === "select") ? buildSelect(field, current) : document.createElement("input");
       if (type !== "select") {
         editor.type = "number";

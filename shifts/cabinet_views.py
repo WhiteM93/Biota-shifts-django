@@ -24,6 +24,7 @@ from biota_shifts.auth import (
     nav_permissions_for_user,
     user_role_for_username,
 )
+from shifts.models import InventoryStockEvent
 from .department_order import apply_department_order, load_department_order, save_department_order
 from .position_order import apply_position_order, load_position_order, save_position_order
 from .db_health import collect_system_health
@@ -78,12 +79,16 @@ def cabinet_view(request):
                     for k in NAV_KEYS:
                         if not nav_map.get(k, True):
                             continue
-                        if k == "products":
+                        if k in ("products", "machines"):
                             continue
                         picked = [d for d in request.POST.getlist(f"priv_nav_dep__{k}") if d in allowed_dep_set]
                         nav_dep_filters[k] = picked
                 else:
                     nav_dep_filters = None
+                store_before = _load_users_store()
+                old_inv = bool((store_before.get(target) or {}).get("inventory_stock_manage"))
+                inv_flag = (request.POST.get("priv_inventory_stock_manage") or "0").strip() == "1"
+                mqe_flag = (request.POST.get("priv_machines_quick_edit") or "0").strip() == "1"
                 ok, err = _set_user_privileges(
                     target,
                     None,
@@ -92,9 +97,21 @@ def cabinet_view(request):
                     nav=nav_map,
                     nav_dep_filters=nav_dep_filters,
                     role=target_role,
+                    inventory_stock_manage=inv_flag,
+                    machines_quick_edit=mqe_flag,
                 )
                 if ok:
                     messages.success(request, "Права сохранены.")
+                    if old_inv != inv_flag:
+                        InventoryStockEvent.objects.create(
+                            actor_username=user,
+                            event_type=InventoryStockEvent.EVENT_PRIVILEGE,
+                            summary=(
+                                f"Учётная запись «{target}»: право редактирования и удаления на складе "
+                                f"{'включено' if inv_flag else 'выключено'}"
+                            ),
+                            details={"target_user": target, "enabled": inv_flag},
+                        )
                 else:
                     messages.error(request, err)
                 return redirect("cabinet")
@@ -196,6 +213,8 @@ def cabinet_view(request):
         ctx["priv_nav"] = _pn
         _ndf = _nav_department_filters_map(pr) if ctx["priv_selected"] else {}
         raw_ndf = pr.get("nav_dep_filters") if isinstance(pr.get("nav_dep_filters"), dict) else {}
+        ctx["priv_stock_manage"] = bool(pr.get("inventory_stock_manage"))
+        ctx["priv_machines_quick_edit"] = bool(pr.get("machines_quick_edit"))
         ctx["priv_nav_rows"] = []
         for k in NAV_KEYS:
             sel_deps = [d for d in (_ndf.get(k) or []) if d in dep_opts]

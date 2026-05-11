@@ -101,6 +101,9 @@ html {
   --bio-tab-pill-fg: #7c8cff;
   --bio-tab-pill-active-bg: #7c8cff;
   --bio-tab-pill-active-fg: #ffffff;
+  /* Чип ячейки «№ инструмента» (product detail): явные цвета вместо color-mix — стабильнее в Яндекс.Браузере и старых Chromium. */
+  --bio-tool-number-chip-bg: #252d4a;
+  --bio-tool-number-chip-border: #3a4666;
   --bio-graph-muted-btn-bg: #2a3348;
   --bio-graph-muted-btn-fg: #d7e2ff;
   --bio-graph-muted-btn-border: #4a5878;
@@ -158,11 +161,12 @@ html {
 html[data-theme="dawn"] {
   color-scheme: light;
   --bio-body-bg:
-    radial-gradient(ellipse 92% 62% at 96% -6%, #ffe8d4 0%, transparent 54%),
-    radial-gradient(ellipse 78% 58% at 4% 100%, #ebe4ff 0%, transparent 50%),
-    radial-gradient(ellipse 55% 42% at 76% 92%, #d4f5e9 0%, transparent 44%),
-    radial-gradient(ellipse 50% 38% at 18% 10%, rgba(253, 224, 231, 0.72) 0%, transparent 52%),
-    linear-gradient(168deg, #fcf9f6 0%, #f7f0e8 40%, #edf5f2 100%);
+    /* Мягкие пятна без сильной мяты внизу справа (иначе просвечивает сквозь полупрозрачные панели). */
+    radial-gradient(ellipse 90% 60% at 96% -10%, rgba(255, 232, 212, 0.85) 0%, rgba(255, 255, 255, 0) 60%),
+    radial-gradient(ellipse 80% 55% at 4% 110%, rgba(235, 228, 255, 0.7) 0%, rgba(255, 255, 255, 0) 55%),
+    radial-gradient(ellipse 58% 42% at 78% 96%, rgba(241, 233, 222, 0.45) 0%, rgba(255, 255, 255, 0) 52%),
+    radial-gradient(ellipse 55% 40% at 18% 10%, rgba(253, 224, 231, 0.55) 0%, rgba(255, 255, 255, 0) 52%),
+    linear-gradient(168deg, #fbf7f1 0%, #f6efe6 45%, #f4f1ec 100%);
   --bio-body-fg: #3c362f;
   --bio-nav-bg: rgba(255, 254, 251, 0.94);
   --bio-nav-border: #e0d4c6;
@@ -259,6 +263,8 @@ html[data-theme="dawn"] {
   --bio-tab-pill-fg: #0f766e;
   --bio-tab-pill-active-bg: #0d9488;
   --bio-tab-pill-active-fg: #ffffff;
+  --bio-tool-number-chip-bg: #eef5f3;
+  --bio-tool-number-chip-border: #c5dbd4;
   --bio-graph-muted-btn-bg: #ede9fe;
   --bio-graph-muted-btn-fg: #3d3358;
   --bio-graph-muted-btn-border: #cfc7e8;
@@ -716,7 +722,31 @@ html[data-theme="dawn"] .nav .nav-refresh-btn:hover {
 }
 
 .nav .nav-logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--bio-nav-logout);
+  min-width: 2.25rem;
+  padding: 6px 10px;
+  line-height: 0;
+}
+
+.nav .nav-logout-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  opacity: 0.94;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.14));
+  overflow: visible;
+}
+
+.nav a.nav-logout:hover .nav-logout-icon {
+  opacity: 1;
+}
+
+html[data-theme="dawn"] .nav .nav-logout-icon {
+  filter: drop-shadow(0 1px 1px rgba(55, 42, 36, 0.08));
 }
 
 .container {
@@ -827,6 +857,21 @@ textarea:focus {
 
 .btn:active {
   transform: translateY(0);
+}
+
+/* «Быстрое редактирование» (карточка продукта, станки): красная кнопка без тени primary/dawn */
+.btn.product-btn-edit-mode {
+  background: linear-gradient(180deg, #ef6a6a 0%, #cf4242 100%);
+  border: 1px solid #a93131;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(169, 49, 49, 0.38);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn.product-btn-edit-mode:hover,
+.btn.product-btn-edit-mode:focus {
+  box-shadow: 0 5px 14px rgba(139, 30, 30, 0.42);
 }
 
 .btn.btn-ghost {

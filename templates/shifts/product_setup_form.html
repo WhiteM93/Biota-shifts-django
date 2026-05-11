@@ -46,6 +46,12 @@
       {% if form.binding_z.errors %}<span class="muted">{{ form.binding_z.errors }}</span>{% endif %}
     </label>
     <label class="field">
+      <span>Система координат G</span>
+      {{ form.gcode_system }}
+      {% if form.gcode_system.errors %}<span class="muted">{{ form.gcode_system.errors }}</span>{% endif %}
+      <span class="muted" style="display:block;margin-top:4px;font-size:12px;">G54…G59 или расширенная привязка, например G54.1 P10 (P от 0 до 99).</span>
+    </label>
+    <label class="field">
       <span>Фото привязки X</span>
       {% if is_edit and setup and setup.binding_x_photo %}
       <div class="binding-photo-card" id="binding-x-photo-card">

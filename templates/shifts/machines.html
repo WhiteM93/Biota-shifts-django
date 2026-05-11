@@ -1,0 +1,1578 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div
+  class="machines-page"
+  data-inline-edit-mode="0"
+  data-machines-quick-edit="{% if biota_machines_quick_edit %}1{% else %}0{% endif %}"
+  data-username="{{ username|default:'Неизвестный пользователь'|escape }}"
+>
+  <h1 class="machines-page-title">Станки</h1>
+
+  <div class="machines-layout">
+    <section class="machines-panel machines-panel--quick" aria-label="Быстрая сводка по станкам">
+      <div class="machines-panel-head machines-panel-head--quick-toolbar">
+        <div class="machines-quick-toolbar-actions">
+          {% if biota_machines_quick_edit %}
+          <button
+            type="button"
+            class="btn product-btn-edit-mode js-machines-inline-edit-toggle"
+            id="machines-quick-title"
+            aria-pressed="false"
+          >
+            Быстрое редактирование
+          </button>
+          {% endif %}
+          <button
+            type="button"
+            class="btn btn-ghost js-machines-history-btn"
+            aria-expanded="false"
+            aria-controls="machines-history-panel"
+            id="machines-history-open"
+          >
+            История
+          </button>
+          {% if biota_machines_quick_edit %}
+          <button
+            type="button"
+            class="btn btn-ghost machines-toolbar-icon-btn js-machines-add-quick-row"
+            aria-label="Добавить строку станка"
+            title="Добавить строку"
+          >
+            +
+          </button>
+          {% endif %}
+        </div>
+      </div>
+      <div class="machines-quick-rows" data-server-quick-count="{{ machine_rows|length }}">
+        {% for row in machine_rows %}
+        <div class="machines-quick-row">
+          <div class="machines-cell machines-cell--code">{{ row.code }}</div>
+          <div class="machines-cell machines-cell--field{% if not row.current %} is-empty{% endif %}">{{ row.current }}</div>
+          <div class="machines-cell machines-cell--field{% if not row.next %} is-empty{% endif %}">{{ row.next }}</div>
+          <div
+            class="machines-cell machines-cell--field machines-cell--notes{% if not row.extra %} is-empty{% endif %}"
+            data-placeholder="Примечание…"
+            aria-label="Примечание"
+          >
+            {{ row.extra }}
+          </div>
+          <div class="machines-cell machines-cell--tag{% if not row.tag %} is-empty{% endif %}">{{ row.tag }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <aside class="machines-panel machines-panel--side" aria-labelledby="machines-schedule-title">
+      <div class="machines-panel-head machines-panel-head--side-toolbar">
+        <span id="machines-schedule-title" class="machines-panel-head-title">План работ</span>
+        {% if biota_machines_quick_edit %}
+        <button
+          type="button"
+          class="btn btn-ghost machines-toolbar-icon-btn js-machines-add-schedule-row"
+          aria-label="Добавить строку плана"
+          title="Добавить строку"
+        >
+          +
+        </button>
+        {% endif %}
+      </div>
+      <div class="machines-schedule-rows" data-next-schedule-index="{{ schedule_rows|length }}">
+        {% for srow in schedule_rows %}
+        <div class="machines-schedule-row">
+          <div
+            class="machines-cell machines-cell--schedule-label{% if not srow.display %} is-empty{% endif %}"
+            data-schedule-index="{{ forloop.counter0 }}"
+            data-machine-code="{{ srow.machine_code|escape }}"
+            data-original-label="{{ srow.label|default:''|escape }}"
+          >
+            <span
+              class="machines-schedule-drag-handle"
+              aria-label="Перетащить на колонку станка"
+              title="Перетащите на «сейчас» или «далее» у нужного станка"
+              >≡</span>
+            <span class="machines-schedule-label-view">{{ srow.display }}</span>
+            <div class="machines-schedule-product-combo js-machines-product-combo" data-schedule-select="{{ forloop.counter0 }}">
+              <input type="hidden" class="js-machines-product-id" value="{% if srow.product_id %}{{ srow.product_id }}{% endif %}" autocomplete="off" />
+              <input
+                type="text"
+                class="machines-schedule-product-search js-machines-product-search"
+                placeholder="Поиск изделия…"
+                autocomplete="off"
+                spellcheck="false"
+                aria-label="Поиск изделия"
+                title="Введите часть названия или номер"
+              />
+              <div class="machines-product-suggest" hidden role="listbox" aria-label="Совпадения"></div>
+            </div>
+          </div>
+          <div class="machines-cell machines-cell--code machines-cell--schedule-code">{{ srow.machine_code }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="machines-side-note muted">Здесь позже будет привязка к плану и сменам.</p>
+    </aside>
+  </div>
+
+  <div class="machines-history-backdrop js-machines-history-backdrop" hidden aria-hidden="true"></div>
+  <div
+    id="machines-history-panel"
+    class="machines-history-panel"
+    hidden
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="machines-history-title"
+  >
+    <div class="machines-history-panel__box">
+      <header class="machines-history-panel__head">
+        <h2 id="machines-history-title" class="machines-history-panel__title">История изменений</h2>
+        <button type="button" class="btn btn-ghost machines-history-panel__close js-machines-history-close" aria-label="Закрыть">
+          ×
+        </button>
+      </header>
+      <p class="muted machines-history-panel__hint">Кто и что менял на этой странице. Записи хранятся только в этом браузере.</p>
+      <div class="machines-history-panel__list js-machines-history-list" role="log" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <template id="machines-tpl-quick-row">
+    <div class="machines-quick-row" data-client-row="1">
+      <div class="machines-cell machines-cell--code is-empty"></div>
+      <div class="machines-cell machines-cell--field is-empty"></div>
+      <div class="machines-cell machines-cell--field is-empty"></div>
+      <div
+        class="machines-cell machines-cell--field machines-cell--notes is-empty"
+        data-placeholder="Примечание…"
+        aria-label="Примечание"
+      ></div>
+      <div class="machines-cell machines-cell--tag is-empty"></div>
+    </div>
+  </template>
+  <template id="machines-tpl-schedule-row">
+    <div class="machines-schedule-row" data-client-row="1">
+      <div
+        class="machines-cell machines-cell--schedule-label is-empty"
+        data-schedule-index=""
+        data-machine-code=""
+        data-original-label=""
+      >
+        <span
+          class="machines-schedule-drag-handle"
+          aria-label="Перетащить на колонку станка"
+          title="Перетащите на «сейчас» или «далее» у нужного станка"
+          >≡</span>
+        <span class="machines-schedule-label-view"></span>
+        <div class="machines-schedule-product-combo js-machines-product-combo">
+          <input type="hidden" class="js-machines-product-id" value="" autocomplete="off" />
+          <input
+            type="text"
+            class="machines-schedule-product-search js-machines-product-search"
+            placeholder="Поиск изделия…"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Поиск изделия"
+          />
+          <div class="machines-product-suggest" hidden role="listbox"></div>
+        </div>
+      </div>
+      <div class="machines-cell machines-cell--code machines-cell--schedule-code is-empty"></div>
+    </div>
+  </template>
+  {{ machines_products_json|json_script:"machines-products-data" }}
+</div>
+
+<style>
+  .machines-page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 8px 0 24px;
+  }
+  .machines-page-title {
+    margin: 0 0 16px;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--bio-heading-accent, var(--bio-body-fg));
+    letter-spacing: 0.02em;
+  }
+  .machines-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+    gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 960px) {
+    .machines-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+  .machines-panel {
+    border: 2px solid var(--bio-filter-border);
+    border-radius: 6px;
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow);
+    min-width: 0;
+    overflow: hidden;
+  }
+  /* Выпадающий список поиска изделий не обрезаем */
+  .machines-panel--side {
+    overflow: visible;
+  }
+  .machines-panel-head {
+    padding: 10px 14px;
+    font-weight: 700;
+    font-size: 15px;
+    border-bottom: 2px solid var(--bio-filter-border);
+    color: var(--bio-heading-accent, var(--bio-body-fg));
+    background: color-mix(in srgb, var(--bio-surface-item) 55%, transparent);
+  }
+  .machines-panel-head--quick-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .machines-quick-toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .machines-history-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+  }
+  /* Иначе author display перебивает UA [hidden] — панель остаётся поверх всей страницы */
+  .machines-history-backdrop[hidden] {
+    display: none !important;
+  }
+  .machines-history-panel {
+    position: fixed;
+    z-index: 121;
+    left: 50%;
+    top: 12vh;
+    transform: translateX(-50%);
+    width: min(520px, calc(100vw - 24px));
+    max-height: min(72vh, 640px);
+    box-sizing: border-box;
+    border: 2px solid var(--bio-filter-border);
+    border-radius: 8px;
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow, 0 12px 40px rgba(0, 0, 0, 0.25));
+  }
+  .machines-history-panel[hidden] {
+    display: none !important;
+  }
+  .machines-history-panel:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+  }
+  .machines-history-panel__box {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: inherit;
+    padding: 12px 14px 14px;
+  }
+  .machines-history-panel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .machines-history-panel__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--bio-heading-accent, var(--bio-body-fg));
+  }
+  .machines-history-panel__close {
+    flex: 0 0 auto;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 22px;
+    line-height: 1;
+  }
+  .machines-history-panel__hint {
+    margin: 0 0 10px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .machines-history-panel__list {
+    flex: 1 1 auto;
+    min-height: 120px;
+    max-height: min(52vh, 480px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--bio-input-border);
+    border-radius: 6px;
+    background: var(--bio-input-bg);
+    padding: 4px 0;
+  }
+  .machines-history-entry {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--bio-table-cell-border, var(--bio-input-border));
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--bio-body-fg);
+  }
+  .machines-history-entry:last-child {
+    border-bottom: none;
+  }
+  .machines-history-entry__meta {
+    font-size: 11px;
+    margin-bottom: 4px;
+    color: var(--bio-muted);
+  }
+  .machines-history-entry__what {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .machines-history-empty {
+    margin: 0;
+    padding: 16px 12px;
+    text-align: center;
+    font-size: 13px;
+  }
+  .machines-panel-head--side-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .machines-panel-head-title {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .machines-toolbar-icon-btn {
+    flex: 0 0 auto;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+  .machines-panel-head--quick-toolbar .btn.product-btn-edit-mode {
+    min-height: 40px;
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .machines-quick-rows,
+  .machines-schedule-rows {
+    padding: 10px 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .machines-quick-row {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 52px;
+    gap: 8px;
+    align-items: stretch;
+  }
+  @media (max-width: 720px) {
+    .machines-quick-row {
+      grid-template-columns: 64px 1fr;
+      grid-template-rows: auto auto auto;
+    }
+    .machines-quick-row .machines-cell--code {
+      grid-column: 1;
+      grid-row: 1 / span 3;
+    }
+    .machines-quick-row .machines-cell--field:nth-of-type(2) {
+      grid-column: 2;
+      grid-row: 1;
+    }
+    .machines-quick-row .machines-cell--field:nth-of-type(3) {
+      grid-column: 2;
+      grid-row: 2;
+    }
+    .machines-quick-row .machines-cell--field:nth-of-type(4) {
+      grid-column: 2;
+      grid-row: 3;
+    }
+    .machines-quick-row .machines-cell--tag {
+      grid-column: 1 / -1;
+      grid-row: 4;
+      min-height: 32px;
+    }
+  }
+  .machines-schedule-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 72px;
+    gap: 8px;
+    align-items: stretch;
+    position: relative;
+    z-index: 0;
+  }
+  .machines-schedule-row:has(.machines-schedule-product-combo.is-open),
+  .machines-schedule-row.machines-schedule-row--suggest-open {
+    z-index: 40;
+  }
+  .machines-cell {
+    border: 2px solid var(--bio-input-border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 14px;
+    line-height: 1.35;
+    color: var(--bio-body-fg);
+    background: var(--bio-input-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 40px;
+    box-sizing: border-box;
+  }
+  .machines-cell--code,
+  .machines-cell--tag,
+  .machines-cell--schedule-code {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .machines-cell--field {
+    justify-content: flex-start;
+    text-align: left;
+    position: relative;
+    z-index: 0;
+  }
+  .machines-cell--schedule-label {
+    justify-content: flex-start;
+    text-align: left;
+    position: relative;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 6px;
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+  .machines-schedule-drag-handle {
+    flex: 0 0 22px;
+    width: 22px;
+    min-width: 22px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    border-radius: 4px;
+    color: var(--bio-muted);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: grab;
+  }
+  .machines-schedule-drag-handle:active {
+    cursor: grabbing;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-schedule-drag-handle {
+    display: flex;
+  }
+  .machines-quick-row > .machines-cell--field.machines-drop-target {
+    box-shadow: inset 0 0 0 2px var(--bio-input-focus-border, #5c709f);
+    background: color-mix(in srgb, var(--bio-input-focus-border, #5c709f) 10%, var(--bio-input-bg));
+  }
+  .machines-cell.is-empty {
+    color: var(--bio-muted);
+    font-style: italic;
+  }
+  .machines-cell.is-empty::after {
+    content: "—";
+    opacity: 0.45;
+  }
+  .machines-cell--field:not(.is-empty) {
+    font-weight: 500;
+  }
+  .machines-panel--quick .machines-cell--notes:not(.is-empty) {
+    white-space: pre-wrap;
+    align-items: flex-start;
+    justify-content: flex-start;
+    text-align: left;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .machines-side-note {
+    margin: 0 12px 12px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .machines-schedule-label-view {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .machines-schedule-product-combo {
+    display: none;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-self: stretch;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    position: relative;
+    z-index: 0;
+  }
+  .machines-schedule-product-combo.is-open {
+    z-index: 1;
+  }
+  .machines-schedule-product-search {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 6px 8px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--bio-input-fg);
+    background: var(--bio-input-bg);
+    border: 1px solid var(--bio-input-border);
+    border-radius: 4px;
+    min-height: 36px;
+  }
+  .machines-schedule-product-search:disabled {
+    opacity: 0.58;
+    cursor: not-allowed;
+    color: var(--bio-muted);
+  }
+  .machines-product-suggest {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 2px);
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    max-height: min(280px, 42vh);
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid var(--bio-input-border);
+    border-radius: 4px;
+    background: var(--bio-input-bg);
+    box-shadow: var(--bio-filter-shadow, 0 8px 24px rgba(0, 0, 0, 0.18));
+    z-index: 50;
+    -webkit-overflow-scrolling: touch;
+  }
+  .machines-product-suggest-item {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 8px 10px;
+    border: 0;
+    border-bottom: 1px solid var(--bio-table-cell-border, var(--bio-input-border));
+    background: transparent;
+    color: var(--bio-input-fg);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .machines-product-suggest-item:last-child {
+    border-bottom: 0;
+  }
+  .machines-product-suggest-item:hover,
+  .machines-product-suggest-item:focus {
+    background: color-mix(in srgb, var(--bio-input-focus-border, #5c709f) 12%, var(--bio-input-bg));
+    outline: none;
+  }
+  .machines-product-suggest-clear {
+    font-weight: 600;
+    color: var(--bio-muted);
+  }
+  .machines-product-suggest-empty {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-panel--side .machines-schedule-label-view {
+    display: none !important;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-panel--side .machines-schedule-product-combo {
+    display: flex;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-cell--schedule-label.is-empty::after {
+    content: none;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-panel--quick .machines-quick-row > .machines-cell[contenteditable="true"] {
+    cursor: text;
+    outline: none;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bio-input-focus-border, #5c709f) 45%, transparent);
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-panel--quick .machines-quick-row > .machines-cell[contenteditable="true"].is-empty::after {
+    content: none;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-panel--quick .machines-quick-row > .machines-cell[contenteditable="true"]:focus {
+    box-shadow: inset 0 0 0 2px var(--bio-input-focus-border, #5c709f);
+  }
+  /* Примечания: многострочный текст, плейсхолдер в режиме правки */
+  .machines-page[data-inline-edit-mode="1"] .machines-panel--quick .machines-quick-row > .machines-cell--notes[contenteditable="true"] {
+    white-space: pre-wrap;
+    align-items: flex-start;
+    justify-content: flex-start;
+    max-height: 14em;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .machines-page[data-inline-edit-mode="1"]
+    .machines-panel--quick
+    .machines-quick-row
+    > .machines-cell--notes[contenteditable="true"].is-empty:not(:focus)::before {
+    content: attr(data-placeholder);
+    color: var(--bio-muted);
+    font-style: italic;
+    pointer-events: none;
+    flex: 0 0 auto;
+    width: 100%;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+</style>
+<script>
+  (function () {
+    var LS_SCHEDULE_PRODUCTS = "biota_machines_schedule_product_ids_v1";
+    var LS_SCHEDULE_CODES = "biota_machines_schedule_machine_codes_v1";
+    var LS_QUICK_EXTRA = "biota_machines_quick_rows_extra_v1";
+    var LS_QUICK_SERVER = "biota_machines_quick_server_rows_v1";
+    var LS_SCHEDULE_EXTRA = "biota_machines_schedule_rows_extra_v1";
+    var MIME_SCHEDULE_DRAG = "application/x-biota-schedule-row";
+    var scheduleDragHoverField = null;
+
+    var root = document.querySelector(".machines-page");
+    var toggleBtn = document.querySelector(".js-machines-inline-edit-toggle");
+    var canQuickEdit = root && (root.getAttribute("data-machines-quick-edit") || "") === "1";
+    var btnAddQuick = document.querySelector(".js-machines-add-quick-row");
+    var btnAddSchedule = document.querySelector(".js-machines-add-schedule-row");
+    var quickWrap = root ? root.querySelector(".machines-quick-rows") : null;
+    var scheduleWrap = root ? root.querySelector(".machines-schedule-rows") : null;
+    var tplQuick = document.getElementById("machines-tpl-quick-row");
+    var tplSchedule = document.getElementById("machines-tpl-schedule-row");
+
+    if (!root || !quickWrap || !scheduleWrap || !tplQuick || !tplSchedule) return;
+
+    var btnHistory = root.querySelector(".js-machines-history-btn");
+    var historyBackdrop = root.querySelector(".js-machines-history-backdrop");
+    var historyPanel = root.querySelector("#machines-history-panel");
+    var historyList = root.querySelector(".js-machines-history-list");
+
+    var _catalog = null;
+    var suggestTimer = null;
+    var LS_PAGE_HISTORY = "biota_machines_page_history_v1";
+    var MAX_PAGE_HISTORY = 150;
+
+    function readJson(key, fallback) {
+      try {
+        var raw = localStorage.getItem(key);
+        if (!raw) return fallback;
+        var o = JSON.parse(raw);
+        return o;
+      } catch (e) {
+        return fallback;
+      }
+    }
+
+    function writeJson(key, val) {
+      try {
+        localStorage.setItem(key, JSON.stringify(val));
+      } catch (e) {}
+    }
+
+    function getMachinesActor() {
+      return (root.getAttribute("data-username") || "").trim() || "Неизвестный пользователь";
+    }
+
+    function pushPageHistory(what) {
+      var msg = String(what || "").trim().slice(0, 500);
+      if (!msg) return;
+      var list = readJson(LS_PAGE_HISTORY, []);
+      if (!Array.isArray(list)) list = [];
+      list.unshift({
+        ts: Date.now(),
+        who: getMachinesActor(),
+        what: msg
+      });
+      if (list.length > MAX_PAGE_HISTORY) list = list.slice(0, MAX_PAGE_HISTORY);
+      writeJson(LS_PAGE_HISTORY, list);
+      if (historyPanel && !historyPanel.hidden && historyList) renderHistoryList();
+    }
+
+    function formatHistoryTime(ts) {
+      try {
+        return new Date(ts || 0).toLocaleString("ru-RU", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
+        });
+      } catch (e) {
+        return "—";
+      }
+    }
+
+    function renderHistoryList() {
+      if (!historyList) return;
+      var list = readJson(LS_PAGE_HISTORY, []);
+      if (!Array.isArray(list) || list.length === 0) {
+        historyList.innerHTML = '<p class="muted machines-history-empty">Пока нет записей в истории.</p>';
+        return;
+      }
+      historyList.textContent = "";
+      list.forEach(function (entry) {
+        var wrap = document.createElement("div");
+        wrap.className = "machines-history-entry";
+        var meta = document.createElement("div");
+        meta.className = "machines-history-entry__meta";
+        meta.textContent = (entry.who || "—") + " · " + formatHistoryTime(entry.ts);
+        var whatEl = document.createElement("div");
+        whatEl.className = "machines-history-entry__what";
+        whatEl.textContent = entry.what || "";
+        wrap.appendChild(meta);
+        wrap.appendChild(whatEl);
+        historyList.appendChild(wrap);
+      });
+    }
+
+    function openHistoryPanel() {
+      if (!historyPanel || !historyBackdrop || !btnHistory) return;
+      historyPanel.hidden = false;
+      historyBackdrop.hidden = false;
+      historyBackdrop.setAttribute("aria-hidden", "false");
+      btnHistory.setAttribute("aria-expanded", "true");
+      document.body.style.overflow = "hidden";
+      renderHistoryList();
+      try {
+        var clos = historyPanel.querySelector(".js-machines-history-close");
+        if (clos) clos.focus();
+      } catch (e1) {}
+    }
+
+    function closeHistoryPanel() {
+      if (!historyPanel || !historyBackdrop || !btnHistory) return;
+      historyPanel.hidden = true;
+      historyBackdrop.hidden = true;
+      historyBackdrop.setAttribute("aria-hidden", "true");
+      btnHistory.setAttribute("aria-expanded", "false");
+      document.body.style.overflow = "";
+    }
+
+    function onHistoryEscape(e) {
+      if (e.key !== "Escape") return;
+      if (!historyPanel || historyPanel.hidden) return;
+      closeHistoryPanel();
+    }
+
+    function readStore() {
+      var o = readJson(LS_SCHEDULE_PRODUCTS, {});
+      return o && typeof o === "object" ? o : {};
+    }
+
+    function writeStore(map) {
+      writeJson(LS_SCHEDULE_PRODUCTS, map);
+    }
+
+    function dataTransferHasScheduleDrag(dt) {
+      if (!dt || !dt.types) return false;
+      try {
+        if (typeof dt.types.contains === "function" && dt.types.contains(MIME_SCHEDULE_DRAG)) return true;
+      } catch (e1) {}
+      for (var ti = 0; ti < dt.types.length; ti++) {
+        if (dt.types[ti] === MIME_SCHEDULE_DRAG) return true;
+      }
+      return false;
+    }
+
+    function clearScheduleDropHover() {
+      if (scheduleDragHoverField) {
+        scheduleDragHoverField.classList.remove("machines-drop-target");
+        scheduleDragHoverField = null;
+      }
+    }
+
+    function scheduleLabelDisplayText(labelCell) {
+      if (!labelCell) return "";
+      var hid = labelCell.querySelector(".js-machines-product-id");
+      if (hid && (hid.value || "").trim()) {
+        var nm = nameById(hid.value.trim());
+        if (nm) return nm;
+      }
+      var span = labelCell.querySelector(".machines-schedule-label-view");
+      if (span && (span.textContent || "").trim()) return span.textContent.trim();
+      return (labelCell.getAttribute("data-original-label") || "").trim();
+    }
+
+    function syncScheduleDragHandles(on) {
+      scheduleWrap.querySelectorAll(".machines-schedule-drag-handle").forEach(function (h) {
+        if (on) {
+          h.setAttribute("draggable", "true");
+        } else {
+          h.removeAttribute("draggable");
+        }
+      });
+    }
+
+    function persistScheduleMachineCodes() {
+      var map = {};
+      scheduleWrap.querySelectorAll(".machines-cell--schedule-label").forEach(function (label) {
+        var idx = label.getAttribute("data-schedule-index");
+        if (idx === null || idx === undefined || idx === "") return;
+        var row = label.closest(".machines-schedule-row");
+        var codeEl = row && row.querySelector(".machines-cell--schedule-code");
+        map[idx] = codeEl ? (codeEl.textContent || "").trim() : "";
+      });
+      writeJson(LS_SCHEDULE_CODES, map);
+    }
+
+    function applyScheduleMachineCodes() {
+      var map = readJson(LS_SCHEDULE_CODES, null);
+      if (!map || typeof map !== "object") return;
+      scheduleWrap.querySelectorAll(".machines-cell--schedule-label").forEach(function (label) {
+        var idx = label.getAttribute("data-schedule-index");
+        if (idx === null || idx === undefined || idx === "") return;
+        if (!Object.prototype.hasOwnProperty.call(map, idx)) return;
+        var code = map[idx] != null ? String(map[idx]).trim() : "";
+        var row = label.closest(".machines-schedule-row");
+        var codeEl = row && row.querySelector(".machines-cell--schedule-code");
+        if (!codeEl) return;
+        codeEl.textContent = code;
+        label.setAttribute("data-machine-code", code);
+        if (code) {
+          codeEl.classList.remove("is-empty");
+        } else {
+          codeEl.classList.add("is-empty");
+        }
+      });
+    }
+
+    function getCatalog() {
+      if (_catalog) return _catalog;
+      var el = document.getElementById("machines-products-data");
+      if (!el || !el.textContent) {
+        _catalog = [];
+        return _catalog;
+      }
+      try {
+        _catalog = JSON.parse(el.textContent);
+        if (!Array.isArray(_catalog)) _catalog = [];
+      } catch (e) {
+        _catalog = [];
+      }
+      return _catalog;
+    }
+
+    function nameById(id) {
+      var sid = String(id);
+      var cat = getCatalog();
+      for (var i = 0; i < cat.length; i++) {
+        if (String(cat[i].id) === sid) return (cat[i].name || "").trim();
+      }
+      return "";
+    }
+
+    function catalogHasId(id) {
+      if (!id) return true;
+      return !!nameById(id);
+    }
+
+    function closeSuggestExcept(exceptCombo) {
+      root.querySelectorAll(".machines-schedule-product-combo.is-open").forEach(function (c) {
+        if (exceptCombo && c === exceptCombo) return;
+        c.classList.remove("is-open");
+        var row = c.closest(".machines-schedule-row");
+        if (row) row.classList.remove("machines-schedule-row--suggest-open");
+        var p = c.querySelector(".machines-product-suggest");
+        if (p) p.hidden = true;
+      });
+    }
+
+    function syncProductComboDisplay(cell) {
+      var span = cell.querySelector(".machines-schedule-label-view");
+      var hid = cell.querySelector(".js-machines-product-id");
+      var search = cell.querySelector(".js-machines-product-search");
+      var combo = cell.querySelector(".js-machines-product-combo");
+      if (!span || !hid || !search) return;
+      var id = (hid.value || "").trim();
+      if (id) {
+        var nm = nameById(id);
+        if (!nm) {
+          var keep = (span.textContent || "").trim();
+          if (!keep) keep = (cell.getAttribute("data-original-label") || "").trim();
+          nm = keep || id;
+        }
+        span.textContent = nm;
+        search.value = nm;
+        cell.classList.remove("is-empty");
+      } else {
+        var orig = (cell.getAttribute("data-original-label") || "").trim();
+        span.textContent = orig;
+        search.value = "";
+        if (!orig) cell.classList.add("is-empty");
+        else cell.classList.remove("is-empty");
+      }
+      if (combo) combo.classList.remove("is-open");
+      var panel = cell.querySelector(".machines-product-suggest");
+      if (panel) panel.hidden = true;
+    }
+
+    function persistAllProducts() {
+      var map = readStore();
+      root.querySelectorAll(".machines-cell--schedule-label").forEach(function (cell) {
+        var idx = cell.getAttribute("data-schedule-index");
+        if (idx === null || idx === undefined || idx === "") return;
+        var hid = cell.querySelector(".js-machines-product-id");
+        if (!hid) return;
+        map[idx] = (hid.value || "").trim();
+      });
+      writeStore(map);
+    }
+
+    function applyStoredSelections() {
+      var map = readStore();
+      root.querySelectorAll(".machines-cell--schedule-label").forEach(function (cell) {
+        var idx = cell.getAttribute("data-schedule-index");
+        if (idx === null || idx === undefined || idx === "" || !Object.prototype.hasOwnProperty.call(map, idx)) return;
+        var raw = map[idx];
+        var hid = cell.querySelector(".js-machines-product-id");
+        if (!hid) return;
+        var want = raw === "" || raw === null ? "" : String(raw);
+        if (want && !catalogHasId(want)) {
+          delete map[idx];
+          writeStore(map);
+          syncProductComboDisplay(cell);
+          return;
+        }
+        hid.value = want;
+        syncProductComboDisplay(cell);
+      });
+    }
+
+    function serverQuickRows() {
+      return Array.prototype.slice.call(quickWrap.querySelectorAll(".machines-quick-row")).filter(function (r) {
+        return r.getAttribute("data-client-row") !== "1";
+      });
+    }
+
+    function normalizeQuickEditableCell(cell) {
+      if (!cell || cell.getAttribute("contenteditable") !== "true") return;
+      var raw = (cell.textContent || "").replace(/\u200b/g, "");
+      var t;
+      if (cell.classList.contains("machines-cell--notes")) {
+        t = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+      } else {
+        t = raw.replace(/\r\n|\r|\n/g, " ").trim();
+        if (cell.classList.contains("machines-cell--code") || cell.classList.contains("machines-cell--tag")) {
+          t = t.replace(/\s+/g, " ");
+        }
+      }
+      cell.textContent = t;
+      if (t) cell.classList.remove("is-empty");
+      else cell.classList.add("is-empty");
+    }
+
+    function syncQuickEditability(on) {
+      quickWrap.querySelectorAll(".machines-quick-row > .machines-cell").forEach(function (cell) {
+        if (on) {
+          cell.setAttribute("contenteditable", "true");
+          cell.setAttribute("spellcheck", "false");
+        } else {
+          normalizeQuickEditableCell(cell);
+          cell.removeAttribute("contenteditable");
+          cell.removeAttribute("spellcheck");
+        }
+      });
+    }
+
+    function syncScheduleProductInteractions(on) {
+      var en = !!on;
+      root.querySelectorAll(".js-machines-product-search").forEach(function (inp) {
+        inp.disabled = !en;
+        inp.setAttribute("aria-disabled", en ? "false" : "true");
+      });
+      if (btnAddQuick) {
+        btnAddQuick.disabled = !en;
+        btnAddQuick.setAttribute("aria-disabled", en ? "false" : "true");
+      }
+      if (btnAddSchedule) {
+        btnAddSchedule.disabled = !en;
+        btnAddSchedule.setAttribute("aria-disabled", en ? "false" : "true");
+      }
+    }
+
+    function persistQuickServerRows() {
+      var expect = parseInt(quickWrap.getAttribute("data-server-quick-count") || "0", 10);
+      var srv = serverQuickRows();
+      if (isNaN(expect) || srv.length !== expect) return;
+      var list = srv.map(function (row) {
+        var cells = row.querySelectorAll(":scope > .machines-cell");
+        if (cells.length < 5) return { c: "", n: "", e: "", x: "", t: "" };
+        return {
+          c: (cells[0].textContent || "").trim(),
+          n: (cells[1].textContent || "").trim(),
+          e: (cells[2].textContent || "").trim(),
+          x: (cells[3].textContent || "").trim(),
+          t: (cells[4].textContent || "").trim()
+        };
+      });
+      writeJson(LS_QUICK_SERVER, list);
+    }
+
+    function restoreQuickServerOverrides() {
+      var expect = parseInt(quickWrap.getAttribute("data-server-quick-count") || "0", 10);
+      var stored = readJson(LS_QUICK_SERVER, null);
+      if (!Array.isArray(stored) || stored.length !== expect) return;
+      var srv = serverQuickRows();
+      if (srv.length !== expect) return;
+      srv.forEach(function (row, i) {
+        var r = stored[i];
+        if (!r || typeof r !== "object") return;
+        var cells = row.querySelectorAll(":scope > .machines-cell");
+        if (cells.length < 5) return;
+        setQuickCellText(cells[0], r.c);
+        setQuickCellText(cells[1], r.n);
+        setQuickCellText(cells[2], r.e);
+        setQuickCellText(cells[3], r.x);
+        setQuickCellText(cells[4], r.t);
+      });
+    }
+
+    function setEditMode(on) {
+      root.setAttribute("data-inline-edit-mode", on ? "1" : "0");
+      if (toggleBtn) toggleBtn.setAttribute("aria-pressed", on ? "true" : "false");
+      closeSuggestExcept(null);
+      if (!on) {
+        var aeCombo = document.activeElement;
+        if (aeCombo && aeCombo.closest && aeCombo.closest(".js-machines-product-combo")) {
+          try {
+            aeCombo.blur();
+          } catch (eBlur) {}
+        }
+      }
+      syncScheduleProductInteractions(on);
+      syncQuickEditability(on);
+      syncScheduleDragHandles(on);
+      if (!on) {
+        root.querySelectorAll(".machines-cell--schedule-label").forEach(syncProductComboDisplay);
+        persistAllProducts();
+        persistScheduleMachineCodes();
+        persistQuickServerRows();
+        saveQuickClientRows();
+      } else {
+        root.querySelectorAll(".machines-cell--schedule-label").forEach(syncProductComboDisplay);
+      }
+      if (on) {
+        pushPageHistory("Включено быстрое редактирование страницы «Станки».");
+      } else {
+        pushPageHistory("Выключено быстрое редактирование; изменения сохранены локально в браузере.");
+      }
+    }
+
+    if (toggleBtn && canQuickEdit) {
+      toggleBtn.addEventListener("click", function () {
+        var on = root.getAttribute("data-inline-edit-mode") !== "1";
+        setEditMode(on);
+      });
+    }
+
+    if (btnHistory && historyBackdrop && historyPanel) {
+      btnHistory.addEventListener("click", function () {
+        if (historyPanel.hidden) openHistoryPanel();
+        else closeHistoryPanel();
+      });
+      historyBackdrop.addEventListener("click", closeHistoryPanel);
+      var histCloseBtn = historyPanel.querySelector(".js-machines-history-close");
+      if (histCloseBtn) histCloseBtn.addEventListener("click", closeHistoryPanel);
+    }
+    document.addEventListener("keydown", onHistoryEscape);
+
+    scheduleWrap.addEventListener("dragstart", function (e) {
+      var handle = e.target.closest(".machines-schedule-drag-handle");
+      if (!handle || !scheduleWrap.contains(handle)) return;
+      if (root.getAttribute("data-inline-edit-mode") !== "1") {
+        e.preventDefault();
+        return;
+      }
+      var cell = handle.closest(".machines-cell--schedule-label");
+      if (!cell) return;
+      var idx = cell.getAttribute("data-schedule-index");
+      if (idx === null || idx === undefined || idx === "") return;
+      var hid = cell.querySelector(".js-machines-product-id");
+      var pid = hid && (hid.value || "").trim() ? String(hid.value).trim() : "";
+      var display = scheduleLabelDisplayText(cell);
+      var payload = { scheduleIndex: String(idx), productId: pid, display: display };
+      try {
+        e.dataTransfer.setData(MIME_SCHEDULE_DRAG, JSON.stringify(payload));
+        e.dataTransfer.setData("text/plain", display);
+      } catch (err2) {}
+      e.dataTransfer.effectAllowed = "copy";
+    });
+
+    scheduleWrap.addEventListener("dragend", function () {
+      clearScheduleDropHover();
+    });
+
+    quickWrap.addEventListener("dragenter", function (e) {
+      if (root.getAttribute("data-inline-edit-mode") !== "1") return;
+      if (!dataTransferHasScheduleDrag(e.dataTransfer)) return;
+      var fieldEnter = e.target.closest(".machines-quick-row > .machines-cell--field:not(.machines-cell--notes)");
+      if (!fieldEnter || !quickWrap.contains(fieldEnter)) return;
+      e.preventDefault();
+    });
+
+    quickWrap.addEventListener("dragover", function (e) {
+      if (root.getAttribute("data-inline-edit-mode") !== "1") return;
+      if (!dataTransferHasScheduleDrag(e.dataTransfer)) return;
+      var field = e.target.closest(".machines-quick-row > .machines-cell--field:not(.machines-cell--notes)");
+      if (!field || !quickWrap.contains(field)) {
+        clearScheduleDropHover();
+        return;
+      }
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      if (scheduleDragHoverField !== field) {
+        clearScheduleDropHover();
+        scheduleDragHoverField = field;
+        field.classList.add("machines-drop-target");
+      }
+    });
+
+    quickWrap.addEventListener("dragleave", function (e) {
+      var field = e.target.closest(".machines-quick-row > .machines-cell--field:not(.machines-cell--notes)");
+      if (!field || !quickWrap.contains(field)) return;
+      var rel = e.relatedTarget;
+      if (rel && field.contains(rel)) return;
+      if (scheduleDragHoverField === field) {
+        field.classList.remove("machines-drop-target");
+        scheduleDragHoverField = null;
+      }
+    });
+
+    quickWrap.addEventListener("drop", function (e) {
+      if (root.getAttribute("data-inline-edit-mode") !== "1") return;
+      var field = e.target.closest(".machines-quick-row > .machines-cell--field:not(.machines-cell--notes)");
+      if (!field || !quickWrap.contains(field)) return;
+      var raw = "";
+      try {
+        raw = e.dataTransfer.getData(MIME_SCHEDULE_DRAG);
+      } catch (err3) {}
+      if (!raw) {
+        e.preventDefault();
+        return;
+      }
+      var payload = null;
+      try {
+        payload = JSON.parse(raw);
+      } catch (err4) {
+        e.preventDefault();
+        return;
+      }
+      if (!payload || payload.scheduleIndex === undefined || payload.scheduleIndex === null) {
+        e.preventDefault();
+        return;
+      }
+      e.preventDefault();
+      clearScheduleDropHover();
+      var display = (payload.display != null && String(payload.display).trim()) || "";
+      if (!display && payload.productId) display = nameById(String(payload.productId)) || "";
+      var qrow = field.closest(".machines-quick-row");
+      if (!qrow) return;
+      var qcells = qrow.querySelectorAll(":scope > .machines-cell");
+      if (qcells.length < 5) return;
+      var machineCode = (qcells[0].textContent || "").trim();
+      machineCode = machineCode.replace(/\r\n|\r|\n/g, " ").replace(/\s+/g, " ").trim();
+      setQuickCellText(field, display);
+      if (field.getAttribute("contenteditable") === "true") {
+        normalizeQuickEditableCell(field);
+      }
+      var schLabel = scheduleWrap.querySelector(
+        '.machines-cell--schedule-label[data-schedule-index="' + String(payload.scheduleIndex) + '"]'
+      );
+      if (!schLabel) return;
+      var schRow = schLabel.closest(".machines-schedule-row");
+      var codeEl = schRow && schRow.querySelector(".machines-cell--schedule-code");
+      if (codeEl) {
+        codeEl.textContent = machineCode;
+        schLabel.setAttribute("data-machine-code", machineCode);
+        if (machineCode) {
+          codeEl.classList.remove("is-empty");
+        } else {
+          codeEl.classList.add("is-empty");
+        }
+      }
+      persistAllProducts();
+      persistScheduleMachineCodes();
+      persistQuickServerRows();
+      saveQuickClientRows();
+      var fieldLabel = "ячейка";
+      if (field === qcells[1]) fieldLabel = "«Сейчас»";
+      else if (field === qcells[2]) fieldLabel = "«Далее»";
+      else if (field === qcells[0]) fieldLabel = "«Код станка»";
+      var si = parseInt(String(payload.scheduleIndex), 10);
+      if (isNaN(si)) si = 0;
+      pushPageHistory(
+        "Из плана (строка №" +
+          String(si + 1) +
+          ") перенесено на станок " +
+          machineCode +
+          ", поле " +
+          fieldLabel +
+          ": «" +
+          (display || "—") +
+          "»."
+      );
+    });
+
+    function renderSuggestPanel(combo, query) {
+      var panel = combo.querySelector(".machines-product-suggest");
+      if (!panel) return;
+      var cat = getCatalog();
+      var q = (query || "").trim().toLowerCase();
+      var max = 200;
+      var hits = [];
+      if (!q) {
+        hits = cat.slice(0, max);
+      } else {
+        for (var i = 0; i < cat.length && hits.length < max; i++) {
+          var p = cat[i];
+          var nm = (p.name || "").toLowerCase();
+          var idStr = String(p.id);
+          if (nm.indexOf(q) !== -1 || idStr.indexOf(q) !== -1) hits.push(p);
+        }
+      }
+      panel.textContent = "";
+      var clearBtn = document.createElement("button");
+      clearBtn.type = "button";
+      clearBtn.className = "machines-product-suggest-item machines-product-suggest-clear";
+      clearBtn.setAttribute("role", "option");
+      clearBtn.dataset.productId = "";
+      clearBtn.textContent = "— не выбрано";
+      panel.appendChild(clearBtn);
+      hits.forEach(function (p) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "machines-product-suggest-item";
+        b.setAttribute("role", "option");
+        b.dataset.productId = String(p.id);
+        b.textContent = p.name || "";
+        panel.appendChild(b);
+      });
+      if (hits.length === 0 && q) {
+        var empty = document.createElement("div");
+        empty.className = "machines-product-suggest-empty muted";
+        empty.textContent = "Ничего не найдено";
+        panel.appendChild(empty);
+      }
+      panel.hidden = false;
+      combo.classList.add("is-open");
+      var schRow = combo.closest(".machines-schedule-row");
+      if (schRow) schRow.classList.add("machines-schedule-row--suggest-open");
+    }
+
+    root.addEventListener("input", function (e) {
+      var search = e.target.closest(".js-machines-product-search");
+      if (!search) return;
+      if (root.getAttribute("data-inline-edit-mode") !== "1") return;
+      var combo = search.closest(".js-machines-product-combo");
+      if (!combo) return;
+      clearTimeout(suggestTimer);
+      suggestTimer = setTimeout(function () {
+        renderSuggestPanel(combo, search.value);
+      }, 100);
+    });
+
+    root.addEventListener("focusin", function (e) {
+      var search = e.target.closest(".js-machines-product-search");
+      if (!search || root.getAttribute("data-inline-edit-mode") !== "1") return;
+      var combo = search.closest(".js-machines-product-combo");
+      if (!combo) return;
+      closeSuggestExcept(combo);
+      renderSuggestPanel(combo, search.value);
+    });
+
+    root.addEventListener("mousedown", function (e) {
+      var item = e.target.closest("button.machines-product-suggest-item");
+      if (!item || !item.closest(".machines-product-suggest")) return;
+      if (root.getAttribute("data-inline-edit-mode") !== "1") return;
+      e.preventDefault();
+      var combo = item.closest(".js-machines-product-combo");
+      var cell = combo ? combo.closest(".machines-cell--schedule-label") : null;
+      if (!combo || !cell) return;
+      var hid = combo.querySelector(".js-machines-product-id");
+      var search = combo.querySelector(".js-machines-product-search");
+      if (!hid || !search) return;
+      var pid = item.getAttribute("data-product-id");
+      hid.value = pid != null && pid !== "" ? String(pid) : "";
+      if (hid.value) {
+        search.value = nameById(hid.value);
+      } else {
+        search.value = "";
+      }
+      closeSuggestExcept(null);
+      syncProductComboDisplay(cell);
+      persistAllProducts();
+      var idxStr = (cell.getAttribute("data-schedule-index") || "").trim();
+      var lineNo = "";
+      if (idxStr !== "") {
+        var ni = parseInt(idxStr, 10);
+        if (!isNaN(ni)) lineNo = " (строка плана №" + String(ni + 1) + ")";
+      }
+      if (hid.value) {
+        var nm = (search.value || "").trim() || nameById(hid.value);
+        pushPageHistory("План" + lineNo + ": выбрано изделие «" + nm + "».");
+      } else {
+        pushPageHistory("План" + lineNo + ": сброшен выбор изделия («не выбрано»).");
+      }
+      try {
+        search.focus();
+      } catch (err) {}
+    });
+
+    root.addEventListener(
+      "blur",
+      function (e) {
+        var search = e.target.closest(".js-machines-product-search");
+        if (!search) return;
+        if (root.getAttribute("data-inline-edit-mode") !== "1") return;
+        var cell = search.closest(".machines-cell--schedule-label");
+        if (!cell) return;
+        var hid = cell.querySelector(".js-machines-product-id");
+        if (!hid) return;
+        window.setTimeout(function () {
+          var ae = document.activeElement;
+          if (ae && ae.closest && ae.closest(".machines-product-suggest")) return;
+          if (hid.value) search.value = nameById(hid.value);
+          else search.value = "";
+        }, 0);
+      },
+      true
+    );
+
+    document.addEventListener("click", function (e) {
+      if (!root || !root.contains(e.target)) return;
+      if (e.target.closest(".js-machines-product-combo")) return;
+      closeSuggestExcept(null);
+    });
+
+    function setQuickCellText(cell, text) {
+      var t = (text || "").trim();
+      cell.textContent = t;
+      if (t) cell.classList.remove("is-empty");
+      else cell.classList.add("is-empty");
+    }
+
+    quickWrap.addEventListener("focusin", function (e) {
+      var cell = e.target.closest(".machines-quick-row > .machines-cell[contenteditable='true']");
+      if (!cell || root.getAttribute("data-inline-edit-mode") !== "1") return;
+      if ((cell.textContent || "").replace(/\u200b/g, "").length === 0 && cell.childNodes.length === 0) {
+        cell.appendChild(document.createTextNode("\u200b"));
+      }
+    });
+
+    quickWrap.addEventListener(
+      "blur",
+      function (e) {
+        var cell = e.target.closest(".machines-quick-row > .machines-cell[contenteditable='true']");
+        if (!cell || !quickWrap.contains(cell)) return;
+        normalizeQuickEditableCell(cell);
+      },
+      true
+    );
+
+    quickWrap.addEventListener("input", function (e) {
+      var cell = e.target.closest(".machines-quick-row > .machines-cell[contenteditable='true']");
+      if (!cell || root.getAttribute("data-inline-edit-mode") !== "1") return;
+      if (cell.classList.contains("machines-cell--notes")) {
+        var nraw = cell.textContent || "";
+        if (nraw.indexOf("\r") !== -1) {
+          cell.textContent = nraw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        }
+        var vis = (cell.textContent || "").replace(/\u200b/g, "").trim();
+        if (vis) cell.classList.remove("is-empty");
+        else cell.classList.add("is-empty");
+        return;
+      }
+      var raw = cell.textContent || "";
+      if (raw.indexOf("\n") === -1 && raw.indexOf("\r") === -1) return;
+      var t = raw.replace(/\r\n|\r|\n/g, " ");
+      if (t !== raw) cell.textContent = t;
+    });
+
+    quickWrap.addEventListener("paste", function (e) {
+      var cell = e.target.closest(".machines-quick-row > .machines-cell[contenteditable='true']");
+      if (!cell || root.getAttribute("data-inline-edit-mode") !== "1") return;
+      e.preventDefault();
+      var text = (e.clipboardData && e.clipboardData.getData("text/plain")) || "";
+      if (cell.classList.contains("machines-cell--notes")) {
+        text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      } else {
+        text = text.replace(/\r\n|\r|\n/g, " ").replace(/\s+/g, " ").trim();
+      }
+      try {
+        document.execCommand("insertText", false, text);
+      } catch (err1) {
+        cell.textContent = ((cell.textContent || "") + text).replace(/\r\n|\r|\n/g, " ");
+      }
+    });
+
+    function saveQuickClientRows() {
+      var rows = [];
+      quickWrap.querySelectorAll('.machines-quick-row[data-client-row="1"]').forEach(function (row) {
+        var cells = row.querySelectorAll(":scope > .machines-cell");
+        if (cells.length < 5) return;
+        rows.push({
+          c: (cells[0].textContent || "").trim(),
+          n: (cells[1].textContent || "").trim(),
+          e: (cells[2].textContent || "").trim(),
+          x: (cells[3].textContent || "").trim(),
+          t: (cells[4].textContent || "").trim()
+        });
+      });
+      writeJson(LS_QUICK_EXTRA, rows);
+    }
+
+    function restoreQuickClientRows() {
+      var rows = readJson(LS_QUICK_EXTRA, []);
+      if (!Array.isArray(rows)) return;
+      rows.forEach(function (r) {
+        var tpl = tplQuick.content.querySelector(".machines-quick-row");
+        if (!tpl) return;
+        var row = tpl.cloneNode(true);
+        var cells = row.querySelectorAll(":scope > .machines-cell");
+        if (cells.length < 5) return;
+        setQuickCellText(cells[0], r.c);
+        setQuickCellText(cells[1], r.n);
+        setQuickCellText(cells[2], r.e);
+        setQuickCellText(cells[3], r.x);
+        setQuickCellText(cells[4], r.t);
+        quickWrap.appendChild(row);
+      });
+    }
+
+    function allocScheduleIndex() {
+      var cur = parseInt(scheduleWrap.getAttribute("data-next-schedule-index") || "0", 10);
+      if (isNaN(cur)) cur = 0;
+      scheduleWrap.setAttribute("data-next-schedule-index", String(cur + 1));
+      return cur;
+    }
+
+    function fillScheduleRowNode(row, idx, machineCode, origLabel) {
+      var labelCell = row.querySelector(".machines-cell--schedule-label");
+      var codeCell = row.querySelector(".machines-cell--schedule-code");
+      var combo = row.querySelector(".js-machines-product-combo");
+      var hid = row.querySelector(".js-machines-product-id");
+      var search = row.querySelector(".js-machines-product-search");
+      var span = row.querySelector(".machines-schedule-label-view");
+      if (!labelCell || !codeCell || !combo || !hid || !search || !span) return;
+      labelCell.setAttribute("data-schedule-index", String(idx));
+      combo.setAttribute("data-schedule-select", String(idx));
+      labelCell.setAttribute("data-machine-code", machineCode || "");
+      labelCell.setAttribute("data-original-label", origLabel || "");
+      hid.value = "";
+      search.value = "";
+      span.textContent = "";
+      var mc = (machineCode || "").trim();
+      codeCell.textContent = mc;
+      if (mc) {
+        codeCell.classList.remove("is-empty");
+      } else {
+        codeCell.classList.add("is-empty");
+      }
+      if ((origLabel || "").trim()) {
+        span.textContent = (origLabel || "").trim();
+        labelCell.classList.remove("is-empty");
+      } else {
+        span.textContent = "";
+        labelCell.classList.add("is-empty");
+      }
+    }
+
+    function saveScheduleClientRows() {
+      var list = [];
+      scheduleWrap.querySelectorAll('.machines-schedule-row[data-client-row="1"]').forEach(function (row) {
+        var codeEl = row.querySelector(".machines-cell--schedule-code");
+        list.push({ machine_code: (codeEl && codeEl.textContent ? codeEl.textContent : "").trim() });
+      });
+      writeJson(LS_SCHEDULE_EXTRA, list);
+    }
+
+    function restoreScheduleClientRows() {
+      var list = readJson(LS_SCHEDULE_EXTRA, []);
+      if (!Array.isArray(list)) return;
+      list.forEach(function (item) {
+        var tpl = tplSchedule.content.querySelector(".machines-schedule-row");
+        if (!tpl) return;
+        var row = tpl.cloneNode(true);
+        var idx = allocScheduleIndex();
+        fillScheduleRowNode(row, idx, item.machine_code || "", "");
+        scheduleWrap.appendChild(row);
+      });
+    }
+
+    function addQuickRow() {
+      if (root.getAttribute("data-inline-edit-mode") !== "1") return;
+      var tpl = tplQuick.content.querySelector(".machines-quick-row");
+      if (!tpl) return;
+      var row = tpl.cloneNode(true);
+      quickWrap.appendChild(row);
+      if (root.getAttribute("data-inline-edit-mode") === "1") {
+        row.querySelectorAll(":scope > .machines-cell").forEach(function (cell) {
+          cell.setAttribute("contenteditable", "true");
+          cell.setAttribute("spellcheck", "false");
+        });
+      }
+      saveQuickClientRows();
+      pushPageHistory("Добавлена новая строка станка (пустая).");
+    }
+
+    function addScheduleRow() {
+      if (root.getAttribute("data-inline-edit-mode") !== "1") return;
+      var tpl = tplSchedule.content.querySelector(".machines-schedule-row");
+      if (!tpl) return;
+      var row = tpl.cloneNode(true);
+      var idx = allocScheduleIndex();
+      fillScheduleRowNode(row, idx, "", "");
+      scheduleWrap.appendChild(row);
+      saveScheduleClientRows();
+      applyStoredSelections();
+      pushPageHistory("Добавлена новая строка плана работ.");
+    }
+
+    if (btnAddQuick) btnAddQuick.addEventListener("click", addQuickRow);
+    if (btnAddSchedule) btnAddSchedule.addEventListener("click", addScheduleRow);
+
+    restoreQuickServerOverrides();
+    restoreQuickClientRows();
+    restoreScheduleClientRows();
+    applyStoredSelections();
+    applyScheduleMachineCodes();
+    root.querySelectorAll(".machines-cell--schedule-label").forEach(syncProductComboDisplay);
+    syncScheduleProductInteractions(root.getAttribute("data-inline-edit-mode") === "1");
+  })();
+</script>
+{% endblock %}

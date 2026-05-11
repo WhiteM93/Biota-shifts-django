@@ -1,4 +1,5 @@
 import os
+import re
 
 from django.core.validators import FileExtensionValidator
 from django.db import models
@@ -132,7 +133,7 @@ class ToolItem(models.Model):
     tool_material = models.CharField(
         max_length=80,
         blank=True,
-        choices=TOOL_MATERIAL_TYPES,
+        default="",
         verbose_name="Материал инструмента",
     )
     coating_type = models.CharField(
@@ -169,6 +170,15 @@ class ToolItem(models.Model):
 
     def __str__(self):
         return f"{self.get_category_display()} / {self.name}"
+
+    def get_tool_material_display(self) -> str:
+        v = (self.tool_material or "").strip()
+        if not v:
+            return ""
+        for key, label in TOOL_MATERIAL_TYPES:
+            if key == v:
+                return str(label)
+        return v
 
 
 class EndMillSpec(models.Model):
@@ -274,6 +284,9 @@ class StockMovement(models.Model):
     comment = models.CharField(max_length=300, blank=True, verbose_name="Комментарий")
     created_by_account = models.CharField(max_length=120, blank=True, verbose_name="Кто выполнил")
     created_at = models.DateTimeField(auto_now_add=True)
+    is_reverted = models.BooleanField(default=False, verbose_name="Откат выполнен")
+    reverted_at = models.DateTimeField(null=True, blank=True, verbose_name="Когда откатили")
+    reverted_by = models.CharField(max_length=120, blank=True, verbose_name="Кто откатил")
 
     class Meta:
         ordering = ("-movement_date", "-id")
@@ -282,6 +295,45 @@ class StockMovement(models.Model):
 
     def __str__(self):
         return f"{self.get_movement_type_display()} {self.quantity} / {self.tool.name}"
+
+
+class InventoryStockEvent(models.Model):
+    """Журнал: правки позиций, удаления, откаты движений, выдача права на склад."""
+
+    EVENT_TOOL_EDIT = "tool_edit"
+    EVENT_TOOL_DELETE = "tool_delete"
+    EVENT_ROLLBACK = "rollback"
+    EVENT_PRIVILEGE = "privilege_stock"
+
+    EVENT_TYPES = [
+        (EVENT_TOOL_EDIT, "Редактирование позиции"),
+        (EVENT_TOOL_DELETE, "Удаление позиции"),
+        (EVENT_ROLLBACK, "Откат движения"),
+        (EVENT_PRIVILEGE, "Право на склад"),
+    ]
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Когда")
+    actor_username = models.CharField(max_length=120, verbose_name="Кто")
+    event_type = models.CharField(max_length=24, choices=EVENT_TYPES, verbose_name="Тип")
+    tool = models.ForeignKey(ToolItem, null=True, blank=True, on_delete=models.SET_NULL, related_name="inventory_events")
+    stock_movement = models.ForeignKey(
+        StockMovement,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="inventory_events",
+        verbose_name="Связанное движение",
+    )
+    summary = models.CharField(max_length=500, verbose_name="Кратко")
+    details = models.JSONField(default=dict, blank=True, verbose_name="Детали")
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = "Событие склада"
+        verbose_name_plural = "События склада"
+
+    def __str__(self):
+        return f"{self.get_event_type_display()} · {self.summary[:80]}"
 
 
 class PurchaseRequest(models.Model):
@@ -568,6 +620,13 @@ class Product(models.Model):
         validators=[FileExtensionValidator(["stl", "stp", "step"])],
         help_text="Скачивание; для STP/STEP в окне — отдельный STL ниже.",
     )
+    cad_step_model = models.FileField(
+        upload_to="products/cad_step/",
+        blank=True,
+        verbose_name="STEP/STP для скачивания",
+        validators=[FileExtensionValidator(["stp", "step"])],
+        help_text="Дополнительно к основной 3D: не показывается в окне, только ссылка в боковой панели.",
+    )
     preview_stl = models.FileField(
         upload_to="products/preview_stl/",
         blank=True,
@@ -668,6 +727,25 @@ class ProductNote(models.Model):
         return f"{self.product_id} s={self.setup_id} {self.author_username} @ {self.created_at}"
 
 
+_PRODUCT_SETUP_GCODE_STD = frozenset({"G54", "G55", "G56", "G57", "G58", "G59"})
+_PRODUCT_SETUP_GCODE_EXT_RE = re.compile(r"^G54\.1\s*P\s*(\d{1,2})\s*$", re.IGNORECASE)
+
+
+def normalize_product_setup_gcode_system(value: str) -> str:
+    s = (value or "").strip()
+    if not s:
+        return "G54"
+    u = s.upper()
+    if u in _PRODUCT_SETUP_GCODE_STD:
+        return u
+    m = _PRODUCT_SETUP_GCODE_EXT_RE.match(s)
+    if m:
+        n = int(m.group(1))
+        if 0 <= n <= 99:
+            return f"G54.1 P{n}"
+    return "G54"
+
+
 class ProductSetup(models.Model):
     """Установка изделия: наладка и программа."""
 
@@ -680,7 +758,7 @@ class ProductSetup(models.Model):
     binding_x = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка X")
     binding_y = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка Y")
     binding_z = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка Z")
-    gcode_system = models.CharField(max_length=3, blank=True, default="G54", verbose_name="Система координат G")
+    gcode_system = models.CharField(max_length=24, blank=True, default="G54", verbose_name="Система координат G")
     binding_x_photo = models.FileField(
         upload_to="products/setup_bindings/",
         blank=True,
@@ -742,11 +820,59 @@ class ProductSetup(models.Model):
     def __str__(self) -> str:
         return f"{self.product_id} / {self.name}"
 
+    def gcode_inline_select_value(self) -> str:
+        raw = (self.gcode_system or "").strip()
+        m = _PRODUCT_SETUP_GCODE_EXT_RE.match(raw)
+        if m:
+            return "__G54_1_P__"
+        u = raw.upper() if raw else "G54"
+        return u if u in _PRODUCT_SETUP_GCODE_STD else "G54"
+
+    def gcode_inline_p_number(self) -> str:
+        m = _PRODUCT_SETUP_GCODE_EXT_RE.match((self.gcode_system or "").strip())
+        if m:
+            return str(int(m.group(1), 10))
+        return "0"
+
     @property
     def program_filename(self) -> str:
         if not self.program_file:
             return ""
         return os.path.basename(self.program_file.name or "")
+
+
+def short_setup_program_file_label(storage_name: str, *, max_len: int = 48) -> str:
+    """
+    Короткая подпись для UI: из длинного имени на диске (uuid_…_O1001_…) вытаскиваем номер O…,
+    иначе — последний осмысленный фрагмент или усечённый stem без «простыни» из подчёркиваний.
+    """
+    base = os.path.basename((storage_name or "").replace("\\", "/").rstrip("/")).strip()
+    if not base:
+        return "—"
+    stem, _ext = os.path.splitext(base)
+    stem = stem.strip()
+    if not stem:
+        return base if len(base) <= max_len else base[: max_len - 1] + "…"
+    # \b не даёт границу между «_» и «O», поэтому ищем O-номер как фрагмент между подчёркиваниями / краями строки
+    m = re.search(r"(?:^|_)(O\d+)(?:_|$)", stem, re.IGNORECASE)
+    if m:
+        return m.group(1).upper()
+    if len(stem) <= max_len:
+        return stem
+    chunks = [c for c in stem.split("_") if c]
+    for chunk in reversed(chunks):
+        if len(chunk) > max_len:
+            continue
+        if len(chunk) < 2:
+            continue
+        if re.fullmatch(r"[0-9a-f]{8,64}", chunk, re.IGNORECASE):
+            continue
+        return chunk
+    head = max_len // 2 - 1
+    tail = max_len - head - 1
+    if head < 4 or tail < 4:
+        return stem[: max_len - 1] + "…"
+    return stem[:head] + "…" + stem[-tail:]
 
 
 class ProductSetupProgramFile(models.Model):
@@ -773,11 +899,20 @@ class ProductSetupProgramFile(models.Model):
     def __str__(self) -> str:
         return self.display_name or f"#{self.pk}"
 
+    def delete(self, using=None, keep_parents=False):
+        """Удаляем запись и физический файл (иначе на диске остаётся мусор)."""
+        if self.file:
+            try:
+                self.file.delete(save=False)
+            except Exception:
+                pass
+        super().delete(using=using, keep_parents=keep_parents)
+
     @property
     def display_name(self) -> str:
         if not self.file:
             return ""
-        return os.path.basename(self.file.name or "")
+        return short_setup_program_file_label(self.file.name or "")
 
 
 class ProductSetupToolRow(models.Model):

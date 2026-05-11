@@ -420,6 +420,7 @@ NAV_KEYS = (
     "employees",
     "regulations",
     "products",
+    "machines",
 )
 USER_ROLE_MANAGER = "manager"
 USER_ROLE_EXECUTOR = "executor"
@@ -435,7 +436,30 @@ NAV_LABELS_RU = {
     "employees": "Сотрудники",
     "regulations": "Регламенты",
     "products": "Изделия",
+    "machines": "Станки",
 }
+
+
+def inventory_stock_manage_for_user(username: str | None) -> bool:
+    """Редактирование/удаление позиций склада (не только админ): флаг users.*.inventory_stock_manage."""
+    u = (username or "").strip()
+    if not u:
+        return False
+    if _is_admin(u):
+        return True
+    rec = _resolve_registered_user(u) or {}
+    return bool(rec.get("inventory_stock_manage"))
+
+
+def machines_quick_edit_for_user(username: str | None) -> bool:
+    """Кнопка «Быстрое редактирование» на странице «Станки»: флаг users.*.machines_quick_edit."""
+    u = (username or "").strip()
+    if not u:
+        return False
+    if _is_admin(u):
+        return True
+    rec = _resolve_registered_user(u) or {}
+    return bool(rec.get("machines_quick_edit"))
 
 
 def nav_permissions_for_user(username: str | None) -> dict[str, bool]:
@@ -503,7 +527,7 @@ def _nav_department_filters_map(rec: dict | None) -> dict[str, list[str]]:
 
 
 def _nav_dep_filters_union_departments(rec: dict) -> list[str] | None:
-    """Объединение отделов из nav_dep_filters по всем включённым разделам (кроме products).
+    """Объединение отделов из nav_dep_filters по всем включённым разделам (кроме products и machines).
 
     None — ключа nav_dep_filters нет или словарь пустой (нет явной привязки к отделам в store).
     Пустой список — в store есть ключи, но ни в одном включённом разделе отделы не отмечены.
@@ -518,7 +542,7 @@ def _nav_dep_filters_union_departments(rec: dict) -> list[str] | None:
     out: list[str] = []
     for k, vals in raw.items():
         ks = str(k or "").strip()
-        if ks not in NAV_KEYS or ks == "products":
+        if ks not in NAV_KEYS or ks in ("products", "machines"):
             continue
         if nav is not None and not bool(nav.get(ks, True)):
             continue
@@ -546,7 +570,7 @@ def employees_df_for_nav(username: str | None, nav_key: str, employees_df: pd.Da
     if rec is None:
         return employees_df.iloc[0:0].copy()
     nk = (nav_key or "").strip()
-    if nk == "products":
+    if nk in ("products", "machines"):
         return employees_df
     base = employees_df
     if nk == "employees":
@@ -599,6 +623,8 @@ def _set_user_privileges(
     nav: dict[str, bool] | None = None,
     nav_dep_filters: dict[str, list[str]] | None = None,
     role: str | None = None,
+    inventory_stock_manage: bool | None = None,
+    machines_quick_edit: bool | None = None,
 ) -> tuple[bool, str]:
     if scope is not None and str(scope).strip() not in ("none", "all", "department", "area"):
         return False, "Неверный тип доступа"
@@ -650,6 +676,10 @@ def _set_user_privileges(
         }
     if role is not None:
         rec["role"] = str(role).strip()
+    if inventory_stock_manage is not None:
+        rec["inventory_stock_manage"] = bool(inventory_stock_manage)
+    if machines_quick_edit is not None:
+        rec["machines_quick_edit"] = bool(machines_quick_edit)
     store[target_username] = rec
     _save_users_store(store)
     return True, ""

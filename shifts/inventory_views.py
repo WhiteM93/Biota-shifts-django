@@ -14,7 +14,7 @@ from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 
 from biota_shifts import db as biota_db
-from biota_shifts.auth import _is_admin, employees_df_for_nav, nav_permissions_for_user
+from biota_shifts.auth import _is_admin, employees_df_for_nav, inventory_stock_manage_for_user, nav_permissions_for_user
 from biota_shifts.constants import MONTH_NAMES_RU
 from biota_shifts.emp_codes import normalize_emp_code
 from biota_shifts.schedule import employee_label_row
@@ -34,6 +34,7 @@ from .models import (
     END_MILL_TYPES,
     CenterDrillSpec,
     EndMillSpec,
+    InventoryStockEvent,
     StockMovement,
     TapSpec,
     ToolItem,
@@ -49,6 +50,112 @@ from .models import (
     WORK_MATERIAL_TYPES,
     PURCHASE_STATUSES,
 )
+
+TOOL_MATERIAL_FILTER_OTHER = "__other__"
+_TOOL_MATERIAL_STD_KEYS = frozenset(k for k, _ in TOOL_MATERIAL_TYPES)
+
+
+def _log_inventory_stock_event(
+    *,
+    actor: str,
+    event_type: str,
+    summary: str,
+    tool: ToolItem | None = None,
+    stock_movement: StockMovement | None = None,
+    details: dict | None = None,
+) -> None:
+    InventoryStockEvent.objects.create(
+        actor_username=(actor or "")[:120],
+        event_type=event_type,
+        summary=(summary or "")[:500],
+        tool=tool,
+        stock_movement=stock_movement,
+        details=details or {},
+    )
+
+
+def _can_rollback_stock_movement(m: StockMovement) -> bool:
+    if getattr(m, "is_reverted", False):
+        return False
+    if m.parent_issue_id:
+        return False
+    if m.movement_type == "issue" and m.issue_outcomes.exists():
+        return False
+    return True
+
+
+def _rollback_stock_movement(movement_id: int, actor: str) -> tuple[bool, str]:
+    with transaction.atomic():
+        m = (
+            StockMovement.objects.select_for_update()
+            .select_related("tool")
+            .prefetch_related("issue_outcomes")
+            .filter(id=movement_id)
+            .first()
+        )
+        if not m:
+            return False, "Запись не найдена."
+        if not _can_rollback_stock_movement(m):
+            return False, "Эту запись нельзя откатить (уже откатана, привязана к выдаче или по ней есть возврат/списание)."
+        tool = ToolItem.objects.select_for_update().filter(id=m.tool_id).first()
+        if not tool:
+            return False, "Инструмент не найден."
+        qty = int(m.quantity)
+        mt = m.movement_type
+        if mt == "issue":
+            tool.quantity += qty
+            tool.save(update_fields=["quantity", "updated_at"])
+            StockMovement.objects.create(
+                movement_type="restock",
+                tool=tool,
+                quantity=qty,
+                employee_name="",
+                movement_date=m.movement_date,
+                comment=f"Откат движения №{m.id} (выдача {qty} шт.).",
+                created_by_account=actor,
+            )
+        elif mt == "restock":
+            if tool.quantity < qty:
+                return False, f"Нельзя откатить пополнение: на складе только {tool.quantity} шт."
+            tool.quantity -= qty
+            tool.save(update_fields=["quantity", "updated_at"])
+            StockMovement.objects.create(
+                movement_type="issue",
+                tool=tool,
+                quantity=qty,
+                employee_name="",
+                movement_date=m.movement_date,
+                comment=f"Откат движения №{m.id} (было пополнение {qty} шт.).",
+                created_by_account=actor,
+            )
+        elif mt == "writeoff":
+            tool.quantity += qty
+            tool.save(update_fields=["quantity", "updated_at"])
+            StockMovement.objects.create(
+                movement_type="restock",
+                tool=tool,
+                quantity=qty,
+                employee_name="",
+                movement_date=m.movement_date,
+                comment=f"Откат движения №{m.id} (было списание {qty} шт.).",
+                created_by_account=actor,
+            )
+        else:
+            return False, "Тип операции не поддерживается для отката."
+        now = timezone.now()
+        m.is_reverted = True
+        m.reverted_at = now
+        m.reverted_by = actor
+        m.save(update_fields=["is_reverted", "reverted_at", "reverted_by"])
+        _log_inventory_stock_event(
+            actor=actor,
+            event_type=InventoryStockEvent.EVENT_ROLLBACK,
+            tool=tool,
+            stock_movement=m,
+            summary=f"Откат движения №{m.id} ({m.get_movement_type_display()}, {qty} шт., {tool.name})",
+            details={"reverted_movement_id": m.id, "movement_type": mt},
+        )
+    return True, ""
 
 
 def _distinct_text_values(qs, field_name: str):
@@ -117,6 +224,7 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "drill_angle_deg",
         "arrival_supplier",
         "tool_material",
+        "tool_material_custom",
         "coating_type",
         "work_material",
     }
@@ -148,7 +256,15 @@ def _merge_inventory_stock_query(username: str, request_get, *, use_saved: bool)
 
 
 _STOCK_GLOBAL_KEYS = frozenset(
-    {"show_all", "category", "arrival_supplier", "tool_material", "coating_type", "work_material"}
+    {
+        "show_all",
+        "category",
+        "arrival_supplier",
+        "tool_material",
+        "tool_material_custom",
+        "coating_type",
+        "work_material",
+    }
 )
 _STOCK_KEYS_BY_CATEGORY = {
     "end_mill": frozenset(
@@ -333,6 +449,7 @@ def inventory_view(request):
 
     username = biota_user(request) or "Неизвестный пользователь"
     is_admin_user = _is_admin(username)
+    can_manage_stock = is_admin_user or inventory_stock_manage_for_user(username)
     perms = nav_permissions_for_user(username)
     can_defects = perms.get("defects", True)
     can_payroll = perms.get("payroll", True)
@@ -348,6 +465,22 @@ def inventory_view(request):
     if panel == "employees" and not can_employees:
         messages.warning(request, "У вас нет доступа к разделу «Сотрудники».")
         return redirect(reverse("inventory"))
+
+    if action == "rollback_stock_movement":
+        if not is_admin_user:
+            messages.error(request, "Откат движений доступен только администратору.")
+            return redirect(f"{request.path}?panel=history")
+        mid = _to_int(request.POST.get("movement_id"), 0)
+        if mid <= 0:
+            messages.error(request, "Не указана запись для отката.")
+            return redirect(f"{request.path}?panel=history")
+        ok_rb, err_rb = _rollback_stock_movement(mid, username)
+        if ok_rb:
+            messages.success(request, "Движение откатано, запись добавлена в историю.")
+        else:
+            messages.error(request, err_rb or "Не удалось выполнить откат.")
+        return redirect(f"{request.path}?panel=history")
+
     employee_options = []
     employee_department_map = {}
     employee_table_rows: list[dict] = []
@@ -537,8 +670,8 @@ def inventory_view(request):
         return redirect("inventory")
 
     if action == "delete_tool_item":
-        if not is_admin_user:
-            messages.error(request, "Удалять позиции склада может только администратор.")
+        if not can_manage_stock:
+            messages.error(request, "Удалять позиции склада могут только администратор или пользователь с выданным правом.")
             return redirect(f"{request.path}?panel=stock")
         tool_id = _to_int(request.POST.get("tool_id"), 0)
         if tool_id <= 0:
@@ -555,12 +688,19 @@ def inventory_view(request):
         tool.deleted_at = timezone.now()
         tool.deleted_by = username
         tool.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+        _log_inventory_stock_event(
+            actor=username,
+            event_type=InventoryStockEvent.EVENT_TOOL_DELETE,
+            tool=tool,
+            summary=f"Помечено удаление позиции: {tool.name} (id {tool.id})",
+            details={"tool_id": tool.id},
+        )
         messages.success(request, "Позиция помечена как удаленная администратором.")
         return redirect(f"{request.path}?panel=stock")
 
     if action == "update_tool_item":
-        if not is_admin_user:
-            messages.error(request, "Изменять позиции склада может только администратор.")
+        if not can_manage_stock:
+            messages.error(request, "Изменять позиции склада могут только администратор или пользователь с выданным правом.")
             return redirect(f"{request.path}?panel=stock")
         tool_id = _to_int(request.POST.get("tool_id"), 0)
         tool = (
@@ -623,12 +763,19 @@ def inventory_view(request):
             tool.drill_spec.save()
 
         tool.save()
+        _log_inventory_stock_event(
+            actor=username,
+            event_type=InventoryStockEvent.EVENT_TOOL_EDIT,
+            tool=tool,
+            summary=f"Обновление карточки инструмента: {tool.name} (id {tool.id})",
+            details={"tool_id": tool.id, "category": tool.category},
+        )
         messages.success(request, "Данные инструмента обновлены.")
         return redirect(f"{request.path}?panel=stock&category={tool.category}")
 
     if action == "update_tool_cell":
-        if not is_admin_user:
-            return JsonResponse({"ok": False, "error": "Только администратор."}, status=403)
+        if not can_manage_stock:
+            return JsonResponse({"ok": False, "error": "Недостаточно прав."}, status=403)
         tool_id = _to_int(request.POST.get("tool_id"), 0)
         field = (request.POST.get("field") or "").strip()
         value_raw = (request.POST.get("value") or "").strip()
@@ -660,7 +807,7 @@ def inventory_view(request):
             tool.main_diameter_mm = _to_decimal_or_none(value_raw)
             tool.save(update_fields=["main_diameter_mm", "updated_at"])
         elif field == "tool_material":
-            tool.tool_material = value_raw
+            tool.tool_material = (value_raw or "")[:80]
             tool.save(update_fields=["tool_material", "updated_at"])
         elif field == "coating_type":
             tool.coating_type = value_raw or "none"
@@ -674,6 +821,13 @@ def inventory_view(request):
         else:
             return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
 
+        _log_inventory_stock_event(
+            actor=username,
+            event_type=InventoryStockEvent.EVENT_TOOL_EDIT,
+            tool=tool,
+            summary=f"Быстрое редактирование ячейки «{field}»: {tool.name} (id {tool.id})",
+            details={"tool_id": tool.id, "field": field, "value": value_raw[:200]},
+        )
         return JsonResponse({"ok": True})
 
     if action == "process_issue_outcome":
@@ -1418,7 +1572,13 @@ def inventory_view(request):
     drill_angle_raw = _sq("drill_angle_deg")
     arrival_supplier = _sq("arrival_supplier")
 
-    tool_material = _sq("tool_material")
+    tm_param = _sq("tool_material")
+    tm_custom_param = (_sq("tool_material_custom") or "")[:80]
+    if tm_param == TOOL_MATERIAL_FILTER_OTHER:
+        tool_material = tm_custom_param.strip()[:80]
+    else:
+        tool_material = tm_param.strip()[:80]
+
     coating_type = _sq("coating_type")
     work_material = _sq("work_material")
 
@@ -1592,6 +1752,37 @@ def inventory_view(request):
     drill_angles = _sorted_unique_decimal_strings(
         _distinct_numeric_values(option_source_qs.filter(category="drill"), "drill_spec__angle_deg")
     )
+
+    tool_material_extra_options = sorted(
+        {
+            v
+            for v in option_source_qs.exclude(tool_material="").values_list("tool_material", flat=True).distinct()
+            if v and v not in _TOOL_MATERIAL_STD_KEYS and v != TOOL_MATERIAL_FILTER_OTHER
+        }
+    )
+    extras_set = set(tool_material_extra_options)
+    if tool_material and tool_material not in _TOOL_MATERIAL_STD_KEYS and tool_material not in extras_set:
+        tool_material_extra_options = sorted(extras_set | {tool_material})
+        extras_set = set(tool_material_extra_options)
+
+    if tm_param == TOOL_MATERIAL_FILTER_OTHER:
+        tm_custom_input = tm_custom_param
+        tool_material_select = TOOL_MATERIAL_FILTER_OTHER
+    elif not tool_material:
+        tm_custom_input = ""
+        tool_material_select = ""
+    elif tool_material in _TOOL_MATERIAL_STD_KEYS:
+        tm_custom_input = ""
+        tool_material_select = tool_material
+    elif tool_material in extras_set:
+        tm_custom_input = ""
+        tool_material_select = tool_material
+    else:
+        tm_custom_input = tool_material
+        tool_material_select = TOOL_MATERIAL_FILTER_OTHER
+
+    stock_tool_material_extra_json = json.dumps(tool_material_extra_options)
+
     issue_candidates = list(
         StockMovement.objects.filter(movement_type="issue")
         .select_related("tool", "tool__end_mill_spec", "tool__tap_spec", "tool__center_drill_spec", "tool__countersink_spec", "tool__drill_spec")
@@ -1701,9 +1892,47 @@ def inventory_view(request):
                 persist[_ik] = _norm_stock_int_filter_str(persist.get(_ik) or "")
         _save_inventory_stock_filter_prefs(username, persist, category=filter_category)
 
+    mv_hist = list(
+        StockMovement.objects.select_related(
+            "tool",
+            "tool__end_mill_spec",
+            "tool__tap_spec",
+            "tool__center_drill_spec",
+            "tool__countersink_spec",
+            "tool__drill_spec",
+        )
+        .prefetch_related("issue_outcomes")
+        .order_by("-created_at")[:80]
+    )
+    ev_hist = list(InventoryStockEvent.objects.select_related("tool", "stock_movement").order_by("-created_at")[:80])
+    timeline: list[dict] = []
+    for m in mv_hist:
+        timeline.append(
+            {
+                "kind": "movement",
+                "ts": m.created_at,
+                "tid": m.id,
+                "movement": m,
+                "show_rollback": is_admin_user and _can_rollback_stock_movement(m),
+            }
+        )
+    for e in ev_hist:
+        timeline.append(
+            {
+                "kind": "event",
+                "ts": e.created_at,
+                "tid": 10**12 + e.id,
+                "event": e,
+                "show_rollback": False,
+            }
+        )
+    timeline.sort(key=lambda x: (x["ts"], x["tid"]), reverse=True)
+    inventory_history = timeline[:120]
+
     ctx = {
         "tool_items": qs.select_related("end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec", "drill_spec"),
-        "movements": StockMovement.objects.select_related("tool", "tool__end_mill_spec", "tool__tap_spec", "tool__center_drill_spec", "tool__countersink_spec", "tool__drill_spec")[:50],
+        "movements": mv_hist[:50],
+        "inventory_history": inventory_history,
         "thread_standards": THREAD_STANDARDS,
         "tap_hole_types": TAP_HOLE_TYPES,
         "tap_tool_types": TAP_TOOL_TYPES,
@@ -1736,6 +1965,8 @@ def inventory_view(request):
             "drill_cutting_length_mm": _norm_stock_decimal_str(drill_cutting_length_raw),
             "drill_angle_deg": _norm_stock_decimal_str(drill_angle_raw),
             "tool_material": tool_material,
+            "tool_material_custom": tm_custom_input,
+            "tool_material_select": tool_material_select,
             "coating_type": coating_type,
             "work_material": work_material,
             "arrival_supplier": arrival_supplier,
@@ -1782,6 +2013,9 @@ def inventory_view(request):
             "angles": drill_angles,
         },
         "tool_material_types": TOOL_MATERIAL_TYPES,
+        "tool_material_extra_options": tool_material_extra_options,
+        "tool_material_filter_other": TOOL_MATERIAL_FILTER_OTHER,
+        "stock_tool_material_extra_json": stock_tool_material_extra_json,
         "coating_types": COATING_TYPES,
         "work_material_types": WORK_MATERIAL_TYPES,
         "today": date.today().isoformat(),
@@ -1796,6 +2030,8 @@ def inventory_view(request):
             "employee": purchase_employee,
         },
         "is_admin_user": is_admin_user,
+        "can_manage_stock": can_manage_stock,
+        "can_rollback_stock": is_admin_user,
         "panel": panel,
         "employee_options": employee_options,
         "defect_records": defects_qs[:300],

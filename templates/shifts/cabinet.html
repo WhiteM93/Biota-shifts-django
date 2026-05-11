@@ -154,7 +154,7 @@
         <input type="checkbox" name="priv_nav" value="{{ row.key }}" {% if row.on %}checked{% endif %}>
         <span><strong>{{ row.label }}</strong></span>
       </label>
-      {% if dep_opts and row.key != "products" %}
+      {% if dep_opts and row.key != "products" and row.key != "machines" %}
       <span class="cab-nav-bulk">
         <button type="button" class="btn js-cab-dep-all" data-nav-key="{{ row.key }}">Все</button>
         <button type="button" class="btn js-cab-dep-none" data-nav-key="{{ row.key }}">Снять всё</button>
@@ -164,6 +164,8 @@
     <div class="cab-check-grid" style="padding-left: 10px;">
       {% if row.key == "products" %}
       <p class="muted" style="margin:4px 0 0 0;">Раздел «Наладки» не привязан к отделам.</p>
+      {% elif row.key == "machines" %}
+      <p class="muted" style="margin:4px 0 0 0;">Раздел «Станки» не привязан к отделам.</p>
       {% elif dep_opts %}
       {% for d in dep_opts %}
       <label class="chk">
@@ -177,6 +179,33 @@
     </div>
   </div>
   {% endfor %}
+  <div class="cab-nav-block" style="margin-top:14px;">
+    <div class="cab-nav-head">
+      <strong>Склад</strong>
+    </div>
+    <p class="muted" style="margin:6px 0 8px 0;">
+      Разрешить пользователю редактировать и удалять позиции на вкладке «Склад» (без статуса администратора).
+      Изменение фиксируется в «Истории» склада.
+    </p>
+    <input type="hidden" name="priv_inventory_stock_manage" value="0">
+    <label class="chk" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" name="priv_inventory_stock_manage" value="1" {% if priv_stock_manage %}checked{% endif %}>
+      <span>Редактирование и удаление позиций склада</span>
+    </label>
+  </div>
+  <div class="cab-nav-block" style="margin-top:14px;">
+    <div class="cab-nav-head">
+      <strong>Станки</strong>
+    </div>
+    <p class="muted" style="margin:6px 0 8px 0;">
+      Разрешить кнопку «Быстрое редактирование» на странице «Станки» (правки сохраняются в браузере пользователя, не на сервере).
+    </p>
+    <input type="hidden" name="priv_machines_quick_edit" value="0">
+    <label class="chk" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" name="priv_machines_quick_edit" value="1" {% if priv_machines_quick_edit %}checked{% endif %}>
+      <span>Быстрое редактирование на странице «Станки»</span>
+    </label>
+  </div>
   <p><button type="submit" class="btn">Сохранить права</button></p>
 </form>
 {% endif %}

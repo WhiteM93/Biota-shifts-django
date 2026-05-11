@@ -7,7 +7,11 @@
 <div class="page-actions" style="margin-bottom:10px;">
   <a href="{% url 'products_list' %}" class="btn btn-ghost">← К списку наладок</a>
   {% if biota_can_edit %}
-  <a href="{% url 'product_setup_create' product.pk %}" class="btn btn-ghost">+</a>
+  <form method="post" action="{% url 'product_detail' product.pk %}" style="display:inline;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create_setup" />
+    <button type="submit" class="btn btn-ghost" title="Новая установка">+</button>
+  </form>
   {% endif %}
 </div>
 <div class="product-detail-grid"{% if setups %} data-product-has-setups="1"{% endif %}>
@@ -20,7 +24,11 @@
     <div class="product-tabs-nav" role="tablist" aria-label="Документация и наладка">
       {% if setups %}
       {% if biota_can_edit %}
-      <a href="{% url 'product_setup_create' product.pk %}" class="btn btn-ghost product-add-setup-inline" title="Новая установка">+</a>
+      <form method="post" action="{% url 'product_detail' product.pk %}" class="product-add-setup-inline" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_setup" />
+        <button type="submit" class="btn btn-ghost" title="Новая установка">+</button>
+      </form>
       {% endif %}
       <label class="field product-setup-select-wrap">
         <select id="setup-tab-select">
@@ -30,6 +38,12 @@
           {% endfor %}
         </select>
       </label>
+      {% elif biota_can_edit %}
+      <form method="post" action="{% url 'product_detail' product.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_setup" />
+        <button type="submit" class="btn btn-ghost" title="Добавить первую установку">+ Установка</button>
+      </form>
       {% endif %}
       {% for setup in setups %}
       <button type="button" class="product-tab{% if tab_default == setup.tab_slug %} is-active{% endif %}" role="tab" data-tab="{{ setup.tab_slug }}" data-setup-index="{{ forloop.counter }}" id="tab-setup-{{ setup.pk }}" aria-controls="panel-setup-{{ setup.pk }}" aria-selected="{% if tab_default == setup.tab_slug %}true{% else %}false{% endif %}" {% if setup.has_any_program %}data-program-url="{{ setup.primary_program_url }}" data-program-filename="{{ setup.primary_program_filename|escape }}"{% endif %} data-setup-name="{{ setup.name|escape }}" data-setup-edit-url="{% url 'product_setup_edit' product.pk setup.pk %}" hidden>Уст. {{ forloop.counter }}</button>
@@ -125,13 +139,18 @@
                     <span data-field-text="gcode_system">{{ setup.gcode_system|default:"G54" }}</span>
                     {% if biota_can_edit %}
                     <select class="js-inline-gcode-system" data-gcode-system-select="{{ setup.pk }}" hidden>
-                      <option value="G54" {% if setup.gcode_system|default:"G54" == "G54" %}selected{% endif %}>G54</option>
-                      <option value="G55" {% if setup.gcode_system == "G55" %}selected{% endif %}>G55</option>
-                      <option value="G56" {% if setup.gcode_system == "G56" %}selected{% endif %}>G56</option>
-                      <option value="G57" {% if setup.gcode_system == "G57" %}selected{% endif %}>G57</option>
-                      <option value="G58" {% if setup.gcode_system == "G58" %}selected{% endif %}>G58</option>
-                      <option value="G59" {% if setup.gcode_system == "G59" %}selected{% endif %}>G59</option>
+                      <option value="G54" {% if setup.gcode_inline_select_value == "G54" %}selected{% endif %}>G54</option>
+                      <option value="G55" {% if setup.gcode_inline_select_value == "G55" %}selected{% endif %}>G55</option>
+                      <option value="G56" {% if setup.gcode_inline_select_value == "G56" %}selected{% endif %}>G56</option>
+                      <option value="G57" {% if setup.gcode_inline_select_value == "G57" %}selected{% endif %}>G57</option>
+                      <option value="G58" {% if setup.gcode_inline_select_value == "G58" %}selected{% endif %}>G58</option>
+                      <option value="G59" {% if setup.gcode_inline_select_value == "G59" %}selected{% endif %}>G59</option>
+                      <option value="__G54_1_P__" {% if setup.gcode_inline_select_value == "__G54_1_P__" %}selected{% endif %}>G54.1 P</option>
                     </select>
+                    <span class="setup-gcode-p-wrap js-inline-gcode-p-wrap" hidden>
+                      <span class="muted">P</span>
+                      <span class="js-inline-gcode-p" spellcheck="false" data-gcode-p-for="{{ setup.pk }}">{{ setup.gcode_inline_p_number }}</span>
+                    </span>
                     {% endif %}
                     </span>
                   </div>
@@ -147,9 +166,21 @@
                 <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="bold" title="Жирный"><b>B</b></button>
                 <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="italic" title="Курсив"><i>I</i></button>
                 <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="underline" title="Подчеркнутый"><u>U</u></button>
-                <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="justifyLeft" title="По левому краю">Л</button>
-                <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="justifyCenter" title="По центру">Ц</button>
-                <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="justifyRight" title="По правому краю">П</button>
+                <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="justifyLeft" title="По левому краю" aria-label="По левому краю">
+                  <svg class="setup-notes-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M3 5h18v2H3V5M3 10h12v2H3v-2M3 15h15v2H3v-2z" />
+                  </svg>
+                </button>
+                <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="justifyCenter" title="По центру" aria-label="По центру">
+                  <svg class="setup-notes-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M3 5h18v2H3V5M6 10h12v2H6v-2M7 15h10v2H7v-2z" />
+                  </svg>
+                </button>
+                <button type="button" class="btn btn-ghost js-notes-cmd" data-cmd="justifyRight" title="По правому краю" aria-label="По правому краю">
+                  <svg class="setup-notes-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M3 5h18v2H3V5M15 10h6v2h-6v-2M12 15h9v2h-9v-2z" />
+                  </svg>
+                </button>
                 <label class="muted setup-inline-toolbar-size">
                   Размер
                   <select class="js-notes-fontsize">
@@ -172,10 +203,23 @@
             </div>
           </div>
           <div class="product-setup-tools-col">
-            <div class="table-wrap" style="padding:0;margin:0;">
-              <table class="data-grid setup-tools-view{% if biota_can_edit %} has-tool-row-move{% endif %}" style="font-size:12px;">
+            <div class="table-wrap setup-tools-table-wrap" style="padding:0;margin:0;">
+              <div class="setup-tools-table-layout">
+                <div class="setup-tools-table-main">
+              <button
+                type="button"
+                class="btn btn-ghost setup-tools-note-toggle js-setup-tools-note-toggle"
+                aria-expanded="false"
+                aria-controls="setup-tools-table-{{ setup.pk }}"
+                data-label-show="Показать примечания"
+                data-label-hide="Скрыть примечания"
+              >
+                Показать примечания
+              </button>
+              <table id="setup-tools-table-{{ setup.pk }}" class="data-grid setup-tools-view{% if biota_can_edit %} has-tool-row-move{% endif %}">
                 <thead>
                   <tr>
+                    {% if biota_can_edit %}<th class="setup-tools-th-hd-autofill" scope="col" title="Автозаполнение H/D по T в строке" aria-label="Колонка автозаполнения корректоров"></th>{% endif %}
                     <th>№</th>
                     <th title="Корректор на инструмент включен">Кор.</th>
                     <th>H</th>
@@ -183,13 +227,24 @@
                     <th class="setup-tools-th-rot">Тип</th>
                     <th class="setup-tools-th-rot setup-tools-th-diameter">⌀</th>
                     <th class="setup-tools-th-rot">Вылет</th>
-                    <th class="setup-tools-th-rot">Примечание</th>
-                    {% if biota_can_edit %}<th class="setup-tools-th-move" scope="col" aria-label="Порядок строк"></th>{% endif %}
+                    <th class="setup-tools-th-rot setup-tools-th-note" data-tool-col-header="note">Примечание</th>
                   </tr>
                 </thead>
                 <tbody>
                   {% for row in setup.tool_display_rows %}
                   <tr data-tool-row-index="{{ forloop.counter0 }}">
+                    {% if biota_can_edit %}
+                    <td class="setup-tools-hd-autofill-cell">
+                      <button
+                        type="button"
+                        class="btn btn-ghost setup-tools-hd-autofill-btn js-setup-tools-hd-autofill-row"
+                        title="Подставить H и D по номеру T в этой строке (T01→H01, D01)"
+                        aria-label="Автозаполнить корректора H и D по номеру инструмента в этой строке"
+                      >
+                        <i class="fi fi-rr-redo-alt ui-icon" aria-hidden="true"></i>
+                      </button>
+                    </td>
+                    {% endif %}
                     <td data-tool-col="tool_number">{{ row.tool_number }}</td>
                     <td data-tool-col="correction_enabled" class="setup-tool-correction-cell" data-correction-enabled="{{ row.correction_enabled|yesno:'1,0' }}">
                       <span class="setup-tool-correction-box{% if row.correction_enabled %} is-checked{% endif %}" aria-hidden="true"></span>
@@ -200,18 +255,12 @@
                     <td data-tool-col="diameter">{{ row.diameter }}</td>
                     <td data-tool-col="overhang">{{ row.overhang }}</td>
                     <td data-tool-col="note">{{ row.note }}</td>
-                    {% if biota_can_edit %}
-                    <td class="setup-tools-move-cell">
-                      <div class="setup-tools-move-btns">
-                        <button type="button" class="btn btn-ghost setup-tools-move-btn js-setup-tool-move-up" title="Выше" aria-label="Переместить строку вверх">↑</button>
-                        <button type="button" class="btn btn-ghost setup-tools-move-btn js-setup-tool-move-down" title="Ниже" aria-label="Переместить строку вниз">↓</button>
-                      </div>
-                    </td>
-                    {% endif %}
                   </tr>
                   {% endfor %}
                 </tbody>
               </table>
+                </div>
+              </div>
             </div>
             {% if biota_can_edit %}
             <div class="setup-tools-add-row" hidden>
@@ -389,11 +438,6 @@
     filter: brightness(1.06);
     border-color: var(--bio-input-hover-border);
   }
-  .product-btn-edit-mode {
-    background: linear-gradient(180deg, #ef6a6a 0%, #cf4242 100%);
-    border: 1px solid #a93131;
-    color: #fff;
-  }
   .btn.product-btn-program {
     background: linear-gradient(180deg, var(--bio-btn-primary-bg1) 0%, var(--bio-btn-primary-bg2) 100%);
     border: 1px solid var(--bio-nav-refresh-border);
@@ -461,6 +505,16 @@
     align-items: center;
     justify-content: center;
     line-height: 1;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    vertical-align: top;
+  }
+  .product-tabs-nav > form.product-add-setup-inline .btn {
+    width: 100%;
+    height: 100%;
+    min-height: var(--product-nav-control-h);
+    box-sizing: border-box;
   }
   #setup-export-specs-btn[hidden],
   #setup-export-photos-btn[hidden] {
@@ -502,6 +556,10 @@
     min-width: 0;
     align-items: stretch;
     transition: border-color 0.22s ease, background 0.28s ease;
+  }
+  /* dawn: --bio-filter-bg* полупрозрачные — сквозь них просвечивал зелёный радиал страницы (низ справа). */
+  html[data-theme="dawn"] .product-setup-specs {
+    background: linear-gradient(180deg, #fffefb 0%, #f4ebe0 100%);
   }
   .product-setup-spec-group {
     border: 1px solid var(--bio-input-border);
@@ -1124,10 +1182,25 @@
     overflow: hidden;
   }
   /* Вложен в .setup-gcode-value, не прямой потомок div.setup-spec-col — отдельный селектор */
+  .setup-spec-col-bindings .setup-gcode-p-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+    font-size: 12px;
+  }
+  .setup-spec-col-bindings .setup-gcode-p-wrap .js-inline-gcode-p {
+    min-width: 1.25em;
+    max-width: 2.5em;
+    text-align: center;
+    padding: 1px 4px;
+    line-height: 1.2;
+    border-radius: 3px;
+  }
   .setup-spec-col-bindings .js-inline-gcode-system {
-    width: 45px;
-    max-width: 45px;
-    min-width: 45px;
+    width: 68px;
+    max-width: 68px;
+    min-width: 68px;
     height: 26px;
     min-height: 26px;
     text-align: center;
@@ -1664,21 +1737,49 @@
       transition-duration: 0.01ms !important;
     }
   }
-  .setup-tools-view th, .setup-tools-view td {
+  .setup-tools-view {
+    min-width: 0;
+    table-layout: fixed;
+    font-family: var(--bio-font, Inter, "Segoe UI", system-ui, -apple-system, sans-serif);
+    font-size: 13px;
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    letter-spacing: 0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  .setup-tools-view th,
+  .setup-tools-view td {
     text-align: center;
-    padding: 4px 6px;
+    padding: 6px 7px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .setup-tools-view th:nth-child(1),
-  .setup-tools-view th:nth-child(2),
-  .setup-tools-view th:nth-child(3),
-  .setup-tools-view th:nth-child(4),
-  .setup-tools-view td:nth-child(1),
-  .setup-tools-view td:nth-child(2),
-  .setup-tools-view td:nth-child(3),
-  .setup-tools-view td:nth-child(4) {
+  .setup-tools-view:not(.has-tool-row-move) th:nth-child(1),
+  .setup-tools-view:not(.has-tool-row-move) th:nth-child(2),
+  .setup-tools-view:not(.has-tool-row-move) th:nth-child(3),
+  .setup-tools-view:not(.has-tool-row-move) th:nth-child(4),
+  .setup-tools-view:not(.has-tool-row-move) td:nth-child(1),
+  .setup-tools-view:not(.has-tool-row-move) td:nth-child(2),
+  .setup-tools-view:not(.has-tool-row-move) td:nth-child(3),
+  .setup-tools-view:not(.has-tool-row-move) td:nth-child(4) {
+    width: 3ch;
+    min-width: 3ch;
+    max-width: 3ch;
+    white-space: nowrap;
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  .setup-tools-view.has-tool-row-move th:nth-child(2),
+  .setup-tools-view.has-tool-row-move th:nth-child(3),
+  .setup-tools-view.has-tool-row-move th:nth-child(4),
+  .setup-tools-view.has-tool-row-move th:nth-child(5),
+  .setup-tools-view.has-tool-row-move td:nth-child(2),
+  .setup-tools-view.has-tool-row-move td:nth-child(3),
+  .setup-tools-view.has-tool-row-move td:nth-child(4),
+  .setup-tools-view.has-tool-row-move td:nth-child(5) {
     width: 3ch;
     min-width: 3ch;
     max-width: 3ch;
@@ -1687,11 +1788,33 @@
     padding-right: 2px;
   }
   /* Номер инструмента (T01…T100) редактируемый — шире слота 3ch */
-  .setup-tools-view th:nth-child(1),
-  .setup-tools-view td:nth-child(1)[data-tool-col="tool_number"] {
+  .setup-tools-view:not(.has-tool-row-move) th:nth-child(1),
+  .setup-tools-view:not(.has-tool-row-move) td:nth-child(1)[data-tool-col="tool_number"] {
     width: 9ch;
     min-width: 9ch;
     max-width: 12ch;
+  }
+  .setup-tools-view.has-tool-row-move th:nth-child(2),
+  .setup-tools-view.has-tool-row-move td:nth-child(2)[data-tool-col="tool_number"] {
+    width: 9ch;
+    min-width: 9ch;
+    max-width: 12ch;
+  }
+  /* Номер инструмента: заметная «техническая» метка в таблице */
+  .setup-tools-view td[data-tool-col="tool_number"] {
+    font-family: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, "Roboto Mono", monospace;
+    font-weight: 700;
+    font-size: 13.5px;
+    letter-spacing: 0.07em;
+    color: var(--bio-heading-accent, var(--bio-body-fg));
+    background: var(--bio-tool-number-chip-bg, #252d4a);
+    border: 1px solid var(--bio-tool-number-chip-border, #3a4666);
+    border-radius: 6px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    vertical-align: middle;
+  }
+  html[data-theme="dawn"] .setup-tools-view td[data-tool-col="tool_number"] {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
   }
   .setup-tools-view th.setup-tools-th-rot {
     height: auto;
@@ -1703,8 +1826,9 @@
     letter-spacing: normal;
   }
   .setup-tools-view th.setup-tools-th-diameter {
-    font-size: 2em;
-    line-height: 1;
+    font-size: 1.55em;
+    line-height: 1.05;
+    font-weight: 700;
   }
   .setup-tools-view td.setup-tool-override {
     border-color: #d94a4a;
@@ -1722,8 +1846,8 @@
     padding: 0;
   }
   .setup-tool-correction-box {
-    width: 14px;
-    height: 14px;
+    width: 15px;
+    height: 15px;
     border: 1px solid var(--bio-input-border);
     border-radius: 1.5px;
     display: inline-flex;
@@ -1731,7 +1855,7 @@
     justify-content: center;
     background: var(--bio-chk-bg);
     color: var(--bio-input-fg);
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1;
     user-select: none;
     pointer-events: none;
@@ -1748,21 +1872,25 @@
   .product-tab-panel[data-inline-edit-mode="1"] .setup-tools-view td[data-tool-col="correction_enabled"] {
     cursor: pointer;
   }
-  .setup-tools-view {
-    min-width: 0;
-    table-layout: fixed;
-  }
-  .setup-tools-view th:nth-child(5),
-  .setup-tools-view td:nth-child(5) { width: 74px; min-width: 74px; max-width: 74px; }
-  .setup-tools-view th:nth-child(6),
-  .setup-tools-view td:nth-child(6) { width: 64px; min-width: 64px; max-width: 64px; }
-  .setup-tools-view th:nth-child(7),
-  .setup-tools-view td:nth-child(7) { width: 68px; min-width: 68px; max-width: 68px; }
-  .setup-tools-view th:nth-child(8),
-  .setup-tools-view td:nth-child(8) { width: 120px; min-width: 120px; max-width: 120px; }
-  /* Колонка ↑↓ только в режиме быстрого редактирования (без атрибута или «0» — не занимает места) */
+  .setup-tools-view:not(.has-tool-row-move) th:nth-child(5),
+  .setup-tools-view:not(.has-tool-row-move) td:nth-child(5) { width: 74px; min-width: 74px; max-width: 74px; }
+  .setup-tools-view:not(.has-tool-row-move) th:nth-child(6),
+  .setup-tools-view:not(.has-tool-row-move) td:nth-child(6) { width: 64px; min-width: 64px; max-width: 64px; }
+  .setup-tools-view:not(.has-tool-row-move) th:nth-child(7),
+  .setup-tools-view:not(.has-tool-row-move) td:nth-child(7) { width: 68px; min-width: 68px; max-width: 68px; }
+  .setup-tools-view:not(.has-tool-row-move) th:nth-child(8),
+  .setup-tools-view:not(.has-tool-row-move) td:nth-child(8) { width: 120px; min-width: 120px; max-width: 120px; }
+  .setup-tools-view.has-tool-row-move th:nth-child(6),
+  .setup-tools-view.has-tool-row-move td:nth-child(6) { width: 74px; min-width: 74px; max-width: 74px; }
+  .setup-tools-view.has-tool-row-move th:nth-child(7),
+  .setup-tools-view.has-tool-row-move td:nth-child(7) { width: 64px; min-width: 64px; max-width: 64px; }
+  .setup-tools-view.has-tool-row-move th:nth-child(8),
+  .setup-tools-view.has-tool-row-move td:nth-child(8) { width: 68px; min-width: 68px; max-width: 68px; }
   .setup-tools-view.has-tool-row-move th:nth-child(9),
-  .setup-tools-view.has-tool-row-move td:nth-child(9) {
+  .setup-tools-view.has-tool-row-move td:nth-child(9) { width: 120px; min-width: 120px; max-width: 120px; }
+  /* Колонка автозаполнения H/D — только в режиме быстрого редактирования */
+  .setup-tools-view.has-tool-row-move th.setup-tools-th-hd-autofill,
+  .setup-tools-view.has-tool-row-move td.setup-tools-hd-autofill-cell {
     display: none;
     width: 0;
     min-width: 0;
@@ -1772,36 +1900,14 @@
     border: none;
     overflow: hidden;
   }
-  .product-tab-panel[data-inline-edit-mode="1"] .setup-tools-view.has-tool-row-move th:nth-child(9),
-  .product-tab-panel[data-inline-edit-mode="1"] .setup-tools-view.has-tool-row-move td:nth-child(9) {
+  .product-tab-panel[data-inline-edit-mode="1"] .setup-tools-view.has-tool-row-move th.setup-tools-th-hd-autofill,
+  .product-tab-panel[data-inline-edit-mode="1"] .setup-tools-view.has-tool-row-move td.setup-tools-hd-autofill-cell {
     display: table-cell;
-    width: 26px;
-    min-width: 26px;
-    max-width: 26px;
-    padding: 1px;
+    width: 38px;
+    min-width: 38px;
+    max-width: 38px;
+    padding: 1px 2px;
     vertical-align: middle;
-  }
-  .setup-tools-move-btns {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0;
-    max-width: 100%;
-  }
-  .setup-tools-view button.setup-tools-move-btn {
-    min-height: 0;
-    height: auto;
-    min-width: 0;
-    width: 100%;
-    max-width: 100%;
-    padding: 0;
-    margin: 0;
-    font-size: 10px;
-    line-height: 1;
-    font-weight: 700;
-    border-radius: 2px;
-    box-sizing: border-box;
   }
   .setup-tools-add-row {
     margin-top: 6px;
@@ -1815,6 +1921,35 @@
     color: var(--bio-body-fg);
     outline: none;
     transition: border-color 0.22s ease, background 0.28s ease, color 0.2s ease;
+  }
+  /* Выше общего td.is-inline-edit: номер инструмента при редактировании */
+  .setup-tools-view td[data-tool-col="tool_number"].is-inline-edit {
+    border-color: color-mix(in srgb, var(--bio-nav-refresh-bg2) 65%, var(--bio-filter-border));
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bio-nav-refresh-bg2) 22%, var(--bio-filter-bg1)) 0%,
+      color-mix(in srgb, var(--bio-nav-refresh-bg2) 12%, var(--bio-filter-bg2)) 100%
+    );
+    box-shadow:
+      var(--bio-filter-shadow),
+      0 0 0 1px color-mix(in srgb, var(--bio-nav-refresh-bg2) 28%, transparent);
+    color: var(--bio-body-fg);
+  }
+  html[data-theme="dawn"] .setup-tools-view td[data-tool-col="tool_number"].is-inline-edit {
+    border-color: color-mix(in srgb, var(--bio-nav-active-border) 70%, var(--bio-filter-border));
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bio-nav-active-bg1) 18%, var(--bio-filter-bg1)) 0%,
+      color-mix(in srgb, var(--bio-nav-active-bg2) 14%, var(--bio-filter-bg2)) 100%
+    );
+    box-shadow:
+      var(--bio-filter-shadow),
+      0 0 0 1px color-mix(in srgb, var(--bio-nav-active-bg2) 30%, transparent);
+  }
+  .setup-tools-view td[data-tool-col="tool_number"].is-inline-edit:focus {
+    outline: none;
+    border-color: var(--bio-input-focus-border);
+    box-shadow: 0 0 0 2px var(--bio-input-focus-ring);
   }
   .setup-tools-view td.setup-tool-override.is-inline-edit {
     border-color: #d94a4a;
@@ -1830,13 +1965,22 @@
   }
   .setup-tools-view td[data-tool-col="diameter"],
   .setup-tools-view td[data-tool-col="overhang"] {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .setup-tools-view:not(.has-tool-row-move) th:nth-child(5),
+  .setup-tools-view.has-tool-row-move th:nth-child(6),
+  .setup-tools-view td[data-tool-col="tool_type"] {
+    font-weight: 500;
+    letter-spacing: 0.005em;
   }
   .setup-tools-view select.js-inline-tool-type {
     width: 100%;
-    font-size: 12px;
-    min-height: 24px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    min-height: 26px;
     text-align: center;
     text-align-last: center;
     -webkit-appearance: none;
@@ -1861,6 +2005,41 @@
   }
   .product-setup-content-grid .table-wrap {
     overflow-x: hidden;
+  }
+  /* На десктопе колонка «Примечание» всегда видна; кнопка — только на узкой ширине */
+  .setup-tools-note-toggle {
+    display: none !important;
+  }
+  .setup-tools-table-wrap {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .setup-tools-table-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .setup-tools-table-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .setup-tools-hd-autofill-btn {
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .setup-tools-hd-autofill-btn .ui-icon {
+    font-size: 16px;
   }
   .product-setup-content-grid .setup-tools-view {
     width: 100%;
@@ -1938,6 +2117,76 @@
     }
     .product-setup-content-grid {
       grid-template-columns: 1fr;
+    }
+    .product-setup-tools-col {
+      min-width: 0;
+    }
+    .setup-tools-note-toggle {
+      display: inline-flex !important;
+      align-items: center;
+      align-self: stretch;
+      justify-content: center;
+      font-size: 13px;
+      padding: 6px 10px;
+      margin: 0 0 4px 0;
+    }
+    .setup-tools-table-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .product-setup-content-grid .setup-tools-table-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    /* По умолчанию на мобильном колонку «Примечание» скрываем — показ по кнопке (8 колонок, только просмотр) */
+    .setup-tools-view:not(.has-tool-row-move):not(.setup-tools-show-note) th:nth-child(8),
+    .setup-tools-view:not(.has-tool-row-move):not(.setup-tools-show-note) td:nth-child(8) {
+      display: none !important;
+    }
+    .setup-tools-view:not(.has-tool-row-move):not(.setup-tools-show-note) th:nth-child(5),
+    .setup-tools-view:not(.has-tool-row-move):not(.setup-tools-show-note) td:nth-child(5) {
+      width: 66px;
+      min-width: 66px;
+      max-width: 66px;
+    }
+    .setup-tools-view:not(.has-tool-row-move):not(.setup-tools-show-note) th:nth-child(6),
+    .setup-tools-view:not(.has-tool-row-move):not(.setup-tools-show-note) td:nth-child(6) {
+      width: 56px;
+      min-width: 56px;
+      max-width: 56px;
+    }
+    .setup-tools-view:not(.has-tool-row-move):not(.setup-tools-show-note) th:nth-child(7),
+    .setup-tools-view:not(.has-tool-row-move):not(.setup-tools-show-note) td:nth-child(7) {
+      width: 58px;
+      min-width: 58px;
+      max-width: 58px;
+    }
+    /* Режим редактирования: +колонка H/D, примечание — 9-я */
+    .setup-tools-view.has-tool-row-move:not(.setup-tools-show-note) th:nth-child(9),
+    .setup-tools-view.has-tool-row-move:not(.setup-tools-show-note) td:nth-child(9) {
+      display: none !important;
+    }
+    .setup-tools-view.has-tool-row-move:not(.setup-tools-show-note) th:nth-child(6),
+    .setup-tools-view.has-tool-row-move:not(.setup-tools-show-note) td:nth-child(6) {
+      width: 66px;
+      min-width: 66px;
+      max-width: 66px;
+    }
+    .setup-tools-view.has-tool-row-move:not(.setup-tools-show-note) th:nth-child(7),
+    .setup-tools-view.has-tool-row-move:not(.setup-tools-show-note) td:nth-child(7) {
+      width: 56px;
+      min-width: 56px;
+      max-width: 56px;
+    }
+    .setup-tools-view.has-tool-row-move:not(.setup-tools-show-note) th:nth-child(8),
+    .setup-tools-view.has-tool-row-move:not(.setup-tools-show-note) td:nth-child(8) {
+      width: 58px;
+      min-width: 58px;
+      max-width: 58px;
+    }
+    .setup-tools-table-layout {
+      flex-direction: column;
     }
   }
   .product-tab-panel[hidden] {
@@ -2078,6 +2327,16 @@
     padding: 2px 7px;
     line-height: 1;
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .setup-inline-toolbar .setup-notes-ico {
+    display: block;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    opacity: 0.92;
   }
   .setup-inline-toolbar select {
     height: 28px;
@@ -2276,6 +2535,10 @@
   .product-download-row .product-download-preview-btn .ui-icon {
     font-size: 16px;
   }
+  .product-download-row .product-download-preview-btn .fi::before {
+    display: block;
+    line-height: 1;
+  }
   .product-download-row .product-download-placeholder {
     flex: 1 1 auto;
     align-self: center;
@@ -2316,8 +2579,10 @@
     margin-top: 12px;
   }
   #product-detail-side .product-drawing-notes__list {
-    max-height: 220px;
+    max-height: min(320px, 48vh);
     overflow-y: auto;
+    padding-right: 2px;
+    scrollbar-gutter: stable;
   }
   .product-drawing-notes__list {
     list-style: none;
@@ -2325,52 +2590,114 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
   }
   .product-drawing-notes__item {
     margin: 0;
-    padding: 10px 12px;
-    border: 1px solid var(--bio-filter-border);
-    border-radius: 6px;
-    background: var(--bio-surface-item);
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--bio-filter-border) 88%, transparent);
+    border-radius: 10px;
+    background: linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--bio-surface-item) 96%, var(--bio-input-bg)) 0%,
+      var(--bio-surface-item) 48%,
+      color-mix(in srgb, var(--bio-surface-item) 92%, var(--bio-input-bg)) 100%
+    );
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 1px 3px rgba(0, 0, 0, 0.07);
+    overflow: hidden;
   }
   .product-drawing-notes__item-top {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 6px;
+    gap: 10px;
+    margin: 0;
+    padding: 10px 10px 6px 12px;
   }
   .product-drawing-notes__item-top .product-drawing-notes__meta {
     margin-bottom: 0;
     flex: 1 1 auto;
     min-width: 0;
+    line-height: 1.35;
   }
   .product-drawing-notes__delete {
     flex: 0 0 auto;
-    padding: 2px 8px;
-    min-width: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    margin: -4px -4px -4px 0;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--bio-filter-border) 70%, transparent);
+    background: color-mix(in srgb, var(--bio-input-bg) 55%, transparent);
+    color: var(--bio-muted);
     line-height: 1;
-    opacity: 0.82;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+  }
+  .product-drawing-notes__delete-inner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .product-drawing-notes__delete .ui-icon {
+    font-size: 13px;
+    line-height: 1;
   }
   .product-drawing-notes__delete:hover {
-    opacity: 1;
-    color: var(--bio-error-soft);
+    color: var(--bio-error-soft, #e5484d);
+    background: color-mix(in srgb, var(--bio-error-soft, #e5484d) 12%, var(--bio-input-bg));
+    border-color: color-mix(in srgb, var(--bio-error-soft, #e5484d) 35%, var(--bio-filter-border));
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--bio-error-soft, #e5484d) 18%, transparent);
+  }
+  .product-drawing-notes__delete:active {
+    transform: scale(0.96);
+  }
+  .product-drawing-notes__delete:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--bio-input-focus-ring, rgba(92, 112, 159, 0.45));
+    border-color: var(--bio-input-focus-border, #5c709f);
+    color: var(--bio-body-fg);
   }
   html[data-theme="dawn"] .product-drawing-notes__delete:hover {
     color: #b91c1c;
+    background: color-mix(in srgb, #b91c1c 10%, var(--bio-input-bg));
+    border-color: color-mix(in srgb, #b91c1c 28%, var(--bio-filter-border));
   }
   .product-drawing-notes__meta {
     font-size: 12px;
-    margin-bottom: 6px;
+    margin-bottom: 0;
   }
   .product-drawing-notes__author {
-    font-weight: 600;
+    font-weight: 650;
     color: var(--bio-body-fg);
   }
+  .product-drawing-notes__sep {
+    margin: 0 0.2em;
+    opacity: 0.55;
+  }
+  .product-drawing-notes__time {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
   .product-drawing-notes__body {
+    padding: 0 12px 12px 12px;
     font-size: 14px;
+    line-height: 1.55;
     word-break: break-word;
+    color: var(--bio-body-fg);
+  }
+  .product-drawing-notes__empty {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px dashed color-mix(in srgb, var(--bio-filter-border) 80%, transparent);
+    text-align: center;
+    font-size: 13px;
   }
   .product-drawing-notes__form {
     margin-top: 4px;
@@ -2394,8 +2721,9 @@
     width: 100%;
     box-sizing: border-box;
     margin: 0;
-    min-height: 96px;
-    max-height: 280px;
+    min-height: 3rem;
+    max-height: min(320px, 42vh);
+    height: auto;
     padding: 11px 13px;
     font-family: inherit;
     font-size: 13px;
@@ -2404,7 +2732,8 @@
     background: var(--bio-input-bg);
     border: 1px solid var(--bio-input-border);
     border-radius: 10px;
-    resize: vertical;
+    resize: none;
+    overflow-y: hidden;
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
     transition: border-color 0.18s ease, box-shadow 0.2s ease, background 0.18s ease;
   }
@@ -2488,9 +2817,13 @@
     inset: 0;
     z-index: 1500;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 8px;
+    align-items: stretch;
+    justify-content: stretch;
+    /* safe-area: иначе на iPhone / в браузерах с нижней панелью контент уезжает под системные полосы */
+    padding: max(8px, env(safe-area-inset-top, 0px)) max(8px, env(safe-area-inset-right, 0px))
+      max(8px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
+    box-sizing: border-box;
+    min-height: 0;
   }
   .setup-photo-modal-backdrop {
     position: absolute;
@@ -2501,21 +2834,27 @@
   .setup-photo-modal-dialog {
     position: relative;
     z-index: 1;
-    width: 100vw;
-    height: 100vh;
-    max-height: 100vh;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
     border: 1px solid var(--bio-filter-border);
     border-radius: 0;
     background: #111827;
     padding: 6px;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     overflow: auto;
+    box-sizing: border-box;
   }
   .setup-photo-modal-dialog img {
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
     max-width: 100%;
-    height: calc(100vh - 78px);
-    max-height: calc(100vh - 78px);
+    height: auto;
+    max-height: none;
     object-fit: contain;
     margin: 0 auto;
     border-radius: 0;
@@ -2523,11 +2862,21 @@
     background: #0a0c12;
   }
   .setup-photo-modal-close {
-    justify-self: end;
+    flex: 0 0 auto;
+    align-self: flex-end;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin: 0 0 4px 0;
     padding: 4px 9px;
     line-height: 1;
     font-size: 20px;
     min-width: 34px;
+    background: rgba(17, 24, 39, 0.92);
+    border-radius: 4px;
+  }
+  .setup-photo-modal-dialog #setup-photo-modal-caption {
+    flex: 0 0 auto;
   }
   @media (max-width: 720px) {
     .product-pdf-frame {
@@ -2535,13 +2884,48 @@
       min-height: 360px;
     }
     .product-tabs-nav {
-      flex-wrap: nowrap;
-      overflow-x: auto;
+      flex-wrap: wrap;
+      overflow-x: visible;
+      overflow-y: visible;
       padding-bottom: 4px;
       margin-bottom: 10px;
+      row-gap: 10px;
+    }
+    /* Иначе «распорка» раздувает ряд и провоцирует горизонтальный скролл */
+    .product-tabs-nav > .nav-spacer {
+      display: none;
+    }
+    .product-tabs-nav .product-setup-select-wrap {
+      flex: 1 1 100%;
+      min-width: 0;
+      width: 100%;
+      max-width: 100%;
+    }
+    .product-tabs-nav .product-setup-select-wrap select,
+    .product-tabs-nav #setup-tab-select {
+      width: 100%;
+      max-width: 100%;
+    }
+    .product-tabs-nav .product-btn-edit-mode,
+    .product-tabs-nav > a.btn:not(.product-add-setup-inline),
+    .product-tabs-nav > .btn:not(.product-add-setup-inline) {
+      flex: 1 1 10rem;
+      min-width: 0;
+      max-width: 100%;
+      white-space: normal;
+      text-align: center;
+      line-height: 1.25;
+      height: auto;
+      min-height: var(--product-nav-control-h);
+      padding-top: 6px;
+      padding-bottom: 6px;
+    }
+    .product-tabs-nav .product-add-setup-inline {
+      flex: 0 0 var(--product-nav-control-h);
     }
     .product-tab {
-      flex: 0 0 auto;
+      flex: 1 1 auto;
+      min-width: 0;
       font-size: 13px;
       padding: 7px 11px;
     }
@@ -2584,17 +2968,14 @@
       overflow-x: hidden;
     }
     .setup-photo-modal {
-      padding: 4px;
+      padding: max(4px, env(safe-area-inset-top, 0px)) max(4px, env(safe-area-inset-right, 0px))
+        max(4px, env(safe-area-inset-bottom, 0px)) max(4px, env(safe-area-inset-left, 0px));
     }
     .setup-photo-modal-dialog {
       width: 100%;
-      height: 100vh;
-      max-height: 100vh;
+      height: 100%;
+      max-height: 100%;
       padding: 2px;
-    }
-    .setup-photo-modal-dialog img {
-      height: calc(100vh - 64px);
-      max-height: calc(100vh - 64px);
     }
   }
 </style>
@@ -2828,6 +3209,7 @@
     var tabButtons = root.querySelectorAll(".product-tab");
     var panels = root.querySelectorAll(".product-tab-panel");
     var programDownloadBtn = document.getElementById("product-program-download");
+    var productNoteTaResizeWired = false;
 
     function getCookie(name) {
       var m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));
@@ -2939,6 +3321,9 @@
       setProgramDownloadByTab(tabName);
       setTopButtonsByTab(tabName);
       setSideBlocksByTab(tabName);
+      window.requestAnimationFrame(function () {
+        resizeAllProductNoteTextareas();
+      });
       var setupSelect = document.getElementById("setup-tab-select");
       if (setupSelect) setupSelect.value = tabName;
     }
@@ -2991,6 +3376,51 @@
       });
     }
     initProductAssetReplace();
+
+    function autoResizeProductNoteTextarea(el) {
+      if (!el || el.nodeName !== "TEXTAREA") return;
+      var cs = window.getComputedStyle(el);
+      var maxH = parseFloat(cs.maxHeight);
+      if (isNaN(maxH) || maxH <= 0) maxH = 320;
+      var minH = parseFloat(cs.minHeight);
+      if (isNaN(minH) || minH <= 0) minH = 48;
+      el.style.height = "auto";
+      var sh = el.scrollHeight;
+      el.style.height = Math.min(Math.max(sh, minH), maxH) + "px";
+      el.style.overflowY = sh > maxH ? "auto" : "hidden";
+    }
+
+    function resizeAllProductNoteTextareas() {
+      document.querySelectorAll(".js-product-note-body").forEach(autoResizeProductNoteTextarea);
+    }
+
+    function initProductNoteTextareaAutosize() {
+      document.querySelectorAll(".js-product-note-body").forEach(function (ta) {
+        if (ta.getAttribute("data-note-autosize") === "1") return;
+        ta.setAttribute("data-note-autosize", "1");
+        var run = function () {
+          autoResizeProductNoteTextarea(ta);
+        };
+        ta.addEventListener("input", run);
+        ta.addEventListener("paste", function () {
+          window.requestAnimationFrame(function () {
+            window.requestAnimationFrame(run);
+          });
+        });
+        run();
+      });
+      if (!productNoteTaResizeWired) {
+        productNoteTaResizeWired = true;
+        var resizeTimer = null;
+        window.addEventListener("resize", function () {
+          if (resizeTimer) window.clearTimeout(resizeTimer);
+          resizeTimer = window.setTimeout(function () {
+            resizeTimer = null;
+            resizeAllProductNoteTextareas();
+          }, 120);
+        });
+      }
+    }
 
     function initProductDrawingNotes() {
       document.querySelectorAll(".js-product-note-form").forEach(function (form) {
@@ -3048,6 +3478,7 @@
       });
     }
     initProductDrawingNotes();
+    initProductNoteTextareaAutosize();
 
     function initProductNoteDeletes() {
       document.addEventListener("click", async function (ev) {
@@ -3228,21 +3659,46 @@
       return { h: "H" + suffix, d: "D" + suffix };
     }
 
-    function syncToolMoveButtonStates(panel) {
+    function toolNumberSortKey(text) {
+      var norm = normalizeToolNumber((text || "").trim());
+      if (norm && norm.charAt(0) === "T" && norm.length > 1) {
+        var rest = norm.slice(1);
+        if (/^\d+$/.test(rest)) return [0, parseInt(rest, 10)];
+      }
+      if (norm) return [1, String(norm).toUpperCase()];
+      return [2, ""];
+    }
+
+    function sortSetupToolsTbodyByToolNumber(tbody) {
+      if (!tbody) return;
+      var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr"));
+      rows.sort(function (a, b) {
+        var ta = a.querySelector('td[data-tool-col="tool_number"]');
+        var tb = b.querySelector('td[data-tool-col="tool_number"]');
+        var ka = toolNumberSortKey(ta ? ta.textContent : "");
+        var kb = toolNumberSortKey(tb ? tb.textContent : "");
+        if (ka[0] !== kb[0]) return ka[0] - kb[0];
+        if (ka[0] === 0) return (ka[1] || 0) - (kb[1] || 0);
+        var sa = String(ka[1] || "");
+        var sb = String(kb[1] || "");
+        if (sa < sb) return -1;
+        if (sa > sb) return 1;
+        return 0;
+      });
+      rows.forEach(function (r) {
+        tbody.appendChild(r);
+      });
+    }
+
+    function sortPanelSetupToolRows(panel) {
       if (!panel) return;
-      var rows = panel.querySelectorAll(".setup-tools-view.has-tool-row-move tbody tr");
-      var n = rows.length;
-      rows.forEach(function (tr, i) {
-        var up = tr.querySelector(".js-setup-tool-move-up");
-        var dn = tr.querySelector(".js-setup-tool-move-down");
-        if (up) {
-          up.disabled = i === 0;
-          up.setAttribute("aria-disabled", i === 0 ? "true" : "false");
-        }
-        if (dn) {
-          dn.disabled = i >= n - 1;
-          dn.setAttribute("aria-disabled", i >= n - 1 ? "true" : "false");
-        }
+      panel.querySelectorAll(".setup-tools-view tbody").forEach(sortSetupToolsTbodyByToolNumber);
+    }
+
+    function syncRowOrderDisplay(panel) {
+      if (!panel) return;
+      panel.querySelectorAll(".setup-tools-view.has-tool-row-move tbody tr").forEach(function (tr, i) {
+        tr.setAttribute("data-tool-row-index", String(i));
       });
     }
 
@@ -3270,6 +3726,19 @@
       if (!tbody) return;
       var toolNo = nextToolNumberDisplay(panel);
       var tr = document.createElement("tr");
+      var tdHd = document.createElement("td");
+      tdHd.className = "setup-tools-hd-autofill-cell";
+      var btnHd = document.createElement("button");
+      btnHd.type = "button";
+      btnHd.className = "btn btn-ghost setup-tools-hd-autofill-btn js-setup-tools-hd-autofill-row";
+      btnHd.title = "Подставить H и D по номеру T в этой строке (T01→H01, D01)";
+      btnHd.setAttribute("aria-label", "Автозаполнить корректора H и D по номеру инструмента в этой строке");
+      var icHd = document.createElement("i");
+      icHd.className = "fi fi-rr-redo-alt ui-icon";
+      icHd.setAttribute("aria-hidden", "true");
+      btnHd.appendChild(icHd);
+      tdHd.appendChild(btnHd);
+      tr.appendChild(tdHd);
       var tdNo = document.createElement("td");
       tdNo.setAttribute("data-tool-col", "tool_number");
       tdNo.textContent = toolNo;
@@ -3297,44 +3766,106 @@
         td.setAttribute("data-tool-col", col);
         tr.appendChild(td);
       });
-      var tdMove = document.createElement("td");
-      tdMove.className = "setup-tools-move-cell";
-      var wrapBtns = document.createElement("div");
-      wrapBtns.className = "setup-tools-move-btns";
-      var btnUp = document.createElement("button");
-      btnUp.type = "button";
-      btnUp.className = "btn btn-ghost setup-tools-move-btn js-setup-tool-move-up";
-      btnUp.title = "Выше";
-      btnUp.setAttribute("aria-label", "Переместить строку вверх");
-      btnUp.textContent = "↑";
-      var btnDn = document.createElement("button");
-      btnDn.type = "button";
-      btnDn.className = "btn btn-ghost setup-tools-move-btn js-setup-tool-move-down";
-      btnDn.title = "Ниже";
-      btnDn.setAttribute("aria-label", "Переместить строку вниз");
-      btnDn.textContent = "↓";
-      wrapBtns.appendChild(btnUp);
-      wrapBtns.appendChild(btnDn);
-      tdMove.appendChild(wrapBtns);
-      tr.appendChild(tdMove);
       tbody.appendChild(tr);
+      sortSetupToolsTbodyByToolNumber(tbody);
+      syncRowOrderDisplay(panel);
       if (inlineEditMode) setToolsEditMode(panel, true, tr);
-      syncToolMoveButtonStates(panel);
       syncToolOverrideClasses(panel);
     }
 
-    function moveSetupToolRow(tr, delta) {
-      var parent = tr.parentNode;
-      if (!parent) return;
-      if (delta < 0) {
-        var prev = tr.previousElementSibling;
-        if (!prev) return;
-        parent.insertBefore(tr, prev);
-      } else {
-        var next = tr.nextElementSibling;
-        if (!next) return;
-        parent.insertBefore(next, tr);
+    function getRowToolType(row) {
+      var c = row.querySelector('td[data-tool-col="tool_type"]');
+      if (!c) return "";
+      var sel = c.querySelector("select.js-inline-tool-type");
+      if (sel) return (sel.value || "").trim();
+      return (c.getAttribute("data-tool-type-value") || c.textContent || "").trim();
+    }
+
+    function looksLikeDescriptiveDiameter(s) {
+      var t = (s || "").trim();
+      if (!t) return false;
+      if (/^[mM]\d/.test(t)) return false;
+      if (/^(?:[⌀ØφΦ]\s*)?[\d.,]+(?:\s*(?:мм|mm))?\s*$/i.test(t)) return false;
+      if (/^[dD]\d/.test(t)) return false;
+      return true;
+    }
+
+    var TOOL_TYPES_METRIC_THREAD = { Метчик: 1, Раскатник: 1, Резьбофреза: 1 };
+    function toolTypeUsesMetricThreadDiameter(tt) {
+      return !!TOOL_TYPES_METRIC_THREAD[(tt || "").trim()];
+    }
+
+    function stripLeadingDiameterMarksOnly(s) {
+      var u = (s || "").trim();
+      if (!u) return "";
+      while (true) {
+        var v = u.replace(/^\s+/, "");
+        if (/^[⌀ØφΦ]/.test(v)) {
+          u = v.slice(1).replace(/^\s+/, "");
+          continue;
+        }
+        var dm = v.match(/^[dD](\d.*)$/);
+        if (dm) {
+          u = dm[1].trim();
+          continue;
+        }
+        break;
       }
+      return u.trim();
+    }
+
+    function formatToolDiameterDisplay(text, toolType) {
+      var s = (text || "").trim();
+      if (!s) return "";
+      var tt = (toolType || "").trim();
+      if (tt === "Другое") {
+        return stripLeadingDiameterMarksOnly(s);
+      }
+      if (toolTypeUsesMetricThreadDiameter(tt)) {
+        var u = s;
+        while (true) {
+          var v = u.replace(/^\s+/, "");
+          if (/^[⌀ØφΦ]/.test(v)) {
+            u = v.slice(1).replace(/^\s+/, "");
+            continue;
+          }
+          var dm = v.match(/^[dD](\d.*)$/);
+          if (dm) {
+            u = dm[1].trim();
+            continue;
+          }
+          break;
+        }
+        u = u.trim();
+        if (!u) return "";
+        if (/^m/i.test(u)) return "M" + u.slice(1).replace(/^\s+/, "");
+        return "M" + u;
+      }
+      if (/^[mM]\d/.test(s)) return s;
+      if (looksLikeDescriptiveDiameter(s)) return s;
+      var t = s;
+      while (true) {
+        var v2 = t.replace(/^\s+/, "");
+        if (/^[⌀ØφΦ]/.test(v2)) {
+          t = v2.slice(1).replace(/^\s+/, "");
+          continue;
+        }
+        var dm2 = v2.match(/^[dD](\d.*)$/);
+        if (dm2) {
+          t = dm2[1].trim();
+          continue;
+        }
+        break;
+      }
+      t = t.trim();
+      return t ? "⌀" + t : "⌀";
+    }
+
+    function formatToolOverhangDisplay(text) {
+      var s = (text || "").trim();
+      if (!s) return "";
+      var base = s.replace(/\s*(?:мм|mm)\s*$/i, "").trim();
+      return base ? base + " мм" : "";
     }
 
     function syncToolOverrideClasses(panel) {
@@ -3355,6 +3886,7 @@
     }
 
     function setToolsEditMode(panel, enabled, singleRowOpt) {
+      if (enabled) sortPanelSetupToolRows(panel);
       var rows = singleRowOpt
         ? [singleRowOpt]
         : Array.prototype.slice.call(panel.querySelectorAll(".setup-tools-view tbody tr"));
@@ -3420,11 +3952,26 @@
           } else {
             if (col === "kor_n" || col === "kor_d") {
               var digitsOut = (cell.textContent || "").replace(/[^0-9]/g, "");
+              var tCellExit = row.querySelector('td[data-tool-col="tool_number"]');
+              var expExit = expectedCorrectors(tCellExit ? tCellExit.textContent || "" : "");
+              var expFull = (col === "kor_n" ? expExit.h : expExit.d) || "";
               if (digitsOut) {
                 var prefix = col === "kor_n" ? "H" : "D";
-                cell.textContent = prefix + digitsOut;
+                var built = prefix + digitsOut;
+                if (expFull && built.toUpperCase() === expFull.toUpperCase()) {
+                  cell.textContent = "";
+                } else {
+                  cell.textContent = built;
+                }
               } else {
                 cell.textContent = "";
+              }
+            } else if (col === "diameter" || col === "overhang") {
+              var ttRow = getRowToolType(row);
+              if (col === "diameter") {
+                cell.textContent = formatToolDiameterDisplay((cell.textContent || "").trim(), ttRow);
+              } else {
+                cell.textContent = formatToolOverhangDisplay((cell.textContent || "").trim());
               }
             }
             cell.classList.remove("is-inline-edit");
@@ -3432,8 +3979,11 @@
           }
         });
       });
-      if (!enabled) syncToolOverrideClasses(panel);
-      if (enabled && panel.querySelector(".setup-tools-view.has-tool-row-move")) syncToolMoveButtonStates(panel);
+      if (!enabled) {
+        sortPanelSetupToolRows(panel);
+        syncToolOverrideClasses(panel);
+      }
+      if (panel.querySelector(".setup-tools-view.has-tool-row-move")) syncRowOrderDisplay(panel);
     }
 
     function collectToolsRows(panel) {
@@ -3451,8 +4001,16 @@
           }
           if (colName === "kor_n" || colName === "kor_d") {
             var digits = (cell.textContent || "").replace(/[^0-9]/g, "");
-            if (!digits) return "";
-            return (colName === "kor_n" ? "H" : "D") + digits;
+            if (digits) {
+              return (colName === "kor_n" ? "H" : "D") + digits;
+            }
+            var tnCell = row.querySelector('td[data-tool-col="tool_number"]');
+            var tnRaw = (tnCell && tnCell.textContent ? tnCell.textContent : "").trim().toUpperCase();
+            var tnNorm = normalizeToolNumber(tnRaw) || tnRaw;
+            var exp = expectedCorrectors(tnNorm);
+            if (colName === "kor_n" && exp.h) return exp.h;
+            if (colName === "kor_d" && exp.d) return exp.d;
+            return "";
           }
           if (colName === "tool_number") {
             var tRaw = (cell.textContent || "").trim().toUpperCase();
@@ -3533,6 +4091,57 @@
       }
     }
 
+    function parseGcodeSystemDisplay(str) {
+      var s = (str || "").trim();
+      var m = /^G54\.1\s*P\s*(\d{1,2})\s*$/i.exec(s);
+      if (m) {
+        var n = Math.min(99, Math.max(0, parseInt(m[1], 10) || 0));
+        return { sel: "__G54_1_P__", pText: String(n) };
+      }
+      var u = s.toUpperCase();
+      if (/^G5[4-9]$/.test(u)) return { sel: u, pText: "0" };
+      return { sel: "G54", pText: "0" };
+    }
+
+    function syncGcodeControlsFromSpan(gcodeSpan, gSel, pWrap, pSpan) {
+      if (!gSel || !gcodeSpan) return;
+      var parsed = parseGcodeSystemDisplay(gcodeSpan.textContent || "G54");
+      gSel.value = parsed.sel;
+      if (pSpan) pSpan.textContent = parsed.pText;
+      if (pWrap) pWrap.hidden = parsed.sel !== "__G54_1_P__";
+    }
+
+    function syncGcodeSpanFromControls(gcodeSpan, gSel, pSpan) {
+      if (!gSel || !gcodeSpan) return;
+      if (gSel.value === "__G54_1_P__") {
+        var n = Math.min(99, Math.max(0, parseInt((pSpan && pSpan.textContent) || "0", 10) || 0));
+        gcodeSpan.textContent = "G54.1 P" + n;
+      } else {
+        gcodeSpan.textContent = gSel.value || "G54";
+      }
+    }
+
+    function collectGcodeSystemFromWrap(wrap) {
+      if (!wrap) return "G54";
+      var gSel = wrap.querySelector(".js-inline-gcode-system");
+      var pSpan = wrap.querySelector(".js-inline-gcode-p");
+      var gcodeSpan = wrap.querySelector('[data-field-text="gcode_system"]');
+      if (!gSel || !gcodeSpan) return "G54";
+      if (gSel.value === "__G54_1_P__") {
+        var n = Math.min(99, Math.max(0, parseInt((pSpan && pSpan.textContent) || "0", 10) || 0));
+        return "G54.1 P" + n;
+      }
+      return gSel.value || "G54";
+    }
+
+    function setGcodePWrapVisibilityFromSelect(sel) {
+      if (!sel) return;
+      var wrap = sel.closest(".setup-gcode-value");
+      var pWrap = wrap ? wrap.querySelector(".js-inline-gcode-p-wrap") : null;
+      if (!pWrap) return;
+      pWrap.hidden = sel.value !== "__G54_1_P__";
+    }
+
     function buildExtraSpecBoxFromSource(sourceBox, clearValues) {
       if (!sourceBox) return null;
       var clone = sourceBox.cloneNode(true);
@@ -3561,17 +4170,35 @@
         });
       });
       clone.querySelectorAll(".js-inline-gcode-system").forEach(function (sel) {
-        if (clearValues) sel.value = "G54";
         var wrap = sel.closest(".setup-gcode-value");
+        var pWrap = wrap ? wrap.querySelector(".js-inline-gcode-p-wrap") : null;
+        var pSpan = wrap ? wrap.querySelector(".js-inline-gcode-p") : null;
+        if (clearValues) {
+          sel.value = "G54";
+          if (pSpan) pSpan.textContent = "0";
+          if (pWrap) pWrap.setAttribute("hidden", "hidden");
+        }
         var span = wrap ? wrap.querySelector('[data-field-text="gcode_system"]') : null;
         if (inlineEditMode) {
           sel.removeAttribute("hidden");
           if (span) span.setAttribute("hidden", "hidden");
+          if (pWrap) setGcodePWrapVisibilityFromSelect(sel);
+          if (pSpan) {
+            pSpan.classList.add("is-inline-edit");
+            pSpan.setAttribute("contenteditable", "true");
+            pSpan.setAttribute("spellcheck", "false");
+          }
         } else {
           sel.setAttribute("hidden", "hidden");
+          if (pWrap) pWrap.setAttribute("hidden", "hidden");
           if (span) {
             span.removeAttribute("hidden");
-            span.textContent = sel.value || span.textContent || "G54";
+            if (!clearValues) syncGcodeSpanFromControls(span, sel, pSpan);
+            else span.textContent = sel.value || "G54";
+          }
+          if (pSpan) {
+            pSpan.classList.remove("is-inline-edit");
+            pSpan.removeAttribute("contenteditable");
           }
         }
       });
@@ -3622,17 +4249,29 @@
           if (field === "gcode_system") {
             var wrap = node.closest(".setup-gcode-value");
             var gSel = wrap ? wrap.querySelector(".js-inline-gcode-system") : null;
+            var pWrap = wrap ? wrap.querySelector(".js-inline-gcode-p-wrap") : null;
+            var pSpan = wrap ? wrap.querySelector(".js-inline-gcode-p") : null;
             if (inlineEditMode) {
               node.setAttribute("hidden", "hidden");
               if (gSel) {
-                gSel.value = (node.textContent || "G54").trim() || "G54";
+                syncGcodeControlsFromSpan(node, gSel, pWrap, pSpan);
                 gSel.removeAttribute("hidden");
+              }
+              if (pSpan) {
+                pSpan.classList.add("is-inline-edit");
+                pSpan.setAttribute("contenteditable", "true");
+                pSpan.setAttribute("spellcheck", "false");
               }
             } else {
               node.removeAttribute("hidden");
               if (gSel) {
-                node.textContent = gSel.value || node.textContent || "G54";
+                syncGcodeSpanFromControls(node, gSel, pSpan);
                 gSel.setAttribute("hidden", "hidden");
+              }
+              if (pWrap) pWrap.setAttribute("hidden", "hidden");
+              if (pSpan) {
+                pSpan.classList.remove("is-inline-edit");
+                pSpan.removeAttribute("contenteditable");
               }
             }
             node.classList.remove("is-inline-edit");
@@ -3676,8 +4315,8 @@
             else row.setAttribute("hidden", "hidden");
           });
           setToolsEditMode(panel, inlineEditMode);
-          if (inlineEditMode && panel.querySelector(".setup-tools-view.has-tool-row-move")) {
-            syncToolMoveButtonStates(panel);
+          if (panel.querySelector(".setup-tools-view.has-tool-row-move")) {
+            syncRowOrderDisplay(panel);
           }
           syncPhotoDnDMode(panel, inlineEditMode);
           syncSpecDnDMode(panel, inlineEditMode);
@@ -3738,8 +4377,21 @@
       document.querySelectorAll(".setup-program-upload-btn").forEach(function (btn) {
         btn.setAttribute("hidden", "hidden");
       });
-      root.querySelectorAll(".js-inline-gcode-system").forEach(function (sel) {
-        sel.setAttribute("hidden", "hidden");
+      root.querySelectorAll(".setup-gcode-value").forEach(function (wrap) {
+        var gcodeSpan = wrap.querySelector('[data-field-text="gcode_system"]');
+        var sel = wrap.querySelector(".js-inline-gcode-system");
+        var pWrap = wrap.querySelector(".js-inline-gcode-p-wrap");
+        var pSpan = wrap.querySelector(".js-inline-gcode-p");
+        if (gcodeSpan && sel) {
+          syncGcodeSpanFromControls(gcodeSpan, sel, pSpan);
+          gcodeSpan.removeAttribute("hidden");
+        }
+        if (sel) sel.setAttribute("hidden", "hidden");
+        if (pWrap) pWrap.setAttribute("hidden", "hidden");
+        if (pSpan) {
+          pSpan.classList.remove("is-inline-edit");
+          pSpan.removeAttribute("contenteditable");
+        }
       });
       root.querySelectorAll(".product-tab-panel").forEach(function (panel) {
         panel.setAttribute("data-inline-edit-mode", "0");
@@ -3767,6 +4419,13 @@
     root.addEventListener(
       "paste",
       function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains("js-inline-gcode-p")) {
+          e.preventDefault();
+          var clipG = e.clipboardData || window.clipboardData;
+          var textG = clipG && clipG.getData ? clipG.getData("text/plain") || "" : "";
+          e.target.textContent = (textG || "").replace(/[^0-9]/g, "").slice(0, 2);
+          return;
+        }
         var td = e.target && e.target.closest ? e.target.closest("table.setup-tools-view td.is-inline-edit[data-tool-col]") : null;
         if (!td) return;
         var col = td.getAttribute("data-tool-col") || "";
@@ -3792,6 +4451,67 @@
           sel.removeAllRanges();
           sel.addRange(range);
         }
+      },
+      true
+    );
+
+    root.addEventListener("input", function (e) {
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (t.classList && t.classList.contains("js-inline-gcode-p")) {
+        var dg = (t.textContent || "").replace(/[^0-9]/g, "").slice(0, 2);
+        if (t.textContent !== dg) t.textContent = dg;
+        return;
+      }
+    });
+
+    root.addEventListener(
+      "keydown",
+      function (e) {
+        var gPkd = e.target && e.target.classList && e.target.classList.contains("js-inline-gcode-p");
+        if (gPkd) {
+          if (e.ctrlKey || e.metaKey || e.altKey) return;
+          var gk = e.key || "";
+          if (
+            gk === "Backspace" ||
+            gk === "Delete" ||
+            gk === "Tab" ||
+            gk === "Escape" ||
+            gk === "ArrowLeft" ||
+            gk === "ArrowRight" ||
+            gk === "Home" ||
+            gk === "End"
+          )
+            return;
+          if (gk === "Enter") {
+            e.preventDefault();
+            e.target.blur();
+            return;
+          }
+          if (gk.length === 1 && !/[0-9]/.test(gk)) e.preventDefault();
+          return;
+        }
+      },
+      true
+    );
+
+    root.addEventListener(
+      "focusout",
+      function (e) {
+        if (!inlineEditMode) return;
+        var tdTn = e.target && e.target.closest && e.target.closest('td[data-tool-col="tool_number"].is-inline-edit');
+        if (!tdTn) return;
+        var trFo = tdTn.closest("tr");
+        var tbodyFo = trFo && trFo.parentNode;
+        var panelFo = trFo && trFo.closest(".product-tab-panel");
+        if (!trFo || !tbodyFo || String(tbodyFo.tagName || "").toUpperCase() !== "TBODY" || !panelFo) return;
+        window.setTimeout(function () {
+          if (!inlineEditMode) return;
+          if (tdTn.contains(document.activeElement)) return;
+          sortSetupToolsTbodyByToolNumber(tbodyFo);
+          syncRowOrderDisplay(panelFo);
+          syncToolOverrideClasses(panelFo);
+        }, 0);
       },
       true
     );
@@ -3850,6 +4570,13 @@
             if (val) normalizeSetupNotesImages(node);
           } else if (k === "gcode_system") {
             node.textContent = val || "G54";
+            var gWrap = node.closest(".setup-gcode-value");
+            if (gWrap) {
+              var gSel = gWrap.querySelector(".js-inline-gcode-system");
+              var pW = gWrap.querySelector(".js-inline-gcode-p-wrap");
+              var pS = gWrap.querySelector(".js-inline-gcode-p");
+              if (gSel && pW && pS) syncGcodeControlsFromSpan(node, gSel, pW, pS);
+            }
           } else if (k === "name") {
             node.textContent = val || "";
           } else {
@@ -3901,10 +4628,10 @@
           payload.append(name, txt === "—" ? "" : txt);
         });
         var mainBoxForGcode = panelSetup.querySelector(".setup-spec-stack .setup-spec-box:not(.setup-spec-box-extra)");
-        var gcodeSelect = mainBoxForGcode
-          ? mainBoxForGcode.querySelector(".js-inline-gcode-system:not([hidden])") || mainBoxForGcode.querySelector(".js-inline-gcode-system")
-          : panelSetup.querySelector(".js-inline-gcode-system:not([hidden])") || panelSetup.querySelector(".js-inline-gcode-system");
-        payload.append("gcode_system", gcodeSelect && gcodeSelect.value ? gcodeSelect.value : "G54");
+        var gcodeWrap = mainBoxForGcode
+          ? mainBoxForGcode.querySelector(".setup-gcode-value")
+          : panelSetup.querySelector(".setup-gcode-value");
+        payload.append("gcode_system", collectGcodeSystemFromWrap(gcodeWrap));
         var notesEl = panelSetup.querySelector('[data-field-text="setup_notes"]');
         var notesText = notesEl ? (notesEl.innerHTML || "").trim() : "";
         payload.append("setup_notes", notesText === "Наладка не заполнена." ? "" : notesText);
@@ -4056,24 +4783,45 @@
     root.addEventListener("click", function (e) {
       var el = e.target;
       if (!el) return;
+      var noteToggle = el.closest && el.closest(".js-setup-tools-note-toggle");
+      if (noteToggle) {
+        var wrap = noteToggle.closest(".setup-tools-table-wrap");
+        var table = wrap && wrap.querySelector("table.setup-tools-view");
+        if (table) {
+          var show = !table.classList.contains("setup-tools-show-note");
+          table.classList.toggle("setup-tools-show-note", show);
+          noteToggle.setAttribute("aria-expanded", show ? "true" : "false");
+          var labelShow = noteToggle.getAttribute("data-label-show") || "Показать примечания";
+          var labelHide = noteToggle.getAttribute("data-label-hide") || "Скрыть примечания";
+          noteToggle.textContent = show ? labelHide : labelShow;
+        }
+        e.preventDefault();
+        return;
+      }
+      var hdAutofill = el.closest && el.closest(".js-setup-tools-hd-autofill-row");
+      if (hdAutofill) {
+        if (!inlineEditMode) return;
+        var row = hdAutofill.closest("tr");
+        var panelHd = hdAutofill.closest(".product-tab-panel");
+        if (!row || !panelHd) return;
+        var toolCell = row.querySelector('td[data-tool-col="tool_number"]');
+        var hCell = row.querySelector('td[data-tool-col="kor_n"]');
+        var dCell = row.querySelector('td[data-tool-col="kor_d"]');
+        if (!toolCell || !hCell || !dCell) return;
+        if (!hCell.classList.contains("is-inline-edit")) return;
+        var exp = expectedCorrectors(toolCell.textContent || "");
+        if (!exp.h || !exp.d) return;
+        hCell.textContent = exp.h.replace(/[^0-9]/g, "");
+        dCell.textContent = exp.d.replace(/[^0-9]/g, "");
+        syncToolOverrideClasses(panelHd);
+        e.preventDefault();
+        return;
+      }
       var addToolBtn = el.closest && el.closest(".js-setup-tools-add-row");
       if (addToolBtn) {
         if (!inlineEditMode) return;
         var panelAdd = addToolBtn.closest(".product-tab-panel");
         if (panelAdd) appendSetupToolRow(panelAdd);
-        return;
-      }
-      var moveUpBtn = el.closest && el.closest(".js-setup-tool-move-up");
-      var moveDnBtn = el.closest && el.closest(".js-setup-tool-move-down");
-      if (moveUpBtn || moveDnBtn) {
-        if (!inlineEditMode) return;
-        var btn = moveUpBtn || moveDnBtn;
-        var trMove = btn.closest("tr");
-        var panelMove = trMove ? trMove.closest(".product-tab-panel") : null;
-        if (!trMove || !panelMove) return;
-        moveSetupToolRow(trMove, moveUpBtn ? -1 : 1);
-        syncToolMoveButtonStates(panelMove);
-        syncToolOverrideClasses(panelMove);
         return;
       }
       var correctionCell = el.closest ? el.closest('td[data-tool-col="correction_enabled"]') : null;
@@ -4852,6 +5600,10 @@
         handleBindingPhotoInputChange(input);
         return;
       }
+      if (input.classList.contains("js-inline-gcode-system")) {
+        setGcodePWrapVisibilityFromSelect(input);
+        return;
+      }
       if (input.classList.contains("setup-program-upload-input")) {
         handleProgramUploadInputChange(input);
       }
@@ -5257,7 +6009,7 @@
     controls.update();
   }
 
-  /** Как на странице /test/: контур граней + flat shading на меше */
+  /** Контур граней + flat shading на меше */
   function addProductStlEdges(mesh, geometry, angleDeg) {
     try {
       const edgeGeo = new THREE.EdgesGeometry(geometry, angleDeg);

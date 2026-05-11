@@ -1,4 +1,10 @@
-from biota_shifts.auth import NAV_KEYS, _is_admin, nav_permissions_for_user, user_is_executor
+from biota_shifts.auth import (
+    NAV_KEYS,
+    _is_admin,
+    machines_quick_edit_for_user,
+    nav_permissions_for_user,
+    user_is_executor,
+)
 
 
 def biota_session(request):
@@ -11,6 +17,7 @@ def biota_session(request):
             "biota_is_executor": False,
             "biota_can_edit": True,
             "biota_is_admin": False,
+            "biota_machines_quick_edit": False,
         }
     nav = nav_permissions_for_user(u)
     adn = (request.session.get("admin_display_name") or "").strip()
@@ -21,6 +28,7 @@ def biota_session(request):
         "biota_is_executor": is_executor,
         "biota_can_edit": is_admin or not is_executor,
         "biota_is_admin": is_admin,
+        "biota_machines_quick_edit": machines_quick_edit_for_user(u),
     }
     if is_admin and adn:
         return {"biota_username": adn, **payload}

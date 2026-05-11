@@ -101,6 +101,27 @@
       <input type="file" name="preview_stl" id="id_preview_stl" accept=".stl" style="display:none;" />
       {% if form.preview_stl.errors %}<span class="muted">{{ form.preview_stl.errors }}</span>{% endif %}
     </label>
+    <label class="field" style="grid-column:1/-1;">
+      <span>STEP/STP отдельно (не для окна предпросмотра — только файл для скачивания в карточке)</span>
+      {% if is_edit and product and product.cad_step_model %}
+      <div class="product-file-row">
+        <a href="{{ product.cad_step_model.url }}" target="_blank" rel="noopener" style="text-decoration:none;color:#c9ddff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ product.cad_step_model.name|cut:"products/cad_step/" }}</a>
+        <input type="hidden" name="remove_cad_step_model" id="id_remove_cad_step_model" value="0" />
+        <div class="product-file-actions">
+          <label for="id_cad_step_model" class="btn btn-ghost file-action-btn" style="cursor:pointer;">Заменить</label>
+          <button type="button" class="btn btn-ghost file-action-btn js-remove-file-btn" data-target="id_remove_cad_step_model">Удалить</button>
+        </div>
+      </div>
+      {% endif %}
+      {% if not is_edit or not product or not product.cad_step_model %}
+      <div class="product-file-picker">
+        <label for="id_cad_step_model" class="btn btn-ghost" style="cursor:pointer;">Выбрать STP/STEP</label>
+        <span class="muted js-file-name" data-for="id_cad_step_model">Файл не выбран</span>
+      </div>
+      {% endif %}
+      <input type="file" name="cad_step_model" id="id_cad_step_model" accept=".stp,.step" style="display:none;" />
+      {% if form.cad_step_model.errors %}<span class="muted">{{ form.cad_step_model.errors }}</span>{% endif %}
+    </label>
   </div>
   <p class="filter-actions" style="margin-top:18px;">
     <button type="submit" class="btn form-action-btn">{% if is_edit %}Сохранить{% else %}Создать{% endif %}</button>

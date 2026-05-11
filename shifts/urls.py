@@ -8,13 +8,12 @@ from . import inventory_views
 from . import payroll_views
 from . import product_views
 from . import skud_views
-from . import admin_lab_views
+from . import machines_views
 from . import views
 
 urlpatterns = [
     path("", views.login_view, name="root"),
     path("home/", views.home_view, name="home"),
-    path("test/", admin_lab_views.admin_test_lab, name="admin_test_lab"),
     path("graph/", graph_views.graph_view, name="graph"),
     path("graph/download/", graph_views.graph_download, name="graph_download"),
     path("hours/", hours_views.hours_view, name="hours"),
@@ -36,11 +35,11 @@ urlpatterns = [
         name="payroll_settlement",
     ),
     path("inventory/", inventory_views.inventory_view, name="inventory"),
+    path("machines/", machines_views.machines_view, name="machines"),
     path("products/", product_views.products_list_view, name="products_list"),
     path("products/new/", product_views.product_create_view, name="product_create"),
     path("products/name-suggestions/", product_views.product_name_suggestions_view, name="product_name_suggestions"),
     path("products/<int:pk>/edit/", product_views.product_edit_view, name="product_edit"),
-    path("products/<int:pk>/setups/new/", product_views.product_setup_create_view, name="product_setup_create"),
     path("products/<int:pk>/setups/<int:setup_pk>/edit/", product_views.product_setup_edit_view, name="product_setup_edit"),
     path("products/<int:pk>/setups/<int:setup_pk>/pdf/<str:mode>/", product_views.product_setup_pdf_export_view, name="product_setup_pdf_export"),
     path("products/<int:pk>/save-list-preview/", product_views.product_save_list_preview_view, name="product_save_list_preview"),

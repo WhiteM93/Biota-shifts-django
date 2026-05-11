@@ -12,6 +12,7 @@ from biota_shifts.auth import (
     NAV_KEYS,
     _is_admin,
     _resolve_registered_user,
+    inventory_stock_manage_for_user,
     nav_permissions_for_user,
     user_is_executor,
 )
@@ -43,6 +44,8 @@ def _nav_key_for_url_name(url_name: str) -> str | None:
         return "regulations"
     if n.startswith("product"):
         return "products"
+    if n == "machines":
+        return "machines"
     return None
 
 
@@ -93,6 +96,7 @@ def post_login_redirect(username: str | None, next_path: str | None = None) -> s
         "employees",
         "regulations",
         "products",
+        "machines",
     )
     for k in order:
         if not perms.get(k, True):
@@ -193,6 +197,9 @@ def write_permission_required(view_func):
         u = biota_user(request)
         if request.method not in {"GET", "HEAD", "OPTIONS"} and not _is_admin(u) and user_is_executor(u):
             action = (request.POST.get("action") or "").strip() if request.method == "POST" else ""
+            rm = getattr(request, "resolver_match", None)
+            if rm and rm.url_name == "inventory" and inventory_stock_manage_for_user(u):
+                return view_func(request, *args, **kwargs)
             if action in {"add_product_note", "delete_product_note"}:
                 return view_func(request, *args, **kwargs)
             if (request.headers.get("X-Requested-With") or "").strip() == "XMLHttpRequest":

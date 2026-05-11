@@ -53,18 +53,38 @@
 </details>
 {% endif %}
 {% if biota_nav.products %}
-<a href="{% url 'products_list' %}" class="{% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_setup_create' or request.resolver_match.url_name == 'product_setup_edit' %}active{% endif %}">Наладки</a>
+<a href="{% url 'products_list' %}" class="{% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_setup_edit' %}active{% endif %}">Наладки</a>
 {% endif %}
-{% if biota_is_admin %}
-<a href="{% url 'admin_test_lab' %}" class="{% if request.resolver_match.url_name == 'admin_test_lab' %}active{% endif %}">Тест</a>
+{% if biota_nav.machines %}
+<a href="{% url 'machines' %}" class="{% if request.resolver_match.url_name == 'machines' %}active{% endif %}">Станки</a>
+{% endif %}
+<span class="nav-spacer"></span>
+{% if biota_username %}
+<a href="{% url 'cabinet' %}" class="nav-user {% if request.resolver_match.url_name == 'cabinet' %}active{% endif %}">{{ biota_username }}</a>
 {% endif %}
 <div class="nav-theme-wrap">
   <button type="button" class="nav-theme-btn" id="biota-theme-toggle" aria-pressed="false" title="Тема «Рассвет» (светлая)">☾</button>
 </div>
-<span class="nav-spacer"></span>
 {% if biota_username %}
-<a href="{% url 'cabinet' %}" class="nav-user {% if request.resolver_match.url_name == 'cabinet' %}active{% endif %}">{{ biota_username }}</a>
-<a href="{% url 'logout' %}" class="nav-logout">Выйти</a>
+<a href="{% url 'logout' %}" class="nav-logout" aria-label="Выйти из аккаунта" title="Выйти">
+  <svg
+    class="nav-logout-icon"
+    viewBox="0 0 24 24"
+    width="20"
+    height="20"
+    aria-hidden="true"
+    focusable="false"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2.15"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+</a>
 {% else %}
 <a href="{% url 'login' %}">Войти</a>
 {% endif %}

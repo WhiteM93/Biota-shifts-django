@@ -85,6 +85,7 @@ class ProductAdmin(admin.ModelAdmin):
                 "fields": (
                     "drawing_pdf",
                     "cad_model",
+                    "cad_step_model",
                     "preview_stl",
                     "program_file",
                 )
