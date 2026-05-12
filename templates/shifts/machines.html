@@ -122,25 +122,28 @@
             data-product-href="{% url 'product_detail' srow.product_id %}"
             {% endif %}
           >
-            <span
-              class="machines-schedule-drag-handle"
-              aria-label="Перетащить на колонку станка"
-              title="Перетащите на «сейчас» или «далее» у нужного станка"
-              >≡</span>
-            <span class="machines-schedule-label-view">{{ srow.display }}</span>
-            <div class="machines-schedule-product-combo js-machines-product-combo" data-schedule-select="{{ forloop.counter0 }}">
-              <input type="hidden" class="js-machines-product-id" value="{% if srow.product_id %}{{ srow.product_id }}{% endif %}" autocomplete="off" />
-              <input
-                type="text"
-                class="machines-schedule-product-search js-machines-product-search"
-                placeholder="Поиск изделия…"
-                autocomplete="off"
-                spellcheck="false"
-                aria-label="Поиск изделия"
-                title="Введите часть названия или номер"
-              />
-              <div class="machines-product-suggest" hidden role="listbox" aria-label="Совпадения"></div>
+            <div class="machines-schedule-label-primary">
+              <span
+                class="machines-schedule-drag-handle"
+                aria-label="Перетащить на колонку станка"
+                title="Перетащите на «сейчас» или «далее» у нужного станка"
+                >≡</span>
+              <span class="machines-schedule-label-view">{{ srow.display }}</span>
+              <div class="machines-schedule-product-combo js-machines-product-combo" data-schedule-select="{{ forloop.counter0 }}">
+                <input type="hidden" class="js-machines-product-id" value="{% if srow.product_id %}{{ srow.product_id }}{% endif %}" autocomplete="off" />
+                <input
+                  type="text"
+                  class="machines-schedule-product-search js-machines-product-search"
+                  placeholder="Поиск изделия…"
+                  autocomplete="off"
+                  spellcheck="false"
+                  aria-label="Поиск изделия"
+                  title="Введите часть названия или номер"
+                />
+                <div class="machines-product-suggest" hidden role="listbox" aria-label="Совпадения"></div>
+              </div>
             </div>
+            <div class="machines-schedule-label-departments{% if not srow.plan_departments_line %} is-empty{% endif %}">{% if srow.plan_departments_line %}{{ srow.plan_departments_line }}{% elif srow.product_id %}—{% endif %}</div>
           </div>
           <div class="machines-cell machines-cell--code machines-cell--schedule-code">{{ srow.machine_code }}</div>
         </div>
@@ -191,24 +194,27 @@
         data-machine-code=""
         data-original-label=""
       >
-        <span
-          class="machines-schedule-drag-handle"
-          aria-label="Перетащить на колонку станка"
-          title="Перетащите на «сейчас» или «далее» у нужного станка"
-          >≡</span>
-        <span class="machines-schedule-label-view"></span>
-        <div class="machines-schedule-product-combo js-machines-product-combo">
-          <input type="hidden" class="js-machines-product-id" value="" autocomplete="off" />
-          <input
-            type="text"
-            class="machines-schedule-product-search js-machines-product-search"
-            placeholder="Поиск изделия…"
-            autocomplete="off"
-            spellcheck="false"
-            aria-label="Поиск изделия"
-          />
-          <div class="machines-product-suggest" hidden role="listbox"></div>
+        <div class="machines-schedule-label-primary">
+          <span
+            class="machines-schedule-drag-handle"
+            aria-label="Перетащить на колонку станка"
+            title="Перетащите на «сейчас» или «далее» у нужного станка"
+            >≡</span>
+          <span class="machines-schedule-label-view"></span>
+          <div class="machines-schedule-product-combo js-machines-product-combo">
+            <input type="hidden" class="js-machines-product-id" value="" autocomplete="off" />
+            <input
+              type="text"
+              class="machines-schedule-product-search js-machines-product-search"
+              placeholder="Поиск изделия…"
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="Поиск изделия"
+            />
+            <div class="machines-product-suggest" hidden role="listbox"></div>
+          </div>
         </div>
+        <div class="machines-schedule-label-departments is-empty"></div>
       </div>
       <div class="machines-cell machines-cell--code machines-cell--schedule-code is-empty"></div>
     </div>
@@ -553,11 +559,31 @@
     justify-content: flex-start;
     text-align: left;
     position: relative;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    min-width: 0;
+  }
+  .machines-schedule-label-primary {
+    display: flex;
     flex-direction: row;
     align-items: stretch;
     gap: 6px;
     flex-wrap: nowrap;
     min-width: 0;
+  }
+  .machines-schedule-label-departments {
+    font-size: 11.5px;
+    line-height: 1.35;
+    color: var(--bio-muted);
+    font-style: normal;
+    font-weight: 500;
+    white-space: normal;
+    word-break: break-word;
+    padding: 0 0 1px 0;
+  }
+  .machines-schedule-label-departments.is-empty {
+    opacity: 0.55;
   }
   .machines-schedule-drag-handle {
     flex: 0 0 22px;
@@ -596,6 +622,9 @@
   }
   .machines-quick-row > .machines-cell--tag.is-empty::after {
     content: "Т";
+  }
+  .machines-cell--schedule-label.is-empty::after {
+    content: none;
   }
   .machines-cell--field:not(.is-empty) {
     font-weight: 500;
@@ -1182,6 +1211,36 @@
       return "";
     }
 
+    function planDepartmentsById(id) {
+      var sid = String(id);
+      var cat = getCatalog();
+      for (var j = 0; j < cat.length; j++) {
+        if (String(cat[j].id) === sid) return String(cat[j].plan_departments || "").trim();
+      }
+      return "";
+    }
+
+    function syncScheduleLabelDepartments(cell) {
+      if (!cell) return;
+      var depEl = cell.querySelector(".machines-schedule-label-departments");
+      if (!depEl) return;
+      var hid = cell.querySelector(".js-machines-product-id");
+      var pid = hid ? (hid.value || "").trim() : "";
+      if (!pid) {
+        depEl.textContent = "";
+        depEl.classList.add("is-empty");
+        return;
+      }
+      var line = planDepartmentsById(pid);
+      if (line) {
+        depEl.textContent = line;
+        depEl.classList.remove("is-empty");
+      } else {
+        depEl.textContent = "—";
+        depEl.classList.add("is-empty");
+      }
+    }
+
     function catalogHasId(id) {
       if (!id) return true;
       return !!nameById(id);
@@ -1303,6 +1362,7 @@
       } else {
         clearQuickFieldProductRef(cell);
       }
+      syncScheduleLabelDepartments(cell);
     }
 
     function persistAllProducts() {
@@ -2036,6 +2096,7 @@
         labelCell.classList.add("is-empty");
       }
       clearQuickFieldProductRef(labelCell);
+      syncScheduleLabelDepartments(labelCell);
     }
 
     function saveScheduleClientRows() {

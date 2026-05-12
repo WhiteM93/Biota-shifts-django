@@ -1,6 +1,7 @@
 """Раздел «Станки» (учёт станков, план на станке)."""
 import json
 
+from django.db.models import Prefetch
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -10,7 +11,7 @@ from django.views.decorators.http import require_http_methods
 from biota_shifts.auth import machines_quick_edit_for_user
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
-from .models import MachinesBoardState, Product
+from .models import MachinesBoardState, PlannedProduct, PlannedProductStage, Product
 
 # Версия «заглушечного» контента с сервера: при изменении дефолтов в коде увеличить,
 # чтобы у клиентов сбросился локальный оверлей (localStorage) и подтянулись новые строки.
@@ -50,7 +51,29 @@ MAX_MACHINE_ROWS = 60
 MAX_SCHEDULE_ROWS = 120
 
 
-def _schedule_rows_with_display(rows: list[dict], product_by_id: dict[int, str]) -> list[dict]:
+def _product_plan_departments_by_id(valid_pids: set[int]) -> dict[int, str]:
+    """Цепочка отделов маршрута плана для карточки наладки (через PlannedProduct.naladki_product)."""
+    if not valid_pids:
+        return {}
+    qs = PlannedProduct.objects.filter(naladki_product_id__in=valid_pids).prefetch_related(
+        Prefetch("stages", PlannedProductStage.objects.order_by("sort_order", "id"))
+    )
+    out: dict[int, str] = {}
+    for pp in qs:
+        pid = pp.naladki_product_id
+        if not pid:
+            continue
+        parts = [s.department for s in pp.stages.all() if (s.department or "").strip()]
+        if parts:
+            out[int(pid)] = " → ".join(parts)
+    return out
+
+
+def _schedule_rows_with_display(
+    rows: list[dict],
+    product_by_id: dict[int, str],
+    plan_departments_by_id: dict[int, str],
+) -> list[dict]:
     out: list[dict] = []
     for r in rows:
         pid = r.get("product_id")
@@ -58,7 +81,21 @@ def _schedule_rows_with_display(rows: list[dict], product_by_id: dict[int, str])
             display = product_by_id[pid]
         else:
             display = (r.get("label") or "").strip()
-        out.append({**r, "product_id": "" if pid is None else pid, "display": display})
+        pid_key: int | None = None
+        if pid not in (None, ""):
+            try:
+                pid_key = int(pid)
+            except (TypeError, ValueError):
+                pid_key = None
+        dept_line = plan_departments_by_id.get(pid_key, "") if pid_key is not None else ""
+        out.append(
+            {
+                **r,
+                "product_id": "" if pid is None else pid,
+                "display": display,
+                "plan_departments_line": dept_line,
+            }
+        )
     return out
 
 
@@ -178,6 +215,7 @@ def machines_view(request):
     product_by_id = {p.id: (p.name or "") for p in plist}
     valid_pids = set(product_by_id.keys())
     product_options = [{"id": p.id, "name": p.name or ""} for p in plist]
+    plan_departments_by_id = _product_plan_departments_by_id(valid_pids)
 
     machine_rows = list(_DEFAULT_MACHINE_ROWS)
     schedule_seed = list(_DEFAULT_SCHEDULE_ROWS)
@@ -192,7 +230,7 @@ def machines_view(request):
             schedule_seed = sr
             machines_board_has_server = True
 
-    schedule_rows = _schedule_rows_with_display(schedule_seed, product_by_id)
+    schedule_rows = _schedule_rows_with_display(schedule_seed, product_by_id, plan_departments_by_id)
 
     if request.method == "POST":
         if (request.headers.get("X-Requested-With") or "").strip() != "XMLHttpRequest":
@@ -204,7 +242,14 @@ def machines_view(request):
         url = ""
         if p.list_preview_image:
             url = request.build_absolute_uri(p.list_preview_image.url)
-        machines_products_json.append({"id": p.id, "name": p.name or "", "list_preview_url": url})
+        machines_products_json.append(
+            {
+                "id": p.id,
+                "name": p.name or "",
+                "list_preview_url": url,
+                "plan_departments": plan_departments_by_id.get(p.id, ""),
+            }
+        )
 
     product_detail_url_sentinel = reverse("product_detail", args=[_MACHINES_DETAIL_URL_SENTINEL])
 

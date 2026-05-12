@@ -56,7 +56,7 @@
       {% endif %}
     </div>
     <div class="product-tab-panels">
-      <section class="product-tab-panel" id="panel-drawing" data-panel="drawing" data-inline-edit-mode="0" role="tabpanel" aria-labelledby="tab-drawing" {% if tab_default != 'drawing' %}hidden{% endif %}>
+      <section class="product-tab-panel" id="panel-drawing" data-panel="drawing" data-inline-edit-mode="0" role="tabpanel" aria-label="Изделие" {% if tab_default != 'drawing' %}hidden{% endif %}>
         {% if setups %}
         {% include "shifts/includes/plan_card_specs_unified.html" with plan_specs_variant="product" %}
         {% endif %}

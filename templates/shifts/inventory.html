@@ -720,7 +720,20 @@
         <select id="issue-tool-select" name="tool_id" required class="issue-tool-combo-native" tabindex="-1" aria-hidden="true">
           <option value="">Выбрать...</option>
           {% for t in movement_tool_options %}
-          <option value="{{ t.id }}" data-category="{{ t.category }}">{{ t.issue_select_label }}</option>
+          {% with card=t.issue_combo_card coat=t.coating_type|default:'none' %}
+          <option
+            value="{{ t.id }}"
+            data-category="{{ t.category }}"
+            data-issue-type="{{ card.tool_type|escape }}"
+            data-issue-specs="{{ card.specs|escape }}"
+            data-issue-material="{{ card.material|escape }}"
+            data-issue-qty="{{ card.qty|escape }}"
+            data-issue-coating-type="{{ coat|escape }}"
+            data-issue-coating-title="{{ coat|coating_hover_title|escape }}"
+            data-issue-wm="{{ t.work_material|default:''|escape }}"
+            data-issue-wm-title="{% if t.work_material %}{{ t.get_work_material_display|escape }}{% endif %}"
+          >{{ t.issue_select_label }}</option>
+          {% endwith %}
           {% endfor %}
         </select>
         <button
@@ -1389,7 +1402,7 @@
   }
   /* Кастомный выбор инструмента (выдача): не нативный select */
   #issue-block .issue-tool-field {
-    min-width: min(100%, 320px);
+    min-width: min(100%, 420px);
     max-width: 100%;
   }
   .issue-tool-combo {
@@ -1487,7 +1500,7 @@
     width: 100%;
     max-width: 100%;
     margin: 0;
-    padding: 9px 12px;
+    padding: 10px 12px;
     box-sizing: border-box;
     border: 0;
     border-bottom: 1px solid var(--bio-table-cell-border, rgba(0, 0, 0, 0.06));
@@ -1500,6 +1513,73 @@
     cursor: pointer;
     white-space: normal;
     word-break: break-word;
+  }
+  .issue-tool-opt-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    text-align: left;
+  }
+  .issue-tool-opt-type {
+    font-weight: 600;
+    font-size: 12.5px;
+    line-height: 1.3;
+    color: var(--bio-input-fg, var(--bio-body-fg));
+  }
+  .issue-tool-opt-specs {
+    font-size: 11.75px;
+    line-height: 1.45;
+    color: var(--bio-muted, #6b7280);
+  }
+  .issue-tool-opt-inline {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin: 0;
+    padding: 0;
+    font-size: 11.5px;
+    line-height: 1.35;
+  }
+  .issue-tool-opt-mat {
+    flex: 1 1 auto;
+    min-width: 0;
+    word-break: break-word;
+    color: var(--bio-input-fg, var(--bio-body-fg));
+  }
+  .issue-tool-opt-chip-slot {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+  }
+  .issue-tool-opt-chip-slot.issue-tool-opt-mo-empty {
+    color: var(--bio-muted, #6b7280);
+  }
+  .issue-tool-opt-qty {
+    flex: 0 0 auto;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  #issue-block .issue-tool-opt-inline .swatch {
+    flex: 0 0 auto;
+    width: 12px;
+    height: 12px;
+    border-width: 1px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  }
+  #issue-block .issue-tool-opt-inline .wm-square {
+    flex: 0 0 auto;
+    width: 15px;
+    height: 15px;
+    font-size: 8px;
+    font-weight: 700;
+    border-width: 1px;
+    border-radius: 2px;
+  }
+  #issue-block .issue-tool-opt-inline .coating-inline-label {
+    font-size: 10.5px;
   }
   .issue-tool-combo-opt:last-child {
     border-bottom: 0;
@@ -2304,6 +2384,114 @@
       btn.setAttribute("aria-expanded", "true");
     }
 
+    function issueToolComboNormCoatingClass(code) {
+      var c = String(code || "none").trim().toLowerCase();
+      if (c === "none" || c === "yellow" || c === "brown" || c === "black" || c === "multicolor" || c === "blue" || c === "other") {
+        return c;
+      }
+      return "other";
+    }
+
+    function issueToolComboNormWmClass(wm) {
+      var c = String(wm || "").trim().toLowerCase();
+      if (c === "p" || c === "m" || c === "k" || c === "n" || c === "s" || c === "h" || c === "pw") {
+        return c;
+      }
+      return "";
+    }
+
+    function issueToolComboAppendInlineSpecs(card, opt, material, qty) {
+      var row = document.createElement("div");
+      row.className = "issue-tool-opt-inline";
+
+      var mat = document.createElement("span");
+      mat.className = "issue-tool-opt-mat";
+      var m = material != null ? String(material).trim() : "";
+      mat.textContent = m && m !== "—" ? m : "—";
+      row.appendChild(mat);
+
+      var coatSlot = document.createElement("span");
+      coatSlot.className = "issue-tool-opt-chip-slot";
+      var rawCt = (opt.getAttribute("data-issue-coating-type") || "none").trim();
+      var ct = issueToolComboNormCoatingClass(rawCt);
+      var coatTitle = (opt.getAttribute("data-issue-coating-title") || "").trim();
+      var sw = document.createElement("span");
+      sw.className = "swatch swatch-" + ct;
+      if (coatTitle) {
+        sw.setAttribute("title", coatTitle);
+      }
+      coatSlot.appendChild(sw);
+      if (ct === "none") {
+        var lab = document.createElement("span");
+        lab.className = "coating-inline-label";
+        lab.textContent = "без покрытия";
+        coatSlot.appendChild(lab);
+      }
+      row.appendChild(coatSlot);
+
+      var moSlot = document.createElement("span");
+      moSlot.className = "issue-tool-opt-chip-slot";
+      var wm = (opt.getAttribute("data-issue-wm") || "").trim();
+      var wmTitle = (opt.getAttribute("data-issue-wm-title") || "").trim();
+      var wmClass = issueToolComboNormWmClass(wm);
+      if (!wm) {
+        moSlot.className += " issue-tool-opt-mo-empty";
+        moSlot.textContent = "—";
+      } else if (wmClass) {
+        var wmSpan = document.createElement("span");
+        wmSpan.className = "wm-square wm-" + wmClass;
+        wmSpan.textContent = wm;
+        if (wmTitle) {
+          wmSpan.setAttribute("title", wmTitle);
+        }
+        moSlot.appendChild(wmSpan);
+      } else {
+        moSlot.textContent = wm;
+        if (wmTitle) {
+          moSlot.setAttribute("title", wmTitle);
+        }
+      }
+      row.appendChild(moSlot);
+
+      var qSpan = document.createElement("span");
+      qSpan.className = "issue-tool-opt-qty";
+      var q = qty != null ? String(qty).trim() : "";
+      qSpan.textContent = !q || q === "—" ? "—" : q + " шт";
+      row.appendChild(qSpan);
+
+      card.appendChild(row);
+    }
+
+    function issueToolComboFillOptionButton(b, opt) {
+      var type = (opt.getAttribute("data-issue-type") || "").trim();
+      var specs = (opt.getAttribute("data-issue-specs") || "").trim();
+      var material = (opt.getAttribute("data-issue-material") || "").trim();
+      var qty = (opt.getAttribute("data-issue-qty") || "").trim();
+      var fallback = (opt.textContent || "").trim();
+      b.textContent = "";
+      b.setAttribute("aria-label", fallback || "Инструмент");
+      if (!type && !specs && !material) {
+        b.textContent = fallback;
+        return;
+      }
+      var card = document.createElement("div");
+      card.className = "issue-tool-opt-card";
+      if (type) {
+        var ty = document.createElement("div");
+        ty.className = "issue-tool-opt-type";
+        ty.textContent = type;
+        card.appendChild(ty);
+      }
+      if (specs) {
+        var sp = document.createElement("div");
+        sp.className = "issue-tool-opt-specs";
+        sp.textContent = specs;
+        card.appendChild(sp);
+      }
+      issueToolComboAppendInlineSpecs(card, opt, material, qty);
+      b.appendChild(card);
+    }
+
     function issueToolComboEnsurePanel(toolSelect) {
       var wrap = issueToolComboGetWrap();
       var panel = wrap && wrap.querySelector(".js-issue-tool-combo-panel");
@@ -2318,7 +2506,7 @@
         b.className = "issue-tool-combo-opt";
         b.setAttribute("role", "option");
         b.setAttribute("data-opt-index", String(idx));
-        b.textContent = opt.textContent || "";
+        issueToolComboFillOptionButton(b, opt);
         b.hidden = !!opt.hidden;
         panel.appendChild(b);
       });

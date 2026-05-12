@@ -297,6 +297,135 @@ class ToolItem(models.Model):
 
         return " · ".join(segs)
 
+    def issue_combo_card(self) -> dict:
+        """Поля для карточки в выпадающем списке выдачи: тип, размеры, материал, покрытие, МО, кол-во."""
+
+        def fmt_mm(v) -> str:
+            if v is None:
+                return "—"
+            from decimal import Decimal
+
+            if isinstance(v, Decimal):
+                s = format(v, "f").rstrip("0").rstrip(".")
+                return s or "0"
+            return str(v)
+
+        def coating_display() -> str:
+            ct = self.coating_type or "none"
+            if ct == "none":
+                return "без покрытия"
+            return str(self.get_coating_type_display())
+
+        def work_mat_display() -> str:
+            wm = (self.work_material or "").strip()
+            if not wm:
+                return "—"
+            return str(self.get_work_material_display())
+
+        def main_d() -> str:
+            return fmt_mm(self.main_diameter_mm) if self.main_diameter_mm is not None else "—"
+
+        cat = self.category
+        tool_type = ""
+        specs_parts: list[str] = []
+
+        if cat == "end_mill":
+            em = getattr(self, "end_mill_spec", None)
+            tool_type = (
+                f"{self.get_category_display()} · {em.get_mill_type_display()}"
+                if em
+                else self.get_category_display()
+            )
+            if em:
+                if em.diameter_mm is not None:
+                    specs_parts.append(f"D={fmt_mm(em.diameter_mm)} мм")
+                if em.corner_radius_mm is not None:
+                    specs_parts.append(f"R={fmt_mm(em.corner_radius_mm)} мм")
+                if em.overall_length_mm is not None:
+                    specs_parts.append(f"L={fmt_mm(em.overall_length_mm)} мм")
+                if em.cutting_length_mm is not None:
+                    specs_parts.append(f"Lc={fmt_mm(em.cutting_length_mm)} мм")
+                if em.flutes_count is not None:
+                    specs_parts.append(f"Z={em.flutes_count}")
+                specs_parts.append(f"Dосн={main_d()}")
+        elif cat == "tap":
+            tp = getattr(self, "tap_spec", None)
+            if tp and (tp.size_label or "").strip():
+                tool_type = f"{self.get_category_display()} · {(tp.size_label or '').strip()}"
+            else:
+                tool_type = self.get_category_display()
+            if tp:
+                specs_parts.append(tp.get_thread_standard_display())
+                if tp.pitch_mm is not None:
+                    specs_parts.append(f"шаг={fmt_mm(tp.pitch_mm)} мм")
+                if tp.tpi is not None:
+                    specs_parts.append(f"TPI={tp.tpi}")
+                specs_parts.append(tp.get_hole_type_display())
+                specs_parts.append(tp.get_tap_type_display())
+                if tp.overall_length_mm is not None:
+                    specs_parts.append(f"L={fmt_mm(tp.overall_length_mm)} мм")
+                if tp.cutting_length_mm is not None:
+                    specs_parts.append(f"Lc={fmt_mm(tp.cutting_length_mm)} мм")
+                specs_parts.append(f"Dосн={main_d()}")
+        elif cat == "center_drill":
+            cd = getattr(self, "center_drill_spec", None)
+            tool_type = self.get_category_display()
+            if cd:
+                if cd.diameter_mm is not None:
+                    specs_parts.append(f"D={fmt_mm(cd.diameter_mm)} мм")
+                if cd.overall_length_mm is not None:
+                    specs_parts.append(f"L={fmt_mm(cd.overall_length_mm)} мм")
+                specs_parts.append(f"∠={cd.angle_deg}°" if cd.angle_deg else "∠=—")
+                specs_parts.append(f"Dосн={main_d()}")
+        elif cat == "countersink":
+            cs = getattr(self, "countersink_spec", None)
+            tool_type = (
+                f"{self.get_category_display()} · {cs.get_countersink_type_display()}"
+                if cs
+                else self.get_category_display()
+            )
+            if cs:
+                if cs.diameter_mm is not None:
+                    specs_parts.append(f"D={fmt_mm(cs.diameter_mm)} мм")
+                specs_parts.append(f"∠={cs.angle_deg}°" if cs.angle_deg else "∠=—")
+                if cs.overall_length_mm is not None:
+                    specs_parts.append(f"L={fmt_mm(cs.overall_length_mm)} мм")
+                if cs.flutes_count is not None:
+                    specs_parts.append(f"Z={cs.flutes_count}")
+                if (cs.size_label or "").strip():
+                    specs_parts.append(str(cs.size_label).strip())
+                specs_parts.append(f"Dосн={main_d()}")
+        elif cat == "drill":
+            dr = getattr(self, "drill_spec", None)
+            tool_type = self.get_category_display()
+            if dr:
+                if dr.diameter_mm is not None:
+                    specs_parts.append(f"D={fmt_mm(dr.diameter_mm)} мм")
+                if dr.overall_length_mm is not None:
+                    specs_parts.append(f"L={fmt_mm(dr.overall_length_mm)} мм")
+                if dr.cutting_length_mm is not None:
+                    specs_parts.append(f"Lc={fmt_mm(dr.cutting_length_mm)} мм")
+                if dr.angle_deg is not None:
+                    specs_parts.append(f"∠={fmt_mm(dr.angle_deg)}°")
+                specs_parts.append(f"Dосн={main_d()}")
+        else:
+            tool_type = self.get_category_display()
+            specs_parts = [self.name] if (self.name or "").strip() else []
+
+        material = self.get_tool_material_display() or "—"
+        coating = coating_display()
+        mo = work_mat_display()
+        qty = str(int(self.quantity))
+
+        return {
+            "tool_type": tool_type,
+            "specs": " · ".join(specs_parts) if specs_parts else "—",
+            "material": material,
+            "coating": coating,
+            "mo": mo,
+            "qty": qty,
+        }
+
 
 class EndMillSpec(models.Model):
     tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="end_mill_spec")
