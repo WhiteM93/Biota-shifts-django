@@ -1161,3 +1161,18 @@ class PlanContractLine(models.Model):
 
     def __str__(self) -> str:
         return f"{self.contract_id}: {self.product_id} × {self.quantity}"
+
+
+class MachinesBoardState(models.Model):
+    """Единая сводка страницы «Станки» (строки станков + план) для всех пользователей."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    payload = models.JSONField(default=dict, blank=True, verbose_name="Данные (JSON)")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        verbose_name = "Станки: общая сводка"
+        verbose_name_plural = "Станки: общая сводка"
+
+    def __str__(self) -> str:
+        return "Станки (общая сводка)"

@@ -148,7 +148,6 @@
                       <option value="__G54_1_P__" {% if setup.gcode_inline_select_value == "__G54_1_P__" %}selected{% endif %}>G54.1 P</option>
                     </select>
                     <span class="setup-gcode-p-wrap js-inline-gcode-p-wrap" hidden>
-                      <span class="muted">P</span>
                       <span class="js-inline-gcode-p" spellcheck="false" data-gcode-p-for="{{ setup.pk }}">{{ setup.gcode_inline_p_number }}</span>
                     </span>
                     {% endif %}
@@ -1182,14 +1181,15 @@
     overflow: hidden;
   }
   /* Вложен в .setup-gcode-value, не прямой потомок div.setup-spec-col — отдельный селектор */
-  .setup-spec-col-bindings .setup-gcode-p-wrap {
+  /* :not([hidden]) — иначе display:inline-flex перебивает UA [hidden] и блок P остаётся видимым */
+  .setup-spec-col-bindings .setup-gcode-p-wrap:not([hidden]) {
     display: inline-flex;
     align-items: center;
     gap: 3px;
     flex-shrink: 0;
     font-size: 12px;
   }
-  .setup-spec-col-bindings .setup-gcode-p-wrap .js-inline-gcode-p {
+  .setup-spec-col-bindings .setup-gcode-p-wrap:not([hidden]) .js-inline-gcode-p {
     min-width: 1.25em;
     max-width: 2.5em;
     text-align: center;
@@ -1198,23 +1198,23 @@
     border-radius: 3px;
   }
   .setup-spec-col-bindings .js-inline-gcode-system {
-    width: 68px;
-    max-width: 68px;
-    min-width: 68px;
-    height: 26px;
-    min-height: 26px;
+    width: 88px;
+    max-width: 88px;
+    min-width: 88px;
+    height: 32px;
+    min-height: 32px;
     text-align: center;
     text-align-last: center;
-    font-size: 10px;
+    font-size: 12px;
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
     background-image: none;
-    padding: 0 3px;
+    padding: 0 6px;
     box-sizing: border-box;
-    margin: 0;
+    margin: 1px 0 0 6px;
     flex-shrink: 0;
-    line-height: 22px;
+    line-height: 28px;
   }
   .setup-spec-col-bindings .setup-row-gcode {
     gap: 4px;
@@ -3952,17 +3952,9 @@
           } else {
             if (col === "kor_n" || col === "kor_d") {
               var digitsOut = (cell.textContent || "").replace(/[^0-9]/g, "");
-              var tCellExit = row.querySelector('td[data-tool-col="tool_number"]');
-              var expExit = expectedCorrectors(tCellExit ? tCellExit.textContent || "" : "");
-              var expFull = (col === "kor_n" ? expExit.h : expExit.d) || "";
               if (digitsOut) {
                 var prefix = col === "kor_n" ? "H" : "D";
-                var built = prefix + digitsOut;
-                if (expFull && built.toUpperCase() === expFull.toUpperCase()) {
-                  cell.textContent = "";
-                } else {
-                  cell.textContent = built;
-                }
+                cell.textContent = prefix + digitsOut;
               } else {
                 cell.textContent = "";
               }
@@ -4139,7 +4131,19 @@
       var wrap = sel.closest(".setup-gcode-value");
       var pWrap = wrap ? wrap.querySelector(".js-inline-gcode-p-wrap") : null;
       if (!pWrap) return;
-      pWrap.hidden = sel.value !== "__G54_1_P__";
+      var show = sel.value === "__G54_1_P__";
+      pWrap.hidden = !show;
+      var pSpan = wrap ? wrap.querySelector(".js-inline-gcode-p") : null;
+      var inlineOn = document.body.classList.contains("setup-inline-edit-enabled");
+      if (!pSpan || !inlineOn) return;
+      if (show) {
+        pSpan.classList.add("is-inline-edit");
+        pSpan.setAttribute("contenteditable", "true");
+        pSpan.setAttribute("spellcheck", "false");
+      } else {
+        pSpan.classList.remove("is-inline-edit");
+        pSpan.removeAttribute("contenteditable");
+      }
     }
 
     function buildExtraSpecBoxFromSource(sourceBox, clearValues) {
@@ -4182,12 +4186,7 @@
         if (inlineEditMode) {
           sel.removeAttribute("hidden");
           if (span) span.setAttribute("hidden", "hidden");
-          if (pWrap) setGcodePWrapVisibilityFromSelect(sel);
-          if (pSpan) {
-            pSpan.classList.add("is-inline-edit");
-            pSpan.setAttribute("contenteditable", "true");
-            pSpan.setAttribute("spellcheck", "false");
-          }
+          setGcodePWrapVisibilityFromSelect(sel);
         } else {
           sel.setAttribute("hidden", "hidden");
           if (pWrap) pWrap.setAttribute("hidden", "hidden");
@@ -4256,11 +4255,7 @@
               if (gSel) {
                 syncGcodeControlsFromSpan(node, gSel, pWrap, pSpan);
                 gSel.removeAttribute("hidden");
-              }
-              if (pSpan) {
-                pSpan.classList.add("is-inline-edit");
-                pSpan.setAttribute("contenteditable", "true");
-                pSpan.setAttribute("spellcheck", "false");
+                setGcodePWrapVisibilityFromSelect(gSel);
               }
             } else {
               node.removeAttribute("hidden");
@@ -4576,6 +4571,9 @@
               var pW = gWrap.querySelector(".js-inline-gcode-p-wrap");
               var pS = gWrap.querySelector(".js-inline-gcode-p");
               if (gSel && pW && pS) syncGcodeControlsFromSpan(node, gSel, pW, pS);
+              if (gSel && document.body.classList.contains("setup-inline-edit-enabled")) {
+                setGcodePWrapVisibilityFromSelect(gSel);
+              }
             }
           } else if (k === "name") {
             node.textContent = val || "";

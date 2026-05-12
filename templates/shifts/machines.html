@@ -5,6 +5,8 @@
   class="machines-page"
   data-inline-edit-mode="0"
   data-machines-quick-edit="{% if biota_machines_quick_edit %}1{% else %}0{% endif %}"
+  data-machines-content-version="{{ machines_content_version }}"
+  data-machines-has-server="{% if machines_board_has_server %}1{% else %}0{% endif %}"
   data-username="{{ username|default:'Неизвестный пользователь'|escape }}"
 >
   <h1 class="machines-page-title">Станки</h1>
@@ -110,7 +112,6 @@
         </div>
         {% endfor %}
       </div>
-      <p class="machines-side-note muted">Здесь позже будет привязка к плану и сменам.</p>
     </aside>
   </div>
 
@@ -507,11 +508,6 @@
     min-width: 0;
     overflow-wrap: anywhere;
   }
-  .machines-side-note {
-    margin: 0 12px 12px;
-    font-size: 12px;
-    line-height: 1.4;
-  }
   .machines-schedule-label-view {
     flex: 1 1 auto;
     min-width: 0;
@@ -661,18 +657,101 @@
     var LS_QUICK_EXTRA = "biota_machines_quick_rows_extra_v1";
     var LS_QUICK_SERVER = "biota_machines_quick_server_rows_v1";
     var LS_SCHEDULE_EXTRA = "biota_machines_schedule_rows_extra_v1";
+    var LS_CONTENT_VER = "biota_machines_content_version_v1";
     var MIME_SCHEDULE_DRAG = "application/x-biota-schedule-row";
     var scheduleDragHoverField = null;
 
     var root = document.querySelector(".machines-page");
     var toggleBtn = document.querySelector(".js-machines-inline-edit-toggle");
     var canQuickEdit = root && (root.getAttribute("data-machines-quick-edit") || "") === "1";
+    var hasServerBoard = root && (root.getAttribute("data-machines-has-server") || "") === "1";
     var btnAddQuick = document.querySelector(".js-machines-add-quick-row");
     var btnAddSchedule = document.querySelector(".js-machines-add-schedule-row");
     var quickWrap = root ? root.querySelector(".machines-quick-rows") : null;
     var scheduleWrap = root ? root.querySelector(".machines-schedule-rows") : null;
     var tplQuick = document.getElementById("machines-tpl-quick-row");
     var tplSchedule = document.getElementById("machines-tpl-schedule-row");
+
+    function getCookie(name) {
+      var parts = ("; " + document.cookie).split("; " + name + "=");
+      if (parts.length === 2) return parts.pop().split(";").shift() || "";
+      return "";
+    }
+
+    function collectMachinesBoardPayload() {
+      var machine_rows = [];
+      quickWrap.querySelectorAll(".machines-quick-row").forEach(function (row) {
+        var cells = row.querySelectorAll(":scope > .machines-cell");
+        if (cells.length < 5) return;
+        machine_rows.push({
+          code: (cells[0].textContent || "").trim(),
+          current: (cells[1].textContent || "").trim(),
+          next: (cells[2].textContent || "").trim(),
+          extra: (cells[3].textContent || "").trim(),
+          tag: (cells[4].textContent || "").trim(),
+        });
+      });
+      var schedule_rows = [];
+      scheduleWrap.querySelectorAll(".machines-schedule-row").forEach(function (row) {
+        var labelCell = row.querySelector(".machines-cell--schedule-label");
+        var codeEl = row.querySelector(".machines-cell--schedule-code");
+        var hid = labelCell ? labelCell.querySelector(".js-machines-product-id") : null;
+        var pidRaw = hid ? (hid.value || "").trim() : "";
+        var pid = null;
+        if (pidRaw) {
+          var pn = parseInt(pidRaw, 10);
+          if (!isNaN(pn)) pid = pn;
+        }
+        schedule_rows.push({
+          label: labelCell ? (labelCell.getAttribute("data-original-label") || "").trim() : "",
+          machine_code: codeEl ? (codeEl.textContent || "").trim() : "",
+          product_id: pid,
+        });
+      });
+      var cv = parseInt((root.getAttribute("data-machines-content-version") || "0").trim(), 10);
+      return {
+        action: "save_machines_board",
+        content_version: isNaN(cv) ? null : cv,
+        machine_rows: machine_rows,
+        schedule_rows: schedule_rows,
+      };
+    }
+
+    async function postMachinesBoardToServer() {
+      if (!canQuickEdit) return true;
+      var token = (getCookie("csrftoken") || "").trim();
+      if (!token) {
+        alert("Нет CSRF-токена (csrftoken). Обновите страницу.");
+        return false;
+      }
+      var body = collectMachinesBoardPayload();
+      try {
+        var res = await fetch(window.location.pathname || "/machines/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": token,
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          body: JSON.stringify(body),
+          credentials: "same-origin",
+        });
+        var data = null;
+        try {
+          data = await res.json();
+        } catch (ej) {
+          data = null;
+        }
+        if (!res.ok || !data || !data.ok) {
+          alert((data && data.error) || "Не удалось сохранить сводку на сервер.");
+          return false;
+        }
+        return true;
+      } catch (e) {
+        alert("Ошибка сети при сохранении сводки.");
+        return false;
+      }
+    }
 
     if (!root || !quickWrap || !scheduleWrap || !tplQuick || !tplSchedule) return;
 
@@ -1062,7 +1141,11 @@
       });
     }
 
-    function setEditMode(on) {
+    async function setEditMode(on) {
+      if (!on && canQuickEdit) {
+        var okSave = await postMachinesBoardToServer();
+        if (!okSave) return;
+      }
       root.setAttribute("data-inline-edit-mode", on ? "1" : "0");
       if (toggleBtn) toggleBtn.setAttribute("aria-pressed", on ? "true" : "false");
       closeSuggestExcept(null);
@@ -1089,14 +1172,18 @@
       if (on) {
         pushPageHistory("Включено быстрое редактирование страницы «Станки».");
       } else {
-        pushPageHistory("Выключено быстрое редактирование; изменения сохранены локально в браузере.");
+        pushPageHistory(
+          canQuickEdit
+            ? "Выключено быстрое редактирование; сводка сохранена на сервере."
+            : "Выключено быстрое редактирование."
+        );
       }
     }
 
     if (toggleBtn && canQuickEdit) {
-      toggleBtn.addEventListener("click", function () {
+      toggleBtn.addEventListener("click", async function () {
         var on = root.getAttribute("data-inline-edit-mode") !== "1";
-        setEditMode(on);
+        await setEditMode(on);
       });
     }
 
@@ -1566,11 +1653,29 @@
     if (btnAddQuick) btnAddQuick.addEventListener("click", addQuickRow);
     if (btnAddSchedule) btnAddSchedule.addEventListener("click", addScheduleRow);
 
-    restoreQuickServerOverrides();
-    restoreQuickClientRows();
-    restoreScheduleClientRows();
-    applyStoredSelections();
-    applyScheduleMachineCodes();
+    (function syncMachinesContentVersion() {
+      var ver = (root.getAttribute("data-machines-content-version") || "0").trim();
+      var prev = null;
+      try {
+        prev = localStorage.getItem(LS_CONTENT_VER);
+      } catch (e0) {}
+      if (prev !== ver) {
+        try {
+          localStorage.removeItem(LS_QUICK_SERVER);
+        } catch (e1) {}
+        try {
+          localStorage.setItem(LS_CONTENT_VER, ver);
+        } catch (e2) {}
+      }
+    })();
+
+    if (!hasServerBoard) {
+      restoreQuickServerOverrides();
+      restoreQuickClientRows();
+      restoreScheduleClientRows();
+      applyStoredSelections();
+      applyScheduleMachineCodes();
+    }
     root.querySelectorAll(".machines-cell--schedule-label").forEach(syncProductComboDisplay);
     syncScheduleProductInteractions(root.getAttribute("data-inline-edit-mode") === "1");
   })();
