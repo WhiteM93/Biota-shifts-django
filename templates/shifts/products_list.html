@@ -41,6 +41,17 @@
     {% endif %}
     <div class="product-tile-meta">
       <span class="muted">Обновлено: {{ p.updated_at|date:"d.m.Y H:i" }}</span>
+      {% if biota_is_admin %}
+      <div class="product-tile-delete-slot">
+        <button type="button" class="btn btn-ghost product-tile-delete-btn" data-delete-phase="0" title="Три нажатия для удаления">
+          Удалить
+        </button>
+        <form method="post" action="{% url 'product_delete' p.pk %}" class="product-tile-delete-form" hidden>
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+        </form>
+      </div>
+      {% endif %}
     </div>
   </article>
   {% empty %}
@@ -129,6 +140,35 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+  }
+  .product-tile-delete-slot {
+    flex: 0 0 auto;
+  }
+  .product-tile-delete-btn {
+    font-size: 12px;
+    padding: 4px 10px;
+    min-height: 32px;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .product-tile-delete-btn[data-delete-phase="1"] {
+    border-color: rgba(200, 160, 40, 0.85);
+    color: #e8c96a;
+    background: rgba(200, 160, 40, 0.18);
+  }
+  .product-tile-delete-btn[data-delete-phase="2"] {
+    border-color: rgba(200, 70, 70, 0.95);
+    color: #ffb4b4;
+    background: rgba(180, 50, 50, 0.32);
+  }
+  html[data-theme="dawn"] .product-tile-delete-btn[data-delete-phase="1"] {
+    border-color: rgba(160, 120, 20, 0.75);
+    color: #6a5210;
+    background: rgba(220, 180, 60, 0.22);
+  }
+  html[data-theme="dawn"] .product-tile-delete-btn[data-delete-phase="2"] {
+    border-color: rgba(160, 40, 40, 0.85);
+    color: #6a1515;
+    background: rgba(220, 100, 90, 0.28);
   }
   @media (max-width: 720px) {
     form.filter-panel .filter-grid[style*="grid-template-columns"] {
@@ -275,5 +315,39 @@
       tick();
     });
   }
+</script>
+<script>
+  (function () {
+    document.querySelectorAll(".product-tile").forEach(function (tile) {
+      var btn = tile.querySelector(".product-tile-delete-btn");
+      var form = tile.querySelector(".product-tile-delete-form");
+      if (!btn || !form) return;
+      var phase = 0;
+      var resetTimer = null;
+      function setPhase(n) {
+        phase = n;
+        btn.setAttribute("data-delete-phase", String(n));
+        if (n === 0) btn.textContent = "Удалить";
+        else if (n === 1) btn.textContent = "Ещё раз";
+        else btn.textContent = "Удалить навсегда";
+      }
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        clearTimeout(resetTimer);
+        if (phase === 0) {
+          setPhase(1);
+        } else if (phase === 1) {
+          setPhase(2);
+        } else {
+          form.submit();
+          return;
+        }
+        resetTimer = setTimeout(function () {
+          setPhase(0);
+        }, 10000);
+      });
+    });
+  })();
 </script>
 {% endblock %}

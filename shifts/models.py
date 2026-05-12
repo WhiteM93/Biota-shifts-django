@@ -180,6 +180,123 @@ class ToolItem(models.Model):
                 return str(label)
         return v
 
+    def issue_select_label(self) -> str:
+        """Строка для выпадающего списка выдачи: те же параметры, что в строке таблицы склада по категории."""
+
+        def fmt_mm(v) -> str:
+            if v is None:
+                return "—"
+            from decimal import Decimal
+
+            if isinstance(v, Decimal):
+                s = format(v, "f").rstrip("0").rstrip(".")
+                return s or "0"
+            return str(v)
+
+        def coating_txt() -> str:
+            ct = self.coating_type or "none"
+            if ct == "none":
+                return "без покрытия"
+            return str(self.get_coating_type_display())
+
+        def work_mat_txt() -> str:
+            wm = (self.work_material or "").strip()
+            if not wm:
+                return "—"
+            return str(self.get_work_material_display())
+
+        def main_d() -> str:
+            return fmt_mm(self.main_diameter_mm) if self.main_diameter_mm is not None else "—"
+
+        cat = self.category
+        segs: list[str] = []
+
+        if cat == "end_mill":
+            em = getattr(self, "end_mill_spec", None)
+            segs = [
+                self.get_category_display(),
+                em.get_mill_type_display() if em else "—",
+                f"Ø{fmt_mm(em.diameter_mm)}" if em and em.diameter_mm is not None else "D —",
+                f"R {fmt_mm(em.corner_radius_mm) if em and em.corner_radius_mm is not None else '—'}",
+                f"L {fmt_mm(em.overall_length_mm) if em and em.overall_length_mm is not None else '—'}",
+                f"Lc {fmt_mm(em.cutting_length_mm) if em and em.cutting_length_mm is not None else '—'}",
+                f"Z {em.flutes_count if em and em.flutes_count is not None else '—'}",
+                f"Dосн {main_d()}",
+                self.get_tool_material_display() or "—",
+                coating_txt(),
+                work_mat_txt(),
+                f"ост {self.quantity}",
+                self.name,
+            ]
+        elif cat == "tap":
+            tp = getattr(self, "tap_spec", None)
+            segs = [
+                self.get_category_display(),
+                tp.size_label if tp and tp.size_label else "—",
+                tp.get_thread_standard_display() if tp else "—",
+                f"шаг {fmt_mm(tp.pitch_mm) if tp and tp.pitch_mm is not None else '—'}",
+                f"TPI {tp.tpi if tp and tp.tpi is not None else '—'}",
+                tp.get_hole_type_display() if tp else "—",
+                tp.get_tap_type_display() if tp else "—",
+                f"L {fmt_mm(tp.overall_length_mm) if tp and tp.overall_length_mm is not None else '—'}",
+                f"Lc {fmt_mm(tp.cutting_length_mm) if tp and tp.cutting_length_mm is not None else '—'}",
+                f"Dосн {main_d()}",
+                self.get_tool_material_display() or "—",
+                coating_txt(),
+                work_mat_txt(),
+                f"ост {self.quantity}",
+                self.name,
+            ]
+        elif cat == "center_drill":
+            cd = getattr(self, "center_drill_spec", None)
+            segs = [
+                self.get_category_display(),
+                f"D {fmt_mm(cd.diameter_mm) if cd and cd.diameter_mm is not None else '—'}",
+                f"L {fmt_mm(cd.overall_length_mm) if cd and cd.overall_length_mm is not None else '—'}",
+                f"∠{cd.angle_deg}°" if cd else "∠—",
+                f"Dосн {main_d()}",
+                self.get_tool_material_display() or "—",
+                coating_txt(),
+                work_mat_txt(),
+                f"ост {self.quantity}",
+                self.name,
+            ]
+        elif cat == "countersink":
+            cs = getattr(self, "countersink_spec", None)
+            segs = [
+                self.get_category_display(),
+                cs.get_countersink_type_display() if cs else "—",
+                f"D {fmt_mm(cs.diameter_mm) if cs and cs.diameter_mm is not None else '—'}",
+                f"∠{cs.angle_deg}°" if cs else "∠—",
+                f"L {fmt_mm(cs.overall_length_mm) if cs and cs.overall_length_mm is not None else '—'}",
+                f"Z {cs.flutes_count if cs and cs.flutes_count is not None else '—'}",
+                (cs.size_label or "—") if cs else "—",
+                f"Dосн {main_d()}",
+                self.get_tool_material_display() or "—",
+                coating_txt(),
+                f"ост {self.quantity}",
+                self.name,
+            ]
+        elif cat == "drill":
+            dr = getattr(self, "drill_spec", None)
+            segs = [
+                self.get_category_display(),
+                f"D {fmt_mm(dr.diameter_mm) if dr and dr.diameter_mm is not None else '—'}",
+                f"L {fmt_mm(dr.overall_length_mm) if dr and dr.overall_length_mm is not None else '—'}",
+                f"Lc {fmt_mm(dr.cutting_length_mm) if dr and dr.cutting_length_mm is not None else '—'}",
+                f"∠{fmt_mm(dr.angle_deg) if dr and dr.angle_deg is not None else '—'}°",
+                f"Dосн {main_d()}",
+                self.get_tool_material_display() or "—",
+                coating_txt(),
+                work_mat_txt(),
+                f"ост {self.quantity}",
+                self.name,
+            ]
+        else:
+            segs = [self.get_category_display(), self.name, f"ост {self.quantity}"]
+
+        return " · ".join(segs)
+
 
 class EndMillSpec(models.Model):
     tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="end_mill_spec")

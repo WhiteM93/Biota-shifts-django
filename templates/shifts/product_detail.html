@@ -234,14 +234,24 @@
                   <tr data-tool-row-index="{{ forloop.counter0 }}">
                     {% if biota_can_edit %}
                     <td class="setup-tools-hd-autofill-cell">
-                      <button
-                        type="button"
-                        class="btn btn-ghost setup-tools-hd-autofill-btn js-setup-tools-hd-autofill-row"
-                        title="Подставить H и D по номеру T в этой строке (T01→H01, D01)"
-                        aria-label="Автозаполнить корректора H и D по номеру инструмента в этой строке"
-                      >
-                        <i class="fi fi-rr-redo-alt ui-icon" aria-hidden="true"></i>
-                      </button>
+                      <div class="setup-tools-hd-autofill-cell-inner">
+                        <button
+                          type="button"
+                          class="btn btn-ghost setup-tools-hd-autofill-btn js-setup-tools-hd-autofill-row"
+                          title="Подставить H и D по номеру T в этой строке (T01→H01, D01)"
+                          aria-label="Автозаполнить корректора H и D по номеру инструмента в этой строке"
+                        >
+                          <i class="fi fi-rr-redo-alt ui-icon" aria-hidden="true"></i>
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-ghost setup-tools-remove-row-btn js-setup-tools-remove-row"
+                          title="Удалить строку"
+                          aria-label="Удалить строку инструмента"
+                        >
+                          <i class="fi fi-br-cross ui-icon" aria-hidden="true"></i>
+                        </button>
+                      </div>
                     </td>
                     {% endif %}
                     <td data-tool-col="tool_number">{{ row.tool_number }}</td>
@@ -1903,11 +1913,35 @@
   .product-tab-panel[data-inline-edit-mode="1"] .setup-tools-view.has-tool-row-move th.setup-tools-th-hd-autofill,
   .product-tab-panel[data-inline-edit-mode="1"] .setup-tools-view.has-tool-row-move td.setup-tools-hd-autofill-cell {
     display: table-cell;
-    width: 38px;
-    min-width: 38px;
-    max-width: 38px;
-    padding: 1px 2px;
+    width: 42px;
+    min-width: 42px;
+    max-width: 42px;
+    padding: 2px 3px;
     vertical-align: middle;
+  }
+  .setup-tools-hd-autofill-cell-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+  .setup-tools-remove-row-btn {
+    width: 34px;
+    min-width: 34px;
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    color: var(--bio-muted, #8a96a8);
+  }
+  .setup-tools-remove-row-btn:hover {
+    color: #e07070;
+  }
+  html[data-theme="dawn"] .setup-tools-remove-row-btn:hover {
+    color: #b91c1c;
   }
   .setup-tools-add-row {
     margin-top: 6px;
@@ -3728,6 +3762,8 @@
       var tr = document.createElement("tr");
       var tdHd = document.createElement("td");
       tdHd.className = "setup-tools-hd-autofill-cell";
+      var innerHd = document.createElement("div");
+      innerHd.className = "setup-tools-hd-autofill-cell-inner";
       var btnHd = document.createElement("button");
       btnHd.type = "button";
       btnHd.className = "btn btn-ghost setup-tools-hd-autofill-btn js-setup-tools-hd-autofill-row";
@@ -3737,7 +3773,18 @@
       icHd.className = "fi fi-rr-redo-alt ui-icon";
       icHd.setAttribute("aria-hidden", "true");
       btnHd.appendChild(icHd);
-      tdHd.appendChild(btnHd);
+      var btnRm = document.createElement("button");
+      btnRm.type = "button";
+      btnRm.className = "btn btn-ghost setup-tools-remove-row-btn js-setup-tools-remove-row";
+      btnRm.title = "Удалить строку";
+      btnRm.setAttribute("aria-label", "Удалить строку инструмента");
+      var icRm = document.createElement("i");
+      icRm.className = "fi fi-br-cross ui-icon";
+      icRm.setAttribute("aria-hidden", "true");
+      btnRm.appendChild(icRm);
+      innerHd.appendChild(btnHd);
+      innerHd.appendChild(btnRm);
+      tdHd.appendChild(innerHd);
       tr.appendChild(tdHd);
       var tdNo = document.createElement("td");
       tdNo.setAttribute("data-tool-col", "tool_number");
@@ -4813,6 +4860,23 @@
         dCell.textContent = exp.d.replace(/[^0-9]/g, "");
         syncToolOverrideClasses(panelHd);
         e.preventDefault();
+        return;
+      }
+      var removeToolRow = el.closest && el.closest(".js-setup-tools-remove-row");
+      if (removeToolRow) {
+        if (!inlineEditMode) return;
+        e.preventDefault();
+        var rowRm = removeToolRow.closest("tr");
+        var panelRm = removeToolRow.closest(".product-tab-panel");
+        var tbodyRm = rowRm && rowRm.parentNode;
+        if (!rowRm || !panelRm || !tbodyRm) return;
+        if (tbodyRm.querySelectorAll("tr").length <= 1) {
+          alert("Нельзя удалить последнюю строку таблицы инструмента.");
+          return;
+        }
+        rowRm.remove();
+        syncRowOrderDisplay(panelRm);
+        syncToolOverrideClasses(panelRm);
         return;
       }
       var addToolBtn = el.closest && el.closest(".js-setup-tools-add-row");

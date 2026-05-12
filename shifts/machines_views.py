@@ -3,6 +3,7 @@ import json
 
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 
@@ -13,23 +14,30 @@ from .models import MachinesBoardState, Product
 
 # Версия «заглушечного» контента с сервера: при изменении дефолтов в коде увеличить,
 # чтобы у клиентов сбросился локальный оверлей (localStorage) и подтянулись новые строки.
-MACHINES_CONTENT_VERSION = 1
+MACHINES_CONTENT_VERSION = 3
 
 # Заглушка до расширения логики: список станков и строка «график» справа (если в БД нет сохранённой сводки).
+# PK-заглушка для шаблона URL карточки наладки в JS (подменяется на реальный id).
+_MACHINES_DETAIL_URL_SENTINEL = 888_888_888
+
 _DEFAULT_MACHINE_ROWS = [
     {
         "code": "F-05",
         "current": "Изделие которое сейчас стоит",
         "next": "следующее в план",
         "extra": "",
-        "tag": "GG",
+        "tag": "Т",
+        "current_product_id": None,
+        "next_product_id": None,
     },
     {
         "code": "F-10",
         "current": "",
         "next": "",
         "extra": "",
-        "tag": "",
+        "tag": "Т",
+        "current_product_id": None,
+        "next_product_id": None,
     },
 ]
 
@@ -54,20 +62,42 @@ def _schedule_rows_with_display(rows: list[dict], product_by_id: dict[int, str])
     return out
 
 
-def _normalize_machine_rows(raw) -> list[dict]:
+def _optional_product_id(raw, valid_pids: set[int]) -> int | None:
+    if raw in (None, "", False):
+        return None
+    try:
+        pid = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if pid not in valid_pids:
+        return None
+    return pid
+
+
+def _normalize_machine_rows(raw, valid_pids: set[int] | None = None) -> list[dict]:
+    valid = valid_pids if valid_pids is not None else set()
     out: list[dict] = []
     if not isinstance(raw, list):
         return out
     for r in raw[:MAX_MACHINE_ROWS]:
         if not isinstance(r, dict):
             continue
+        cpi = _optional_product_id(r.get("current_product_id"), valid)
+        npi = _optional_product_id(r.get("next_product_id"), valid)
+        tag_raw = str(r.get("tag") or "").strip()[:64]
+        if not tag_raw or tag_raw.upper() == "GG":
+            tag = "Т"
+        else:
+            tag = tag_raw
         out.append(
             {
                 "code": str(r.get("code") or "").strip()[:32],
                 "current": str(r.get("current") or "").strip()[:500],
                 "next": str(r.get("next") or "").strip()[:500],
                 "extra": str(r.get("extra") or "").strip()[:2000],
-                "tag": str(r.get("tag") or "").strip()[:64],
+                "tag": tag,
+                "current_product_id": cpi,
+                "next_product_id": npi,
             }
         )
     return out
@@ -118,7 +148,7 @@ def _machines_post_save(request):
     if (body.get("action") or "").strip() != "save_machines_board":
         return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
     valid_pids = set(Product.objects.values_list("id", flat=True))
-    mrows = _normalize_machine_rows(body.get("machine_rows"))
+    mrows = _normalize_machine_rows(body.get("machine_rows"), valid_pids)
     srows = _normalize_schedule_rows(body.get("schedule_rows"), valid_pids)
     if not mrows:
         return JsonResponse({"ok": False, "error": "Нужна хотя бы одна строка станка."}, status=400)
@@ -144,9 +174,10 @@ def _machines_post_save(request):
 @write_permission_required
 @require_http_methods(["GET", "HEAD", "POST"])
 def machines_view(request):
-    product_options = list(Product.objects.order_by("name").values("id", "name"))
-    product_by_id = {p["id"]: p["name"] for p in product_options}
+    plist = list(Product.objects.order_by("name").only("id", "name", "list_preview_image"))
+    product_by_id = {p.id: (p.name or "") for p in plist}
     valid_pids = set(product_by_id.keys())
+    product_options = [{"id": p.id, "name": p.name or ""} for p in plist]
 
     machine_rows = list(_DEFAULT_MACHINE_ROWS)
     schedule_seed = list(_DEFAULT_SCHEDULE_ROWS)
@@ -154,7 +185,7 @@ def machines_view(request):
 
     board_payload = _board_payload_from_db()
     if board_payload:
-        mr = _normalize_machine_rows(board_payload.get("machine_rows"))
+        mr = _normalize_machine_rows(board_payload.get("machine_rows"), valid_pids)
         sr = _normalize_schedule_rows(board_payload.get("schedule_rows"), valid_pids)
         if mr and sr:
             machine_rows = mr
@@ -168,6 +199,15 @@ def machines_view(request):
             return JsonResponse({"ok": False, "error": "Ожидается AJAX."}, status=400)
         return _machines_post_save(request)
 
+    machines_products_json: list[dict] = []
+    for p in plist:
+        url = ""
+        if p.list_preview_image:
+            url = request.build_absolute_uri(p.list_preview_image.url)
+        machines_products_json.append({"id": p.id, "name": p.name or "", "list_preview_url": url})
+
+    product_detail_url_sentinel = reverse("product_detail", args=[_MACHINES_DETAIL_URL_SENTINEL])
+
     return render(
         request,
         "shifts/machines.html",
@@ -178,6 +218,8 @@ def machines_view(request):
             "machine_rows": machine_rows,
             "schedule_rows": schedule_rows,
             "product_options": product_options,
-            "machines_products_json": [{"id": p["id"], "name": p["name"]} for p in product_options],
+            "machines_products_json": machines_products_json,
+            "product_detail_url_sentinel": product_detail_url_sentinel,
+            "machines_detail_url_sentinel_pk": _MACHINES_DETAIL_URL_SENTINEL,
         },
     )

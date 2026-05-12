@@ -713,6 +713,25 @@ def products_list_view(request):
 
 @biota_login_required
 @nav_permission_required("products")
+@require_http_methods(["POST"])
+def product_delete_view(request, pk: int):
+    """Удаление карточки наладки — только администратор (Biota)."""
+    u = biota_user(request)
+    if not _is_admin(u):
+        messages.error(request, "Удалять наладки может только администратор.")
+        return redirect("products_list")
+    product = get_object_or_404(Product, pk=pk)
+    nm = (product.name or "").strip() or f"#{pk}"
+    product.delete()
+    messages.success(request, f"Наладка «{nm}» удалена.")
+    nxt = (request.POST.get("next") or "").strip()
+    if nxt.startswith("/") and not nxt.startswith("//"):
+        return redirect(nxt)
+    return redirect("products_list")
+
+
+@biota_login_required
+@nav_permission_required("products")
 @require_http_methods(["GET"])
 def product_setup_pdf_export_view(request, pk: int, setup_pk: int, mode: str):
     product = get_object_or_404(Product, pk=pk)

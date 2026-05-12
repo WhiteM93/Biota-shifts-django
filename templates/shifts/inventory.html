@@ -715,17 +715,27 @@
     <label class="field"><span>Поиск инструмента</span>
       <input type="text" class="js-tool-search" data-target-select="issue-tool-select" placeholder="Например: 1, 1.0, M6, D1">
     </label>
-    <label class="field"><span>Инструмент</span>
-      <select id="issue-tool-select" name="tool_id" required>
-        <option value="">Выбрать...</option>
-        {% for t in movement_tool_options %}
-        <option value="{{ t.id }}" data-category="{{ t.category }}">
-          {{ t.get_category_display }}
-          {% if t.category == "end_mill" and t.end_mill_spec %}| {{ t.end_mill_spec.get_mill_type_display }}{% elif t.category == "tap" and t.tap_spec %}| {{ t.tap_spec.get_tap_type_display }}{% elif t.category == "center_drill" and t.center_drill_spec %}| центровка {{ t.center_drill_spec.angle_deg }}°{% elif t.category == "countersink" and t.countersink_spec %}| зенкер {{ t.countersink_spec.get_countersink_type_display }} {{ t.countersink_spec.angle_deg }}°{% elif t.category == "drill" and t.drill_spec %}| сверло {{ t.drill_spec.angle_deg }}°{% endif %}
-          | {{ t.name }} | остаток {{ t.quantity }}
-        </option>
-        {% endfor %}
-      </select>
+    <label class="field issue-tool-field"><span>Инструмент</span>
+      <div class="issue-tool-combo js-issue-tool-combo">
+        <select id="issue-tool-select" name="tool_id" required class="issue-tool-combo-native" tabindex="-1" aria-hidden="true">
+          <option value="">Выбрать...</option>
+          {% for t in movement_tool_options %}
+          <option value="{{ t.id }}" data-category="{{ t.category }}">{{ t.issue_select_label }}</option>
+          {% endfor %}
+        </select>
+        <button
+          type="button"
+          class="issue-tool-combo-btn js-issue-tool-combo-btn"
+          id="issue-tool-combo-trigger"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-controls="issue-tool-combo-listbox"
+        >
+          <span class="issue-tool-combo-btn-text js-issue-tool-combo-text">Выбрать...</span>
+          <span class="issue-tool-combo-chevron" aria-hidden="true"></span>
+        </button>
+        <div id="issue-tool-combo-listbox" class="issue-tool-combo-panel js-issue-tool-combo-panel" hidden role="listbox" aria-labelledby="issue-tool-combo-trigger"></div>
+      </div>
     </label>
     <label class="field"><span>Количество</span><input type="number" name="quantity" min="1" required></label>
     <label class="field"><span>Сотрудник (для выдачи)</span><input type="text" name="employee_name" placeholder="ФИО"></label>
@@ -1376,6 +1386,131 @@
   #issue-outcome-block .issue-inline-form input[name="writeoff_qty"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
+  }
+  /* Кастомный выбор инструмента (выдача): не нативный select */
+  #issue-block .issue-tool-field {
+    min-width: min(100%, 320px);
+    max-width: 100%;
+  }
+  .issue-tool-combo {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    z-index: 1;
+  }
+  .issue-tool-combo.is-open {
+    z-index: 40;
+  }
+  .issue-tool-combo-native {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+    clip-path: inset(50%) !important;
+  }
+  .issue-tool-combo-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    box-sizing: border-box;
+    text-align: left;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--bio-input-fg, var(--bio-body-fg));
+    background: var(--bio-input-bg, #fff);
+    border: 1px solid var(--bio-input-border, #c9d1e0);
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .issue-tool-combo-btn:hover {
+    border-color: var(--bio-input-focus-border, #5c709f);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+  .issue-tool-combo-btn:focus {
+    outline: none;
+    border-color: var(--bio-input-focus-border, #5c709f);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--bio-input-focus-border, #5c709f) 35%, transparent);
+  }
+  .issue-tool-combo-btn-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .issue-tool-combo-chevron {
+    flex: 0 0 auto;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--bio-muted, #6b7280);
+    margin-top: 2px;
+    opacity: 0.85;
+    transition: transform 0.18s ease;
+  }
+  .issue-tool-combo.is-open .issue-tool-combo-chevron {
+    transform: rotate(180deg);
+  }
+  .issue-tool-combo-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    max-height: min(320px, 52vh);
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--bio-input-border, #c9d1e0);
+    border-radius: 8px;
+    background: var(--bio-input-bg, #fff);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .issue-tool-combo-panel[hidden] {
+    display: none !important;
+  }
+  .issue-tool-combo-opt {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 9px 12px;
+    box-sizing: border-box;
+    border: 0;
+    border-bottom: 1px solid var(--bio-table-cell-border, rgba(0, 0, 0, 0.06));
+    background: transparent;
+    color: var(--bio-input-fg, var(--bio-body-fg));
+    font: inherit;
+    font-size: 12.5px;
+    line-height: 1.35;
+    text-align: left;
+    cursor: pointer;
+    white-space: normal;
+    word-break: break-word;
+  }
+  .issue-tool-combo-opt:last-child {
+    border-bottom: 0;
+  }
+  .issue-tool-combo-opt:hover,
+  .issue-tool-combo-opt:focus {
+    background: color-mix(in srgb, var(--bio-input-focus-border, #5c709f) 10%, var(--bio-input-bg, #fff));
+    outline: none;
+  }
+  .issue-tool-combo-opt[hidden] {
+    display: none !important;
   }
   .arrival-bulk-table-wrap {
     width: 100%;
@@ -2129,6 +2264,123 @@
         .trim();
     }
 
+    function issueToolComboGetWrap() {
+      return document.querySelector("#issue-block .js-issue-tool-combo");
+    }
+
+    function issueToolComboUpdateLabel(toolSelect) {
+      var wrap = issueToolComboGetWrap();
+      var textEl = wrap && wrap.querySelector(".js-issue-tool-combo-text");
+      if (!textEl || !toolSelect || toolSelect.id !== "issue-tool-select") return;
+      var opt = toolSelect.options[toolSelect.selectedIndex];
+      if (!opt || !opt.value) {
+        textEl.textContent = "Выбрать...";
+      } else {
+        textEl.textContent = (opt.textContent || "").trim();
+      }
+    }
+
+    function issueToolComboClose() {
+      var wrap = issueToolComboGetWrap();
+      if (!wrap) return;
+      wrap.classList.remove("is-open");
+      var panel = wrap.querySelector(".js-issue-tool-combo-panel");
+      var btn = wrap.querySelector(".js-issue-tool-combo-btn");
+      if (panel) panel.hidden = true;
+      if (btn) btn.setAttribute("aria-expanded", "false");
+    }
+
+    function issueToolComboOpen() {
+      var wrap = issueToolComboGetWrap();
+      var toolSelect = document.getElementById("issue-tool-select");
+      if (!wrap || !toolSelect) return;
+      issueToolComboEnsurePanel(toolSelect);
+      issueToolComboSyncVisibility(toolSelect);
+      var panel = wrap.querySelector(".js-issue-tool-combo-panel");
+      var btn = wrap.querySelector(".js-issue-tool-combo-btn");
+      if (!panel || !btn) return;
+      wrap.classList.add("is-open");
+      panel.hidden = false;
+      btn.setAttribute("aria-expanded", "true");
+    }
+
+    function issueToolComboEnsurePanel(toolSelect) {
+      var wrap = issueToolComboGetWrap();
+      var panel = wrap && wrap.querySelector(".js-issue-tool-combo-panel");
+      if (!toolSelect || !wrap || !panel || toolSelect.id !== "issue-tool-select") return;
+      if (panel.getAttribute("data-built") === "1") return;
+      panel.setAttribute("data-built", "1");
+      panel.innerHTML = "";
+      Array.prototype.forEach.call(toolSelect.options, function (opt, idx) {
+        if (idx === 0) return;
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "issue-tool-combo-opt";
+        b.setAttribute("role", "option");
+        b.setAttribute("data-opt-index", String(idx));
+        b.textContent = opt.textContent || "";
+        b.hidden = !!opt.hidden;
+        panel.appendChild(b);
+      });
+      panel.addEventListener("click", function (e) {
+        var ob = e.target.closest(".issue-tool-combo-opt");
+        var w = issueToolComboGetWrap();
+        if (!ob || !w || !w.contains(ob) || ob.hidden) return;
+        var ts = document.getElementById("issue-tool-select");
+        if (!ts) return;
+        var idx = parseInt(ob.getAttribute("data-opt-index"), 10);
+        if (isNaN(idx) || idx < 1) return;
+        ts.selectedIndex = idx;
+        try {
+          ts.dispatchEvent(new Event("change", { bubbles: true }));
+        } catch (eCh) {}
+        issueToolComboUpdateLabel(ts);
+        issueToolComboClose();
+      });
+    }
+
+    function issueToolComboSyncVisibility(toolSelect) {
+      var wrap = issueToolComboGetWrap();
+      var panel = wrap && wrap.querySelector(".js-issue-tool-combo-panel");
+      if (!toolSelect || !panel || panel.getAttribute("data-built") !== "1") return;
+      Array.prototype.forEach.call(panel.querySelectorAll(".issue-tool-combo-opt"), function (btn) {
+        var idx = parseInt(btn.getAttribute("data-opt-index"), 10);
+        var opt = toolSelect.options[idx];
+        if (!opt) return;
+        btn.hidden = !!opt.hidden;
+      });
+    }
+
+    function issueToolComboBindUi() {
+      var wrap = issueToolComboGetWrap();
+      var toolSelect = document.getElementById("issue-tool-select");
+      var btn = wrap && wrap.querySelector(".js-issue-tool-combo-btn");
+      if (!wrap || !toolSelect || !btn || btn.getAttribute("data-bound") === "1") return;
+      btn.setAttribute("data-bound", "1");
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (wrap.classList.contains("is-open")) {
+          issueToolComboClose();
+        } else {
+          issueToolComboOpen();
+        }
+      });
+      toolSelect.addEventListener("change", function () {
+        issueToolComboUpdateLabel(toolSelect);
+      });
+      document.addEventListener("click", function (e) {
+        var w = issueToolComboGetWrap();
+        if (!w || !w.classList.contains("is-open")) return;
+        if (w.contains(e.target)) return;
+        issueToolComboClose();
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key !== "Escape") return;
+        issueToolComboClose();
+      });
+    }
+
     function filterToolOptions(targetId) {
       if (!targetId) return;
       var toolSelect = document.getElementById(targetId);
@@ -2152,8 +2404,17 @@
         opt.hidden = !(categoryMatch && searchMatch);
       });
 
+      if (toolSelect.id === "issue-tool-select") {
+        issueToolComboEnsurePanel(toolSelect);
+        issueToolComboSyncVisibility(toolSelect);
+      }
+
       if (toolSelect.selectedIndex > 0 && toolSelect.options[toolSelect.selectedIndex].hidden) {
         toolSelect.selectedIndex = 0;
+      }
+
+      if (toolSelect.id === "issue-tool-select") {
+        issueToolComboUpdateLabel(toolSelect);
       }
     }
 
@@ -2167,6 +2428,7 @@
       input.addEventListener("input", function () { filterToolOptions(targetId); });
       filterToolOptions(targetId);
     });
+    issueToolComboBindUi();
   })();
   (function () {
     var categorySelect = document.getElementById("arrival-bulk-category");

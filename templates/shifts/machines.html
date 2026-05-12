@@ -8,6 +8,8 @@
   data-machines-content-version="{{ machines_content_version }}"
   data-machines-has-server="{% if machines_board_has_server %}1{% else %}0{% endif %}"
   data-username="{{ username|default:'Неизвестный пользователь'|escape }}"
+  data-product-detail-url-tpl="{{ product_detail_url_sentinel|escape }}"
+  data-product-detail-sentinel="{{ machines_detail_url_sentinel_pk }}"
 >
   <h1 class="machines-page-title">Станки</h1>
 
@@ -50,8 +52,36 @@
         {% for row in machine_rows %}
         <div class="machines-quick-row">
           <div class="machines-cell machines-cell--code">{{ row.code }}</div>
-          <div class="machines-cell machines-cell--field{% if not row.current %} is-empty{% endif %}">{{ row.current }}</div>
-          <div class="machines-cell machines-cell--field{% if not row.next %} is-empty{% endif %}">{{ row.next }}</div>
+          <div
+            class="machines-cell machines-cell--field{% if not row.current %} is-empty{% endif %}"
+            {% if row.current_product_id %}
+            data-preview-product-id="{{ row.current_product_id }}"
+            data-product-href="{% url 'product_detail' row.current_product_id %}"
+            {% endif %}
+          >
+            <span
+              class="machines-quick-field-view"
+              {% if row.current_product_id %}
+              data-preview-product-id="{{ row.current_product_id }}"
+              data-product-href="{% url 'product_detail' row.current_product_id %}"
+              {% endif %}
+            >{{ row.current }}</span>
+          </div>
+          <div
+            class="machines-cell machines-cell--field{% if not row.next %} is-empty{% endif %}"
+            {% if row.next_product_id %}
+            data-preview-product-id="{{ row.next_product_id }}"
+            data-product-href="{% url 'product_detail' row.next_product_id %}"
+            {% endif %}
+          >
+            <span
+              class="machines-quick-field-view"
+              {% if row.next_product_id %}
+              data-preview-product-id="{{ row.next_product_id }}"
+              data-product-href="{% url 'product_detail' row.next_product_id %}"
+              {% endif %}
+            >{{ row.next }}</span>
+          </div>
           <div
             class="machines-cell machines-cell--field machines-cell--notes{% if not row.extra %} is-empty{% endif %}"
             data-placeholder="Примечание…"
@@ -87,6 +117,10 @@
             data-schedule-index="{{ forloop.counter0 }}"
             data-machine-code="{{ srow.machine_code|escape }}"
             data-original-label="{{ srow.label|default:''|escape }}"
+            {% if srow.product_id %}
+            data-preview-product-id="{{ srow.product_id }}"
+            data-product-href="{% url 'product_detail' srow.product_id %}"
+            {% endif %}
           >
             <span
               class="machines-schedule-drag-handle"
@@ -139,8 +173,8 @@
   <template id="machines-tpl-quick-row">
     <div class="machines-quick-row" data-client-row="1">
       <div class="machines-cell machines-cell--code is-empty"></div>
-      <div class="machines-cell machines-cell--field is-empty"></div>
-      <div class="machines-cell machines-cell--field is-empty"></div>
+      <div class="machines-cell machines-cell--field is-empty"><span class="machines-quick-field-view"></span></div>
+      <div class="machines-cell machines-cell--field is-empty"><span class="machines-quick-field-view"></span></div>
       <div
         class="machines-cell machines-cell--field machines-cell--notes is-empty"
         data-placeholder="Примечание…"
@@ -179,6 +213,10 @@
       <div class="machines-cell machines-cell--code machines-cell--schedule-code is-empty"></div>
     </div>
   </template>
+  <div id="machines-quick-preview-pop" class="machines-quick-preview-pop" hidden aria-hidden="true">
+    <img src="" alt="" class="machines-quick-preview-pop-img" loading="lazy" decoding="async" hidden />
+    <div class="machines-quick-preview-pop-empty muted">Превью не сохранено</div>
+  </div>
   {{ machines_products_json|json_script:"machines-products-data" }}
 </div>
 
@@ -446,11 +484,70 @@
     font-weight: 700;
     letter-spacing: 0.04em;
   }
+  .machines-quick-row > .machines-cell--code[data-mc-tone="1"],
+  .machines-cell--schedule-code[data-mc-tone="1"] {
+    --mc-sat: 38%;
+    --mc-lit: 43%;
+    background: color-mix(in srgb, hsl(var(--mc-hue), var(--mc-sat), var(--mc-lit)) 22%, var(--bio-input-bg));
+    border-color: color-mix(in srgb, hsl(var(--mc-hue), var(--mc-sat), var(--mc-lit)) 48%, var(--bio-input-border));
+    color: color-mix(in srgb, hsl(var(--mc-hue), calc(var(--mc-sat) + 6%), calc(var(--mc-lit) - 18%)) 55%, var(--bio-body-fg));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, hsl(var(--mc-hue), var(--mc-sat), var(--mc-lit)) 18%, transparent);
+  }
   .machines-cell--field {
     justify-content: flex-start;
     text-align: left;
     position: relative;
     z-index: 0;
+  }
+  .machines-quick-row > .machines-cell--field:not(.machines-cell--notes) {
+    min-width: 0;
+  }
+  .machines-schedule-label-view,
+  .machines-quick-row > .machines-cell--field:not(.machines-cell--notes) > .machines-quick-field-view {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .machines-page[data-inline-edit-mode="0"] .machines-quick-field-view[data-product-href] {
+    cursor: pointer;
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+  }
+  .machines-page[data-inline-edit-mode="0"] .machines-cell--schedule-label[data-product-href] .machines-schedule-label-view {
+    cursor: pointer;
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+  }
+  .machines-quick-preview-pop {
+    position: fixed;
+    z-index: 95;
+    pointer-events: none;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    border: 1px solid var(--bio-filter-border);
+    background: var(--bio-preview-image-bg, var(--bio-input-bg));
+    max-width: min(320px, 42vw);
+    max-height: min(320px, 50vh);
+    padding: 6px;
+    box-sizing: border-box;
+  }
+  .machines-quick-preview-pop-img {
+    display: block;
+    max-width: 100%;
+    max-height: min(300px, 48vh);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    vertical-align: middle;
+  }
+  .machines-quick-preview-pop-empty {
+    padding: 12px 14px;
+    font-size: 13px;
+    max-width: 220px;
   }
   .machines-cell--schedule-label {
     justify-content: flex-start;
@@ -497,6 +594,9 @@
     content: "—";
     opacity: 0.45;
   }
+  .machines-quick-row > .machines-cell--tag.is-empty::after {
+    content: "Т";
+  }
   .machines-cell--field:not(.is-empty) {
     font-weight: 500;
   }
@@ -507,14 +607,6 @@
     text-align: left;
     min-width: 0;
     overflow-wrap: anywhere;
-  }
-  .machines-schedule-label-view {
-    flex: 1 1 auto;
-    min-width: 0;
-    width: auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
   .machines-schedule-product-combo {
     display: none;
@@ -683,12 +775,26 @@
       quickWrap.querySelectorAll(".machines-quick-row").forEach(function (row) {
         var cells = row.querySelectorAll(":scope > .machines-cell");
         if (cells.length < 5) return;
+        var curPidRaw = readQuickFieldProductPidAttr(cells[1]);
+        var nextPidRaw = readQuickFieldProductPidAttr(cells[2]);
+        var curPid = null;
+        var nextPid = null;
+        if (curPidRaw) {
+          var cpn = parseInt(curPidRaw, 10);
+          if (!isNaN(cpn)) curPid = cpn;
+        }
+        if (nextPidRaw) {
+          var npn = parseInt(nextPidRaw, 10);
+          if (!isNaN(npn)) nextPid = npn;
+        }
         machine_rows.push({
           code: (cells[0].textContent || "").trim(),
           current: (cells[1].textContent || "").trim(),
           next: (cells[2].textContent || "").trim(),
           extra: (cells[3].textContent || "").trim(),
           tag: (cells[4].textContent || "").trim(),
+          current_product_id: curPid,
+          next_product_id: nextPid,
         });
       });
       var schedule_rows = [];
@@ -759,6 +865,106 @@
     var historyBackdrop = root.querySelector(".js-machines-history-backdrop");
     var historyPanel = root.querySelector("#machines-history-panel");
     var historyList = root.querySelector(".js-machines-history-list");
+
+    var previewPop = document.getElementById("machines-quick-preview-pop");
+    var previewImg = previewPop ? previewPop.querySelector(".machines-quick-preview-pop-img") : null;
+    var previewEmpty = previewPop ? previewPop.querySelector(".machines-quick-preview-pop-empty") : null;
+    var quickPreviewPidShown = null;
+
+    function positionQuickPreviewPop(clientX, clientY) {
+      if (!previewPop) return;
+      previewPop.style.left = "0px";
+      previewPop.style.top = "0px";
+      var rect = previewPop.getBoundingClientRect();
+      var pad = 12;
+      var x = clientX + pad;
+      var y = clientY + pad;
+      var maxL = window.innerWidth - rect.width - 8;
+      var maxT = window.innerHeight - rect.height - 8;
+      if (x > maxL) x = Math.max(8, maxL);
+      if (y > maxT) y = Math.max(8, maxT);
+      previewPop.style.left = x + "px";
+      previewPop.style.top = y + "px";
+    }
+
+    function hideQuickPreview() {
+      quickPreviewPidShown = null;
+      if (!previewPop) return;
+      previewPop.hidden = true;
+      previewPop.setAttribute("aria-hidden", "true");
+      if (previewImg) {
+        previewImg.removeAttribute("src");
+        previewImg.hidden = true;
+      }
+      if (previewEmpty) previewEmpty.hidden = false;
+    }
+
+    function showQuickPreviewForPid(pidStr, clientX, clientY) {
+      if (!previewPop || !previewImg || !previewEmpty) return;
+      if (quickPreviewPidShown === pidStr && !previewPop.hidden) {
+        positionQuickPreviewPop(clientX, clientY);
+        return;
+      }
+      quickPreviewPidShown = pidStr;
+      var url = previewUrlById(pidStr);
+      if (url) {
+        previewImg.hidden = false;
+        previewEmpty.hidden = true;
+        previewImg.onload = function () {
+          positionQuickPreviewPop(clientX, clientY);
+        };
+        previewImg.src = url;
+      } else {
+        previewImg.hidden = true;
+        previewImg.removeAttribute("src");
+        previewEmpty.hidden = false;
+      }
+      previewPop.hidden = false;
+      previewPop.setAttribute("aria-hidden", "false");
+      requestAnimationFrame(function () {
+        positionQuickPreviewPop(clientX, clientY);
+      });
+    }
+
+    function normMachineCodeKey(s) {
+      return (s || "").replace(/\r\n|\r|\n/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+    }
+
+    function hueFromMachineCode(code) {
+      var c = normMachineCodeKey(code);
+      if (!c) return 210;
+      var h = 0;
+      for (var i = 0; i < c.length; i++) {
+        h = (h * 33 + c.charCodeAt(i)) | 0;
+      }
+      return Math.abs(h) % 360;
+    }
+
+    function syncMachineCodeAppearance() {
+      if (!quickWrap || !scheduleWrap) return;
+      quickWrap.querySelectorAll(".machines-quick-row").forEach(function (row) {
+        var ce = row.querySelector(":scope > .machines-cell--code");
+        if (!ce) return;
+        var v = normMachineCodeKey(ce.textContent);
+        if (!v) {
+          ce.removeAttribute("data-mc-tone");
+          ce.style.removeProperty("--mc-hue");
+          return;
+        }
+        ce.setAttribute("data-mc-tone", "1");
+        ce.style.setProperty("--mc-hue", String(hueFromMachineCode(v)));
+      });
+      scheduleWrap.querySelectorAll(".machines-cell--schedule-code").forEach(function (ce) {
+        var v = normMachineCodeKey(ce.textContent);
+        if (!v) {
+          ce.removeAttribute("data-mc-tone");
+          ce.style.removeProperty("--mc-hue");
+          return;
+        }
+        ce.setAttribute("data-mc-tone", "1");
+        ce.style.setProperty("--mc-hue", String(hueFromMachineCode(v)));
+      });
+    }
 
     var _catalog = null;
     var suggestTimer = null;
@@ -948,6 +1154,7 @@
           codeEl.classList.add("is-empty");
         }
       });
+      syncMachineCodeAppearance();
     }
 
     function getCatalog() {
@@ -978,6 +1185,78 @@
     function catalogHasId(id) {
       if (!id) return true;
       return !!nameById(id);
+    }
+
+    function previewUrlById(id) {
+      var sid = String(id);
+      var cat = getCatalog();
+      for (var i = 0; i < cat.length; i++) {
+        if (String(cat[i].id) === sid) return (cat[i].list_preview_url || "").trim();
+      }
+      return "";
+    }
+
+    function productDetailHrefFromId(pidStr) {
+      var tpl = (root.getAttribute("data-product-detail-url-tpl") || "").trim();
+      var sent = String(root.getAttribute("data-product-detail-sentinel") || "").trim();
+      var pid = (pidStr || "").trim();
+      if (!tpl || !sent || !pid) return "";
+      return tpl.split(sent).join(pid);
+    }
+
+    function readQuickFieldProductPidAttr(cell) {
+      if (!cell) return "";
+      var sp = cell.querySelector(":scope > .machines-quick-field-view");
+      var v = sp ? (sp.getAttribute("data-preview-product-id") || "").trim() : "";
+      if (v) return v;
+      return (cell.getAttribute("data-preview-product-id") || "").trim();
+    }
+
+    function clearQuickFieldProductRef(cell) {
+      cell.removeAttribute("data-preview-product-id");
+      cell.removeAttribute("data-product-href");
+      var sp = cell.querySelector(":scope > .machines-quick-field-view");
+      if (sp) {
+        sp.removeAttribute("data-preview-product-id");
+        sp.removeAttribute("data-product-href");
+      }
+    }
+
+    function setQuickFieldProductRef(cell, pidStr) {
+      var pid = (pidStr || "").trim();
+      if (!pid || !nameById(pid)) {
+        clearQuickFieldProductRef(cell);
+        return;
+      }
+      cell.setAttribute("data-preview-product-id", pid);
+      var href = productDetailHrefFromId(pid);
+      if (href) cell.setAttribute("data-product-href", href);
+      else cell.removeAttribute("data-product-href");
+      var sp = cell.querySelector(":scope > .machines-quick-field-view");
+      if (sp) {
+        sp.setAttribute("data-preview-product-id", pid);
+        if (href) sp.setAttribute("data-product-href", href);
+        else sp.removeAttribute("data-product-href");
+      }
+    }
+
+    function syncQuickFieldProductRefAfterBlur(cell) {
+      if (!cell || !cell.classList.contains("machines-cell--field") || cell.classList.contains("machines-cell--notes")) return;
+      var qrow = cell.closest(".machines-quick-row");
+      if (!qrow || !quickWrap.contains(qrow)) return;
+      var cells = qrow.querySelectorAll(":scope > .machines-cell");
+      if (cells.length < 5) return;
+      if (cell !== cells[1] && cell !== cells[2]) return;
+      var pid = readQuickFieldProductPidAttr(cell);
+      if (!pid) return;
+      if (!nameById(pid)) {
+        clearQuickFieldProductRef(cell);
+        return;
+      }
+      var t = (cell.textContent || "").replace(/\u200b/g, "").replace(/\r\n|\r|\n/g, " ").trim();
+      if (!t) {
+        clearQuickFieldProductRef(cell);
+      }
     }
 
     function closeSuggestExcept(exceptCombo) {
@@ -1018,6 +1297,12 @@
       if (combo) combo.classList.remove("is-open");
       var panel = cell.querySelector(".machines-product-suggest");
       if (panel) panel.hidden = true;
+      var hidVal = (hid.value || "").trim();
+      if (hidVal) {
+        setQuickFieldProductRef(cell, hidVal);
+      } else {
+        clearQuickFieldProductRef(cell);
+      }
     }
 
     function persistAllProducts() {
@@ -1060,6 +1345,7 @@
 
     function normalizeQuickEditableCell(cell) {
       if (!cell || cell.getAttribute("contenteditable") !== "true") return;
+      ensureQuickProductViewSpan(cell);
       var raw = (cell.textContent || "").replace(/\u200b/g, "");
       var t;
       if (cell.classList.contains("machines-cell--notes")) {
@@ -1070,7 +1356,12 @@
           t = t.replace(/\s+/g, " ");
         }
       }
-      cell.textContent = t;
+      var inner = cell.querySelector(":scope > .machines-quick-field-view");
+      if (inner && !cell.classList.contains("machines-cell--notes")) {
+        inner.textContent = t;
+      } else {
+        cell.textContent = t;
+      }
       if (t) cell.classList.remove("is-empty");
       else cell.classList.add("is-empty");
     }
@@ -1082,6 +1373,7 @@
           cell.setAttribute("spellcheck", "false");
         } else {
           normalizeQuickEditableCell(cell);
+          syncQuickFieldProductRefAfterBlur(cell);
           cell.removeAttribute("contenteditable");
           cell.removeAttribute("spellcheck");
         }
@@ -1110,13 +1402,15 @@
       if (isNaN(expect) || srv.length !== expect) return;
       var list = srv.map(function (row) {
         var cells = row.querySelectorAll(":scope > .machines-cell");
-        if (cells.length < 5) return { c: "", n: "", e: "", x: "", t: "" };
+        if (cells.length < 5) return { c: "", n: "", e: "", x: "", t: "", cp: "", ep: "" };
         return {
           c: (cells[0].textContent || "").trim(),
           n: (cells[1].textContent || "").trim(),
           e: (cells[2].textContent || "").trim(),
           x: (cells[3].textContent || "").trim(),
-          t: (cells[4].textContent || "").trim()
+          t: (cells[4].textContent || "").trim(),
+          cp: readQuickFieldProductPidAttr(cells[1]),
+          ep: readQuickFieldProductPidAttr(cells[2])
         };
       });
       writeJson(LS_QUICK_SERVER, list);
@@ -1133,11 +1427,15 @@
         if (!r || typeof r !== "object") return;
         var cells = row.querySelectorAll(":scope > .machines-cell");
         if (cells.length < 5) return;
-        setQuickCellText(cells[0], r.c);
-        setQuickCellText(cells[1], r.n);
-        setQuickCellText(cells[2], r.e);
-        setQuickCellText(cells[3], r.x);
-        setQuickCellText(cells[4], r.t);
+        setQuickCellText(cells[0], r.c, { skipClearProductRef: true });
+        setQuickCellText(cells[1], r.n, { skipClearProductRef: true });
+        setQuickCellText(cells[2], r.e, { skipClearProductRef: true });
+        setQuickCellText(cells[3], r.x, { skipClearProductRef: true });
+        setQuickCellText(cells[4], r.t, { skipClearProductRef: true });
+        if ((r.cp || "").trim()) setQuickFieldProductRef(cells[1], String(r.cp).trim());
+        else clearQuickFieldProductRef(cells[1]);
+        if ((r.ep || "").trim()) setQuickFieldProductRef(cells[2], String(r.ep).trim());
+        else clearQuickFieldProductRef(cells[2]);
       });
     }
 
@@ -1147,6 +1445,9 @@
         if (!okSave) return;
       }
       root.setAttribute("data-inline-edit-mode", on ? "1" : "0");
+      if (on) {
+        hideQuickPreview();
+      }
       if (toggleBtn) toggleBtn.setAttribute("aria-pressed", on ? "true" : "false");
       closeSuggestExcept(null);
       if (!on) {
@@ -1166,6 +1467,7 @@
         persistScheduleMachineCodes();
         persistQuickServerRows();
         saveQuickClientRows();
+        syncMachineCodeAppearance();
       } else {
         root.querySelectorAll(".machines-cell--schedule-label").forEach(syncProductComboDisplay);
       }
@@ -1294,6 +1596,11 @@
       var machineCode = (qcells[0].textContent || "").trim();
       machineCode = machineCode.replace(/\r\n|\r|\n/g, " ").replace(/\s+/g, " ").trim();
       setQuickCellText(field, display);
+      if (payload.productId) {
+        setQuickFieldProductRef(field, String(payload.productId));
+      } else {
+        clearQuickFieldProductRef(field);
+      }
       if (field.getAttribute("contenteditable") === "true") {
         normalizeQuickEditableCell(field);
       }
@@ -1316,6 +1623,7 @@
       persistScheduleMachineCodes();
       persistQuickServerRows();
       saveQuickClientRows();
+      syncMachineCodeAppearance();
       var fieldLabel = "ячейка";
       if (field === qcells[1]) fieldLabel = "«Сейчас»";
       else if (field === qcells[2]) fieldLabel = "«Далее»";
@@ -1333,6 +1641,70 @@
           (display || "—") +
           "»."
       );
+    });
+
+    root.addEventListener("mouseover", function (e) {
+      if (root.getAttribute("data-inline-edit-mode") === "1") {
+        hideQuickPreview();
+        return;
+      }
+      var sl = e.target.closest(".machines-cell--schedule-label");
+      if (sl && scheduleWrap.contains(sl)) {
+        var pSched = (sl.getAttribute("data-preview-product-id") || "").trim();
+        if (pSched) {
+          showQuickPreviewForPid(pSched, e.clientX, e.clientY);
+        } else {
+          hideQuickPreview();
+        }
+        return;
+      }
+      var fld = e.target.closest(".machines-quick-row > .machines-cell--field:not(.machines-cell--notes)");
+      if (fld && quickWrap.contains(fld)) {
+        var pQuick = readQuickFieldProductPidAttr(fld);
+        if (pQuick) {
+          showQuickPreviewForPid(pQuick, e.clientX, e.clientY);
+        } else {
+          hideQuickPreview();
+        }
+        return;
+      }
+      hideQuickPreview();
+    });
+
+    root.addEventListener("mousemove", function (e) {
+      if (!previewPop || previewPop.hidden) return;
+      if (root.getAttribute("data-inline-edit-mode") === "1") return;
+      positionQuickPreviewPop(e.clientX, e.clientY);
+    });
+
+    root.addEventListener("mouseleave", function (e) {
+      if (e.relatedTarget && root.contains(e.relatedTarget)) return;
+      hideQuickPreview();
+    });
+
+    root.addEventListener("click", function (e) {
+      if (root.getAttribute("data-inline-edit-mode") === "1") return;
+      if (e.button !== 0) return;
+      var linkEl = e.target.closest("[data-product-href]");
+      if (!linkEl || !root.contains(linkEl)) return;
+      var href = (linkEl.getAttribute("data-product-href") || "").trim();
+      if (!href) return;
+      var ok = false;
+      if (scheduleWrap.contains(linkEl) && linkEl.classList.contains("machines-cell--schedule-label")) {
+        ok = true;
+      } else if (quickWrap.contains(linkEl)) {
+        if (linkEl.classList.contains("machines-quick-field-view")) ok = true;
+        else if (linkEl.classList.contains("machines-cell--field") && !linkEl.classList.contains("machines-cell--notes")) {
+          ok = true;
+        }
+      }
+      if (!ok) return;
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        window.open(href, "_blank", "noopener,noreferrer");
+      } else {
+        window.location.href = href;
+      }
     });
 
     function renderSuggestPanel(combo, query) {
@@ -1466,16 +1838,58 @@
       closeSuggestExcept(null);
     });
 
-    function setQuickCellText(cell, text) {
-      var t = (text || "").trim();
-      cell.textContent = t;
+    function ensureQuickProductViewSpan(cell) {
+      var qrow = cell && cell.closest(".machines-quick-row");
+      if (!qrow || !quickWrap.contains(qrow)) return;
+      if (!cell.classList.contains("machines-cell--field") || cell.classList.contains("machines-cell--notes")) return;
+      var cells = qrow.querySelectorAll(":scope > .machines-cell");
+      if (cells.length < 3 || (cell !== cells[1] && cell !== cells[2])) return;
+      if (cell.querySelector(":scope > .machines-quick-field-view")) return;
+      var migrated = (cell.textContent || "").trim();
+      var cp = (cell.getAttribute("data-preview-product-id") || "").trim();
+      var ch = (cell.getAttribute("data-product-href") || "").trim();
+      cell.textContent = "";
+      var span = document.createElement("span");
+      span.className = "machines-quick-field-view";
+      span.textContent = migrated;
+      if (cp) span.setAttribute("data-preview-product-id", cp);
+      if (ch) span.setAttribute("data-product-href", ch);
+      cell.appendChild(span);
+    }
+
+    function setQuickCellText(cell, text, opts) {
+      opts = opts || {};
+      var t = (text != null ? String(text) : "").trim();
+      ensureQuickProductViewSpan(cell);
+      var inner = cell.querySelector(":scope > .machines-quick-field-view");
+      if (inner) {
+        inner.textContent = t;
+      } else {
+        cell.textContent = t;
+      }
       if (t) cell.classList.remove("is-empty");
       else cell.classList.add("is-empty");
+      if (opts.skipClearProductRef) return;
+      if (!cell.classList.contains("machines-cell--field") || cell.classList.contains("machines-cell--notes")) return;
+      var qrow = cell.closest(".machines-quick-row");
+      if (!qrow) return;
+      var cells = qrow.querySelectorAll(":scope > .machines-cell");
+      if (cells.length < 5) return;
+      if (cell === cells[1] || cell === cells[2]) {
+        clearQuickFieldProductRef(cell);
+      }
     }
 
     quickWrap.addEventListener("focusin", function (e) {
       var cell = e.target.closest(".machines-quick-row > .machines-cell[contenteditable='true']");
       if (!cell || root.getAttribute("data-inline-edit-mode") !== "1") return;
+      var inner = cell.querySelector(":scope > .machines-quick-field-view");
+      if (inner && !cell.classList.contains("machines-cell--notes")) {
+        if ((inner.textContent || "").replace(/\u200b/g, "").length === 0 && inner.childNodes.length === 0) {
+          inner.appendChild(document.createTextNode("\u200b"));
+        }
+        return;
+      }
       if ((cell.textContent || "").replace(/\u200b/g, "").length === 0 && cell.childNodes.length === 0) {
         cell.appendChild(document.createTextNode("\u200b"));
       }
@@ -1487,6 +1901,14 @@
         var cell = e.target.closest(".machines-quick-row > .machines-cell[contenteditable='true']");
         if (!cell || !quickWrap.contains(cell)) return;
         normalizeQuickEditableCell(cell);
+        syncQuickFieldProductRefAfterBlur(cell);
+        var qrow = cell.closest(".machines-quick-row");
+        if (qrow) {
+          var qcells = qrow.querySelectorAll(":scope > .machines-cell");
+          if (qcells.length && cell === qcells[0]) {
+            syncMachineCodeAppearance();
+          }
+        }
       },
       true
     );
@@ -1507,7 +1929,12 @@
       var raw = cell.textContent || "";
       if (raw.indexOf("\n") === -1 && raw.indexOf("\r") === -1) return;
       var t = raw.replace(/\r\n|\r|\n/g, " ");
-      if (t !== raw) cell.textContent = t;
+      var inner = cell.querySelector(":scope > .machines-quick-field-view");
+      if (inner && !cell.classList.contains("machines-cell--notes")) {
+        if (t !== raw) inner.textContent = t;
+      } else if (t !== raw) {
+        cell.textContent = t;
+      }
     });
 
     quickWrap.addEventListener("paste", function (e) {
@@ -1523,7 +1950,12 @@
       try {
         document.execCommand("insertText", false, text);
       } catch (err1) {
-        cell.textContent = ((cell.textContent || "") + text).replace(/\r\n|\r|\n/g, " ");
+        var inner = cell.querySelector(":scope > .machines-quick-field-view");
+        if (inner && !cell.classList.contains("machines-cell--notes")) {
+          inner.textContent = ((inner.textContent || "") + text).replace(/\r\n|\r|\n/g, " ");
+        } else {
+          cell.textContent = ((cell.textContent || "") + text).replace(/\r\n|\r|\n/g, " ");
+        }
       }
     });
 
@@ -1537,7 +1969,9 @@
           n: (cells[1].textContent || "").trim(),
           e: (cells[2].textContent || "").trim(),
           x: (cells[3].textContent || "").trim(),
-          t: (cells[4].textContent || "").trim()
+          t: (cells[4].textContent || "").trim(),
+          cp: readQuickFieldProductPidAttr(cells[1]),
+          ep: readQuickFieldProductPidAttr(cells[2])
         });
       });
       writeJson(LS_QUICK_EXTRA, rows);
@@ -1552,11 +1986,15 @@
         var row = tpl.cloneNode(true);
         var cells = row.querySelectorAll(":scope > .machines-cell");
         if (cells.length < 5) return;
-        setQuickCellText(cells[0], r.c);
-        setQuickCellText(cells[1], r.n);
-        setQuickCellText(cells[2], r.e);
-        setQuickCellText(cells[3], r.x);
-        setQuickCellText(cells[4], r.t);
+        setQuickCellText(cells[0], r.c, { skipClearProductRef: true });
+        setQuickCellText(cells[1], r.n, { skipClearProductRef: true });
+        setQuickCellText(cells[2], r.e, { skipClearProductRef: true });
+        setQuickCellText(cells[3], r.x, { skipClearProductRef: true });
+        setQuickCellText(cells[4], r.t, { skipClearProductRef: true });
+        if ((r.cp || "").trim()) setQuickFieldProductRef(cells[1], String(r.cp).trim());
+        else clearQuickFieldProductRef(cells[1]);
+        if ((r.ep || "").trim()) setQuickFieldProductRef(cells[2], String(r.ep).trim());
+        else clearQuickFieldProductRef(cells[2]);
         quickWrap.appendChild(row);
       });
     }
@@ -1597,6 +2035,7 @@
         span.textContent = "";
         labelCell.classList.add("is-empty");
       }
+      clearQuickFieldProductRef(labelCell);
     }
 
     function saveScheduleClientRows() {
@@ -1677,6 +2116,7 @@
       applyScheduleMachineCodes();
     }
     root.querySelectorAll(".machines-cell--schedule-label").forEach(syncProductComboDisplay);
+    syncMachineCodeAppearance();
     syncScheduleProductInteractions(root.getAttribute("data-inline-edit-mode") === "1");
   })();
 </script>
