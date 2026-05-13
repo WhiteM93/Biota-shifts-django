@@ -28,6 +28,7 @@ from .models import (
     ProductSetupProgramFile,
     ProductSetupToolRow,
     normalize_product_setup_gcode_system,
+    product_setup_gcode_inline_parts,
 )
 from .product_plan_sync import (
     apply_product_plan_post,
@@ -70,6 +71,57 @@ def _meaningful_tokens(tokens: list[str]) -> list[str]:
             continue
         out.append(t)
     return out
+
+
+_MAX_BINDING_EXTRA_BLOCKS = 20
+
+
+def _safe_binding_extra_blocks_from_json(raw: str) -> list[dict]:
+    s = (raw or "").strip()
+    if not s:
+        return []
+    try:
+        data = json.loads(s)
+    except Exception:
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[dict] = []
+    for item in data[:_MAX_BINDING_EXTRA_BLOCKS]:
+        if not isinstance(item, dict):
+            continue
+        out.append(
+            {
+                "binding_x": str(item.get("binding_x") or "")[:64],
+                "binding_y": str(item.get("binding_y") or "")[:64],
+                "binding_z": str(item.get("binding_z") or "")[:64],
+                "gcode_system": normalize_product_setup_gcode_system(str(item.get("gcode_system") or "G54"))[:24],
+            }
+        )
+    return out
+
+
+def _binding_extra_blocks_template_rows(setup: ProductSetup) -> list[dict]:
+    raw_list = setup.binding_extra_blocks
+    if not isinstance(raw_list, list):
+        return []
+    rows: list[dict] = []
+    for item in raw_list[:_MAX_BINDING_EXTRA_BLOCKS]:
+        if not isinstance(item, dict):
+            continue
+        gc = normalize_product_setup_gcode_system(str(item.get("gcode_system") or "G54"))
+        sel, pnum = product_setup_gcode_inline_parts(gc)
+        rows.append(
+            {
+                "binding_x": str(item.get("binding_x") or "")[:64],
+                "binding_y": str(item.get("binding_y") or "")[:64],
+                "binding_z": str(item.get("binding_z") or "")[:64],
+                "gcode_system": gc,
+                "gcode_inline_select_value": sel,
+                "gcode_inline_p_number": pnum,
+            }
+        )
+    return rows
 
 
 def _read_program_file_for_display(program_file) -> tuple[str | None, bool]:
@@ -1203,6 +1255,12 @@ def product_detail_view(request, pk: int):
                     raw = normalize_product_setup_gcode_system(raw)
                 setattr(setup, field, raw)
                 changed_setup_fields.append(field)
+            if "binding_extra_blocks_json" in request.POST:
+                setup.binding_extra_blocks = _safe_binding_extra_blocks_from_json(
+                    request.POST.get("binding_extra_blocks_json") or "[]"
+                )
+                if "binding_extra_blocks" not in changed_setup_fields:
+                    changed_setup_fields.append("binding_extra_blocks")
             setup.save(update_fields=list(changed_setup_fields) + ["updated_at"])
             product_drawing_update: list[str] = []
             if "drawing_blank_size" in request.POST:
@@ -1280,6 +1338,9 @@ def product_detail_view(request, pk: int):
                     "material": setup.material or "—",
                     "size": setup.size or "—",
                     "setup_notes": (setup.setup_notes or "").strip(),
+                    "binding_extra_blocks": _safe_binding_extra_blocks_from_json(
+                        json.dumps(getattr(setup, "binding_extra_blocks", None) or [])
+                    ),
                 },
                 "product_drawing": {
                     "drawing_blank_size": (product.drawing_blank_size or "").strip() or "—",
@@ -1314,6 +1375,7 @@ def product_detail_view(request, pk: int):
         setup.primary_program_filename = os.path.basename(prim_pf.name) if prim_pf else ""
         setup.tool_rows = list(setup.tools.all())
         setup.tool_display_rows = _build_display_tool_rows(setup.tool_rows)
+        setup.binding_extra_blocks_tpl = _binding_extra_blocks_template_rows(setup)
     has_setup_preview_stl = any(bool(getattr(s, "preview_stl", None)) for s in setups)
     cad_name = (product.cad_model.name or "") if product.cad_model else ""
     cad_ext = _cad_ext(cad_name)

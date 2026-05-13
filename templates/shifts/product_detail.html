@@ -155,6 +155,48 @@
                   </div>
                 </div>
                 </div>
+                {% for eb in setup.binding_extra_blocks_tpl %}
+                <div class="setup-spec-box setup-spec-box-extra">
+                <div class="setup-spec-box-controls" hidden>
+                  <button type="button" class="btn btn-ghost js-setup-spec-copy setup-spec-copy-btn" title="Копировать блок" aria-label="Копировать блок"><i class="fi fi-rr-copy ui-icon" aria-hidden="true"></i></button>
+                  <button type="button" class="btn btn-ghost js-setup-spec-remove setup-spec-remove-btn" title="Удалить блок" aria-label="Удалить блок"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
+                </div>
+                <div class="setup-spec-col setup-spec-col-bindings">
+                  <div class="setup-row-photo setup-row-photo-binding">
+                    <span class="setup-binding-photo-rail"></span>
+                    <span class="muted">X:</span> <span data-field-text="binding_x">{% if eb.binding_x %}{{ eb.binding_x }}{% else %}—{% endif %}</span>
+                  </div>
+                  <div class="setup-row-photo setup-row-photo-binding">
+                    <span class="setup-binding-photo-rail"></span>
+                    <span class="muted">Y:</span> <span data-field-text="binding_y">{% if eb.binding_y %}{{ eb.binding_y }}{% else %}—{% endif %}</span>
+                  </div>
+                  <div class="setup-row-photo setup-row-photo-binding">
+                    <span class="setup-binding-photo-rail"></span>
+                    <span class="muted">Z:</span> <span data-field-text="binding_z">{% if eb.binding_z %}{{ eb.binding_z }}{% else %}—{% endif %}</span>
+                  </div>
+                  <div class="setup-row-gcode">
+                    <span class="muted">Привяка:</span>
+                    <span class="setup-gcode-value">
+                    <span data-field-text="gcode_system">{{ eb.gcode_system|default:"G54" }}</span>
+                    {% if biota_can_edit %}
+                    <select class="js-inline-gcode-system" data-gcode-system-select="{{ setup.pk }}" hidden>
+                      <option value="G54" {% if eb.gcode_inline_select_value == "G54" %}selected{% endif %}>G54</option>
+                      <option value="G55" {% if eb.gcode_inline_select_value == "G55" %}selected{% endif %}>G55</option>
+                      <option value="G56" {% if eb.gcode_inline_select_value == "G56" %}selected{% endif %}>G56</option>
+                      <option value="G57" {% if eb.gcode_inline_select_value == "G57" %}selected{% endif %}>G57</option>
+                      <option value="G58" {% if eb.gcode_inline_select_value == "G58" %}selected{% endif %}>G58</option>
+                      <option value="G59" {% if eb.gcode_inline_select_value == "G59" %}selected{% endif %}>G59</option>
+                      <option value="__G54_1_P__" {% if eb.gcode_inline_select_value == "__G54_1_P__" %}selected{% endif %}>G54.1 P</option>
+                    </select>
+                    <span class="setup-gcode-p-wrap js-inline-gcode-p-wrap"{% if eb.gcode_inline_select_value != "__G54_1_P__" %} hidden{% endif %}>
+                      <span class="js-inline-gcode-p" spellcheck="false" data-gcode-p-for="{{ setup.pk }}">{{ eb.gcode_inline_p_number }}</span>
+                    </span>
+                    {% endif %}
+                    </span>
+                  </div>
+                </div>
+                </div>
+                {% endfor %}
                 </div>
               </div>
               </div>
@@ -4173,6 +4215,27 @@
       return gSel.value || "G54";
     }
 
+    function collectBindingSpecBlocksFromStack(panelSetup) {
+      var stack = panelSetup.querySelector(".setup-spec-stack");
+      if (!stack) return [];
+      return Array.from(stack.querySelectorAll(".setup-spec-box:not(.setup-spec-box-header)")).map(function (box) {
+        var bx = box.querySelector('[data-field-text="binding_x"]');
+        var by = box.querySelector('[data-field-text="binding_y"]');
+        var bz = box.querySelector('[data-field-text="binding_z"]');
+        var gw = box.querySelector(".setup-gcode-value");
+        function normDash(el) {
+          var t = el ? (el.textContent || "").trim() : "";
+          return t === "—" ? "" : t;
+        }
+        return {
+          binding_x: normDash(bx),
+          binding_y: normDash(by),
+          binding_z: normDash(bz),
+          gcode_system: collectGcodeSystemFromWrap(gw),
+        };
+      });
+    }
+
     function setGcodePWrapVisibilityFromSelect(sel) {
       if (!sel) return;
       var wrap = sel.closest(".setup-gcode-value");
@@ -4253,6 +4316,9 @@
           if (link.remove) link.remove();
         });
       }
+      clone.querySelectorAll(".setup-binding-photo-input, .setup-binding-photo-btn, a.binding-photo-link").forEach(function (node) {
+        if (node && node.remove) node.remove();
+      });
       return clone;
     }
 
@@ -4585,6 +4651,73 @@
       payload.append("made_material", madeIn ? (madeIn.value || "").trim() : "");
     }
 
+    function fillBindingSpecBoxFromData(box, blk) {
+      if (!box || !blk) return;
+      function setField(attr, val) {
+        var el = box.querySelector('[data-field-text="' + attr + '"]');
+        var s = val != null ? String(val).trim() : "";
+        if (el) el.textContent = s ? s : "—";
+      }
+      setField("binding_x", blk.binding_x);
+      setField("binding_y", blk.binding_y);
+      setField("binding_z", blk.binding_z);
+      var gcodeStr = (blk.gcode_system && String(blk.gcode_system).trim()) || "G54";
+      var gWrap = box.querySelector(".setup-gcode-value");
+      var gspan = gWrap ? gWrap.querySelector('[data-field-text="gcode_system"]') : null;
+      var gSel = gWrap ? gWrap.querySelector(".js-inline-gcode-system") : null;
+      var pW = gWrap ? gWrap.querySelector(".js-inline-gcode-p-wrap") : null;
+      var pS = gWrap ? gWrap.querySelector(".js-inline-gcode-p") : null;
+      if (gspan) gspan.textContent = gcodeStr;
+      if (gspan && gSel && pW && pS) {
+        syncGcodeControlsFromSpan(gspan, gSel, pW, pS);
+      }
+    }
+
+    function rebuildBindingExtraBoxesFromResponse(panelSetup, setupPayload) {
+      if (!panelSetup || !setupPayload) return;
+      var stack = panelSetup.querySelector(".setup-spec-stack");
+      if (!stack) return;
+      var extras = setupPayload.binding_extra_blocks;
+      stack.querySelectorAll(".setup-spec-box-extra").forEach(function (n) {
+        if (n && n.remove) n.remove();
+      });
+      if (!extras || !extras.length) {
+        syncSpecDnDMode(panelSetup, document.body.classList.contains("setup-inline-edit-enabled"));
+        return;
+      }
+      var mainBox = stack.querySelector(".setup-spec-box:not(.setup-spec-box-extra)");
+      if (!mainBox) return;
+      var inlineOn = document.body.classList.contains("setup-inline-edit-enabled");
+      extras.forEach(function (blk) {
+        var node = buildExtraSpecBoxFromSource(mainBox, true);
+        if (!node) return;
+        fillBindingSpecBoxFromData(node, blk);
+        var gWrap = node.querySelector(".setup-gcode-value");
+        var gspan = gWrap ? gWrap.querySelector('[data-field-text="gcode_system"]') : null;
+        var gSel = gWrap ? gWrap.querySelector(".js-inline-gcode-system") : null;
+        var pW = gWrap ? gWrap.querySelector(".js-inline-gcode-p-wrap") : null;
+        var pS = gWrap ? gWrap.querySelector(".js-inline-gcode-p") : null;
+        if (gspan && gSel && pW && pS) {
+          if (inlineOn) {
+            gspan.setAttribute("hidden", "hidden");
+            gSel.removeAttribute("hidden");
+            setGcodePWrapVisibilityFromSelect(gSel);
+          } else {
+            syncGcodeSpanFromControls(gspan, gSel, pS);
+            gspan.removeAttribute("hidden");
+            gSel.setAttribute("hidden", "hidden");
+            pW.setAttribute("hidden", "hidden");
+            if (pS) {
+              pS.classList.remove("is-inline-edit");
+              pS.removeAttribute("contenteditable");
+            }
+          }
+        }
+        stack.appendChild(node);
+      });
+      syncSpecDnDMode(panelSetup, inlineOn);
+    }
+
     function applyInlineUpdateResponseToDom(setupId, data) {
       if (!data || !data.setup) return;
       if (data.product_drawing) {
@@ -4629,6 +4762,7 @@
           }
         });
         refreshInlineFieldTitles(panel, false);
+        rebuildBindingExtraBoxesFromResponse(panel, data.setup);
       });
     }
 
@@ -4667,16 +4801,19 @@
           var txt = el ? (el.textContent || "").trim() : "";
           payload.append(name, txt === "—" ? "" : txt);
         });
-        ["name", "binding_x", "binding_y", "binding_z"].forEach(function (name) {
-          var el = panelSetup.querySelector('[data-field-text="' + name + '"]');
-          var txt = el ? (el.textContent || "").trim() : "";
-          payload.append(name, txt === "—" ? "" : txt);
-        });
-        var mainBoxForGcode = panelSetup.querySelector(".setup-spec-stack .setup-spec-box:not(.setup-spec-box-extra)");
-        var gcodeWrap = mainBoxForGcode
-          ? mainBoxForGcode.querySelector(".setup-gcode-value")
-          : panelSetup.querySelector(".setup-gcode-value");
-        payload.append("gcode_system", collectGcodeSystemFromWrap(gcodeWrap));
+        var nameEl = panelSetup.querySelector('[data-field-text="name"]');
+        var nameTxt = nameEl ? (nameEl.textContent || "").trim() : "";
+        payload.append("name", nameTxt);
+        var bindingBlocks = collectBindingSpecBlocksFromStack(panelSetup);
+        var first = bindingBlocks.length
+          ? bindingBlocks[0]
+          : { binding_x: "", binding_y: "", binding_z: "", gcode_system: "G54" };
+        payload.append("binding_x", first.binding_x || "");
+        payload.append("binding_y", first.binding_y || "");
+        payload.append("binding_z", first.binding_z || "");
+        payload.append("gcode_system", first.gcode_system || "G54");
+        var extras = bindingBlocks.length > 1 ? bindingBlocks.slice(1) : [];
+        payload.append("binding_extra_blocks_json", JSON.stringify(extras));
         var notesEl = panelSetup.querySelector('[data-field-text="setup_notes"]');
         var notesText = notesEl ? (notesEl.innerHTML || "").trim() : "";
         payload.append("setup_notes", notesText === "Наладка не заполнена." ? "" : notesText);
@@ -4685,7 +4822,12 @@
         payload.append("workpiece", "");
         payload.append("size", "");
         payload.append("material", "");
+        payload.append("name", "");
+        payload.append("binding_x", "");
+        payload.append("binding_y", "");
+        payload.append("binding_z", "");
         payload.append("gcode_system", "G54");
+        payload.append("binding_extra_blocks_json", "[]");
         payload.append("setup_notes", "");
         payload.append("rows_json", "[]");
       }

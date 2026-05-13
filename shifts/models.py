@@ -992,6 +992,21 @@ def normalize_product_setup_gcode_system(value: str) -> str:
     return "G54"
 
 
+def product_setup_gcode_inline_parts(value: str) -> tuple[str, str]:
+    """Как у ProductSetup.gcode_inline_select_value / gcode_inline_p_number, но для произвольной строки."""
+    raw = (value or "").strip()
+    m = _PRODUCT_SETUP_GCODE_EXT_RE.match(raw)
+    if m:
+        return "__G54_1_P__", str(int(m.group(1), 10))
+    u = raw.upper() if raw else "G54"
+    sel = u if u in _PRODUCT_SETUP_GCODE_STD else "G54"
+    return sel, "0"
+
+
+def _default_binding_extra_blocks() -> list:
+    return []
+
+
 class ProductSetup(models.Model):
     """Установка изделия: наладка и программа."""
 
@@ -1005,6 +1020,12 @@ class ProductSetup(models.Model):
     binding_y = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка Y")
     binding_z = models.CharField(max_length=64, blank=True, default="", verbose_name="Привязка Z")
     gcode_system = models.CharField(max_length=24, blank=True, default="G54", verbose_name="Система координат G")
+    binding_extra_blocks = models.JSONField(
+        blank=True,
+        default=_default_binding_extra_blocks,
+        verbose_name="Дополнительные блоки привязок (X/Y/Z/G)",
+        help_text="Список объектов {binding_x, binding_y, binding_z, gcode_system}; основной блок — в полях выше.",
+    )
     binding_x_photo = models.FileField(
         upload_to="products/setup_bindings/",
         blank=True,
