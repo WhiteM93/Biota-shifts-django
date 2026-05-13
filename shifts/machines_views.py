@@ -1,7 +1,6 @@
 """Раздел «Станки» (учёт станков, план на станке)."""
 import json
 
-from django.db.models import Prefetch
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -11,11 +10,11 @@ from django.views.decorators.http import require_http_methods
 from biota_shifts.auth import machines_quick_edit_for_user
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
-from .models import MachinesBoardState, PlannedProduct, PlannedProductStage, Product
+from .models import MachinesBoardState, Product, ProductSetup
 
 # Версия «заглушечного» контента с сервера: при изменении дефолтов в коде увеличить,
 # чтобы у клиентов сбросился локальный оверлей (localStorage) и подтянулись новые строки.
-MACHINES_CONTENT_VERSION = 3
+MACHINES_CONTENT_VERSION = 5
 
 # Заглушка до расширения логики: список станков и строка «график» справа (если в БД нет сохранённой сводки).
 # PK-заглушка для шаблона URL карточки наладки в JS (подменяется на реальный id).
@@ -43,36 +42,170 @@ _DEFAULT_MACHINE_ROWS = [
 ]
 
 _DEFAULT_SCHEDULE_ROWS = [
-    {"label": "График по станку", "machine_code": "F-10", "product_id": None},
-    {"label": "", "machine_code": "F-05", "product_id": None},
+    {"label": "График по станку", "machine_code": "F-10", "product_id": None, "setup_id": None},
+    {"label": "", "machine_code": "F-05", "product_id": None, "setup_id": None},
 ]
 
 MAX_MACHINE_ROWS = 60
 MAX_SCHEDULE_ROWS = 120
 
 
-def _product_plan_departments_by_id(valid_pids: set[int]) -> dict[int, str]:
-    """Цепочка отделов маршрута плана для карточки наладки (через PlannedProduct.naladki_product)."""
-    if not valid_pids:
-        return {}
-    qs = PlannedProduct.objects.filter(naladki_product_id__in=valid_pids).prefetch_related(
-        Prefetch("stages", PlannedProductStage.objects.order_by("sort_order", "id"))
-    )
-    out: dict[int, str] = {}
-    for pp in qs:
-        pid = pp.naladki_product_id
-        if not pid:
+def _quick_field_label_parts(label: str) -> tuple[str, str]:
+    """Две части подписи «сейчас/далее»: до первого « - » и после (как в списке изделий)."""
+    s = " ".join((label or "").split())
+    sep = " - "
+    if sep not in s:
+        return s, ""
+    a, _, b = s.partition(sep)
+    return a.strip(), b.strip()
+
+
+def _machine_rows_with_label_parts(rows: list[dict]) -> list[dict]:
+    out: list[dict] = []
+    for r in rows:
+        d = dict(r)
+        cs, ct = _quick_field_label_parts(str(d.get("current") or ""))
+        ns, nt = _quick_field_label_parts(str(d.get("next") or ""))
+        d["current_sku"], d["current_title"] = cs, ct
+        d["next_sku"], d["next_title"] = ns, nt
+        out.append(d)
+    return out
+
+
+def _norm_machine_code_key(code: str) -> str:
+    return " ".join((code or "").split()).strip().upper()
+
+
+def _schedule_setup_lines_by_machine_product(schedule_rows: list[dict]) -> dict[tuple[str, int], str]:
+    """Строка установки из плана по паре (код станка, id изделия) — для колонок «сейчас/далее»."""
+    out: dict[tuple[str, int], str] = {}
+    for sr in schedule_rows:
+        mc = _norm_machine_code_key(str(sr.get("machine_code") or ""))
+        pid = sr.get("product_id")
+        if not mc or pid in (None, ""):
             continue
-        parts = [s.department for s in pp.stages.all() if (s.department or "").strip()]
-        if parts:
-            out[int(pid)] = " → ".join(parts)
+        try:
+            pi = int(pid)
+        except (TypeError, ValueError):
+            continue
+        line = str(sr.get("setup_line") or "").strip()
+        if not line:
+            continue
+        key = (mc, pi)
+        if key not in out:
+            out[key] = line
+    return out
+
+
+def _schedule_setup_ids_by_machine_product(schedule_rows: list[dict]) -> dict[tuple[str, int], int | None]:
+    """Выбранная установка в плане по паре (код станка, id изделия)."""
+    out: dict[tuple[str, int], int | None] = {}
+    for sr in schedule_rows:
+        mc = _norm_machine_code_key(str(sr.get("machine_code") or ""))
+        pid = sr.get("product_id")
+        if not mc or pid in (None, ""):
+            continue
+        try:
+            pi = int(pid)
+        except (TypeError, ValueError):
+            continue
+        sid_raw = sr.get("setup_id")
+        si: int | None = None
+        if sid_raw not in (None, ""):
+            try:
+                si = int(sid_raw)
+            except (TypeError, ValueError):
+                si = None
+        key = (mc, pi)
+        if key not in out:
+            out[key] = si
+    return out
+
+
+def _machine_rows_with_quick_setup_slots(
+    machine_rows: list[dict],
+    schedule_rows: list[dict],
+    setups_by_product: dict[int, list[dict[str, int | str]]],
+) -> list[dict]:
+    look_line = _schedule_setup_lines_by_machine_product(schedule_rows)
+    look_sid = _schedule_setup_ids_by_machine_product(schedule_rows)
+    out: list[dict] = []
+    for r in machine_rows:
+        d = dict(r)
+        code = _norm_machine_code_key(str(d.get("code") or ""))
+        cpi = d.get("current_product_id")
+        npi = d.get("next_product_id")
+        csl = ""
+        nsl = ""
+        csi: int | None = None
+        nsi: int | None = None
+        if code and cpi is not None:
+            try:
+                ik = (code, int(cpi))
+                csl = look_line.get(ik, "") or ""
+                csi = look_sid.get(ik)
+            except (TypeError, ValueError):
+                pass
+        stored_csi = d.get("current_setup_id")
+        if cpi is not None and stored_csi not in (None, ""):
+            try:
+                stored_csi_int = int(stored_csi)
+            except (TypeError, ValueError):
+                stored_csi_int = None
+            if stored_csi_int is not None and any(int(s["id"]) == stored_csi_int for s in setups_by_product.get(int(cpi), [])):
+                csi = stored_csi_int
+        if code and npi is not None:
+            try:
+                ik = (code, int(npi))
+                nsl = look_line.get(ik, "") or ""
+                nsi = look_sid.get(ik)
+            except (TypeError, ValueError):
+                pass
+        stored_nsi = d.get("next_setup_id")
+        if npi is not None and stored_nsi not in (None, ""):
+            try:
+                stored_nsi_int = int(stored_nsi)
+            except (TypeError, ValueError):
+                stored_nsi_int = None
+            if stored_nsi_int is not None and any(int(s["id"]) == stored_nsi_int for s in setups_by_product.get(int(npi), [])):
+                nsi = stored_nsi_int
+        d["current_setup_line"] = csl
+        d["next_setup_line"] = nsl
+        d["current_setup_id"] = "" if csi is None else csi
+        d["next_setup_id"] = "" if nsi is None else nsi
+        cpo: int | None = None
+        npo: int | None = None
+        if cpi is not None:
+            try:
+                cpo = int(cpi)
+            except (TypeError, ValueError):
+                cpo = None
+        if npi is not None:
+            try:
+                npo = int(npi)
+            except (TypeError, ValueError):
+                npo = None
+        d["current_setup_options"] = list(setups_by_product.get(cpo, [])) if cpo is not None else []
+        d["next_setup_options"] = list(setups_by_product.get(npo, [])) if npo is not None else []
+        out.append(d)
+    return out
+
+
+def _setups_by_product_id(product_ids: set[int]) -> dict[int, list[dict[str, int | str]]]:
+    """Установки наладки по изделию (как вкладки «Уст. N» в карточке изделия)."""
+    if not product_ids:
+        return {}
+    qs = ProductSetup.objects.filter(product_id__in=product_ids).order_by("product_id", "sort_order", "id")
+    out: dict[int, list[dict[str, int | str]]] = {}
+    for su in qs:
+        out.setdefault(int(su.product_id), []).append({"id": int(su.pk), "name": (su.name or "").strip()[:200]})
     return out
 
 
 def _schedule_rows_with_display(
     rows: list[dict],
     product_by_id: dict[int, str],
-    plan_departments_by_id: dict[int, str],
+    setups_by_product: dict[int, list[dict[str, int | str]]],
 ) -> list[dict]:
     out: list[dict] = []
     for r in rows:
@@ -87,13 +220,35 @@ def _schedule_rows_with_display(
                 pid_key = int(pid)
             except (TypeError, ValueError):
                 pid_key = None
-        dept_line = plan_departments_by_id.get(pid_key, "") if pid_key is not None else ""
+        setups = setups_by_product.get(pid_key, []) if pid_key is not None else []
+        setup_id_raw = r.get("setup_id")
+        setup_id_res: int | None = None
+        if isinstance(setup_id_raw, int):
+            setup_id_res = setup_id_raw
+        elif setup_id_raw not in (None, ""):
+            try:
+                setup_id_res = int(setup_id_raw)
+            except (TypeError, ValueError):
+                setup_id_res = None
+        if setup_id_res is not None and not any(int(s["id"]) == setup_id_res for s in setups):
+            setup_id_res = None
+        if pid_key is not None and setups and setup_id_res is None and len(setups) == 1:
+            setup_id_res = int(setups[0]["id"])
+        setup_line = ""
+        if setup_id_res is not None:
+            for i, su in enumerate(setups, start=1):
+                if int(su["id"]) == setup_id_res:
+                    nm = str(su.get("name") or "").strip()
+                    setup_line = f"Уст. {i} — {nm}" if nm else f"Уст. {i}"
+                    break
         out.append(
             {
                 **r,
                 "product_id": "" if pid is None else pid,
                 "display": display,
-                "plan_departments_line": dept_line,
+                "setup_id": setup_id_res if setup_id_res is not None else "",
+                "setup_line": setup_line,
+                "setup_options": list(setups),
             }
         )
     return out
@@ -126,6 +281,22 @@ def _normalize_machine_rows(raw, valid_pids: set[int] | None = None) -> list[dic
             tag = "Т"
         else:
             tag = tag_raw
+        current_setup_id = None
+        next_setup_id = None
+        for attr, product_id in (("current_setup_id", cpi), ("next_setup_id", npi)):
+            if product_id is None:
+                continue
+            setup_raw = r.get(attr)
+            if setup_raw in (None, ""):
+                continue
+            try:
+                setup_id = int(setup_raw)
+            except (TypeError, ValueError):
+                continue
+            if attr == "current_setup_id":
+                current_setup_id = setup_id
+            else:
+                next_setup_id = setup_id
         out.append(
             {
                 "code": str(r.get("code") or "").strip()[:32],
@@ -135,6 +306,8 @@ def _normalize_machine_rows(raw, valid_pids: set[int] | None = None) -> list[dic
                 "tag": tag,
                 "current_product_id": cpi,
                 "next_product_id": npi,
+                "current_setup_id": current_setup_id,
+                "next_setup_id": next_setup_id,
             }
         )
     return out
@@ -144,6 +317,7 @@ def _normalize_schedule_rows(raw, valid_pids: set[int]) -> list[dict]:
     out: list[dict] = []
     if not isinstance(raw, list):
         return out
+    staged: list[tuple[str, str, int | None, int | None]] = []
     for r in raw[:MAX_SCHEDULE_ROWS]:
         if not isinstance(r, dict):
             continue
@@ -154,11 +328,37 @@ def _normalize_schedule_rows(raw, valid_pids: set[int]) -> list[dict]:
             pid = None
         if pid is not None and pid not in valid_pids:
             pid = None
+        sid_raw = r.get("setup_id")
+        setup_id: int | None = None
+        if sid_raw not in (None, ""):
+            try:
+                setup_id = int(sid_raw)
+            except (TypeError, ValueError):
+                setup_id = None
+        staged.append(
+            (
+                str(r.get("label") or "").strip()[:500],
+                str(r.get("machine_code") or "").strip()[:32],
+                pid,
+                setup_id,
+            )
+        )
+    pids_for_setup = {p for _, _, p, _ in staged if p is not None}
+    valid_pairs: set[tuple[int, int]] = set()
+    if pids_for_setup:
+        for su in ProductSetup.objects.filter(product_id__in=pids_for_setup).only("id", "product_id"):
+            valid_pairs.add((int(su.product_id), int(su.pk)))
+    for label, mcode, pid, setup_id in staged:
+        if pid is None:
+            setup_id = None
+        elif setup_id is not None and (pid, setup_id) not in valid_pairs:
+            setup_id = None
         out.append(
             {
-                "label": str(r.get("label") or "").strip()[:500],
-                "machine_code": str(r.get("machine_code") or "").strip()[:32],
+                "label": label,
+                "machine_code": mcode,
                 "product_id": pid,
+                "setup_id": setup_id,
             }
         )
     return out
@@ -215,7 +415,7 @@ def machines_view(request):
     product_by_id = {p.id: (p.name or "") for p in plist}
     valid_pids = set(product_by_id.keys())
     product_options = [{"id": p.id, "name": p.name or ""} for p in plist]
-    plan_departments_by_id = _product_plan_departments_by_id(valid_pids)
+    setups_by_product = _setups_by_product_id(valid_pids)
 
     machine_rows = list(_DEFAULT_MACHINE_ROWS)
     schedule_seed = list(_DEFAULT_SCHEDULE_ROWS)
@@ -230,7 +430,12 @@ def machines_view(request):
             schedule_seed = sr
             machines_board_has_server = True
 
-    schedule_rows = _schedule_rows_with_display(schedule_seed, product_by_id, plan_departments_by_id)
+    schedule_rows = _schedule_rows_with_display(schedule_seed, product_by_id, setups_by_product)
+    machine_rows = _machine_rows_with_quick_setup_slots(
+        _machine_rows_with_label_parts(machine_rows),
+        schedule_rows,
+        setups_by_product,
+    )
 
     if request.method == "POST":
         if (request.headers.get("X-Requested-With") or "").strip() != "XMLHttpRequest":
@@ -247,7 +452,7 @@ def machines_view(request):
                 "id": p.id,
                 "name": p.name or "",
                 "list_preview_url": url,
-                "plan_departments": plan_departments_by_id.get(p.id, ""),
+                "setups": setups_by_product.get(p.id, []),
             }
         )
 
