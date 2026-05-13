@@ -93,7 +93,7 @@
                   {% endif %}
                   {% for opt in row.current_setup_options %}
                     <option value="{{ opt.id }}"{% if row.current_setup_id == opt.id %} selected{% endif %}>
-                      Уст. {{ forloop.counter }} — {% if opt.name %}{{ opt.name }}{% else %}без названия{% endif %}
+                      {% if opt.name %}{{ opt.name }}{% else %}без названия{% endif %}
                     </option>
                   {% endfor %}
                 {% endif %}
@@ -135,7 +135,7 @@
                   {% endif %}
                   {% for opt in row.next_setup_options %}
                     <option value="{{ opt.id }}"{% if row.next_setup_id == opt.id %} selected{% endif %}>
-                      Уст. {{ forloop.counter }} — {% if opt.name %}{{ opt.name }}{% else %}без названия{% endif %}
+                      {% if opt.name %}{{ opt.name }}{% else %}без названия{% endif %}
                     </option>
                   {% endfor %}
                 {% endif %}
@@ -1567,7 +1567,7 @@
         var o = document.createElement("option");
         o.value = String(su.id);
         var nm = (su.name || "").trim();
-        o.textContent = nm ? "Уст. " + String(idx + 1) + " — " + nm : "Уст. " + String(idx + 1);
+        o.textContent = nm || "без названия";
         sel.appendChild(o);
       });
       var prevSetup =
