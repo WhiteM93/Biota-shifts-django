@@ -10,14 +10,17 @@ def forwards_sync(apps, schema_editor):
         sync_plan_piece_for_naladki_in_same_transaction,
     )
 
-    for prod in Product.objects.order_by("id").iterator(chunk_size=500):
+    for pk in Product.objects.order_by("id").values_list("pk", flat=True).iterator(chunk_size=500):
         with transaction.atomic():
-            sync_plan_piece_for_naladki_in_same_transaction(prod.pk)
-    for pp in PlannedProduct.objects.filter(is_assembly=False, is_purchased=False).order_by("id").iterator(
-        chunk_size=500
+            sync_plan_piece_for_naladki_in_same_transaction(pk)
+    for pk in (
+        PlannedProduct.objects.filter(is_assembly=False, is_purchased=False)
+        .order_by("id")
+        .values_list("pk", flat=True)
+        .iterator(chunk_size=500)
     ):
         with transaction.atomic():
-            finalize_plan_piece_naladki_link(pp.pk)
+            finalize_plan_piece_naladki_link(pk)
 
 
 def backwards_noop(apps, schema_editor):
