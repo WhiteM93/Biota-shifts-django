@@ -68,6 +68,7 @@
             data-current-setup-id="{{ row.current_setup_id }}"
             {% endif %}
           >
+            <button type="button" class="machines-cell-clear js-machines-cell-clear" aria-label="Очистить" tabindex="-1"></button>
             <div class="machines-quick-field-and-setup">
               <span
                 class="machines-quick-field-view{% if row.current_title %} is-split{% endif %}"
@@ -110,6 +111,7 @@
             data-current-setup-id="{{ row.next_setup_id }}"
             {% endif %}
           >
+            <button type="button" class="machines-cell-clear js-machines-cell-clear" aria-label="Очистить" tabindex="-1"></button>
             <div class="machines-quick-field-and-setup">
               <span
                 class="machines-quick-field-view{% if row.next_title %} is-split{% endif %}"
@@ -170,7 +172,6 @@
       </div>
       <div class="machines-schedule-header" aria-hidden="true">
         <div>Изделие</div>
-        <div>Станок</div>
       </div>
       <div class="machines-schedule-rows" data-next-schedule-index="{{ schedule_rows|length }}">
         {% for srow in schedule_rows %}
@@ -211,6 +212,7 @@
             </div>
           </div>
           <div class="machines-cell machines-cell--code machines-cell--schedule-code">{{ srow.machine_code }}</div>
+          <button type="button" class="machines-schedule-row-delete js-machines-schedule-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
         </div>
         {% endfor %}
       </div>
@@ -242,6 +244,7 @@
     <div class="machines-quick-row" data-client-row="1">
       <div class="machines-cell machines-cell--code is-empty"></div>
       <div class="machines-cell machines-cell--field is-empty">
+        <button type="button" class="machines-cell-clear js-machines-cell-clear" aria-label="Очистить" tabindex="-1"></button>
         <div class="machines-quick-field-and-setup">
           <span class="machines-quick-field-view"><span class="machines-quick-field-part machines-quick-field-part--sku"></span><span class="machines-quick-field-part machines-quick-field-part--title"></span></span>
           <select class="machines-quick-setup-select js-machines-quick-setup-select" aria-label="Установка наладки" disabled>
@@ -250,6 +253,7 @@
         </div>
       </div>
       <div class="machines-cell machines-cell--field is-empty">
+        <button type="button" class="machines-cell-clear js-machines-cell-clear" aria-label="Очистить" tabindex="-1"></button>
         <div class="machines-quick-field-and-setup">
           <span class="machines-quick-field-view"><span class="machines-quick-field-part machines-quick-field-part--sku"></span><span class="machines-quick-field-part machines-quick-field-part--title"></span></span>
           <select class="machines-quick-setup-select js-machines-quick-setup-select" aria-label="Установка наладки" disabled>
@@ -297,6 +301,7 @@
         </div>
       </div>
       <div class="machines-cell machines-cell--code machines-cell--schedule-code is-empty"></div>
+      <button type="button" class="machines-schedule-row-delete js-machines-schedule-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
     </div>
   </template>
   <div id="machines-quick-preview-pop" class="machines-quick-preview-pop" hidden aria-hidden="true">
@@ -614,6 +619,11 @@
     font-weight: 600;
     line-height: 1.2;
   }
+  .machines-panel-head--quick-toolbar .btn.product-btn-edit-mode[aria-pressed="true"] {
+    background: #43a047;
+    border-color: #388e3c;
+    color: #fff;
+  }
   .machines-panel-head--quick-toolbar .btn.btn-ghost {
     min-height: 30px;
     padding: 0 10px;
@@ -646,7 +656,7 @@
     color: color-mix(in srgb, #7ba7e8 60%, var(--bio-muted));
   }
   .machines-schedule-header {
-    grid-template-columns: minmax(0, 1fr) 64px;
+    grid-template-columns: minmax(0, 1fr);
   }
   .machines-quick-header > div,
   .machines-schedule-header > div {
@@ -747,9 +757,9 @@
   }
   .machines-schedule-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 64px;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 0;
-    align-items: stretch;
+    align-items: center;
     position: relative;
     z-index: 0;
     animation: machinesRowReveal 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -799,7 +809,7 @@
   .machines-cell--code,
   .machines-cell--schedule-code {
     font-family: var(--bio-font);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 760;
     letter-spacing: 0.01em;
     color: color-mix(in srgb, var(--bio-body-fg) 88%, var(--bio-heading-accent) 12%);
@@ -832,8 +842,8 @@
       inset 5px 0 0 color-mix(in srgb, hsl(var(--mc-hue), var(--mc-sat), var(--mc-lit)) 95%, transparent);
   }
   .machines-cell--field {
-    justify-content: flex-start;
-    text-align: left;
+    justify-content: center;
+    text-align: center;
     position: relative;
     z-index: 0;
     overflow: hidden;
@@ -854,6 +864,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-weight: 500;
   }
   .machines-quick-row > .machines-cell--field:not(.machines-cell--notes) > .machines-quick-field-and-setup {
     flex: 1 1 100%;
@@ -989,18 +1000,18 @@
     max-width: 220px;
   }
   .machines-cell--schedule-label {
-    justify-content: flex-start;
-    text-align: left;
+    justify-content: center;
+    text-align: center;
     position: relative;
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
     gap: 4px;
     min-width: 0;
   }
   .machines-schedule-label-primary {
     display: flex;
     flex-direction: row;
-    align-items: stretch;
+    align-items: center;
     gap: 6px;
     flex-wrap: nowrap;
     min-width: 0;
@@ -1042,6 +1053,18 @@
   }
   .machines-cell.is-empty::after {
     content: none;
+  }
+  .machines-cell--field.is-empty .machines-quick-setup-select {
+    display: none;
+  }
+  .machines-cell--schedule-code {
+    display: none;
+  }
+  .machines-cell--field.is-match,
+  .machines-cell--schedule-code.is-match,
+  .machines-cell--schedule-label.is-match {
+    background: color-mix(in srgb, hsl(var(--mc-hue, 0), 50%, 50%) 10%, var(--bio-input-bg, #fff));
+    box-shadow: inset 3px 0 0 hsl(var(--mc-hue, 0), 50%, 50%);
   }
   .machines-cell--schedule-label.is-empty::after {
     content: none;
@@ -1173,6 +1196,60 @@
   }
   .machines-page[data-inline-edit-mode="1"] .machines-panel--quick .machines-quick-row > .machines-cell[contenteditable="true"]:focus {
     box-shadow: inset 0 0 0 2px var(--bio-input-focus-border, #5c709f);
+  }
+  .machines-cell-clear {
+    display: none;
+    position: absolute;
+    top: 3px;
+    right: 96px;
+    z-index: 5;
+    width: 10px;
+    height: 10px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--bio-danger, #d9534f);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    flex-shrink: 0;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-cell--field:not(.is-empty):not(.machines-cell--notes) .machines-cell-clear {
+    display: block;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-cell--field:not(.is-empty):not(.machines-cell--notes):hover .machines-cell-clear {
+    opacity: 0.7;
+  }
+  .machines-cell-clear:hover {
+    opacity: 1 !important;
+  }
+  .machines-schedule-row-delete {
+    display: none;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--bio-danger, #d9534f);
+    color: #fff;
+    font-size: 12px;
+    line-height: 18px;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    flex-shrink: 0;
+    align-self: center;
+    margin-left: 4px;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-schedule-row-delete {
+    display: block;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-schedule-row:hover .machines-schedule-row-delete {
+    opacity: 0.7;
+  }
+  .machines-schedule-row-delete:hover {
+    opacity: 1 !important;
   }
   /* Примечания: многострочный текст, плейсхолдер в режиме правки */
   .machines-page[data-inline-edit-mode="1"] .machines-panel--quick .machines-quick-row > .machines-cell--notes[contenteditable="true"] {
@@ -2108,6 +2185,63 @@
       });
     }
 
+    function syncScheduleCodeVisibility() {
+      var quickRows = quickWrap ? quickWrap.querySelectorAll(".machines-quick-row") : [];
+      var machineMap = {};
+      quickRows.forEach(function (qrow) {
+        var cells = qrow.querySelectorAll(":scope > .machines-cell");
+        if (cells.length < 3) return;
+        var code = (cells[0].textContent || "").trim();
+        if (!code) return;
+        var codeCell = cells[0];
+        var hue = codeCell.style.getPropertyValue("--mc-hue") || "";
+        var pid = (cells[1].getAttribute("data-preview-product-id") || "").trim();
+        machineMap[code] = { pid: pid, hue: hue, fieldCell: cells[1] };
+      });
+      root.querySelectorAll(".machines-quick-row .machines-cell--field:not(.machines-cell--notes)").forEach(function (fc) {
+        fc.classList.remove("is-match");
+        fc.style.removeProperty("--mc-hue");
+      });
+      root.querySelectorAll(".machines-cell--schedule-label").forEach(function (lc) {
+        lc.classList.remove("is-match");
+        lc.style.removeProperty("--mc-hue");
+      });
+      root.querySelectorAll(".machines-schedule-row").forEach(function (srow) {
+        var label = srow.querySelector(".machines-cell--schedule-label");
+        var codeCell = srow.querySelector(".machines-cell--schedule-code");
+        if (!label || !codeCell) return;
+        var mc = (label.getAttribute("data-machine-code") || "").trim();
+        var hid = label.querySelector(".js-machines-product-id");
+        var schedPid = hid ? (hid.value || "").trim() : "";
+        codeCell.classList.remove("is-match");
+        codeCell.style.removeProperty("--mc-hue");
+        if (!mc || !schedPid) {
+          codeCell.textContent = mc;
+          return;
+        }
+        var info = machineMap[mc];
+        var workPid = info ? info.pid : "";
+        if (workPid === schedPid) {
+          codeCell.textContent = mc;
+          codeCell.classList.remove("is-empty");
+          var hue = info ? info.hue : "";
+          if (hue) {
+            codeCell.classList.add("is-match");
+            codeCell.style.setProperty("--mc-hue", hue);
+            label.classList.add("is-match");
+            label.style.setProperty("--mc-hue", hue);
+            if (info.fieldCell) {
+              info.fieldCell.classList.add("is-match");
+              info.fieldCell.style.setProperty("--mc-hue", hue);
+            }
+          }
+        } else {
+          codeCell.textContent = "";
+          codeCell.classList.add("is-empty");
+        }
+      });
+    }
+
     function serverQuickRows() {
       return Array.prototype.slice.call(quickWrap.querySelectorAll(".machines-quick-row")).filter(function (r) {
         return r.getAttribute("data-client-row") !== "1";
@@ -2240,7 +2374,10 @@
       if (on) {
         hideQuickPreview();
       }
-      if (toggleBtn) toggleBtn.setAttribute("aria-pressed", on ? "true" : "false");
+      if (toggleBtn) {
+        toggleBtn.setAttribute("aria-pressed", on ? "true" : "false");
+        toggleBtn.textContent = on ? "Сохранить" : "Быстрое редактирование";
+      }
       closeSuggestExcept(null);
       if (!on) {
         var aeCombo = document.activeElement;
@@ -2291,6 +2428,14 @@
       if (histCloseBtn) histCloseBtn.addEventListener("click", closeHistoryPanel);
     }
     document.addEventListener("keydown", onHistoryEscape);
+
+    scheduleWrap.addEventListener("click", function (e) {
+      var btn = e.target.closest(".js-machines-schedule-row-delete");
+      if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
+      var row = btn.closest(".machines-schedule-row");
+      if (!row) return;
+      row.remove();
+    });
 
     scheduleWrap.addEventListener("dragstart", function (e) {
       var handle = e.target.closest(".machines-schedule-drag-handle");
@@ -2416,6 +2561,7 @@
       persistQuickServerRows();
       saveQuickClientRows();
       syncMachineCodeAppearance();
+      syncScheduleCodeVisibility();
       var fieldLabel = "ячейка";
       if (field === qcells[1]) fieldLabel = "«Сейчас»";
       else if (field === qcells[2]) fieldLabel = "«Далее»";
@@ -2584,6 +2730,7 @@
       closeSuggestExcept(null);
       syncProductComboDisplay(cell);
       persistAllProducts();
+      syncScheduleCodeVisibility();
       var idxStr = (cell.getAttribute("data-schedule-index") || "").trim();
       var lineNo = "";
       if (idxStr !== "") {
@@ -2732,6 +2879,17 @@
       }
     });
 
+    quickWrap.addEventListener("click", function (e) {
+      var btn = e.target.closest(".js-machines-cell-clear");
+      if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
+      var cell = btn.closest(".machines-cell--field");
+      if (!cell) return;
+      setQuickCellText(cell, "");
+      clearQuickFieldProductRef(cell);
+      syncQuickFieldSetupSelect(cell);
+      syncScheduleCodeVisibility();
+    });
+
     quickWrap.addEventListener(
       "blur",
       function (e) {
@@ -2746,6 +2904,7 @@
             syncMachineCodeAppearance();
           }
         }
+        syncScheduleCodeVisibility();
       },
       true
     );
@@ -2961,6 +3120,7 @@
     root.querySelectorAll(".machines-cell--schedule-label").forEach(syncProductComboDisplay);
     syncMachineCodeAppearance();
     syncScheduleProductInteractions(root.getAttribute("data-inline-edit-mode") === "1");
+    syncScheduleCodeVisibility();
   })();
 </script>
 {% endblock %}
