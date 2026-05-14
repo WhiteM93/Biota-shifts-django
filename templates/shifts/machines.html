@@ -89,7 +89,7 @@
                   <option value="">Нет установок</option>
                 {% else %}
                   {% if row.current_setup_options|length > 1 %}
-                    {% if not row.current_setup_id %}<option value="">— установка —</option>{% endif %}
+                    {% if not row.current_setup_id %}<option value="">—</option>{% endif %}
                   {% endif %}
                   {% for opt in row.current_setup_options %}
                     <option value="{{ opt.id }}"{% if row.current_setup_id == opt.id %} selected{% endif %}>
@@ -131,7 +131,7 @@
                   <option value="">Нет установок</option>
                 {% else %}
                   {% if row.next_setup_options|length > 1 %}
-                    {% if not row.next_setup_id %}<option value="">— установка —</option>{% endif %}
+                    {% if not row.next_setup_id %}<option value="">—</option>{% endif %}
                   {% endif %}
                   {% for opt in row.next_setup_options %}
                     <option value="{{ opt.id }}"{% if row.next_setup_id == opt.id %} selected{% endif %}>
@@ -1041,8 +1041,7 @@
     font-style: italic;
   }
   .machines-cell.is-empty::after {
-    content: "—";
-    opacity: 0.45;
+    content: none;
   }
   .machines-cell--schedule-label.is-empty::after {
     content: none;
@@ -1567,7 +1566,7 @@
       if (setups.length > 1) {
         var ph = document.createElement("option");
         ph.value = "";
-        ph.textContent = "— установка —";
+        ph.textContent = "—";
         sel.appendChild(ph);
       }
       setups.forEach(function (su, idx) {
