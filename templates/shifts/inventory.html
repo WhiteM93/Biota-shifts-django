@@ -1098,8 +1098,22 @@
   <input type="hidden" name="panel" value="defects">
   <h3>Фильтр записей</h3>
   <div class="filter-grid">
-    <label class="field"><span>Дата с</span><input type="date" name="defect_date_from" value="{{ defect_filters.date_from }}"></label>
-    <label class="field"><span>Дата по</span><input type="date" name="defect_date_to" value="{{ defect_filters.date_to }}"></label>
+    <div class="field defect-date-filter" id="defect-date-filter">
+      <div class="defect-date-mode-btns">
+        <button type="button" class="defect-date-mode-btn is-active" data-mode="day">День</button>
+        <button type="button" class="defect-date-mode-btn" data-mode="range">Период</button>
+      </div>
+      <div class="defect-date-inputs">
+        <input type="date" id="defect-date-single" class="defect-date-single" value="{{ defect_filters.date_from }}">
+        <span class="defect-date-range" id="defect-date-range" style="display:none">
+          <input type="date" id="defect-date-from-inp" value="{{ defect_filters.date_from }}">
+          <span class="defect-date-sep">—</span>
+          <input type="date" id="defect-date-to-inp" value="{{ defect_filters.date_to }}">
+        </span>
+        <input type="hidden" name="defect_date_from" id="defect-date-from-val" value="{{ defect_filters.date_from }}">
+        <input type="hidden" name="defect_date_to" id="defect-date-to-val" value="{{ defect_filters.date_to }}">
+      </div>
+    </div>
     <label class="field"><span>Отдел</span>
       <select name="defect_department">
         <option value="">Все</option>
@@ -1110,6 +1124,52 @@
     </label>
   </div>
 </form>
+<script>
+(function(){
+  var wrap = document.getElementById("defect-date-filter");
+  if (!wrap) return;
+  var modeBtns = wrap.querySelectorAll(".defect-date-mode-btn");
+  var singleInp = document.getElementById("defect-date-single");
+  var rangeWrap = document.getElementById("defect-date-range");
+  var fromInp = document.getElementById("defect-date-from-inp");
+  var toInp = document.getElementById("defect-date-to-inp");
+  var fromVal = document.getElementById("defect-date-from-val");
+  var toVal = document.getElementById("defect-date-to-val");
+  var form = wrap.closest("form");
+  var mode = (fromVal.value && toVal.value && fromVal.value !== toVal.value) ? "range" : "day";
+
+  function syncHidden() {
+    if (mode === "day") {
+      fromVal.value = singleInp.value;
+      toVal.value = singleInp.value;
+    } else {
+      fromVal.value = fromInp.value;
+      toVal.value = toInp.value;
+    }
+  }
+
+  function setMode(m) {
+    mode = m;
+    modeBtns.forEach(function(b){ b.classList.toggle("is-active", b.dataset.mode === m); });
+    singleInp.style.display = m === "day" ? "" : "none";
+    rangeWrap.style.display = m === "range" ? "" : "none";
+    syncHidden();
+  }
+
+  modeBtns.forEach(function(btn){
+    btn.addEventListener("click", function(){
+      setMode(btn.dataset.mode);
+      if (fromVal.value || toVal.value) form.submit();
+    });
+  });
+
+  singleInp.addEventListener("change", function(){ syncHidden(); });
+  fromInp.addEventListener("change", function(){ syncHidden(); });
+  toInp.addEventListener("change", function(){ syncHidden(); });
+
+  setMode(mode);
+})();
+</script>
 
 <div class="table-wrap">
   <table class="data-grid defects-table">

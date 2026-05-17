@@ -889,6 +889,31 @@
     padding: 4px 6px;
     font-size: 12px;
   }
+  /* ── Defect date filter ──────────────────── */
+  .defect-date-filter { display: flex; flex-direction: column; gap: 6px; }
+  .defect-date-mode-btns { display: flex; gap: 4px; }
+  .defect-date-mode-btn {
+    padding: 3px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 99px;
+    border: 1px solid rgba(255,255,255,.1);
+    background: transparent;
+    color: var(--bio-text-muted, #888);
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .defect-date-mode-btn.is-active {
+    background: rgba(143,156,255,.15);
+    border-color: rgba(143,156,255,.4);
+    color: #c0cbff;
+  }
+  .defect-date-inputs { display: flex; align-items: center; gap: 6px; }
+  .defect-date-inputs input[type="date"] { flex: 1; min-width: 0; }
+  .defect-date-range { display: flex; align-items: center; gap: 6px; flex: 1; }
+  .defect-date-sep { opacity: .5; font-size: 14px; flex-shrink: 0; }
+  .defect-date-single { width: 100%; }
+
   /* ── Defect type toggle ───────────────────── */
   .defect-type-toggle {
     display: flex;
