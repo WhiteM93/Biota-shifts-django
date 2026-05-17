@@ -1056,20 +1056,8 @@
         {% endfor %}
       </select>
     </label>
-    <label class="field defect-scold-only"><span>Ответственные (можно несколько)</span>
-      <div class="defect-responsible-picker">
-        <input type="text" class="defect-responsible-search js-defect-responsible-search" data-target-list="defect-responsible-list" placeholder="Поиск по ФИО" autocomplete="off">
-        <div id="defect-responsible-list" class="defect-responsible-list" role="group" aria-label="Ответственные сотрудники">
-          {% for employee in employee_options %}
-          <label class="defect-responsible-option"><input type="checkbox" name="responsible_names" value="{{ employee }}"><span>{{ employee }}</span></label>
-          {% endfor %}
-        </div>
-      </div>
-    </label>
     <label class="field defect-scold-only"><span>Кол-во брака</span><input type="number" name="defect_quantity" min="0" value="0"></label>
     <label class="field defect-scold-only"><span>Неисправно</span><input type="number" name="bad_quantity" min="0" value="0"></label>
-    <label class="field defect-scold-only"><span>Потенциальный брак</span><input type="number" name="potential_defect_quantity" min="0" value="0"></label>
-    <label class="field defect-scold-only"><span>Изделие</span><input type="text" name="product_name" placeholder="Название изделия"></label>
     <label class="field"><span id="defect-reason-label">Причина брака</span><input type="text" name="defect_reason" id="defect-reason-input" required placeholder="Опишите причину"></label>
     <div class="filter-actions"><button type="submit" class="btn" id="defect-add-submit-btn">Добавить запись</button></div>
   </form>
