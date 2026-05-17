@@ -954,3 +954,33 @@
   .defect-row--scold { background: rgba(239,68,68,.04); }
   .defect-row--praise { background: rgba(34,197,94,.04); }
 
+  /* ── Employee autocomplete combobox ─────────── */
+  .defect-emp-search {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .defect-emp-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 200;
+    background: var(--bio-panel-bg, #1a2035);
+    border: 1px solid var(--bio-border, rgba(255,255,255,.12));
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    max-height: 220px;
+    overflow-y: auto;
+    margin-top: 2px;
+  }
+  .defect-emp-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background .12s;
+  }
+  .defect-emp-item:hover,
+  .defect-emp-item.is-active {
+    background: rgba(99,179,237,.15);
+  }
+

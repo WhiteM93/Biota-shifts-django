@@ -1045,14 +1045,15 @@
     <input type="hidden" name="action" value="create_defect_record">
     <input type="hidden" name="record_type" id="defect-record-type-input" value="scold">
     <label class="field"><span>Дата</span><input type="date" name="defect_date" value="{{ today }}" required></label>
-    <label class="field"><span>Сотрудник</span>
-      <input type="text" class="js-tool-search" data-target-select="defect-employee-select" placeholder="Поиск по ФИО">
-      <select id="defect-employee-select" name="employee_name" required>
-        <option value="">Выбрать...</option>
+    <label class="field" style="position:relative;">
+      <span>Сотрудник</span>
+      <input type="hidden" name="employee_name" id="defect-employee-value" required>
+      <input type="text" id="defect-employee-search" class="defect-emp-search" placeholder="Поиск по ФИО..." autocomplete="off">
+      <div id="defect-employee-list" class="defect-emp-list" hidden>
         {% for employee in employee_options %}
-        <option value="{{ employee }}">{{ employee }}</option>
+        <div class="defect-emp-item" data-value="{{ employee }}">{{ employee }}</div>
         {% endfor %}
-      </select>
+      </div>
     </label>
     <label class="field defect-scold-only"><span>Кол-во брака</span><input type="number" name="defect_quantity" min="0" value="0"></label>
     <label class="field defect-scold-only"><span>Неисправно</span><input type="number" name="bad_quantity" min="0" value="0"></label>
@@ -1090,6 +1091,68 @@
   });
 
   setType("scold");
+
+  // Employee autocomplete combobox
+  var empSearch = document.getElementById("defect-employee-search");
+  var empValue  = document.getElementById("defect-employee-value");
+  var empList   = document.getElementById("defect-employee-list");
+  var empItems  = empList ? Array.prototype.slice.call(empList.querySelectorAll(".defect-emp-item")) : [];
+  var activeIdx = -1;
+
+  function showList() { empList.hidden = false; }
+  function hideList() { empList.hidden = true; activeIdx = -1; }
+
+  function filterItems(q) {
+    var lower = q.toLowerCase();
+    var visible = [];
+    empItems.forEach(function(item) {
+      var match = !q || item.dataset.value.toLowerCase().indexOf(lower) !== -1;
+      item.hidden = !match;
+      if (match) visible.push(item);
+    });
+    return visible;
+  }
+
+  function setActive(items, idx) {
+    items.forEach(function(it, i) { it.classList.toggle("is-active", i === idx); });
+    if (items[idx]) items[idx].scrollIntoView({ block: "nearest" });
+  }
+
+  function selectItem(value) {
+    empSearch.value = value;
+    empValue.value  = value;
+    hideList();
+  }
+
+  empSearch.addEventListener("input", function() {
+    empValue.value = "";
+    var visible = filterItems(empSearch.value);
+    activeIdx = -1;
+    if (visible.length) showList(); else hideList();
+  });
+
+  empSearch.addEventListener("keydown", function(e) {
+    if (empList.hidden) return;
+    var visible = empItems.filter(function(it){ return !it.hidden; });
+    if (e.key === "ArrowDown") { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, visible.length - 1); setActive(visible, activeIdx); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); setActive(visible, activeIdx); }
+    else if (e.key === "Enter" && activeIdx >= 0) { e.preventDefault(); selectItem(visible[activeIdx].dataset.value); }
+    else if (e.key === "Escape") { hideList(); }
+  });
+
+  empList.addEventListener("mousedown", function(e) {
+    var item = e.target.closest(".defect-emp-item");
+    if (item) { e.preventDefault(); selectItem(item.dataset.value); }
+  });
+
+  document.addEventListener("mousedown", function(e) {
+    if (!empSearch.contains(e.target) && !empList.contains(e.target)) hideList();
+  });
+
+  empSearch.addEventListener("focus", function() {
+    filterItems(empSearch.value);
+    showList();
+  });
 })();
 </script>
 {% endif %}
@@ -1177,10 +1240,7 @@
       <col class="col-date">
       <col class="col-employee">
       <col class="col-qty">
-      <col class="col-good">
       <col class="col-bad">
-      <col class="col-potential">
-      <col class="col-product">
       <col class="col-reason">
       {% if is_admin_user %}<col class="col-actions">{% endif %}
     </colgroup>
@@ -1189,10 +1249,7 @@
         <th class="defect-col-date">Дата</th>
         <th class="defect-col-employee">Сотрудник</th>
         <th class="defect-col-qty">Кол-во брака</th>
-        <th class="defect-col-good">Исправно</th>
         <th class="defect-col-bad">Неисправно</th>
-        <th class="defect-col-potential">Потенциальный брак</th>
-        <th class="defect-col-product">Изделие</th>
         <th class="defect-col-reason">Причина брака</th>
         {% if is_admin_user %}<th class="defect-col-actions">Действия</th>{% endif %}
       </tr>
@@ -1228,32 +1285,11 @@
           <strong>{{ rec.defect_quantity }}</strong>
           {% endif %}
         </td>
-        <td class="defect-col-good">
-          {% if biota_can_edit or is_admin_user %}
-          <span><strong>{{ rec.good_quantity }}</strong></span>
-          {% else %}
-          {{ rec.good_quantity }}
-          {% endif %}
-        </td>
         <td class="defect-col-bad">
           {% if biota_can_edit or is_admin_user %}
           <input class="defect-cell-input defect-num-input" type="number" name="bad_quantity" min="0" value="{{ rec.bad_quantity }}" form="defect-edit-form-{{ rec.id }}" readonly>
           {% else %}
           {{ rec.bad_quantity }}
-          {% endif %}
-        </td>
-        <td class="defect-col-potential">
-          {% if biota_can_edit or is_admin_user %}
-          <input class="defect-cell-input defect-num-input" type="number" name="potential_defect_quantity" min="0" value="{{ rec.potential_defect_quantity }}" form="defect-edit-form-{{ rec.id }}" readonly>
-          {% else %}
-          {{ rec.potential_defect_quantity }}
-          {% endif %}
-        </td>
-        <td class="defect-col-product">
-          {% if biota_can_edit or is_admin_user %}
-          <input class="defect-cell-input" type="text" name="product_name" value="{{ rec.product_name }}" form="defect-edit-form-{{ rec.id }}" readonly placeholder="Название изделия">
-          {% else %}
-          {{ rec.product_name|default:"-" }}
           {% endif %}
         </td>
         <td class="defect-col-reason">

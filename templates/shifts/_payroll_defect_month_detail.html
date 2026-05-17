@@ -5,9 +5,7 @@
 <p class="muted" style="margin:0 0 14px 0;font-size:12px;line-height:1.45;">
   Итого за {{ month_name }}: записей <strong>{{ defect_month.count }}</strong>;
   кол-во брака <strong>{{ defect_month.defect_quantity }}</strong>;
-  исправно <strong>{{ defect_month.good_quantity }}</strong>;
-  неисправно <strong>{{ defect_month.bad_quantity }}</strong>;
-  потенциальный брак <strong>{{ defect_month.potential_defect_quantity }}</strong>.
+  неисправно <strong>{{ defect_month.bad_quantity }}</strong>.
 </p>
 {% for rec in defect_records %}
 <div class="payroll-defect-entry">
@@ -23,14 +21,8 @@
     <dd>{{ rec.employee_name }}</dd>
     <dt>Кол-во брака</dt>
     <dd>{{ rec.defect_quantity }}</dd>
-    <dt>Исправно</dt>
-    <dd>{{ rec.good_quantity }}</dd>
     <dt>Неисправно</dt>
     <dd>{{ rec.bad_quantity }}</dd>
-    <dt>Потенциальный брак</dt>
-    <dd>{{ rec.potential_defect_quantity }}</dd>
-    <dt>Изделие</dt>
-    <dd>{{ rec.product_name|default:"—" }}</dd>
     <dt>Причина брака</dt>
     <dd>{{ rec.defect_reason }}</dd>
     <dt>Создано в системе</dt>
