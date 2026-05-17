@@ -642,7 +642,14 @@ html[data-theme="dawn"] #graph-page-root .emp-cell {
 }
 .fp-action-btn svg { width: 13px; height: 13px; opacity: .7; flex-shrink: 0; }
 .fp-action-btn:hover { background: rgba(255,255,255,.11); border-color: rgba(255,255,255,.18); }
+.fp-action-btn--accent {
+  background: rgba(143,156,255,.18);
+  border-color: rgba(143,156,255,.4);
+  color: #c0cbff;
+}
+.fp-action-btn--accent:hover { background: rgba(143,156,255,.28); border-color: rgba(143,156,255,.6); }
 .fp-upload-form { display: contents; }
+.fp-head-actions [hidden] { display: none !important; }
 html[data-theme="dawn"] .fp-head { border-bottom-color: rgba(0,0,0,.06); }
 html[data-theme="dawn"] .fp-action-btn {
   background: rgba(0,0,0,.04);

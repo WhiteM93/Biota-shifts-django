@@ -25,12 +25,12 @@
         <input type="hidden" name="month" value="{{ month }}">
         <input id="graph-schedule-file" type="file" name="schedule_file" accept=".xlsx" required class="graph-upload-input">
         <label for="graph-schedule-file" class="fp-action-btn graph-upload-pick-btn">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10V2M5 5l3-3 3 3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg>
-          <span id="graph-upload-filename" class="graph-upload-filename">Загрузить</span>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+          <span id="graph-upload-filename" class="graph-upload-filename">Выбрать xlsx</span>
         </label>
-        <button type="submit" class="fp-action-btn fp-upload-submit" id="fp-upload-submit-btn" hidden>
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 8 6 12 14 4"/></svg>
-          В систему
+        <button type="submit" class="fp-action-btn fp-upload-submit fp-action-btn--accent" id="fp-upload-submit-btn" hidden>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V3M5 6l3-3 3 3M2 13h12"/></svg>
+          Загрузить
         </button>
       </form>
       {% endif %}
