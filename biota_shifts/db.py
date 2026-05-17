@@ -116,11 +116,33 @@ def _load_employees_uncached(db_key: tuple) -> pd.DataFrame:
         return pd.read_sql(sql, conn)
 
 
+def _demo_employees() -> pd.DataFrame:
+    """Демо-данные для локальной работы без BIOTA_DB."""
+    rows = [
+        ("1001", "Иванов",    "Иван",     "Механический цех", "Токарь 5р.",       "Участок А"),
+        ("1002", "Петров",    "Пётр",     "Механический цех", "Фрезеровщик 4р.",  "Участок А"),
+        ("1003", "Сидоров",   "Сергей",   "Механический цех", "Токарь 4р.",       "Участок А"),
+        ("1004", "Козлов",    "Андрей",   "Сборочный цех",    "Сборщик 5р.",      "Участок Б"),
+        ("1005", "Новиков",   "Дмитрий",  "Сборочный цех",    "Сборщик 4р.",      "Участок Б"),
+        ("1006", "Морозов",   "Алексей",  "Сборочный цех",    "Слесарь 5р.",      "Участок Б"),
+        ("1007", "Волков",    "Виктор",   "ОТК",              "Контролёр 5р.",    ""),
+        ("1008", "Лебедев",   "Николай",  "ОТК",              "Контролёр 4р.",    ""),
+        ("1009", "Семёнов",   "Олег",     "Инструментальный", "Наладчик 5р.",     "Участок В"),
+        ("1010", "Егоров",    "Павел",    "Инструментальный", "Наладчик 4р.",     "Участок В"),
+    ]
+    return pd.DataFrame(rows, columns=[
+        "emp_code", "last_name", "first_name",
+        "department_name", "position_name", "area_name",
+    ])
+
+
 def load_employees(cfg: dict) -> pd.DataFrame:
     try:
         return _load_employees_uncached(_db_cache_key(cfg))
     except Exception as exc:
         _on_biota_unavailable(exc)
+        if (_config_str("BIOTA_DEMO_DATA") or "").strip().lower() in ("1", "true", "yes", "on"):
+            return _demo_employees()
         return pd.DataFrame()
 
 

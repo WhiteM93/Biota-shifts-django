@@ -24,47 +24,72 @@
   <button type="button" class="btn btn-png-export" id="graph-png-btn" title="Снимок таблицы в тёмном оформлении (PNG)">PNG (тёмная тема)</button>
 </div>
 
-<form method="get" action="" class="filter-panel auto-submit-form">
-  <div class="filter-grid">
-  <label class="field"><span>Год</span>
-    <select name="year">
-      {% for y in year_options %}
-      <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label class="field"><span>Месяц</span>
-    <select name="month">
-      {% for mm, mlab in month_choices %}
-      <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <div class="filter-actions">
-    <button type="submit" class="btn">Показать</button>
+<form method="get" action="" class="filter-panel auto-submit-form" id="graph-filter-form">
+  <div class="fp-head">
+    <span class="fp-head-label">
+      <svg class="fp-head-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 5h14M6 10h8M9 15h2"/>
+      </svg>
+      Период и фильтры
+    </span>
+    <button type="button" class="fp-collapse-btn" id="fp-collapse-btn" aria-label="Свернуть/развернуть фильтр">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="5 8 10 13 15 8"/>
+      </svg>
+    </button>
   </div>
-  </div>
-  <div class="mode-row">
-    <span class="label">Отделы:</span>
-    <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not dep_mode_pick %}checked{% endif %}> Все</label>
-    <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if dep_mode_pick %}checked{% endif %}> По списку</label>
-  </div>
-  <div class="check-row mode-target {% if not dep_mode_pick %}is-hidden{% endif %}" data-mode-target="dep">
-    <span class="label">Отделы:</span>
-    {% for dep in all_deps %}
-    <label class="chk"><input type="checkbox" name="dep" value="{{ dep }}" {% if dep in sel_deps %}checked{% endif %}> {{ dep }}</label>
-    {% endfor %}
-  </div>
-  <div class="mode-row">
-    <span class="label">Должности:</span>
-    <label class="inline"><input type="radio" name="pos_mode" value="all" {% if not pos_mode_pick %}checked{% endif %}> Все</label>
-    <label class="inline"><input type="radio" name="pos_mode" value="pick" {% if pos_mode_pick %}checked{% endif %}> По списку</label>
-  </div>
-  <div class="check-row mode-target {% if not pos_mode_pick %}is-hidden{% endif %}" data-mode-target="pos">
-    <span class="label">Должности:</span>
-    {% for pos in all_positions %}
-    <label class="chk"><input type="checkbox" name="pos" value="{{ pos }}" {% if pos in sel_positions %}checked{% endif %}> {{ pos }}</label>
-    {% endfor %}
+  <div class="fp-body" id="fp-body">
+    <div class="filter-grid">
+      <label class="field"><span>Год</span>
+        <select name="year">
+          {% for y in year_options %}
+          <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field"><span>Месяц</span>
+        <select name="month">
+          {% for mm, mlab in month_choices %}
+          <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="filter-actions">
+        <button type="submit" class="btn">Показать</button>
+      </div>
+    </div>
+    <div class="fp-modes-wrap">
+      <input type="hidden" name="dep_mode" id="fp-dep-mode-val" value="{% if dep_mode_pick %}pick{% else %}all{% endif %}">
+      <div class="fp-mode-group">
+        <span class="fp-mode-label">Отделы</span>
+        <div class="fp-dd" id="fp-dd-dep">
+          <button type="button" class="fp-dd-btn">
+            <span class="fp-dd-txt" id="fp-dep-txt"></span>
+            <svg class="fp-dd-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
+          </button>
+          <div class="fp-dd-panel" id="fp-dep-panel" hidden>
+            {% for dep in all_deps %}
+            <label class="fp-dd-item"><input type="checkbox" name="dep" value="{{ dep }}" {% if dep in sel_deps %}checked{% endif %}><span>{{ dep }}</span></label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <input type="hidden" name="pos_mode" id="fp-pos-mode-val" value="{% if pos_mode_pick %}pick{% else %}all{% endif %}">
+      <div class="fp-mode-group">
+        <span class="fp-mode-label">Должности</span>
+        <div class="fp-dd" id="fp-dd-pos">
+          <button type="button" class="fp-dd-btn">
+            <span class="fp-dd-txt" id="fp-pos-txt"></span>
+            <svg class="fp-dd-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
+          </button>
+          <div class="fp-dd-panel" id="fp-pos-panel" hidden>
+            {% for pos in all_positions %}
+            <label class="fp-dd-item"><input type="checkbox" name="pos" value="{{ pos }}" {% if pos in sel_positions %}checked{% endif %}><span>{{ pos }}</span></label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </form>
 
@@ -496,6 +521,109 @@
       });
     });
     syncPosModeVisibility();
+
+    // Filter panel collapse
+    (function () {
+      var collapseBtn = document.getElementById("fp-collapse-btn");
+      var fpBody = document.getElementById("fp-body");
+      if (!collapseBtn || !fpBody) return;
+      function setCollapsed(collapsed, animate) {
+        if (!animate) fpBody.style.transition = "none";
+        collapseBtn.classList.toggle("is-collapsed", collapsed);
+        if (collapsed) {
+          fpBody.style.overflow = "hidden";
+          fpBody.style.maxHeight = "0";
+          fpBody.style.opacity = "0";
+        } else {
+          fpBody.style.maxHeight = fpBody.scrollHeight + "px";
+          fpBody.style.opacity = "1";
+          setTimeout(function () {
+            if (!collapseBtn.classList.contains("is-collapsed")) fpBody.style.overflow = "visible";
+          }, 360);
+        }
+        if (!animate) { fpBody.getBoundingClientRect(); fpBody.style.transition = ""; }
+        try { localStorage.setItem("graph-fp-collapsed", collapsed ? "1" : "0"); } catch (e) {}
+      }
+      var saved = "";
+      try { saved = localStorage.getItem("graph-fp-collapsed"); } catch (e) {}
+      setCollapsed(saved === "1", false);
+      if (saved !== "1") fpBody.style.maxHeight = fpBody.scrollHeight + "px";
+      collapseBtn.addEventListener("click", function () {
+        setCollapsed(!collapseBtn.classList.contains("is-collapsed"), true);
+      });
+      window.addEventListener("resize", function () {
+        if (!collapseBtn.classList.contains("is-collapsed")) {
+          fpBody.style.maxHeight = fpBody.scrollHeight + "px";
+        }
+      });
+    })();
+
+    // Multi-select dropdowns for dep/pos filters
+    (function () {
+      var filterForm = document.getElementById("graph-filter-form");
+      if (!filterForm) return;
+
+      function initDropdown(ddId, modeInputId, txtId) {
+        var dd = document.getElementById(ddId);
+        var modeInput = document.getElementById(modeInputId);
+        var txtEl = document.getElementById(txtId);
+        if (!dd || !modeInput || !txtEl) return;
+        var panel = dd.querySelector(".fp-dd-panel");
+        var cbs = panel ? Array.prototype.slice.call(panel.querySelectorAll("input[type='checkbox']")) : [];
+        var isOpen = false;
+        var submitTimer = null;
+        var changed = false;
+
+        function updateLabel() {
+          var checked = cbs.filter(function (cb) { return cb.checked; });
+          if (checked.length === 0) {
+            txtEl.textContent = "Все";
+            modeInput.value = "all";
+          } else if (checked.length <= 2) {
+            txtEl.textContent = checked.map(function (cb) { return cb.value; }).join(", ");
+            modeInput.value = "pick";
+          } else {
+            txtEl.textContent = "Выбрано: " + checked.length;
+            modeInput.value = "pick";
+          }
+        }
+
+        var justOpened = false;
+        function openPanel() {
+          isOpen = true; changed = false; justOpened = true;
+          setTimeout(function () { justOpened = false; }, 150);
+          if (panel) { panel.hidden = false; requestAnimationFrame(function () { panel.classList.add("is-open"); }); }
+          dd.classList.add("is-open");
+        }
+
+        function closePanel(submit) {
+          if (justOpened) return;
+          isOpen = false;
+          if (panel) { panel.classList.remove("is-open"); setTimeout(function () { if (!isOpen) panel.hidden = true; }, 220); }
+          dd.classList.remove("is-open");
+          if (submit && changed) {
+            if (submitTimer) clearTimeout(submitTimer);
+            submitTimer = setTimeout(function () {
+              if (filterForm.dataset.submitting !== "1") { filterForm.dataset.submitting = "1"; filterForm.submit(); }
+            }, 60);
+          }
+        }
+
+        var btn = dd.querySelector(".fp-dd-btn");
+        if (btn) btn.addEventListener("click", function () { if (isOpen) closePanel(true); else openPanel(); });
+        if (panel) {
+          panel.addEventListener("change", function (e) { e.stopPropagation(); changed = true; updateLabel(); });
+        }
+        document.addEventListener("click", function (e) {
+          if (isOpen && !dd.contains(e.target)) closePanel(true);
+        });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && isOpen) closePanel(true); });
+        updateLabel();
+      }
+
+      initDropdown("fp-dd-dep", "fp-dep-mode-val", "fp-dep-txt");
+      initDropdown("fp-dd-pos", "fp-pos-mode-val", "fp-pos-txt");
+    })();
 
     var printBtn = document.getElementById("graph-print-btn");
     if (printBtn) {
