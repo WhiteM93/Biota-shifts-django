@@ -1045,10 +1045,8 @@
     <input type="hidden" name="action" value="create_defect_record">
     <input type="hidden" name="record_type" id="defect-record-type-input" value="scold">
     <label class="field"><span>Дата</span><input type="date" name="defect_date" value="{{ today }}" required></label>
-    <label class="field"><span>Поиск сотрудника</span>
-      <input type="text" class="js-tool-search" data-target-select="defect-employee-select" placeholder="Введите ФИО">
-    </label>
     <label class="field"><span>Сотрудник</span>
+      <input type="text" class="js-tool-search" data-target-select="defect-employee-select" placeholder="Поиск по ФИО">
       <select id="defect-employee-select" name="employee_name" required>
         <option value="">Выбрать...</option>
         {% for employee in employee_options %}
