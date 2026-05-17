@@ -68,6 +68,10 @@
             <svg class="fp-dd-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
           </button>
           <div class="fp-dd-panel" id="fp-dep-panel" hidden>
+            <div class="fp-dd-actions">
+              <button type="button" class="fp-dd-all">Все</button>
+              <button type="button" class="fp-dd-none">Снять</button>
+            </div>
             {% for dep in all_deps %}
             <label class="fp-dd-item"><input type="checkbox" name="dep" value="{{ dep }}" {% if dep in sel_deps %}checked{% endif %}><span>{{ dep }}</span></label>
             {% endfor %}
@@ -83,6 +87,10 @@
             <svg class="fp-dd-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
           </button>
           <div class="fp-dd-panel" id="fp-pos-panel" hidden>
+            <div class="fp-dd-actions">
+              <button type="button" class="fp-dd-all">Все</button>
+              <button type="button" class="fp-dd-none">Снять</button>
+            </div>
             {% for pos in all_positions %}
             <label class="fp-dd-item"><input type="checkbox" name="pos" value="{{ pos }}" {% if pos in sel_positions %}checked{% endif %}><span>{{ pos }}</span></label>
             {% endfor %}
@@ -613,6 +621,18 @@
         if (btn) btn.addEventListener("click", function () { if (isOpen) closePanel(true); else openPanel(); });
         if (panel) {
           panel.addEventListener("change", function (e) { e.stopPropagation(); changed = true; updateLabel(); });
+          var allBtn = panel.querySelector(".fp-dd-all");
+          var noneBtn = panel.querySelector(".fp-dd-none");
+          if (allBtn) allBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            cbs.forEach(function (cb) { cb.checked = true; });
+            changed = true; updateLabel();
+          });
+          if (noneBtn) noneBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            cbs.forEach(function (cb) { cb.checked = false; });
+            changed = true; updateLabel();
+          });
         }
         document.addEventListener("click", function (e) {
           if (isOpen && !dd.contains(e.target)) closePanel(true);
