@@ -750,6 +750,18 @@ html[data-theme="dawn"] #graph-page-root .emp-cell {
   transition: background .18s, border-color .18s, color .18s;
 }
 .fp-dd-btn:hover { background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.16); }
+.fp-dd-lbl {
+  font-weight: 700;
+  opacity: .7;
+  letter-spacing: .02em;
+}
+.fp-dd-sep {
+  width: 1px;
+  height: 11px;
+  background: currentColor;
+  opacity: .2;
+  flex-shrink: 0;
+}
 .fp-dd.is-open .fp-dd-btn {
   background: rgba(143,156,255,.15);
   border-color: rgba(143,156,255,.4);
