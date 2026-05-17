@@ -721,6 +721,66 @@ html[data-theme="dawn"] .nav .nav-refresh-btn:hover {
   border-color: var(--bio-nav-user-border);
 }
 
+.nav .nav-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--bio-theme-btn-border);
+  background: var(--bio-theme-btn-bg);
+  color: var(--bio-theme-btn-fg);
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.22s ease,
+    transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.24s ease;
+}
+.nav .nav-icon-btn svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.nav .nav-icon-btn:hover {
+  background: var(--bio-theme-btn-hover-bg);
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+}
+html[data-theme="dawn"] .nav .nav-icon-btn:hover {
+  box-shadow: 0 8px 20px rgba(55, 42, 36, 0.1);
+}
+.nav .nav-icon-btn:active {
+  transform: translateY(0) scale(1);
+  transition-duration: 0.12s;
+}
+.nav .nav-icon-btn:focus-visible {
+  outline: 2px solid var(--bio-input-focus-border);
+  outline-offset: 2px;
+}
+.nav .nav-icon-btn.active {
+  /* Сбрасываем всё что накладывает .nav a.active — иконка должна быть одного размера с кнопкой темы */
+  background: var(--bio-theme-btn-hover-bg);
+  border-color: var(--bio-input-focus-border);
+  box-shadow: none;
+  color: var(--bio-theme-btn-fg);
+  padding: 0 8px;
+  border-radius: 8px;
+}
+.nav .nav-icon-btn.active:hover {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+}
+html[data-theme="dawn"] .nav .nav-icon-btn.active:hover {
+  box-shadow: 0 8px 20px rgba(55, 42, 36, 0.1);
+}
+
 .nav .nav-logout {
   display: inline-flex;
   align-items: center;

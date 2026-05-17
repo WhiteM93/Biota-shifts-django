@@ -272,3 +272,42 @@ def home_view(request):
 def refresh_db_cache(request):
     biota_db.clear_biota_db_cache()
     return redirect(request.META.get("HTTP_REFERER") or "/")
+
+
+@biota_login_required
+def calculator_view(request):
+    from .models import Product, ProductSetup, ProductSetupToolRow
+    import json as _json
+
+    products_qs = Product.objects.prefetch_related(
+        "setups__tools"
+    ).order_by("name")
+
+    products_data = []
+    for product in products_qs:
+        setups_data = []
+        for setup in product.setups.all():
+            tools_data = []
+            for tool in setup.tools.all():
+                tools_data.append({
+                    "id": tool.pk,
+                    "number": tool.tool_number,
+                    "name": tool.name,
+                    "type": tool.tool_type,
+                    "diameter": tool.diameter,
+                    "overhang": tool.overhang,
+                })
+            setups_data.append({
+                "id": setup.pk,
+                "name": setup.name,
+                "tools": tools_data,
+            })
+        products_data.append({
+            "id": product.pk,
+            "name": product.name,
+            "setups": setups_data,
+        })
+
+    return render(request, "shifts/calculator.html", {
+        "products_json": _json.dumps(products_data, ensure_ascii=False),
+    })

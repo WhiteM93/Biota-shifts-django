@@ -36,6 +36,7 @@ urlpatterns = [
     ),
     path("inventory/", inventory_views.inventory_view, name="inventory"),
     path("machines/", machines_views.machines_view, name="machines"),
+    path("calculator/", views.calculator_view, name="calculator"),
     path("products/", product_views.products_list_view, name="products_list"),
     path("products/<int:pk>/delete/", product_views.product_delete_view, name="product_delete"),
     path("products/new/", product_views.product_create_view, name="product_create"),

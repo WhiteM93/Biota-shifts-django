@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block content %}
 <div class="page-actions">
@@ -128,112 +129,7 @@
     <a href="{% if is_edit and product %}{% url 'product_detail' product.pk %}{% else %}{% url 'products_list' %}{% endif %}" class="btn btn-ghost form-action-btn">Отмена</a>
   </p>
 </form>
-<style>
-  .product-form-panel {
-    max-width: 1280px;
-  }
-  .product-form-grid {
-    gap: 14px;
-  }
-  .product-form-panel .field > span {
-    font-size: 12px;
-    font-weight: 700;
-    color: #c4d4ec;
-  }
-  .product-form-panel #id_name {
-    min-height: 40px;
-  }
-  .product-form-panel #id_description {
-    min-height: 110px;
-    resize: vertical;
-    line-height: 1.45;
-    border-radius: 5px;
-    background: var(--bio-input-bg);
-    color: var(--bio-body-fg);
-    border: 1px solid var(--bio-input-border);
-  }
-  .product-form-panel #id_description:hover {
-    border-color: var(--bio-input-hover-border);
-  }
-  .product-form-panel #id_description:focus {
-    outline: none;
-    border-color: var(--bio-input-focus-border);
-    box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.22);
-    background: var(--bio-input-focus-bg);
-  }
-  .product-file-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px;
-    align-items: center;
-    padding: 10px;
-    border: 1px solid var(--bio-filter-border);
-    border-radius: 5px;
-    background: #111827;
-  }
-  .product-file-actions {
-    display: inline-flex;
-    gap: 8px;
-    align-items: center;
-  }
-  .product-file-picker {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    padding-left: 2px;
-  }
-  .file-action-btn {
-    height: 36px;
-    min-height: 36px;
-    padding: 0 12px;
-    line-height: 1.2;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    white-space: nowrap;
-  }
-  .form-action-btn {
-    height: 36px;
-    min-height: 36px;
-    padding: 0 14px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1.2;
-    box-sizing: border-box;
-    white-space: nowrap;
-  }
-  @media (max-width: 720px) {
-    .product-file-row {
-      grid-template-columns: 1fr;
-      gap: 10px;
-      align-items: start;
-    }
-    .product-file-actions {
-      width: 100%;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-    }
-    .product-file-actions .file-action-btn {
-      width: 100%;
-      justify-content: center;
-    }
-    .product-file-picker .btn {
-      width: 100%;
-      justify-content: center;
-    }
-    .product-file-picker .js-file-name {
-      width: 100%;
-      word-break: break-word;
-    }
-    .form-action-btn {
-      width: 100%;
-    }
-  }
-</style>
+<link rel="stylesheet" href="{% static "shifts/css/product_form.css" %}">
 <script>
   (function () {
     var nameInput = document.getElementById("id_name");

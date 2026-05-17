@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block content %}
 
@@ -85,24 +86,5 @@
 
 {% endif %}
 
-<style>
-.skud-form h3 { margin-top: 18px; font-size: 1rem; color: var(--bio-muted); }
-.skud-period-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
-.err-banner { color: var(--bio-error-soft); padding: 10px 0; }
-.skud-tabs { display: flex; gap: 8px; margin: 16px 0; }
-.skud-tabs .tab { padding: 8px 14px; border-radius: 3px; background: var(--bio-table-th-bg); color: var(--bio-input-focus-border); text-decoration: none; font-weight: 600; }
-.skud-tabs .tab.active { background: var(--bio-input-focus-border); color: #fff; }
-.table-wrap { overflow-x: auto; border: 1px solid var(--bio-table-cell-border); border-radius: 4px; padding: 8px; margin-top: 10px; }
-.data-grid { min-width: max-content; font-size: 12px; }
-.data-grid th, .data-grid td { border: 1px solid var(--bio-table-cell-border); padding: 4px 6px; text-align: center; }
-.dl-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-.dl-row .btn { text-decoration: none; display: inline-block; }
-@media (max-width: 720px) {
-  .skud-period-grid { grid-template-columns: 1fr; }
-  .mode-row { gap: 6px; }
-  .inline { padding: 4px 8px; font-size: 11px; }
-  .skud-tabs .tab { padding: 7px 10px; font-size: 12px; }
-  .data-grid th, .data-grid td { font-size: 11px; padding: 4px; }
-}
-</style>
+<link rel="stylesheet" href="{% static "shifts/css/skud.css" %}">
 {% endblock %}
