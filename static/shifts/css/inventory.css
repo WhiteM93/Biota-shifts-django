@@ -889,3 +889,43 @@
     padding: 4px 6px;
     font-size: 12px;
   }
+  /* ── Defect type toggle ───────────────────── */
+  .defect-type-toggle {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .defect-type-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 99px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    background: transparent;
+    color: var(--bio-text-muted, #888);
+    transition: background .18s, color .18s, border-color .18s;
+  }
+  .defect-type-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .defect-type-btn--scold.is-active {
+    background: rgba(239,68,68,.12);
+    border-color: rgba(239,68,68,.4);
+    color: #ef4444;
+  }
+  .defect-type-btn--praise.is-active {
+    background: rgba(34,197,94,.12);
+    border-color: rgba(34,197,94,.4);
+    color: #16a34a;
+  }
+  .defect-add-panel--scold { border-left: 3px solid rgba(239,68,68,.5); }
+  .defect-add-panel--praise { border-left: 3px solid rgba(34,197,94,.5); }
+
+  /* ── Defect table row colors ─────────────── */
+  .defect-row--scold td:first-child { border-left: 3px solid rgba(239,68,68,.55); }
+  .defect-row--praise td:first-child { border-left: 3px solid rgba(34,197,94,.55); }
+  .defect-row--scold { background: rgba(239,68,68,.04); }
+  .defect-row--praise { background: rgba(34,197,94,.04); }
+

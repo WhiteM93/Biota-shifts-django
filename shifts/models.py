@@ -619,7 +619,21 @@ class PurchaseRequest(models.Model):
         return self.unit_price * self.quantity
 
 
+DEFECT_RECORD_TYPE_SCOLD = "scold"
+DEFECT_RECORD_TYPE_PRAISE = "praise"
+DEFECT_RECORD_TYPE_CHOICES = [
+    (DEFECT_RECORD_TYPE_SCOLD, "Поругать"),
+    (DEFECT_RECORD_TYPE_PRAISE, "Похвалить"),
+]
+
+
 class EmployeeDefectRecord(models.Model):
+    record_type = models.CharField(
+        max_length=10,
+        choices=DEFECT_RECORD_TYPE_CHOICES,
+        default=DEFECT_RECORD_TYPE_SCOLD,
+        verbose_name="Тип записи",
+    )
     defect_date = models.DateField(verbose_name="Дата")
     responsible_name = models.CharField(max_length=120, verbose_name="Ответственный")
     employee_name = models.CharField(max_length=120, db_index=True, verbose_name="Сотрудник")

@@ -1028,12 +1028,22 @@
 
 {% if panel == "defects" %}
 {% if biota_can_edit %}
-<div class="filter-panel">
-  <h3>Учёт брака сотрудников</h3>
-  <form method="post" class="filter-grid">
+<div class="filter-panel defect-add-panel" id="defect-add-panel">
+  <div class="defect-type-toggle" id="defect-type-toggle">
+    <button type="button" class="defect-type-btn defect-type-btn--scold is-active" data-type="scold">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3M8 11h.01"/></svg>
+      Поругать
+    </button>
+    <button type="button" class="defect-type-btn defect-type-btn--praise" data-type="praise">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2l1.5 3.5L13 6l-2.5 2.5.5 3.5L8 10.5 5 12l.5-3.5L3 6l3.5-.5z"/></svg>
+      Похвалить
+    </button>
+  </div>
+  <form method="post" class="filter-grid" id="defect-add-form">
     {% csrf_token %}
     <input type="hidden" name="panel" value="defects">
     <input type="hidden" name="action" value="create_defect_record">
+    <input type="hidden" name="record_type" id="defect-record-type-input" value="scold">
     <label class="field"><span>Дата</span><input type="date" name="defect_date" value="{{ today }}" required></label>
     <label class="field"><span>Поиск сотрудника</span>
       <input type="text" class="js-tool-search" data-target-select="defect-employee-select" placeholder="Введите ФИО">
@@ -1046,33 +1056,56 @@
         {% endfor %}
       </select>
     </label>
-    <label class="field"><span>Ответственные (можно несколько)</span>
+    <label class="field defect-scold-only"><span>Ответственные (можно несколько)</span>
       <div class="defect-responsible-picker">
-        <input
-          type="text"
-          class="defect-responsible-search js-defect-responsible-search"
-          data-target-list="defect-responsible-list"
-          placeholder="Поиск по ФИО"
-          autocomplete="off"
-        >
+        <input type="text" class="defect-responsible-search js-defect-responsible-search" data-target-list="defect-responsible-list" placeholder="Поиск по ФИО" autocomplete="off">
         <div id="defect-responsible-list" class="defect-responsible-list" role="group" aria-label="Ответственные сотрудники">
           {% for employee in employee_options %}
-          <label class="defect-responsible-option">
-            <input type="checkbox" name="responsible_names" value="{{ employee }}">
-            <span>{{ employee }}</span>
-          </label>
+          <label class="defect-responsible-option"><input type="checkbox" name="responsible_names" value="{{ employee }}"><span>{{ employee }}</span></label>
           {% endfor %}
         </div>
       </div>
     </label>
-    <label class="field"><span>Кол-во брака</span><input type="number" name="defect_quantity" min="0" value="0"></label>
-    <label class="field"><span>Неисправно</span><input type="number" name="bad_quantity" min="0" value="0"></label>
-    <label class="field"><span>Потенциальный брак</span><input type="number" name="potential_defect_quantity" min="0" value="0"></label>
-    <label class="field"><span>Изделие</span><input type="text" name="product_name" placeholder="Название изделия"></label>
-    <label class="field"><span>Причина брака</span><input type="text" name="defect_reason" required placeholder="Опишите причину"></label>
-    <div class="filter-actions"><button type="submit" class="btn">Добавить запись</button></div>
+    <label class="field defect-scold-only"><span>Кол-во брака</span><input type="number" name="defect_quantity" min="0" value="0"></label>
+    <label class="field defect-scold-only"><span>Неисправно</span><input type="number" name="bad_quantity" min="0" value="0"></label>
+    <label class="field defect-scold-only"><span>Потенциальный брак</span><input type="number" name="potential_defect_quantity" min="0" value="0"></label>
+    <label class="field defect-scold-only"><span>Изделие</span><input type="text" name="product_name" placeholder="Название изделия"></label>
+    <label class="field"><span id="defect-reason-label">Причина брака</span><input type="text" name="defect_reason" id="defect-reason-input" required placeholder="Опишите причину"></label>
+    <div class="filter-actions"><button type="submit" class="btn" id="defect-add-submit-btn">Добавить запись</button></div>
   </form>
 </div>
+<script>
+(function(){
+  var toggle = document.getElementById("defect-type-toggle");
+  var typeInput = document.getElementById("defect-record-type-input");
+  var reasonLabel = document.getElementById("defect-reason-label");
+  var reasonInput = document.getElementById("defect-reason-input");
+  var submitBtn = document.getElementById("defect-add-submit-btn");
+  var panel = document.getElementById("defect-add-panel");
+  var scoldFields = panel ? Array.prototype.slice.call(panel.querySelectorAll(".defect-scold-only")) : [];
+
+  function setType(type) {
+    typeInput.value = type;
+    var isScold = type === "scold";
+    toggle.querySelectorAll(".defect-type-btn").forEach(function(btn){
+      btn.classList.toggle("is-active", btn.dataset.type === type);
+    });
+    scoldFields.forEach(function(el){ el.style.display = isScold ? "" : "none"; });
+    reasonLabel.textContent = isScold ? "Причина брака" : "За что хвалим";
+    reasonInput.placeholder = isScold ? "Опишите причину" : "Опишите достижение";
+    submitBtn.textContent = isScold ? "Добавить запись" : "Похвалить";
+    panel.classList.toggle("defect-add-panel--scold", isScold);
+    panel.classList.toggle("defect-add-panel--praise", !isScold);
+  }
+
+  toggle.addEventListener("click", function(e){
+    var btn = e.target.closest(".defect-type-btn");
+    if (btn) setType(btn.dataset.type);
+  });
+
+  setType("scold");
+})();
+</script>
 {% endif %}
 
 <form method="get" class="filter-panel auto-submit-form">
@@ -1120,7 +1153,7 @@
     </thead>
     <tbody>
       {% for rec in defect_records %}
-      <tr>
+      <tr class="defect-row defect-row--{{ rec.record_type }}">
         <td class="defect-col-date">
           {% if biota_can_edit or is_admin_user %}
           <input class="defect-cell-input" type="date" name="defect_date" value="{{ rec.defect_date|date:'Y-m-d' }}" form="defect-edit-form-{{ rec.id }}" readonly required>
