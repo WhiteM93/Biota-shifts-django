@@ -750,6 +750,28 @@ html[data-theme="dawn"] #graph-page-root .emp-cell {
   transition: background .18s, border-color .18s, color .18s;
 }
 .fp-dd-btn:hover { background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.16); }
+/* override global grid — compact flex row for graph filter */
+#graph-page-root > form.filter-panel .filter-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.fp-sel-wrap { cursor: pointer; }
+.fp-sel {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  outline: none;
+  appearance: auto;
+  -webkit-appearance: auto;
+  max-width: 90px;
+}
 .fp-dd-lbl {
   font-weight: 700;
   opacity: .7;

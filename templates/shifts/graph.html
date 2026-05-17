@@ -40,23 +40,24 @@
   </div>
   <div class="fp-body" id="fp-body">
     <div class="filter-grid">
-      <label class="field"><span>Год</span>
-        <select name="year">
+      <label class="fp-dd-btn fp-sel-wrap">
+        <span class="fp-dd-lbl">Год</span>
+        <span class="fp-dd-sep"></span>
+        <select name="year" class="fp-sel">
           {% for y in year_options %}
           <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
           {% endfor %}
         </select>
       </label>
-      <label class="field"><span>Месяц</span>
-        <select name="month">
+      <label class="fp-dd-btn fp-sel-wrap">
+        <span class="fp-dd-lbl">Месяц</span>
+        <span class="fp-dd-sep"></span>
+        <select name="month" class="fp-sel">
           {% for mm, mlab in month_choices %}
           <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
           {% endfor %}
         </select>
       </label>
-      <div class="filter-actions">
-        <button type="submit" class="btn">Показать</button>
-      </div>
     </div>
     <div class="fp-modes-wrap">
       <input type="hidden" name="dep_mode" id="fp-dep-mode-val" value="{% if dep_mode_pick %}pick{% else %}all{% endif %}">
