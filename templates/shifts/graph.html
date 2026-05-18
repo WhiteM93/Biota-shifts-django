@@ -27,24 +27,6 @@
           <span class="fp-btn-label">PNG</span>
         </button>
       </div>
-      {% if biota_can_edit %}
-      <span class="fp-actions-sep"></span>
-      <form method="post" action="" enctype="multipart/form-data" class="graph-upload-form fp-upload-form">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="upload">
-        <input type="hidden" name="year" value="{{ year }}">
-        <input type="hidden" name="month" value="{{ month }}">
-        <input id="graph-schedule-file" type="file" name="schedule_file" accept=".xlsx" required class="graph-upload-input">
-        <label for="graph-schedule-file" class="fp-action-btn fp-action-btn--upload graph-upload-pick-btn">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
-          <span id="graph-upload-filename" class="graph-upload-filename fp-btn-label">Загрузить xlsx</span>
-        </label>
-        <button type="submit" class="fp-action-btn fp-upload-submit fp-action-btn--accent" id="fp-upload-submit-btn" hidden>
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V3M5 6l3-3 3 3M2 13h12"/></svg>
-          <span class="fp-btn-label">Загрузить</span>
-        </button>
-      </form>
-      {% endif %}
     </div>
     <button type="button" class="fp-collapse-btn" id="fp-collapse-btn" aria-label="Свернуть/развернуть фильтр">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
