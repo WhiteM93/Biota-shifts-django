@@ -278,14 +278,14 @@
   }
   .machines-toolbar-icon-btn {
     flex: 0 0 auto;
-    width: 30px;
-    min-width: 30px;
-    height: 30px;
-    padding: 0;
-    font-size: 18px;
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 30px !important;
+    padding: 0 !important;
+    font-size: 18px !important;
     font-weight: 700;
-    line-height: 1;
-    display: inline-flex;
+    line-height: 1 !important;
+    display: inline-flex !important;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
@@ -297,6 +297,11 @@
   .machines-toolbar-icon-btn:hover {
     transform: translateY(-1px) rotate(6deg) scale(1.04);
     filter: brightness(1.06);
+  }
+  /* Кнопки добавления строк — только в режиме редактирования */
+  .machines-page[data-inline-edit-mode="0"] .js-machines-add-quick-row,
+  .machines-page[data-inline-edit-mode="0"] .js-machines-add-schedule-row {
+    display: none;
   }
   .machines-panel-head--quick-toolbar .btn.product-btn-edit-mode {
     min-height: 30px;

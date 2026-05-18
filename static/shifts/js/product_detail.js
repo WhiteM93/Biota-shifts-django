@@ -3120,4 +3120,3 @@ var PD = (function () {
       normalizeSetupNotesImages(n);
     });
   })();
-</script>

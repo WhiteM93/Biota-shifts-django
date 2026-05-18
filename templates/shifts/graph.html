@@ -13,35 +13,38 @@
       Период и фильтры
     </span>
     <div class="fp-head-actions">
-      <a class="fp-action-btn" href="{% url 'graph_download' %}?year={{ year }}&month={{ month }}">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg>
-        Excel
-      </a>
+      <div class="fp-actions-group">
+        <a class="fp-action-btn" href="{% url 'graph_download' %}?year={{ year }}&month={{ month }}">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg>
+          <span class="fp-btn-label">Excel</span>
+        </a>
+        <button type="button" class="fp-action-btn" id="graph-print-btn" title="Печать / PDF">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="10" height="7" rx="1"/><path d="M5 6V3h6v3M5 10h6"/></svg>
+          <span class="fp-btn-label">Печать</span>
+        </button>
+        <button type="button" class="fp-action-btn" id="graph-png-btn" title="Снимок PNG (тёмная тема)">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1"/><circle cx="6" cy="7" r="1.2"/><path d="M2 11l3-3 3 3 2-2 4 4"/></svg>
+          <span class="fp-btn-label">PNG</span>
+        </button>
+      </div>
       {% if biota_can_edit %}
+      <span class="fp-actions-sep"></span>
       <form method="post" action="" enctype="multipart/form-data" class="graph-upload-form fp-upload-form">
         {% csrf_token %}
         <input type="hidden" name="action" value="upload">
         <input type="hidden" name="year" value="{{ year }}">
         <input type="hidden" name="month" value="{{ month }}">
         <input id="graph-schedule-file" type="file" name="schedule_file" accept=".xlsx" required class="graph-upload-input">
-        <label for="graph-schedule-file" class="fp-action-btn graph-upload-pick-btn">
+        <label for="graph-schedule-file" class="fp-action-btn fp-action-btn--upload graph-upload-pick-btn">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
-          <span id="graph-upload-filename" class="graph-upload-filename">Выбрать xlsx</span>
+          <span id="graph-upload-filename" class="graph-upload-filename fp-btn-label">Загрузить xlsx</span>
         </label>
         <button type="submit" class="fp-action-btn fp-upload-submit fp-action-btn--accent" id="fp-upload-submit-btn" hidden>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V3M5 6l3-3 3 3M2 13h12"/></svg>
-          Загрузить
+          <span class="fp-btn-label">Загрузить</span>
         </button>
       </form>
       {% endif %}
-      <button type="button" class="fp-action-btn" id="graph-print-btn" title="Печать / PDF">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="10" height="7" rx="1"/><path d="M5 6V3h6v3M5 10h6"/></svg>
-        Печать
-      </button>
-      <button type="button" class="fp-action-btn" id="graph-png-btn" title="Снимок PNG (тёмная тема)">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1"/><circle cx="6" cy="7" r="1.2"/><path d="M2 11l3-3 3 3 2-2 4 4"/></svg>
-        PNG
-      </button>
     </div>
     <button type="button" class="fp-collapse-btn" id="fp-collapse-btn" aria-label="Свернуть/развернуть фильтр">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -51,7 +54,9 @@
   </div>
   <div class="fp-body" id="fp-body">
     <form method="get" action="" class="auto-submit-form" id="graph-filter-form">
-      <div class="filter-grid">
+      <input type="hidden" name="dep_mode" id="fp-dep-mode-val" value="{% if dep_mode_pick %}pick{% else %}all{% endif %}">
+      <input type="hidden" name="pos_mode" id="fp-pos-mode-val" value="{% if pos_mode_pick %}pick{% else %}all{% endif %}">
+      <div class="filter-grid fp-filter-row">
         <label class="fp-dd-btn fp-sel-wrap">
           <span class="fp-dd-lbl">Год</span>
           <span class="fp-dd-sep"></span>
@@ -70,46 +75,39 @@
             {% endfor %}
           </select>
         </label>
-      </div>
-      <div class="fp-modes-wrap">
-        <input type="hidden" name="dep_mode" id="fp-dep-mode-val" value="{% if dep_mode_pick %}pick{% else %}all{% endif %}">
-        <div class="fp-mode-group">
-          <div class="fp-dd" id="fp-dd-dep">
-            <button type="button" class="fp-dd-btn">
-              <span class="fp-dd-lbl">Отделы</span>
-              <span class="fp-dd-sep"></span>
-              <span class="fp-dd-txt" id="fp-dep-txt"></span>
-              <svg class="fp-dd-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
-            </button>
-            <div class="fp-dd-panel" id="fp-dep-panel" hidden>
-              <div class="fp-dd-actions">
-                <button type="button" class="fp-dd-all">Все</button>
-                <button type="button" class="fp-dd-none">Снять</button>
-              </div>
-              {% for dep in all_deps %}
-              <label class="fp-dd-item"><input type="checkbox" name="dep" value="{{ dep }}" {% if dep in sel_deps %}checked{% endif %}><span>{{ dep }}</span></label>
-              {% endfor %}
+        <span class="fp-filter-sep"></span>
+        <div class="fp-dd" id="fp-dd-dep">
+          <button type="button" class="fp-dd-btn">
+            <span class="fp-dd-lbl">Отделы</span>
+            <span class="fp-dd-sep"></span>
+            <span class="fp-dd-txt" id="fp-dep-txt"></span>
+            <svg class="fp-dd-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
+          </button>
+          <div class="fp-dd-panel" id="fp-dep-panel" hidden>
+            <div class="fp-dd-actions">
+              <button type="button" class="fp-dd-all">Все</button>
+              <button type="button" class="fp-dd-none">Снять</button>
             </div>
+            {% for dep in all_deps %}
+            <label class="fp-dd-item"><input type="checkbox" name="dep" value="{{ dep }}" {% if dep in sel_deps %}checked{% endif %}><span>{{ dep }}</span></label>
+            {% endfor %}
           </div>
         </div>
-        <input type="hidden" name="pos_mode" id="fp-pos-mode-val" value="{% if pos_mode_pick %}pick{% else %}all{% endif %}">
-        <div class="fp-mode-group">
-          <div class="fp-dd" id="fp-dd-pos">
-            <button type="button" class="fp-dd-btn">
-              <span class="fp-dd-lbl">Должности</span>
-              <span class="fp-dd-sep"></span>
-              <span class="fp-dd-txt" id="fp-pos-txt"></span>
-              <svg class="fp-dd-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
-            </button>
-            <div class="fp-dd-panel" id="fp-pos-panel" hidden>
-              <div class="fp-dd-actions">
-                <button type="button" class="fp-dd-all">Все</button>
-                <button type="button" class="fp-dd-none">Снять</button>
-              </div>
-              {% for pos in all_positions %}
-              <label class="fp-dd-item"><input type="checkbox" name="pos" value="{{ pos }}" {% if pos in sel_positions %}checked{% endif %}><span>{{ pos }}</span></label>
-              {% endfor %}
+        <div class="fp-dd" id="fp-dd-pos">
+          <button type="button" class="fp-dd-btn">
+            <span class="fp-dd-lbl">Должности</span>
+            <span class="fp-dd-sep"></span>
+            <span class="fp-dd-txt" id="fp-pos-txt"></span>
+            <svg class="fp-dd-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
+          </button>
+          <div class="fp-dd-panel" id="fp-pos-panel" hidden>
+            <div class="fp-dd-actions">
+              <button type="button" class="fp-dd-all">Все</button>
+              <button type="button" class="fp-dd-none">Снять</button>
             </div>
+            {% for pos in all_positions %}
+            <label class="fp-dd-item"><input type="checkbox" name="pos" value="{{ pos }}" {% if pos in sel_positions %}checked{% endif %}><span>{{ pos }}</span></label>
+            {% endfor %}
           </div>
         </div>
       </div>

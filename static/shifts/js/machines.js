@@ -1809,6 +1809,12 @@
       applyStoredSelections();
       applyScheduleMachineCodes();
     }
+    // Trim whitespace from server-rendered notes cells
+    quickWrap && quickWrap.querySelectorAll(".machines-cell--notes").forEach(function (cell) {
+      var t = (cell.textContent || "").trim();
+      if (cell.textContent !== t) cell.textContent = t;
+      if (t) cell.classList.remove("is-empty"); else cell.classList.add("is-empty");
+    });
     root.querySelectorAll(".machines-cell--schedule-label").forEach(syncProductComboDisplay);
     syncMachineCodeAppearance();
     syncScheduleProductInteractions(root.getAttribute("data-inline-edit-mode") === "1");

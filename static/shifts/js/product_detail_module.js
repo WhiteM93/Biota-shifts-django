@@ -432,4 +432,4 @@ const PD = (function () {
       }, "image/png");
     });
   }
-</script>
+

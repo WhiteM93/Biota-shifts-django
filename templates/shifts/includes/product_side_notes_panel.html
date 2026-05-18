@@ -31,6 +31,7 @@
   </ul>
   {% if username %}
   <form class="product-drawing-notes__form js-product-note-form biota-exempt-global-readonly-form" method="post" action="#" data-note-setup-id="{{ notes_setup_id }}">
+    {% csrf_token %}
     <label class="field product-drawing-notes__label">
       <span class="product-drawing-notes__label-text">Новая заметка</span>
       <textarea name="body" rows="1" maxlength="4000" placeholder="Короткий комментарий к чертежу или наладке…" class="product-drawing-notes__textarea js-product-note-body" required></textarea>
