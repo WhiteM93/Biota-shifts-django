@@ -263,9 +263,31 @@ def load_schedule_table(employees_df: pd.DataFrame, year: int, month: int) -> pd
     return apply_prev_month_tail_from_previous_schedule(df, employees_df, year, month)
 
 
+def _rotate_schedule_backups(year: int, month: int, keep: int = 20) -> None:
+    """Перед сохранением делает резервную копию текущего файла; хранит не более keep копий."""
+    file_path = schedule_path(year, month)
+    if not file_path.exists():
+        return
+    backup_dir = file_path.parent / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_dst = backup_dir / f"schedule_{year}_{month:02d}_{ts}.xlsx"
+    import shutil
+    shutil.copy2(file_path, backup_dst)
+    # Удаляем лишние копии (оставляем keep самых новых)
+    pattern = f"schedule_{year}_{month:02d}_*.xlsx"
+    copies = sorted(backup_dir.glob(pattern), key=lambda p: p.stat().st_mtime)
+    for old in copies[:-keep]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+
+
 def save_schedule_table(df: pd.DataFrame, year: int, month: int) -> Path:
     file_path = schedule_path(year, month)
     file_path.parent.mkdir(parents=True, exist_ok=True)
+    _rotate_schedule_backups(year, month)
     with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="График")
     return file_path
