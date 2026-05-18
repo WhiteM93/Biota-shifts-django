@@ -110,10 +110,13 @@ def normalize_schedule_excel(xl: pd.DataFrame, employees_df: pd.DataFrame, year:
     label_by_code = {str(r["emp_code"]): employee_label_row(r) for _, r in employees_df.iterrows()}
     valid = set(employees_df["emp_code"].astype(str))
 
+    xl = xl.copy()
+    # pd.read_excel парсит числовые заголовки как int; "1"→1 и т.д. → нормализуем все в str
+    xl.columns = [str(c) for c in xl.columns]
+
     if "Код" not in xl.columns:
         raise ValueError("В таблице должна быть колонка «Код» (код сотрудника, как в БД).")
 
-    xl = xl.copy()
     xl["Код"] = xl["Код"].astype(str)
     xl = xl[xl["Код"].isin(valid)].copy()
     if "Порядок" not in xl.columns:

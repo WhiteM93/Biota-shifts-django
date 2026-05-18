@@ -661,6 +661,16 @@
       initDropdown("fp-dd-pos", "fp-pos-mode-val", "fp-pos-txt");
     })();
 
+    // Если есть несохранённые правки — отправить через sendBeacon перед навигацией
+    var filterForm = document.getElementById("graph-filter-form");
+    if (filterForm) {
+      filterForm.addEventListener("submit", function () {
+        if (canEdit && editing) {
+          try { navigator.sendBeacon(window.location.href, new FormData(form)); } catch (e) {}
+        }
+      });
+    }
+
     var printBtn = document.getElementById("graph-print-btn");
     if (printBtn) {
       printBtn.addEventListener("click", function () {
