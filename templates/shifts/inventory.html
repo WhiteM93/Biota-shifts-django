@@ -682,11 +682,7 @@
   <form method="post" class="filter-grid">
     {% csrf_token %}
     <input type="hidden" name="action" value="move_stock">
-    <label class="field"><span>Операция</span>
-      <select name="movement_type">
-        <option value="issue">Выдача</option>
-      </select>
-    </label>
+    <input type="hidden" name="movement_type" value="issue">
     <label class="field"><span>Тип инструмента</span>
       <select class="js-tool-category" data-target-select="issue-tool-select">
         <option value="">Все</option>
