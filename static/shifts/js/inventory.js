@@ -144,7 +144,6 @@ var INV = (function () {
 (function () {
   var categorySelects = document.querySelectorAll(".js-tool-category");
   var searchInputs = document.querySelectorAll(".js-tool-search");
-  if (!categorySelects.length && !searchInputs.length) return;
 
   function normalizeText(s) {
     return String(s || "")
@@ -154,63 +153,21 @@ var INV = (function () {
       .trim();
   }
 
-  function issueToolComboGetWrap() {
-    return document.querySelector("#issue-block .js-issue-tool-combo");
-  }
+  /* --- Generic combo helpers (pure DOM builders, no global state) --- */
 
-  function issueToolComboUpdateLabel(toolSelect) {
-    var wrap = issueToolComboGetWrap();
-    var textEl = wrap && wrap.querySelector(".js-issue-tool-combo-text");
-    if (!textEl || !toolSelect || toolSelect.id !== "issue-tool-select") return;
-    var opt = toolSelect.options[toolSelect.selectedIndex];
-    if (!opt || !opt.value) {
-      textEl.textContent = "Выбрать...";
-    } else {
-      textEl.textContent = (opt.textContent || "").trim();
-    }
-  }
-
-  function issueToolComboClose() {
-    var wrap = issueToolComboGetWrap();
-    if (!wrap) return;
-    wrap.classList.remove("is-open");
-    var panel = wrap.querySelector(".js-issue-tool-combo-panel");
-    var btn = wrap.querySelector(".js-issue-tool-combo-btn");
-    if (panel) panel.hidden = true;
-    if (btn) btn.setAttribute("aria-expanded", "false");
-  }
-
-  function issueToolComboOpen() {
-    var wrap = issueToolComboGetWrap();
-    var toolSelect = document.getElementById("issue-tool-select");
-    if (!wrap || !toolSelect) return;
-    issueToolComboEnsurePanel(toolSelect);
-    issueToolComboSyncVisibility(toolSelect);
-    var panel = wrap.querySelector(".js-issue-tool-combo-panel");
-    var btn = wrap.querySelector(".js-issue-tool-combo-btn");
-    if (!panel || !btn) return;
-    wrap.classList.add("is-open");
-    panel.hidden = false;
-    btn.setAttribute("aria-expanded", "true");
-  }
-
-  function issueToolComboNormCoatingClass(code) {
+  function combNormCoatingClass(code) {
     var c = String(code || "none").trim().toLowerCase();
-    if (c === "none" || c === "yellow" || c === "brown" || c === "black" || c === "multicolor" || c === "blue" || c === "other") {
-      return c;
-    }
+    if (c === "none" || c === "yellow" || c === "brown" || c === "black" || c === "multicolor" || c === "blue" || c === "other") return c;
     return "other";
   }
 
-  function issueToolComboNormWmClass(wm) {
+  function combNormWmClass(wm) {
     var c = String(wm || "").trim().toLowerCase();
-    if (c === "p" || c === "m" || c === "k" || c === "n" || c === "s" || c === "h" || c === "pw") {
-      return c;
-    }
+    if (c === "p" || c === "m" || c === "k" || c === "n" || c === "s" || c === "h" || c === "pw") return c;
     return "";
   }
 
-  function issueToolComboAppendInlineSpecs(card, opt, material, qty) {
+  function combAppendInlineSpecs(card, opt, material, qty) {
     var row = document.createElement("div");
     row.className = "issue-tool-opt-inline";
 
@@ -223,13 +180,11 @@ var INV = (function () {
     var coatSlot = document.createElement("span");
     coatSlot.className = "issue-tool-opt-chip-slot";
     var rawCt = (opt.getAttribute("data-issue-coating-type") || "none").trim();
-    var ct = issueToolComboNormCoatingClass(rawCt);
+    var ct = combNormCoatingClass(rawCt);
     var coatTitle = (opt.getAttribute("data-issue-coating-title") || "").trim();
     var sw = document.createElement("span");
     sw.className = "swatch swatch-" + ct;
-    if (coatTitle) {
-      sw.setAttribute("title", coatTitle);
-    }
+    if (coatTitle) sw.setAttribute("title", coatTitle);
     coatSlot.appendChild(sw);
     if (ct === "none") {
       var lab = document.createElement("span");
@@ -243,7 +198,7 @@ var INV = (function () {
     moSlot.className = "issue-tool-opt-chip-slot";
     var wm = (opt.getAttribute("data-issue-wm") || "").trim();
     var wmTitle = (opt.getAttribute("data-issue-wm-title") || "").trim();
-    var wmClass = issueToolComboNormWmClass(wm);
+    var wmClass = combNormWmClass(wm);
     if (!wm) {
       moSlot.className += " issue-tool-opt-mo-empty";
       moSlot.textContent = "—";
@@ -251,15 +206,11 @@ var INV = (function () {
       var wmSpan = document.createElement("span");
       wmSpan.className = "wm-square wm-" + wmClass;
       wmSpan.textContent = wm;
-      if (wmTitle) {
-        wmSpan.setAttribute("title", wmTitle);
-      }
+      if (wmTitle) wmSpan.setAttribute("title", wmTitle);
       moSlot.appendChild(wmSpan);
     } else {
       moSlot.textContent = wm;
-      if (wmTitle) {
-        moSlot.setAttribute("title", wmTitle);
-      }
+      if (wmTitle) moSlot.setAttribute("title", wmTitle);
     }
     row.appendChild(moSlot);
 
@@ -272,11 +223,12 @@ var INV = (function () {
     card.appendChild(row);
   }
 
-  function issueToolComboFillOptionButton(b, opt) {
+  function combFillOptionButton(b, opt) {
     var type = (opt.getAttribute("data-issue-type") || "").trim();
     var specs = (opt.getAttribute("data-issue-specs") || "").trim();
     var material = (opt.getAttribute("data-issue-material") || "").trim();
     var qty = (opt.getAttribute("data-issue-qty") || "").trim();
+    var extra = (opt.getAttribute("data-issue-extra") || "").trim();
     var fallback = (opt.textContent || "").trim();
     b.textContent = "";
     b.setAttribute("aria-label", fallback || "Инструмент");
@@ -298,84 +250,103 @@ var INV = (function () {
       sp.textContent = specs;
       card.appendChild(sp);
     }
-    issueToolComboAppendInlineSpecs(card, opt, material, qty);
+    combAppendInlineSpecs(card, opt, material, qty);
+    if (extra) {
+      var ex = document.createElement("div");
+      ex.className = "issue-tool-opt-extra";
+      ex.textContent = extra;
+      card.appendChild(ex);
+    }
     b.appendChild(card);
   }
 
-  function issueToolComboEnsurePanel(toolSelect) {
-    var wrap = issueToolComboGetWrap();
+  /* --- Generic combo controller (accepts wrap element + select element) --- */
+
+  function comboClose(wrap) {
+    if (!wrap) return;
+    wrap.classList.remove("is-open");
+    var panel = wrap.querySelector(".js-issue-tool-combo-panel");
+    var btn = wrap.querySelector(".js-issue-tool-combo-btn");
+    if (panel) panel.hidden = true;
+    if (btn) btn.setAttribute("aria-expanded", "false");
+  }
+
+  function comboUpdateLabel(wrap, sel) {
+    var textEl = wrap && wrap.querySelector(".js-issue-tool-combo-text");
+    if (!textEl || !sel) return;
+    var opt = sel.options[sel.selectedIndex];
+    textEl.textContent = (!opt || !opt.value) ? "Выбрать..." : (opt.textContent || "").trim();
+  }
+
+  function comboEnsurePanel(wrap, sel) {
     var panel = wrap && wrap.querySelector(".js-issue-tool-combo-panel");
-    if (!toolSelect || !wrap || !panel || toolSelect.id !== "issue-tool-select") return;
+    if (!sel || !panel) return;
     if (panel.getAttribute("data-built") === "1") return;
     panel.setAttribute("data-built", "1");
     panel.innerHTML = "";
-    Array.prototype.forEach.call(toolSelect.options, function (opt, idx) {
+    Array.prototype.forEach.call(sel.options, function (opt, idx) {
       if (idx === 0) return;
       var b = document.createElement("button");
       b.type = "button";
       b.className = "issue-tool-combo-opt";
       b.setAttribute("role", "option");
       b.setAttribute("data-opt-index", String(idx));
-      issueToolComboFillOptionButton(b, opt);
+      combFillOptionButton(b, opt);
       b.hidden = !!opt.hidden;
       panel.appendChild(b);
     });
     panel.addEventListener("click", function (e) {
       var ob = e.target.closest(".issue-tool-combo-opt");
-      var w = issueToolComboGetWrap();
-      if (!ob || !w || !w.contains(ob) || ob.hidden) return;
-      var ts = document.getElementById("issue-tool-select");
-      if (!ts) return;
+      if (!ob || !wrap.contains(ob) || ob.hidden) return;
       var idx = parseInt(ob.getAttribute("data-opt-index"), 10);
       if (isNaN(idx) || idx < 1) return;
-      ts.selectedIndex = idx;
-      try {
-        ts.dispatchEvent(new Event("change", { bubbles: true }));
-      } catch (eCh) {}
-      issueToolComboUpdateLabel(ts);
-      issueToolComboClose();
+      sel.selectedIndex = idx;
+      try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (eCh) {}
+      comboUpdateLabel(wrap, sel);
+      comboClose(wrap);
     });
   }
 
-  function issueToolComboSyncVisibility(toolSelect) {
-    var wrap = issueToolComboGetWrap();
+  function comboSyncVisibility(wrap, sel) {
     var panel = wrap && wrap.querySelector(".js-issue-tool-combo-panel");
-    if (!toolSelect || !panel || panel.getAttribute("data-built") !== "1") return;
+    if (!sel || !panel || panel.getAttribute("data-built") !== "1") return;
     Array.prototype.forEach.call(panel.querySelectorAll(".issue-tool-combo-opt"), function (btn) {
       var idx = parseInt(btn.getAttribute("data-opt-index"), 10);
-      var opt = toolSelect.options[idx];
+      var opt = sel.options[idx];
       if (!opt) return;
       btn.hidden = !!opt.hidden;
     });
   }
 
-  function issueToolComboBindUi() {
-    var wrap = issueToolComboGetWrap();
-    var toolSelect = document.getElementById("issue-tool-select");
+  function comboBindUi(wrap, sel) {
     var btn = wrap && wrap.querySelector(".js-issue-tool-combo-btn");
-    if (!wrap || !toolSelect || !btn || btn.getAttribute("data-bound") === "1") return;
+    if (!wrap || !sel || !btn || btn.getAttribute("data-bound") === "1") return;
     btn.setAttribute("data-bound", "1");
     btn.addEventListener("click", function (e) {
       e.preventDefault();
       e.stopPropagation();
       if (wrap.classList.contains("is-open")) {
-        issueToolComboClose();
+        comboClose(wrap);
       } else {
-        issueToolComboOpen();
+        comboEnsurePanel(wrap, sel);
+        comboSyncVisibility(wrap, sel);
+        var panel = wrap.querySelector(".js-issue-tool-combo-panel");
+        var b = wrap.querySelector(".js-issue-tool-combo-btn");
+        if (!panel || !b) return;
+        wrap.classList.add("is-open");
+        panel.hidden = false;
+        b.setAttribute("aria-expanded", "true");
       }
     });
-    toolSelect.addEventListener("change", function () {
-      issueToolComboUpdateLabel(toolSelect);
-    });
+    sel.addEventListener("change", function () { comboUpdateLabel(wrap, sel); });
     document.addEventListener("click", function (e) {
-      var w = issueToolComboGetWrap();
-      if (!w || !w.classList.contains("is-open")) return;
-      if (w.contains(e.target)) return;
-      issueToolComboClose();
+      if (!wrap.classList.contains("is-open")) return;
+      if (wrap.contains(e.target)) return;
+      comboClose(wrap);
     });
     document.addEventListener("keydown", function (e) {
       if (e.key !== "Escape") return;
-      issueToolComboClose();
+      comboClose(wrap);
     });
   }
 
@@ -390,10 +361,7 @@ var INV = (function () {
     var queryCompact = queryRaw.replace(/\.0+\b/g, "");
 
     Array.prototype.forEach.call(toolSelect.options, function (opt, idx) {
-      if (idx === 0) {
-        opt.hidden = false;
-        return;
-      }
+      if (idx === 0) { opt.hidden = false; return; }
       var optionCategory = opt.getAttribute("data-category");
       var categoryMatch = !selectedCategory || optionCategory === selectedCategory;
       var text = normalizeText(opt.textContent);
@@ -402,31 +370,61 @@ var INV = (function () {
       opt.hidden = !(categoryMatch && searchMatch);
     });
 
-    if (toolSelect.id === "issue-tool-select") {
-      issueToolComboEnsurePanel(toolSelect);
-      issueToolComboSyncVisibility(toolSelect);
+    var wrap = toolSelect.closest(".js-issue-tool-combo");
+    if (wrap) {
+      comboEnsurePanel(wrap, toolSelect);
+      comboSyncVisibility(wrap, toolSelect);
     }
-
     if (toolSelect.selectedIndex > 0 && toolSelect.options[toolSelect.selectedIndex].hidden) {
       toolSelect.selectedIndex = 0;
     }
-
-    if (toolSelect.id === "issue-tool-select") {
-      issueToolComboUpdateLabel(toolSelect);
-    }
+    if (wrap) comboUpdateLabel(wrap, toolSelect);
   }
 
-  Array.prototype.forEach.call(categorySelects, function (select) {
-    var targetId = select.getAttribute("data-target-select");
-    select.addEventListener("change", function () { filterToolOptions(targetId); });
-    filterToolOptions(targetId);
-  });
-  Array.prototype.forEach.call(searchInputs, function (input) {
-    var targetId = input.getAttribute("data-target-select");
-    input.addEventListener("input", function () { filterToolOptions(targetId); });
-    filterToolOptions(targetId);
-  });
-  issueToolComboBindUi();
+  if (categorySelects.length || searchInputs.length) {
+    Array.prototype.forEach.call(categorySelects, function (select) {
+      var targetId = select.getAttribute("data-target-select");
+      select.addEventListener("change", function () { filterToolOptions(targetId); });
+      filterToolOptions(targetId);
+    });
+    Array.prototype.forEach.call(searchInputs, function (input) {
+      var targetId = input.getAttribute("data-target-select");
+      input.addEventListener("input", function () { filterToolOptions(targetId); });
+      filterToolOptions(targetId);
+    });
+  }
+
+  /* Initialize issue panel combo */
+  var issueWrap = document.querySelector("#issue-block .js-issue-tool-combo");
+  var issueSel = document.getElementById("issue-tool-select");
+  if (issueWrap && issueSel) comboBindUi(issueWrap, issueSel);
+
+  /* Initialize issue-outcome panel combo */
+  var outcomeWrap = document.querySelector("#issue-outcome-block .js-issue-tool-combo");
+  var outcomeSel = document.getElementById("issue-id-select");
+  if (outcomeWrap && outcomeSel) {
+    comboBindUi(outcomeWrap, outcomeSel);
+    var outcomeSearch = document.getElementById("issue-search-input");
+    if (outcomeSearch) {
+      function filterOutcomeOptions() {
+        var queryRaw = normalizeText(outcomeSearch.value);
+        var queryCompact = queryRaw.replace(/\.0+\b/g, "");
+        Array.prototype.forEach.call(outcomeSel.options, function (opt, idx) {
+          if (idx === 0) { opt.hidden = false; return; }
+          var text = normalizeText(opt.textContent + " " + (opt.getAttribute("data-issue-extra") || ""));
+          var textCompact = text.replace(/\.0+\b/g, "");
+          opt.hidden = !(!queryRaw || text.indexOf(queryRaw) !== -1 || textCompact.indexOf(queryCompact) !== -1);
+        });
+        comboEnsurePanel(outcomeWrap, outcomeSel);
+        comboSyncVisibility(outcomeWrap, outcomeSel);
+        if (outcomeSel.selectedIndex > 0 && outcomeSel.options[outcomeSel.selectedIndex].hidden) {
+          outcomeSel.selectedIndex = 0;
+        }
+        comboUpdateLabel(outcomeWrap, outcomeSel);
+      }
+      outcomeSearch.addEventListener("input", filterOutcomeOptions);
+    }
+  }
 })();
 (function () {
   var categorySelect = document.getElementById("arrival-bulk-category");
@@ -1023,41 +1021,6 @@ var INV = (function () {
   editableCells.forEach(function (cell) {
     cell.addEventListener("click", function () { activate(cell); });
   });
-})();
-
-(function () {
-  var searchInput = document.getElementById("issue-search-input");
-  var issueSelect = document.getElementById("issue-id-select");
-  if (!searchInput || !issueSelect) return;
-
-  function normalizeText(s) {
-    return String(s || "")
-      .toLowerCase()
-      .replace(/,/g, ".")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  function filterIssueOptions() {
-    var queryRaw = normalizeText(searchInput.value);
-    var queryCompact = queryRaw.replace(/\.0+\b/g, "");
-    Array.prototype.forEach.call(issueSelect.options, function (opt, idx) {
-      if (idx === 0) {
-        opt.hidden = false;
-        return;
-      }
-      var text = normalizeText(opt.textContent);
-      var textCompact = text.replace(/\.0+\b/g, "");
-      var match = !queryRaw || text.indexOf(queryRaw) !== -1 || textCompact.indexOf(queryCompact) !== -1;
-      opt.hidden = !match;
-    });
-    if (issueSelect.selectedIndex > 0 && issueSelect.options[issueSelect.selectedIndex].hidden) {
-      issueSelect.selectedIndex = 0;
-    }
-  }
-
-  searchInput.addEventListener("input", filterIssueOptions);
-  filterIssueOptions();
 })();
 (function () {
   var rows = document.querySelectorAll(".issue-candidate-row");

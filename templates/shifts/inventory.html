@@ -800,17 +800,40 @@
     <label class="field"><span>Поиск инструмента</span>
       <input type="text" id="issue-search-input" placeholder="Например: 1, 1.0, M6, D1">
     </label>
-    <label class="field"><span>Выданная позиция</span>
-      <select name="issue_id" id="issue-id-select" required>
-        <option value="">Выбрать...</option>
-        {% for iss in issue_candidates %}
-        <option value="{{ iss.id }}">
-          #{{ iss.id }} | {{ iss.movement_date }} | {{ iss.tool.get_category_display }}
-          {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}| {{ iss.tool.end_mill_spec.get_mill_type_display }}{% elif iss.tool.category == "tap" and iss.tool.tap_spec %}| {{ iss.tool.tap_spec.get_tap_type_display }}{% elif iss.tool.category == "center_drill" and iss.tool.center_drill_spec %}| центровка {{ iss.tool.center_drill_spec.angle_deg }}°{% elif iss.tool.category == "countersink" and iss.tool.countersink_spec %}| зенкер {{ iss.tool.countersink_spec.get_countersink_type_display }} {{ iss.tool.countersink_spec.angle_deg }}°{% elif iss.tool.category == "drill" and iss.tool.drill_spec %}| сверло {{ iss.tool.drill_spec.angle_deg }}°{% endif %}
-          | {{ iss.tool.name }} | кому: {{ iss.employee_name|default:"-" }} | выдано {{ iss.quantity }} | осталось обработать {{ iss.remaining_qty }}
-        </option>
-        {% endfor %}
-      </select>
+    <label class="field issue-tool-field"><span>Выданная позиция</span>
+      <div class="issue-tool-combo js-issue-tool-combo">
+        <select name="issue_id" id="issue-id-select" required class="issue-tool-combo-native" tabindex="-1" aria-hidden="true">
+          <option value="">Выбрать...</option>
+          {% for iss in issue_candidates %}
+          {% with card=iss.tool.issue_combo_card coat=iss.tool.coating_type|default:'none' %}
+          <option
+            value="{{ iss.id }}"
+            data-category="{{ iss.tool.category }}"
+            data-issue-type="{{ card.tool_type|escape }}"
+            data-issue-specs="{{ card.specs|escape }}"
+            data-issue-material="{{ card.material|escape }}"
+            data-issue-qty="{{ iss.tool.qty|default:'' }}"
+            data-issue-coating-type="{{ coat|escape }}"
+            data-issue-coating-title="{{ coat|coating_hover_title|escape }}"
+            data-issue-wm="{{ iss.tool.work_material|default:''|escape }}"
+            data-issue-wm-title="{% if iss.tool.work_material %}{{ iss.tool.get_work_material_display|escape }}{% endif %}"
+            data-issue-extra="кому: {{ iss.employee_name|default:'-'|escape }} · {{ iss.movement_date|date:'d.m.Y' }} · выдано {{ iss.quantity }} · ост. {{ iss.remaining_qty }}"
+          >{{ iss.tool.issue_select_label }}</option>
+          {% endwith %}
+          {% endfor %}
+        </select>
+        <button
+          type="button"
+          class="issue-tool-combo-btn js-issue-tool-combo-btn"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-controls="issue-id-combo-listbox"
+        >
+          <span class="issue-tool-combo-btn-text js-issue-tool-combo-text">Выбрать...</span>
+          <span class="issue-tool-combo-chevron" aria-hidden="true"></span>
+        </button>
+        <div id="issue-id-combo-listbox" class="issue-tool-combo-panel js-issue-tool-combo-panel" hidden role="listbox" aria-labelledby="issue-id-combo-trigger"></div>
+      </div>
     </label>
     <label class="field"><span>Вернулось на склад, шт</span><input type="number" name="returned_qty" min="0" value="0"></label>
     <label class="field"><span>Списано, шт</span><input type="number" name="writeoff_qty" min="0" value="0"></label>
