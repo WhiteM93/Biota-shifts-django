@@ -6,10 +6,10 @@ from .models import RegulationPlan
 @admin.register(RegulationPlan)
 class RegulationPlanAdmin(admin.ModelAdmin):
     list_display = (
-        "plan_date",
         "employee_code",
         "employee_name",
         "shift",
+        "department",
         "locked",
         "eight_hour_shift",
         "breakfast_start",
@@ -17,5 +17,5 @@ class RegulationPlanAdmin(admin.ModelAdmin):
         "lunch_start",
         "lunch_end",
     )
-    list_filter = ("plan_date", "shift", "department", "locked", "eight_hour_shift")
+    list_filter = ("shift", "department", "locked", "eight_hour_shift")
     search_fields = ("employee_code", "employee_name")
