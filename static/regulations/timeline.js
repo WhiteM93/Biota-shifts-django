@@ -387,7 +387,7 @@
         "Content-Type": "application/json",
         "X-CSRFToken": token,
       },
-      body: JSON.stringify({ date: dateIso, items: items }),
+      body: JSON.stringify({ items: items }),
     }).then(function (r) {
       if (!r.ok) {
         return r.text().then(function (t) {
@@ -456,7 +456,7 @@
           "Content-Type": "application/json",
           "X-CSRFToken": token || "",
         },
-        body: JSON.stringify({ date: dateIso, updates: updates }),
+        body: JSON.stringify({ updates: updates }),
       }).then(function (r) {
         if (!r.ok) {
           return r.text().then(function (t) {

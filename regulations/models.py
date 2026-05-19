@@ -4,7 +4,6 @@ from django.db import models
 class RegulationPlan(models.Model):
     SHIFT_CHOICES = (("д", "Дневная"), ("н", "Ночная"))
 
-    plan_date = models.DateField()
     employee_code = models.CharField(max_length=64, db_index=True)
     employee_name = models.CharField(max_length=255)
     department = models.CharField(max_length=255, blank=True, default="")
@@ -48,10 +47,10 @@ class RegulationPlan(models.Model):
         ordering = ["employee_name"]
         constraints = [
             models.UniqueConstraint(
-                fields=["plan_date", "employee_code", "shift"],
-                name="uniq_regulation_employee_day_shift",
+                fields=["employee_code", "shift"],
+                name="uniq_regulation_employee_shift",
             )
         ]
 
     def __str__(self) -> str:
-        return f"{self.plan_date} | {self.employee_name} ({self.employee_code})"
+        return f"{self.employee_name} ({self.employee_code}) — {self.get_shift_display()}"

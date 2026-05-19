@@ -5,9 +5,9 @@
 <div class="reg-page" id="reg-page-root">
 <div class="reg-shift-tabs" role="tablist" aria-label="Смена регламента">
   <a role="tab" class="reg-shift-tab {% if reg_shift == 'д' %}reg-shift-tab--active{% endif %}"
-    href="{% url 'regulations_page' %}?month={{ plan_month_value }}&shift=д{{ reg_dep_qs }}">Дневная смена</a>
+    href="{% url 'regulations_page' %}?shift=д{{ reg_dep_qs }}">Дневная смена</a>
   <a role="tab" class="reg-shift-tab {% if reg_shift == 'н' %}reg-shift-tab--active{% endif %}"
-    href="{% url 'regulations_page' %}?month={{ plan_month_value }}&shift=н{{ reg_dep_qs }}">Ночная смена</a>
+    href="{% url 'regulations_page' %}?shift=н{{ reg_dep_qs }}">Ночная смена</a>
 </div>
 
 <div class="reg-toolbar filter-panel">
@@ -18,7 +18,7 @@
         <input type="month" name="month" value="{{ plan_month_value }}" required>
       </label>
       <div class="reg-toolbar-meta">
-        <span class="muted">Месяц: {{ plan_date_display }}</span>
+        
         {% if biota_ok and emp_count is not None %}
         <span class="muted">в справочнике: {{ emp_count }} чел.</span>
         {% endif %}
@@ -38,14 +38,14 @@
     {% endif %}
   </form>
   <div class="reg-toolbar-actions">
-    <a class="btn" href="{% url 'regulations_excel' %}?month={{ plan_month_value }}&shift={{ reg_shift }}{{ reg_dep_qs }}"
+    <a class="btn" href="{% url 'regulations_excel' %}?shift={{ reg_shift }}{{ reg_dep_qs }}"
       {% if not rows %}aria-disabled="true" tabindex="-1" style="pointer-events:none;opacity:0.45;" title="Нет строк на этот месяц"{% endif %}>Скачать Excel</a>
-    <a class="btn" href="{% url 'regulations_pdf' %}?month={{ plan_month_value }}&shift={{ reg_shift }}{{ reg_dep_qs }}"
+    <a class="btn" href="{% url 'regulations_pdf' %}?shift={{ reg_shift }}{{ reg_dep_qs }}"
       {% if not rows %}aria-disabled="true" tabindex="-1" style="pointer-events:none;opacity:0.45;" title="Нет строк на этот месяц"{% endif %}>Скачать PDF</a>
     {% if biota_can_edit %}
-    <form method="post" action="{% url 'regulations_page' %}?month={{ plan_month_value }}&shift={{ reg_shift }}{{ reg_dep_qs }}" class="reg-toolbar-inline">
+    <form method="post" action="{% url 'regulations_page' %}?shift={{ reg_shift }}{{ reg_dep_qs }}" class="reg-toolbar-inline">
       {% csrf_token %}
-      <input type="hidden" name="month" value="{{ plan_month_value }}">
+      
       <input type="hidden" name="shift" value="{{ reg_shift }}">
       {% if post_dep_mode %}<input type="hidden" name="dep_mode" value="{{ post_dep_mode }}">{% endif %}
       {% for d in post_dep_list %}<input type="hidden" name="dep" value="{{ d }}">{% endfor %}
@@ -202,7 +202,7 @@
     if (window.regBindMetaControls) {
       window.regBindMetaControls(
         "{% url 'regulations_api_meta' %}",
-        "{{ plan_date }}",
+        "",
         getCookie
       );
     }
@@ -211,7 +211,7 @@
     if (saveBtn) {
       saveBtn.addEventListener("click", function () {
         st.textContent = "…";
-        window.saveRegTimeline("{% url 'regulations_api_save' %}", "{{ plan_date }}", getCookie)
+        window.saveRegTimeline("{% url 'regulations_api_save' %}", "", getCookie)
           .then(function (d) {
             var n = d.updated || 0;
             st.textContent =
@@ -278,7 +278,7 @@
               restoreTheme();
               try {
                 var a = document.createElement("a");
-                a.download = "reglament_{{ plan_month_value }}_{{ reg_shift }}.png";
+                a.download = "reglament_{{ reg_shift }}.png";
                 a.href = canvas.toDataURL("image/png");
                 a.click();
               } catch (e) {

@@ -479,7 +479,7 @@ def _excel_interval_text(start: str, end: str, ncols: int) -> str:
 
 def build_regulations_timeline_excel(
     rows: list[dict],
-    plan_date: date,
+    plan_date,
     shift: str,
 ) -> bytes:
     """Светлая вёрстка: 144 колонки по 5 мин (08:00–20:00), шапка — полчаса до 19:30–20:00."""
@@ -505,7 +505,7 @@ def build_regulations_timeline_excel(
     ws.cell(1, 1).font = Font(bold=True, size=12, color="000000")
     ws.cell(1, 1).fill = title_fill
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=REG_EXPORT_N_SLOTS + 1)
-    ws.cell(2, 1, value=f"{plan_date.strftime('%d.%m.%Y')} · {_reg_shift_caption(shift)}")
+    ws.cell(2, 1, value=f"{plan_date.strftime('%d.%m.%Y') + '  · ' if plan_date else ''}{_reg_shift_caption(shift)}")
     ws.cell(2, 1).font = Font(size=10, color="333333")
     ws.cell(2, 1).fill = title_fill
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=REG_EXPORT_N_SLOTS + 1)
@@ -602,7 +602,7 @@ def build_regulations_timeline_excel(
 
 def build_regulations_timeline_pdf(
     rows: list[dict],
-    plan_date: date,
+    plan_date,
     shift: str,
 ) -> bytes:
     """Светлый PDF: 144 колонки по 5 мин до 20:00; шапка — полчаса, последняя метка 19:30–20:00."""
@@ -664,7 +664,7 @@ def build_regulations_timeline_pdf(
     # Два абзаца: длинная строка в одном Paragraph обрезалась у края («20:0»).
     story.append(
         Paragraph(
-            f"<b>{plan_date.strftime('%d.%m.%Y')}</b> · {_reg_shift_caption(shift)}",
+            f"{('<b>' + plan_date.strftime('%d.%m.%Y') + '</b> · ') if plan_date else ''}{_reg_shift_caption(shift)}",
             sub_st,
         )
     )
@@ -815,7 +815,7 @@ def build_regulations_timeline_pdf(
 
 def build_regulations_list_pdf(
     rows: list[dict],
-    plan_date: date,
+    plan_date,
     shift: str,
 ) -> bytes:
     """PDF регламента: №, сотрудник, завтрак, обед, перерывы."""
@@ -887,7 +887,8 @@ def build_regulations_list_pdf(
             sub_style,
         )
     )
-    story.append(Paragraph(f"Действует с {plan_date.strftime('%d.%m.%Y')}", sub_style))
+    if plan_date:
+        story.append(Paragraph(f"Действует с {plan_date.strftime('%d.%m.%Y')}", sub_style))
     story.append(
         Paragraph(
             "В таблице указаны временные окна: завтрак, обед и дополнительные перерывы.",

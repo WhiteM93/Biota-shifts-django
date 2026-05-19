@@ -1,6 +1,6 @@
 """Регламенты: интерактивная шкала времени + API сохранения (БД Django)."""
 import json
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, time
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -94,7 +94,6 @@ def _normalized_breaks(o: RegulationPlan, raw_items) -> list[dict]:
 
 
 def _break_intervals_minutes_day(breaks: list[dict]) -> list[tuple[int, int]]:
-    """Интервалы промежутков в минутах от полуночи (только валидные start < end)."""
     out: list[tuple[int, int]] = []
     for b in breaks:
         try:
@@ -110,7 +109,6 @@ def _break_intervals_minutes_day(breaks: list[dict]) -> list[tuple[int, int]]:
 
 
 def _intervals_overlap_pairwise(intervals: list[tuple[int, int]]) -> bool:
-    """Пересечение [a0,a1) и [b0,b1) при строгих неравенствах (стык a1==b0 — не пересечение)."""
     for i in range(len(intervals)):
         a0, a1 = intervals[i]
         for j in range(i + 1, len(intervals)):
@@ -120,7 +118,7 @@ def _intervals_overlap_pairwise(intervals: list[tuple[int, int]]) -> bool:
     return False
 
 
-def _primary_windows_from_breaks(plan: RegulationPlan, breaks: list[dict]) -> tuple[time, time, time, time, str, time | None, time | None]:
+def _primary_windows_from_breaks(plan: RegulationPlan, breaks: list[dict]) -> tuple:
     bf = next((b for b in breaks if b.get("color_kind") == "bf"), None)
     ln = next((b for b in breaks if b.get("color_kind") == "ln"), None)
     br = next((b for b in breaks if b.get("color_kind") == "br"), None)
@@ -134,83 +132,6 @@ def _primary_windows_from_breaks(plan: RegulationPlan, breaks: list[dict]) -> tu
         br_l = str(br.get("label") or "").strip()[:100] or "Перерыв 1"
         return bf_s, bf_e, ln_s, ln_e, br_l, br_s, br_e
     return bf_s, bf_e, ln_s, ln_e, "", None, None
-
-
-def _department_filter_context(request, plan_date: date) -> dict:
-    """Фильтр отделов как на «Графике» (пустой список = ни один отдел)."""
-    ctx = {
-        "reg_filter_deps": [],
-        "reg_sel_deps": [],
-        "reg_dep_mode_pick": False,
-        "reg_dep_qs": "",
-        "post_dep_mode": request.GET.get("dep_mode") or "",
-        "post_dep_list": list(request.GET.getlist("dep")),
-    }
-    try:
-        employees_df = _employees_for_user(request)
-        schedule_df = biota_schedule.load_schedule_table(
-            employees_df, plan_date.year, plan_date.month
-        )
-        schedule_df = _schedule_with_department(schedule_df, employees_df)
-        all_deps = apply_department_order(
-            sorted(schedule_df["Отдел"].unique().tolist()),
-            load_department_order(),
-        )
-        sel, depm = _extract_selected_deps(request, all_deps, from_post=False)
-        ctx["reg_filter_deps"] = all_deps
-        ctx["reg_sel_deps"] = sel
-        ctx["reg_dep_mode_pick"] = depm != "all"
-        q = []
-        if request.GET.get("dep_mode"):
-            q.append(("dep_mode", request.GET.get("dep_mode")))
-        for d in request.GET.getlist("dep"):
-            q.append(("dep", d))
-        ctx["reg_dep_qs"] = ("&" + urlencode(q)) if q else ""
-    except Exception:
-        pass
-    return ctx
-
-
-def _first_of_month(d: date) -> date:
-    return date(d.year, d.month, 1)
-
-
-def _prev_month_first(plan_day: date) -> date:
-    first = _first_of_month(plan_day)
-    if first.month == 1:
-        return date(first.year - 1, 12, 1)
-    return date(first.year, first.month - 1, 1)
-
-
-def _parse_plan_date(raw: str | None) -> date:
-    """Любая дата или YYYY-MM → первый день месяца (регламент ведётся по месяцу)."""
-    if not raw:
-        return _first_of_month(date.today())
-    s = raw.strip()
-    if len(s) == 7 and s[4] == "-":
-        try:
-            y, m = int(s[:4]), int(s[5:7])
-            return date(y, m, 1)
-        except ValueError:
-            return _first_of_month(date.today())
-    try:
-        d = date.fromisoformat(s)
-        return _first_of_month(d)
-    except ValueError:
-        return _first_of_month(date.today())
-
-
-def _resolve_plan_date(request) -> date:
-    month = (request.GET.get("month") or request.POST.get("month") or "").strip()
-    if month and len(month) >= 7 and month[4] == "-":
-        try:
-            y, m = int(month[:4]), int(month[5:7])
-            return date(y, m, 1)
-        except ValueError:
-            pass
-    return _parse_plan_date(
-        (request.GET.get("date") or request.POST.get("date") or "").strip() or None
-    )
 
 
 def _parse_shift(raw: str | None) -> str:
@@ -228,7 +149,7 @@ def _employees_for_user(request):
     return employees_df_for_nav(biota_user(request), "regulations", employees_df)
 
 
-def _fill_from_catalog(plan_date: date, employees_df) -> tuple[int, int]:
+def _fill_from_catalog(employees_df) -> tuple[int, int]:
     created = 0
     skipped = 0
     for _, row in employees_df.iterrows():
@@ -242,7 +163,6 @@ def _fill_from_catalog(plan_date: date, employees_df) -> tuple[int, int]:
         pos = str(row.get("position_name") or "").strip()
         for shift_key in ("д", "н"):
             _, was_created = RegulationPlan.objects.get_or_create(
-                plan_date=plan_date,
                 employee_code=code,
                 shift=shift_key,
                 defaults={
@@ -262,74 +182,7 @@ def _fill_from_catalog(plan_date: date, employees_df) -> tuple[int, int]:
     return created, skipped
 
 
-def _seed_from_previous_month(plan_date: date, shift: str) -> int:
-    """Если на первый день месяца нет строк — копируем все с прошлого месяца (та же смена)."""
-    if RegulationPlan.objects.filter(plan_date=plan_date, shift=shift).exists():
-        return 0
-    prev = _prev_month_first(plan_date)
-    prev_rows = list(RegulationPlan.objects.filter(plan_date=prev, shift=shift))
-    if not prev_rows:
-        return 0
-    created = 0
-    for p in prev_rows:
-        RegulationPlan.objects.create(
-            plan_date=plan_date,
-            employee_code=p.employee_code,
-            employee_name=p.employee_name,
-            department=p.department,
-            position=p.position,
-            shift=p.shift,
-            breakfast_start=p.breakfast_start,
-            breakfast_end=p.breakfast_end,
-            lunch_start=p.lunch_start,
-            lunch_end=p.lunch_end,
-            locked=p.locked,
-            eight_hour_shift=p.eight_hour_shift,
-        )
-        created += 1
-    return created
-
-
-def _overlay_from_previous_month(plan_date: date, shift: str) -> int:
-    """Для уже существующих строк подставить время и флаги с прошлого месяца (незаблокированные)."""
-    prev = _prev_month_first(plan_date)
-    prev_map = {
-        str(o.employee_code).strip(): o
-        for o in RegulationPlan.objects.filter(plan_date=prev, shift=shift)
-    }
-    if not prev_map:
-        return 0
-    updated = 0
-    for o in RegulationPlan.objects.filter(plan_date=plan_date, shift=shift):
-        if o.locked:
-            continue
-        src = prev_map.get(str(o.employee_code).strip())
-        if not src:
-            continue
-        RegulationPlan.objects.filter(pk=o.pk).update(
-            breakfast_start=src.breakfast_start,
-            breakfast_end=src.breakfast_end,
-            lunch_start=src.lunch_start,
-            lunch_end=src.lunch_end,
-            locked=src.locked,
-            eight_hour_shift=src.eight_hour_shift,
-        )
-        updated += 1
-    return updated
-
-
-def _scale_slots_30min() -> list[dict]:
-    """Подписи в шапке каждые 30 мин: 08:00 … 20:00 (25 отметок на полную шкалу до конца)."""
-    slots: list[dict] = []
-    for i in range(25):
-        total_min = 8 * 60 + i * 30
-        h, m = divmod(total_min, 60)
-        lbl = f"{h:02d}:{m:02d}"
-        slots.append({"label": lbl, "strong": m == 0})
-    return slots
-
-
-def _sync_regulation_catalog_fields(plan_date: date, employees_df) -> int:
+def _sync_regulation_catalog_fields(employees_df) -> int:
     """Подставить актуальные ФИО, отдел и должность из Biota в строки регламента."""
     if employees_df is None or getattr(employees_df, "empty", True):
         return 0
@@ -345,7 +198,7 @@ def _sync_regulation_catalog_fields(plan_date: date, employees_df) -> int:
         pos = str(row.get("position_name") or "").strip()
         by_code[code] = (name, dept, pos)
     updated = 0
-    for obj in RegulationPlan.objects.filter(plan_date=plan_date):
+    for obj in RegulationPlan.objects.all():
         info = by_code.get(str(obj.employee_code).strip())
         if not info:
             continue
@@ -363,6 +216,16 @@ def _sync_regulation_catalog_fields(plan_date: date, employees_df) -> int:
         )
         updated += 1
     return updated
+
+
+def _scale_slots_30min() -> list[dict]:
+    slots: list[dict] = []
+    for i in range(25):
+        total_min = 8 * 60 + i * 30
+        h, m = divmod(total_min, 60)
+        lbl = f"{h:02d}:{m:02d}"
+        slots.append({"label": lbl, "strong": m == 0})
+    return slots
 
 
 def _row_json(o: RegulationPlan) -> dict:
@@ -394,12 +257,12 @@ def _fallback_dep_color_map(plans: list[RegulationPlan]) -> dict[str, str]:
 
 
 def _regulation_plans_and_colors(
-    plan_date: date, request, shift: str = "д"
+    request, shift: str = "д"
 ) -> tuple[list[RegulationPlan], dict[str, str]]:
     """Порядок строк как на «Графике» + цвета отделов; только выбранная смена (д/н)."""
     if shift not in ("д", "н"):
         shift = "д"
-    base_all = list(RegulationPlan.objects.filter(plan_date=plan_date))
+    base_all = list(RegulationPlan.objects.all())
     employees_df = None
     try:
         employees_df = _employees_for_user(request)
@@ -417,8 +280,9 @@ def _regulation_plans_and_colors(
     if employees_df.empty:
         return [], {}
     try:
-        y, m = plan_date.year, plan_date.month
-        schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
+        from datetime import date
+        today = date.today()
+        schedule_df = biota_schedule.load_schedule_table(employees_df, today.year, today.month)
         schedule_df = _schedule_with_department(schedule_df, employees_df)
         all_deps = apply_department_order(
             sorted(schedule_df["Отдел"].unique().tolist()),
@@ -452,12 +316,47 @@ def _regulation_plans_and_colors(
         if o is not None:
             ordered.append(o)
             seen.add(code)
-    # В режиме «По списку» не подмешиваем остальных из SQLite — иначе снова видны «все».
     if dep_mode == "all":
         rest = [o for o in base if str(o.employee_code).strip() not in seen]
         rest.sort(key=lambda o: (o.employee_name.lower(), o.employee_code))
         ordered.extend(rest)
     return ordered, dep_color_map
+
+
+def _department_filter_context(request) -> dict:
+    ctx = {
+        "reg_filter_deps": [],
+        "reg_sel_deps": [],
+        "reg_dep_mode_pick": False,
+        "reg_dep_qs": "",
+        "post_dep_mode": request.GET.get("dep_mode") or "",
+        "post_dep_list": list(request.GET.getlist("dep")),
+    }
+    try:
+        from datetime import date
+        today = date.today()
+        employees_df = _employees_for_user(request)
+        schedule_df = biota_schedule.load_schedule_table(
+            employees_df, today.year, today.month
+        )
+        schedule_df = _schedule_with_department(schedule_df, employees_df)
+        all_deps = apply_department_order(
+            sorted(schedule_df["Отдел"].unique().tolist()),
+            load_department_order(),
+        )
+        sel, depm = _extract_selected_deps(request, all_deps, from_post=False)
+        ctx["reg_filter_deps"] = all_deps
+        ctx["reg_sel_deps"] = sel
+        ctx["reg_dep_mode_pick"] = depm != "all"
+        q = []
+        if request.GET.get("dep_mode"):
+            q.append(("dep_mode", request.GET.get("dep_mode")))
+        for d in request.GET.getlist("dep"):
+            q.append(("dep", d))
+        ctx["reg_dep_qs"] = ("&" + urlencode(q)) if q else ""
+    except Exception:
+        pass
+    return ctx
 
 
 def _parse_hm(s: str) -> time:
@@ -479,15 +378,9 @@ def _regulation_timeline_export_rows(
         lunches = [b for b in breaks if b.get("color_kind") == "ln"]
         pauses = [b for b in breaks if b.get("color_kind") == "br"]
 
-        breakfast_text_lines: list[str] = []
-        for i, b in enumerate(breakfasts, start=1):
-            breakfast_text_lines.append(f"{b.get('start','')}–{b.get('end','')}")
-        lunch_text_lines: list[str] = []
-        for i, b in enumerate(lunches, start=1):
-            lunch_text_lines.append(f"{b.get('start','')}–{b.get('end','')}")
-        pause_lines: list[str] = []
-        for i, p in enumerate(pauses, start=1):
-            pause_lines.append(f"{p.get('start','')}–{p.get('end','')}")
+        breakfast_text_lines = [f"{b.get('start','')}–{b.get('end','')}" for b in breakfasts]
+        lunch_text_lines = [f"{b.get('start','')}–{b.get('end','')}" for b in lunches]
+        pause_lines = [f"{b.get('start','')}–{b.get('end','')}" for b in pauses]
 
         first_bf = breakfasts[0] if breakfasts else None
         first_ln = lunches[0] if lunches else None
@@ -512,17 +405,14 @@ def _regulation_timeline_export_rows(
 @nav_permission_required("regulations")
 @require_http_methods(["GET"])
 def regulations_excel(request):
-    plan_date = _resolve_plan_date(request)
     shift = _parse_shift(request.GET.get("shift"))
-    plans, dep_color_map = _regulation_plans_and_colors(plan_date, request, shift=shift)
+    plans, dep_color_map = _regulation_plans_and_colors(request, shift=shift)
     if not plans:
-        return HttpResponse("Нет данных на выбранную дату и смену", status=400, content_type="text/plain; charset=utf-8")
+        return HttpResponse("Нет данных для выбранной смены", status=400, content_type="text/plain; charset=utf-8")
     rows = _regulation_timeline_export_rows(plans, dep_color_map)
-    data = biota_export.build_regulations_timeline_excel(rows, plan_date, shift)
-    y, m, d = plan_date.year, plan_date.month, plan_date.day
+    data = biota_export.build_regulations_timeline_excel(rows, None, shift)
     tag = "n" if shift == "н" else "d"
-    fn = f"reglament_{tag}_{y}_{m:02d}_{d:02d}.xlsx"
-    # FileResponse(BytesIO) на части стеков (gunicorn/nginx) даёт 500 из‑за fileno() — отдаём из памяти.
+    fn = f"reglament_{tag}.xlsx"
     resp = HttpResponse(
         data,
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -535,19 +425,17 @@ def regulations_excel(request):
 @nav_permission_required("regulations")
 @require_http_methods(["GET"])
 def regulations_pdf(request):
-    plan_date = _resolve_plan_date(request)
     shift = _parse_shift(request.GET.get("shift"))
-    plans, dep_color_map = _regulation_plans_and_colors(plan_date, request, shift=shift)
+    plans, dep_color_map = _regulation_plans_and_colors(request, shift=shift)
     if not plans:
-        return HttpResponse("Нет данных на выбранную дату и смену", status=400, content_type="text/plain; charset=utf-8")
+        return HttpResponse("Нет данных для выбранной смены", status=400, content_type="text/plain; charset=utf-8")
     rows = _regulation_timeline_export_rows(plans, dep_color_map)
     try:
-        data = biota_export.build_regulations_list_pdf(rows, plan_date, shift)
+        data = biota_export.build_regulations_list_pdf(rows, None, shift)
     except Exception as exc:
         return HttpResponse(f"PDF недоступен: {exc}", status=500, content_type="text/plain; charset=utf-8")
-    y, m, d = plan_date.year, plan_date.month, plan_date.day
     tag = "n" if shift == "н" else "d"
-    fn = f"reglament_{tag}_{y}_{m:02d}_{d:02d}.pdf"
+    fn = f"reglament_{tag}.pdf"
     resp = HttpResponse(data, content_type="application/pdf")
     resp["Content-Disposition"] = f'attachment; filename="{fn}"'
     return resp
@@ -559,9 +447,6 @@ def regulations_pdf(request):
 @write_permission_required
 @require_http_methods(["GET", "POST"])
 def regulation_page(request):
-    plan_date = _resolve_plan_date(request)
-    plan_date_s = plan_date.isoformat()
-    plan_month_value = f"{plan_date.year:04d}-{plan_date.month:02d}"
     reg_shift = _parse_shift(request.GET.get("shift") or request.POST.get("shift"))
 
     if request.method == "POST" and request.POST.get("action") == "from_catalog":
@@ -579,14 +464,11 @@ def regulation_page(request):
                 "Справочник сотрудников пуст или нет прав — нечего подставлять.",
             )
         else:
-            n_new, n_skip = _fill_from_catalog(plan_date, employees_df)
-            n_ov = _overlay_from_previous_month(plan_date, _parse_shift(request.POST.get("shift")))
-            msg = f"Добавлено новых строк: {n_new}. Уже были на этот месяц: {n_skip}."
-            if n_ov:
-                msg += f" Подтянуто с прошлого месяца (время и отметки): {n_ov}."
+            n_new, n_skip = _fill_from_catalog(employees_df)
+            msg = f"Добавлено новых строк: {n_new}. Уже были в регламенте: {n_skip}."
             messages.success(request, msg)
         post_shift = _parse_shift(request.POST.get("shift"))
-        redir_q = [("month", plan_month_value), ("shift", post_shift)]
+        redir_q = [("shift", post_shift)]
         dm = (request.POST.get("dep_mode") or "").strip()
         if dm:
             redir_q.append(("dep_mode", dm))
@@ -596,15 +478,9 @@ def regulation_page(request):
         return redirect(f"{reverse('regulations_page')}?{urlencode(redir_q)}")
 
     if request.method == "GET":
-        seeded = _seed_from_previous_month(plan_date, reg_shift)
-        if seeded:
-            messages.info(
-                request,
-                f"Для этого месяца не было строк — скопировано из прошлого месяца: {seeded}.",
-            )
         try:
             employees_sync = _employees_for_user(request)
-            n_sync = _sync_regulation_catalog_fields(plan_date, employees_sync)
+            n_sync = _sync_regulation_catalog_fields(employees_sync)
             if n_sync:
                 messages.info(
                     request,
@@ -613,9 +489,7 @@ def regulation_page(request):
         except Exception:
             pass
 
-    plans, dep_color_map = _regulation_plans_and_colors(
-        plan_date, request, shift=reg_shift
-    )
+    plans, dep_color_map = _regulation_plans_and_colors(request, shift=reg_shift)
     rows: list[dict] = []
     for o in plans:
         row = _row_json(o)
@@ -632,15 +506,12 @@ def regulation_page(request):
     except Exception:
         biota_ok = False
 
-    dep_ctx = _department_filter_context(request, plan_date)
+    dep_ctx = _department_filter_context(request)
 
     return render(
         request,
         "regulations/timeline.html",
         {
-            "plan_date": plan_date_s,
-            "plan_month_value": plan_month_value,
-            "plan_date_display": plan_date.strftime("%m.%Y"),
             "reg_shift": reg_shift,
             "reg_shift_title": _shift_title(reg_shift),
             "rows": rows,
@@ -662,14 +533,9 @@ def regulations_api_save(request):
         payload = json.loads(request.body.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError):
         return HttpResponseBadRequest("invalid json")
-    d_raw = payload.get("date")
     items = payload.get("items")
-    if not d_raw or not isinstance(items, list):
-        return HttpResponseBadRequest("date, items required")
-    try:
-        plan_date = _first_of_month(date.fromisoformat(str(d_raw).strip()))
-    except ValueError:
-        return HttpResponseBadRequest("bad date")
+    if not isinstance(items, list):
+        return HttpResponseBadRequest("items required")
 
     updated = 0
     for it in items:
@@ -679,7 +545,7 @@ def regulations_api_save(request):
             pk = int(it.get("id"))
         except (TypeError, ValueError):
             continue
-        row = RegulationPlan.objects.filter(pk=pk, plan_date=plan_date).first()
+        row = RegulationPlan.objects.filter(pk=pk).first()
         if not row:
             continue
         breaks = _normalized_breaks(row, it.get("breaks"))
@@ -693,7 +559,7 @@ def regulations_api_save(request):
             bf_s, bf_e, ln_s, ln_e, ex_l, ex_s, ex_e = _primary_windows_from_breaks(row, breaks)
         except (ValueError, KeyError, TypeError):
             return HttpResponseBadRequest("bad breaks")
-        n = RegulationPlan.objects.filter(pk=pk, plan_date=plan_date).update(
+        n = RegulationPlan.objects.filter(pk=pk).update(
             breakfast_start=bf_s,
             breakfast_end=bf_e,
             lunch_start=ln_s,
@@ -719,15 +585,9 @@ def regulations_api_meta(request):
         payload = json.loads(request.body.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError):
         return HttpResponseBadRequest("invalid json")
-    d_raw = payload.get("date")
     updates = payload.get("updates")
-    if not d_raw or not isinstance(updates, list):
-        return HttpResponseBadRequest("date, updates required")
-    try:
-        plan_date = date.fromisoformat(str(d_raw).strip())
-    except ValueError:
-        return HttpResponseBadRequest("bad date")
-    plan_date = _first_of_month(plan_date)
+    if not isinstance(updates, list):
+        return HttpResponseBadRequest("updates required")
 
     changed = 0
     updated_rows: list[dict] = []
@@ -743,10 +603,10 @@ def regulations_api_meta(request):
             fields["locked"] = bool(u.get("locked"))
         if not fields:
             continue
-        n = RegulationPlan.objects.filter(pk=pk, plan_date=plan_date).update(**fields)
+        n = RegulationPlan.objects.filter(pk=pk).update(**fields)
         changed += n
         if n:
-            obj = RegulationPlan.objects.filter(pk=pk, plan_date=plan_date).first()
+            obj = RegulationPlan.objects.filter(pk=pk).first()
             if obj:
                 updated_rows.append(_row_json(obj))
 
