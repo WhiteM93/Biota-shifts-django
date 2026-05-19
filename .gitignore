@@ -11,4 +11,6 @@ media/
 .env.secrets
 .biota_users.json
 FETCH_HEAD
-FETCH_HEAD
+
+# Графики смен — хранятся только на сервере, не трекаются гитом
+schedules/
