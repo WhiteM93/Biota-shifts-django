@@ -224,12 +224,15 @@
             data-placeholder="—"
             aria-label="Количество"
           >{% if srow.qty %}{{ srow.qty }}{% endif %}</div>
-          <div
-            class="machines-cell machines-cell--schedule-color"
-            style="{% if srow.color %}background-color: {{ srow.color|escape }};{% endif %}"
-            data-color="{% if srow.color %}{{ srow.color|escape }}{% endif %}"
-            aria-label="Цвет"
-          ></div>
+          <div class="machines-cell machines-cell--schedule-color" aria-label="Цвет">
+            <button type="button"
+              class="machines-color-swatch-btn js-machines-color-trigger"
+              data-color="{{ srow.color|default:''|escape }}"
+              style="{% if srow.color %}background:{{ srow.color|escape }};{% endif %}"
+              aria-label="Выбрать цвет"
+              tabindex="-1"
+            ></button>
+          </div>
           <div class="machines-cell machines-cell--code machines-cell--schedule-code">{{ srow.machine_code }}</div>
           <button type="button" class="machines-schedule-row-delete js-machines-schedule-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
         </div>
@@ -322,7 +325,9 @@
         </div>
       </div>
       <div class="machines-cell machines-cell--schedule-qty is-empty" data-placeholder="—" aria-label="Количество"></div>
-      <div class="machines-cell machines-cell--schedule-color" aria-label="Цвет"></div>
+      <div class="machines-cell machines-cell--schedule-color" aria-label="Цвет">
+        <button type="button" class="machines-color-swatch-btn js-machines-color-trigger" data-color="" aria-label="Выбрать цвет" tabindex="-1"></button>
+      </div>
       <div class="machines-cell machines-cell--code machines-cell--schedule-code is-empty"></div>
       <button type="button" class="machines-schedule-row-delete js-machines-schedule-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
     </div>
@@ -332,6 +337,7 @@
     <div class="machines-quick-preview-pop-empty muted">Превью не сохранено</div>
   </div>
   {{ machines_products_json|json_script:"machines-products-data" }}
+  <div id="machines-color-picker-pop" class="machines-color-picker-pop" hidden role="dialog" aria-label="Выбор цвета"></div>
 </div>
 
 <link rel="stylesheet" href="{% static "shifts/css/machines.css" %}">

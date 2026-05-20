@@ -8,6 +8,13 @@
     var MIME_SCHEDULE_DRAG = "application/x-biota-schedule-row";
     var scheduleDragHoverField = null;
 
+    // 16 цветов: 8 основных + 8 оттенков
+    var COLOR_PALETTE = [
+      "#FF4D4D", "#FF8C00", "#EAB308", "#22C55E", "#06B6D4", "#3B82F6", "#A855F7", "#F472B6",
+      "#B91C1C", "#C05621", "#A16207", "#15803D", "#0E7490", "#1D4ED8", "#7E22CE", "#BE185D",
+    ];
+    var colorPickerTarget = null;
+
     var root = document.querySelector(".machines-page");
     var toggleBtn = document.querySelector(".js-machines-inline-edit-toggle");
     var canQuickEdit = root && (root.getAttribute("data-machines-quick-edit") || "") === "1";
@@ -124,7 +131,7 @@
         }
         var qtyEl = row.querySelector(".machines-cell--schedule-qty");
         var priorityEl = row.querySelector(".machines-cell--schedule-priority");
-        var colorEl = row.querySelector(".machines-cell--schedule-color");
+        var colorTrigger = row.querySelector(".js-machines-color-trigger");
         schedule_rows.push({
           label: labelCell ? (labelCell.getAttribute("data-original-label") || "").trim() : "",
           machine_code: codeEl ? (codeEl.textContent || "").trim() : "",
@@ -138,7 +145,7 @@
           })(),
           qty: qtyEl ? (qtyEl.textContent || "").trim() : "",
           priority: priorityEl ? (priorityEl.textContent || "").trim() : "",
-          color: colorEl ? (colorEl.getAttribute("data-color") || colorEl.style.backgroundColor || "").trim() : "",
+          color: colorTrigger ? (colorTrigger.dataset.color || "").trim() : "",
         });
       });
       var cv = parseInt((root.getAttribute("data-machines-content-version") || "0").trim(), 10);
@@ -857,6 +864,112 @@
       syncScheduleSetupUi(cell);
     }
 
+    // ─── Цветовой пикер ──────────────────────────────────────────────
+
+    function buildColorPickerPop() {
+      var pop = document.getElementById("machines-color-picker-pop");
+      if (!pop || pop.dataset.built) return;
+      pop.dataset.built = "1";
+      var clearRow = document.createElement("div");
+      var clearBtn = document.createElement("button");
+      clearBtn.type = "button";
+      clearBtn.className = "machines-color-picker-pop__clear-btn js-machines-color-pick";
+      clearBtn.dataset.color = "";
+      clearBtn.textContent = "✕  Без цвета";
+      clearRow.appendChild(clearBtn);
+      pop.appendChild(clearRow);
+      var row1 = document.createElement("div");
+      row1.className = "machines-color-picker-pop__row";
+      var row2 = document.createElement("div");
+      row2.className = "machines-color-picker-pop__row";
+      for (var i = 0; i < 8; i++) {
+        [row1, row2].forEach(function (rowEl, ri) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "machines-color-picker-pop__swatch js-machines-color-pick";
+          btn.dataset.color = COLOR_PALETTE[ri * 8 + i];
+          btn.style.background = COLOR_PALETTE[ri * 8 + i];
+          btn.title = COLOR_PALETTE[ri * 8 + i];
+          rowEl.appendChild(btn);
+        });
+      }
+      pop.appendChild(row1);
+      pop.appendChild(row2);
+    }
+
+    function openColorPicker(triggerBtn) {
+      buildColorPickerPop();
+      var pop = document.getElementById("machines-color-picker-pop");
+      if (!pop) return;
+      colorPickerTarget = triggerBtn;
+      pop.hidden = false;
+      var rect = triggerBtn.getBoundingClientRect();
+      var popW = pop.offsetWidth || 200;
+      var popH = pop.offsetHeight || 90;
+      var top = rect.bottom + 4;
+      var left = rect.left;
+      if (left + popW > window.innerWidth - 8) left = rect.right - popW;
+      if (top + popH > window.innerHeight - 8) top = rect.top - popH - 4;
+      if (left < 4) left = 4;
+      pop.style.top = top + "px";
+      pop.style.left = left + "px";
+      var cur = (triggerBtn.dataset.color || "").toLowerCase();
+      pop.querySelectorAll(".js-machines-color-pick").forEach(function (b) {
+        b.classList.toggle("is-selected", (b.dataset.color || "").toLowerCase() === cur);
+      });
+    }
+
+    function closeColorPicker() {
+      var pop = document.getElementById("machines-color-picker-pop");
+      if (pop) pop.hidden = true;
+      colorPickerTarget = null;
+    }
+
+    function applyColorToRow(row, color) {
+      var colorCell = row.querySelector(".machines-cell--schedule-color");
+      var triggerBtn = colorCell ? colorCell.querySelector(".js-machines-color-trigger") : null;
+      if (triggerBtn) {
+        triggerBtn.dataset.color = color || "";
+        triggerBtn.style.background = color || "";
+      }
+      if (color) {
+        row.style.setProperty("--srow-bg", color);
+        row.setAttribute("data-row-color", "1");
+      } else {
+        row.style.removeProperty("--srow-bg");
+        row.removeAttribute("data-row-color");
+      }
+    }
+
+    function syncScheduleColorsToQuickRows() {
+      // Строим карту product_id → color из строк плана
+      var colorMap = {};
+      scheduleWrap.querySelectorAll(".machines-schedule-row").forEach(function (row) {
+        var labelCell = row.querySelector(".machines-cell--schedule-label");
+        var triggerBtn = row.querySelector(".js-machines-color-trigger");
+        if (!labelCell || !triggerBtn) return;
+        var hid = labelCell.querySelector(".js-machines-product-id");
+        var pid = hid ? (hid.value || "").trim() : "";
+        var color = (triggerBtn.dataset.color || "").trim();
+        if (pid && color) colorMap[pid] = color;
+      });
+      // Применяем к ячейкам станков
+      quickWrap.querySelectorAll(".machines-quick-row").forEach(function (row) {
+        row.querySelectorAll(".machines-cell--field:not(.machines-cell--notes)").forEach(function (cell) {
+          var pid = (cell.getAttribute("data-preview-product-id") || "").trim();
+          if (pid && colorMap[pid]) {
+            cell.style.setProperty("--product-bg", colorMap[pid]);
+            cell.setAttribute("data-product-color", "1");
+          } else {
+            cell.style.removeProperty("--product-bg");
+            cell.removeAttribute("data-product-color");
+          }
+        });
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+
     function persistAllProducts() {
       var map = readStore();
       root.querySelectorAll(".machines-cell--schedule-label").forEach(function (cell) {
@@ -1030,13 +1143,7 @@
           cell.removeAttribute("spellcheck");
         }
       });
-      scheduleWrap.querySelectorAll(".machines-cell--schedule-color").forEach(function (cell) {
-        if (en) {
-          cell.setAttribute("contenteditable", "true");
-        } else {
-          cell.removeAttribute("contenteditable");
-        }
-      });
+      // color-cell управляется через пикер, contenteditable не нужен
       root.querySelectorAll(".js-machines-product-search").forEach(function (inp) {
         inp.disabled = !en;
         inp.setAttribute("aria-disabled", en ? "false" : "true");
@@ -1178,21 +1285,49 @@
     });
 
     scheduleWrap.addEventListener("click", function (e) {
-      var btn = e.target.closest(".js-machines-schedule-row-delete");
-      if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
-      var row = btn.closest(".machines-schedule-row");
-      if (!row) return;
-      var labelCell = row.querySelector(".machines-cell--schedule-label");
-      if (labelCell) {
-        var idx = labelCell.getAttribute("data-schedule-index");
-        if (idx !== null && idx !== "") {
-          var map = readStore();
-          delete map[idx];
-          writeStore(map);
+      // Удаление строки
+      var delBtn = e.target.closest(".js-machines-schedule-row-delete");
+      if (delBtn && root.getAttribute("data-inline-edit-mode") === "1") {
+        var row = delBtn.closest(".machines-schedule-row");
+        if (row) {
+          var labelCell = row.querySelector(".machines-cell--schedule-label");
+          if (labelCell) {
+            var idx = labelCell.getAttribute("data-schedule-index");
+            if (idx !== null && idx !== "") { var map = readStore(); delete map[idx]; writeStore(map); }
+          }
+          row.remove();
+          saveScheduleClientRows();
         }
+        return;
       }
-      row.remove();
-      saveScheduleClientRows();
+      // Открытие цветового пикера
+      var colorTrigger = e.target.closest(".js-machines-color-trigger");
+      if (colorTrigger && root.getAttribute("data-inline-edit-mode") === "1") {
+        if (colorPickerTarget === colorTrigger) { closeColorPicker(); return; }
+        openColorPicker(colorTrigger);
+        return;
+      }
+    });
+
+    // Выбор цвета из пикера
+    document.addEventListener("mousedown", function (e) {
+      var pop = document.getElementById("machines-color-picker-pop");
+      if (!pop || pop.hidden) return;
+      var pick = e.target.closest(".js-machines-color-pick");
+      if (pick && pop.contains(pick)) {
+        e.preventDefault();
+        var color = pick.dataset.color || "";
+        if (colorPickerTarget) {
+          var row = colorPickerTarget.closest(".machines-schedule-row");
+          if (row) { applyColorToRow(row, color); syncScheduleColorsToQuickRows(); scheduleSave(); }
+        }
+        closeColorPicker();
+        return;
+      }
+      // Клик вне пикера — закрыть
+      if (!pop.contains(e.target) && !e.target.closest(".js-machines-color-trigger")) {
+        closeColorPicker();
+      }
     });
 
     scheduleWrap.addEventListener("dragstart", function (e) {
@@ -1504,6 +1639,7 @@
       syncProductComboDisplay(cell);
       persistAllProducts();
       syncScheduleCodeVisibility();
+      syncScheduleColorsToQuickRows();
       var idxStr = (cell.getAttribute("data-schedule-index") || "").trim();
       var lineNo = "";
       if (idxStr !== "") {
@@ -1819,12 +1955,12 @@
         var codeEl = row.querySelector(".machines-cell--schedule-code");
         var qtyEl = row.querySelector(".machines-cell--schedule-qty");
         var priorityEl = row.querySelector(".machines-cell--schedule-priority");
-        var colorEl = row.querySelector(".machines-cell--schedule-color");
+        var colorTrigger = row.querySelector(".js-machines-color-trigger");
         list.push({
           machine_code: (codeEl && codeEl.textContent ? codeEl.textContent : "").trim(),
           qty: (qtyEl && qtyEl.textContent ? qtyEl.textContent : "").trim(),
           priority: (priorityEl && priorityEl.textContent ? priorityEl.textContent : "").trim(),
-          color: (colorEl && colorEl.style.backgroundColor ? colorEl.style.backgroundColor : "").trim(),
+          color: colorTrigger ? (colorTrigger.dataset.color || "").trim() : "",
         });
       });
       writeJson(LS_SCHEDULE_EXTRA, list);
@@ -1849,11 +1985,7 @@
           priorityEl.textContent = item.priority;
           priorityEl.classList.remove("is-empty");
         }
-        var colorEl = row.querySelector(".machines-cell--schedule-color");
-        if (colorEl && item.color) {
-          colorEl.style.backgroundColor = item.color;
-          colorEl.setAttribute("data-color", item.color);
-        }
+        if (item.color) applyColorToRow(row, item.color);
         scheduleWrap.appendChild(row);
       });
     }
@@ -1929,4 +2061,11 @@
     syncMachineCodeAppearance();
     syncScheduleProductInteractions(root.getAttribute("data-inline-edit-mode") === "1");
     syncScheduleCodeVisibility();
+    // Инициализация цветов серверных строк и цветовой подсветки станков
+    buildColorPickerPop();
+    scheduleWrap.querySelectorAll(".machines-schedule-row").forEach(function (row) {
+      var triggerBtn = row.querySelector(".js-machines-color-trigger");
+      if (triggerBtn && triggerBtn.dataset.color) applyColorToRow(row, triggerBtn.dataset.color);
+    });
+    syncScheduleColorsToQuickRows();
   })();

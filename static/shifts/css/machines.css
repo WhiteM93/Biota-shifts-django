@@ -785,14 +785,111 @@
     outline: none;
     box-shadow: inset 0 0 0 2px var(--bio-input-focus-border, #5c709f);
   }
+  /* Ячейка цвета */
   .machines-cell--schedule-color {
-    border: 1px solid var(--bio-input-border);
-    border-radius: 2px;
-    margin: 6px 4px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-right: 1px solid var(--bio-input-border);
+    border-bottom: 1px solid var(--bio-input-border);
+    background: var(--bio-input-bg);
   }
-  .machines-page[data-inline-edit-mode="1"] .machines-cell--schedule-color[contenteditable="true"] {
+  .machines-color-swatch-btn {
+    display: block;
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    border-radius: 3px;
+    border: 1.5px solid color-mix(in srgb, var(--bio-input-border) 80%, transparent);
+    background: transparent;
+    cursor: default;
+    padding: 0;
+    flex-shrink: 0;
+    transition: border-color 0.15s, transform 0.12s;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-color-swatch-btn {
     cursor: pointer;
-    min-height: 24px;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-color-swatch-btn:hover {
+    border-color: rgba(255,255,255,0.5);
+    transform: scale(1.1);
+  }
+
+  /* Подсветка строки плана цветом */
+  .machines-schedule-row[data-row-color] .machines-cell--schedule-label,
+  .machines-schedule-row[data-row-color] .machines-cell--schedule-priority,
+  .machines-schedule-row[data-row-color] .machines-cell--schedule-qty {
+    background: color-mix(in srgb, var(--srow-bg) 28%, var(--bio-input-bg));
+  }
+  .machines-schedule-row:nth-child(even)[data-row-color] .machines-cell--schedule-label,
+  .machines-schedule-row:nth-child(even)[data-row-color] .machines-cell--schedule-priority,
+  .machines-schedule-row:nth-child(even)[data-row-color] .machines-cell--schedule-qty {
+    background: color-mix(in srgb, var(--srow-bg) 34%, var(--bio-input-bg));
+  }
+
+  /* Подсветка ячеек станков тем же цветом */
+  .machines-quick-row > .machines-cell--field[data-product-color] {
+    background: color-mix(in srgb, var(--product-bg) 22%, var(--bio-input-bg)) !important;
+  }
+  .machines-quick-row:hover > .machines-cell--field[data-product-color] {
+    background: color-mix(in srgb, var(--product-bg) 30%, var(--bio-input-bg)) !important;
+  }
+  .machines-quick-row:nth-child(even) > .machines-cell--field[data-product-color] {
+    background: color-mix(in srgb, var(--product-bg) 26%, var(--bio-input-bg)) !important;
+  }
+
+  /* Цветовой пикер (попап) */
+  .machines-color-picker-pop {
+    position: fixed;
+    z-index: 300;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--bio-filter-border, rgba(255,255,255,0.12));
+    background: var(--bio-filter-bg2, #181c28);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .machines-color-picker-pop__clear-btn {
+    font-size: 11px;
+    color: var(--bio-muted);
+    background: none;
+    border: 1px solid var(--bio-input-border);
+    border-radius: 4px;
+    padding: 3px 10px;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    transition: color 0.12s, background 0.12s;
+  }
+  .machines-color-picker-pop__clear-btn:hover {
+    color: var(--bio-body-fg);
+    background: color-mix(in srgb, var(--bio-input-bg) 80%, transparent);
+  }
+  .machines-color-picker-pop__row {
+    display: flex;
+    gap: 4px;
+  }
+  .machines-color-picker-pop__swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: transform 0.1s, border-color 0.1s;
+  }
+  .machines-color-picker-pop__swatch:hover {
+    transform: scale(1.25);
+    border-color: rgba(255,255,255,0.55);
+  }
+  .machines-color-picker-pop__swatch.is-selected {
+    border-color: rgba(255,255,255,0.9);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
   }
   .machines-cell--field.is-match,
   .machines-cell--schedule-code.is-match,
