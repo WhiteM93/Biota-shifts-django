@@ -762,11 +762,6 @@
   .machines-cell--schedule-qty.is-empty {
     color: var(--bio-muted);
   }
-  .machines-page[data-inline-edit-mode="1"] .machines-cell--schedule-qty[contenteditable="true"].is-empty:not(:focus)::before {
-    content: "—";
-    color: var(--bio-muted);
-    pointer-events: none;
-  }
   .machines-page[data-inline-edit-mode="1"] .machines-cell--schedule-qty[contenteditable="true"]:focus {
     outline: none;
     box-shadow: inset 0 0 0 2px var(--bio-input-focus-border, #5c709f);
