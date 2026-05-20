@@ -73,7 +73,13 @@
       if (!inner || !inner.classList.contains("machines-quick-field-view")) return;
       var flat = getQuickFieldFlatText(inner);
       inner.classList.remove("is-split");
-      inner.textContent = flat;
+      // Полностью очищаем вложенные элементы, оставляя только текст
+      while (inner.firstChild) {
+        inner.removeChild(inner.firstChild);
+      }
+      if (flat) {
+        inner.appendChild(document.createTextNode(flat));
+      }
     }
 
     function collectMachinesBoardPayload() {
@@ -975,12 +981,14 @@
     function syncQuickEditability(on) {
       quickWrap.querySelectorAll(".machines-quick-row > .machines-cell").forEach(function (cell) {
         if (on) {
+          // Для field cells полностью очищаем структуру и оставляем только текст
+          if (cell.classList.contains("machines-cell--field") && !cell.classList.contains("machines-cell--notes")) {
+            var innerOn = cell.querySelector(".machines-quick-field-view");
+            var textToKeep = innerOn ? getQuickFieldFlatText(innerOn) : (cell.textContent || "");
+            cell.textContent = textToKeep;
+          }
           cell.setAttribute("contenteditable", "true");
           cell.setAttribute("spellcheck", "false");
-          var innerOn = cell.querySelector(".machines-quick-field-view");
-          if (innerOn && cell.classList.contains("machines-cell--field") && !cell.classList.contains("machines-cell--notes")) {
-            collapseQuickFieldViewForEdit(innerOn);
-          }
         } else {
           normalizeQuickEditableCell(cell);
           syncQuickFieldProductRefAfterBlur(cell);
