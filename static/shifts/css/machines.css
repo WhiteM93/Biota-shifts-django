@@ -914,6 +914,34 @@
   .machines-cell-clear:hover {
     opacity: 1 !important;
   }
+  .machines-quick-row-delete {
+    display: none;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--bio-danger, #d9534f);
+    color: #fff;
+    font-size: 12px;
+    line-height: 18px;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    flex-shrink: 0;
+    align-self: center;
+    margin-left: 4px;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-quick-row-delete {
+    display: block;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-quick-row:hover .machines-quick-row-delete {
+    opacity: 0.7;
+  }
+  .machines-quick-row-delete:hover {
+    opacity: 1 !important;
+  }
   .machines-schedule-row-delete {
     display: none;
     width: 18px;

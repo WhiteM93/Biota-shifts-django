@@ -1121,6 +1121,15 @@
     }
     document.addEventListener("keydown", onHistoryEscape);
 
+    quickWrap.addEventListener("click", function (e) {
+      var btn = e.target.closest(".js-machines-quick-row-delete");
+      if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
+      var row = btn.closest(".machines-quick-row");
+      if (!row) return;
+      row.remove();
+      scheduleSave();
+    });
+
     scheduleWrap.addEventListener("click", function (e) {
       var btn = e.target.closest(".js-machines-schedule-row-delete");
       if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
