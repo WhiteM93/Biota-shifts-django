@@ -59,16 +59,20 @@
     <div class="product-tab-panels">
       <section class="product-tab-panel" id="panel-drawing" data-panel="drawing" data-inline-edit-mode="0" role="tabpanel" aria-label="Изделие" {% if tab_default != 'drawing' %}hidden{% endif %}>
         <div class="product-drawing-intro">
-        {% if setups %}
-        {% include "shifts/includes/plan_card_specs_unified.html" with plan_specs_variant="product" %}
-        {% endif %}
-        <div class="product-drawing-meta filter-panel">
-          <div class="product-drawing-name-row">
-            <span class="muted product-drawing-name-row__label">Название</span>
-            <span class="product-drawing-name" data-field-text="product_name">{{ product.name }}</span>
+          <div class="product-drawing-left-col">
+            {% if setups %}
+            {% include "shifts/includes/plan_card_specs_unified.html" with plan_specs_variant="product" %}
+            {% endif %}
           </div>
-          <p class="muted product-drawing-description__text" data-field-text="product_description" data-empty-label="Описание не задано.">{% if product.description %}{{ product.description }}{% else %}Описание не задано.{% endif %}</p>
-        </div>
+          <div class="product-drawing-right-col">
+            <div class="product-drawing-meta filter-panel">
+              <div class="product-drawing-name-row">
+                <span class="muted product-drawing-name-row__label">Название</span>
+                <span class="product-drawing-name is-inline-edit" data-field-text="product_name" contenteditable="true" spellcheck="false">{{ product.name }}</span>
+              </div>
+              <p class="muted product-drawing-description__text is-inline-edit" data-field-text="product_description" data-empty-label="Описание не задано." contenteditable="true" spellcheck="true">{% if product.description %}{{ product.description }}{% endif %}</p>
+            </div>
+          </div>
         </div>
       </section>
       {% for setup in setups %}

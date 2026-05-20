@@ -6,7 +6,8 @@
       "Bash(git -C D:/Github/Biota-shifts-django clean -fd -e \".env.secrets\" -e \".env\" -e \"schedules/\")",
       "mcp__Claude_Preview__preview_start",
       "Bash(python manage.py makemigrations)",
-      "Bash(python manage.py migrate)"
+      "Bash(python manage.py migrate)",
+      "mcp__Claude_in_Chrome__list_connected_browsers"
     ]
   }
 }
