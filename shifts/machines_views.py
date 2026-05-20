@@ -202,6 +202,27 @@ def _setups_by_product_id(product_ids: set[int]) -> dict[int, list[dict[str, int
     return out
 
 
+def _schedule_sort_key(row: dict) -> tuple:
+    """Меньший приоритет — выше в списке; при равном — большее кол-во выше."""
+    priority_str = str(row.get("priority") or "").strip()
+    qty_str = str(row.get("qty") or "").strip()
+    try:
+        priority = int(priority_str)
+    except (ValueError, TypeError):
+        priority = float("inf")
+    try:
+        qty = -int(qty_str)
+    except (ValueError, TypeError):
+        qty = 0
+    return (priority, qty)
+
+
+def _sort_schedule_rows(rows: list[dict]) -> list[dict]:
+    out = list(rows)
+    out.sort(key=_schedule_sort_key)
+    return out
+
+
 def _schedule_rows_with_display(
     rows: list[dict],
     product_by_id: dict[int, str],
@@ -251,22 +272,7 @@ def _schedule_rows_with_display(
                 "setup_options": list(setups),
             }
         )
-    # Сортировка по приоритету, затем по кол-ву (по убыванию)
-    def sort_key(row: dict) -> tuple:
-        priority_str = str(row.get("priority") or "").strip()
-        qty_str = str(row.get("qty") or "").strip()
-        try:
-            priority = int(priority_str)
-        except (ValueError, TypeError):
-            priority = float('inf')  # Пустые приоритеты в конец
-        try:
-            qty = -int(qty_str)  # Минус для сортировки по убыванию
-        except (ValueError, TypeError):
-            qty = 0
-        return (priority, qty)
-
-    out.sort(key=sort_key)
-    return out
+    return _sort_schedule_rows(out)
 
 
 def _optional_product_id(raw, valid_pids: set[int]) -> int | None:
@@ -407,7 +413,7 @@ def _machines_post_save(request):
         return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
     valid_pids = set(Product.objects.values_list("id", flat=True))
     mrows = _normalize_machine_rows(body.get("machine_rows"), valid_pids)
-    srows = _normalize_schedule_rows(body.get("schedule_rows"), valid_pids)
+    srows = _sort_schedule_rows(_normalize_schedule_rows(body.get("schedule_rows"), valid_pids))
     if not mrows:
         return JsonResponse({"ok": False, "error": "Нужна хотя бы одна строка станка."}, status=400)
     if not srows:

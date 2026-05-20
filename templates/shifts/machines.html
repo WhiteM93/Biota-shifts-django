@@ -145,12 +145,13 @@
               </select>
             </div>
           </div>
-          <div
-            class="machines-cell machines-cell--field machines-cell--notes{% if not row.extra %} is-empty{% endif %}"
-            data-placeholder="Примечание…"
-            aria-label="Примечание"
-          >{{ row.extra }}</div>
-          <button type="button" class="machines-quick-row-delete js-machines-quick-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
+          <div class="machines-cell machines-cell--field machines-cell--notes{% if not row.extra %} is-empty{% endif %}" aria-label="Примечание">
+            <div
+              class="machines-quick-notes-body"
+              data-placeholder="Примечание…"
+            >{{ row.extra }}</div>
+            <button type="button" class="machines-quick-row-delete js-machines-quick-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
+          </div>
         </div>
         {% endfor %}
       </div>
@@ -171,7 +172,7 @@
         {% endif %}
       </div>
       <div class="machines-schedule-header" aria-hidden="true">
-        <div>Приоритет</div>
+        <div title="Приоритет">Пр.</div>
         <div>Изделие</div>
         <div>Кол-во</div>
         <div>Цвет</div>
@@ -225,16 +226,18 @@
             aria-label="Количество"
           >{% if srow.qty %}{{ srow.qty }}{% endif %}</div>
           <div class="machines-cell machines-cell--schedule-color" aria-label="Цвет">
-            <button type="button"
-              class="machines-color-swatch-btn js-machines-color-trigger"
-              data-color="{{ srow.color|default:''|escape }}"
-              style="{% if srow.color %}background:{{ srow.color|escape }};{% endif %}"
-              aria-label="Выбрать цвет"
-              tabindex="-1"
-            ></button>
+            <div class="machines-schedule-color-actions">
+              <button type="button"
+                class="machines-color-swatch-btn js-machines-color-trigger"
+                data-color="{{ srow.color|default:''|escape }}"
+                style="{% if srow.color %}background:{{ srow.color|escape }};{% endif %}"
+                aria-label="Выбрать цвет"
+                tabindex="-1"
+              ></button>
+              <button type="button" class="machines-schedule-row-delete js-machines-schedule-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
+            </div>
           </div>
           <div class="machines-cell machines-cell--code machines-cell--schedule-code">{{ srow.machine_code }}</div>
-          <button type="button" class="machines-schedule-row-delete js-machines-schedule-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
         </div>
         {% endfor %}
       </div>
@@ -283,12 +286,10 @@
           </select>
         </div>
       </div>
-      <div
-        class="machines-cell machines-cell--field machines-cell--notes is-empty"
-        data-placeholder="Примечание…"
-        aria-label="Примечание"
-      ></div>
-      <button type="button" class="machines-quick-row-delete js-machines-quick-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
+      <div class="machines-cell machines-cell--field machines-cell--notes is-empty" aria-label="Примечание">
+        <div class="machines-quick-notes-body" data-placeholder="Примечание…"></div>
+        <button type="button" class="machines-quick-row-delete js-machines-quick-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
+      </div>
     </div>
   </template>
   <template id="machines-tpl-schedule-row">
@@ -326,10 +327,12 @@
       </div>
       <div class="machines-cell machines-cell--schedule-qty is-empty" data-placeholder="—" aria-label="Количество"></div>
       <div class="machines-cell machines-cell--schedule-color" aria-label="Цвет">
-        <button type="button" class="machines-color-swatch-btn js-machines-color-trigger" data-color="" aria-label="Выбрать цвет" tabindex="-1"></button>
+        <div class="machines-schedule-color-actions">
+          <button type="button" class="machines-color-swatch-btn js-machines-color-trigger" data-color="" aria-label="Выбрать цвет" tabindex="-1"></button>
+          <button type="button" class="machines-schedule-row-delete js-machines-schedule-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
+        </div>
       </div>
       <div class="machines-cell machines-cell--code machines-cell--schedule-code is-empty"></div>
-      <button type="button" class="machines-schedule-row-delete js-machines-schedule-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
     </div>
   </template>
   <div id="machines-quick-preview-pop" class="machines-quick-preview-pop" hidden aria-hidden="true">

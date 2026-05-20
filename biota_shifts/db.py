@@ -42,13 +42,29 @@ def _fallback_to_local_enabled() -> bool:
     return raw not in {"0", "false", "no", "off"}
 
 
+def _demo_data_enabled() -> bool:
+    """Демо-сотрудники для графика/регламентов без BIOTA_DB.
+
+    BIOTA_DEMO_DATA=1 — явно включить; =0 — явно выключить (пустой справочник).
+    По умолчанию при локальном fallback — включено.
+    """
+    raw = (_config_str("BIOTA_DEMO_DATA") or "").strip().lower()
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    return _fallback_to_local_enabled()
+
+
 def _on_biota_unavailable(exc: Exception):
     global _fallback_warned
     if _fallback_to_local_enabled():
         if not _fallback_warned:
             _fallback_warned = True
+            mode = "demo employees" if _demo_data_enabled() else "empty datasets"
             _log.warning(
-                "BIOTA_DB unavailable, using local fallback (empty datasets): %s",
+                "BIOTA_DB unavailable, using local fallback (%s): %s",
+                mode,
                 exc,
             )
         return
@@ -141,7 +157,7 @@ def load_employees(cfg: dict) -> pd.DataFrame:
         return _load_employees_uncached(_db_cache_key(cfg))
     except Exception as exc:
         _on_biota_unavailable(exc)
-        if (_config_str("BIOTA_DEMO_DATA") or "").strip().lower() in ("1", "true", "yes", "on"):
+        if _demo_data_enabled():
             return _demo_employees()
         return pd.DataFrame()
 

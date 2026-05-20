@@ -356,7 +356,7 @@ body {
   border-bottom: 1px solid var(--bio-nav-border);
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 100;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   transition:

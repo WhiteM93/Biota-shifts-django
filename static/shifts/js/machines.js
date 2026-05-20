@@ -33,11 +33,18 @@
     }
 
     function splitQuickProductLabel(t) {
-      var s = (t || "").replace(/\s+/g, " ").trim();
-      var sep = " - ";
-      var ix = s.indexOf(sep);
-      if (ix === -1) return { sku: s, title: "" };
-      return { sku: s.slice(0, ix).trim(), title: s.slice(ix + sep.length).trim() };
+      var s = sanitizeQuickProductText(t);
+      var m = s.match(/^(.+?)\s+[—–\-]\s+(.+)$/);
+      if (!m) return { sku: s, title: "" };
+      return { sku: m[1].trim(), title: m[2].trim() };
+    }
+
+    function sanitizeQuickProductText(t) {
+      var s = (t != null ? String(t) : "").replace(/\u200b/g, "").replace(/\s+/g, " ").trim();
+      // «кукуу — — — —» → «кукуu» после серии пустых разделителей
+      s = s.replace(/(?:\s+[—–\-]\s*)+$/, "").trim();
+      s = s.replace(/(\s+[—–\-]\s*){2,}/g, " - ");
+      return s;
     }
 
     function getQuickFieldFlatText(inner) {
@@ -52,6 +59,68 @@
         return b;
       }
       return (inner.textContent || "").replace(/\u200b/g, "").trim();
+    }
+
+    function ensureQuickNotesBody(notesCell) {
+      if (!notesCell || !notesCell.classList.contains("machines-cell--notes")) return null;
+      var body = notesCell.querySelector(":scope > .machines-quick-notes-body");
+      if (body) return body;
+      body = document.createElement("div");
+      body.className = "machines-quick-notes-body";
+      var placeholder = notesCell.getAttribute("data-placeholder");
+      if (placeholder) {
+        body.setAttribute("data-placeholder", placeholder);
+        notesCell.removeAttribute("data-placeholder");
+      }
+      var toMove = [];
+      Array.prototype.slice.call(notesCell.childNodes).forEach(function (node) {
+        if (node.nodeType === 1 && node.classList && node.classList.contains("machines-quick-row-delete")) return;
+        toMove.push(node);
+      });
+      toMove.forEach(function (node) {
+        notesCell.removeChild(node);
+        body.appendChild(node);
+      });
+      notesCell.insertBefore(body, notesCell.firstChild);
+      return body;
+    }
+
+    function readQuickNotesText(notesCell) {
+      if (!notesCell) return "";
+      ensureQuickNotesBody(notesCell);
+      var body = notesCell.querySelector(":scope > .machines-quick-notes-body");
+      var el = body || notesCell;
+      return (el.textContent || "").replace(/\u200b/g, "").trim();
+    }
+
+    function resolveQuickEditableCell(el) {
+      if (!el) return null;
+      if (el.closest(".machines-quick-notes-body")) {
+        return el.closest(".machines-cell--notes");
+      }
+      var inner = el.closest(".machines-quick-field-view[contenteditable='true']");
+      if (inner) {
+        return inner.closest(".machines-cell--field") || inner.closest(".machines-cell");
+      }
+      return el.closest(".machines-quick-row > .machines-cell[contenteditable='true']");
+    }
+
+    function quickFieldEditableInner(cell) {
+      if (!cell || !cell.classList.contains("machines-cell--field") || cell.classList.contains("machines-cell--notes")) {
+        return null;
+      }
+      return cell.querySelector(":scope > .machines-quick-field-and-setup > .machines-quick-field-view");
+    }
+
+    function isQuickEditableCellActive(cell) {
+      if (!cell) return false;
+      if (cell.classList.contains("machines-cell--notes")) {
+        var notesBody = cell.querySelector(":scope > .machines-quick-notes-body");
+        return !!(notesBody && notesBody.getAttribute("contenteditable") === "true");
+      }
+      var inner = quickFieldEditableInner(cell);
+      if (inner) return inner.getAttribute("contenteditable") === "true";
+      return cell.getAttribute("contenteditable") === "true";
     }
 
     function fillQuickFieldViewTwoParts(inner, t) {
@@ -78,9 +147,8 @@
 
     function collapseQuickFieldViewForEdit(inner) {
       if (!inner || !inner.classList.contains("machines-quick-field-view")) return;
-      var flat = getQuickFieldFlatText(inner);
+      var flat = sanitizeQuickProductText(getQuickFieldFlatText(inner));
       inner.classList.remove("is-split");
-      // Полностью очищаем вложенные элементы, оставляя только текст
       while (inner.firstChild) {
         inner.removeChild(inner.firstChild);
       }
@@ -110,7 +178,7 @@
           code: (cells[0].textContent || "").trim(),
           current: readQuickProductSlotPlainText(cells[1]),
           next: readQuickProductSlotPlainText(cells[2]),
-          extra: (cells[3].textContent || "").trim(),
+          extra: readQuickNotesText(cells[3]),
           tag: "Т",
           current_product_id: curPid,
           next_product_id: nextPid,
@@ -866,8 +934,39 @@
 
     // ─── Цветовой пикер ──────────────────────────────────────────────
 
-    function buildColorPickerPop() {
+    function ensureColorPickerPopInBody() {
       var pop = document.getElementById("machines-color-picker-pop");
+      if (pop && pop.parentNode !== document.body) {
+        document.body.appendChild(pop);
+      }
+      return pop;
+    }
+
+    function bindColorPickerPopEvents() {
+      var pop = ensureColorPickerPopInBody();
+      if (!pop || pop.dataset.eventsBound) return;
+      pop.dataset.eventsBound = "1";
+      pop.addEventListener("mouseover", function (e) {
+        var pick = e.target.closest(".js-machines-color-pick");
+        if (!pick || !colorPickerTarget) return;
+        var row = colorPickerTarget.closest(".machines-schedule-row");
+        if (row) {
+          applyColorToRow(row, pick.dataset.color || "");
+          syncScheduleColorsToQuickRows();
+        }
+      });
+      pop.addEventListener("mouseleave", function () {
+        if (!colorPickerTarget) return;
+        var row = colorPickerTarget.closest(".machines-schedule-row");
+        if (row) {
+          applyColorToRow(row, colorPickerTarget.dataset.color || "");
+          syncScheduleColorsToQuickRows();
+        }
+      });
+    }
+
+    function buildColorPickerPop() {
+      var pop = ensureColorPickerPopInBody();
       if (!pop || pop.dataset.built) return;
       pop.dataset.built = "1";
       var clearRow = document.createElement("div");
@@ -895,27 +994,35 @@
       }
       pop.appendChild(row1);
       pop.appendChild(row2);
+      bindColorPickerPopEvents();
     }
 
     function openColorPicker(triggerBtn) {
       buildColorPickerPop();
-      var pop = document.getElementById("machines-color-picker-pop");
-      if (!pop) return;
+      var pop = ensureColorPickerPopInBody();
+      if (!pop || !triggerBtn) return;
       colorPickerTarget = triggerBtn;
       pop.hidden = false;
-      var rect = triggerBtn.getBoundingClientRect();
-      var popW = pop.offsetWidth || 200;
-      var popH = pop.offsetHeight || 90;
-      var top = rect.bottom + 4;
-      var left = rect.left;
-      if (left + popW > window.innerWidth - 8) left = rect.right - popW;
-      if (top + popH > window.innerHeight - 8) top = rect.top - popH - 4;
-      if (left < 4) left = 4;
-      pop.style.top = top + "px";
-      pop.style.left = left + "px";
-      var cur = (triggerBtn.dataset.color || "").toLowerCase();
-      pop.querySelectorAll(".js-machines-color-pick").forEach(function (b) {
-        b.classList.toggle("is-selected", (b.dataset.color || "").toLowerCase() === cur);
+      pop.style.visibility = "hidden";
+      pop.style.top = "0px";
+      pop.style.left = "0px";
+      requestAnimationFrame(function () {
+        if (!colorPickerTarget || pop.hidden) return;
+        var rect = colorPickerTarget.getBoundingClientRect();
+        var popW = pop.offsetWidth || 200;
+        var popH = pop.offsetHeight || 90;
+        var top = rect.bottom + 4;
+        var left = rect.left;
+        if (left + popW > window.innerWidth - 8) left = rect.right - popW;
+        if (top + popH > window.innerHeight - 8) top = rect.top - popH - 4;
+        if (left < 4) left = 4;
+        pop.style.top = top + "px";
+        pop.style.left = left + "px";
+        pop.style.visibility = "";
+        var cur = (colorPickerTarget.dataset.color || "").toLowerCase();
+        pop.querySelectorAll(".js-machines-color-pick").forEach(function (b) {
+          b.classList.toggle("is-selected", (b.dataset.color || "").toLowerCase() === cur);
+        });
       });
     }
 
@@ -923,6 +1030,11 @@
       var pop = document.getElementById("machines-color-picker-pop");
       if (pop) pop.hidden = true;
       colorPickerTarget = null;
+    }
+
+    function persistScheduleColorChange() {
+      saveScheduleClientRows();
+      syncScheduleColorsToQuickRows();
     }
 
     function applyColorToRow(row, color) {
@@ -965,6 +1077,64 @@
             cell.removeAttribute("data-product-color");
           }
         });
+      });
+    }
+
+    function normalizeScheduleSortCell(cell) {
+      if (!cell) return;
+      var t = (cell.textContent || "").replace(/\u200b/g, "").trim();
+      cell.textContent = t;
+      if (t) cell.classList.remove("is-empty");
+      else cell.classList.add("is-empty");
+    }
+
+    function parseSchedulePriorityValue(text) {
+      var t = (text || "").trim();
+      if (!t) return Number.POSITIVE_INFINITY;
+      var n = parseInt(t, 10);
+      return isNaN(n) ? Number.POSITIVE_INFINITY : n;
+    }
+
+    function parseScheduleQtyValue(text) {
+      var t = (text || "").trim();
+      if (!t) return 0;
+      var n = parseInt(t, 10);
+      return isNaN(n) ? 0 : n;
+    }
+
+    function prepareScheduleRowsForSave() {
+      if (!scheduleWrap) return;
+      var ae = document.activeElement;
+      if (ae && scheduleWrap.contains(ae)) {
+        var activeSortCell = ae.closest(".machines-cell--schedule-priority, .machines-cell--schedule-qty");
+        if (activeSortCell) {
+          normalizeScheduleSortCell(activeSortCell);
+          try {
+            ae.blur();
+          } catch (eBlurSort) {}
+        }
+      }
+      scheduleWrap.querySelectorAll(".machines-cell--schedule-priority, .machines-cell--schedule-qty").forEach(function (cell) {
+        normalizeScheduleSortCell(cell);
+      });
+      sortScheduleRowsByPriorityQty();
+    }
+
+    function sortScheduleRowsByPriorityQty() {
+      if (!scheduleWrap) return;
+      var rows = Array.prototype.slice.call(scheduleWrap.querySelectorAll(".machines-schedule-row"));
+      rows.sort(function (a, b) {
+        var priA = a.querySelector(".machines-cell--schedule-priority");
+        var priB = b.querySelector(".machines-cell--schedule-priority");
+        var pa = parseSchedulePriorityValue(priA ? priA.textContent : "");
+        var pb = parseSchedulePriorityValue(priB ? priB.textContent : "");
+        if (pa !== pb) return pa - pb;
+        var qtyA = a.querySelector(".machines-cell--schedule-qty");
+        var qtyB = b.querySelector(".machines-cell--schedule-qty");
+        return parseScheduleQtyValue(qtyB ? qtyB.textContent : "") - parseScheduleQtyValue(qtyA ? qtyA.textContent : "");
+      });
+      rows.forEach(function (row) {
+        scheduleWrap.appendChild(row);
       });
     }
 
@@ -1066,14 +1236,20 @@
     }
 
     function normalizeQuickEditableCell(cell) {
-      if (!cell || cell.getAttribute("contenteditable") !== "true") return;
+      if (!cell) return;
+      var isNotes = cell.classList.contains("machines-cell--notes");
+      if (!isNotes && !isQuickEditableCellActive(cell)) return;
       ensureQuickProductViewSpan(cell);
-      var inner = cell.querySelector(".machines-quick-field-view");
+      var inner = quickFieldEditableInner(cell) || cell.querySelector(".machines-quick-field-view");
       var raw;
       if (cell.classList.contains("machines-cell--notes")) {
-        raw = (cell.textContent || "").replace(/\u200b/g, "");
-      } else if (inner && !cell.classList.contains("machines-cell--notes")) {
-        raw = getQuickFieldFlatText(inner).replace(/\u200b/g, "");
+        ensureQuickNotesBody(cell);
+        var notesBodyNorm = cell.querySelector(":scope > .machines-quick-notes-body");
+        raw = notesBodyNorm
+          ? (notesBodyNorm.textContent || "").replace(/\u200b/g, "")
+          : (cell.textContent || "").replace(/\u200b/g, "");
+      } else if (inner && cell.classList.contains("machines-cell--field")) {
+        raw = sanitizeQuickProductText(getQuickFieldFlatText(inner)).replace(/\u200b/g, "");
       } else {
         raw = (cell.textContent || "").replace(/\u200b/g, "");
       }
@@ -1081,13 +1257,17 @@
       if (cell.classList.contains("machines-cell--notes")) {
         t = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
       } else {
-        t = raw.replace(/\r\n|\r|\n/g, " ").trim();
+        t = sanitizeQuickProductText(raw.replace(/\r\n|\r|\n/g, " ").trim());
         if (cell.classList.contains("machines-cell--code")) {
           t = t.replace(/\s+/g, " ");
         }
       }
       if (inner && !cell.classList.contains("machines-cell--notes")) {
         fillQuickFieldViewTwoParts(inner, t);
+      } else if (cell.classList.contains("machines-cell--notes")) {
+        var notesBodySet = cell.querySelector(":scope > .machines-quick-notes-body");
+        if (notesBodySet) notesBodySet.textContent = t;
+        else cell.textContent = t;
       } else {
         cell.textContent = t;
       }
@@ -1097,18 +1277,39 @@
 
     function syncQuickEditability(on) {
       quickWrap.querySelectorAll(".machines-quick-row > .machines-cell").forEach(function (cell) {
+        if (cell.classList.contains("machines-cell--notes")) {
+          var notesBody = ensureQuickNotesBody(cell);
+          cell.removeAttribute("contenteditable");
+          cell.removeAttribute("spellcheck");
+          if (on && notesBody) {
+            notesBody.setAttribute("contenteditable", "true");
+            notesBody.setAttribute("spellcheck", "false");
+          } else {
+            if (!on) normalizeQuickEditableCell(cell);
+            if (notesBody) {
+              notesBody.removeAttribute("contenteditable");
+              notesBody.removeAttribute("spellcheck");
+            }
+          }
+          return;
+        }
         if (on) {
-          cell.setAttribute("contenteditable", "true");
-          cell.setAttribute("spellcheck", "false");
           if (cell.classList.contains("machines-cell--field") && !cell.classList.contains("machines-cell--notes")) {
-            var innerOn = cell.querySelector(".machines-quick-field-view");
+            cell.removeAttribute("contenteditable");
+            cell.removeAttribute("spellcheck");
+            var innerOn = quickFieldEditableInner(cell) || cell.querySelector(".machines-quick-field-view");
             if (innerOn) {
               collapseQuickFieldViewForEdit(innerOn);
             }
-            // Защищаем select и его обёртку от contenteditable
             var andSetup = cell.querySelector(".machines-quick-field-and-setup");
             if (andSetup) andSetup.setAttribute("contenteditable", "false");
-            if (innerOn) innerOn.setAttribute("contenteditable", "true");
+            if (innerOn) {
+              innerOn.setAttribute("contenteditable", "true");
+              innerOn.setAttribute("spellcheck", "false");
+            }
+          } else {
+            cell.setAttribute("contenteditable", "true");
+            cell.setAttribute("spellcheck", "false");
           }
         } else {
           normalizeQuickEditableCell(cell);
@@ -1176,7 +1377,7 @@
           c: (cells[0].textContent || "").trim(),
           n: readQuickProductSlotPlainText(cells[1]),
           e: readQuickProductSlotPlainText(cells[2]),
-          x: (cells[3].textContent || "").trim(),
+          x: readQuickNotesText(cells[3]),
           t: "Т",
           cp: readQuickFieldProductPidAttr(cells[1]),
           ep: readQuickFieldProductPidAttr(cells[2]),
@@ -1212,9 +1413,12 @@
     }
 
     async function setEditMode(on) {
-      if (!on && canQuickEdit) {
-        var okSave = await postMachinesBoardToServer();
-        if (!okSave) return;
+      if (!on) {
+        prepareScheduleRowsForSave();
+        if (canQuickEdit) {
+          var okSave = await postMachinesBoardToServer();
+          if (!okSave) return;
+        }
       }
       root.setAttribute("data-inline-edit-mode", on ? "1" : "0");
       if (on) {
@@ -1278,16 +1482,29 @@
     quickWrap.addEventListener("click", function (e) {
       var btn = e.target.closest(".js-machines-quick-row-delete");
       if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
+      e.stopPropagation();
       var row = btn.closest(".machines-quick-row");
       if (!row) return;
       row.remove();
-      scheduleSave();
+      saveQuickClientRows();
+    });
+
+    quickWrap.addEventListener("click", function (e) {
+      var btn = e.target.closest(".js-machines-cell-clear");
+      if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
+      var cell = btn.closest(".machines-cell--field");
+      if (!cell) return;
+      setQuickCellText(cell, "");
+      clearQuickFieldProductRef(cell);
+      syncQuickFieldSetupSelect(cell);
+      syncScheduleCodeVisibility();
     });
 
     scheduleWrap.addEventListener("click", function (e) {
       // Удаление строки
       var delBtn = e.target.closest(".js-machines-schedule-row-delete");
       if (delBtn && root.getAttribute("data-inline-edit-mode") === "1") {
+        e.stopPropagation();
         var row = delBtn.closest(".machines-schedule-row");
         if (row) {
           var labelCell = row.querySelector(".machines-cell--schedule-label");
@@ -1297,17 +1514,44 @@
           }
           row.remove();
           saveScheduleClientRows();
+          syncScheduleColorsToQuickRows();
         }
         return;
       }
       // Открытие цветового пикера
       var colorTrigger = e.target.closest(".js-machines-color-trigger");
       if (colorTrigger && root.getAttribute("data-inline-edit-mode") === "1") {
-        if (colorPickerTarget === colorTrigger) { closeColorPicker(); return; }
+        e.preventDefault();
+        e.stopPropagation();
+        if (colorPickerTarget === colorTrigger) {
+          var popEl = document.getElementById("machines-color-picker-pop");
+          if (popEl && !popEl.hidden) {
+            closeColorPicker();
+            return;
+          }
+        }
         openColorPicker(colorTrigger);
         return;
       }
     });
+
+    scheduleWrap.addEventListener("pointerdown", function (e) {
+      var colorTrigger = e.target.closest(".js-machines-color-trigger");
+      if (!colorTrigger || root.getAttribute("data-inline-edit-mode") !== "1") return;
+      if (e.target.closest(".js-machines-schedule-row-delete")) return;
+      e.stopPropagation();
+    });
+
+    scheduleWrap.addEventListener(
+      "blur",
+      function (e) {
+        var cell = e.target.closest(".machines-cell--schedule-priority, .machines-cell--schedule-qty");
+        if (!cell || !scheduleWrap.contains(cell)) return;
+        normalizeScheduleSortCell(cell);
+        saveScheduleClientRows();
+      },
+      true
+    );
 
     // Выбор цвета из пикера
     document.addEventListener("mousedown", function (e) {
@@ -1319,7 +1563,10 @@
         var color = pick.dataset.color || "";
         if (colorPickerTarget) {
           var row = colorPickerTarget.closest(".machines-schedule-row");
-          if (row) { applyColorToRow(row, color); syncScheduleColorsToQuickRows(); scheduleSave(); }
+          if (row) {
+            applyColorToRow(row, color);
+            persistScheduleColorChange();
+          }
         }
         closeColorPicker();
         return;
@@ -1744,6 +1991,14 @@
     function setQuickCellText(cell, text, opts) {
       opts = opts || {};
       var t = (text != null ? String(text) : "").trim();
+      if (cell.classList.contains("machines-cell--notes")) {
+        ensureQuickNotesBody(cell);
+        var notesBody = cell.querySelector(":scope > .machines-quick-notes-body");
+        if (notesBody) notesBody.textContent = t;
+        if (t) cell.classList.remove("is-empty");
+        else cell.classList.add("is-empty");
+        return;
+      }
       ensureQuickProductViewSpan(cell);
       var inner = cell.querySelector(".machines-quick-field-view");
       if (inner) {
@@ -1774,7 +2029,7 @@
     }
 
     quickWrap.addEventListener("focusin", function (e) {
-      var cell = e.target.closest(".machines-quick-row > .machines-cell[contenteditable='true']");
+      var cell = resolveQuickEditableCell(e.target);
       if (!cell || root.getAttribute("data-inline-edit-mode") !== "1") return;
       var inner = cell.querySelector(".machines-quick-field-view");
       if (inner && !cell.classList.contains("machines-cell--notes")) {
@@ -1783,8 +2038,11 @@
         }
         return;
       }
-      if ((cell.textContent || "").replace(/\u200b/g, "").length === 0 && cell.childNodes.length === 0) {
-        cell.appendChild(document.createTextNode("\u200b"));
+      if (cell.classList.contains("machines-cell--notes")) {
+        var notesBodyFocus = cell.querySelector(":scope > .machines-quick-notes-body") || cell;
+        if ((notesBodyFocus.textContent || "").replace(/\u200b/g, "").length === 0 && notesBodyFocus.childNodes.length === 0) {
+          notesBodyFocus.appendChild(document.createTextNode("\u200b"));
+        }
       }
     });
 
@@ -1802,7 +2060,7 @@
     quickWrap.addEventListener(
       "blur",
       function (e) {
-        var cell = e.target.closest(".machines-quick-row > .machines-cell[contenteditable='true']");
+        var cell = resolveQuickEditableCell(e.target);
         if (!cell || !quickWrap.contains(cell)) return;
         normalizeQuickEditableCell(cell);
         syncQuickFieldProductRefAfterBlur(cell);
@@ -1819,31 +2077,32 @@
     );
 
     quickWrap.addEventListener("input", function (e) {
-      var cell = e.target.closest(".machines-quick-row > .machines-cell[contenteditable='true']");
+      var cell = resolveQuickEditableCell(e.target);
       if (!cell || root.getAttribute("data-inline-edit-mode") !== "1") return;
       if (cell.classList.contains("machines-cell--notes")) {
-        var nraw = cell.textContent || "";
+        var notesBodyInput = cell.querySelector(":scope > .machines-quick-notes-body") || cell;
+        var nraw = notesBodyInput.textContent || "";
         if (nraw.indexOf("\r") !== -1) {
-          cell.textContent = nraw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+          notesBodyInput.textContent = nraw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
         }
-        var vis = (cell.textContent || "").replace(/\u200b/g, "").trim();
+        var vis = (notesBodyInput.textContent || "").replace(/\u200b/g, "").trim();
         if (vis) cell.classList.remove("is-empty");
         else cell.classList.add("is-empty");
         return;
       }
-      var raw = cell.textContent || "";
+      var innerInput = quickFieldEditableInner(cell) || cell.querySelector(".machines-quick-field-view");
+      var raw = innerInput ? innerInput.textContent || "" : cell.textContent || "";
       if (raw.indexOf("\n") === -1 && raw.indexOf("\r") === -1) return;
-      var t = raw.replace(/\r\n|\r|\n/g, " ");
-      var inner = cell.querySelector(".machines-quick-field-view");
-      if (inner && !cell.classList.contains("machines-cell--notes")) {
-        if (t !== raw) inner.textContent = t;
-      } else if (t !== raw) {
+      var t = sanitizeQuickProductText(raw.replace(/\r\n|\r|\n/g, " "));
+      if (innerInput) {
+        if (t !== raw.replace(/\r\n|\r|\n/g, " ")) innerInput.textContent = t;
+      } else if (t !== raw.replace(/\r\n|\r|\n/g, " ")) {
         cell.textContent = t;
       }
     });
 
     quickWrap.addEventListener("paste", function (e) {
-      var cell = e.target.closest(".machines-quick-row > .machines-cell[contenteditable='true']");
+      var cell = resolveQuickEditableCell(e.target);
       if (!cell || root.getAttribute("data-inline-edit-mode") !== "1") return;
       e.preventDefault();
       var text = (e.clipboardData && e.clipboardData.getData("text/plain")) || "";
@@ -1859,7 +2118,8 @@
         if (inner && !cell.classList.contains("machines-cell--notes")) {
           inner.textContent = ((inner.textContent || "") + text).replace(/\r\n|\r|\n/g, " ");
         } else {
-          cell.textContent = ((cell.textContent || "") + text).replace(/\r\n|\r|\n/g, " ");
+          var notesBodyPaste = cell.querySelector(":scope > .machines-quick-notes-body") || cell;
+          notesBodyPaste.textContent = ((notesBodyPaste.textContent || "") + text).replace(/\r\n|\r|\n/g, " ");
         }
       }
     });
@@ -1873,7 +2133,7 @@
           c: (cells[0].textContent || "").trim(),
           n: readQuickProductSlotPlainText(cells[1]),
           e: readQuickProductSlotPlainText(cells[2]),
-          x: (cells[3].textContent || "").trim(),
+          x: readQuickNotesText(cells[3]),
           t: "Т",
           cp: readQuickFieldProductPidAttr(cells[1]),
           ep: readQuickFieldProductPidAttr(cells[2]),
@@ -1996,12 +2256,7 @@
       if (!tpl) return;
       var row = tpl.cloneNode(true);
       quickWrap.appendChild(row);
-      if (root.getAttribute("data-inline-edit-mode") === "1") {
-        row.querySelectorAll(":scope > .machines-cell").forEach(function (cell) {
-          cell.setAttribute("contenteditable", "true");
-          cell.setAttribute("spellcheck", "false");
-        });
-      }
+      syncQuickEditability(root.getAttribute("data-inline-edit-mode") === "1");
       saveQuickClientRows();
       pushPageHistory("Добавлена новая строка станка (пустая).");
     }
@@ -2053,9 +2308,21 @@
     }
     // Trim whitespace from server-rendered notes cells
     quickWrap && quickWrap.querySelectorAll(".machines-cell--notes").forEach(function (cell) {
-      var t = (cell.textContent || "").trim();
-      if (cell.textContent !== t) cell.textContent = t;
-      if (t) cell.classList.remove("is-empty"); else cell.classList.add("is-empty");
+      ensureQuickNotesBody(cell);
+      var t = readQuickNotesText(cell);
+      var body = cell.querySelector(":scope > .machines-quick-notes-body");
+      if (body && body.textContent !== t) body.textContent = t;
+      if (t) cell.classList.remove("is-empty");
+      else cell.classList.add("is-empty");
+    });
+    quickWrap && quickWrap.querySelectorAll(".machines-quick-field-view").forEach(function (inner) {
+      var t = sanitizeQuickProductText(getQuickFieldFlatText(inner));
+      fillQuickFieldViewTwoParts(inner, t);
+      var fieldCell = inner.closest(".machines-cell--field");
+      if (fieldCell) {
+        if (t) fieldCell.classList.remove("is-empty");
+        else fieldCell.classList.add("is-empty");
+      }
     });
     root.querySelectorAll(".machines-cell--schedule-label").forEach(syncProductComboDisplay);
     syncMachineCodeAppearance();
@@ -2068,4 +2335,5 @@
       if (triggerBtn && triggerBtn.dataset.color) applyColorToRow(row, triggerBtn.dataset.color);
     });
     syncScheduleColorsToQuickRows();
+    sortScheduleRowsByPriorityQty();
   })();
