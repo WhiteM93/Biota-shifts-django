@@ -612,11 +612,9 @@ var PD = (function () {
       var wpv = wp ? wp.value : "";
       var showMade = ptype === "made";
       var showLaser = showMade && wpv === "laser";
-      var showMadeNonLaser = showMade && wpv && wpv !== "laser";
       wrap.classList.toggle("plan-summary-editing-workpiece", showMade);
-      wrap.classList.toggle("plan-summary-editing-laser-material", showLaser);
       wrap.classList.toggle("plan-summary-editing-laser-thick", showLaser);
-      wrap.classList.toggle("plan-summary-editing-made-material", showMadeNonLaser);
+      wrap.classList.toggle("plan-summary-editing-material", showMade && !!wpv);
     }
 
     function applyPlanInlineStateToQuickEdits(state) {
@@ -630,10 +628,8 @@ var PD = (function () {
         if (wp) wp.value = state.workpiece_type || "";
         var thick = pr.querySelector(".js-product-plan-laser-thick");
         if (thick) thick.value = state.laser_sheet_thickness_mm || "";
-        var mark = pr.querySelector(".js-product-plan-laser-mark");
-        if (mark) mark.value = state.laser_material_marking || "";
-        var made = pr.querySelector(".js-product-plan-made-material");
-        if (made) made.value = state.made_material || "";
+        var mat = pr.querySelector(".js-product-plan-made-material, .js-product-plan-laser-mark, .js-plan-inline-material");
+        if (mat) mat.value = state.plan_material || state.made_material || state.laser_material_marking || "";
         var wrap = pr.querySelector("[data-workpiece-laser-wrap]");
         var laser = pr.querySelector("[data-laser-panel]");
         var madePanel = pr.querySelector("[data-made-material-panel]");
@@ -655,10 +651,8 @@ var PD = (function () {
         if (wp) wp.value = state.workpiece_type || "";
         var thick = wrap.querySelector(".js-plan-inline-laser-thick");
         if (thick) thick.value = state.laser_sheet_thickness_mm || "";
-        var mark = wrap.querySelector(".js-plan-inline-laser-mark");
-        if (mark) mark.value = state.laser_material_marking || "";
-        var made = wrap.querySelector(".js-plan-inline-made-material");
-        if (made) made.value = state.made_material || "";
+        var mat = wrap.querySelector(".js-plan-inline-material");
+        if (mat) mat.value = state.plan_material || state.made_material || state.laser_material_marking || "";
         syncSetupPlanInlineVisibility(wrap);
       });
     }
@@ -1288,6 +1282,11 @@ var PD = (function () {
       wrap.querySelectorAll("[data-field-text]").forEach(function (node) {
         var field = node.getAttribute("data-field-text") || "";
         if (!field || field === "setup_notes") return;
+        if (field === "product_description") {
+          var emptyLabel = (node.getAttribute("data-empty-label") || "Описание не задано.").trim();
+          if (isInlineMode && (node.textContent || "").trim() === emptyLabel) node.textContent = "";
+          if (!isInlineMode && !(node.textContent || "").trim()) node.textContent = emptyLabel;
+        }
         if (isInlineMode) {
           node.removeAttribute("title");
           return;
@@ -1350,10 +1349,18 @@ var PD = (function () {
           if (inlineEditMode) {
             node.classList.add("is-inline-edit");
             node.setAttribute("contenteditable", "true");
-            node.setAttribute("spellcheck", field === "setup_notes" ? "true" : "false");
+            node.setAttribute("spellcheck", field === "setup_notes" || field === "product_description" ? "true" : "false");
+            if (field === "product_description") {
+              var emptyLbl = (node.getAttribute("data-empty-label") || "Описание не задано.").trim();
+              if ((node.textContent || "").trim() === emptyLbl) node.textContent = "";
+            }
           } else {
             node.classList.remove("is-inline-edit");
             node.removeAttribute("contenteditable");
+            if (field === "product_description") {
+              var emptyLbl2 = (node.getAttribute("data-empty-label") || "Описание не задано.").trim();
+              if (!(node.textContent || "").trim()) node.textContent = emptyLbl2;
+            }
           }
         });
         if (!isDrawingPanel) {
@@ -1609,10 +1616,11 @@ var PD = (function () {
       payload.append("workpiece_type", wpVal);
       var thickIn = planWrap.querySelector(".js-plan-inline-laser-thick");
       payload.append("laser_sheet_thickness_mm", thickIn ? (thickIn.value || "").trim() : "");
-      var markIn = planWrap.querySelector(".js-plan-inline-laser-mark");
-      payload.append("laser_material_marking", markIn ? (markIn.value || "").trim() : "");
-      var madeIn = planWrap.querySelector(".js-plan-inline-made-material");
-      payload.append("made_material", madeIn ? (madeIn.value || "").trim() : "");
+      var matIn = planWrap.querySelector(".js-plan-inline-material");
+      var matVal = matIn ? (matIn.value || "").trim() : "";
+      payload.append("plan_material", matVal);
+      payload.append("made_material", matVal);
+      payload.append("laser_material_marking", matVal);
     }
 
     function fillBindingSpecBoxFromData(box, blk) {
@@ -1682,8 +1690,29 @@ var PD = (function () {
       syncSpecDnDMode(panelSetup, inlineOn);
     }
 
+    function applyProductMetaToDom(productData) {
+      if (!productData) return;
+      if (Object.prototype.hasOwnProperty.call(productData, "name")) {
+        var nameVal = (productData.name || "").trim();
+        root.querySelectorAll('[data-field-text="product_name"]').forEach(function (el) {
+          el.textContent = nameVal || "—";
+        });
+        var sideName = document.getElementById("product-side-name");
+        if (sideName) sideName.textContent = nameVal || "—";
+      }
+      if (Object.prototype.hasOwnProperty.call(productData, "description")) {
+        var descEl = root.querySelector('[data-field-text="product_description"]');
+        if (descEl) {
+          var emptyLabel = (descEl.getAttribute("data-empty-label") || "Описание не задано.").trim();
+          var descVal = (productData.description || "").trim();
+          descEl.textContent = descVal || emptyLabel;
+        }
+      }
+    }
+
     function applyInlineUpdateResponseToDom(setupId, data) {
       if (!data || !data.setup) return;
+      if (data.product) applyProductMetaToDom(data.product);
       if (data.product_drawing) {
         var pd = data.product_drawing;
         var pds = root.querySelector("#plan-product-drawing-blank-size");
@@ -1797,6 +1826,14 @@ var PD = (function () {
       }
       if (includePlan) {
         appendPlanFieldsToPayload(payload, root.querySelector("#panel-drawing [data-product-plan-summary]"));
+        var pnameEl = root.querySelector('[data-field-text="product_name"]');
+        if (pnameEl) payload.append("product_name", (pnameEl.textContent || "").replace(/\s+/g, " ").trim());
+        var pdescEl = root.querySelector('[data-field-text="product_description"]');
+        if (pdescEl) {
+          var emptyLabel = (pdescEl.getAttribute("data-empty-label") || "Описание не задано.").trim();
+          var descRaw = (pdescEl.textContent || "").trim();
+          payload.append("product_description", descRaw === emptyLabel ? "" : descRaw);
+        }
       }
       return payload;
     }
@@ -1976,6 +2013,17 @@ var PD = (function () {
       true
     );
     }
+
+    (function maybeOpenQuickEditFromUrl() {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        if (params.get("quick_edit") !== "1" || !editToggleBtn || inlineEditMode) return;
+        toggleInlineEdit();
+        params.delete("quick_edit");
+        var qs = params.toString();
+        window.history.replaceState({}, "", window.location.pathname + (qs ? "?" + qs : ""));
+      } catch (_e) {}
+    })();
 
     root.addEventListener("click", function (e) {
       var el = e.target;

@@ -46,24 +46,52 @@ def parse_laser_sheet_thickness_mm(raw: str | None) -> tuple[Decimal | None, str
 
 
 def laser_material_marking_suggestions() -> list[str]:
-    rows = (
-        PlannedProduct.objects.filter(workpiece_type="laser")
-        .exclude(laser_material_marking="")
-        .order_by("id")
-        .values_list("laser_material_marking", flat=True)
-    )
+    """Обратная совместимость — см. plan_material_suggestions()."""
+    return plan_material_suggestions()
+
+
+def plan_material_suggestions() -> list[str]:
+    """Уникальные материалы из плана (лазер) и наладок (setup.material)."""
     seen: set[str] = set()
     out: list[str] = []
-    for raw in rows:
+
+    def add(raw: str) -> None:
         s = (raw or "").strip()
         if not s:
-            continue
+            return
         key = s.casefold()
         if key in seen:
-            continue
+            return
         seen.add(key)
         out.append(s)
+
+    for raw in (
+        PlannedProduct.objects.exclude(laser_material_marking="")
+        .order_by("id")
+        .values_list("laser_material_marking", flat=True)
+    ):
+        add(str(raw))
+    for raw in (
+        ProductSetup.objects.exclude(material="")
+        .order_by("id")
+        .values_list("material", flat=True)
+    ):
+        add(str(raw))
     return out
+
+
+def _plan_material_value(product: Product | None, plan_piece: PlannedProduct | None) -> str:
+    if plan_piece and (plan_piece.workpiece_type or "").strip() == "laser":
+        return (plan_piece.laser_material_marking or "").strip()
+    return _first_setup_material(product)
+
+
+def _plan_material_from_post(post: Any) -> str:
+    for key in ("plan_material", "made_material", "laser_material_marking"):
+        val = (post.get(key) or "").strip()
+        if val:
+            return val[:180]
+    return ""
 
 
 def validate_product_plan_post(post: Any) -> str | None:
@@ -77,8 +105,8 @@ def validate_product_plan_post(post: Any) -> str | None:
             _, terr = parse_laser_sheet_thickness_mm(post.get("laser_sheet_thickness_mm"))
             if terr:
                 return terr
-            if not (post.get("laser_material_marking") or "").strip():
-                return "Укажите маркировку материала для лазерной заготовки."
+            if not _plan_material_from_post(post):
+                return "Укажите материал для лазерной заготовки."
     return None
 
 
@@ -110,8 +138,9 @@ def plan_inline_state_payload(product: Product | None) -> dict[str, str]:
         "plan_product_type": ctx.get("plan_product_type") or "made",
         "workpiece_type": ctx.get("plan_workpiece_type_value") or "",
         "laser_sheet_thickness_mm": ctx.get("plan_laser_sheet_thickness_value") or "",
-        "laser_material_marking": ctx.get("plan_laser_material_marking_value") or "",
-        "made_material": ctx.get("plan_made_material_value") or "",
+        "plan_material": ctx.get("plan_material_value") or "",
+        "made_material": ctx.get("plan_material_value") or "",
+        "laser_material_marking": ctx.get("plan_material_value") or "",
     }
 
 
@@ -188,7 +217,7 @@ def plan_form_context(product: Product | None) -> dict[str, Any]:
                 s = format(d, "f").rstrip("0").rstrip(".")
                 laser_sheet_thickness_value = s if s else "0"
             laser_material_marking_value = (plan_piece.laser_material_marking or "").strip()
-    plan_made_material_value = _first_setup_material(product) if product is not None and getattr(product, "pk", None) else ""
+    plan_made_material_value = _plan_material_value(product, plan_piece)
     card = plan_card_summary(plan_piece, product)
     return {
         "plan_piece": plan_piece,
@@ -196,9 +225,11 @@ def plan_form_context(product: Product | None) -> dict[str, Any]:
         "plan_workpiece_type_value": workpiece_type_value,
         "plan_workpiece_type_choices": PLANNED_PRODUCT_WORKPIECE_TYPE_CHOICES,
         "plan_laser_sheet_thickness_value": laser_sheet_thickness_value,
-        "plan_laser_material_marking_value": laser_material_marking_value,
+        "plan_laser_material_marking_value": (plan_piece.laser_material_marking or "").strip() if plan_piece else "",
         "plan_made_material_value": plan_made_material_value,
-        "plan_laser_material_marking_suggestions": laser_material_marking_suggestions(),
+        "plan_material_value": plan_made_material_value,
+        "plan_laser_material_marking_suggestions": plan_material_suggestions(),
+        "plan_material_suggestions": plan_material_suggestions(),
         "plan_display_type_line": card["type_line"],
         "plan_display_product_kind_line": card["product_kind_line"],
         "plan_display_workpiece_line": card["workpiece_line"],
@@ -240,12 +271,13 @@ def apply_product_plan_post(product: Product, post: Any) -> str | None:
         if t == "made":
             wp = (post.get("workpiece_type") or "").strip()
             pp.workpiece_type = wp
+            plan_mat = _plan_material_from_post(post)
             if wp == "laser":
                 thick, _ = parse_laser_sheet_thickness_mm(post.get("laser_sheet_thickness_mm"))
                 if thick is None:
                     return "Укажите толщину листа, мм."
                 pp.laser_sheet_thickness_mm = thick
-                pp.laser_material_marking = (post.get("laser_material_marking") or "").strip()
+                pp.laser_material_marking = plan_mat
             else:
                 pp.laser_sheet_thickness_mm = None
                 pp.laser_material_marking = ""
@@ -253,6 +285,7 @@ def apply_product_plan_post(product: Product, post: Any) -> str | None:
             pp.workpiece_type = ""
             pp.laser_sheet_thickness_mm = None
             pp.laser_material_marking = ""
+            plan_mat = ""
 
         pp.save(
             update_fields=[
@@ -267,8 +300,8 @@ def apply_product_plan_post(product: Product, post: Any) -> str | None:
         )
         if t == "made":
             wp = (post.get("workpiece_type") or "").strip()
-            if wp and wp != "laser":
-                sheet_mat = (post.get("made_material") or "").strip()[:180]
+            if wp:
+                sheet_mat = _plan_material_from_post(post)
                 setup0 = (
                     ProductSetup.objects.filter(product_id=product.pk)
                     .order_by("sort_order", "id")

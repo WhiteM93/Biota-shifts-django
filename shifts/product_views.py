@@ -12,7 +12,7 @@ from django.core.files.base import ContentFile
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Max, Q
-from django.http import JsonResponse
+from django.http import JsonResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -30,6 +30,7 @@ from .models import (
     normalize_product_setup_gcode_system,
     product_setup_gcode_inline_parts,
 )
+from .plan_naladki_bridge import sync_plan_piece_for_naladki_in_same_transaction
 from .product_plan_sync import (
     apply_product_plan_post,
     plan_card_summary,
@@ -267,27 +268,6 @@ def _apply_setup_instance_photo_changes(request, product: Product, setup: Produc
                 caption=caption,
             )
             next_sort += 1
-
-
-class ProductForm(forms.ModelForm):
-    class Meta:
-        model = Product
-        fields = (
-            "name",
-            "description",
-            "drawing_blank_size",
-            "drawing_blank_type",
-            "drawing_pdf",
-            "cad_model",
-            "cad_step_model",
-            "preview_stl",
-        )
-        widgets = {
-            "name": forms.TextInput(attrs={"placeholder": "Например, Корпус А-12"}),
-            "description": forms.Textarea(attrs={"rows": 4, "placeholder": "Опционально"}),
-            "drawing_blank_size": forms.TextInput(attrs={"placeholder": "Например, 50×120 мм"}),
-            "drawing_blank_type": forms.TextInput(attrs={"placeholder": "Например, круг D50 L120"}),
-        }
 
 
 class ProductSetupForm(forms.ModelForm):
@@ -821,78 +801,51 @@ def product_setup_pdf_export_view(request, pk: int, setup_pk: int, mode: str):
     )
 
 
+NEW_PRODUCT_NAME_BASE = "Новая наладка"
+NEW_PRODUCT_DEFAULT_WORKPIECE = "preparatory"
+
+
+def _allocate_new_product_name(base: str = NEW_PRODUCT_NAME_BASE) -> str:
+    name = base
+    n = 2
+    while Product.objects.filter(name__iexact=name).exists():
+        name = f"{base} {n}"
+        n += 1
+    return name
+
+
+def create_product_with_defaults() -> Product:
+    """Новая карточка наладки: изделие, первая установка, план с дефолтами."""
+    with transaction.atomic():
+        product = Product.objects.create(
+            name=_allocate_new_product_name(),
+            description="",
+            drawing_blank_size="",
+            drawing_blank_type="",
+        )
+        ProductSetup.objects.create(
+            product=product,
+            name="Установка 1",
+            sort_order=0,
+        )
+        sync_plan_piece_for_naladki_in_same_transaction(product.pk)
+        plan_post = QueryDict(mutable=True)
+        plan_post["plan_product_type"] = "made"
+        plan_post["workpiece_type"] = NEW_PRODUCT_DEFAULT_WORKPIECE
+        plan_post["made_material"] = ""
+        apply_product_plan_post(product, plan_post)
+    return product
+
+
 @biota_login_required
 @nav_permission_required("products")
 @write_permission_required
 @require_http_methods(["GET", "POST"])
 def product_create_view(request):
-    if request.method == "POST":
-        form = ProductForm(request.POST, request.FILES)
-        if form.is_valid():
-            plan_err = validate_product_plan_post(request.POST)
-            if plan_err:
-                messages.error(request, plan_err)
-                return render(
-                    request,
-                    "shifts/product_form.html",
-                    {
-                        "form": form,
-                        "username": biota_user(request),
-                        "is_edit": False,
-                        "product": None,
-                        **plan_form_context(None),
-                    },
-                )
-            name_raw = (form.cleaned_data.get("name") or "").strip()
-            if name_raw:
-                exact_exists = Product.objects.filter(name__iexact=name_raw).exists()
-                if exact_exists:
-                    form.add_error("name", "Наладка с таким названием уже существует. Проверьте список похожих ниже.")
-                    messages.error(request, "Найдено полное совпадение названия. Избегайте дублирования.")
-                    return render(
-                        request,
-                        "shifts/product_form.html",
-                        {
-                            "form": form,
-                            "username": biota_user(request),
-                            "is_edit": False,
-                            "product": None,
-                            **plan_form_context(None),
-                        },
-                    )
-            with transaction.atomic():
-                obj: Product = form.save()
-                _apply_setup_photo_changes(request, obj)
-            pe = apply_product_plan_post(obj, request.POST)
-            if pe:
-                messages.warning(request, pe)
-            messages.success(request, "Изделие создано.")
-            return redirect("product_detail", pk=obj.pk)
-        messages.error(request, "Исправьте ошибки в форме.")
-        return render(
-            request,
-            "shifts/product_form.html",
-            {
-                "form": form,
-                "username": biota_user(request),
-                "is_edit": False,
-                "product": None,
-                **plan_form_context(None),
-            },
-        )
-    else:
-        form = ProductForm()
-    return render(
-        request,
-        "shifts/product_form.html",
-        {
-            "form": form,
-            "username": biota_user(request),
-            "is_edit": False,
-            "product": None,
-            **plan_form_context(None),
-        },
-    )
+    product = create_product_with_defaults()
+    messages.success(request, "Создана новая наладка — заполните карточку изделия.")
+    base = reverse("product_detail", kwargs={"pk": product.pk})
+    return redirect(f"{base}?{urlencode({'tab': 'drawing', 'quick_edit': '1'})}")
 
 
 @biota_login_required
@@ -1262,6 +1215,24 @@ def product_detail_view(request, pk: int):
                 if "binding_extra_blocks" not in changed_setup_fields:
                     changed_setup_fields.append("binding_extra_blocks")
             setup.save(update_fields=list(changed_setup_fields) + ["updated_at"])
+            product_meta_changed: list[str] = []
+            if "product_name" in request.POST:
+                nm = (request.POST.get("product_name") or "").strip()[:300]
+                if not nm:
+                    return JsonResponse({"ok": False, "error": "Укажите название наладки."}, status=400)
+                if Product.objects.filter(name__iexact=nm).exclude(pk=product.pk).exists():
+                    return JsonResponse(
+                        {"ok": False, "error": "Наладка с таким названием уже существует."},
+                        status=400,
+                    )
+                if nm != (product.name or "").strip():
+                    product.name = nm
+                    product_meta_changed.append("name")
+            if "product_description" in request.POST:
+                desc = (request.POST.get("product_description") or "").strip()
+                if desc != (product.description or "").strip():
+                    product.description = desc
+                    product_meta_changed.append("description")
             product_drawing_update: list[str] = []
             if "drawing_blank_size" in request.POST:
                 product.drawing_blank_size = (request.POST.get("drawing_blank_size") or "").strip()[:180]
@@ -1269,8 +1240,11 @@ def product_detail_view(request, pk: int):
             if "drawing_blank_type" in request.POST:
                 product.drawing_blank_type = (request.POST.get("drawing_blank_type") or "").strip()[:220]
                 product_drawing_update.append("drawing_blank_type")
-            if product_drawing_update:
-                product.save(update_fields=list(product_drawing_update) + ["updated_at"])
+            product_update_fields = list(dict.fromkeys(product_meta_changed + product_drawing_update))
+            if product_update_fields:
+                product.save(update_fields=product_update_fields + ["updated_at"])
+            if product_meta_changed:
+                sync_plan_piece_for_naladki_in_same_transaction(product.pk)
             rows_json = (request.POST.get("rows_json") or "").strip()
             if rows_json:
                 try:
@@ -1345,6 +1319,10 @@ def product_detail_view(request, pk: int):
                 "product_drawing": {
                     "drawing_blank_size": (product.drawing_blank_size or "").strip() or "—",
                     "drawing_blank_type": (product.drawing_blank_type or "").strip() or "—",
+                },
+                "product": {
+                    "name": (product.name or "").strip(),
+                    "description": (product.description or "").strip(),
                 },
             }
             if (request.POST.get("sync_plan_from_inline") or "").strip() == "1":

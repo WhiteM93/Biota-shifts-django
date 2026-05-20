@@ -30,20 +30,16 @@
         <span>Толщина листа, мм</span>
         <input type="text" name="laser_sheet_thickness_mm" id="{{ pfx }}-laser-thick" value="{{ plan_laser_sheet_thickness_value }}" inputmode="decimal" autocomplete="off" placeholder="Например, 2 или 1,5" class="js-product-plan-laser-thick">
       </label>
-      <label class="field" style="margin-top:10px;">
-        <span>Маркировка материала</span>
-        <input type="text" name="laser_material_marking" id="{{ pfx }}-laser-mark" value="{{ plan_laser_material_marking_value }}" maxlength="240" autocomplete="off" placeholder="Как в плане" list="{{ pfx }}-laser-datalist" class="js-product-plan-laser-mark">
-        <datalist id="{{ pfx }}-laser-datalist">
-          {% for m in plan_laser_material_marking_suggestions %}
+    </div>
+    <div class="filter-panel product-plan-material-panel" data-material-panel style="padding:12px;{% if plan_product_type != 'made' or not plan_workpiece_type_value %}display:none;{% endif %}">
+      <label class="field" style="max-width:100%;">
+        <span>Материал заготовки</span>
+        <input type="text" name="plan_material" id="{{ pfx }}-plan-material" value="{{ plan_material_value|default:'' }}" maxlength="180" autocomplete="off" placeholder="Введите или выберите из списка" list="{{ pfx }}-material-datalist" class="js-product-plan-material">
+        <datalist id="{{ pfx }}-material-datalist">
+          {% for m in plan_material_suggestions %}
           <option value="{{ m }}"></option>
           {% endfor %}
         </datalist>
-      </label>
-    </div>
-    <div class="filter-panel product-plan-made-material-panel" data-made-material-panel style="padding:12px;{% if plan_product_type != 'made' or plan_workpiece_type_value == 'laser' or not plan_workpiece_type_value %}display:none;{% endif %}">
-      <label class="field" style="max-width:100%;">
-        <span>Материал заготовки</span>
-        <input type="text" name="made_material" id="{{ pfx }}-made-mat" value="{{ plan_made_material_value|default:'' }}" maxlength="180" autocomplete="off" placeholder="Сохраняется в первой наладке" class="js-product-plan-made-material">
       </label>
     </div>
   </div>
@@ -57,15 +53,14 @@
     var type = t ? t.value : "made";
     var wrap = root.querySelector("[data-workpiece-laser-wrap]");
     var laser = root.querySelector("[data-laser-panel]");
-    var madePanel = root.querySelector("[data-made-material-panel]");
+    var materialPanel = root.querySelector("[data-material-panel]");
     var wp = root.querySelector(".js-product-plan-workpiece");
     if (wrap) wrap.style.display = type === "made" ? "" : "none";
     if (laser && wp) {
       laser.style.display = type === "made" && wp.value === "laser" ? "" : "none";
     }
-    if (madePanel && wp) {
-      madePanel.style.display =
-        type === "made" && wp.value && wp.value !== "laser" ? "" : "none";
+    if (materialPanel && wp) {
+      materialPanel.style.display = type === "made" && wp.value ? "" : "none";
     }
   }
   root.querySelectorAll(".js-product-plan-type").forEach(function (r) { r.addEventListener("change", sync); });

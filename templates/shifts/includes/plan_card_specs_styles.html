@@ -157,24 +157,13 @@
   body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-workpiece .setup-plan-line--workpiece .setup-plan-inline-fields {
     display: inline-flex !important;
   }
-  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .setup-plan-summary-value {
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-material .setup-plan-line--material .setup-plan-summary-value {
     display: none !important;
   }
-  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .setup-plan-inline-fields {
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-material .setup-plan-line--material .setup-plan-inline-fields {
     display: inline-flex !important;
   }
-  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-made-material .setup-plan-line--material .setup-plan-summary-value {
-    display: none !important;
-  }
-  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-made-material .setup-plan-line--material .setup-plan-inline-fields {
-    display: inline-flex !important;
-  }
-  .setup-plan-line--material .setup-plan-inline-fields .js-plan-inline-made-material,
-  .setup-plan-line--material .setup-plan-inline-fields .js-plan-inline-laser-mark {
-    display: none !important;
-  }
-  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-made-material .setup-plan-line--material .js-plan-inline-made-material {
-    display: inline-block !important;
+  .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-material {
     flex: 1 1 140px;
     min-width: 0;
     max-width: 100%;
@@ -185,8 +174,14 @@
     background: var(--bio-input-bg);
     color: var(--bio-input-fg);
   }
-  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .js-plan-inline-laser-mark {
+  .setup-plan-line--material .setup-plan-inline-fields .js-plan-inline-material {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-material .setup-plan-line--material .js-plan-inline-material {
     display: inline-block !important;
+    flex: 1 1 140px;
+    min-width: 0;
+    max-width: 100%;
   }
   .setup-plan-line--workpiece .setup-plan-inline-fields .js-plan-inline-laser-thick {
     display: none !important;

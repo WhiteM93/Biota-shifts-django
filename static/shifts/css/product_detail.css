@@ -694,7 +694,7 @@
     background: var(--bio-input-bg);
     color: var(--bio-input-fg);
   }
-  .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-laser-mark {
+  .setup-plan-summary-wrap .setup-plan-inline-fields .js-plan-inline-material {
     flex: 1 1 140px;
     min-width: 0;
     max-width: 100%;
@@ -704,6 +704,12 @@
     border: 1px solid var(--bio-input-border);
     background: var(--bio-input-bg);
     color: var(--bio-input-fg);
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-material .setup-plan-line--material .setup-plan-summary-value {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-material .setup-plan-line--material .setup-plan-inline-fields {
+    display: inline-flex !important;
   }
   body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-line--position-type .setup-plan-summary-value {
     display: none !important;
@@ -717,23 +723,10 @@
   body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-workpiece .setup-plan-line--workpiece .setup-plan-inline-fields {
     display: inline-flex !important;
   }
-  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .setup-plan-summary-value {
+  .setup-plan-line--material .setup-plan-inline-fields .js-plan-inline-material {
     display: none !important;
   }
-  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .setup-plan-inline-fields {
-    display: inline-flex !important;
-  }
-  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-made-material .setup-plan-line--material .setup-plan-summary-value {
-    display: none !important;
-  }
-  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-made-material .setup-plan-line--material .setup-plan-inline-fields {
-    display: inline-flex !important;
-  }
-  .setup-plan-line--material .setup-plan-inline-fields .js-plan-inline-made-material,
-  .setup-plan-line--material .setup-plan-inline-fields .js-plan-inline-laser-mark {
-    display: none !important;
-  }
-  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-made-material .setup-plan-line--material .js-plan-inline-made-material {
+  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-material .setup-plan-line--material .js-plan-inline-material {
     display: inline-block !important;
     flex: 1 1 140px;
     min-width: 0;
@@ -744,9 +737,6 @@
     border: 1px solid var(--bio-input-border);
     background: var(--bio-input-bg);
     color: var(--bio-input-fg);
-  }
-  body.setup-inline-edit-enabled .product-tab-panel[data-inline-edit-mode="1"] .setup-plan-summary-wrap.plan-summary-editing-laser-material .setup-plan-line--material .js-plan-inline-laser-mark {
-    display: inline-block !important;
   }
   .setup-plan-line--workpiece .setup-plan-inline-fields .js-plan-inline-laser-thick {
     display: none !important;
@@ -1965,14 +1955,75 @@
   .product-detail-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+    grid-template-rows: auto 1fr;
     gap: 18px;
     margin-top: 0;
     align-items: start;
   }
   .product-detail-main {
+    display: contents;
+  }
+  #product-tabs {
+    display: contents;
+  }
+  .product-tabs-nav {
+    grid-column: 1;
+    grid-row: 1;
     min-width: 0;
   }
+  .product-tab-panels {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+  }
+  .product-drawing-intro {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .product-drawing-intro .plan-unified-specs-card {
+    margin-bottom: 0;
+    flex: 0 0 auto;
+  }
+  .product-drawing-meta {
+    flex: 1 1 200px;
+    min-width: 0;
+    margin: 0;
+    padding: 14px;
+  }
+  .product-drawing-name-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 12px;
+    margin-bottom: 10px;
+  }
+  .product-drawing-name-row__label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .product-drawing-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.35;
+    min-width: 0;
+    flex: 1 1 160px;
+  }
+  .product-drawing-description__text {
+    white-space: pre-wrap;
+    margin: 0;
+    line-height: 1.45;
+  }
+  .product-drawing-description__text.is-inline-edit {
+    min-height: 4.5em;
+  }
   .product-detail-side {
+    grid-column: 2;
+    grid-row: 2;
     min-width: 0;
     width: 100%;
     background: var(--bio-nav-bg);
@@ -1980,16 +2031,11 @@
     border: 1px solid var(--bio-nav-border);
     border-radius: 6px;
     padding: 8px;
-    margin-top: 48px;
+    margin-top: 0;
     margin-left: 0;
     box-sizing: border-box;
+    align-self: start;
     transition: background 0.25s ease, border-color 0.25s ease;
-  }
-  .product-detail-side[data-current-tab="drawing"] {
-    margin-top: 83px;
-  }
-  .product-detail-side[data-current-tab^="setup-"] {
-    margin-top: 83px;
   }
   [data-field-text].is-inline-edit {
     display: inline-block;
@@ -2491,6 +2537,13 @@
   @media (max-width: 960px) {
     .product-detail-grid {
       grid-template-columns: 1fr;
+      grid-template-rows: none;
+    }
+    .product-tabs-nav,
+    .product-tab-panels,
+    .product-detail-side {
+      grid-column: 1;
+      grid-row: auto;
     }
     .product-detail-side {
       margin-top: 0;

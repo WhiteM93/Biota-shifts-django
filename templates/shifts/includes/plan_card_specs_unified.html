@@ -48,10 +48,9 @@
                 <span class="setup-plan-summary-value" data-plan-material-line>{{ plan_display_material_line }}</span>
                 {% if biota_can_edit %}
                 <div class="setup-plan-inline-fields">
-                  <input type="text" class="js-plan-inline-made-material" value="{{ plan_made_material_value|default:'' }}" maxlength="180" placeholder="Материал заготовки" autocomplete="off" aria-label="Материал заготовки (первая наладка)">
-                  <input type="text" class="js-plan-inline-laser-mark" value="{{ plan_laser_material_marking_value }}" maxlength="240" list="drawing-inline-plan-laser-dl" placeholder="Маркировка материала" autocomplete="off" aria-label="Маркировка материала для лазера">
-                  <datalist id="drawing-inline-plan-laser-dl">
-                    {% for m in plan_laser_material_marking_suggestions %}
+                  <input type="text" class="js-plan-inline-material" value="{{ plan_material_value|default:'' }}" maxlength="180" list="drawing-inline-plan-material-dl" placeholder="Материал заготовки" autocomplete="off" aria-label="Материал заготовки">
+                  <datalist id="drawing-inline-plan-material-dl">
+                    {% for m in plan_material_suggestions %}
                     <option value="{{ m }}"></option>
                     {% endfor %}
                   </datalist>

@@ -704,13 +704,31 @@ html[data-theme="dawn"] .fp-action-btn:hover { background: rgba(0,0,0,.08); bord
 .fp-collapse-btn:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.18); }
 .fp-collapse-btn svg {
   width: 14px; height: 14px;
-  transition: transform .28s cubic-bezier(0.34,1.56,0.64,1);
+  transition: transform .18s ease;
 }
 .fp-collapse-btn.is-collapsed svg { transform: rotate(-180deg); }
+.fp-body-shell {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows .18s ease;
+}
+#graph-filter-panel.fp-collapsed .fp-body-shell {
+  grid-template-rows: 0fr;
+}
+#graph-filter-panel.fp-collapsed .fp-head {
+  border-bottom-color: transparent;
+}
 .fp-body {
+  overflow: hidden;
+  min-height: 0;
   padding: 10px 14px 14px;
+}
+#graph-filter-panel:not(.fp-collapsed) .fp-body {
   overflow: visible;
-  transition: max-height .32s cubic-bezier(.4,0,.2,1), opacity .24s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fp-body-shell { transition: none; }
+  .fp-collapse-btn svg { transition: none; }
 }
 .fp-filter-row {
   align-items: center;

@@ -20,12 +20,13 @@
         </a>
       </div>
     </div>
-    <button type="button" class="fp-collapse-btn" id="fp-collapse-btn" aria-label="Свернуть/развернуть фильтр">
+    <button type="button" class="fp-collapse-btn" id="fp-collapse-btn" aria-label="Свернуть/развернуть фильтр" aria-expanded="true" aria-controls="fp-body">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="5 8 10 13 15 8"/>
       </svg>
     </button>
   </div>
+  <div class="fp-body-shell">
   <div class="fp-body" id="fp-body">
     <form method="get" action="" class="auto-submit-form" id="graph-filter-form">
       <input type="hidden" name="dep_mode" id="fp-dep-mode-val" value="{% if dep_mode_pick %}pick{% else %}all{% endif %}">
@@ -86,6 +87,7 @@
         </div>
       </div>
     </form>
+  </div>
   </div>
 </div>
 
@@ -520,39 +522,25 @@
     });
     syncPosModeVisibility();
 
-    // Filter panel collapse
+    // Filter panel collapse (CSS grid — без max-height/scrollHeight)
     (function () {
       var collapseBtn = document.getElementById("fp-collapse-btn");
-      var fpBody = document.getElementById("fp-body");
-      if (!collapseBtn || !fpBody) return;
-      function setCollapsed(collapsed, animate) {
-        if (!animate) fpBody.style.transition = "none";
+      var panel = document.getElementById("graph-filter-panel");
+      if (!collapseBtn || !panel) return;
+
+      function setCollapsed(collapsed) {
+        panel.classList.toggle("fp-collapsed", collapsed);
         collapseBtn.classList.toggle("is-collapsed", collapsed);
-        if (collapsed) {
-          fpBody.style.overflow = "hidden";
-          fpBody.style.maxHeight = "0";
-          fpBody.style.opacity = "0";
-        } else {
-          fpBody.style.maxHeight = fpBody.scrollHeight + "px";
-          fpBody.style.opacity = "1";
-          setTimeout(function () {
-            if (!collapseBtn.classList.contains("is-collapsed")) fpBody.style.overflow = "visible";
-          }, 360);
-        }
-        if (!animate) { fpBody.getBoundingClientRect(); fpBody.style.transition = ""; }
+        collapseBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
         try { localStorage.setItem("graph-fp-collapsed", collapsed ? "1" : "0"); } catch (e) {}
       }
-      var saved = "";
-      try { saved = localStorage.getItem("graph-fp-collapsed"); } catch (e) {}
-      setCollapsed(saved === "1", false);
-      if (saved !== "1") fpBody.style.maxHeight = fpBody.scrollHeight + "px";
+
+      var saved = false;
+      try { saved = localStorage.getItem("graph-fp-collapsed") === "1"; } catch (e) {}
+      setCollapsed(saved);
+
       collapseBtn.addEventListener("click", function () {
-        setCollapsed(!collapseBtn.classList.contains("is-collapsed"), true);
-      });
-      window.addEventListener("resize", function () {
-        if (!collapseBtn.classList.contains("is-collapsed")) {
-          fpBody.style.maxHeight = fpBody.scrollHeight + "px";
-        }
+        setCollapsed(!panel.classList.contains("fp-collapsed"));
       });
     })();
 
