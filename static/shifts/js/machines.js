@@ -1146,7 +1146,17 @@
       if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
       var row = btn.closest(".machines-schedule-row");
       if (!row) return;
+      var labelCell = row.querySelector(".machines-cell--schedule-label");
+      if (labelCell) {
+        var idx = labelCell.getAttribute("data-schedule-index");
+        if (idx !== null && idx !== "") {
+          var map = readStore();
+          delete map[idx];
+          writeStore(map);
+        }
+      }
       row.remove();
+      saveScheduleClientRows();
     });
 
     scheduleWrap.addEventListener("dragstart", function (e) {
@@ -1806,6 +1816,12 @@
       var row = tpl.cloneNode(true);
       var idx = allocScheduleIndex();
       fillScheduleRowNode(row, idx, "", "");
+      // Удаляем возможный устаревший продукт по этому idx из localStorage
+      var map = readStore();
+      if (Object.prototype.hasOwnProperty.call(map, String(idx))) {
+        delete map[String(idx)];
+        writeStore(map);
+      }
       scheduleWrap.appendChild(row);
       saveScheduleClientRows();
       applyStoredSelections();
