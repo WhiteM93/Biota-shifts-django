@@ -853,6 +853,9 @@
     flex-direction: column;
     gap: 5px;
   }
+  .machines-color-picker-pop[hidden] {
+    display: none !important;
+  }
   .machines-color-picker-pop__clear-btn {
     font-size: 11px;
     color: var(--bio-muted);
