@@ -22,6 +22,7 @@ from biota_shifts.auth import _is_admin
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
 from .models import (
     Product,
+    ProductFile,
     ProductNote,
     ProductSetup,
     ProductSetupPhoto,
@@ -154,6 +155,101 @@ def _setup_primary_program_field(setup: ProductSetup):
     if setup.program_file:
         return setup.program_file
     return None
+
+
+# ─── Файловый менеджер для древа изделий ───────────────────────────────────────
+
+
+def get_all_product_files(product_id: int) -> dict:
+    """
+    Получить иерархический список всех файлов изделия с группировкой по наладкам.
+
+    Возвращает:
+    {
+        'product_root': [ProductFile, ...],  # Файлы уровня изделия
+        'setups': [
+            {'setup': ProductSetup, 'files': [ProductFile, ...]},
+            ...
+        ]
+    }
+    """
+    product = get_object_or_404(Product, id=product_id)
+
+    # Файлы уровня изделия (setup=null)
+    root_files = list(ProductFile.objects.filter(product_id=product_id, setup__isnull=True).order_by("sort_order", "id"))
+
+    # Файлы по наладкам
+    setups_with_files = []
+    for setup in product.setups.order_by("sort_order", "id"):
+        setup_files = list(ProductFile.objects.filter(setup_id=setup.id).order_by("sort_order", "id"))
+        setups_with_files.append({
+            "setup": setup,
+            "files": setup_files,
+        })
+
+    return {
+        "product_root": root_files,
+        "setups": setups_with_files,
+    }
+
+
+def upload_product_file(file_obj, product_id: int, setup_id: int | None = None, file_type: str = "custom") -> ProductFile:
+    """
+    Загрузить файл в изделие (уровень изделия или конкретной наладки).
+
+    Args:
+        file_obj: Django UploadedFile object
+        product_id: ID изделия
+        setup_id: ID наладки (опционально, если None — файл уровня изделия)
+        file_type: Тип файла (default: 'custom')
+
+    Returns:
+        ProductFile instance
+    """
+    product = get_object_or_404(Product, id=product_id)
+    setup = None
+    if setup_id:
+        setup = get_object_or_404(ProductSetup, id=setup_id, product_id=product_id)
+
+    # Получить отображаемое имя (без пути)
+    file_name = getattr(file_obj, 'name', 'file')
+    if '/' in file_name:
+        file_name = file_name.rsplit('/', 1)[-1]
+
+    # Создать ProductFile
+    pf = ProductFile(
+        product=product,
+        setup=setup,
+        file_type=file_type,
+        file=file_obj,
+        file_name=file_name,
+        sort_order=0,
+    )
+    pf.save()
+
+    return pf
+
+
+def delete_product_file(file_id: int) -> bool:
+    """
+    Удалить файл изделия.
+
+    Args:
+        file_id: ID ProductFile
+
+    Returns:
+        True if deleted, False if not found
+    """
+    try:
+        pf = ProductFile.objects.get(id=file_id)
+        if pf.file:
+            # Удалить физический файл
+            if hasattr(pf.file, 'delete') and hasattr(pf.file.storage, 'delete'):
+                pf.file.delete()
+        pf.delete()
+        return True
+    except ProductFile.DoesNotExist:
+        return False
 
 
 def _append_setup_program_file(setup: ProductSetup, uploaded_file) -> ProductSetupProgramFile:

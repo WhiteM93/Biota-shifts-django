@@ -1268,6 +1268,104 @@ class ProductSetupPhoto(models.Model):
         return f"{self.product_id} #{self.pk}"
 
 
+class ProductFile(models.Model):
+    """Единый менеджер файлов изделия: поддерживает любые типы файлов на уровне изделия или наладки."""
+
+    FILE_TYPE_CHOICES = [
+        ("drawing", "Чертёж (PDF)"),
+        ("cad_model", "3D-модель (STL/STP/STEP)"),
+        ("cad_step", "STP/STEP"),
+        ("program", "Программа (G/M-код)"),
+        ("tool_spec", "Инструментальная спецификация"),
+        ("photo", "Фото"),
+        ("custom", "Другое"),
+    ]
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        verbose_name="Изделие",
+        related_name="files",
+    )
+    setup = models.ForeignKey(
+        ProductSetup,
+        on_delete=models.CASCADE,
+        verbose_name="Наладка (опционально)",
+        related_name="files",
+        null=True,
+        blank=True,
+        help_text="Если указана, файл относится к конкретной наладке. Если пусто — файл уровня изделия.",
+    )
+    file_type = models.CharField(
+        max_length=20,
+        choices=FILE_TYPE_CHOICES,
+        default="custom",
+        verbose_name="Тип файла",
+    )
+    file = models.FileField(
+        upload_to="products/files/",
+        verbose_name="Файл",
+        help_text="Допускается любой тип файла.",
+    )
+    file_name = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Отображаемое имя",
+        help_text="Если пусто, используется имя загруженного файла.",
+    )
+    # Для обратной совместимости: какое поле Product/ProductSetup обновить при сохранении
+    original_field_name = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        verbose_name="Исходное поле",
+        help_text="Для обратной совместимости (drawing_pdf, cad_model, etc.). Внутреннее использование.",
+    )
+    sort_order = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Порядок сортировки",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Загружено",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Обновлено",
+    )
+
+    class Meta:
+        ordering = ("sort_order", "created_at", "id")
+        verbose_name = "Файл изделия"
+        verbose_name_plural = "Файлы изделия"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "setup", "original_field_name"],
+                condition=models.Q(original_field_name__gt=""),
+                name="unique_product_file_legacy_field",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        display_name = self.file_name or self.file.name.split("/")[-1]
+        if self.setup_id:
+            return f"{self.product_id}→{self.setup_id}: {display_name}"
+        return f"{self.product_id}: {display_name}"
+
+    @property
+    def extension(self) -> str:
+        """Расширение файла без точки."""
+        if not self.file:
+            return ""
+        return self.file.name.rsplit(".", 1)[-1].lower() if "." in self.file.name else ""
+
+    def get_file_url(self) -> str:
+        """Абсолютный URL для скачивания."""
+        if self.file:
+            return self.file.url
+        return ""
+
+
 class PlannedProduct(models.Model):
     """Изделие в разделе «План»: название и упорядоченные этапы по отделам."""
 

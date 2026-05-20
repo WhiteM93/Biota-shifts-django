@@ -7,6 +7,7 @@ from .models import (
     PlannedProduct,
     PlannedProductStage,
     Product,
+    ProductFile,
     ProductSetup,
     ProductSetupPhoto,
 )
@@ -16,6 +17,13 @@ class ProductSetupPhotoInline(admin.TabularInline):
     model = ProductSetupPhoto
     extra = 0
     fields = ("setup", "image", "sort_order", "caption")
+
+
+class ProductFileInline(admin.TabularInline):
+    model = ProductFile
+    extra = 1
+    fields = ("setup", "file_type", "file", "file_name", "sort_order")
+    ordering = ("sort_order", "id")
 
 
 class ProductSetupInline(admin.TabularInline):
@@ -72,7 +80,7 @@ class PlannedProductAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    inlines = (ProductSetupInline, ProductSetupPhotoInline)
+    inlines = (ProductSetupInline, ProductFileInline, ProductSetupPhotoInline)
     list_display = ("id", "name", "preview_stl_column", "created_at", "updated_at")
     list_display_links = ("id", "name")
     search_fields = ("name", "description", "setup_notes")
