@@ -83,7 +83,9 @@
           <label class="form-label muted">Тип заготовки</label>
           <select class="plan-cascade-type-enum" data-field="workpiece_type_enum" autocomplete="off" aria-label="Тип заготовки">
             <option value="">— выберите —</option>
-            <option value="preparatory" {% if plan_workpiece_type_enum_value == 'preparatory' %}selected{% endif %}>Заготовительный</option>
+            <option value="plate" {% if plan_workpiece_type_enum_value == 'plate' %}selected{% endif %}>Плита</option>
+            <option value="circle" {% if plan_workpiece_type_enum_value == 'circle' %}selected{% endif %}>Круг</option>
+            <option value="rod" {% if plan_workpiece_type_enum_value == 'rod' %}selected{% endif %}>Пруток</option>
           </select>
         </div>
 

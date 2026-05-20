@@ -165,6 +165,8 @@ def validate_product_plan_post(post: Any) -> str | None:
             workpiece_type_enum = (post.get("workpiece_type_enum") or "").strip()
             if not workpiece_type_enum:
                 return "Выберите тип заготовки."
+            if workpiece_type_enum not in ("plate", "circle", "rod"):
+                return "Неизвестный тип заготовки."
 
         # Путь 1c: ПКИ (вид заготовки)
         elif workpiece_type == "pki":
