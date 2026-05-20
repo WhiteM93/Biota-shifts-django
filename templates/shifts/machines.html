@@ -171,12 +171,19 @@
         {% endif %}
       </div>
       <div class="machines-schedule-header" aria-hidden="true">
+        <div>Приоритет</div>
         <div>Изделие</div>
         <div>Кол-во</div>
+        <div>Цвет</div>
       </div>
       <div class="machines-schedule-rows" data-next-schedule-index="{{ schedule_rows|length }}">
         {% for srow in schedule_rows %}
         <div class="machines-schedule-row">
+          <div
+            class="machines-cell machines-cell--schedule-priority{% if not srow.priority %} is-empty{% endif %}"
+            data-placeholder="—"
+            aria-label="Приоритет"
+          >{% if srow.priority %}{{ srow.priority }}{% endif %}</div>
           <div
             class="machines-cell machines-cell--schedule-label{% if not srow.display %} is-empty{% endif %}"
             data-schedule-index="{{ forloop.counter0 }}"
@@ -217,6 +224,12 @@
             data-placeholder="—"
             aria-label="Количество"
           >{% if srow.qty %}{{ srow.qty }}{% endif %}</div>
+          <div
+            class="machines-cell machines-cell--schedule-color"
+            style="{% if srow.color %}background-color: {{ srow.color|escape }};{% endif %}"
+            data-color="{% if srow.color %}{{ srow.color|escape }}{% endif %}"
+            aria-label="Цвет"
+          ></div>
           <div class="machines-cell machines-cell--code machines-cell--schedule-code">{{ srow.machine_code }}</div>
           <button type="button" class="machines-schedule-row-delete js-machines-schedule-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
         </div>
@@ -277,6 +290,7 @@
   </template>
   <template id="machines-tpl-schedule-row">
     <div class="machines-schedule-row" data-client-row="1">
+      <div class="machines-cell machines-cell--schedule-priority is-empty" data-placeholder="—" aria-label="Приоритет"></div>
       <div
         class="machines-cell machines-cell--schedule-label is-empty"
         data-schedule-index=""
@@ -308,6 +322,7 @@
         </div>
       </div>
       <div class="machines-cell machines-cell--schedule-qty is-empty" data-placeholder="—" aria-label="Количество"></div>
+      <div class="machines-cell machines-cell--schedule-color" aria-label="Цвет"></div>
       <div class="machines-cell machines-cell--code machines-cell--schedule-code is-empty"></div>
       <button type="button" class="machines-schedule-row-delete js-machines-schedule-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
     </div>

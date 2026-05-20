@@ -16,7 +16,18 @@
       "Bash(git push *)",
       "Bash(git commit *)",
       "Bash(python manage.py migrate shifts 0076)",
-      "mcp__Claude_in_Chrome__tabs_context_mcp"
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(python -c ' *)",
+      "Bash(node --check \"E:\\\\Github\\\\Biota-shifts-django\\\\.claude\\\\worktrees\\\\exciting-wright-e8828d\\\\static\\\\shifts\\\\js\\\\product_detail.js\")",
+      "Bash(node --check \"E:\\\\Github\\\\Biota-shifts-django\\\\.claude\\\\worktrees\\\\exciting-wright-e8828d\\\\static\\\\shifts\\\\js\\\\product_detail_module.js\")",
+      "Bash(node -e ' *)",
+      "Bash(node --check static/shifts/js/product_detail.js)",
+      "Bash(node --check static/shifts/js/product_detail_module.js)",
+      "Bash(xargs grep -l \"ToolItem\\\\|StockMovement\\\\|PurchaseRequest\\\\|InventoryStockEvent\")",
+      "Bash(findstr -i settings)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(python manage.py migrate)"
     ]
   }
 }

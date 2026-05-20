@@ -42,8 +42,8 @@ _DEFAULT_MACHINE_ROWS = [
 ]
 
 _DEFAULT_SCHEDULE_ROWS = [
-    {"label": "График по станку", "machine_code": "F-10", "product_id": None, "setup_id": None, "qty": ""},
-    {"label": "", "machine_code": "F-05", "product_id": None, "setup_id": None, "qty": ""},
+    {"label": "График по станку", "machine_code": "F-10", "product_id": None, "setup_id": None, "qty": "", "priority": "", "color": ""},
+    {"label": "", "machine_code": "F-05", "product_id": None, "setup_id": None, "qty": "", "priority": "", "color": ""},
 ]
 
 MAX_MACHINE_ROWS = 60
@@ -251,6 +251,21 @@ def _schedule_rows_with_display(
                 "setup_options": list(setups),
             }
         )
+    # Сортировка по приоритету, затем по кол-ву (по убыванию)
+    def sort_key(row: dict) -> tuple:
+        priority_str = str(row.get("priority") or "").strip()
+        qty_str = str(row.get("qty") or "").strip()
+        try:
+            priority = int(priority_str)
+        except (ValueError, TypeError):
+            priority = float('inf')  # Пустые приоритеты в конец
+        try:
+            qty = -int(qty_str)  # Минус для сортировки по убыванию
+        except (ValueError, TypeError):
+            qty = 0
+        return (priority, qty)
+
+    out.sort(key=sort_key)
     return out
 
 
@@ -342,14 +357,16 @@ def _normalize_schedule_rows(raw, valid_pids: set[int]) -> list[dict]:
                 pid,
                 setup_id,
                 str(r.get("qty") or "").strip()[:32],
+                str(r.get("priority") or "").strip()[:10],
+                str(r.get("color") or "").strip()[:7],
             )
         )
-    pids_for_setup = {p for _, _, p, _, _ in staged if p is not None}
+    pids_for_setup = {p for _, _, p, _, _, _, _ in staged if p is not None}
     valid_pairs: set[tuple[int, int]] = set()
     if pids_for_setup:
         for su in ProductSetup.objects.filter(product_id__in=pids_for_setup).only("id", "product_id"):
             valid_pairs.add((int(su.product_id), int(su.pk)))
-    for label, mcode, pid, setup_id, qty in staged:
+    for label, mcode, pid, setup_id, qty, priority, color in staged:
         if pid is None:
             setup_id = None
         elif setup_id is not None and (pid, setup_id) not in valid_pairs:
@@ -361,6 +378,8 @@ def _normalize_schedule_rows(raw, valid_pids: set[int]) -> list[dict]:
                 "product_id": pid,
                 "setup_id": setup_id,
                 "qty": qty,
+                "priority": priority,
+                "color": color,
             }
         )
     return out

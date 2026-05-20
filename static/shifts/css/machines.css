@@ -347,7 +347,7 @@
     color: color-mix(in srgb, #7ba7e8 60%, var(--bio-muted));
   }
   .machines-schedule-header {
-    grid-template-columns: minmax(0, 1fr) 52px;
+    grid-template-columns: 40px minmax(0, 1fr) 52px 40px;
   }
   .machines-quick-header > div,
   .machines-schedule-header > div {
@@ -448,7 +448,7 @@
   }
   .machines-schedule-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 52px auto;
+    grid-template-columns: 40px minmax(0, 1fr) 52px 40px auto;
     gap: 0;
     align-items: center;
     position: relative;
@@ -765,6 +765,34 @@
   .machines-page[data-inline-edit-mode="1"] .machines-cell--schedule-qty[contenteditable="true"]:focus {
     outline: none;
     box-shadow: inset 0 0 0 2px var(--bio-input-focus-border, #5c709f);
+  }
+  .machines-cell--schedule-priority {
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    justify-content: center;
+    padding: 4px 2px;
+    min-width: 0;
+    color: var(--bio-body-fg);
+  }
+  .machines-cell--schedule-priority.is-empty {
+    color: var(--bio-muted);
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-cell--schedule-priority[contenteditable="true"] {
+    cursor: text;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-cell--schedule-priority[contenteditable="true"]:focus {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--bio-input-focus-border, #5c709f);
+  }
+  .machines-cell--schedule-color {
+    border: 1px solid var(--bio-input-border);
+    border-radius: 2px;
+    margin: 6px 4px;
+  }
+  .machines-page[data-inline-edit-mode="1"] .machines-cell--schedule-color[contenteditable="true"] {
+    cursor: pointer;
+    min-height: 24px;
   }
   .machines-cell--field.is-match,
   .machines-cell--schedule-code.is-match,

@@ -123,6 +123,8 @@
           if (!isNaN(pn)) pid = pn;
         }
         var qtyEl = row.querySelector(".machines-cell--schedule-qty");
+        var priorityEl = row.querySelector(".machines-cell--schedule-priority");
+        var colorEl = row.querySelector(".machines-cell--schedule-color");
         schedule_rows.push({
           label: labelCell ? (labelCell.getAttribute("data-original-label") || "").trim() : "",
           machine_code: codeEl ? (codeEl.textContent || "").trim() : "",
@@ -135,6 +137,8 @@
             return isNaN(sn) ? null : sn;
           })(),
           qty: qtyEl ? (qtyEl.textContent || "").trim() : "",
+          priority: priorityEl ? (priorityEl.textContent || "").trim() : "",
+          color: colorEl ? (colorEl.getAttribute("data-color") || colorEl.style.backgroundColor || "").trim() : "",
         });
       });
       var cv = parseInt((root.getAttribute("data-machines-content-version") || "0").trim(), 10);
@@ -1009,6 +1013,22 @@
           cell.removeAttribute("spellcheck");
         }
       });
+      scheduleWrap.querySelectorAll(".machines-cell--schedule-priority").forEach(function (cell) {
+        if (en) {
+          cell.setAttribute("contenteditable", "true");
+          cell.setAttribute("spellcheck", "false");
+        } else {
+          cell.removeAttribute("contenteditable");
+          cell.removeAttribute("spellcheck");
+        }
+      });
+      scheduleWrap.querySelectorAll(".machines-cell--schedule-color").forEach(function (cell) {
+        if (en) {
+          cell.setAttribute("contenteditable", "true");
+        } else {
+          cell.removeAttribute("contenteditable");
+        }
+      });
       root.querySelectorAll(".js-machines-product-search").forEach(function (inp) {
         inp.disabled = !en;
         inp.setAttribute("aria-disabled", en ? "false" : "true");
@@ -1790,9 +1810,13 @@
       scheduleWrap.querySelectorAll('.machines-schedule-row[data-client-row="1"]').forEach(function (row) {
         var codeEl = row.querySelector(".machines-cell--schedule-code");
         var qtyEl = row.querySelector(".machines-cell--schedule-qty");
+        var priorityEl = row.querySelector(".machines-cell--schedule-priority");
+        var colorEl = row.querySelector(".machines-cell--schedule-color");
         list.push({
           machine_code: (codeEl && codeEl.textContent ? codeEl.textContent : "").trim(),
           qty: (qtyEl && qtyEl.textContent ? qtyEl.textContent : "").trim(),
+          priority: (priorityEl && priorityEl.textContent ? priorityEl.textContent : "").trim(),
+          color: (colorEl && colorEl.style.backgroundColor ? colorEl.style.backgroundColor : "").trim(),
         });
       });
       writeJson(LS_SCHEDULE_EXTRA, list);
@@ -1811,6 +1835,16 @@
         if (qtyEl && item.qty) {
           qtyEl.textContent = item.qty;
           qtyEl.classList.remove("is-empty");
+        }
+        var priorityEl = row.querySelector(".machines-cell--schedule-priority");
+        if (priorityEl && item.priority) {
+          priorityEl.textContent = item.priority;
+          priorityEl.classList.remove("is-empty");
+        }
+        var colorEl = row.querySelector(".machines-cell--schedule-color");
+        if (colorEl && item.color) {
+          colorEl.style.backgroundColor = item.color;
+          colorEl.setAttribute("data-color", item.color);
         }
         scheduleWrap.appendChild(row);
       });
