@@ -7,7 +7,8 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(python manage.py makemigrations)",
       "Bash(python manage.py migrate)",
-      "mcp__Claude_in_Chrome__list_connected_browsers"
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "Bash(awk '/^@media \\\\\\(max-width: 760px\\\\\\)/{start=NR} /^}$/ && NR>start && NR>2000{print NR\": \"$0; if\\(start\\) {exit}}' \"/d/Github/Biota-shifts-django/static/shifts/css/product_detail.css\")"
     ]
   }
 }
