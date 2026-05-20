@@ -1406,9 +1406,19 @@
       }
       panel.hidden = false;
       panel.classList.remove("opens-up");
-      var rect = panel.getBoundingClientRect();
-      if (rect.bottom > window.innerHeight - 8) {
-        panel.classList.add("opens-up");
+      // Определяем, нужно ли открыть дропдаун вверх
+      var searchEl = combo.querySelector(".js-machines-product-search");
+      if (searchEl) {
+        var searchRect = searchEl.getBoundingClientRect();
+        var panelHeight = panel.offsetHeight || 240;
+        if (searchRect.bottom + panelHeight + 4 > window.innerHeight - 8) {
+          panel.classList.add("opens-up");
+        }
+      } else {
+        var rect = panel.getBoundingClientRect();
+        if (rect.bottom > window.innerHeight - 8) {
+          panel.classList.add("opens-up");
+        }
       }
       combo.classList.add("is-open");
       var schRow = combo.closest(".machines-schedule-row");
