@@ -985,19 +985,27 @@
     function syncQuickEditability(on) {
       quickWrap.querySelectorAll(".machines-quick-row > .machines-cell").forEach(function (cell) {
         if (on) {
-          // Для field cells полностью очищаем структуру и оставляем только текст
-          if (cell.classList.contains("machines-cell--field") && !cell.classList.contains("machines-cell--notes")) {
-            var innerOn = cell.querySelector(".machines-quick-field-view");
-            var textToKeep = innerOn ? getQuickFieldFlatText(innerOn) : (cell.textContent || "");
-            cell.textContent = textToKeep;
-          }
           cell.setAttribute("contenteditable", "true");
           cell.setAttribute("spellcheck", "false");
+          if (cell.classList.contains("machines-cell--field") && !cell.classList.contains("machines-cell--notes")) {
+            var innerOn = cell.querySelector(".machines-quick-field-view");
+            if (innerOn) {
+              collapseQuickFieldViewForEdit(innerOn);
+            }
+            // Защищаем select и его обёртку от contenteditable
+            var andSetup = cell.querySelector(".machines-quick-field-and-setup");
+            if (andSetup) andSetup.setAttribute("contenteditable", "false");
+            if (innerOn) innerOn.setAttribute("contenteditable", "true");
+          }
         } else {
           normalizeQuickEditableCell(cell);
           syncQuickFieldProductRefAfterBlur(cell);
           cell.removeAttribute("contenteditable");
           cell.removeAttribute("spellcheck");
+          var andSetupOff = cell.querySelector(".machines-quick-field-and-setup");
+          if (andSetupOff) andSetupOff.removeAttribute("contenteditable");
+          var innerOff = cell.querySelector(".machines-quick-field-view");
+          if (innerOff) innerOff.removeAttribute("contenteditable");
         }
       });
     }
