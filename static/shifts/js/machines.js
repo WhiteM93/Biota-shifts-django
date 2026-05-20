@@ -1405,6 +1405,11 @@
         panel.appendChild(empty);
       }
       panel.hidden = false;
+      panel.classList.remove("opens-up");
+      var rect = panel.getBoundingClientRect();
+      if (rect.bottom > window.innerHeight - 8) {
+        panel.classList.add("opens-up");
+      }
       combo.classList.add("is-open");
       var schRow = combo.closest(".machines-schedule-row");
       if (schRow) schRow.classList.add("machines-schedule-row--suggest-open");

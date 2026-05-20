@@ -827,12 +827,13 @@
     left: auto;
     right: 0;
     top: calc(100% + 2px);
+    bottom: auto;
     width: min(320px, calc(100vw - 24px));
     max-width: calc(100vw - 24px);
     min-width: 0;
     box-sizing: border-box;
-    max-height: none;
-    overflow: visible;
+    max-height: 240px;
+    overflow-y: auto;
     border: 1px solid var(--bio-input-border);
     border-radius: 4px;
     background: var(--bio-input-bg);
@@ -841,6 +842,11 @@
     -webkit-overflow-scrolling: touch;
     transform-origin: top right;
     animation: machinesSuggestReveal 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .machines-product-suggest.opens-up {
+    top: auto;
+    bottom: calc(100% + 2px);
+    transform-origin: bottom right;
   }
   .machines-product-suggest-item {
     display: block;
