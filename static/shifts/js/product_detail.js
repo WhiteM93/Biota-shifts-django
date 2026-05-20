@@ -654,6 +654,12 @@ var PD = (function () {
         var mat = wrap.querySelector(".js-plan-inline-material");
         if (mat) mat.value = state.plan_material || state.made_material || state.laser_material_marking || "";
         syncSetupPlanInlineVisibility(wrap);
+
+        // Синхронизировать каскадную форму если она существует
+        var cascadeFormContainer = wrap.querySelector("[data-plan-cascade-form]");
+        if (cascadeFormContainer && cascadeFormContainer._cascadeFormManager) {
+          cascadeFormContainer._cascadeFormManager.syncFromServer(state);
+        }
       });
     }
 
@@ -1495,6 +1501,15 @@ var PD = (function () {
       syncSetupPlanInlineVisibility(wrap);
     });
 
+    // Инициализация каскадной формы планирования
+    root.querySelectorAll("[data-plan-cascade-form]").forEach(function (formContainer) {
+      if (typeof PlanCascadeFormManager !== "undefined") {
+        var cascadeForm = new PlanCascadeFormManager(formContainer);
+        // Сохранить ссылку на менеджер для доступа из других функций
+        formContainer._cascadeFormManager = cascadeForm;
+      }
+    });
+
     root.addEventListener(
       "paste",
       function (e) {
@@ -1602,6 +1617,41 @@ var PD = (function () {
     }
 
     function appendPlanFieldsToPayload(payload, planWrap) {
+      if (!planWrap) return;
+
+      // Проверить наличие каскадной формы
+      var cascadeFormContainer = planWrap.querySelector("[data-plan-cascade-form]");
+      if (cascadeFormContainer && cascadeFormContainer._cascadeFormManager) {
+        // Использовать новую каскадную форму
+        var cascadeManager = cascadeFormContainer._cascadeFormManager;
+
+        // Валидировать форму
+        var validation = cascadeManager.validateForm();
+        if (!validation.valid) {
+          // Ошибка валидации - не отправлять
+          console.warn("Cascade form validation errors:", validation.errors);
+          return;
+        }
+
+        // Получить payload из менеджера
+        var formData = cascadeManager.getFormPayload();
+
+        // Добавить в payload FormData
+        payload.append("sync_plan_from_inline", "1");
+        payload.append("product_type", formData.product_type || "");
+        payload.append("plan_product_type", formData.product_type || "");
+        payload.append("workpiece_type", formData.workpiece_type || "");
+        payload.append("laser_thickness", formData.laser_thickness || "");
+        payload.append("laser_sheet_thickness_mm", formData.laser_thickness || "");
+        payload.append("material", formData.material || "");
+        payload.append("plan_material", formData.material || "");
+        payload.append("workpiece_size", formData.workpiece_size || "");
+        payload.append("workpiece_type_enum", formData.workpiece_type_enum || "");
+
+        return;
+      }
+
+      // Fallback на старый способ для совместимости
       var planTypeEl = planWrap ? planWrap.querySelector(".js-plan-inline-product-type") : null;
       if (!planWrap || !planTypeEl) return;
       var ptype = (planTypeEl.value || "made").trim();

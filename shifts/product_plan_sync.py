@@ -95,18 +95,114 @@ def _plan_material_from_post(post: Any) -> str:
 
 
 def validate_product_plan_post(post: Any) -> str | None:
-    """POST / QueryDict — ошибка для messages.error или None."""
-    t = normalize_plan_product_type(post.get("plan_product_type"))
-    if t == "made":
-        wp = (post.get("workpiece_type") or "").strip()
-        if wp not in PLANNED_PRODUCT_WORKPIECE_TYPE_VALUES:
-            return "Для изделия выберите тип заготовки: заготовительный, лазер или ПКИ."
-        if wp == "laser":
-            _, terr = parse_laser_sheet_thickness_mm(post.get("laser_sheet_thickness_mm"))
-            if terr:
-                return terr
-            if not _plan_material_from_post(post):
-                return "Укажите материал для лазерной заготовки."
+    """
+    Валидация формы планирования изделия с поддержкой каскадной логики.
+
+    Проверяет обязательные поля в зависимости от выбранного пути каскада:
+    1. Изделие → Лазерная резка: требуется толщина листа и материал
+    2. Изделие → Ленточная пила: требуется материал, размер и тип заготовки
+    3. Изделие → ПКИ (вид): требуется материал и размер
+    4. Сборка: требуется материал и размер
+    5. ПКИ (тип): требуется материал и размер
+
+    Args:
+        post: POST данные или QueryDict
+
+    Returns:
+        Строка ошибки для messages.error или None если валидация пройдена
+    """
+    # Получить тип изделия (product_type или старый план_product_type)
+    product_type = (post.get("product_type") or post.get("plan_product_type") or "").strip()
+    product_type = normalize_plan_product_type(product_type)
+
+    if not product_type:
+        return "Выберите тип изделия (Изделие, Сборка или ПКИ)."
+
+    # Путь 1: Изделие
+    if product_type == "made":
+        workpiece_type = (post.get("workpiece_type") or "").strip()
+
+        if not workpiece_type:
+            return "Для изделия выберите вид заготовки."
+
+        if workpiece_type not in PLANNED_PRODUCT_WORKPIECE_TYPE_VALUES:
+            return "Неизвестный вид заготовки. Выберите: ленточная пила, лазерная резка или ПКИ."
+
+        # Путь 1a: Лазерная резка
+        if workpiece_type == "laser":
+            # Проверить толщину листа
+            laser_thickness = (post.get("laser_thickness") or post.get("laser_sheet_thickness_mm") or "").strip()
+            if not laser_thickness:
+                return "Укажите толщину листа (мм)."
+
+            try:
+                thickness_value = float(laser_thickness)
+                if thickness_value <= 0:
+                    return "Толщина листа должна быть больше 0."
+                if thickness_value >= 500:
+                    return "Толщина листа должна быть меньше 500 мм."
+            except (ValueError, TypeError):
+                return "Толщина листа должна быть числовым значением."
+
+            # Проверить материал
+            material = (post.get("material") or post.get("plan_material") or "").strip()
+            if not material:
+                return "Укажите материал для лазерной резки."
+
+        # Путь 1b: Ленточная пила (preparatory)
+        elif workpiece_type == "preparatory":
+            # Проверить материал
+            material = (post.get("material") or post.get("plan_material") or "").strip()
+            if not material:
+                return "Укажите материал для ленточной пилы."
+
+            # Проверить размер заготовки
+            workpiece_size = (post.get("workpiece_size") or "").strip()
+            if not workpiece_size:
+                return "Укажите размер заготовки."
+
+            # Проверить тип заготовки
+            workpiece_type_enum = (post.get("workpiece_type_enum") or "").strip()
+            if not workpiece_type_enum:
+                return "Выберите тип заготовки."
+
+        # Путь 1c: ПКИ (вид заготовки)
+        elif workpiece_type == "pki":
+            # Проверить материал
+            material = (post.get("material") or post.get("plan_material") or "").strip()
+            if not material:
+                return "Укажите материал для ПКИ заготовки."
+
+            # Проверить размер заготовки
+            workpiece_size = (post.get("workpiece_size") or "").strip()
+            if not workpiece_size:
+                return "Укажите размер заготовки."
+
+    # Путь 2: Сборка
+    elif product_type == "assembly":
+        # Проверить материал
+        material = (post.get("material") or post.get("plan_material") or "").strip()
+        if not material:
+            return "Укажите материал для сборки."
+
+        # Проверить размер заготовки
+        workpiece_size = (post.get("workpiece_size") or "").strip()
+        if not workpiece_size:
+            return "Укажите размер заготовки для сборки."
+
+    # Путь 3: ПКИ (тип изделия)
+    elif product_type == "pki":
+        # Проверить материал
+        material = (post.get("material") or post.get("plan_material") or "").strip()
+        if not material:
+            return "Укажите материал для ПКИ."
+
+        # Проверить размер заготовки
+        workpiece_size = (post.get("workpiece_size") or "").strip()
+        if not workpiece_size:
+            return "Укажите размер заготовки для ПКИ."
+
+    # Все проверки пройдены
     return None
 
 
@@ -132,15 +228,24 @@ def plan_piece_for_naladki_card(product: Product) -> PlannedProduct | None:
 
 
 def plan_inline_state_payload(product: Product | None) -> dict[str, str]:
-    """Состояние полей плана после сохранения (для инлайна / синхронизации форм)."""
+    """
+    Состояние полей плана после сохранения (для инлайна / синхронизации форм).
+
+    Используется для обновления форм на клиенте после сохранения данных.
+    Включает все поля каскадной формы.
+    """
     ctx = plan_form_context(product)
     return {
+        "product_type": ctx.get("plan_product_type") or "made",
         "plan_product_type": ctx.get("plan_product_type") or "made",
         "workpiece_type": ctx.get("plan_workpiece_type_value") or "",
+        "laser_thickness": ctx.get("plan_laser_sheet_thickness_value") or "",
         "laser_sheet_thickness_mm": ctx.get("plan_laser_sheet_thickness_value") or "",
+        "material": ctx.get("plan_material_value") or "",
         "plan_material": ctx.get("plan_material_value") or "",
-        "made_material": ctx.get("plan_material_value") or "",
-        "laser_material_marking": ctx.get("plan_material_value") or "",
+        "laser_material_marking": ctx.get("plan_laser_material_marking_value") or "",
+        "workpiece_size": ctx.get("plan_workpiece_size_value") or "",
+        "workpiece_type_enum": ctx.get("plan_workpiece_type_enum_value") or "",
     }
 
 
@@ -196,12 +301,22 @@ def plan_card_summary(pp: PlannedProduct | None, product: Product | None = None)
 
 
 def plan_form_context(product: Product | None) -> dict[str, Any]:
-    """Контекст шаблона: блок «Тип / заготовка» как в плане."""
+    """
+    Контекст шаблона для формы планирования изделия.
+
+    Возвращает все данные о плане изделия для отображения и редактирования:
+    - Тип изделия (Изделие, Сборка, ПКИ)
+    - Вид заготовки (Ленточная пила, Лазерная резка, ПКИ)
+    - Параметры в зависимости от пути каскада
+    """
     plan_product_type = "made"
     workpiece_type_value = ""
     laser_sheet_thickness_value = ""
     laser_material_marking_value = ""
+    workpiece_size_value = ""
+    workpiece_type_enum_value = ""
     plan_piece = None
+
     if product is not None and getattr(product, "pk", None):
         plan_piece = plan_piece_for_naladki_card(product)
         if plan_piece:
@@ -211,23 +326,32 @@ def plan_form_context(product: Product | None) -> dict[str, Any]:
                 plan_product_type = "pki"
             else:
                 plan_product_type = "made"
+
             workpiece_type_value = (plan_piece.workpiece_type or "").strip()
+
             if plan_piece.laser_sheet_thickness_mm is not None:
                 d = plan_piece.laser_sheet_thickness_mm
                 s = format(d, "f").rstrip("0").rstrip(".")
                 laser_sheet_thickness_value = s if s else "0"
+
             laser_material_marking_value = (plan_piece.laser_material_marking or "").strip()
+            workpiece_size_value = (plan_piece.workpiece_size or "").strip()
+            workpiece_type_enum_value = (plan_piece.workpiece_type_enum or "").strip()
+
     plan_made_material_value = _plan_material_value(product, plan_piece)
     card = plan_card_summary(plan_piece, product)
+
     return {
         "plan_piece": plan_piece,
         "plan_product_type": plan_product_type,
         "plan_workpiece_type_value": workpiece_type_value,
         "plan_workpiece_type_choices": PLANNED_PRODUCT_WORKPIECE_TYPE_CHOICES,
         "plan_laser_sheet_thickness_value": laser_sheet_thickness_value,
-        "plan_laser_material_marking_value": (plan_piece.laser_material_marking or "").strip() if plan_piece else "",
+        "plan_laser_material_marking_value": laser_material_marking_value,
         "plan_made_material_value": plan_made_material_value,
         "plan_material_value": plan_made_material_value,
+        "plan_workpiece_size_value": workpiece_size_value,
+        "plan_workpiece_type_enum_value": workpiece_type_enum_value,
         "plan_laser_material_marking_suggestions": plan_material_suggestions(),
         "plan_material_suggestions": plan_material_suggestions(),
         "plan_display_type_line": card["type_line"],
@@ -261,32 +385,79 @@ def apply_product_plan_post(product: Product, post: Any) -> str | None:
             ensure_plan_piece_for_naladki_product(product.pk)
             pp = PlannedProduct.objects.select_for_update().get(naladki_product_id=product.pk)
 
-        t = normalize_plan_product_type(post.get("plan_product_type"))
+        t = normalize_plan_product_type(post.get("product_type") or post.get("plan_product_type") or "")
         is_asm, is_pki = flags_from_plan_product_type(t)
 
         pp.name = nm_plan or pp.name
         pp.is_assembly = is_asm
         pp.is_purchased = is_pki
 
+        # Получить материал (общий для всех путей, если нужен)
+        plan_mat = (post.get("material") or post.get("plan_material") or "").strip()
+
         if t == "made":
             wp = (post.get("workpiece_type") or "").strip()
             pp.workpiece_type = wp
-            plan_mat = _plan_material_from_post(post)
+
             if wp == "laser":
-                thick, _ = parse_laser_sheet_thickness_mm(post.get("laser_sheet_thickness_mm"))
+                # Путь: Изделие → Лазерная резка
+                thick, _ = parse_laser_sheet_thickness_mm(
+                    post.get("laser_thickness") or post.get("laser_sheet_thickness_mm")
+                )
                 if thick is None:
                     return "Укажите толщину листа, мм."
                 pp.laser_sheet_thickness_mm = thick
                 pp.laser_material_marking = plan_mat
-            else:
+                pp.workpiece_size = ""
+                pp.workpiece_type_enum = ""
+
+            elif wp == "preparatory":
+                # Путь: Изделие → Ленточная пила
                 pp.laser_sheet_thickness_mm = None
                 pp.laser_material_marking = ""
-        else:
+                pp.workpiece_size = (post.get("workpiece_size") or "").strip()
+                pp.workpiece_type_enum = (post.get("workpiece_type_enum") or "").strip()
+
+            elif wp == "pki":
+                # Путь: Изделие → ПКИ (вид заготовки)
+                pp.laser_sheet_thickness_mm = None
+                pp.laser_material_marking = ""
+                pp.workpiece_size = (post.get("workpiece_size") or "").strip()
+                pp.workpiece_type_enum = ""
+
+            else:
+                # Неизвестный вид заготовки
+                pp.laser_sheet_thickness_mm = None
+                pp.laser_material_marking = ""
+                pp.workpiece_size = ""
+                pp.workpiece_type_enum = ""
+
+        elif t == "assembly":
+            # Путь: Сборка
             pp.workpiece_type = ""
             pp.laser_sheet_thickness_mm = None
             pp.laser_material_marking = ""
+            pp.workpiece_size = (post.get("workpiece_size") or "").strip()
+            pp.workpiece_type_enum = ""
+
+        elif t == "pki":
+            # Путь: ПКИ (тип изделия)
+            pp.workpiece_type = ""
+            pp.laser_sheet_thickness_mm = None
+            pp.laser_material_marking = ""
+            pp.workpiece_size = (post.get("workpiece_size") or "").strip()
+            pp.workpiece_type_enum = ""
+
+        else:
+            # Нет типа изделия
+            pp.workpiece_type = ""
+            pp.laser_sheet_thickness_mm = None
+            pp.laser_material_marking = ""
+            pp.workpiece_size = ""
+            pp.workpiece_type_enum = ""
             plan_mat = ""
 
+        # Сохранить все поля PlannedProduct
         pp.save(
             update_fields=[
                 "name",
@@ -295,20 +466,22 @@ def apply_product_plan_post(product: Product, post: Any) -> str | None:
                 "workpiece_type",
                 "laser_sheet_thickness_mm",
                 "laser_material_marking",
+                "workpiece_size",
+                "workpiece_type_enum",
                 "updated_at",
             ]
         )
-        if t == "made":
+
+        # Синхронизировать материал с первой установкой (если это путь "made")
+        if t == "made" and plan_mat:
             wp = (post.get("workpiece_type") or "").strip()
-            if wp:
-                sheet_mat = _plan_material_from_post(post)
-                setup0 = (
-                    ProductSetup.objects.filter(product_id=product.pk)
-                    .order_by("sort_order", "id")
-                    .first()
-                )
-                if setup0 and setup0.material != sheet_mat:
-                    setup0.material = sheet_mat
-                    setup0.save(update_fields=["material", "updated_at"])
+            setup0 = (
+                ProductSetup.objects.filter(product_id=product.pk)
+                .order_by("sort_order", "id")
+                .first()
+            )
+            if setup0 and setup0.material != plan_mat:
+                setup0.material = plan_mat
+                setup0.save(update_fields=["material", "updated_at"])
         finalize_plan_piece_naladki_link(pp.pk)
     return None

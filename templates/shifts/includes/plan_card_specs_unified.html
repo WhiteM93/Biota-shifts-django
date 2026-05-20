@@ -1,12 +1,96 @@
 {% comment %}
   plan_specs_variant: "product" | "article"
-  product: setups, biota_can_edit, plan_* (plan_form_context), data-product-plan-summary; справа — поля изделия drawing_blank_* (размер и тип заготовки по чертежу)
-  article: только сборка/ПКИ (компактные строки), если когда-либо понадобится отдельная карточка без product.
+
+  Каскадная форма для планирования изделия. Показывает/скрывает поля в зависимости от:
+  - Тип изделия (Изделие, Сборка, ПКИ)
+  - Вид заготовки (Ленточная пила, Лазерная резка, ПКИ) - только для Изделия
+
+  Пути каскада:
+  1. Изделие → Лазерная резка: толщина листа + материал
+  2. Изделие → Ленточная пила: материал + размер + тип заготовки
+  3. Изделие → ПКИ: материал + размер
+  4. Сборка: материал + размер
+  5. ПКИ (тип): материал + размер
 {% endcomment %}
-<div class="plan-unified-specs-card filter-panel product-drawing-plan-section plan-article-readonly-specs">
+
+<div class="plan-unified-specs-card filter-panel product-drawing-plan-section">
   <div class="plan-unified-specs-grid">
     <div class="plan-unified-specs-grid__left">
       {% if plan_specs_variant == "product" %}
+
+      <!-- Каскадная форма для редактирования -->
+      {% if biota_can_edit %}
+      <div class="plan-cascade-form-container" data-plan-cascade-form>
+
+        <!-- Поле 1: Тип изделия (всегда видимо) -->
+        <div class="form-field form-field--always-visible" data-field="product_type">
+          <label class="form-label muted">Тип изделия</label>
+          <select class="plan-cascade-product-type" data-field="product_type" autocomplete="off" aria-label="Тип позиции в плане">
+            <option value="">— выберите —</option>
+            <option value="made" {% if plan_product_type == 'made' %}selected{% endif %}>Изделие</option>
+            <option value="assembly" {% if plan_product_type == 'assembly' %}selected{% endif %}>Сборка</option>
+            <option value="pki" {% if plan_product_type == 'pki' %}selected{% endif %}>ПКИ</option>
+          </select>
+        </div>
+
+        <!-- Поле 2: Вид заготовки (видно если Тип изделия = "made") -->
+        <div class="form-field form-field--cascade" data-field="workpiece_type" data-show-when="product_type=made">
+          <label class="form-label muted">Вид заготовки</label>
+          <select class="plan-cascade-workpiece-type" data-field="workpiece_type" autocomplete="off" aria-label="Вид заготовки">
+            <option value="">— выберите —</option>
+            {% for val, label in plan_workpiece_type_choices %}
+            <option value="{{ val }}" {% if plan_workpiece_type_value == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Поле 3: Толщина листа (видно если product_type=made AND workpiece_type=laser) -->
+        <div class="form-field form-field--cascade" data-field="laser_thickness" data-show-when="product_type=made&workpiece_type=laser">
+          <label class="form-label muted">Толщина листа (мм)</label>
+          <input type="number" class="plan-cascade-laser-thickness" data-field="laser_thickness"
+                 value="{{ plan_laser_sheet_thickness_value|default:'' }}"
+                 placeholder="мм" min="0" max="500" step="0.1"
+                 inputmode="decimal" autocomplete="off" aria-label="Толщина листа, мм">
+        </div>
+
+        <!-- Поле 4: Материал (видно для всех путей кроме только product_type select) -->
+        <div class="form-field form-field--cascade" data-field="material" data-show-when="product_type=made&workpiece_type=laser|product_type=made&workpiece_type=preparatory|product_type=made&workpiece_type=pki|product_type=assembly|product_type=pki">
+          <label class="form-label muted">Материал</label>
+          <input type="text" class="plan-cascade-material" data-field="material"
+                 value="{{ plan_material_value|default:'' }}"
+                 maxlength="240" list="plan-cascade-material-datalist"
+                 placeholder="Начните вводить или выберите..."
+                 autocomplete="off" aria-label="Материал заготовки">
+          <datalist id="plan-cascade-material-datalist">
+            {% for m in plan_material_suggestions %}
+            <option value="{{ m }}">{{ m }}</option>
+            {% endfor %}
+          </datalist>
+        </div>
+
+        <!-- Поле 5: Размер заготовки (видно если нужен размер) -->
+        <div class="form-field form-field--cascade" data-field="workpiece_size" data-show-when="product_type=made&workpiece_type=preparatory|product_type=made&workpiece_type=pki|product_type=assembly|product_type=pki">
+          <label class="form-label muted">Размер заготовки</label>
+          <input type="text" class="plan-cascade-workpiece-size" data-field="workpiece_size"
+                 value="{{ plan_workpiece_size_value|default:'' }}"
+                 maxlength="100"
+                 placeholder="например: 10x10x10"
+                 autocomplete="off" aria-label="Размер заготовки">
+        </div>
+
+        <!-- Поле 6: Тип заготовки (видно если product_type=made AND workpiece_type=preparatory) -->
+        <div class="form-field form-field--cascade" data-field="workpiece_type_enum" data-show-when="product_type=made&workpiece_type=preparatory">
+          <label class="form-label muted">Тип заготовки</label>
+          <select class="plan-cascade-type-enum" data-field="workpiece_type_enum" autocomplete="off" aria-label="Тип заготовки">
+            <option value="">— выберите —</option>
+            <option value="preparatory" {% if plan_workpiece_type_enum_value == 'preparatory' %}selected{% endif %}>Заготовительный</option>
+          </select>
+        </div>
+
+      </div>
+
+      <!-- Режим просмотра (не редактирование) -->
+      {% else %}
       <div class="setup-meta-plan-block">
         <div class="setup-plan-summary-wrap" data-product-plan-summary>
           <div class="setup-plan-quick-readonly">
@@ -14,53 +98,26 @@
               <span class="muted">Тип изделия:</span>
               <div class="setup-plan-summary-cell">
                 <span class="setup-plan-summary-value" data-plan-product-kind-line>{{ plan_display_product_kind_line }}</span>
-                {% if biota_can_edit %}
-                <div class="setup-plan-inline-fields">
-                  <select class="js-plan-inline-product-type" autocomplete="off" aria-label="Тип позиции в плане">
-                    <option value="made" {% if plan_product_type == 'made' %}selected{% endif %}>Изделие</option>
-                    <option value="assembly" {% if plan_product_type == 'assembly' %}selected{% endif %}>Сборка</option>
-                    <option value="pki" {% if plan_product_type == 'pki' %}selected{% endif %}>ПКИ</option>
-                  </select>
-                </div>
-                {% endif %}
               </div>
             </div>
             <div class="setup-plan-summary-line setup-plan-line--workpiece">
-              <span class="muted">Тип заготовки:</span>
+              <span class="muted">Вид заготовки:</span>
               <div class="setup-plan-summary-cell">
                 <span class="setup-plan-summary-value" data-plan-workpiece-line>{{ plan_display_workpiece_line }}</span>
-                {% if biota_can_edit %}
-                <div class="setup-plan-inline-fields">
-                  <select class="js-plan-inline-workpiece" autocomplete="off" aria-label="Тип заготовки в плане">
-                    <option value="">— выберите —</option>
-                    {% for val, label in plan_workpiece_type_choices %}
-                    <option value="{{ val }}" {% if plan_workpiece_type_value == val %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                  </select>
-                  <input type="text" class="js-plan-inline-laser-thick" inputmode="decimal" placeholder="Толщина, мм" value="{{ plan_laser_sheet_thickness_value }}" autocomplete="off" aria-label="Толщина листа, мм">
-                </div>
-                {% endif %}
               </div>
             </div>
             <div class="setup-plan-summary-line setup-plan-line--material">
               <span class="muted">Материал:</span>
               <div class="setup-plan-summary-cell">
                 <span class="setup-plan-summary-value" data-plan-material-line>{{ plan_display_material_line }}</span>
-                {% if biota_can_edit %}
-                <div class="setup-plan-inline-fields">
-                  <input type="text" class="js-plan-inline-material" value="{{ plan_material_value|default:'' }}" maxlength="180" list="drawing-inline-plan-material-dl" placeholder="Материал заготовки" autocomplete="off" aria-label="Материал заготовки">
-                  <datalist id="drawing-inline-plan-material-dl">
-                    {% for m in plan_material_suggestions %}
-                    <option value="{{ m }}"></option>
-                    {% endfor %}
-                  </datalist>
-                </div>
-                {% endif %}
               </div>
             </div>
           </div>
         </div>
       </div>
+      {% endif %}
+
+      <!-- Вариант для не-product -->
       {% else %}
       <div class="setup-meta-plan-block">
         <div class="setup-plan-summary-wrap">
@@ -71,7 +128,7 @@
               <div class="setup-plan-summary-cell"><strong>Сборка</strong></div>
             </div>
             <div class="setup-plan-summary-line">
-              <span class="muted">Тип заготовки:</span>
+              <span class="muted">Вид заготовки:</span>
               <div class="setup-plan-summary-cell"><span class="muted">—</span></div>
             </div>
             <div class="setup-plan-summary-line">
@@ -84,7 +141,7 @@
               <div class="setup-plan-summary-cell"><strong>ПКИ</strong></div>
             </div>
             <div class="setup-plan-summary-line">
-              <span class="muted">Тип заготовки:</span>
+              <span class="muted">Вид заготовки:</span>
               <div class="setup-plan-summary-cell"><span class="muted">—</span></div>
             </div>
             <div class="setup-plan-summary-line">
@@ -96,17 +153,20 @@
         </div>
       </div>
       {% endif %}
+
     </div>
+
+    <!-- Правая колонка: размер и тип заготовки из чертежа -->
     <div class="plan-unified-specs-grid__right">
       {% if plan_specs_variant == "product" %}
         <div class="setup-plan-summary-line setup-plan-line--blank-size">
-          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-size-label">Размер заготовки</span>
+          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-size-label">Размер заготовки по чертежу</span>
           <div class="setup-plan-summary-cell">
             <span id="plan-product-drawing-blank-size" data-field-text="drawing_blank_size" aria-labelledby="plan-product-drawing-blank-size-label">{% if product.drawing_blank_size %}{{ product.drawing_blank_size }}{% else %}—{% endif %}</span>
           </div>
         </div>
         <div class="setup-plan-summary-line setup-plan-line--blank-size">
-          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-type-label">Тип заготовки</span>
+          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-type-label">Тип заготовки по чертежу</span>
           <div class="setup-plan-summary-cell">
             <span id="plan-product-drawing-blank-type" data-field-text="drawing_blank_type" aria-labelledby="plan-product-drawing-blank-type-label">{% if product.drawing_blank_type %}{{ product.drawing_blank_type }}{% else %}—{% endif %}</span>
           </div>
@@ -114,13 +174,13 @@
       {% else %}
         {% with nprod=item.naladki_product %}
         <div class="setup-plan-summary-line setup-plan-line--blank-size">
-          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-size-label">Размер заготовки</span>
+          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-size-label">Размер заготовки по чертежу</span>
           <div class="setup-plan-summary-cell">
             <span id="plan-product-drawing-blank-size" data-field-text="drawing_blank_size" aria-labelledby="plan-product-drawing-blank-size-label">{% if nprod and nprod.drawing_blank_size %}{{ nprod.drawing_blank_size }}{% else %}—{% endif %}</span>
           </div>
         </div>
         <div class="setup-plan-summary-line setup-plan-line--blank-size">
-          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-type-label">Тип заготовки</span>
+          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-type-label">Тип заготовки по чертежу</span>
           <div class="setup-plan-summary-cell">
             <span id="plan-product-drawing-blank-type" data-field-text="drawing_blank_type" aria-labelledby="plan-product-drawing-blank-type-label">{% if nprod and nprod.drawing_blank_type %}{{ nprod.drawing_blank_type }}{% else %}—{% endif %}</span>
           </div>
@@ -128,5 +188,6 @@
         {% endwith %}
       {% endif %}
     </div>
+
   </div>
 </div>

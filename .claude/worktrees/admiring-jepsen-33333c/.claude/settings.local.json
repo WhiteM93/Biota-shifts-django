@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C D:/Github/Biota-shifts-django fetch origin main)",
+      "Bash(git -C D:/Github/Biota-shifts-django reset --hard origin/main)",
+      "Bash(git -C D:/Github/Biota-shifts-django clean -fd -e \".env.secrets\" -e \".env\" -e \"schedules/\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(python manage.py makemigrations)",
+      "Bash(python manage.py migrate)"
+    ]
+  }
+}

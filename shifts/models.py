@@ -1402,6 +1402,20 @@ class PlannedProduct(models.Model):
         verbose_name="Маркировка материала (лазер)",
         help_text="Для заготовки с лазера: маркировка листа/материала.",
     )
+    workpiece_size = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        verbose_name="Размер заготовки",
+        help_text="Размеры заготовки для ленточной пилы или ПКИ (например: 10x10x10).",
+    )
+    workpiece_type_enum = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        verbose_name="Тип заготовки",
+        help_text="Тип заготовки для ленточной пилы (заготовительный, валиковый и т.д.).",
+    )
     naladki_product = models.OneToOneField(
         "Product",
         null=True,
