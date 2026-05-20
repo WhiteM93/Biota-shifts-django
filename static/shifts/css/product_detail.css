@@ -1,7 +1,202 @@
 {% include "shifts/includes/plan_card_specs_styles.html" %}
 
 @import url("https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css");
-  @import url("https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css");
+@import url("https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css");
+
+/* ── Переменные стиля (из калькулятора) ── */
+:root {
+  --pd-text: #eaf0ff;
+  --pd-text-muted: #9bb0d8;
+  --pd-accent: #8f9cff;
+  --pd-accent2: #6f7ef2;
+  --pd-success: #34d399;
+  --pd-glass-bg: rgba(255,255,255,.04);
+  --pd-glass-border: rgba(255,255,255,.09);
+  --pd-card-bg: #151b27;
+}
+
+html[data-theme="dawn"] {
+  --pd-text: #3c362f;
+  --pd-text-muted: #6b6258;
+  --pd-accent: #14b8a6;
+  --pd-accent2: #0d9488;
+  --pd-success: #f59e0b;
+  --pd-glass-bg: rgba(0,0,0,.030);
+  --pd-glass-border: rgba(0,0,0,.075);
+  --pd-card-bg: #fffefb;
+}
+
+/* ── Улучшенные стили для формы ── */
+.setup-meta-plan-block,
+.setup-plan-summary-wrap {
+  background: var(--pd-glass-bg) !important;
+  border: 1px solid var(--pd-glass-border) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  backdrop-filter: blur(12px);
+  transition: all 0.2s ease;
+}
+
+.setup-plan-summary-wrap:hover {
+  background: rgba(255,255,255,.06) !important;
+  border-color: rgba(255,255,255,.12) !important;
+}
+
+.setup-plan-summary-line {
+  margin-bottom: 14px !important;
+  padding: 8px 0 !important;
+}
+
+.setup-plan-summary-line:last-child {
+  margin-bottom: 0 !important;
+}
+
+.setup-plan-summary-line .muted {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--pd-text-muted);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.setup-plan-summary-cell select,
+.setup-plan-inline-fields select {
+  background: var(--pd-glass-bg) !important;
+  border: 1px solid var(--pd-glass-border) !important;
+  color: var(--pd-text) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  font-size: 14px;
+  min-height: 36px;
+  transition: all 0.2s ease;
+}
+
+.setup-plan-summary-cell select:hover,
+.setup-plan-inline-fields select:hover {
+  border-color: var(--pd-accent2) !important;
+  background: rgba(255,255,255,.06) !important;
+}
+
+.setup-plan-summary-cell select:focus,
+.setup-plan-inline-fields select:focus {
+  border-color: var(--pd-accent) !important;
+  background: rgba(255,255,255,.08) !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(143, 156, 255, .15) !important;
+}
+
+.setup-plan-summary-value {
+  font-weight: 500;
+  color: var(--pd-text);
+  padding: 6px 0;
+}
+
+/* ── Улучшенные стили для карточек параметров ── */
+.plan-unified-specs-card {
+  background: var(--pd-glass-bg) !important;
+  border: 1px solid var(--pd-glass-border) !important;
+  border-radius: 14px !important;
+  padding: 20px !important;
+  backdrop-filter: blur(12px);
+  margin-bottom: 20px;
+}
+
+.plan-unified-specs-card h5 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--pd-accent);
+  margin: 0 0 12px;
+}
+
+/* ── Улучшенные стили для input/textarea ── */
+.setup-plan-inline-fields input[type="text"],
+.setup-plan-inline-fields input[type="email"],
+.setup-plan-inline-fields textarea {
+  background: var(--pd-glass-bg) !important;
+  border: 1px solid var(--pd-glass-border) !important;
+  color: var(--pd-text) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.setup-plan-inline-fields input[type="text"]:hover,
+.setup-plan-inline-fields input[type="email"]:hover,
+.setup-plan-inline-fields textarea:hover {
+  border-color: var(--pd-accent2) !important;
+  background: rgba(255,255,255,.06) !important;
+}
+
+.setup-plan-inline-fields input[type="text"]:focus,
+.setup-plan-inline-fields input[type="email"]:focus,
+.setup-plan-inline-fields textarea:focus {
+  border-color: var(--pd-accent) !important;
+  background: rgba(255,255,255,.08) !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(143, 156, 255, .15) !important;
+}
+
+/* ── Стили для кнопок ── */
+.btn {
+  border-radius: 8px !important;
+  transition: all 0.2s ease;
+}
+
+.btn.btn-ghost {
+  background: var(--pd-glass-bg) !important;
+  border: 1px solid var(--pd-glass-border) !important;
+  color: var(--pd-text) !important;
+}
+
+.btn.btn-ghost:hover {
+  border-color: var(--pd-accent2) !important;
+  background: rgba(255,255,255,.06) !important;
+}
+
+/* ── Стили для блока с названием и описанием ── */
+.product-drawing-meta {
+  background: var(--pd-glass-bg) !important;
+  border: 1px solid var(--pd-glass-border) !important;
+  border-radius: 14px !important;
+  padding: 20px !important;
+  backdrop-filter: blur(12px);
+  margin-bottom: 20px;
+}
+
+.product-drawing-meta .product-drawing-name-row {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.product-drawing-name-row__label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--pd-accent);
+}
+
+.product-drawing-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--pd-text);
+  line-height: 1.3;
+}
+
+.product-drawing-description__text {
+  font-size: 14px;
+  color: var(--pd-text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
 
   .product-setup-photos {
     margin-top: 16px;
@@ -1979,7 +2174,7 @@
   .product-drawing-intro {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 14px;
     margin-bottom: 16px;
   }
@@ -1992,6 +2187,9 @@
     min-width: 0;
     margin: 0;
     padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
   }
   .product-drawing-name-row {
     display: flex;
