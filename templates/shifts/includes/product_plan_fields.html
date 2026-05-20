@@ -9,7 +9,7 @@
   {% endif %}
   <div class="plan-product-type-row" role="radiogroup" aria-label="Тип позиции плана" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin-bottom:12px;">
     <span class="muted" style="font-size:12px;font-weight:600;width:100%;">Тип</span>
-    <label class="chk"><input type="radio" name="plan_product_type" value="made" class="js-product-plan-type" id="{{ pfx }}-type-made" {% if plan_product_type == 'made' %}checked{% endif %}><span>Изделие</span></label>
+    <label class="chk"><input type="radio" name="plan_product_type" value="made" class="js-product-plan-type" id="{{ pfx }}-type-made" {% if plan_product_type == 'made' %}checked{% endif %}><span>Деталь</span></label>
     <label class="chk"><input type="radio" name="plan_product_type" value="assembly" class="js-product-plan-type" id="{{ pfx }}-type-asm" {% if plan_product_type == 'assembly' %}checked{% endif %}><span>Сборка</span></label>
     <label class="chk"><input type="radio" name="plan_product_type" value="pki" class="js-product-plan-type" id="{{ pfx }}-type-pki" {% if plan_product_type == 'pki' %}checked{% endif %} title="Закупная позиция"><span>ПКИ</span></label>
   </div>

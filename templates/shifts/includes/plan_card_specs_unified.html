@@ -2,13 +2,13 @@
   plan_specs_variant: "product" | "article"
 
   Каскадная форма для планирования изделия. Показывает/скрывает поля в зависимости от:
-  - Тип изделия (Изделие, Сборка, ПКИ)
-  - Вид заготовки (Ленточная пила, Лазерная резка, ПКИ) - только для Изделия
+  - Тип изделия (Деталь, Сборка, ПКИ)
+  - Вид заготовки (Ленточная пила, Лазерная резка, ПКИ) - только для Детали
 
   Пути каскада:
-  1. Изделие → Лазерная резка: толщина листа + материал
-  2. Изделие → Ленточная пила: материал + размер + тип заготовки
-  3. Изделие → ПКИ: материал + размер
+  1. Деталь → Лазерная резка: толщина листа + материал
+  2. Деталь → Ленточная пила: материал + размер + тип заготовки
+  3. Деталь → ПКИ: материал + размер
   4. Сборка: материал + размер
   5. ПКИ (тип): материал + размер
 {% endcomment %}
@@ -27,7 +27,7 @@
           <label class="form-label muted">Тип изделия</label>
           <select class="plan-cascade-product-type" data-field="product_type" autocomplete="off" aria-label="Тип позиции в плане">
             <option value="">— выберите —</option>
-            <option value="made" {% if plan_product_type == 'made' %}selected{% endif %}>Изделие</option>
+            <option value="made" {% if plan_product_type == 'made' %}selected{% endif %}>Деталь</option>
             <option value="assembly" {% if plan_product_type == 'assembly' %}selected{% endif %}>Сборка</option>
             <option value="pki" {% if plan_product_type == 'pki' %}selected{% endif %}>ПКИ</option>
           </select>

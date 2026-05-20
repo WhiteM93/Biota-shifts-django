@@ -99,9 +99,9 @@ def validate_product_plan_post(post: Any) -> str | None:
     Валидация формы планирования изделия с поддержкой каскадной логики.
 
     Проверяет обязательные поля в зависимости от выбранного пути каскада:
-    1. Изделие → Лазерная резка: требуется толщина листа и материал
-    2. Изделие → Ленточная пила: требуется материал, размер и тип заготовки
-    3. Изделие → ПКИ (вид): требуется материал и размер
+    1. Деталь → Лазерная резка: требуется толщина листа и материал
+    2. Деталь → Ленточная пила: требуется материал, размер и тип заготовки
+    3. Деталь → ПКИ (вид): требуется материал и размер
     4. Сборка: требуется материал и размер
     5. ПКИ (тип): требуется материал и размер
 
@@ -271,7 +271,7 @@ def plan_card_summary(pp: PlannedProduct | None, product: Product | None = None)
         summary["workpiece_line"] = "—"
         summary["material_line"] = "—"
         return summary
-    summary["product_kind_line"] = "Изделие"
+    summary["product_kind_line"] = "Деталь"
     if pp.workpiece_type == "laser":
         summary["type_line"] = "Лазер"
         thick = ""
@@ -400,7 +400,7 @@ def apply_product_plan_post(product: Product, post: Any) -> str | None:
             pp.workpiece_type = wp
 
             if wp == "laser":
-                # Путь: Изделие → Лазерная резка
+                # Путь: Деталь → Лазерная резка
                 thick, _ = parse_laser_sheet_thickness_mm(
                     post.get("laser_thickness") or post.get("laser_sheet_thickness_mm")
                 )
@@ -412,14 +412,14 @@ def apply_product_plan_post(product: Product, post: Any) -> str | None:
                 pp.workpiece_type_enum = ""
 
             elif wp == "preparatory":
-                # Путь: Изделие → Ленточная пила
+                # Путь: Деталь → Ленточная пила
                 pp.laser_sheet_thickness_mm = None
                 pp.laser_material_marking = ""
                 pp.workpiece_size = (post.get("workpiece_size") or "").strip()
                 pp.workpiece_type_enum = (post.get("workpiece_type_enum") or "").strip()
 
             elif wp == "pki":
-                # Путь: Изделие → ПКИ (вид заготовки)
+                # Путь: Деталь → ПКИ (вид заготовки)
                 pp.laser_sheet_thickness_mm = None
                 pp.laser_material_marking = ""
                 pp.workpiece_size = (post.get("workpiece_size") or "").strip()
