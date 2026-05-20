@@ -42,8 +42,8 @@ _DEFAULT_MACHINE_ROWS = [
 ]
 
 _DEFAULT_SCHEDULE_ROWS = [
-    {"label": "График по станку", "machine_code": "F-10", "product_id": None, "setup_id": None},
-    {"label": "", "machine_code": "F-05", "product_id": None, "setup_id": None},
+    {"label": "График по станку", "machine_code": "F-10", "product_id": None, "setup_id": None, "qty": ""},
+    {"label": "", "machine_code": "F-05", "product_id": None, "setup_id": None, "qty": ""},
 ]
 
 MAX_MACHINE_ROWS = 60
@@ -341,14 +341,15 @@ def _normalize_schedule_rows(raw, valid_pids: set[int]) -> list[dict]:
                 str(r.get("machine_code") or "").strip()[:32],
                 pid,
                 setup_id,
+                str(r.get("qty") or "").strip()[:32],
             )
         )
-    pids_for_setup = {p for _, _, p, _ in staged if p is not None}
+    pids_for_setup = {p for _, _, p, _, _ in staged if p is not None}
     valid_pairs: set[tuple[int, int]] = set()
     if pids_for_setup:
         for su in ProductSetup.objects.filter(product_id__in=pids_for_setup).only("id", "product_id"):
             valid_pairs.add((int(su.product_id), int(su.pk)))
-    for label, mcode, pid, setup_id in staged:
+    for label, mcode, pid, setup_id, qty in staged:
         if pid is None:
             setup_id = None
         elif setup_id is not None and (pid, setup_id) not in valid_pairs:
@@ -359,6 +360,7 @@ def _normalize_schedule_rows(raw, valid_pids: set[int]) -> list[dict]:
                 "machine_code": mcode,
                 "product_id": pid,
                 "setup_id": setup_id,
+                "qty": qty,
             }
         )
     return out

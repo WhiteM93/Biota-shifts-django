@@ -116,6 +116,7 @@
           var pn = parseInt(pidRaw, 10);
           if (!isNaN(pn)) pid = pn;
         }
+        var qtyEl = row.querySelector(".machines-cell--schedule-qty");
         schedule_rows.push({
           label: labelCell ? (labelCell.getAttribute("data-original-label") || "").trim() : "",
           machine_code: codeEl ? (codeEl.textContent || "").trim() : "",
@@ -127,6 +128,7 @@
             var sn = parseInt(raw, 10);
             return isNaN(sn) ? null : sn;
           })(),
+          qty: qtyEl ? (qtyEl.textContent || "").trim() : "",
         });
       });
       var cv = parseInt((root.getAttribute("data-machines-content-version") || "0").trim(), 10);
@@ -990,6 +992,15 @@
 
     function syncScheduleProductInteractions(on) {
       var en = !!on;
+      scheduleWrap.querySelectorAll(".machines-cell--schedule-qty").forEach(function (cell) {
+        if (en) {
+          cell.setAttribute("contenteditable", "true");
+          cell.setAttribute("spellcheck", "false");
+        } else {
+          cell.removeAttribute("contenteditable");
+          cell.removeAttribute("spellcheck");
+        }
+      });
       root.querySelectorAll(".js-machines-product-search").forEach(function (inp) {
         inp.disabled = !en;
         inp.setAttribute("aria-disabled", en ? "false" : "true");
@@ -1745,7 +1756,11 @@
       var list = [];
       scheduleWrap.querySelectorAll('.machines-schedule-row[data-client-row="1"]').forEach(function (row) {
         var codeEl = row.querySelector(".machines-cell--schedule-code");
-        list.push({ machine_code: (codeEl && codeEl.textContent ? codeEl.textContent : "").trim() });
+        var qtyEl = row.querySelector(".machines-cell--schedule-qty");
+        list.push({
+          machine_code: (codeEl && codeEl.textContent ? codeEl.textContent : "").trim(),
+          qty: (qtyEl && qtyEl.textContent ? qtyEl.textContent : "").trim(),
+        });
       });
       writeJson(LS_SCHEDULE_EXTRA, list);
     }
@@ -1759,6 +1774,11 @@
         var row = tpl.cloneNode(true);
         var idx = allocScheduleIndex();
         fillScheduleRowNode(row, idx, item.machine_code || "", "");
+        var qtyEl = row.querySelector(".machines-cell--schedule-qty");
+        if (qtyEl && item.qty) {
+          qtyEl.textContent = item.qty;
+          qtyEl.classList.remove("is-empty");
+        }
         scheduleWrap.appendChild(row);
       });
     }

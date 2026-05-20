@@ -172,6 +172,7 @@
       </div>
       <div class="machines-schedule-header" aria-hidden="true">
         <div>Изделие</div>
+        <div>Кол-во</div>
       </div>
       <div class="machines-schedule-rows" data-next-schedule-index="{{ schedule_rows|length }}">
         {% for srow in schedule_rows %}
@@ -211,6 +212,11 @@
               <input type="hidden" class="js-machines-setup-id" value="{% if srow.setup_id %}{{ srow.setup_id }}{% endif %}" autocomplete="off" />
             </div>
           </div>
+          <div
+            class="machines-cell machines-cell--schedule-qty{% if not srow.qty %} is-empty{% endif %}"
+            data-placeholder="—"
+            aria-label="Количество"
+          >{% if srow.qty %}{{ srow.qty }}{% endif %}</div>
           <div class="machines-cell machines-cell--code machines-cell--schedule-code">{{ srow.machine_code }}</div>
           <button type="button" class="machines-schedule-row-delete js-machines-schedule-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
         </div>
@@ -301,6 +307,7 @@
           <input type="hidden" class="js-machines-setup-id" value="" autocomplete="off" />
         </div>
       </div>
+      <div class="machines-cell machines-cell--schedule-qty is-empty" data-placeholder="—" aria-label="Количество"></div>
       <div class="machines-cell machines-cell--code machines-cell--schedule-code is-empty"></div>
       <button type="button" class="machines-schedule-row-delete js-machines-schedule-row-delete" aria-label="Удалить строку" tabindex="-1">&times;</button>
     </div>
