@@ -160,6 +160,59 @@ def _merge_binding_extra_block_photos(
     return merged
 
 
+def _pdf_binding_block_dict(
+    *,
+    label: str,
+    binding_x: str,
+    binding_y: str,
+    binding_z: str,
+    gcode_system: str,
+) -> dict:
+    bx = (binding_x or "").strip() or "—"
+    by = (binding_y or "").strip() or "—"
+    bz = (binding_z or "").strip() or "—"
+    gc = normalize_product_setup_gcode_system((gcode_system or "").strip() or "G54")
+    is_empty = bx == "—" and by == "—" and bz == "—" and gc in ("G54", "")
+    return {
+        "label": label,
+        "binding_x": bx,
+        "binding_y": by,
+        "binding_z": bz,
+        "gcode_system": gc or "G54",
+        "is_empty": is_empty,
+    }
+
+
+def _pdf_binding_blocks_for_setup(setup: ProductSetup) -> list[dict]:
+    blocks: list[dict] = [
+        _pdf_binding_block_dict(
+            label="Основная",
+            binding_x=setup.binding_x,
+            binding_y=setup.binding_y,
+            binding_z=setup.binding_z,
+            gcode_system=setup.gcode_system,
+        )
+    ]
+    raw = setup.binding_extra_blocks
+    if not isinstance(raw, list):
+        return blocks
+    extra_index = 0
+    for item in raw[:_MAX_BINDING_EXTRA_BLOCKS]:
+        if not isinstance(item, dict):
+            continue
+        extra_index += 1
+        blk = _pdf_binding_block_dict(
+            label=f"Доп. {extra_index}",
+            binding_x=str(item.get("binding_x") or ""),
+            binding_y=str(item.get("binding_y") or ""),
+            binding_z=str(item.get("binding_z") or ""),
+            gcode_system=str(item.get("gcode_system") or "G54"),
+        )
+        if not blk["is_empty"]:
+            blocks.append(blk)
+    return blocks
+
+
 def _binding_extra_blocks_template_rows(setup: ProductSetup) -> list[dict]:
     raw_list = setup.binding_extra_blocks
     if not isinstance(raw_list, list):
@@ -941,6 +994,14 @@ def product_setup_pdf_export_view(request, pk: int, setup_pk: int, mode: str):
     photo_slots: list[ProductSetupPhoto | None] = photos[:15]
     if len(photo_slots) < 15:
         photo_slots.extend([None] * (15 - len(photo_slots)))
+    binding_blocks = _pdf_binding_blocks_for_setup(setup)
+    setup_notes_html = (setup.setup_notes or "").strip()
+    product_comment_notes = list(
+        ProductNote.objects.filter(product=product, setup__isnull=True).order_by("created_at", "id")
+    )
+    setup_comment_notes = list(
+        ProductNote.objects.filter(product=product, setup=setup).order_by("created_at", "id")
+    )
     return render(
         request,
         "shifts/product_setup_pdf_export.html",
@@ -952,6 +1013,10 @@ def product_setup_pdf_export_view(request, pk: int, setup_pk: int, mode: str):
             "photo_slots": photo_slots,
             "mode": export_mode,
             "setup_program_line": setup_program_line,
+            "binding_blocks": binding_blocks,
+            "setup_notes_html": setup_notes_html,
+            "product_comment_notes": product_comment_notes,
+            "setup_comment_notes": setup_comment_notes,
             "username": biota_user(request),
         },
     )

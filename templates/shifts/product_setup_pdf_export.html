@@ -7,55 +7,214 @@
   <style>
     @page {
       size: A4 landscape;
-      margin: 10mm;
+      margin: 8mm;
     }
     html, body {
       margin: 0;
       padding: 0;
-      font-family: Arial, sans-serif;
-      font-size: 13px;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      line-height: 1.25;
       color: #111;
       background: #fff;
     }
     .page-title {
-      margin: 0 0 8px 0;
-      font-size: 16px;
+      margin: 0 0 6px 0;
+      font-size: 15px;
       font-weight: 700;
+      line-height: 1.2;
     }
     .muted { color: #555; }
-    .specs-grid {
+
+    /* ── Параметры (specs): слева — привязки и заметки, справа — инструмент ── */
+    .specs-page {
+      display: flex;
+      flex-direction: column;
+      min-height: 194mm;
+      box-sizing: border-box;
+    }
+    .specs-split {
       display: grid;
-      grid-template-columns: 1.1fr 1.2fr;
-      gap: 10px;
-      margin-bottom: 8px;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+      gap: 8px;
+      flex: 1 1 auto;
+      align-items: stretch;
+      min-height: 0;
+    }
+    .specs-left {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+      min-height: 0;
+    }
+    .specs-right {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      height: 100%;
     }
     .card {
-      border: 1px solid #999;
-      padding: 8px;
+      border: 1px solid #888;
+      padding: 6px 8px;
       border-radius: 2px;
+      box-sizing: border-box;
       break-inside: avoid;
+    }
+    .card-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #444;
+      margin: 0 0 5px 0;
+    }
+    .bindings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+      gap: 5px;
+      align-items: stretch;
+    }
+    .binding-block {
+      border: 1px solid #aaa;
+      border-radius: 2px;
+      padding: 4px 5px;
+      background: #fafafa;
+      min-width: 0;
+      break-inside: avoid;
+    }
+    .binding-block-title {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #333;
+      margin: 0 0 3px 0;
+      letter-spacing: 0.03em;
+    }
+    .binding-line {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin: 0 0 1px 0;
+      font-size: 10px;
+      min-width: 0;
+    }
+    .binding-line .k {
+      font-weight: 700;
+      flex: 0 0 auto;
+      min-width: 1.2em;
+    }
+    .binding-line .v {
+      flex: 1 1 auto;
+      min-width: 0;
+      word-break: break-word;
+    }
+    .meta-rows {
+      margin-top: 6px;
+      padding-top: 5px;
+      border-top: 1px dashed #ccc;
     }
     .spec-row {
       display: grid;
-      grid-template-columns: 130px 1fr;
-      gap: 6px;
-      margin-bottom: 3px;
+      grid-template-columns: 72px 1fr;
+      gap: 4px;
+      margin-bottom: 2px;
+      font-size: 10px;
     }
     .spec-key { font-weight: 700; }
-    .notes {
-      white-space: pre-wrap;
-      border-top: 1px dashed #bbb;
-      margin-top: 6px;
-      padding-top: 6px;
-      min-height: 70px;
+    .notes-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+      overflow: visible;
     }
-    table {
+    .notes-section + .notes-section {
+      padding-top: 6px;
+      border-top: 1px dashed #ccc;
+    }
+    .notes-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #444;
+      margin: 0 0 4px 0;
+    }
+    .notes-rich,
+    .notes-text {
+      font-size: 10px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    .notes-rich :is(p, ul, ol) {
+      margin: 0 0 4px 0;
+    }
+    .notes-rich ul,
+    .notes-rich ol {
+      padding-left: 1.2em;
+    }
+    .pdf-notes-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .pdf-note-item {
+      border: 1px solid #ccc;
+      border-radius: 2px;
+      padding: 4px 6px;
+      background: #fff;
+      break-inside: avoid;
+    }
+    .pdf-note-meta {
+      font-size: 9px;
+      color: #555;
+      margin: 0 0 3px 0;
+    }
+    .pdf-note-meta strong {
+      color: #222;
+    }
+    .pdf-note-body {
+      font-size: 10px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .notes-empty {
+      font-size: 10px;
+      color: #777;
+    }
+
+    .tools-wrap {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: visible;
+    }
+    table.tools-table {
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
-      margin-top: 8px;
+      font-size: 10px;
     }
-    th, td {
+    table.tools-table thead {
+      display: table-header-group;
+    }
+    table.tools-table tr {
+      break-inside: avoid;
+    }
+    table.tools-table.many-rows {
+      font-size: 9px;
+    }
+    table.tools-table.many-rows th,
+    table.tools-table.many-rows td {
+      padding: 2px 3px;
+    }
+    table.tools-table th,
+    table.tools-table td {
       border: 1px solid #777;
       padding: 3px 4px;
       text-align: center;
@@ -68,12 +227,14 @@
       max-width: 4ch;
       white-space: nowrap;
     }
-    .col-type { width: 23%; }
-    .col-note { width: 30%; text-align: left; }
+    .col-type { width: 22%; }
+    .col-note { width: 32%; text-align: left !important; }
     th.col-diameter {
-      font-size: 16px;
+      font-size: 13px;
       line-height: 1;
     }
+
+    /* ── Фото (photos mode) ── */
     .photos-grid {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
@@ -117,11 +278,20 @@
     @media screen {
       body { padding: 10px; }
     }
+    @media print {
+      .specs-page { min-height: auto; }
+      .specs-split {
+        grid-template-columns: minmax(0, 48%) minmax(0, 52%);
+      }
+      .bindings-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      }
+    }
   </style>
 </head>
 <body>
   {% if mode == "photos" %}
-    <h1 class="page-title">{{ product.name }} — {{ setup.name }} — Фото (3x5)</h1>
+    <h1 class="page-title">{{ product.name }} — {{ setup.name }} — Фото (3×5)</h1>
     <div class="photos-grid">
       {% for photo in photo_slots %}
         <div class="photo-cell {% if not photo %}empty-cell{% endif %}">
@@ -136,49 +306,102 @@
       {% endfor %}
     </div>
   {% else %}
-    <h1 class="page-title">{{ product.name }} — {{ setup.name }}</h1>
-    <div class="specs-grid">
-      <div class="card">
-        <div class="spec-row"><div class="spec-key">X</div><div>{{ setup.binding_x|default:"—" }}</div></div>
-        <div class="spec-row"><div class="spec-key">Y</div><div>{{ setup.binding_y|default:"—" }}</div></div>
-        <div class="spec-row"><div class="spec-key">Z</div><div>{{ setup.binding_z|default:"—" }}</div></div>
-        <div class="spec-row"><div class="spec-key">Привязка</div><div>{{ setup.gcode_system|default:"G54" }}</div></div>
-        <div class="spec-row"><div class="spec-key">Тип</div><div>{{ setup.workpiece|default:"—" }}</div></div>
-        <div class="spec-row"><div class="spec-key">Материал</div><div>{{ setup.material|default:"—" }}</div></div>
-        <div class="spec-row"><div class="spec-key">Размер</div><div>{{ setup.size|default:"—" }}</div></div>
-        <div class="spec-row"><div class="spec-key">Программа</div><div>{{ setup_program_line|default:"—" }}</div></div>
-      </div>
-      <div class="card">
-        <div class="spec-key" style="margin-bottom:4px;">Наладка</div>
-        <div class="notes">{{ setup.setup_notes|safe }}</div>
+    <div class="specs-page">
+      <h1 class="page-title">{{ product.name }} — {{ setup.name }}</h1>
+      <div class="specs-split">
+        <div class="specs-left">
+          <div class="card bindings-card">
+            <div class="card-title">Привязки</div>
+            <div class="bindings-grid">
+              {% for block in binding_blocks %}
+              <div class="binding-block">
+                <div class="binding-block-title">{{ block.label }}</div>
+                <div class="binding-line"><span class="k">X</span><span class="v">{{ block.binding_x }}</span></div>
+                <div class="binding-line"><span class="k">Y</span><span class="v">{{ block.binding_y }}</span></div>
+                <div class="binding-line"><span class="k">Z</span><span class="v">{{ block.binding_z }}</span></div>
+                <div class="binding-line"><span class="k">G</span><span class="v">{{ block.gcode_system }}</span></div>
+              </div>
+              {% endfor %}
+            </div>
+            <div class="meta-rows">
+              <div class="spec-row"><div class="spec-key">Тип</div><div>{{ setup.workpiece|default:"—" }}</div></div>
+              <div class="spec-row"><div class="spec-key">Материал</div><div>{{ setup.material|default:"—" }}</div></div>
+              <div class="spec-row"><div class="spec-key">Размер</div><div>{{ setup.size|default:"—" }}</div></div>
+              <div class="spec-row"><div class="spec-key">Программа</div><div>{{ setup_program_line|default:"—" }}</div></div>
+            </div>
+          </div>
+          <div class="card notes-card">
+            <div class="card-title">Заметки</div>
+            {% if setup_notes_html %}
+            <div class="notes-section">
+              <div class="notes-section-title">Текст наладки</div>
+              <div class="notes-rich">{{ setup_notes_html|safe }}</div>
+            </div>
+            {% endif %}
+            {% if product_comment_notes %}
+            <div class="notes-section">
+              <div class="notes-section-title">Изделие</div>
+              <ul class="pdf-notes-list">
+                {% for note in product_comment_notes %}
+                <li class="pdf-note-item">
+                  <div class="pdf-note-meta"><strong>{{ note.author_username }}</strong> · {{ note.created_at|date:"d.m.Y H:i" }}</div>
+                  <div class="pdf-note-body">{{ note.body|linebreaksbr }}</div>
+                </li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endif %}
+            {% if setup_comment_notes %}
+            <div class="notes-section">
+              <div class="notes-section-title">Установка</div>
+              <ul class="pdf-notes-list">
+                {% for note in setup_comment_notes %}
+                <li class="pdf-note-item">
+                  <div class="pdf-note-meta"><strong>{{ note.author_username }}</strong> · {{ note.created_at|date:"d.m.Y H:i" }}</div>
+                  <div class="pdf-note-body">{{ note.body|linebreaksbr }}</div>
+                </li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endif %}
+            {% if not setup_notes_html and not product_comment_notes and not setup_comment_notes %}
+            <div class="notes-empty">—</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="card specs-right tools-card">
+          <div class="card-title">Инструмент</div>
+          <div class="tools-wrap">
+            <table class="tools-table{% if tool_rows|length > 16 %} many-rows{% endif %}">
+              <thead>
+                <tr>
+                  <th class="col-small">№</th>
+                  <th class="col-small">H</th>
+                  <th class="col-small">D</th>
+                  <th class="col-type">Тип</th>
+                  <th class="col-diameter">⌀</th>
+                  <th>Вылет</th>
+                  <th class="col-note">Примечание</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in tool_rows %}
+                <tr>
+                  <td>{{ row.tool_number }}</td>
+                  <td{% if row.kor_n_override %} style="font-weight:700; text-decoration:underline;"{% endif %}>{{ row.kor_n }}</td>
+                  <td{% if row.kor_d_override %} style="font-weight:700; text-decoration:underline;"{% endif %}>{{ row.kor_d }}</td>
+                  <td>{{ row.tool_type }}</td>
+                  <td>{{ row.diameter }}</td>
+                  <td>{{ row.overhang }}</td>
+                  <td class="col-note">{{ row.note }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th class="col-small">№</th>
-          <th class="col-small">H</th>
-          <th class="col-small">D</th>
-          <th class="col-type">Тип</th>
-          <th class="col-diameter">⌀</th>
-          <th>Вылет</th>
-          <th class="col-note">Примечание</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in tool_rows %}
-        <tr>
-          <td>{{ row.tool_number }}</td>
-          <td{% if row.kor_n_override %} style="font-weight:700; text-decoration:underline;"{% endif %}>{{ row.kor_n }}</td>
-          <td{% if row.kor_d_override %} style="font-weight:700; text-decoration:underline;"{% endif %}>{{ row.kor_d }}</td>
-          <td>{{ row.tool_type }}</td>
-          <td>{{ row.diameter }}</td>
-          <td>{{ row.overhang }}</td>
-          <td class="col-note">{{ row.note }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
   {% endif %}
   <script>
     window.addEventListener("load", function () {
