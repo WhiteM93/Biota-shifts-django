@@ -231,15 +231,18 @@ def graph_view(request):
             full_idx = filtered_orig_indices[i]
 
             for d in day_columns:
-                if str(d) in PREV_MONTH_KEYS:
+                # ВАЖНО: конвертируем d в string для консистентности с GET обработчиком
+                col_key = str(d)
+                if col_key in PREV_MONTH_KEYS:
                     continue
-                key = f"cell_{i}_{d}"
+                key = f"cell_{i}_{col_key}"
                 if key not in request.POST:
                     continue
                 raw = (request.POST.get(key) or "").strip().lower()
                 if raw not in SCHEDULE_CODES:
                     raw = ""
-                full_schedule_df.at[full_idx, d] = raw
+                # Используем col_key для доступа к DataFrame
+                full_schedule_df.at[full_idx, col_key] = raw
         full_schedule_df = biota_schedule.apply_prev_month_tail_from_previous_schedule(
             full_schedule_df, employees_df, y, m
         )
