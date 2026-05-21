@@ -8,7 +8,9 @@ from urllib.parse import urlencode
 from django import forms
 from django.forms import inlineformset_factory
 from django.contrib import messages
+from django.conf import settings
 from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Max, Q
@@ -76,6 +78,51 @@ def _meaningful_tokens(tokens: list[str]) -> list[str]:
 
 
 _MAX_BINDING_EXTRA_BLOCKS = 20
+_BINDING_EXTRA_PHOTO_FIELDS = frozenset({"binding_x_photo", "binding_y_photo", "binding_z_photo"})
+_BINDING_PHOTO_FILE_SUFFIX = {
+    "binding_x_photo": "x",
+    "binding_y_photo": "y",
+    "binding_z_photo": "z",
+}
+
+
+def _binding_extra_block_item(item: dict) -> dict:
+    return {
+        "binding_x": str(item.get("binding_x") or "")[:64],
+        "binding_y": str(item.get("binding_y") or "")[:64],
+        "binding_z": str(item.get("binding_z") or "")[:64],
+        "gcode_system": normalize_product_setup_gcode_system(str(item.get("gcode_system") or "G54"))[:24],
+        "binding_x_photo": str(item.get("binding_x_photo") or "")[:500],
+        "binding_y_photo": str(item.get("binding_y_photo") or "")[:500],
+        "binding_z_photo": str(item.get("binding_z_photo") or "")[:500],
+    }
+
+
+def _delete_stored_media_url(url: str) -> None:
+    path = (url or "").strip()
+    if not path:
+        return
+    media_url = (settings.MEDIA_URL or "/media/").rstrip("/") + "/"
+    if path.startswith(media_url):
+        path = path[len(media_url) :]
+    path = path.lstrip("/")
+    try:
+        if default_storage.exists(path):
+            default_storage.delete(path)
+    except Exception:
+        pass
+
+
+def _save_binding_extra_block_photo(setup: ProductSetup, block_index: int, field_name: str, uploaded_file) -> str:
+    suffix = _BINDING_PHOTO_FILE_SUFFIX[field_name]
+    ext = os.path.splitext(getattr(uploaded_file, "name", "") or "")[1].lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+        ext = ".jpg"
+    storage_path = f"products/setup_bindings/setup_{setup.pk}_extra_{block_index}_{suffix}{ext}"
+    if default_storage.exists(storage_path):
+        default_storage.delete(storage_path)
+    saved_path = default_storage.save(storage_path, uploaded_file)
+    return default_storage.url(saved_path)
 
 
 def _safe_binding_extra_blocks_from_json(raw: str) -> list[dict]:
@@ -92,15 +139,25 @@ def _safe_binding_extra_blocks_from_json(raw: str) -> list[dict]:
     for item in data[:_MAX_BINDING_EXTRA_BLOCKS]:
         if not isinstance(item, dict):
             continue
-        out.append(
-            {
-                "binding_x": str(item.get("binding_x") or "")[:64],
-                "binding_y": str(item.get("binding_y") or "")[:64],
-                "binding_z": str(item.get("binding_z") or "")[:64],
-                "gcode_system": normalize_product_setup_gcode_system(str(item.get("gcode_system") or "G54"))[:24],
-            }
-        )
+        out.append(_binding_extra_block_item(item))
     return out
+
+
+def _merge_binding_extra_block_photos(
+    new_blocks: list[dict], old_blocks: list | None
+) -> list[dict]:
+    """Сохранить URL фото доп. блоков, если клиент не передал их при inline-сохранении."""
+    old_list = old_blocks if isinstance(old_blocks, list) else []
+    merged: list[dict] = []
+    photo_fields = ("binding_x_photo", "binding_y_photo", "binding_z_photo")
+    for i, blk in enumerate(new_blocks):
+        item = dict(blk)
+        if i < len(old_list) and isinstance(old_list[i], dict):
+            for pf in photo_fields:
+                if not (item.get(pf) or "").strip() and (old_list[i].get(pf) or "").strip():
+                    item[pf] = str(old_list[i][pf])[:500]
+        merged.append(_binding_extra_block_item(item))
+    return merged
 
 
 def _binding_extra_blocks_template_rows(setup: ProductSetup) -> list[dict]:
@@ -121,6 +178,9 @@ def _binding_extra_blocks_template_rows(setup: ProductSetup) -> list[dict]:
                 "gcode_system": gc,
                 "gcode_inline_select_value": sel,
                 "gcode_inline_p_number": pnum,
+                "binding_x_photo": str(item.get("binding_x_photo") or "")[:500],
+                "binding_y_photo": str(item.get("binding_y_photo") or "")[:500],
+                "binding_z_photo": str(item.get("binding_z_photo") or "")[:500],
             }
         )
     return rows
@@ -1212,6 +1272,30 @@ def product_detail_view(request, pk: int):
             image_file = request.FILES.get("image")
             if not image_file:
                 return JsonResponse({"ok": False, "error": "Выберите фото."}, status=400)
+            extra_index_raw = (request.POST.get("extra_block_index") or "").strip()
+            if extra_index_raw != "":
+                if field_name not in _BINDING_EXTRA_PHOTO_FIELDS:
+                    return JsonResponse({"ok": False, "error": "Некорректное поле фото."}, status=400)
+                try:
+                    extra_index = int(extra_index_raw)
+                except ValueError:
+                    return JsonResponse({"ok": False, "error": "Некорректный блок привязки."}, status=400)
+                if extra_index < 0 or extra_index >= _MAX_BINDING_EXTRA_BLOCKS:
+                    return JsonResponse({"ok": False, "error": "Некорректный блок привязки."}, status=400)
+                blocks = [
+                    _binding_extra_block_item(b)
+                    for b in (setup.binding_extra_blocks or [])
+                    if isinstance(b, dict)
+                ]
+                while len(blocks) <= extra_index:
+                    blocks.append(_binding_extra_block_item({}))
+                old_url = blocks[extra_index].get(field_name) or ""
+                _delete_stored_media_url(old_url)
+                new_url = _save_binding_extra_block_photo(setup, extra_index, field_name, image_file)
+                blocks[extra_index][field_name] = new_url
+                setup.binding_extra_blocks = blocks[:_MAX_BINDING_EXTRA_BLOCKS]
+                setup.save(update_fields=["binding_extra_blocks", "updated_at"])
+                return JsonResponse({"ok": True, "url": new_url, "extra_block_index": extra_index})
             old_file = getattr(setup, field_name)
             if old_file:
                 try:
@@ -1305,8 +1389,11 @@ def product_detail_view(request, pk: int):
                 setattr(setup, field, raw)
                 changed_setup_fields.append(field)
             if "binding_extra_blocks_json" in request.POST:
-                setup.binding_extra_blocks = _safe_binding_extra_blocks_from_json(
+                new_extra = _safe_binding_extra_blocks_from_json(
                     request.POST.get("binding_extra_blocks_json") or "[]"
+                )
+                setup.binding_extra_blocks = _merge_binding_extra_block_photos(
+                    new_extra, getattr(setup, "binding_extra_blocks", None)
                 )
                 if "binding_extra_blocks" not in changed_setup_fields:
                     changed_setup_fields.append("binding_extra_blocks")

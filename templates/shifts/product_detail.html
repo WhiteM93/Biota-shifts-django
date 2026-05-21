@@ -2,18 +2,8 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=3">
-<div class="page-actions" style="margin-bottom:10px;">
-  <a href="{% url 'products_list' %}" class="btn btn-ghost">← К списку наладок</a>
-  {% if biota_can_edit %}
-  <form method="post" action="{% url 'product_detail' product.pk %}" style="display:inline;">
-    {% csrf_token %}
-    <input type="hidden" name="action" value="create_setup" />
-    <button type="submit" class="btn btn-ghost" title="Новая установка">+</button>
-  </form>
-  {% endif %}
-</div>
-<div class="product-detail-grid"{% if setups %} data-product-has-setups="1"{% endif %}>
+<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=17">
+<div class="product-detail-grid{% if tab_default == 'drawing' %} has-meta-column{% endif %}"{% if setups %} data-product-has-setups="1"{% endif %}>
   <div class="product-detail-main">
 
   <div class="product-tabs" id="product-tabs" {% if setups %}data-inline-setup-ids="{% for setup in setups %}{{ setup.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"{% endif %} {% if product.program_file %}data-product-program-url="{{ product.program_file.url }}" data-product-program-filename="{{ product.program_filename|escape }}"{% endif %}>
@@ -57,32 +47,7 @@
       {% endif %}
     </div>
     <div class="product-tab-panels">
-      <section class="product-tab-panel" id="panel-drawing" data-panel="drawing" data-inline-edit-mode="0" role="tabpanel" aria-label="Изделие" {% if tab_default != 'drawing' %}hidden{% endif %}>
-        <div class="product-detail-header">
-          <div class="product-detail-header-name">
-            <span class="product-detail-name" data-field-text="product_name" spellcheck="false">{{ product.name }}</span>
-          </div>
-        </div>
-
-        <div class="product-drawing-content">
-          <div class="product-drawing-left-col">
-            {% if setups %}
-            {% include "shifts/includes/plan_card_specs_unified.html" with plan_specs_variant="product" %}
-            {% endif %}
-          </div>
-          <div class="product-detail-description-block">
-            <div class="description-toolbar" hidden>
-              <button type="button" class="desc-format-btn" data-format="bold" title="Жирный (Ctrl+B)"><strong>Ж</strong></button>
-              <button type="button" class="desc-format-btn" data-format="italic" title="Курсив (Ctrl+I)"><em>К</em></button>
-              <button type="button" class="desc-format-btn" data-format="underline" title="Подчеркивание (Ctrl+U)"><u>П</u></button>
-              <div class="desc-toolbar-sep"></div>
-              <button type="button" class="desc-format-btn" data-format="insertUnorderedList" title="Маркированный список">◆ Список</button>
-              <button type="button" class="desc-format-btn" data-format="insertOrderedList" title="Нумерованный список">1. Список</button>
-            </div>
-            <div class="product-drawing-description" data-field-text="product_description" data-empty-label="Добавьте описание изделия..." spellcheck="true">{% if product.description %}{{ product.description }}{% endif %}</div>
-          </div>
-        </div>
-      </section>
+      <section class="product-tab-panel product-tab-panel--drawing-placeholder" id="panel-drawing" data-panel="drawing" data-inline-edit-mode="0" role="tabpanel" aria-label="Изделие" {% if tab_default != 'drawing' %}hidden{% endif %}></section>
       {% for setup in setups %}
       <section class="product-tab-panel" id="panel-setup-{{ setup.pk }}" data-panel="{{ setup.tab_slug }}" data-inline-edit-mode="0" role="tabpanel" aria-labelledby="tab-setup-{{ setup.pk }}" {% if tab_default != setup.tab_slug %}hidden{% endif %}>
         <div class="product-setup-panel-title">
@@ -178,23 +143,59 @@
                 </div>
                 </div>
                 {% for eb in setup.binding_extra_blocks_tpl %}
-                <div class="setup-spec-box setup-spec-box-extra">
+                <div class="setup-spec-box setup-spec-box-extra" data-extra-block-index="{{ forloop.counter0 }}">
                 <div class="setup-spec-box-controls" hidden>
                   <button type="button" class="btn btn-ghost js-setup-spec-copy setup-spec-copy-btn" title="Копировать блок" aria-label="Копировать блок"><i class="fi fi-rr-copy ui-icon" aria-hidden="true"></i></button>
                   <button type="button" class="btn btn-ghost js-setup-spec-remove setup-spec-remove-btn" title="Удалить блок" aria-label="Удалить блок"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
                 </div>
                 <div class="setup-spec-col setup-spec-col-bindings">
                   <div class="setup-row-photo setup-row-photo-binding">
-                    <span class="setup-binding-photo-rail"></span>
+                    <span class="setup-binding-photo-rail">
+                      {% if eb.binding_x_photo %}
+                      <a href="{{ eb.binding_x_photo }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ eb.binding_x_photo }}" data-photo-caption="{{ setup.name|escape }} — Привязка X (доп.)" aria-label="Открыть фото привязки X">
+                        <i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>
+                      </a>
+                      {% endif %}
+                      {% if biota_can_edit %}
+                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_x_photo" data-extra-block-index="{{ forloop.counter0 }}" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки X" aria-label="Загрузить или заменить фото привязки X" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+                      {% endif %}
+                    </span>
                     <span class="muted">X:</span> <span data-field-text="binding_x">{% if eb.binding_x %}{{ eb.binding_x }}{% else %}—{% endif %}</span>
+                    {% if biota_can_edit %}
+                    <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-binding-photo-input" data-photo-field-input="binding_x_photo" data-extra-block-index="{{ forloop.counter0 }}" data-setup-id="{{ setup.pk }}" hidden />
+                    {% endif %}
                   </div>
                   <div class="setup-row-photo setup-row-photo-binding">
-                    <span class="setup-binding-photo-rail"></span>
+                    <span class="setup-binding-photo-rail">
+                      {% if eb.binding_y_photo %}
+                      <a href="{{ eb.binding_y_photo }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ eb.binding_y_photo }}" data-photo-caption="{{ setup.name|escape }} — Привязка Y (доп.)" aria-label="Открыть фото привязки Y">
+                        <i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>
+                      </a>
+                      {% endif %}
+                      {% if biota_can_edit %}
+                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_y_photo" data-extra-block-index="{{ forloop.counter0 }}" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки Y" aria-label="Загрузить или заменить фото привязки Y" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+                      {% endif %}
+                    </span>
                     <span class="muted">Y:</span> <span data-field-text="binding_y">{% if eb.binding_y %}{{ eb.binding_y }}{% else %}—{% endif %}</span>
+                    {% if biota_can_edit %}
+                    <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-binding-photo-input" data-photo-field-input="binding_y_photo" data-extra-block-index="{{ forloop.counter0 }}" data-setup-id="{{ setup.pk }}" hidden />
+                    {% endif %}
                   </div>
                   <div class="setup-row-photo setup-row-photo-binding">
-                    <span class="setup-binding-photo-rail"></span>
+                    <span class="setup-binding-photo-rail">
+                      {% if eb.binding_z_photo %}
+                      <a href="{{ eb.binding_z_photo }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ eb.binding_z_photo }}" data-photo-caption="{{ setup.name|escape }} — Привязка Z (доп.)" aria-label="Открыть фото привязки Z">
+                        <i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>
+                      </a>
+                      {% endif %}
+                      {% if biota_can_edit %}
+                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_z_photo" data-extra-block-index="{{ forloop.counter0 }}" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки Z" aria-label="Загрузить или заменить фото привязки Z" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+                      {% endif %}
+                    </span>
                     <span class="muted">Z:</span> <span data-field-text="binding_z">{% if eb.binding_z %}{{ eb.binding_z }}{% else %}—{% endif %}</span>
+                    {% if biota_can_edit %}
+                    <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-binding-photo-input" data-photo-field-input="binding_z_photo" data-extra-block-index="{{ forloop.counter0 }}" data-setup-id="{{ setup.pk }}" hidden />
+                    {% endif %}
                   </div>
                   <div class="setup-row-gcode">
                     <span class="muted">Привяка:</span>
@@ -282,7 +283,7 @@
               <table id="setup-tools-table-{{ setup.pk }}" class="data-grid setup-tools-view{% if biota_can_edit %} has-tool-row-move{% endif %}">
                 <thead>
                   <tr>
-                    {% if biota_can_edit %}<th class="setup-tools-th-hd-autofill" scope="col" title="Автозаполнение H/D по T в строке" aria-label="Колонка автозаполнения корректоров"></th>{% endif %}
+                    {% if biota_can_edit %}<th class="setup-tools-th-row-actions" scope="col" aria-label="Действия со строкой"></th>{% endif %}
                     <th>№</th>
                     <th title="Корректор на инструмент включен">Кор.</th>
                     <th>H</th>
@@ -297,16 +298,8 @@
                   {% for row in setup.tool_display_rows %}
                   <tr data-tool-row-index="{{ forloop.counter0 }}">
                     {% if biota_can_edit %}
-                    <td class="setup-tools-hd-autofill-cell">
-                      <div class="setup-tools-hd-autofill-cell-inner">
-                        <button
-                          type="button"
-                          class="btn btn-ghost setup-tools-hd-autofill-btn js-setup-tools-hd-autofill-row"
-                          title="Подставить H и D по номеру T в этой строке (T01→H01, D01)"
-                          aria-label="Автозаполнить корректора H и D по номеру инструмента в этой строке"
-                        >
-                          <i class="fi fi-rr-redo-alt ui-icon" aria-hidden="true"></i>
-                        </button>
+                    <td class="setup-tools-row-actions-cell">
+                      <div class="setup-tools-row-actions-cell-inner">
                         <button
                           type="button"
                           class="btn btn-ghost setup-tools-remove-row-btn js-setup-tools-remove-row"
@@ -375,6 +368,51 @@
   </div>
   </div>
 
+  <aside class="product-detail-meta" id="product-detail-meta" aria-label="Параметры и описание изделия"{% if tab_default != 'drawing' %} hidden{% endif %}>
+    <div class="product-detail-meta-inner">
+      <div class="product-detail-header product-detail-meta-header">
+        <div class="product-detail-header-name">
+          <span class="product-detail-name" data-field-text="product_name" spellcheck="false">{{ product.name }}</span>
+        </div>
+      </div>
+      <div class="product-detail-meta-split">
+        <div class="product-detail-meta-plan">
+          {% include "shifts/includes/plan_card_specs_unified.html" with plan_specs_variant="product" %}
+        </div>
+        <div class="product-detail-description-block">
+          <div class="form-field form-field--always-visible product-description-toolbar-field">
+            <label class="form-label muted product-description-toolbar-label" aria-hidden="true">&#8203;</label>
+            <div class="description-toolbar" hidden>
+            <button type="button" class="desc-format-btn" data-cmd="bold" title="Жирный (Ctrl+B)"><strong>Ж</strong></button>
+            <button type="button" class="desc-format-btn" data-cmd="italic" title="Курсив (Ctrl+I)"><em>К</em></button>
+            <button type="button" class="desc-format-btn" data-cmd="underline" title="Подчёркивание (Ctrl+U)"><u>П</u></button>
+            <div class="desc-toolbar-sep"></div>
+            <button type="button" class="desc-format-btn" data-cmd="justifyLeft" title="По левому краю" aria-label="По левому краю">
+              <svg class="desc-format-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M3 5h18v2H3V5M3 10h12v2H3v-2M3 15h15v2H3v-2z" />
+              </svg>
+            </button>
+            <button type="button" class="desc-format-btn" data-cmd="justifyCenter" title="По центру" aria-label="По центру">
+              <svg class="desc-format-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M3 5h18v2H3V5M6 10h12v2H6v-2M7 15h10v2H7v-2z" />
+              </svg>
+            </button>
+            <button type="button" class="desc-format-btn" data-cmd="justifyRight" title="По правому краю" aria-label="По правому краю">
+              <svg class="desc-format-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M3 5h18v2H3V5M15 10h6v2h-6v-2M12 15h9v2h-9v-2z" />
+              </svg>
+            </button>
+            <div class="desc-toolbar-sep"></div>
+            <button type="button" class="desc-format-btn" data-cmd="insertUnorderedList" title="Маркированный список">◆ Список</button>
+            <button type="button" class="desc-format-btn" data-cmd="insertOrderedList" title="Нумерованный список">1. Список</button>
+            </div>
+          </div>
+          <div class="product-drawing-description" data-field-text="product_description" data-empty-label="Добавьте описание изделия..." spellcheck="true">{% if product.description %}{{ product.description|safe }}{% endif %}</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
   <div class="product-detail-side" id="product-detail-side">
     <div id="product-detail-side-inner">
     {% if product.cad_model or product.preview_stl %}
@@ -413,7 +451,7 @@
   "tool_type_choices": [{% for v, lbl in tool_type_choices %}{"value":"{{ v|escapejs }}","label":"{{ lbl|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
 }</script>
 <script src="{% static 'shifts/js/plan-cascade-form.js' %}" defer></script>
-<script src="{% static 'shifts/js/product_detail.js' %}?v=3" defer></script>
+<script src="{% static 'shifts/js/product_detail.js' %}?v=17" defer></script>
 
 {% if cad_inline_preview or has_setup_preview_stl %}
 <script type="importmap">

@@ -290,10 +290,13 @@ var PD = (function () {
     function setSideBlocksByTab(tabName) {
       var isDrawing = tabName === "drawing";
       var side = document.getElementById("product-detail-side");
+      var meta = document.getElementById("product-detail-meta");
       var grid = document.querySelector(".product-detail-grid");
       var savePreviewBlock = document.getElementById("product-save-preview-block");
       var downloadsBlock = document.getElementById("product-downloads-block");
       var sideProgramWrap = document.getElementById("product-side-programs");
+      if (meta) meta.hidden = !isDrawing;
+      if (grid) grid.classList.toggle("has-meta-column", isDrawing);
       if (side) side.hidden = false;
       if (side) side.setAttribute("data-current-tab", tabName || "");
       if (grid) grid.classList.toggle("is-drawing-only", false);
@@ -569,8 +572,55 @@ var PD = (function () {
   (function () {
     var editToggleBtn = document.getElementById("setup-inline-edit-btn");
     var root = document.getElementById("product-tabs");
+    var detailGrid = document.querySelector(".product-detail-grid");
     if (!root) return;
     var inlineEditMode = false;
+
+    function productDetailMetaEl() {
+      return document.getElementById("product-detail-meta");
+    }
+
+    function productDetailPlanScope() {
+      return detailGrid || document;
+    }
+
+    function productDetailPlanWrap() {
+      var meta = productDetailMetaEl();
+      if (!meta) return null;
+      return meta.querySelector(".product-drawing-plan-section")
+        || meta.querySelector("[data-product-plan-summary]");
+    }
+
+    function forEachPlanCascadeForm(cb) {
+      productDetailPlanScope().querySelectorAll("[data-plan-cascade-form]").forEach(cb);
+    }
+
+    function syncMetaDrawingInlineEdit(enabled) {
+      var meta = productDetailMetaEl();
+      if (!meta) return;
+      meta.setAttribute("data-inline-edit-mode", enabled ? "1" : "0");
+      meta.querySelectorAll("[data-field-text]").forEach(function (node) {
+        var field = node.getAttribute("data-field-text") || "";
+        if (!field || field === "setup_notes") return;
+        if (enabled) {
+          node.classList.add("is-inline-edit");
+          node.contentEditable = "true";
+          node.setAttribute("spellcheck", field === "product_description" ? "true" : "false");
+          if (field === "product_description") {
+            var emptyLbl = (node.getAttribute("data-empty-label") || "Описание не задано.").trim();
+            if ((node.textContent || "").trim() === emptyLbl) node.textContent = "";
+          }
+        } else {
+          node.classList.remove("is-inline-edit");
+          node.contentEditable = "false";
+          node.removeAttribute("contenteditable");
+          if (field === "product_description") {
+            var emptyLbl2 = (node.getAttribute("data-empty-label") || "Описание не задано.").trim();
+            if (!(node.textContent || "").trim()) node.textContent = emptyLbl2;
+          }
+        }
+      });
+    }
     var notesSelection = null;
     var TOOL_TYPE_OPTIONS = (PD.tool_type_choices || []);
 
@@ -655,9 +705,9 @@ var PD = (function () {
         if (mat) mat.value = state.plan_material || state.made_material || state.laser_material_marking || "";
         syncSetupPlanInlineVisibility(wrap);
 
-        // Синхронизировать каскадную форму если она существует
-        var cascadeFormContainer = wrap.querySelector("[data-plan-cascade-form]");
-        if (cascadeFormContainer && cascadeFormContainer._cascadeFormManager) {
+      });
+      forEachPlanCascadeForm(function (cascadeFormContainer) {
+        if (cascadeFormContainer._cascadeFormManager) {
           cascadeFormContainer._cascadeFormManager.syncFromServer(state);
         }
       });
@@ -763,19 +813,10 @@ var PD = (function () {
       if (!tbody) return;
       var toolNo = nextToolNumberDisplay(panel);
       var tr = document.createElement("tr");
-      var tdHd = document.createElement("td");
-      tdHd.className = "setup-tools-hd-autofill-cell";
-      var innerHd = document.createElement("div");
-      innerHd.className = "setup-tools-hd-autofill-cell-inner";
-      var btnHd = document.createElement("button");
-      btnHd.type = "button";
-      btnHd.className = "btn btn-ghost setup-tools-hd-autofill-btn js-setup-tools-hd-autofill-row";
-      btnHd.title = "Подставить H и D по номеру T в этой строке (T01→H01, D01)";
-      btnHd.setAttribute("aria-label", "Автозаполнить корректора H и D по номеру инструмента в этой строке");
-      var icHd = document.createElement("i");
-      icHd.className = "fi fi-rr-redo-alt ui-icon";
-      icHd.setAttribute("aria-hidden", "true");
-      btnHd.appendChild(icHd);
+      var tdActions = document.createElement("td");
+      tdActions.className = "setup-tools-row-actions-cell";
+      var innerActions = document.createElement("div");
+      innerActions.className = "setup-tools-row-actions-cell-inner";
       var btnRm = document.createElement("button");
       btnRm.type = "button";
       btnRm.className = "btn btn-ghost setup-tools-remove-row-btn js-setup-tools-remove-row";
@@ -785,10 +826,9 @@ var PD = (function () {
       icRm.className = "fi fi-br-cross ui-icon";
       icRm.setAttribute("aria-hidden", "true");
       btnRm.appendChild(icRm);
-      innerHd.appendChild(btnHd);
-      innerHd.appendChild(btnRm);
-      tdHd.appendChild(innerHd);
-      tr.appendChild(tdHd);
+      innerActions.appendChild(btnRm);
+      tdActions.appendChild(innerActions);
+      tr.appendChild(tdActions);
       var tdNo = document.createElement("td");
       tdNo.setAttribute("data-tool-col", "tool_number");
       tdNo.textContent = toolNo;
@@ -1176,6 +1216,24 @@ var PD = (function () {
       return gSel.value || "G54";
     }
 
+    function bindingPhotoUrlFromBox(box, fieldName) {
+      if (!box || !fieldName) return "";
+      var btn = box.querySelector('.setup-binding-photo-btn[data-photo-field="' + fieldName + '"]');
+      var rail = btn ? btn.closest(".setup-binding-photo-rail") : null;
+      if (!rail) return "";
+      var link = rail.querySelector(".binding-photo-link");
+      if (!link) return "";
+      return (link.getAttribute("data-photo-url") || link.getAttribute("href") || "").trim();
+    }
+
+    function syncBindingPhotoButtonsInPanel(panel, show) {
+      if (!panel) return;
+      panel.querySelectorAll(".setup-binding-photo-btn").forEach(function (btn) {
+        if (show) btn.removeAttribute("hidden");
+        else btn.setAttribute("hidden", "hidden");
+      });
+    }
+
     function collectBindingSpecBlocksFromStack(panelSetup) {
       var stack = panelSetup.querySelector(".setup-spec-stack");
       if (!stack) return [];
@@ -1193,6 +1251,9 @@ var PD = (function () {
           binding_y: normDash(by),
           binding_z: normDash(bz),
           gcode_system: collectGcodeSystemFromWrap(gw),
+          binding_x_photo: bindingPhotoUrlFromBox(box, "binding_x_photo"),
+          binding_y_photo: bindingPhotoUrlFromBox(box, "binding_y_photo"),
+          binding_z_photo: bindingPhotoUrlFromBox(box, "binding_z_photo"),
         };
       });
     }
@@ -1217,10 +1278,52 @@ var PD = (function () {
       }
     }
 
+    function reindexExtraBindingBlocks(stack) {
+      if (!stack) return;
+      Array.from(stack.querySelectorAll(".setup-spec-box-extra")).forEach(function (box, idx) {
+        box.setAttribute("data-extra-block-index", String(idx));
+        box.querySelectorAll(".setup-binding-photo-btn, .setup-binding-photo-input").forEach(function (el) {
+          el.setAttribute("data-extra-block-index", String(idx));
+        });
+      });
+    }
+
+    function applyBindingPhotoUrlToBox(box, fieldName, url, captionPrefix) {
+      if (!box) return;
+      var rowFieldMap = {
+        binding_x_photo: "Привязка X",
+        binding_y_photo: "Привязка Y",
+        binding_z_photo: "Привязка Z",
+      };
+      var label = rowFieldMap[fieldName] || "Фото";
+      var isExtra = box.classList.contains("setup-spec-box-extra");
+      var caption = (captionPrefix ? captionPrefix + " — " : "") + label + (isExtra ? " (доп.)" : "");
+      var btn = box.querySelector('.setup-binding-photo-btn[data-photo-field="' + fieldName + '"]');
+      if (!btn) return;
+      var rail = btn.closest(".setup-binding-photo-rail");
+      if (!rail) return;
+      rail.querySelectorAll(".binding-photo-link").forEach(function (link) {
+        if (link.remove) link.remove();
+      });
+      if (url) {
+        var link = document.createElement("a");
+        link.href = url;
+        link.className = "binding-photo-link setup-photo-open";
+        link.setAttribute("data-photo-url", url);
+        link.setAttribute("data-photo-caption", caption);
+        link.setAttribute("aria-label", "Открыть фото: " + label);
+        link.innerHTML = '<i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>';
+        rail.insertBefore(link, btn);
+      }
+      btn.innerHTML = '<i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i>';
+    }
+
     function buildExtraSpecBoxFromSource(sourceBox, clearValues) {
       if (!sourceBox) return null;
       var clone = sourceBox.cloneNode(true);
+      clone.classList.remove("setup-spec-box-extra");
       clone.classList.add("setup-spec-box-extra");
+      clone.removeAttribute("data-extra-block-index");
       clone.querySelectorAll("[data-field-text]").forEach(function (el) {
         var field = el.getAttribute("data-field-text") || "";
         if (clearValues) {
@@ -1277,23 +1380,20 @@ var PD = (function () {
           if (link.remove) link.remove();
         });
       }
-      clone.querySelectorAll(".setup-binding-photo-input, .setup-binding-photo-btn, a.binding-photo-link").forEach(function (node) {
-        if (node && node.remove) node.remove();
-      });
       return clone;
     }
 
     function syncDrawingPanelQuickEdit(enabled) {
-      var drawingPanel = root.querySelector("#panel-drawing");
-      if (!drawingPanel) return;
-      var toolbar = drawingPanel.querySelector(".description-toolbar");
+      var meta = productDetailMetaEl();
+      if (!meta) return;
+      var toolbar = meta.querySelector(".description-toolbar");
       if (toolbar) {
         if (enabled) toolbar.removeAttribute("hidden");
         else toolbar.setAttribute("hidden", "hidden");
       }
-      var planSection = drawingPanel.querySelector(".product-drawing-plan-section");
+      var planSection = meta.querySelector(".product-drawing-plan-section");
       if (planSection) planSection.classList.toggle("is-plan-readonly", !enabled);
-      drawingPanel.querySelectorAll("[data-plan-cascade-form] select, [data-plan-cascade-form] input").forEach(function (el) {
+      meta.querySelectorAll("[data-plan-cascade-form] select, [data-plan-cascade-form] input").forEach(function (el) {
         el.disabled = !enabled;
       });
     }
@@ -1431,11 +1531,16 @@ var PD = (function () {
         if (inlineEditMode) btn.removeAttribute("hidden");
         else btn.setAttribute("hidden", "hidden");
       });
-      var planSumAll = root.querySelector("#panel-drawing [data-product-plan-summary]");
-      if (planSumAll) syncSetupPlanInlineVisibility(planSumAll);
+      var planSumAll = productDetailPlanWrap();
+      if (planSumAll && planSumAll.querySelector("[data-product-plan-summary]")) {
+        syncSetupPlanInlineVisibility(planSumAll.querySelector("[data-product-plan-summary]"));
+      }
       root.querySelectorAll(".product-tab-panel").forEach(function (panel) {
         refreshInlineFieldTitles(panel, inlineEditMode);
       });
+      var metaRoot = productDetailMetaEl();
+      if (metaRoot) refreshInlineFieldTitles(metaRoot, inlineEditMode);
+      syncMetaDrawingInlineEdit(inlineEditMode);
       if (editToggleBtn) {
         editToggleBtn.textContent = inlineEditMode ? "Сохранить изменения" : "Быстрое редактирование";
       }
@@ -1453,10 +1558,12 @@ var PD = (function () {
       root.querySelectorAll(".setup-inline-toolbar-block").forEach(function (toolbar) {
         toolbar.setAttribute("hidden", "hidden");
       });
-      root.querySelectorAll("[data-field-text]").forEach(function (node) {
+      (detailGrid || root).querySelectorAll("[data-field-text]").forEach(function (node) {
         node.classList.remove("is-inline-edit");
         node.removeAttribute("contenteditable");
       });
+      syncMetaDrawingInlineEdit(false);
+      syncDrawingPanelQuickEdit(false);
       root.querySelectorAll(".setup-photo-inline-controls").forEach(function (row) {
         row.setAttribute("hidden", "hidden");
       });
@@ -1517,12 +1624,11 @@ var PD = (function () {
       syncSetupPlanInlineVisibility(wrap);
     });
 
-    // Инициализация каскадной формы планирования
-    root.querySelectorAll("[data-plan-cascade-form]").forEach(function (formContainer) {
+    // Инициализация каскадной формы (в #product-detail-meta, вне #product-tabs)
+    forEachPlanCascadeForm(function (formContainer) {
+      if (formContainer._cascadeFormManager) return;
       if (typeof PlanCascadeFormManager !== "undefined") {
-        var cascadeForm = new PlanCascadeFormManager(formContainer);
-        // Сохранить ссылку на менеджер для доступа из других функций
-        formContainer._cascadeFormManager = cascadeForm;
+        formContainer._cascadeFormManager = new PlanCascadeFormManager(formContainer);
       }
     });
 
@@ -1709,6 +1815,12 @@ var PD = (function () {
       if (gspan && gSel && pW && pS) {
         syncGcodeControlsFromSpan(gspan, gSel, pW, pS);
       }
+      var setupCaption = "";
+      var activeBtn = root.querySelector(".product-tab.is-active");
+      if (activeBtn) setupCaption = activeBtn.getAttribute("data-setup-name") || "";
+      ["binding_x_photo", "binding_y_photo", "binding_z_photo"].forEach(function (fieldName) {
+        if (blk[fieldName]) applyBindingPhotoUrlToBox(box, fieldName, blk[fieldName], setupCaption);
+      });
     }
 
     function rebuildBindingExtraBoxesFromResponse(panelSetup, setupPayload) {
@@ -1753,25 +1865,27 @@ var PD = (function () {
         }
         stack.appendChild(node);
       });
+      reindexExtraBindingBlocks(stack);
       syncSpecDnDMode(panelSetup, inlineOn);
+      if (inlineOn) syncBindingPhotoButtonsInPanel(panelSetup, true);
     }
 
     function applyProductMetaToDom(productData) {
       if (!productData) return;
       if (Object.prototype.hasOwnProperty.call(productData, "name")) {
         var nameVal = (productData.name || "").trim();
-        root.querySelectorAll('[data-field-text="product_name"]').forEach(function (el) {
+        (detailGrid || root).querySelectorAll('[data-field-text="product_name"]').forEach(function (el) {
           el.textContent = nameVal || "—";
         });
         var sideName = document.getElementById("product-side-name");
         if (sideName) sideName.textContent = nameVal || "—";
       }
       if (Object.prototype.hasOwnProperty.call(productData, "description")) {
-        var descEl = root.querySelector('[data-field-text="product_description"]');
+        var descEl = (detailGrid || root).querySelector('[data-field-text="product_description"]');
         if (descEl) {
           var emptyLabel = (descEl.getAttribute("data-empty-label") || "Описание не задано.").trim();
           var descVal = (productData.description || "").trim();
-          descEl.textContent = descVal || emptyLabel;
+          descEl.innerHTML = descVal || emptyLabel;
         }
       }
     }
@@ -1891,14 +2005,18 @@ var PD = (function () {
         payload.append("rows_json", "[]");
       }
       if (includePlan) {
-        appendPlanFieldsToPayload(payload, root.querySelector("#panel-drawing [data-product-plan-summary]"));
-        var pnameEl = root.querySelector('[data-field-text="product_name"]');
+        appendPlanFieldsToPayload(payload, productDetailPlanWrap());
+        var pnameEl = (detailGrid || root).querySelector('[data-field-text="product_name"]');
         if (pnameEl) payload.append("product_name", (pnameEl.textContent || "").replace(/\s+/g, " ").trim());
-        var pdescEl = root.querySelector('[data-field-text="product_description"]');
+        var pdescEl = (detailGrid || root).querySelector('[data-field-text="product_description"]');
         if (pdescEl) {
           var emptyLabel = (pdescEl.getAttribute("data-empty-label") || "Описание не задано.").trim();
-          var descRaw = (pdescEl.textContent || "").trim();
-          payload.append("product_description", descRaw === emptyLabel ? "" : descRaw);
+          var descText = (pdescEl.textContent || "").replace(/\s+/g, " ").trim();
+          var descHtml = (pdescEl.innerHTML || "").trim();
+          payload.append(
+            "product_description",
+            !descText || descText === emptyLabel ? "" : descHtml
+          );
         }
       }
       return payload;
@@ -2109,25 +2227,6 @@ var PD = (function () {
         e.preventDefault();
         return;
       }
-      var hdAutofill = el.closest && el.closest(".js-setup-tools-hd-autofill-row");
-      if (hdAutofill) {
-        if (!inlineEditMode) return;
-        var row = hdAutofill.closest("tr");
-        var panelHd = hdAutofill.closest(".product-tab-panel");
-        if (!row || !panelHd) return;
-        var toolCell = row.querySelector('td[data-tool-col="tool_number"]');
-        var hCell = row.querySelector('td[data-tool-col="kor_n"]');
-        var dCell = row.querySelector('td[data-tool-col="kor_d"]');
-        if (!toolCell || !hCell || !dCell) return;
-        if (!hCell.classList.contains("is-inline-edit")) return;
-        var exp = expectedCorrectors(toolCell.textContent || "");
-        if (!exp.h || !exp.d) return;
-        hCell.textContent = exp.h.replace(/[^0-9]/g, "");
-        dCell.textContent = exp.d.replace(/[^0-9]/g, "");
-        syncToolOverrideClasses(panelHd);
-        e.preventDefault();
-        return;
-      }
       var removeToolRow = el.closest && el.closest(".js-setup-tools-remove-row");
       if (removeToolRow) {
         if (!inlineEditMode) return;
@@ -2195,7 +2294,9 @@ var PD = (function () {
           alert("Нельзя удалить последний блок.");
           return;
         }
+        var stackRemoved = boxToRemove.parentNode;
         boxToRemove.remove();
+        if (stackRemoved) reindexExtraBindingBlocks(stackRemoved);
         return;
       }
       if (!addBtn && !copyBtn) return;
@@ -2216,13 +2317,17 @@ var PD = (function () {
         var emptyBox = buildExtraSpecBoxFromSource(source, true);
         if (emptyBox) {
           stack.appendChild(emptyBox);
+          reindexExtraBindingBlocks(stack);
           syncSpecDnDMode(panel, true);
+          syncBindingPhotoButtonsInPanel(panel, true);
         }
       } else if (copyBtn) {
         var copyBox = buildExtraSpecBoxFromSource(source, false);
         if (copyBox) {
           source.after(copyBox);
+          reindexExtraBindingBlocks(stack);
           syncSpecDnDMode(panel, true);
+          syncBindingPhotoButtonsInPanel(panel, true);
         }
       }
     });
@@ -2464,7 +2569,28 @@ var PD = (function () {
         var fieldBtn = btnBindingPhoto.getAttribute("data-photo-field") || "";
         if (!setupIdBtn || !fieldBtn) return;
         var localScope = btnBindingPhoto.closest(".setup-spec-box") || btnBindingPhoto.closest(".product-tab-panel") || root;
-        var input = localScope.querySelector('.setup-binding-photo-input[data-setup-id="' + setupIdBtn + '"][data-photo-field-input="' + fieldBtn + '"]');
+        var extraIdx = btnBindingPhoto.getAttribute("data-extra-block-index");
+        var input = null;
+        if (extraIdx != null && extraIdx !== "") {
+          input = localScope.querySelector(
+            '.setup-binding-photo-input[data-setup-id="' +
+              setupIdBtn +
+              '"][data-photo-field-input="' +
+              fieldBtn +
+              '"][data-extra-block-index="' +
+              extraIdx +
+              '"]'
+          );
+        } else {
+          input = localScope.querySelector(
+            '.setup-binding-photo-input[data-setup-id="' + setupIdBtn + '"][data-photo-field-input="' + fieldBtn + '"]:not([data-extra-block-index])'
+          );
+          if (!input) {
+            input = localScope.querySelector(
+              '.setup-binding-photo-input[data-setup-id="' + setupIdBtn + '"][data-photo-field-input="' + fieldBtn + '"]'
+            );
+          }
+        }
         if (input) input.click();
       }
 
@@ -2762,6 +2888,10 @@ var PD = (function () {
         fd.append("action", "inline_replace_binding_photo");
         fd.append("setup_id", setupId);
         fd.append("field_name", fieldName);
+        var extraIdx = input.getAttribute("data-extra-block-index");
+        if (extraIdx != null && extraIdx !== "") {
+          fd.append("extra_block_index", extraIdx);
+        }
         fd.append("image", file);
         var res = await fetch(window.location.href, {
           method: "POST",
@@ -2775,46 +2905,11 @@ var PD = (function () {
           input.value = "";
           return;
         }
-        var rowFieldMap = {
-          binding_x_photo: "Привязка X",
-          binding_y_photo: "Привязка Y",
-          binding_z_photo: "Привязка Z",
-          workpiece_photo: "Заготовка",
-        };
-        var label = rowFieldMap[fieldName] || "Фото";
-        var panel = input.closest(".product-tab-panel");
         var box = input.closest(".setup-spec-box");
-        var scope = box || panel;
         var setupName = "";
         var activeBtn = root.querySelector(".product-tab.is-active");
         if (activeBtn) setupName = activeBtn.getAttribute("data-setup-name") || "";
-        if (panel) {
-          var existingLink = scope.querySelector('[data-photo-caption*="' + label + '"]');
-          if (existingLink && existingLink.classList.contains("binding-photo-link")) {
-            existingLink.href = data.url;
-            existingLink.setAttribute("data-photo-url", data.url);
-            existingLink.setAttribute("data-photo-caption", (setupName ? setupName + " — " : "") + label);
-          } else {
-            var btn = scope.querySelector('.setup-binding-photo-btn[data-photo-field="' + fieldName + '"]');
-            if (btn) {
-              var link = document.createElement("a");
-              link.href = data.url;
-              link.className = "binding-photo-link setup-photo-open";
-              link.setAttribute("data-photo-url", data.url);
-              link.setAttribute("data-photo-caption", (setupName ? setupName + " — " : "") + label);
-              link.setAttribute("aria-label", "Открыть фото: " + label);
-              link.innerHTML = '<i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>';
-              var rail = btn.closest(".setup-binding-photo-rail");
-              if (rail) {
-                rail.insertBefore(link, btn);
-              } else {
-                btn.insertAdjacentElement("beforebegin", link);
-              }
-            }
-          }
-          var editBtn = scope.querySelector('.setup-binding-photo-btn[data-photo-field="' + fieldName + '"]');
-          if (editBtn) editBtn.innerHTML = '<i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i>';
-        }
+        if (box) applyBindingPhotoUrlToBox(box, fieldName, data.url, setupName);
         input.value = "";
     }
 
@@ -2964,6 +3059,449 @@ var PD = (function () {
       var panelHint = wrap.closest(".product-tab-panel");
       await uploadSetupProgramFile(setupId, file, panelHint);
     });
+
+    root.querySelectorAll('[data-field-text="setup_notes"]').forEach(function (n) {
+      normalizeSetupNotesImages(n);
+    });
+
+    // Панель форматирования описания (contenteditable)
+    (function initDescriptionFormatting() {
+      var meta = productDetailMetaEl();
+      if (!meta) return;
+      var descriptionArea = meta.querySelector(".product-drawing-description[data-field-text='product_description']");
+      if (!descriptionArea) return;
+
+      var savedDescRange = null;
+      var INLINE_FMT = { bold: "strong", italic: "em", underline: "u" };
+      var INLINE_FMT_TAGS = {
+        bold: ["STRONG", "B"],
+        italic: ["EM", "I"],
+        underline: ["U"],
+      };
+      var toolbar = meta.querySelector(".description-toolbar");
+
+      function isDescEditing() {
+        return (
+          document.body.classList.contains("setup-inline-edit-enabled") &&
+          meta.getAttribute("data-inline-edit-mode") === "1" &&
+          descriptionArea.isContentEditable
+        );
+      }
+
+      function selectionInDescription() {
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return false;
+        return descriptionArea.contains(sel.anchorNode);
+      }
+
+      function selectionHasInlineFmt(cmd) {
+        var tags = INLINE_FMT_TAGS[cmd];
+        if (!tags) return false;
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return false;
+        var node = sel.anchorNode;
+        if (!node || !descriptionArea.contains(node)) return false;
+        if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+        while (node && node !== descriptionArea) {
+          if (node.nodeType === Node.ELEMENT_NODE && tags.indexOf((node.tagName || "").toUpperCase()) >= 0) {
+            return true;
+          }
+          node = node.parentNode;
+        }
+        return false;
+      }
+
+      function queryAlignActive(cmd) {
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return false;
+        var block = findAlignBlock(sel.getRangeAt(0));
+        var expected = cmd === "justifyLeft" ? "left" : cmd === "justifyCenter" ? "center" : "right";
+        var attr = block.getAttribute ? block.getAttribute("data-desc-align") : "";
+        if (attr) {
+          if (cmd === "justifyLeft") return attr === "left";
+          return attr === expected;
+        }
+        var ta = (block.style.textAlign || window.getComputedStyle(block).textAlign || "left").toLowerCase();
+        if (cmd === "justifyLeft") return ta === "left" || ta === "start";
+        return ta === expected;
+      }
+
+      function queryFmtActive(cmd) {
+        if (!selectionInDescription()) return false;
+        if (cmd === "justifyLeft" || cmd === "justifyCenter" || cmd === "justifyRight") {
+          return queryAlignActive(cmd);
+        }
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return false;
+        if (sel.getRangeAt(0).collapsed) {
+          return selectionHasInlineFmt(cmd);
+        }
+        try {
+          return document.queryCommandState(cmd);
+        } catch (errState) {
+          return selectionHasInlineFmt(cmd);
+        }
+      }
+
+      function unwrapElement(el) {
+        var parent = el.parentNode;
+        if (!parent) return;
+        while (el.firstChild) parent.insertBefore(el.firstChild, el);
+        parent.removeChild(el);
+      }
+
+      function unwrapInlineFmt(cmd) {
+        var tags = INLINE_FMT_TAGS[cmd];
+        if (!tags) return;
+        var range = getActiveRange();
+        if (!range) return;
+        var selector = tags.map(function (t) {
+          return t.toLowerCase();
+        }).join(",");
+
+        if (range.collapsed) {
+          var node = range.startContainer;
+          if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+          while (node && node !== descriptionArea) {
+            if (node.nodeType === Node.ELEMENT_NODE && tags.indexOf((node.tagName || "").toUpperCase()) >= 0) {
+              unwrapElement(node);
+              return;
+            }
+            node = node.parentNode;
+          }
+          return;
+        }
+
+        var matches = Array.prototype.slice.call(descriptionArea.querySelectorAll(selector));
+        matches = matches.filter(function (el) {
+          try {
+            return range.intersectsNode(el);
+          } catch (errIntersect) {
+            var elRange = document.createRange();
+            elRange.selectNodeContents(el);
+            return (
+              range.compareBoundaryPoints(Range.END_TO_START, elRange) < 0 &&
+              range.compareBoundaryPoints(Range.START_TO_END, elRange) > 0
+            );
+          }
+        });
+        matches.sort(function (a, b) {
+          if (a.contains(b)) return 1;
+          if (b.contains(a)) return -1;
+          return 0;
+        });
+        matches.forEach(unwrapElement);
+      }
+
+      function syncDescToolbarState() {
+        if (!toolbar) return;
+        var buttons = toolbar.querySelectorAll(".desc-format-btn[data-cmd]");
+        if (!isDescEditing() || !selectionInDescription()) {
+          buttons.forEach(function (btn) {
+            btn.classList.remove("is-active");
+          });
+          return;
+        }
+        descriptionArea.focus({ preventScroll: true });
+        buttons.forEach(function (btn) {
+          var cmd = btn.getAttribute("data-cmd") || "";
+          var active = false;
+          if (INLINE_FMT[cmd]) {
+            active = queryFmtActive(cmd);
+          } else if (cmd === "justifyLeft" || cmd === "justifyCenter" || cmd === "justifyRight") {
+            active = queryAlignActive(cmd);
+          } else if (cmd === "insertUnorderedList" || cmd === "insertOrderedList") {
+            try {
+              active = document.queryCommandState(cmd);
+            } catch (errList) { /* ignore */ }
+          }
+          btn.classList.toggle("is-active", !!active);
+        });
+      }
+
+      function captureDescRange() {
+        if (!isDescEditing()) return;
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        var range = sel.getRangeAt(0);
+        if (!descriptionArea.contains(range.commonAncestorContainer)) return;
+        savedDescRange = range.cloneRange();
+        syncDescToolbarState();
+      }
+
+      function restoreDescRange() {
+        descriptionArea.focus({ preventScroll: true });
+        var sel = window.getSelection();
+        if (!sel) return;
+        sel.removeAllRanges();
+        if (savedDescRange) {
+          try {
+            sel.addRange(savedDescRange);
+            return;
+          } catch (err) { /* fall through */ }
+        }
+        var range = document.createRange();
+        range.selectNodeContents(descriptionArea);
+        range.collapse(false);
+        sel.addRange(range);
+      }
+
+      function getActiveRange() {
+        restoreDescRange();
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return null;
+        var range = sel.getRangeAt(0);
+        if (!descriptionArea.contains(range.commonAncestorContainer)) return null;
+        return range;
+      }
+
+      function setSelectionRange(range) {
+        var sel = window.getSelection();
+        if (!sel || !range) return;
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+
+      function wrapRangeWithTag(range, tagName) {
+        var el = document.createElement(tagName);
+        if (range.collapsed) {
+          el.appendChild(document.createTextNode("\u200b"));
+          range.insertNode(el);
+          var caret = document.createRange();
+          caret.selectNodeContents(el);
+          caret.collapse(false);
+          setSelectionRange(caret);
+          return;
+        }
+        try {
+          range.surroundContents(el);
+        } catch (errWrap) {
+          var fragment = range.extractContents();
+          el.appendChild(fragment);
+          range.insertNode(el);
+        }
+        var after = document.createRange();
+        after.selectNodeContents(el);
+        after.collapse(false);
+        setSelectionRange(after);
+      }
+
+      function findAlignBlock(range) {
+        var node = range.commonAncestorContainer;
+        if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+        while (node && node !== descriptionArea) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            var tag = (node.tagName || "").toUpperCase();
+            if (tag === "UL" || tag === "OL") return node;
+            if (tag === "LI") {
+              var listParent = node.parentNode;
+              if (listParent && (listParent.tagName === "UL" || listParent.tagName === "OL")) {
+                return listParent;
+              }
+            }
+            if (tag === "P" || tag === "DIV" || tag === "H1" || tag === "H2" || tag === "H3") {
+              return node;
+            }
+          }
+          node = node.parentNode;
+        }
+        return descriptionArea;
+      }
+
+      function applyAlignToElement(el, align) {
+        if (!el) return;
+        var tag = (el.tagName || "").toUpperCase();
+        var isList = tag === "UL" || tag === "OL";
+        el.style.textAlign = align;
+        if (isList) {
+          if (align === "left" || align === "start") {
+            el.removeAttribute("data-desc-align");
+            el.style.listStylePosition = "";
+            el.style.paddingLeft = "";
+            el.style.width = "";
+            el.style.maxWidth = "";
+            el.style.marginLeft = "";
+            el.style.marginRight = "";
+          } else {
+            el.setAttribute("data-desc-align", align);
+            el.style.listStylePosition = "inside";
+            el.style.paddingLeft = "0";
+            el.style.width = "fit-content";
+            el.style.maxWidth = "100%";
+            el.style.marginLeft = "auto";
+            el.style.marginRight = align === "center" ? "auto" : "0";
+          }
+          return;
+        }
+        if (align === "left" || align === "start") {
+          el.removeAttribute("data-desc-align");
+        } else {
+          el.setAttribute("data-desc-align", align);
+        }
+        if (tag === "P" || tag === "DIV") {
+          el.querySelectorAll("ul, ol").forEach(function (list) {
+            if (descriptionArea.contains(list)) applyAlignToElement(list, align);
+          });
+        }
+      }
+
+      function syncListAlignFromAncestors() {
+        descriptionArea.querySelectorAll("ul, ol").forEach(function (list) {
+          if (list.getAttribute("data-desc-align")) return;
+          var ta = (list.style.textAlign || "").toLowerCase();
+          if (ta === "center" || ta === "right") {
+            applyAlignToElement(list, ta);
+            return;
+          }
+          var node = list.parentElement;
+          while (node && node !== descriptionArea) {
+            var parentTa = (node.style.textAlign || window.getComputedStyle(node).textAlign || "").toLowerCase();
+            if (parentTa === "center" || parentTa === "right") {
+              applyAlignToElement(list, parentTa);
+              return;
+            }
+            if (node.getAttribute && node.getAttribute("data-desc-align")) {
+              applyAlignToElement(list, node.getAttribute("data-desc-align"));
+              return;
+            }
+            node = node.parentElement;
+          }
+        });
+      }
+
+      function applyAlignFallback(align) {
+        var range = getActiveRange();
+        if (!range) return;
+        var block = findAlignBlock(range);
+        applyAlignToElement(block, align);
+        if (block === descriptionArea) {
+          descriptionArea.querySelectorAll("ul, ol").forEach(function (list) {
+            try {
+              if (range.intersectsNode(list)) applyAlignToElement(list, align);
+            } catch (errListAlign) {
+              applyAlignToElement(list, align);
+            }
+          });
+        } else if (align !== "left" && align !== "start") {
+          var lists = block.querySelectorAll ? block.querySelectorAll("ul, ol") : [];
+          Array.prototype.forEach.call(lists, function (list) {
+            try {
+              if (range.intersectsNode(list)) applyAlignToElement(list, align);
+            } catch (errListAlign) {
+              applyAlignToElement(list, align);
+            }
+          });
+        }
+        syncListAlignFromAncestors();
+      }
+
+      function runDescCommand(cmd) {
+        if (!cmd || !isDescEditing()) return;
+        restoreDescRange();
+        descriptionArea.focus({ preventScroll: true });
+
+        if (INLINE_FMT[cmd]) {
+          var wasActive = queryFmtActive(cmd);
+          if (wasActive) {
+            try {
+              document.execCommand(cmd, false, null);
+            } catch (errOff) { /* ignore */ }
+            if (queryFmtActive(cmd)) unwrapInlineFmt(cmd);
+          } else {
+            var okInline = false;
+            try {
+              okInline = document.execCommand(cmd, false, null);
+            } catch (errInline) { /* ignore */ }
+            if (!okInline || !queryFmtActive(cmd)) {
+              var range = getActiveRange();
+              if (range) wrapRangeWithTag(range, INLINE_FMT[cmd]);
+            }
+          }
+          captureDescRange();
+          syncDescToolbarState();
+          return;
+        }
+
+        if (cmd === "justifyLeft" || cmd === "justifyCenter" || cmd === "justifyRight") {
+          var align = cmd === "justifyLeft" ? "left" : cmd === "justifyCenter" ? "center" : "right";
+          var alignActive = queryFmtActive(cmd);
+          if (alignActive && cmd !== "justifyLeft") {
+            try {
+              document.execCommand("justifyLeft", false, null);
+            } catch (errAlignOff) { /* ignore */ }
+            applyAlignFallback("left");
+          } else if (!alignActive) {
+            try {
+              document.execCommand(cmd, false, null);
+            } catch (errAlign) { /* ignore */ }
+            applyAlignFallback(align);
+          }
+          captureDescRange();
+          syncDescToolbarState();
+          return;
+        }
+
+        if (cmd === "insertUnorderedList" || cmd === "insertOrderedList") {
+          try {
+            document.execCommand(cmd, false, null);
+          } catch (errList) { /* ignore */ }
+          syncListAlignFromAncestors();
+          captureDescRange();
+          syncDescToolbarState();
+        }
+      }
+
+      descriptionArea.addEventListener("keyup", captureDescRange);
+      descriptionArea.addEventListener("mouseup", captureDescRange);
+      descriptionArea.addEventListener("focus", captureDescRange);
+      document.addEventListener("selectionchange", function () {
+        if (!isDescEditing()) return;
+        if (!selectionInDescription()) return;
+        var sel = window.getSelection();
+        if (sel && sel.rangeCount) {
+          var range = sel.getRangeAt(0);
+          if (descriptionArea.contains(range.commonAncestorContainer)) {
+            savedDescRange = range.cloneRange();
+          }
+        }
+        syncDescToolbarState();
+      });
+      window.addEventListener("setup-inline-edit-mode", function (ev) {
+        if (ev && ev.detail && ev.detail.enabled) {
+          window.setTimeout(function () {
+            syncListAlignFromAncestors();
+            syncDescToolbarState();
+          }, 0);
+        } else if (toolbar) {
+          toolbar.querySelectorAll(".desc-format-btn.is-active").forEach(function (btn) {
+            btn.classList.remove("is-active");
+          });
+        }
+      });
+
+      descriptionArea.addEventListener("keydown", function (e) {
+        if (!isDescEditing()) return;
+        if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+        var key = (e.key || "").toLowerCase();
+        var cmd = key === "b" ? "bold" : key === "i" ? "italic" : key === "u" ? "underline" : "";
+        if (!cmd) return;
+        e.preventDefault();
+        runDescCommand(cmd);
+      });
+
+      document.addEventListener(
+        "mousedown",
+        function (e) {
+          var btn = e.target && e.target.closest ? e.target.closest("#product-detail-meta .desc-format-btn") : null;
+          if (!btn) return;
+          if (!isDescEditing()) return;
+          e.preventDefault();
+          e.stopPropagation();
+          runDescCommand(btn.getAttribute("data-cmd"));
+        },
+        true
+      );
+    })();
   })();
   (function () {
     var MAX_GCODE_HIGHLIGHT_CHARS = 120000;
@@ -3229,63 +3767,4 @@ var PD = (function () {
     }
 
     document.querySelectorAll(".program-search-input").forEach(bindSearchInput);
-
-    root.querySelectorAll('[data-field-text="setup_notes"]').forEach(function (n) {
-      normalizeSetupNotesImages(n);
-    });
-
-    // Панель форматирования описания (contenteditable + execCommand)
-    (function initDescriptionFormatting() {
-      var descriptionArea = root.querySelector('[data-field-text="product_description"]');
-      if (!descriptionArea) return;
-
-      var formatButtons = root.querySelectorAll(".desc-format-btn");
-      if (!formatButtons.length) return;
-
-      var savedDescRange = null;
-
-      function captureDescRange() {
-        var sel = window.getSelection();
-        if (!sel || !sel.rangeCount) return;
-        var range = sel.getRangeAt(0);
-        if (!descriptionArea.contains(range.commonAncestorContainer)) return;
-        savedDescRange = range.cloneRange();
-      }
-
-      function restoreDescRange() {
-        descriptionArea.focus();
-        var sel = window.getSelection();
-        if (!sel) return;
-        sel.removeAllRanges();
-        if (savedDescRange) {
-          try {
-            sel.addRange(savedDescRange);
-            return;
-          } catch (err) { /* fall through */ }
-        }
-        var range = document.createRange();
-        range.selectNodeContents(descriptionArea);
-        range.collapse(false);
-        sel.addRange(range);
-      }
-
-      descriptionArea.addEventListener("keyup", captureDescRange);
-      descriptionArea.addEventListener("mouseup", captureDescRange);
-      descriptionArea.addEventListener("focus", captureDescRange);
-
-      formatButtons.forEach(function (btn) {
-        btn.addEventListener("mousedown", function (e) {
-          if (!document.body.classList.contains("setup-inline-edit-enabled")) return;
-          if (!descriptionArea.isContentEditable) return;
-          e.preventDefault();
-          var command = btn.getAttribute("data-format");
-          if (!command) return;
-          restoreDescRange();
-          try {
-            document.execCommand(command, false, null);
-          } catch (err) { /* ignore */ }
-          captureDescRange();
-        });
-      });
-    })();
   })();
