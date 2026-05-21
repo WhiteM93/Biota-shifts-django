@@ -159,7 +159,15 @@ html[data-theme="dawn"] {
   background: rgba(255,255,255,.06) !important;
 }
 
-/* ── Стили для блока с названием и описанием ── */
+/* ── Вкладка «Изделие»: название сверху, параметры слева, описание справа ── */
+.product-drawing-content {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+
 .product-drawing-intro {
   display: grid !important;
   grid-template-columns: 280px 1fr !important;
@@ -172,8 +180,13 @@ html[data-theme="dawn"] {
 .product-drawing-left-col {
   flex-shrink: 0 !important;
   width: auto !important;
-  min-width: 280px !important;
+  min-width: 0 !important;
+  max-width: 280px !important;
   grid-column: 1 !important;
+}
+
+#panel-drawing .product-drawing-content > .product-drawing-left-col {
+  grid-column: auto;
 }
 
 .product-drawing-right-col {
@@ -2204,6 +2217,9 @@ html[data-theme="dawn"] {
     grid-row: 2;
     min-width: 0;
   }
+  .product-drawing-content {
+    grid-template-columns: 1fr;
+  }
   .product-drawing-intro {
     display: grid;
     grid-template-columns: 1fr;
@@ -3097,12 +3113,20 @@ html[data-theme="dawn"] .form-label {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 0 16px 0;
+  padding: 16px 0 12px;
   border-bottom: 1px solid var(--pd-border);
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  width: 100%;
 }
 
 .product-detail-header-name {
+  width: 100%;
+  max-width: 100%;
+  text-align: center;
+}
+
+.product-detail-header-name .product-detail-name {
+  display: inline-block;
   font-size: 28px;
   font-weight: 600;
   text-align: center;
@@ -3114,20 +3138,17 @@ html[data-theme="dawn"] .form-label {
   transition: all 0.2s ease;
   word-break: break-word;
   white-space: pre-wrap;
+  max-width: 100%;
 }
 
-.product-detail-header-name:hover {
+body.setup-inline-edit-enabled #panel-drawing .product-detail-name.is-inline-edit:hover {
   background-color: rgba(255, 255, 255, 0.04);
 }
 
-.product-detail-header-name:focus {
+body.setup-inline-edit-enabled #panel-drawing .product-detail-name.is-inline-edit:focus {
   background-color: var(--pd-glass-bg);
   border: 1px solid var(--pd-accent);
   box-shadow: 0 0 0 2px rgba(143, 156, 255, 0.15);
-}
-
-html[data-theme="dawn"] .product-detail-header-name:focus {
-  background-color: rgba(255, 255, 255, 0.08);
 }
 
 .product-detail-description-block {
@@ -3138,19 +3159,26 @@ html[data-theme="dawn"] .product-detail-header-name:focus {
   background-color: var(--pd-glass-bg);
   border: 1px solid var(--pd-glass-border);
   border-radius: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 0;
   min-height: 200px;
+  min-width: 0;
 }
 
 .description-toolbar {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 8px;
   background-color: rgba(0, 0, 0, 0.2);
   border-radius: 8px;
-  border-bottom: 1px solid var(--pd-glass-border);
+  border: 1px solid var(--pd-glass-border);
   flex-wrap: wrap;
+  pointer-events: auto;
+}
+
+body.setup-inline-edit-enabled #panel-drawing .description-toolbar {
+  display: flex !important;
 }
 
 .desc-format-btn {
@@ -3193,6 +3221,37 @@ html[data-theme="dawn"] .product-detail-header-name:focus {
   height: 20px;
   background-color: rgba(255, 255, 255, 0.1);
   margin: 0 4px;
+}
+
+/* Вкладка «Изделие»: правка только при «Быстрое редактирование» */
+body.setup-inline-edit-enabled #panel-drawing .product-detail-name.is-inline-edit,
+body.setup-inline-edit-enabled #panel-drawing .product-drawing-description.is-inline-edit {
+  pointer-events: auto;
+}
+
+body:not(.setup-inline-edit-enabled) #panel-drawing .product-detail-name,
+body:not(.setup-inline-edit-enabled) #panel-drawing .product-drawing-description {
+  cursor: default;
+  pointer-events: none;
+  user-select: text;
+}
+
+body:not(.setup-inline-edit-enabled) #panel-drawing .product-detail-name.is-inline-edit,
+body:not(.setup-inline-edit-enabled) #panel-drawing .product-drawing-description.is-inline-edit {
+  pointer-events: none;
+}
+
+body:not(.setup-inline-edit-enabled) #panel-drawing .description-toolbar {
+  display: none !important;
+}
+
+body:not(.setup-inline-edit-enabled) #panel-drawing .plan-cascade-form-container.is-plan-readonly select,
+body:not(.setup-inline-edit-enabled) #panel-drawing .plan-cascade-form-container.is-plan-readonly input,
+body:not(.setup-inline-edit-enabled) #panel-drawing .product-drawing-plan-section.is-plan-readonly select,
+body:not(.setup-inline-edit-enabled) #panel-drawing .product-drawing-plan-section.is-plan-readonly input {
+  pointer-events: none;
+  opacity: 0.72;
+  cursor: not-allowed;
 }
 
 .product-drawing-description {

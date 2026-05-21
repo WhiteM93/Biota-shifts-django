@@ -1283,6 +1283,21 @@ var PD = (function () {
       return clone;
     }
 
+    function syncDrawingPanelQuickEdit(enabled) {
+      var drawingPanel = root.querySelector("#panel-drawing");
+      if (!drawingPanel) return;
+      var toolbar = drawingPanel.querySelector(".description-toolbar");
+      if (toolbar) {
+        if (enabled) toolbar.removeAttribute("hidden");
+        else toolbar.setAttribute("hidden", "hidden");
+      }
+      var planSection = drawingPanel.querySelector(".product-drawing-plan-section");
+      if (planSection) planSection.classList.toggle("is-plan-readonly", !enabled);
+      drawingPanel.querySelectorAll("[data-plan-cascade-form] select, [data-plan-cascade-form] input").forEach(function (el) {
+        el.disabled = !enabled;
+      });
+    }
+
     function refreshInlineFieldTitles(scope, isInlineMode) {
       var wrap = scope || root;
       wrap.querySelectorAll("[data-field-text]").forEach(function (node) {
@@ -1424,6 +1439,7 @@ var PD = (function () {
       if (editToggleBtn) {
         editToggleBtn.textContent = inlineEditMode ? "Сохранить изменения" : "Быстрое редактирование";
       }
+      syncDrawingPanelQuickEdit(inlineEditMode);
       syncInlineDeleteSetupBtn();
       window.dispatchEvent(new CustomEvent("setup-inline-edit-mode", { detail: { enabled: inlineEditMode } }));
     }
@@ -1483,12 +1499,12 @@ var PD = (function () {
         syncSpecDnDMode(panel, false);
         refreshInlineFieldTitles(panel, false);
       });
+      syncDrawingPanelQuickEdit(false);
       syncInlineDeleteSetupBtn();
       window.dispatchEvent(new CustomEvent("setup-inline-edit-mode", { detail: { enabled: false } }));
     }
 
-    refreshInlineFieldTitles(root, false);
-    syncInlineDeleteSetupBtn();
+    forceDisableInlineEdit();
 
     root.querySelectorAll("[data-product-plan-summary]").forEach(function (wrap) {
       var pt = wrap.querySelector(".js-plan-inline-product-type");
@@ -3218,45 +3234,57 @@ var PD = (function () {
       normalizeSetupNotesImages(n);
     });
 
-    // Инициализация панели форматирования для блока описания
+    // Панель форматирования описания (contenteditable + execCommand)
     (function initDescriptionFormatting() {
-      var descriptionArea = document.querySelector('[data-field-text="product_description"]');
+      var descriptionArea = root.querySelector('[data-field-text="product_description"]');
       if (!descriptionArea) return;
 
-      var formatButtons = document.querySelectorAll('.desc-format-btn');
+      var formatButtons = root.querySelectorAll(".desc-format-btn");
       if (!formatButtons.length) return;
 
-      // Handle formatting button clicks with proper selection preservation
+      var savedDescRange = null;
+
+      function captureDescRange() {
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        var range = sel.getRangeAt(0);
+        if (!descriptionArea.contains(range.commonAncestorContainer)) return;
+        savedDescRange = range.cloneRange();
+      }
+
+      function restoreDescRange() {
+        descriptionArea.focus();
+        var sel = window.getSelection();
+        if (!sel) return;
+        sel.removeAllRanges();
+        if (savedDescRange) {
+          try {
+            sel.addRange(savedDescRange);
+            return;
+          } catch (err) { /* fall through */ }
+        }
+        var range = document.createRange();
+        range.selectNodeContents(descriptionArea);
+        range.collapse(false);
+        sel.addRange(range);
+      }
+
+      descriptionArea.addEventListener("keyup", captureDescRange);
+      descriptionArea.addEventListener("mouseup", captureDescRange);
+      descriptionArea.addEventListener("focus", captureDescRange);
+
       formatButtons.forEach(function (btn) {
-        btn.addEventListener('mousedown', function (e) {
+        btn.addEventListener("mousedown", function (e) {
+          if (!document.body.classList.contains("setup-inline-edit-enabled")) return;
+          if (!descriptionArea.isContentEditable) return;
           e.preventDefault();
-
-          var command = btn.getAttribute('data-format');
+          var command = btn.getAttribute("data-format");
           if (!command) return;
-
-          // Save the current selection before executing command
-          var selection = window.getSelection();
-          var savedRange = null;
-
-          if (selection.rangeCount > 0) {
-            savedRange = selection.getRangeAt(0);
-          }
-
-          // Execute the formatting command
-          document.execCommand(command, false, null);
-
-          // Restore focus and selection if needed
-          if (savedRange) {
-            try {
-              selection.removeAllRanges();
-              selection.addRange(savedRange);
-            } catch (e) {
-              // Selection restoration might fail in some cases, that's okay
-            }
-          }
-
-          // Ensure focus is on the description area
-          descriptionArea.focus();
+          restoreDescRange();
+          try {
+            document.execCommand(command, false, null);
+          } catch (err) { /* ignore */ }
+          captureDescRange();
         });
       });
     })();

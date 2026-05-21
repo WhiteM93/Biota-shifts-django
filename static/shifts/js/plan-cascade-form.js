@@ -40,6 +40,24 @@ class PlanCascadeFormManager {
     this.attachEventListeners();
     this.syncStateFromDOM();
     this.updateFieldVisibility();
+    this._onInlineEditMode = this._onInlineEditMode.bind(this);
+    window.addEventListener("setup-inline-edit-mode", this._onInlineEditMode);
+    this.setFormEnabled(document.body.classList.contains("setup-inline-edit-enabled"));
+  }
+
+  /**
+   * Включить/выключить поля (только в режиме «Быстрое редактирование»).
+   */
+  setFormEnabled(enabled) {
+    this.container.classList.toggle("is-plan-readonly", !enabled);
+    this.container.querySelectorAll("select, input").forEach(function (el) {
+      el.disabled = !enabled;
+    });
+  }
+
+  _onInlineEditMode(ev) {
+    var enabled = !!(ev && ev.detail && ev.detail.enabled);
+    this.setFormEnabled(enabled);
   }
 
   /**
