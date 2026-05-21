@@ -283,12 +283,6 @@ class PlanCascadeFormManager {
       }
     } else if (product_type === 'assembly') {
       // Сборка: только тип изделия нужен
-      if (!material) {
-        errors.push('Выберите или введите материал');
-      }
-      if (!workpiece_size) {
-        errors.push('Укажите размер заготовки');
-      }
     } else if (product_type === 'pki') {
       // ПКИ (тип): материал и размер обязательны
       if (!material) {
