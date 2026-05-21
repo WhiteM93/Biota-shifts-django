@@ -53,8 +53,8 @@
                  inputmode="decimal" autocomplete="off" aria-label="Толщина листа, мм">
         </div>
 
-        <!-- Поле 4: Материал (видно для всех путей кроме только product_type select) -->
-        <div class="form-field form-field--cascade" data-field="material" data-show-when="product_type=made&workpiece_type=laser|product_type=made&workpiece_type=preparatory|product_type=made&workpiece_type=pki|product_type=assembly|product_type=pki">
+        <!-- Поле 4: Материал (видно для made с выбранным видом заготовки и для pki) -->
+        <div class="form-field form-field--cascade" data-field="material" data-show-when="product_type=made&workpiece_type=laser|product_type=made&workpiece_type=preparatory|product_type=made&workpiece_type=pki|product_type=pki">
           <label class="form-label muted">Материал</label>
           <input type="text" class="plan-cascade-material" data-field="material"
                  value="{{ plan_material_value|default:'' }}"
@@ -69,7 +69,7 @@
         </div>
 
         <!-- Поле 5: Размер заготовки (видно если нужен размер) -->
-        <div class="form-field form-field--cascade" data-field="workpiece_size" data-show-when="product_type=made&workpiece_type=preparatory|product_type=made&workpiece_type=pki|product_type=assembly|product_type=pki">
+        <div class="form-field form-field--cascade" data-field="workpiece_size" data-show-when="product_type=made&workpiece_type=preparatory|product_type=made&workpiece_type=pki|product_type=pki">
           <label class="form-label muted">Размер заготовки</label>
           <input type="text" class="plan-cascade-workpiece-size" data-field="workpiece_size"
                  value="{{ plan_workpiece_size_value|default:'' }}"
@@ -102,6 +102,7 @@
                 <span class="setup-plan-summary-value" data-plan-product-kind-line>{{ plan_display_product_kind_line }}</span>
               </div>
             </div>
+            {% if plan_product_type != 'assembly' %}
             <div class="setup-plan-summary-line setup-plan-line--workpiece">
               <span class="muted">Вид заготовки:</span>
               <div class="setup-plan-summary-cell">
@@ -114,6 +115,7 @@
                 <span class="setup-plan-summary-value" data-plan-material-line>{{ plan_display_material_line }}</span>
               </div>
             </div>
+            {% endif %}
           </div>
         </div>
       </div>
