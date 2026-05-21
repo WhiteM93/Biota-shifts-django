@@ -214,16 +214,13 @@ def graph_view(request):
             schedule_df["Отдел"].isin(selected_deps)
             & schedule_df["Должность"].isin(selected_positions)
         ].copy()
-        # Сохраняем оригинальные индексы перед сортировкой и reset
-        original_indices = filtered.index.tolist()
-        filtered = _sort_graph_rows(filtered, dep_rank, pos_rank).reset_index(drop=True)
+        filtered = _sort_graph_rows(filtered, dep_rank, pos_rank)
 
         day_columns = sort_schedule_day_columns(
             [c for c in full_schedule_df.columns if is_schedule_day_column(c)], y, m
         )
-        for i in range(len(filtered)):
-            base_idx = original_indices[i]
-            row = filtered.iloc[i]
+        for i, row in enumerate(filtered.itertuples(index=True)):
+            base_idx = int(row.Index)
             for d in day_columns:
                 if str(d) in PREV_MONTH_KEYS:
                     continue
