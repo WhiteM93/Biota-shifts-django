@@ -330,11 +330,12 @@ def graph_view(request):
         row = schedule_df.iloc[i]
         day_cells: list[dict] = []
         for d in day_columns:
-            meta = col_meta.get(str(d), {})
+            col_key = str(d)
+            meta = col_meta.get(col_key, {})
             day_cells.append(
                 {
-                    "key": str(d),
-                    "val": str(row.get(d, "") or ""),
+                    "key": col_key,
+                    "val": str(row.get(col_key, "") or ""),
                     "is_prev_month": bool(meta.get("is_prev_month")),
                     "is_today": bool(meta.get("is_today")),
                 }
