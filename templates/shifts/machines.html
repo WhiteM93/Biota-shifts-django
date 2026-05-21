@@ -58,7 +58,10 @@
       <div class="machines-quick-rows" data-server-quick-count="{{ machine_rows|length }}">
         {% for row in machine_rows %}
         <div class="machines-quick-row">
-          <div class="machines-cell machines-cell--code">{{ row.code }}</div>
+          <div class="machines-cell machines-cell--code">
+            <button type="button" class="machines-quick-row-drag-handle" aria-label="Перетащить строку" tabindex="-1" title="Перетащить">⠿</button>
+            <span class="machines-quick-row-code-text">{{ row.code }}</span>
+          </div>
           <div
             class="machines-cell machines-cell--field{% if not row.current %} is-empty{% endif %}"
             {% if row.current_product_id %}
@@ -267,7 +270,10 @@
 
   <template id="machines-tpl-quick-row">
     <div class="machines-quick-row" data-client-row="1">
-      <div class="machines-cell machines-cell--code is-empty"></div>
+      <div class="machines-cell machines-cell--code is-empty">
+        <button type="button" class="machines-quick-row-drag-handle" aria-label="Перетащить строку" tabindex="-1" title="Перетащить">⠿</button>
+        <span class="machines-quick-row-code-text"></span>
+      </div>
       <div class="machines-cell machines-cell--field is-empty">
         <button type="button" class="machines-cell-clear js-machines-cell-clear" aria-label="Очистить" tabindex="-1"></button>
         <div class="machines-quick-field-and-setup">

@@ -6,7 +6,13 @@
     var LS_SCHEDULE_EXTRA = "biota_machines_schedule_rows_extra_v1";
     var LS_CONTENT_VER = "biota_machines_content_version_v1";
     var MIME_SCHEDULE_DRAG = "application/x-biota-schedule-row";
+    var MIME_QUICK_ROW_REORDER = "application/x-biota-machines-quick-row-reorder";
     var scheduleDragHoverField = null;
+    var quickRowDragEl = null;
+    var quickRowDropTarget = null;
+    var quickRowDropPosition = null;
+    var MACHINES_CONFIRM_RESET_MS = 10000;
+    var machinesConfirmTimers = new WeakMap();
 
     // 16 цветов: 8 основных + 8 оттенков
     var COLOR_PALETTE = [
@@ -30,6 +36,61 @@
       var parts = ("; " + document.cookie).split("; " + name + "=");
       if (parts.length === 2) return parts.pop().split(";").shift() || "";
       return "";
+    }
+
+    function clearMachinesConfirmTimer(btn) {
+      if (!btn) return;
+      var t = machinesConfirmTimers.get(btn);
+      if (t) {
+        clearTimeout(t);
+        machinesConfirmTimers.delete(btn);
+      }
+    }
+
+    function resetMachinesConfirmPhase(btn) {
+      if (!btn) return;
+      clearMachinesConfirmTimer(btn);
+      btn.setAttribute("data-confirm-phase", "0");
+    }
+
+    function resetAllMachinesConfirmPhases() {
+      if (!root) return;
+      root
+        .querySelectorAll(
+          ".js-machines-cell-clear, .js-machines-quick-row-delete, .js-machines-schedule-row-delete"
+        )
+        .forEach(resetMachinesConfirmPhase);
+    }
+
+    function initMachinesConfirmButtons(scope) {
+      var host = scope && scope.querySelectorAll ? scope : root;
+      if (!host || !host.querySelectorAll) return;
+      host
+        .querySelectorAll(
+          ".js-machines-cell-clear, .js-machines-quick-row-delete, .js-machines-schedule-row-delete"
+        )
+        .forEach(function (btn) {
+          if (!btn.hasAttribute("data-confirm-phase")) btn.setAttribute("data-confirm-phase", "0");
+        });
+    }
+
+    function handleMachinesTripleConfirm(btn, e, onConfirm) {
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var phase = parseInt(btn.getAttribute("data-confirm-phase") || "0", 10);
+      if (isNaN(phase) || phase < 0) phase = 0;
+      clearMachinesConfirmTimer(btn);
+      if (phase >= 2) {
+        resetMachinesConfirmPhase(btn);
+        if (typeof onConfirm === "function") onConfirm();
+        return;
+      }
+      btn.setAttribute("data-confirm-phase", String(phase + 1));
+      var timer = setTimeout(function () {
+        resetMachinesConfirmPhase(btn);
+      }, MACHINES_CONFIRM_RESET_MS);
+      machinesConfirmTimers.set(btn, timer);
     }
 
     function splitQuickProductLabel(t) {
@@ -93,8 +154,52 @@
       return (el.textContent || "").replace(/\u200b/g, "").trim();
     }
 
+    function readQuickRowCode(codeCell) {
+      if (!codeCell) return "";
+      ensureQuickRowCodeStructure(codeCell);
+      var el = codeCell.querySelector(".machines-quick-row-code-text");
+      return el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "";
+    }
+
+    function ensureQuickRowCodeStructure(codeCell) {
+      if (!codeCell || !codeCell.classList.contains("machines-cell--code")) return codeCell;
+      var span = codeCell.querySelector(".machines-quick-row-code-text");
+      var handle = codeCell.querySelector(".machines-quick-row-drag-handle");
+      if (!span) {
+        var text = (codeCell.textContent || "").replace(/\s+/g, " ").trim();
+        codeCell.textContent = "";
+        if (!handle) {
+          handle = document.createElement("button");
+          handle.type = "button";
+          handle.className = "machines-quick-row-drag-handle";
+          handle.setAttribute("aria-label", "Перетащить строку");
+          handle.setAttribute("tabindex", "-1");
+          handle.title = "Перетащить";
+          handle.textContent = "⠿";
+        }
+        span = document.createElement("span");
+        span.className = "machines-quick-row-code-text";
+        span.textContent = text;
+        codeCell.appendChild(handle);
+        codeCell.appendChild(span);
+      } else if (!handle) {
+        handle = document.createElement("button");
+        handle.type = "button";
+        handle.className = "machines-quick-row-drag-handle";
+        handle.setAttribute("aria-label", "Перетащить строку");
+        handle.setAttribute("tabindex", "-1");
+        handle.title = "Перетащить";
+        handle.textContent = "⠿";
+        codeCell.insertBefore(handle, span);
+      }
+      return codeCell;
+    }
+
     function resolveQuickEditableCell(el) {
       if (!el) return null;
+      if (el.closest(".machines-quick-row-code-text")) {
+        return el.closest(".machines-cell--code");
+      }
       if (el.closest(".machines-quick-notes-body")) {
         return el.closest(".machines-cell--notes");
       }
@@ -175,7 +280,7 @@
           if (!isNaN(npn)) nextPid = npn;
         }
         machine_rows.push({
-          code: (cells[0].textContent || "").trim(),
+          code: readQuickRowCode(cells[0]),
           current: readQuickProductSlotPlainText(cells[1]),
           next: readQuickProductSlotPlainText(cells[2]),
           extra: readQuickNotesText(cells[3]),
@@ -374,7 +479,7 @@
       quickWrap.querySelectorAll(".machines-quick-row").forEach(function (qrow) {
         var cells = qrow.querySelectorAll(":scope > .machines-cell");
         if (cells.length < 3) return;
-        var code = (cells[0].textContent || "").replace(/\r\n|\r|\n/g, " ").replace(/\s+/g, " ").trim();
+        var code = readQuickRowCode(cells[0]);
         [1, 2].forEach(function (ix) {
           var fcell = cells[ix];
           var qsel = fcell.querySelector(".js-machines-quick-setup-select");
@@ -397,7 +502,7 @@
       if (cells.length < 3) return;
       if (fieldCell !== cells[1] && fieldCell !== cells[2]) return;
       var edit = root.getAttribute("data-inline-edit-mode") === "1";
-      var code = (cells[0].textContent || "").replace(/\r\n|\r|\n/g, " ").replace(/\s+/g, " ").trim();
+      var code = readQuickRowCode(cells[0]);
       var pid = readQuickFieldProductPidAttr(fieldCell);
       var setups = setupsArrayByProductId(pid);
       sel.textContent = "";
@@ -470,7 +575,7 @@
       quickWrap.querySelectorAll(".machines-quick-row").forEach(function (row) {
         var ce = row.querySelector(":scope > .machines-cell--code");
         if (!ce) return;
-        var v = normMachineCodeKey(ce.textContent);
+        var v = normMachineCodeKey(readQuickRowCode(ce));
         if (!v) {
           ce.removeAttribute("data-mc-tone");
           ce.style.removeProperty("--mc-hue");
@@ -647,6 +752,47 @@
           h.removeAttribute("draggable");
         }
       });
+    }
+
+    function syncQuickRowDragHandles(on) {
+      if (!quickWrap) return;
+      quickWrap.querySelectorAll(".machines-quick-row-drag-handle").forEach(function (h) {
+        if (on) {
+          h.setAttribute("draggable", "true");
+        } else {
+          h.removeAttribute("draggable");
+        }
+      });
+    }
+
+    function dataTransferHasQuickRowReorder(dt) {
+      if (!dt) return false;
+      try {
+        if (dt.types && Array.prototype.indexOf.call(dt.types, MIME_QUICK_ROW_REORDER) !== -1) return true;
+        return !!(dt.getData && dt.getData(MIME_QUICK_ROW_REORDER));
+      } catch (eDt) {
+        return false;
+      }
+    }
+
+    function clearQuickRowDropIndicators() {
+      if (!quickWrap) return;
+      quickWrap.querySelectorAll(".machines-quick-row").forEach(function (r) {
+        r.classList.remove("machines-quick-row--drop-before", "machines-quick-row--drop-after");
+      });
+      quickRowDropTarget = null;
+      quickRowDropPosition = null;
+    }
+
+    function moveQuickRow(dragRow, targetRow, position) {
+      if (!quickWrap || !dragRow || !targetRow || dragRow === targetRow) return;
+      if (position === "before") {
+        quickWrap.insertBefore(dragRow, targetRow);
+      } else {
+        quickWrap.insertBefore(dragRow, targetRow.nextSibling);
+      }
+      syncMachineCodeAppearance();
+      syncScheduleCodeVisibility();
     }
 
     function persistScheduleMachineCodes() {
@@ -1053,6 +1199,24 @@
       }
     }
 
+    function scheduleRowColor(scheduleRow) {
+      if (!scheduleRow) return "";
+      var triggerBtn = scheduleRow.querySelector(".js-machines-color-trigger");
+      return triggerBtn ? (triggerBtn.dataset.color || "").trim() : "";
+    }
+
+    function applyProductColorToQuickField(fieldCell, color) {
+      if (!fieldCell) return;
+      var c = (color || "").trim();
+      if (c) {
+        fieldCell.style.setProperty("--product-bg", c);
+        fieldCell.setAttribute("data-product-color", "1");
+      } else {
+        fieldCell.style.removeProperty("--product-bg");
+        fieldCell.removeAttribute("data-product-color");
+      }
+    }
+
     function syncScheduleColorsToQuickRows() {
       // Строим карту product_id → color из строк плана
       var colorMap = {};
@@ -1068,14 +1232,8 @@
       // Применяем к ячейкам станков
       quickWrap.querySelectorAll(".machines-quick-row").forEach(function (row) {
         row.querySelectorAll(".machines-cell--field:not(.machines-cell--notes)").forEach(function (cell) {
-          var pid = (cell.getAttribute("data-preview-product-id") || "").trim();
-          if (pid && colorMap[pid]) {
-            cell.style.setProperty("--product-bg", colorMap[pid]);
-            cell.setAttribute("data-product-color", "1");
-          } else {
-            cell.style.removeProperty("--product-bg");
-            cell.removeAttribute("data-product-color");
-          }
+          var pid = readQuickFieldProductPidAttr(cell);
+          applyProductColorToQuickField(cell, pid && colorMap[pid] ? colorMap[pid] : "");
         });
       });
     }
@@ -1178,7 +1336,7 @@
       quickRows.forEach(function (qrow) {
         var cells = qrow.querySelectorAll(":scope > .machines-cell");
         if (cells.length < 3) return;
-        var code = (cells[0].textContent || "").trim();
+        var code = readQuickRowCode(cells[0]);
         if (!code) return;
         var codeCell = cells[0];
         var hue = codeCell.style.getPropertyValue("--mc-hue") || "";
@@ -1250,6 +1408,10 @@
           : (cell.textContent || "").replace(/\u200b/g, "");
       } else if (inner && cell.classList.contains("machines-cell--field")) {
         raw = sanitizeQuickProductText(getQuickFieldFlatText(inner)).replace(/\u200b/g, "");
+      } else if (cell.classList.contains("machines-cell--code")) {
+        ensureQuickRowCodeStructure(cell);
+        var codeSpanNorm = cell.querySelector(".machines-quick-row-code-text");
+        raw = codeSpanNorm ? (codeSpanNorm.textContent || "").replace(/\u200b/g, "") : (cell.textContent || "").replace(/\u200b/g, "");
       } else {
         raw = (cell.textContent || "").replace(/\u200b/g, "");
       }
@@ -1267,6 +1429,11 @@
       } else if (cell.classList.contains("machines-cell--notes")) {
         var notesBodySet = cell.querySelector(":scope > .machines-quick-notes-body");
         if (notesBodySet) notesBodySet.textContent = t;
+        else cell.textContent = t;
+      } else if (cell.classList.contains("machines-cell--code")) {
+        ensureQuickRowCodeStructure(cell);
+        var codeSpanSet = cell.querySelector(".machines-quick-row-code-text");
+        if (codeSpanSet) codeSpanSet.textContent = t;
         else cell.textContent = t;
       } else {
         cell.textContent = t;
@@ -1289,6 +1456,23 @@
             if (notesBody) {
               notesBody.removeAttribute("contenteditable");
               notesBody.removeAttribute("spellcheck");
+            }
+          }
+          return;
+        }
+        if (cell.classList.contains("machines-cell--code")) {
+          ensureQuickRowCodeStructure(cell);
+          var codeText = cell.querySelector(".machines-quick-row-code-text");
+          cell.removeAttribute("contenteditable");
+          cell.removeAttribute("spellcheck");
+          if (on && codeText) {
+            codeText.setAttribute("contenteditable", "true");
+            codeText.setAttribute("spellcheck", "false");
+          } else {
+            if (!on) normalizeQuickEditableCell(cell);
+            if (codeText) {
+              codeText.removeAttribute("contenteditable");
+              codeText.removeAttribute("spellcheck");
             }
           }
           return;
@@ -1374,7 +1558,7 @@
         var cells = row.querySelectorAll(":scope > .machines-cell");
         if (cells.length < 4) return { c: "", n: "", e: "", x: "", t: "", cp: "", ep: "", cs: "", es: "" };
         return {
-          c: (cells[0].textContent || "").trim(),
+          c: readQuickRowCode(cells[0]),
           n: readQuickProductSlotPlainText(cells[1]),
           e: readQuickProductSlotPlainText(cells[2]),
           x: readQuickNotesText(cells[3]),
@@ -1421,6 +1605,9 @@
         }
       }
       root.setAttribute("data-inline-edit-mode", on ? "1" : "0");
+      if (!on) {
+        resetAllMachinesConfirmPhases();
+      }
       if (on) {
         hideQuickPreview();
       }
@@ -1439,6 +1626,7 @@
       }
       syncScheduleProductInteractions(on);
       syncQuickEditability(on);
+      syncQuickRowDragHandles(on);
       syncScheduleDragHandles(on);
       if (!on) {
         root.querySelectorAll(".machines-cell--schedule-label").forEach(syncProductComboDisplay);
@@ -1482,11 +1670,12 @@
     quickWrap.addEventListener("click", function (e) {
       var btn = e.target.closest(".js-machines-quick-row-delete");
       if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
-      e.stopPropagation();
       var row = btn.closest(".machines-quick-row");
       if (!row) return;
-      row.remove();
-      saveQuickClientRows();
+      handleMachinesTripleConfirm(btn, e, function () {
+        row.remove();
+        saveQuickClientRows();
+      });
     });
 
     quickWrap.addEventListener("click", function (e) {
@@ -1494,28 +1683,34 @@
       if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
       var cell = btn.closest(".machines-cell--field");
       if (!cell) return;
-      setQuickCellText(cell, "");
-      clearQuickFieldProductRef(cell);
-      syncQuickFieldSetupSelect(cell);
-      syncScheduleCodeVisibility();
+      handleMachinesTripleConfirm(btn, e, function () {
+        setQuickCellText(cell, "");
+        clearQuickFieldProductRef(cell);
+        syncQuickFieldSetupSelect(cell);
+        syncScheduleCodeVisibility();
+      });
     });
 
     scheduleWrap.addEventListener("click", function (e) {
       // Удаление строки
       var delBtn = e.target.closest(".js-machines-schedule-row-delete");
       if (delBtn && root.getAttribute("data-inline-edit-mode") === "1") {
-        e.stopPropagation();
-        var row = delBtn.closest(".machines-schedule-row");
-        if (row) {
-          var labelCell = row.querySelector(".machines-cell--schedule-label");
+        var rowDel = delBtn.closest(".machines-schedule-row");
+        if (!rowDel) return;
+        handleMachinesTripleConfirm(delBtn, e, function () {
+          var labelCell = rowDel.querySelector(".machines-cell--schedule-label");
           if (labelCell) {
             var idx = labelCell.getAttribute("data-schedule-index");
-            if (idx !== null && idx !== "") { var map = readStore(); delete map[idx]; writeStore(map); }
+            if (idx !== null && idx !== "") {
+              var map = readStore();
+              delete map[idx];
+              writeStore(map);
+            }
           }
-          row.remove();
+          rowDel.remove();
           saveScheduleClientRows();
           syncScheduleColorsToQuickRows();
-        }
+        });
         return;
       }
       // Открытие цветового пикера
@@ -1603,8 +1798,38 @@
       clearScheduleDropHover();
     });
 
+    quickWrap.addEventListener("dragstart", function (e) {
+      var handle = e.target.closest(".machines-quick-row-drag-handle");
+      if (!handle || !quickWrap.contains(handle)) return;
+      if (root.getAttribute("data-inline-edit-mode") !== "1") {
+        e.preventDefault();
+        return;
+      }
+      var row = handle.closest(".machines-quick-row");
+      if (!row) return;
+      quickRowDragEl = row;
+      row.classList.add("machines-quick-row--dragging");
+      try {
+        e.dataTransfer.setData(MIME_QUICK_ROW_REORDER, "1");
+        e.dataTransfer.effectAllowed = "move";
+      } catch (errQr) {}
+    });
+
+    quickWrap.addEventListener("dragend", function () {
+      if (quickRowDragEl) quickRowDragEl.classList.remove("machines-quick-row--dragging");
+      quickRowDragEl = null;
+      clearQuickRowDropIndicators();
+    });
+
     quickWrap.addEventListener("dragenter", function (e) {
       if (root.getAttribute("data-inline-edit-mode") !== "1") return;
+      if (quickRowDragEl && dataTransferHasQuickRowReorder(e.dataTransfer)) {
+        var rowEnter = e.target.closest(".machines-quick-row");
+        if (rowEnter && quickWrap.contains(rowEnter) && rowEnter !== quickRowDragEl) {
+          e.preventDefault();
+        }
+        return;
+      }
       if (!dataTransferHasScheduleDrag(e.dataTransfer)) return;
       var fieldEnter = e.target.closest(".machines-quick-row > .machines-cell--field:not(.machines-cell--notes)");
       if (!fieldEnter || !quickWrap.contains(fieldEnter)) return;
@@ -1613,6 +1838,25 @@
 
     quickWrap.addEventListener("dragover", function (e) {
       if (root.getAttribute("data-inline-edit-mode") !== "1") return;
+      if (quickRowDragEl && dataTransferHasQuickRowReorder(e.dataTransfer)) {
+        var rowOver = e.target.closest(".machines-quick-row");
+        if (!rowOver || !quickWrap.contains(rowOver) || rowOver === quickRowDragEl) {
+          clearQuickRowDropIndicators();
+          return;
+        }
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        var rect = rowOver.getBoundingClientRect();
+        var before = e.clientY < rect.top + rect.height / 2;
+        var pos = before ? "before" : "after";
+        if (quickRowDropTarget !== rowOver || quickRowDropPosition !== pos) {
+          clearQuickRowDropIndicators();
+          quickRowDropTarget = rowOver;
+          quickRowDropPosition = pos;
+          rowOver.classList.add(before ? "machines-quick-row--drop-before" : "machines-quick-row--drop-after");
+        }
+        return;
+      }
       if (!dataTransferHasScheduleDrag(e.dataTransfer)) return;
       var field = e.target.closest(".machines-quick-row > .machines-cell--field:not(.machines-cell--notes)");
       if (!field || !quickWrap.contains(field)) {
@@ -1641,6 +1885,26 @@
 
     quickWrap.addEventListener("drop", function (e) {
       if (root.getAttribute("data-inline-edit-mode") !== "1") return;
+      if (quickRowDragEl && dataTransferHasQuickRowReorder(e.dataTransfer)) {
+        e.preventDefault();
+        var targetRow = quickRowDropTarget || e.target.closest(".machines-quick-row");
+        if (!targetRow || !quickWrap.contains(targetRow) || targetRow === quickRowDragEl) {
+          clearQuickRowDropIndicators();
+          return;
+        }
+        var pos = quickRowDropPosition || "before";
+        var dragRow = quickRowDragEl;
+        var codeMoved = readQuickRowCode(dragRow.querySelector(":scope > .machines-cell--code"));
+        moveQuickRow(dragRow, targetRow, pos);
+        clearQuickRowDropIndicators();
+        quickRowDragEl = null;
+        if (codeMoved) {
+          pushPageHistory("Строка станка «" + codeMoved + "» перемещена.");
+        } else {
+          pushPageHistory("Строка станка перемещена.");
+        }
+        return;
+      }
       var field = e.target.closest(".machines-quick-row > .machines-cell--field:not(.machines-cell--notes)");
       if (!field || !quickWrap.contains(field)) return;
       var raw = "";
@@ -1670,8 +1934,7 @@
       if (!qrow) return;
       var qcells = qrow.querySelectorAll(":scope > .machines-cell");
       if (qcells.length < 4) return;
-      var machineCode = (qcells[0].textContent || "").trim();
-      machineCode = machineCode.replace(/\r\n|\r|\n/g, " ").replace(/\s+/g, " ").trim();
+      var machineCode = readQuickRowCode(qcells[0]);
       setQuickCellText(field, display);
       if (payload.productId) {
         setQuickFieldProductRef(field, String(payload.productId));
@@ -1700,6 +1963,10 @@
       persistScheduleMachineCodes();
       persistQuickServerRows();
       saveQuickClientRows();
+      if (schRow) {
+        applyProductColorToQuickField(field, scheduleRowColor(schRow));
+      }
+      syncScheduleColorsToQuickRows();
       syncMachineCodeAppearance();
       syncScheduleCodeVisibility();
       var fieldLabel = "ячейка";
@@ -1991,6 +2258,14 @@
     function setQuickCellText(cell, text, opts) {
       opts = opts || {};
       var t = (text != null ? String(text) : "").trim();
+      if (cell.classList.contains("machines-cell--code")) {
+        ensureQuickRowCodeStructure(cell);
+        var codeSpanSet = cell.querySelector(".machines-quick-row-code-text");
+        if (codeSpanSet) codeSpanSet.textContent = t;
+        if (t) cell.classList.remove("is-empty");
+        else cell.classList.add("is-empty");
+        return;
+      }
       if (cell.classList.contains("machines-cell--notes")) {
         ensureQuickNotesBody(cell);
         var notesBody = cell.querySelector(":scope > .machines-quick-notes-body");
@@ -2043,18 +2318,18 @@
         if ((notesBodyFocus.textContent || "").replace(/\u200b/g, "").length === 0 && notesBodyFocus.childNodes.length === 0) {
           notesBodyFocus.appendChild(document.createTextNode("\u200b"));
         }
+        return;
       }
-    });
-
-    quickWrap.addEventListener("click", function (e) {
-      var btn = e.target.closest(".js-machines-cell-clear");
-      if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
-      var cell = btn.closest(".machines-cell--field");
-      if (!cell) return;
-      setQuickCellText(cell, "");
-      clearQuickFieldProductRef(cell);
-      syncQuickFieldSetupSelect(cell);
-      syncScheduleCodeVisibility();
+      if (cell.classList.contains("machines-cell--code")) {
+        var codeSpanFocus = cell.querySelector(".machines-quick-row-code-text");
+        if (
+          codeSpanFocus &&
+          (codeSpanFocus.textContent || "").replace(/\u200b/g, "").length === 0 &&
+          codeSpanFocus.childNodes.length === 0
+        ) {
+          codeSpanFocus.appendChild(document.createTextNode("\u200b"));
+        }
+      }
     });
 
     quickWrap.addEventListener(
@@ -2091,13 +2366,29 @@
         return;
       }
       var innerInput = quickFieldEditableInner(cell) || cell.querySelector(".machines-quick-field-view");
-      var raw = innerInput ? innerInput.textContent || "" : cell.textContent || "";
+      var codeSpanInput = cell.classList.contains("machines-cell--code")
+        ? cell.querySelector(".machines-quick-row-code-text")
+        : null;
+      var raw = innerInput
+        ? innerInput.textContent || ""
+        : codeSpanInput
+          ? codeSpanInput.textContent || ""
+          : cell.textContent || "";
       if (raw.indexOf("\n") === -1 && raw.indexOf("\r") === -1) return;
       var t = sanitizeQuickProductText(raw.replace(/\r\n|\r|\n/g, " "));
+      if (cell.classList.contains("machines-cell--code")) {
+        t = t.replace(/\s+/g, " ");
+      }
       if (innerInput) {
         if (t !== raw.replace(/\r\n|\r|\n/g, " ")) innerInput.textContent = t;
+      } else if (codeSpanInput) {
+        if (t !== raw.replace(/\r\n|\r|\n/g, " ")) codeSpanInput.textContent = t;
       } else if (t !== raw.replace(/\r\n|\r|\n/g, " ")) {
         cell.textContent = t;
+      }
+      if (cell.classList.contains("machines-cell--code")) {
+        if (t) cell.classList.remove("is-empty");
+        else cell.classList.add("is-empty");
       }
     });
 
@@ -2130,7 +2421,7 @@
         var cells = row.querySelectorAll(":scope > .machines-cell");
         if (cells.length < 4) return;
         rows.push({
-          c: (cells[0].textContent || "").trim(),
+          c: readQuickRowCode(cells[0]),
           n: readQuickProductSlotPlainText(cells[1]),
           e: readQuickProductSlotPlainText(cells[2]),
           x: readQuickNotesText(cells[3]),
@@ -2164,6 +2455,7 @@
         if ((r.ep || "").trim()) setQuickFieldProductRef(cells[2], String(r.ep).trim());
         else clearQuickFieldProductRef(cells[2]);
         quickWrap.appendChild(row);
+        initMachinesConfirmButtons(row);
       });
     }
 
@@ -2247,6 +2539,7 @@
         }
         if (item.color) applyColorToRow(row, item.color);
         scheduleWrap.appendChild(row);
+        initMachinesConfirmButtons(row);
       });
     }
 
@@ -2255,8 +2548,12 @@
       var tpl = tplQuick.content.querySelector(".machines-quick-row");
       if (!tpl) return;
       var row = tpl.cloneNode(true);
+      var codeCellNew = row.querySelector(":scope > .machines-cell--code");
+      if (codeCellNew) ensureQuickRowCodeStructure(codeCellNew);
       quickWrap.appendChild(row);
+      initMachinesConfirmButtons(row);
       syncQuickEditability(root.getAttribute("data-inline-edit-mode") === "1");
+      syncQuickRowDragHandles(true);
       saveQuickClientRows();
       pushPageHistory("Добавлена новая строка станка (пустая).");
     }
@@ -2275,6 +2572,7 @@
         writeStore(map);
       }
       scheduleWrap.appendChild(row);
+      initMachinesConfirmButtons(row);
       saveScheduleClientRows();
       applyStoredSelections();
       pushPageHistory("Добавлена новая строка плана работ.");
@@ -2307,6 +2605,10 @@
       applyScheduleMachineCodes();
     }
     // Trim whitespace from server-rendered notes cells
+    quickWrap &&
+      quickWrap.querySelectorAll(".machines-quick-row > .machines-cell--code").forEach(function (codeCell) {
+        ensureQuickRowCodeStructure(codeCell);
+      });
     quickWrap && quickWrap.querySelectorAll(".machines-cell--notes").forEach(function (cell) {
       ensureQuickNotesBody(cell);
       var t = readQuickNotesText(cell);
@@ -2336,4 +2638,5 @@
     });
     syncScheduleColorsToQuickRows();
     sortScheduleRowsByPriorityQty();
+    initMachinesConfirmButtons(root);
   })();
