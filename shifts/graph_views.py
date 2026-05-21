@@ -215,20 +215,20 @@ def graph_view(request):
             & schedule_df["Должность"].isin(selected_positions)
         ].copy()
         filtered = _sort_graph_rows(filtered, dep_rank, pos_rank)
+        # КРИТИЧНО: сохраняем оригинальные индексы ДО reset_index
+        # Эти индексы соответствуют позициям в full_schedule_df
+        filtered_orig_indices = filtered.index.tolist()
+        filtered = filtered.reset_index(drop=True)
 
         day_columns = sort_schedule_day_columns(
             [c for c in full_schedule_df.columns if is_schedule_day_column(c)], y, m
         )
 
-        # Важно: используем "Код" (код сотрудника) вместо индексов DataFrame,
-        # потому что индексы не сохраняются в Excel и не загружаются обратно!
-        for i, (_, frow) in enumerate(filtered.iterrows()):
-            emp_code = str(frow.get("Код", ""))
-            # Находим строку с этим кодом в full_schedule_df
-            matching = full_schedule_df[full_schedule_df["Код"] == emp_code]
-            if matching.empty:
-                continue
-            row_idx = matching.index[0]
+        # После reset_index, индексы в filtered это 0, 1, 2, 3...
+        # которые совпадают с i в цикле и с cell_i_d на клиенте
+        for i in range(len(filtered)):
+            # filtered_orig_indices[i] это индекс в full_schedule_df ДЕ сортировки по dep_rank/pos_rank
+            full_idx = filtered_orig_indices[i]
 
             for d in day_columns:
                 if str(d) in PREV_MONTH_KEYS:
@@ -239,7 +239,7 @@ def graph_view(request):
                 raw = (request.POST.get(key) or "").strip().lower()
                 if raw not in SCHEDULE_CODES:
                     raw = ""
-                full_schedule_df.at[row_idx, d] = raw
+                full_schedule_df.at[full_idx, d] = raw
         full_schedule_df = biota_schedule.apply_prev_month_tail_from_previous_schedule(
             full_schedule_df, employees_df, y, m
         )
