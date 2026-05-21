@@ -158,38 +158,6 @@
 
     </div>
 
-    <!-- Правая колонка: размер и тип заготовки из чертежа -->
-    <div class="plan-unified-specs-grid__right">
-      {% if plan_specs_variant == "product" %}
-        <div class="setup-plan-summary-line setup-plan-line--blank-size">
-          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-size-label">Размер заготовки по чертежу</span>
-          <div class="setup-plan-summary-cell">
-            <span id="plan-product-drawing-blank-size" data-field-text="drawing_blank_size" aria-labelledby="plan-product-drawing-blank-size-label">{% if product.drawing_blank_size %}{{ product.drawing_blank_size }}{% else %}—{% endif %}</span>
-          </div>
-        </div>
-        <div class="setup-plan-summary-line setup-plan-line--blank-size">
-          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-type-label">Тип заготовки по чертежу</span>
-          <div class="setup-plan-summary-cell">
-            <span id="plan-product-drawing-blank-type" data-field-text="drawing_blank_type" aria-labelledby="plan-product-drawing-blank-type-label">{% if product.drawing_blank_type %}{{ product.drawing_blank_type }}{% else %}—{% endif %}</span>
-          </div>
-        </div>
-      {% else %}
-        {% with nprod=item.naladki_product %}
-        <div class="setup-plan-summary-line setup-plan-line--blank-size">
-          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-size-label">Размер заготовки по чертежу</span>
-          <div class="setup-plan-summary-cell">
-            <span id="plan-product-drawing-blank-size" data-field-text="drawing_blank_size" aria-labelledby="plan-product-drawing-blank-size-label">{% if nprod and nprod.drawing_blank_size %}{{ nprod.drawing_blank_size }}{% else %}—{% endif %}</span>
-          </div>
-        </div>
-        <div class="setup-plan-summary-line setup-plan-line--blank-size">
-          <span class="muted setup-plan-blank-size-label" id="plan-product-drawing-blank-type-label">Тип заготовки по чертежу</span>
-          <div class="setup-plan-summary-cell">
-            <span id="plan-product-drawing-blank-type" data-field-text="drawing_blank_type" aria-labelledby="plan-product-drawing-blank-type-label">{% if nprod and nprod.drawing_blank_type %}{{ nprod.drawing_blank_type }}{% else %}—{% endif %}</span>
-          </div>
-        </div>
-        {% endwith %}
-      {% endif %}
-    </div>
 
   </div>
 </div>
