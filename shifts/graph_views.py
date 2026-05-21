@@ -215,16 +215,16 @@ def graph_view(request):
             & schedule_df["Должность"].isin(selected_positions)
         ].copy()
         filtered = _sort_graph_rows(filtered, dep_rank, pos_rank)
-        # Сохраняем индексы после сортировки (до reset_index)
-        sorted_indices = filtered.index.tolist()
+        # Сохраняем индексы после сортировки (это индексы в schedule_df, которые = индексам в full_schedule_df)
+        filtered_indices = filtered.index.tolist()
         filtered = filtered.reset_index(drop=True)
 
         day_columns = sort_schedule_day_columns(
             [c for c in full_schedule_df.columns if is_schedule_day_column(c)], y, m
         )
         for i in range(len(filtered)):
-            # base_idx это оригинальный индекс из full_schedule_df
-            base_idx = sorted_indices[i]
+            # filtered_indices[i] это индекс в full_schedule_df (потому что schedule_df индексы совпадают с full_schedule_df)
+            full_idx = filtered_indices[i]
             for d in day_columns:
                 if str(d) in PREV_MONTH_KEYS:
                     continue
@@ -234,7 +234,7 @@ def graph_view(request):
                 raw = (request.POST.get(key) or "").strip().lower()
                 if raw not in SCHEDULE_CODES:
                     raw = ""
-                full_schedule_df.at[base_idx, d] = raw
+                full_schedule_df.at[full_idx, d] = raw
         full_schedule_df = biota_schedule.apply_prev_month_tail_from_previous_schedule(
             full_schedule_df, employees_df, y, m
         )
