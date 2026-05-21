@@ -11,6 +11,7 @@
     var quickRowDragEl = null;
     var quickRowDropTarget = null;
     var quickRowDropPosition = null;
+    var quickRowPointerDrag = null;
     var MACHINES_CONFIRM_RESET_MS = 10000;
     var machinesConfirmTimers = new WeakMap();
 
@@ -78,6 +79,7 @@
       if (!btn) return;
       e.preventDefault();
       e.stopPropagation();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
       var phase = parseInt(btn.getAttribute("data-confirm-phase") || "0", 10);
       if (isNaN(phase) || phase < 0) phase = 0;
       clearMachinesConfirmTimer(btn);
@@ -161,36 +163,40 @@
       return el ? (el.textContent || "").replace(/\s+/g, " ").trim() : "";
     }
 
+    function createQuickRowDragHandle() {
+      var handle = document.createElement("span");
+      handle.className = "machines-quick-row-drag-handle";
+      handle.setAttribute("role", "button");
+      handle.setAttribute("aria-label", "Перетащить строку");
+      handle.setAttribute("tabindex", "-1");
+      handle.title = "Перетащить";
+      handle.textContent = "⠿";
+      return handle;
+    }
+
+    function upgradeQuickRowDragHandle(codeCell) {
+      if (!codeCell) return;
+      var legacyBtn = codeCell.querySelector("button.machines-quick-row-drag-handle");
+      if (!legacyBtn) return;
+      legacyBtn.parentNode.replaceChild(createQuickRowDragHandle(), legacyBtn);
+    }
+
     function ensureQuickRowCodeStructure(codeCell) {
       if (!codeCell || !codeCell.classList.contains("machines-cell--code")) return codeCell;
+      upgradeQuickRowDragHandle(codeCell);
       var span = codeCell.querySelector(".machines-quick-row-code-text");
       var handle = codeCell.querySelector(".machines-quick-row-drag-handle");
       if (!span) {
         var text = (codeCell.textContent || "").replace(/\s+/g, " ").trim();
         codeCell.textContent = "";
-        if (!handle) {
-          handle = document.createElement("button");
-          handle.type = "button";
-          handle.className = "machines-quick-row-drag-handle";
-          handle.setAttribute("aria-label", "Перетащить строку");
-          handle.setAttribute("tabindex", "-1");
-          handle.title = "Перетащить";
-          handle.textContent = "⠿";
-        }
+        if (!handle) handle = createQuickRowDragHandle();
         span = document.createElement("span");
         span.className = "machines-quick-row-code-text";
         span.textContent = text;
         codeCell.appendChild(handle);
         codeCell.appendChild(span);
       } else if (!handle) {
-        handle = document.createElement("button");
-        handle.type = "button";
-        handle.className = "machines-quick-row-drag-handle";
-        handle.setAttribute("aria-label", "Перетащить строку");
-        handle.setAttribute("tabindex", "-1");
-        handle.title = "Перетащить";
-        handle.textContent = "⠿";
-        codeCell.insertBefore(handle, span);
+        codeCell.insertBefore(createQuickRowDragHandle(), span);
       }
       return codeCell;
     }
@@ -759,10 +765,76 @@
       quickWrap.querySelectorAll(".machines-quick-row-drag-handle").forEach(function (h) {
         if (on) {
           h.setAttribute("draggable", "true");
+          h.classList.add("is-drag-enabled");
         } else {
           h.removeAttribute("draggable");
+          h.classList.remove("is-drag-enabled");
         }
       });
+    }
+
+    function updateQuickRowDropIndicator(rowOver, clientY) {
+      if (!rowOver || !quickWrap || !quickWrap.contains(rowOver)) {
+        clearQuickRowDropIndicators();
+        return;
+      }
+      if (quickRowPointerDrag && rowOver === quickRowPointerDrag.row) {
+        clearQuickRowDropIndicators();
+        return;
+      }
+      var rect = rowOver.getBoundingClientRect();
+      var before = clientY < rect.top + rect.height / 2;
+      var pos = before ? "before" : "after";
+      if (quickRowDropTarget !== rowOver || quickRowDropPosition !== pos) {
+        clearQuickRowDropIndicators();
+        quickRowDropTarget = rowOver;
+        quickRowDropPosition = pos;
+        rowOver.classList.add(before ? "machines-quick-row--drop-before" : "machines-quick-row--drop-after");
+      }
+    }
+
+    function finishQuickRowPointerDrag() {
+      document.removeEventListener("mousemove", onQuickRowPointerMove);
+      document.removeEventListener("mouseup", onQuickRowPointerUp);
+      if (quickRowPointerDrag && quickRowPointerDrag.row) {
+        quickRowPointerDrag.row.classList.remove("machines-quick-row--dragging");
+      }
+      if (quickRowPointerDrag && quickRowDropTarget && quickRowPointerDrag.row) {
+        moveQuickRow(quickRowPointerDrag.row, quickRowDropTarget, quickRowDropPosition || "before");
+      }
+      quickRowPointerDrag = null;
+      quickRowDragEl = null;
+      clearQuickRowDropIndicators();
+    }
+
+    function onQuickRowPointerMove(e) {
+      if (!quickRowPointerDrag) return;
+      e.preventDefault();
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var rowOver = el && el.closest(".machines-quick-row");
+      updateQuickRowDropIndicator(rowOver, e.clientY);
+    }
+
+    function onQuickRowPointerUp(e) {
+      if (!quickRowPointerDrag) return;
+      e.preventDefault();
+      finishQuickRowPointerDrag();
+    }
+
+    function onQuickRowPointerDown(e) {
+      if (e.button !== 0) return;
+      var handle = e.target.closest(".machines-quick-row-drag-handle");
+      if (!handle || !quickWrap || !quickWrap.contains(handle)) return;
+      if (root.getAttribute("data-inline-edit-mode") !== "1") return;
+      var row = handle.closest(".machines-quick-row");
+      if (!row) return;
+      e.preventDefault();
+      e.stopPropagation();
+      quickRowPointerDrag = { row: row };
+      quickRowDragEl = row;
+      row.classList.add("machines-quick-row--dragging");
+      document.addEventListener("mousemove", onQuickRowPointerMove);
+      document.addEventListener("mouseup", onQuickRowPointerUp);
     }
 
     function dataTransferHasQuickRowReorder(dt) {
@@ -1606,6 +1678,7 @@
       }
       root.setAttribute("data-inline-edit-mode", on ? "1" : "0");
       if (!on) {
+        finishQuickRowPointerDrag();
         resetAllMachinesConfirmPhases();
       }
       if (on) {
@@ -1667,31 +1740,43 @@
     }
     document.addEventListener("keydown", onHistoryEscape);
 
-    quickWrap.addEventListener("click", function (e) {
-      var btn = e.target.closest(".js-machines-quick-row-delete");
-      if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
-      var row = btn.closest(".machines-quick-row");
-      if (!row) return;
-      handleMachinesTripleConfirm(btn, e, function () {
-        row.remove();
-        saveQuickClientRows();
-      });
-    });
+    quickWrap.addEventListener(
+      "click",
+      function (e) {
+        var btn = e.target.closest(".js-machines-quick-row-delete");
+        if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
+        var row = btn.closest(".machines-quick-row");
+        if (!row) return;
+        handleMachinesTripleConfirm(btn, e, function () {
+          row.remove();
+          saveQuickClientRows();
+        });
+      },
+      true
+    );
 
-    quickWrap.addEventListener("click", function (e) {
-      var btn = e.target.closest(".js-machines-cell-clear");
-      if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
-      var cell = btn.closest(".machines-cell--field");
-      if (!cell) return;
-      handleMachinesTripleConfirm(btn, e, function () {
-        setQuickCellText(cell, "");
-        clearQuickFieldProductRef(cell);
-        syncQuickFieldSetupSelect(cell);
-        syncScheduleCodeVisibility();
-      });
-    });
+    quickWrap.addEventListener(
+      "click",
+      function (e) {
+        var btn = e.target.closest(".js-machines-cell-clear");
+        if (!btn || root.getAttribute("data-inline-edit-mode") !== "1") return;
+        var cell = btn.closest(".machines-cell--field");
+        if (!cell) return;
+        handleMachinesTripleConfirm(btn, e, function () {
+          setQuickCellText(cell, "");
+          clearQuickFieldProductRef(cell);
+          syncQuickFieldSetupSelect(cell);
+          syncScheduleCodeVisibility();
+        });
+      },
+      true
+    );
 
-    scheduleWrap.addEventListener("click", function (e) {
+    quickWrap.addEventListener("mousedown", onQuickRowPointerDown);
+
+    scheduleWrap.addEventListener(
+      "click",
+      function (e) {
       // Удаление строки
       var delBtn = e.target.closest(".js-machines-schedule-row-delete");
       if (delBtn && root.getAttribute("data-inline-edit-mode") === "1") {
@@ -1728,7 +1813,9 @@
         openColorPicker(colorTrigger);
         return;
       }
-    });
+    },
+      true
+    );
 
     scheduleWrap.addEventListener("pointerdown", function (e) {
       var colorTrigger = e.target.closest(".js-machines-color-trigger");
@@ -1846,15 +1933,7 @@
         }
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
-        var rect = rowOver.getBoundingClientRect();
-        var before = e.clientY < rect.top + rect.height / 2;
-        var pos = before ? "before" : "after";
-        if (quickRowDropTarget !== rowOver || quickRowDropPosition !== pos) {
-          clearQuickRowDropIndicators();
-          quickRowDropTarget = rowOver;
-          quickRowDropPosition = pos;
-          rowOver.classList.add(before ? "machines-quick-row--drop-before" : "machines-quick-row--drop-after");
-        }
+        updateQuickRowDropIndicator(rowOver, e.clientY);
         return;
       }
       if (!dataTransferHasScheduleDrag(e.dataTransfer)) return;

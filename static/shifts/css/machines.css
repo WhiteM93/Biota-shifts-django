@@ -588,6 +588,10 @@
     line-height: 1;
     user-select: none;
     -webkit-user-select: none;
+    touch-action: none;
+    cursor: grab;
+  }
+  .machines-quick-row-drag-handle.is-drag-enabled {
     cursor: grab;
   }
   .machines-quick-row-drag-handle:active {
