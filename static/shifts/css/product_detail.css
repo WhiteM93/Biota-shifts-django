@@ -13,6 +13,8 @@
   --pd-glass-bg: rgba(255,255,255,.04);
   --pd-glass-border: rgba(255,255,255,.09);
   --pd-card-bg: #151b27;
+  --pd-accent-rgb: 143, 156, 255;
+  --pd-accent-glow: rgba(124, 140, 255, 0.2);
 }
 
 html[data-theme="dawn"] {
@@ -24,6 +26,8 @@ html[data-theme="dawn"] {
   --pd-glass-bg: rgba(0,0,0,.030);
   --pd-glass-border: rgba(0,0,0,.075);
   --pd-card-bg: #fffefb;
+  --pd-accent-rgb: 20, 184, 166;
+  --pd-accent-glow: rgba(13, 148, 136, 0.22);
 }
 
 /* ── Улучшенные стили для формы ── */
@@ -1208,27 +1212,6 @@ html[data-theme="dawn"] {
     align-items: center;
     flex: 0 0 auto;
   }
-  .product-side-programs {
-    margin-top: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .product-side-program-files[hidden] {
-    display: none !important;
-  }
-  .product-side-program-files .setup-program-meta-row {
-    border: 1px solid var(--bio-filter-border);
-    border-radius: 5px;
-    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
-    box-shadow: var(--bio-filter-shadow);
-    padding: 8px 10px;
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    overflow: hidden;
-    transition: border-color 0.2s ease, background 0.25s ease;
-  }
   .setup-program-meta-row.is-file-drop-target {
     border-color: var(--bio-input-focus-border);
     box-shadow:
@@ -1238,19 +1221,6 @@ html[data-theme="dawn"] {
   }
   .setup-program-meta-row.is-file-drop-target .setup-side-program-download {
     color: #fff;
-  }
-  .product-side-program-files .setup-program-upload-wrap {
-    flex: 0 0 100%;
-    width: 100%;
-    justify-content: center;
-    margin-top: 2px;
-  }
-  .product-side-program-files .setup-program-upload-btn {
-    width: 24px;
-    min-width: 24px;
-    height: 24px;
-    min-height: 24px;
-    padding: 0;
   }
   .setup-program-upload-btn-side {
     width: 22px;
@@ -1263,15 +1233,6 @@ html[data-theme="dawn"] {
   }
   .setup-program-upload-btn-side .ui-icon {
     font-size: 12px;
-  }
-  .setup-program-files-list-side {
-    gap: 6px;
-    flex: 1 1 100%;
-  }
-  .setup-program-file-item-side {
-    align-items: stretch;
-    gap: 6px;
-    position: relative;
   }
   .setup-side-program-download {
     flex: 1 1 auto;
@@ -1294,27 +1255,6 @@ html[data-theme="dawn"] {
   .setup-side-program-download:focus {
     color: var(--bio-body-fg);
   }
-  .product-side-program-files .setup-side-program-download {
-    background: linear-gradient(180deg, var(--bio-btn-primary-bg1) 0%, var(--bio-btn-primary-bg2) 100%);
-    border: 1px solid var(--bio-nav-refresh-border);
-    color: #fff;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    font-size: 13px;
-    font-weight: 600;
-    text-decoration: none;
-    border-radius: 5px;
-    box-shadow: var(--bio-btn-sm-shadow);
-    transition: filter 0.14s ease, border-color 0.16s ease;
-  }
-  .product-side-program-files .setup-side-program-download:hover,
-  .product-side-program-files .setup-side-program-download:focus {
-    filter: brightness(1.06);
-    border-color: var(--bio-nav-active-border);
-    color: #fff;
-  }
   .product-setup-notes .setup-side-program-download {
     display: inline-flex;
     max-width: 100%;
@@ -1325,33 +1265,6 @@ html[data-theme="dawn"] {
     box-shadow: none;
     padding: 0 10px;
     box-sizing: border-box;
-  }
-  .product-side-program-files .js-setup-program-file-delete {
-    display: none !important;
-  }
-  .setup-inline-edit-enabled .product-side-program-files .js-setup-program-file-delete {
-    display: inline-flex !important;
-  }
-  .setup-program-file-item-side .setup-program-file-delete {
-    position: absolute;
-    right: 6px;
-    top: 50%;
-    transform: translateY(-50%);
-    margin-left: 0;
-    z-index: 2;
-  }
-  .setup-program-file-item-draft {
-    border: 1px dashed var(--bio-input-hover-border);
-    border-radius: 4px;
-    padding: 6px;
-    justify-content: flex-start;
-  }
-  .setup-program-file-item-draft .setup-program-upload-btn {
-    width: 24px;
-    min-width: 24px;
-    height: 24px;
-    min-height: 24px;
-    padding: 0;
   }
   .product-tab-panel .js-setup-program-file-delete {
     display: none !important;
@@ -2403,16 +2316,15 @@ html[data-theme="dawn"] {
     grid-row: 2;
     min-width: 0;
     width: 100%;
-    background: var(--bio-nav-bg);
-    backdrop-filter: blur(8px);
-    border: 1px solid var(--bio-nav-border);
-    border-radius: 6px;
-    padding: 8px;
+    background: transparent;
+    backdrop-filter: none;
+    border: none;
+    border-radius: 0;
+    padding: 0;
     margin-top: 0;
     margin-left: 0;
     box-sizing: border-box;
     align-self: start;
-    transition: background 0.25s ease, border-color 0.25s ease;
   }
   [data-field-text].is-inline-edit {
     display: inline-block;
@@ -2517,6 +2429,9 @@ html[data-theme="dawn"] {
   }
   #product-detail-side-inner {
     width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
   }
   .product-detail-grid.is-drawing-only {
     grid-template-columns: minmax(0, 1fr);
@@ -3569,4 +3484,225 @@ html[data-theme="dawn"] .product-drawing-description:hover {
 html[data-theme="dawn"] .product-drawing-description:focus {
   border-color: var(--pd-accent);
   background-color: rgba(0, 0, 0, 0.08);
+}
+
+/* ── Боковая панель изделия (#product-detail-side) — стиль калькулятора ── */
+#product-detail-side.product-detail-side {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+#product-detail-side #product-cad-block,
+#product-detail-side #product-downloads-block,
+#product-detail-side .product-side-notes-panel {
+  background: var(--pd-glass-bg);
+  border: 1px solid var(--pd-glass-border);
+  border-radius: 16px;
+  padding: 18px 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-sizing: border-box;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+#product-detail-side #product-cad-block:hover,
+#product-detail-side #product-downloads-block:hover,
+#product-detail-side .product-side-notes-panel:hover {
+  border-color: rgba(var(--pd-accent-rgb), 0.22);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+#product-detail-side #product-save-preview-block {
+  margin-top: 12px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+#product-detail-side #product-side-name {
+  margin: 0 0 14px;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--pd-text);
+  background: linear-gradient(135deg, var(--pd-accent), var(--pd-accent2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+#product-detail-side .product-cad-viewport {
+  height: min(280px, 36vh);
+  border-radius: 12px;
+  border: 1px solid var(--pd-glass-border);
+  background: color-mix(in srgb, var(--pd-glass-bg) 70%, var(--pd-card-bg));
+}
+
+#product-detail-side #product-downloads-block::before {
+  display: block;
+  content: "Файлы";
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--pd-text-muted);
+  margin: 0 0 14px;
+}
+
+#product-detail-side .product-drawing-notes__title {
+  margin: 0 0 14px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--pd-text-muted);
+}
+
+#product-detail-side .product-side-notes-panel.product-drawing-notes {
+  margin-top: 0;
+}
+
+#product-detail-side .product-side-notes-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 0;
+}
+
+#product-detail-side .product-downloads {
+  margin-top: 0;
+  gap: 10px;
+}
+
+#product-detail-side .product-download-row .product-download-main-btn.btn:not(.product-btn-secondary) {
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--pd-accent), var(--pd-accent2));
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 14px var(--pd-accent-glow);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+#product-detail-side .product-download-row .product-download-main-btn.btn:not(.product-btn-secondary):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px var(--pd-accent-glow);
+  filter: brightness(1.05);
+  color: #fff;
+}
+
+#product-detail-side .product-download-row .product-download-main-btn.product-btn-secondary {
+  border-radius: 10px;
+  border: 1.5px solid var(--pd-glass-border);
+  background: var(--bio-input-bg);
+  color: var(--pd-text);
+  font-weight: 500;
+}
+
+#product-detail-side .product-download-row .product-download-main-btn.product-btn-secondary:hover {
+  border-color: rgba(var(--pd-accent-rgb), 0.45);
+  box-shadow: 0 0 0 3px var(--pd-accent-glow);
+}
+
+#product-detail-side .product-download-row .product-download-preview-btn,
+#product-detail-side #save-list-preview-block .btn {
+  border-radius: 10px;
+  border: 1.5px solid var(--pd-glass-border);
+  background: color-mix(in srgb, var(--pd-glass-bg) 88%, transparent);
+  color: var(--pd-text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+#product-detail-side .product-download-row .product-download-preview-btn:hover,
+#product-detail-side #save-list-preview-block .btn:hover {
+  border-color: rgba(var(--pd-accent-rgb), 0.45);
+  box-shadow: 0 0 0 3px var(--pd-accent-glow);
+}
+
+#product-detail-side #save-list-preview-block .btn {
+  width: 100%;
+  min-height: 40px;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--pd-accent), var(--pd-accent2));
+  border: none;
+  color: #fff;
+  box-shadow: 0 4px 14px var(--pd-accent-glow);
+}
+
+#product-detail-side #save-list-preview-block .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px var(--pd-accent-glow);
+  color: #fff;
+}
+
+#product-detail-side .product-download-row .product-download-placeholder {
+  font-size: 13px;
+  color: var(--pd-text-muted);
+}
+
+#product-detail-side .product-drawing-notes__item {
+  border: 1px solid var(--pd-glass-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--pd-glass-bg) 65%, transparent);
+  box-shadow: none;
+}
+
+#product-detail-side .product-drawing-notes__empty {
+  border-color: var(--pd-glass-border);
+  color: var(--pd-text-muted);
+}
+
+#product-detail-side .product-drawing-notes__textarea {
+  border-radius: 10px;
+  border: 1.5px solid var(--bio-input-border);
+  background: var(--bio-input-bg);
+  color: var(--pd-text);
+}
+
+#product-detail-side .product-drawing-notes__textarea:focus {
+  border-color: rgba(var(--pd-accent-rgb), 0.5);
+  box-shadow: 0 0 0 3px var(--pd-accent-glow);
+}
+
+#product-detail-side .product-drawing-notes__label-text {
+  color: var(--pd-text-muted);
+  letter-spacing: 0.07em;
+}
+
+#product-detail-side .product-drawing-notes__submit {
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--pd-accent), var(--pd-accent2));
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 14px var(--pd-accent-glow);
+}
+
+#product-detail-side .product-drawing-notes__submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px var(--pd-accent-glow);
+  color: #fff;
+}
+
+#product-detail-side .product-drawing-notes.filter-panel,
+#product-detail-side .product-side-notes-panel.filter-panel {
+  margin: 0 !important;
+  background: var(--pd-glass-bg) !important;
+  border: 1px solid var(--pd-glass-border) !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
 }

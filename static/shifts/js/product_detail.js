@@ -294,7 +294,6 @@ var PD = (function () {
       var grid = document.querySelector(".product-detail-grid");
       var savePreviewBlock = document.getElementById("product-save-preview-block");
       var downloadsBlock = document.getElementById("product-downloads-block");
-      var sideProgramWrap = document.getElementById("product-side-programs");
       if (meta) meta.hidden = !isDrawing;
       if (grid) grid.classList.toggle("has-meta-column", isDrawing);
       if (side) side.hidden = false;
@@ -302,12 +301,6 @@ var PD = (function () {
       if (grid) grid.classList.toggle("is-drawing-only", false);
       if (savePreviewBlock) savePreviewBlock.hidden = false;
       if (downloadsBlock) downloadsBlock.hidden = false;
-      if (sideProgramWrap) {
-        sideProgramWrap.querySelectorAll(".product-side-program-files").forEach(function (el) {
-          var isMatch = el.getAttribute("data-setup-tab") === tabName;
-          el.hidden = !isMatch;
-        });
-      }
       document.querySelectorAll(".product-side-notes-panel").forEach(function (el) {
         var isMatch = el.getAttribute("data-notes-for-tab") === tabName;
         el.hidden = !isMatch;
@@ -2596,34 +2589,11 @@ var PD = (function () {
 
       var btnProgramUpload = e.target.closest(".setup-program-upload-btn");
       if (btnProgramUpload) {
-        if (btnProgramUpload.classList.contains("js-side-program-add-block")) {
-          // Handled by side-panel draft block action below.
-        } else {
         var setupIdProgram = btnProgramUpload.getAttribute("data-setup-id") || "";
         if (!setupIdProgram) return;
         var localProgramScope = btnProgramUpload.closest(".setup-program-files-inline") || btnProgramUpload.closest(".setup-spec-box") || btnProgramUpload.closest(".product-tab-panel") || root;
         var programInput = localProgramScope.querySelector('.setup-program-upload-input[data-setup-program-input="' + setupIdProgram + '"]');
         if (programInput) programInput.click();
-        return;
-        }
-      }
-
-      var btnAddSideProgramBlock = e.target.closest(".js-side-program-add-block");
-      if (btnAddSideProgramBlock) {
-        var sideSetupId = btnAddSideProgramBlock.getAttribute("data-setup-id") || "";
-        if (!sideSetupId) return;
-        addSideProgramDraft(sideSetupId);
-        return;
-      }
-
-      var btnDraftProgramUpload = e.target.closest(".js-side-program-draft-upload");
-      if (btnDraftProgramUpload) {
-        var draftSetupId = btnDraftProgramUpload.getAttribute("data-setup-id") || "";
-        if (!draftSetupId) return;
-        var sideWrap = btnDraftProgramUpload.closest(".setup-program-files-inline");
-        if (!sideWrap) return;
-        var sideInput = sideWrap.querySelector('.setup-program-upload-input[data-setup-program-input="' + draftSetupId + '"]');
-        if (sideInput) sideInput.click();
         return;
       }
 
@@ -2914,20 +2884,13 @@ var PD = (function () {
     }
 
     function renderSetupProgramFilesList(panel, setupId, data) {
-      if (!data) return;
-      var wrap = panel ? panel.querySelector('.setup-program-files-inline[data-setup-id="' + setupId + '"]') : null;
-      if (!wrap) {
-        wrap = document.querySelector('#product-side-programs .setup-program-files-inline[data-setup-id="' + setupId + '"]');
-      }
+      if (!data || !panel) return;
+      var wrap = panel.querySelector('.setup-program-files-inline[data-setup-id="' + setupId + '"]');
       if (!wrap) return;
       var ul = wrap.querySelector(".setup-program-files-list");
       if (!ul) return;
       var files = data.program_files || [];
-      var isSide = wrap.classList.contains("product-side-program-files");
-      var editMode = !!(panel && panel.getAttribute("data-inline-edit-mode") === "1");
-      if (isSide && !editMode) {
-        editMode = !!root.querySelector('.product-tab-panel[data-inline-edit-mode="1"]');
-      }
+      var editMode = panel.getAttribute("data-inline-edit-mode") === "1";
       ul.textContent = "";
       if (!files.length) {
         var li0 = document.createElement("li");
@@ -2937,12 +2900,12 @@ var PD = (function () {
       } else {
         files.forEach(function (f) {
           var li = document.createElement("li");
-          li.className = "setup-program-file-item" + (isSide ? " setup-program-file-item-side" : "");
+          li.className = "setup-program-file-item";
           li.setAttribute("data-program-file-id", String(f.id));
           var a = document.createElement("a");
           a.href = f.url || "#";
           a.setAttribute("download", "");
-          a.className = isSide ? "btn product-btn-program setup-side-program-download" : "setup-program-file-link";
+          a.className = "setup-program-file-link";
           a.textContent = f.name || "";
           li.appendChild(a);
           if (editMode) {
@@ -2959,23 +2922,8 @@ var PD = (function () {
           ul.appendChild(li);
         });
       }
-      var emptyMsg = panel ? panel.querySelector(".setup-program-tab-empty-msg") : null;
+      var emptyMsg = panel.querySelector(".setup-program-tab-empty-msg");
       if (emptyMsg) emptyMsg.hidden = files.length > 0;
-    }
-
-    function addSideProgramDraft(setupId) {
-      if (!setupId) return;
-      var wrap = document.querySelector('#product-side-programs .setup-program-files-inline[data-setup-id="' + setupId + '"]');
-      if (!wrap) return;
-      var ul = wrap.querySelector(".setup-program-files-list");
-      if (!ul) return;
-      var empty = ul.querySelector(".setup-program-file-empty");
-      if (empty) empty.remove();
-      var draft = document.createElement("li");
-      draft.className = "setup-program-file-item setup-program-file-item-side setup-program-file-item-draft";
-      draft.setAttribute("data-setup-id", setupId);
-      draft.innerHTML = '<button type="button" class="btn btn-ghost setup-program-upload-btn js-side-program-draft-upload" data-setup-id="' + setupId + '" aria-label="Добавить файл программы" title="Добавить файл программы"><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>';
-      ul.appendChild(draft);
     }
 
     async function uploadSetupProgramFile(setupId, file, panelHint) {

@@ -1,4 +1,4 @@
-<div class="product-drawing-notes filter-panel product-side-notes-panel" data-notes-for-tab="{{ notes_panel_tab }}" {% if notes_hidden %}hidden{% endif %}>
+<div class="product-drawing-notes filter-panel product-side-notes-panel" data-notes-for-tab="{{ notes_panel_tab }}" data-notes-title="{{ notes_title }}" {% if notes_hidden %}hidden{% endif %}>
   <h4 class="product-drawing-notes__title">{{ notes_title }}</h4>
   <ul class="product-drawing-notes__list">
     {% for note in notes_list %}

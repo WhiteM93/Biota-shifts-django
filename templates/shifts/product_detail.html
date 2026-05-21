@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=17">
+<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=19">
 <div class="product-detail-grid{% if tab_default == 'drawing' %} has-meta-column{% endif %}"{% if setups %} data-product-has-setups="1"{% endif %}>
   <div class="product-detail-main">
 
@@ -417,7 +417,7 @@
     <div id="product-detail-side-inner">
     {% if product.cad_model or product.preview_stl %}
     <div id="product-cad-block">
-    <div class="muted" style="margin:0 0 8px 0; font-weight:700;" id="product-side-name">{{ product.name }}</div>
+    <div class="product-side-cad-name" id="product-side-name">{{ product.name }}</div>
     <div id="product-cad-viewport" class="product-cad-viewport"
       {% if preview_stl_url %}data-stl-url="{{ preview_stl_url }}"{% endif %}
       data-cad-ext="{{ cad_ext }}">
@@ -431,6 +431,12 @@
       <p class="muted" style="padding:12px;">Загружен только STL предпросмотра; основная 3D-модель не указана.</p>
       {% endif %}
     </div>
+    {% if cad_inline_preview and biota_can_edit %}
+    <div id="product-save-preview-block" class="product-cad-preview-actions">
+      <button type="button" class="btn btn-ghost" id="save-list-preview-btn">Сохранить превью для списка</button>
+      <p class="muted" id="save-list-preview-msg" style="display:none;"></p>
+    </div>
+    {% endif %}
     </div>
     {% if product.preview_stl and cad_inline_preview and cad_is_step %}{% endif %}
     {% else %}
@@ -451,7 +457,7 @@
   "tool_type_choices": [{% for v, lbl in tool_type_choices %}{"value":"{{ v|escapejs }}","label":"{{ lbl|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
 }</script>
 <script src="{% static 'shifts/js/plan-cascade-form.js' %}" defer></script>
-<script src="{% static 'shifts/js/product_detail.js' %}?v=17" defer></script>
+<script src="{% static 'shifts/js/product_detail.js' %}?v=18" defer></script>
 
 {% if cad_inline_preview or has_setup_preview_stl %}
 <script type="importmap">
