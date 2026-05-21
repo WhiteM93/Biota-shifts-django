@@ -229,3 +229,54 @@ biota_schedule.save_schedule_table(full_schedule_df, y, m)
 **На сервере при POST**: сохраняем настоящие индексы из full_schedule_df ДО reset_index, потом используем их для обновления, чтобы данные сохранились в правильные строки
 
 **Критическое условие**: GET и POST должны использовать ОДИНАКОВЫЕ фильтры, сортировку и сопоставление индексов
+
+---
+
+## Критическое Исправление (b0195aa)
+
+### Проблема: Несогласованность типов day_columns
+
+В POST обработчике была критическая ошибка в обработке дневных столбцов (day_columns):
+
+```python
+# ДО ИСПРАВЛЕНИЯ (неправильно):
+for d in day_columns:
+    if str(d) in PREV_MONTH_KEYS:     # Конвертируем в string здесь
+        continue
+    key = f"cell_{i}_{d}"             # Но используем d без конверсии здесь!
+    ...
+    full_schedule_df.at[full_idx, d] = raw  # И здесь используем d напрямую
+```
+
+**Почему это неправильно**:
+- Форма генерирует input names используя stringified столбцы: `cell_2_01`, `cell_2_02`
+- POST обработчик строил ключи вроде: `f"cell_{i}_{d}"` где d может быть integer 1, 2, ...
+  - Если d = 1, то key = "cell_2_1" (без leading zero)
+  - Это не совпадает с form input name "cell_2_01"!
+- DataFrame доступ с `full_schedule_df.at[full_idx, d]` использует неправильный тип столбца
+
+### Решение: Конвертировать строки консистентно (как в GET)
+
+```python
+# ПОСЛЕ ИСПРАВЛЕНИЯ (правильно):
+for d in day_columns:
+    col_key = str(d)                      # Конвертируем ДО начала блока
+    if col_key in PREV_MONTH_KEYS:        # Используем col_key
+        continue
+    key = f"cell_{i}_{col_key}"           # Используем col_key для form key
+    ...
+    full_schedule_df.at[full_idx, col_key] = raw  # Используем col_key для DataFrame
+```
+
+**Почему это работает**:
+- GET обработчик также конвертирует: `col_key = str(d)` (line 288)
+- GET и POST теперь используют ОДИНАКОВЫЕ stringified столбцы
+- Form keys совпадают с input names: `cell_2_01` совпадает с `cell_2_"01"`
+- DataFrame доступ использует правильный тип столбца (string)
+
+### Результат
+
+После исправления:
+- Данные сохраняются в правильные строки даже когда применены фильтры
+- No more type mismatches between form keys and DataFrame column access
+- Consistent behavior between GET (table generation) and POST (data saving)
