@@ -215,12 +215,16 @@ def graph_view(request):
             & schedule_df["Должность"].isin(selected_positions)
         ].copy()
         filtered = _sort_graph_rows(filtered, dep_rank, pos_rank)
+        # Сохраняем индексы после сортировки (до reset_index)
+        sorted_indices = filtered.index.tolist()
+        filtered = filtered.reset_index(drop=True)
 
         day_columns = sort_schedule_day_columns(
             [c for c in full_schedule_df.columns if is_schedule_day_column(c)], y, m
         )
-        for i, row in enumerate(filtered.itertuples(index=True)):
-            base_idx = int(row.Index)
+        for i in range(len(filtered)):
+            # base_idx это оригинальный индекс из full_schedule_df
+            base_idx = sorted_indices[i]
             for d in day_columns:
                 if str(d) in PREV_MONTH_KEYS:
                     continue
