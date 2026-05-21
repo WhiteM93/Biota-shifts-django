@@ -3226,32 +3226,38 @@ var PD = (function () {
       var formatButtons = document.querySelectorAll('.desc-format-btn');
       if (!formatButtons.length) return;
 
+      // Handle formatting button clicks with proper selection preservation
       formatButtons.forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
+        btn.addEventListener('mousedown', function (e) {
           e.preventDefault();
+
           var command = btn.getAttribute('data-format');
           if (!command) return;
 
-          // Ensure focus is on the description area
-          descriptionArea.focus();
+          // Save the current selection before executing command
+          var selection = window.getSelection();
+          var savedRange = null;
+
+          if (selection.rangeCount > 0) {
+            savedRange = selection.getRangeAt(0);
+          }
 
           // Execute the formatting command
           document.execCommand(command, false, null);
 
-          // Restore focus to description area
+          // Restore focus and selection if needed
+          if (savedRange) {
+            try {
+              selection.removeAllRanges();
+              selection.addRange(savedRange);
+            } catch (e) {
+              // Selection restoration might fail in some cases, that's okay
+            }
+          }
+
+          // Ensure focus is on the description area
           descriptionArea.focus();
         });
       });
-
-      // Restore focus after toolbar buttons are clicked
-      var toolbar = document.querySelector('.description-toolbar');
-      if (toolbar) {
-        toolbar.addEventListener('mousedown', function (e) {
-          if (e.target.closest('.desc-format-btn')) {
-            e.preventDefault();
-            descriptionArea.focus();
-          }
-        });
-      }
     })();
   })();
