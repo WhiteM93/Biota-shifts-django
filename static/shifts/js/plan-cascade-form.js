@@ -190,9 +190,7 @@ class PlanCascadeFormManager {
         visible.add('workpiece_size');
       }
     } else if (product_type === 'assembly') {
-      // Путь: Сборка
-      visible.add('material');
-      visible.add('workpiece_size');
+      // Путь: Сборка - только тип изделия, больше ничего
     } else if (product_type === 'pki') {
       // Путь: ПКИ (в типе изделия)
       visible.add('material');
@@ -284,7 +282,7 @@ class PlanCascadeFormManager {
         }
       }
     } else if (product_type === 'assembly') {
-      // Сборка: материал и размер обязательны
+      // Сборка: только тип изделия нужен
       if (!material) {
         errors.push('Выберите или введите материал');
       }
