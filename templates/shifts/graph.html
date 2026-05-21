@@ -360,6 +360,44 @@
       }
       isSaving = true;
       setStatus("Сохранение...", "#c9d4f0");
+
+      // Синхронизировать текущие значения фильтров перед сохранением
+      if (hiddenDepMode) {
+        var currentDepMode = document.querySelector('#graph-filter-form input[name="dep_mode"]');
+        if (currentDepMode) {
+          hiddenDepMode.value = currentDepMode.value;
+        }
+      }
+      if (hiddenPosMode) {
+        var currentPosMode = document.querySelector('#graph-filter-form input[name="pos_mode"]');
+        if (currentPosMode) {
+          hiddenPosMode.value = currentPosMode.value;
+        }
+      }
+
+      // Обновить все значения dep и pos из фильтра
+      var depInputs = form.querySelectorAll('input[name="dep"]');
+      depInputs.forEach(function(inp) { inp.remove(); });
+      var filterDepInputs = document.querySelectorAll('#graph-filter-form input[name="dep"]');
+      filterDepInputs.forEach(function(inp) {
+        var newInput = document.createElement('input');
+        newInput.type = 'hidden';
+        newInput.name = 'dep';
+        newInput.value = inp.value;
+        form.appendChild(newInput);
+      });
+
+      var posInputs = form.querySelectorAll('input[name="pos"]');
+      posInputs.forEach(function(inp) { inp.remove(); });
+      var filterPosInputs = document.querySelectorAll('#graph-filter-form input[name="pos"]');
+      filterPosInputs.forEach(function(inp) {
+        var newInput = document.createElement('input');
+        newInput.type = 'hidden';
+        newInput.name = 'pos';
+        newInput.value = inp.value;
+        form.appendChild(newInput);
+      });
+
       fetch(window.location.href, {
         method: "POST",
         headers: {
