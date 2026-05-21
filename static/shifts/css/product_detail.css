@@ -3090,3 +3090,179 @@ html[data-theme="dawn"] .plan-cascade-form-container input {
 html[data-theme="dawn"] .form-label {
   color: var(--pd-text-muted);
 }
+
+/* ── Стили для блока описания продукта ── */
+
+.product-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0 16px 0;
+  border-bottom: 1px solid var(--pd-border);
+  margin-bottom: 24px;
+}
+
+.product-detail-header-name {
+  font-size: 28px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--pd-text);
+  padding: 12px 20px;
+  border-radius: 8px;
+  outline: none;
+  min-height: 44px;
+  transition: all 0.2s ease;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.product-detail-header-name:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.product-detail-header-name:focus {
+  background-color: var(--pd-glass-bg);
+  border: 1px solid var(--pd-accent);
+  box-shadow: 0 0 0 2px rgba(143, 156, 255, 0.15);
+}
+
+html[data-theme="dawn"] .product-detail-header-name:focus {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.product-detail-description-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background-color: var(--pd-glass-bg);
+  border: 1px solid var(--pd-glass-border);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  min-height: 200px;
+}
+
+.description-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border-bottom: 1px solid var(--pd-glass-border);
+  flex-wrap: wrap;
+}
+
+.desc-format-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--pd-text);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.desc-format-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.desc-format-btn:active {
+  background-color: var(--pd-accent);
+  border-color: var(--pd-accent);
+  color: white;
+}
+
+.desc-format-btn:focus-visible {
+  outline: 2px solid var(--pd-accent);
+  outline-offset: 2px;
+}
+
+.desc-toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background-color: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
+}
+
+.product-drawing-description {
+  flex: 1;
+  min-height: 140px;
+  padding: 12px;
+  background-color: rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--pd-glass-border);
+  border-radius: 8px;
+  color: var(--pd-text);
+  font-size: 14px;
+  line-height: 1.6;
+  outline: none;
+  transition: all 0.2s ease;
+  word-break: break-word;
+  white-space: pre-wrap;
+  overflow-y: auto;
+  max-height: 400px;
+  resize: none;
+  -webkit-appearance: none;
+}
+
+.product-drawing-description:hover {
+  border-color: var(--pd-accent2);
+  background-color: rgba(0, 0, 0, 0.15);
+}
+
+.product-drawing-description:focus {
+  border-color: var(--pd-accent);
+  background-color: rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 0 2px rgba(143, 156, 255, 0.15);
+}
+
+html[data-theme="dawn"] .product-detail-description-block {
+  background-color: var(--pd-glass-bg);
+  border-color: var(--pd-glass-border);
+}
+
+html[data-theme="dawn"] .description-toolbar {
+  background-color: rgba(0, 0, 0, 0.06);
+  border-color: var(--pd-glass-border);
+}
+
+html[data-theme="dawn"] .desc-format-btn {
+  background-color: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: var(--pd-text);
+}
+
+html[data-theme="dawn"] .desc-format-btn:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="dawn"] .desc-toolbar-sep {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+html[data-theme="dawn"] .product-drawing-description {
+  background-color: rgba(0, 0, 0, 0.03);
+  border-color: var(--pd-glass-border);
+  color: var(--pd-text);
+}
+
+html[data-theme="dawn"] .product-drawing-description:hover {
+  border-color: var(--pd-accent2);
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+html[data-theme="dawn"] .product-drawing-description:focus {
+  border-color: var(--pd-accent);
+  background-color: rgba(0, 0, 0, 0.08);
+}

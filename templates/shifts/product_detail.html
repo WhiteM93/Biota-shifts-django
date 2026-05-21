@@ -58,20 +58,32 @@
     </div>
     <div class="product-tab-panels">
       <section class="product-tab-panel" id="panel-drawing" data-panel="drawing" data-inline-edit-mode="0" role="tabpanel" aria-label="Изделие" {% if tab_default != 'drawing' %}hidden{% endif %}>
+        <!-- Блок с названием детали -->
+        <div class="product-detail-header">
+          <div class="product-detail-header-name">
+            <span class="product-detail-name is-inline-edit" data-field-text="product_name" contenteditable="true" spellcheck="false">{{ product.name }}</span>
+          </div>
+        </div>
+
+        <!-- Блок с описанием -->
+        <div class="product-detail-description-block">
+          <div class="description-toolbar">
+            <button type="button" class="desc-format-btn" data-format="bold" title="Жирный (Ctrl+B)"><strong>Ж</strong></button>
+            <button type="button" class="desc-format-btn" data-format="italic" title="Курсив (Ctrl+I)"><em>К</em></button>
+            <button type="button" class="desc-format-btn" data-format="underline" title="Подчеркивание (Ctrl+U)"><u>П</u></button>
+            <div class="desc-toolbar-sep"></div>
+            <button type="button" class="desc-format-btn" data-format="insertUnorderedList" title="Маркированный список">◆ Список</button>
+            <button type="button" class="desc-format-btn" data-format="insertOrderedList" title="Нумерованный список">1. Список</button>
+          </div>
+          <div class="product-drawing-description is-inline-edit" data-field-text="product_description" data-empty-label="Добавьте описание изделия..." contenteditable="true" spellcheck="true">{% if product.description %}{{ product.description }}{% endif %}</div>
+        </div>
+
+        <!-- Колонка с параметрами -->
         <div class="product-drawing-intro">
           <div class="product-drawing-left-col">
             {% if setups %}
             {% include "shifts/includes/plan_card_specs_unified.html" with plan_specs_variant="product" %}
             {% endif %}
-          </div>
-          <div class="product-drawing-right-col">
-            <div class="product-drawing-meta filter-panel">
-              <div class="product-drawing-name-row">
-                <span class="muted product-drawing-name-row__label">Название</span>
-                <span class="product-drawing-name is-inline-edit" data-field-text="product_name" contenteditable="true" spellcheck="false">{{ product.name }}</span>
-              </div>
-              <p class="muted product-drawing-description__text is-inline-edit" data-field-text="product_description" data-empty-label="Описание не задано." contenteditable="true" spellcheck="true">{% if product.description %}{{ product.description }}{% endif %}</p>
-            </div>
           </div>
         </div>
       </section>

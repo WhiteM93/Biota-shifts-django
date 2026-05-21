@@ -3217,4 +3217,41 @@ var PD = (function () {
     root.querySelectorAll('[data-field-text="setup_notes"]').forEach(function (n) {
       normalizeSetupNotesImages(n);
     });
+
+    // Инициализация панели форматирования для блока описания
+    (function initDescriptionFormatting() {
+      var descriptionArea = document.querySelector('[data-field-text="product_description"]');
+      if (!descriptionArea) return;
+
+      var formatButtons = document.querySelectorAll('.desc-format-btn');
+      if (!formatButtons.length) return;
+
+      formatButtons.forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          var command = btn.getAttribute('data-format');
+          if (!command) return;
+
+          // Ensure focus is on the description area
+          descriptionArea.focus();
+
+          // Execute the formatting command
+          document.execCommand(command, false, null);
+
+          // Restore focus to description area
+          descriptionArea.focus();
+        });
+      });
+
+      // Restore focus after toolbar buttons are clicked
+      var toolbar = document.querySelector('.description-toolbar');
+      if (toolbar) {
+        toolbar.addEventListener('mousedown', function (e) {
+          if (e.target.closest('.desc-format-btn')) {
+            e.preventDefault();
+            descriptionArea.focus();
+          }
+        });
+      }
+    })();
   })();
