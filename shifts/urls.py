@@ -47,6 +47,7 @@ urlpatterns = [
     path("products/<int:pk>/save-list-preview/", product_views.product_save_list_preview_view, name="product_save_list_preview"),
     path("products/<int:pk>/", product_views.product_detail_view, name="product_detail"),
     path("cabinet/", cabinet_views.cabinet_view, name="cabinet"),
+    path("cabinet/backups/", cabinet_views.schedule_backups_view, name="schedule_backups"),
     path("refresh-cache/", views.refresh_db_cache, name="refresh_cache"),
     path("accounts/login/", views.login_view, name="login"),
     path("accounts/register/", views.register_view, name="register"),

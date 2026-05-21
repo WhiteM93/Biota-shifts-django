@@ -1,9 +1,15 @@
 """Личный кабинет: профиль и пароль (пользователи), имя и права (админ) — логика как в Streamlit."""
+from datetime import datetime
+from pathlib import Path
+import shutil
+
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
+from django.http import HttpResponse
 
 from biota_shifts import db as biota_db
+from biota_shifts.config import SCHEDULE_DIR
 from biota_shifts.auth import (
     ADMIN_USERNAME,
     NAV_KEYS,
@@ -241,3 +247,96 @@ def cabinet_view(request):
         ctx["profile_missing"] = not bool(rec)
 
     return render(request, "shifts/cabinet.html", ctx)
+
+
+@biota_login_required
+@require_http_methods(["GET", "POST"])
+def schedule_backups_view(request):
+    """Управление резервными копиями графиков."""
+    from .auth_utils import biota_admin_required
+
+    # Проверяем, что пользователь админ
+    if not _is_admin(biota_user(request)):
+        messages.error(request, "Доступ запрещен")
+        return redirect("/cabinet/")
+
+    backups_dir = SCHEDULE_DIR / "backups"
+    backups_dir.mkdir(parents=True, exist_ok=True)
+
+    if request.method == "POST":
+        action = request.POST.get("action", "").strip()
+
+        # Создать резервную копию всех графиков
+        if action == "backup_all":
+            try:
+                # Находим все файлы schedule_*.xlsx в основной папке
+                main_dir = SCHEDULE_DIR
+                backup_count = 0
+
+                for schedule_file in main_dir.glob("schedule_*.xlsx"):
+                    if schedule_file.is_file():
+                        # Создаем имя для бэкапа с временной меткой
+                        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        backup_name = f"{schedule_file.stem}_{now}.xlsx"
+                        backup_path = backups_dir / backup_name
+
+                        # Копируем файл
+                        shutil.copy2(schedule_file, backup_path)
+                        backup_count += 1
+
+                messages.success(request, f"Создано {backup_count} резервных копий графиков")
+            except Exception as exc:
+                messages.error(request, f"Ошибка при создании резервных копий: {exc}")
+
+            return redirect("/cabinet/backups/")
+
+        # Восстановить из резервной копии
+        elif action == "restore":
+            backup_filename = request.POST.get("backup_filename", "").strip()
+            if not backup_filename or ".." in backup_filename:
+                messages.error(request, "Некорректное имя файла")
+                return redirect("/cabinet/backups/")
+
+            backup_path = backups_dir / backup_filename
+            if not backup_path.exists() or not backup_path.is_file():
+                messages.error(request, "Резервная копия не найдена")
+                return redirect("/cabinet/backups/")
+
+            try:
+                # Извлекаем имя исходного файла (удаляем временную метку)
+                # schedule_2026_05_20260521_101450.xlsx -> schedule_2026_05.xlsx
+                parts = backup_filename.replace(".xlsx", "").split("_")
+                if len(parts) >= 4:  # schedule, year, month, и дата
+                    original_name = f"{parts[0]}_{parts[1]}_{parts[2]}.xlsx"
+                else:
+                    original_name = backup_filename
+
+                original_path = SCHEDULE_DIR / original_name
+
+                # Копируем бэкап обратно
+                shutil.copy2(backup_path, original_path)
+                messages.success(request, f"График восстановлен из резервной копии: {backup_filename}")
+            except Exception as exc:
+                messages.error(request, f"Ошибка при восстановлении: {exc}")
+
+            return redirect("/cabinet/backups/")
+
+    # Получить список резервных копий, отсортированный по дате (новые сверху)
+    backups = []
+    if backups_dir.exists():
+        for backup_file in sorted(backups_dir.glob("schedule_*.xlsx"),
+                                  key=lambda p: p.stat().st_mtime,
+                                  reverse=True):
+            stat = backup_file.stat()
+            backups.append({
+                "filename": backup_file.name,
+                "size": f"{stat.st_size / 1024:.1f} KB",
+                "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+            })
+
+    ctx = {
+        "backups": backups,
+        "backups_count": len(backups),
+    }
+
+    return render(request, "shifts/schedule_backups.html", ctx)

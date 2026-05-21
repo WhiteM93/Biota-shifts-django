@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m 'Remove drawing blank size and type fields from specs display *)",
+      "Bash(git push *)",
+      "Bash(pkill -f \"python.*manage.py runserver\")",
+      "Bash(python manage.py runserver 127.0.0.1:8000)",
+      "Bash(git commit -m 'Remove validation requirements for assembly material and size *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}

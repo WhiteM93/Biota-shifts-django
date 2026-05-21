@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto; padding: 20px;">
+  <h1>Управление резервными копиями графиков</h1>
+
+  <div style="margin-bottom: 30px;">
+    <form method="post" style="display: inline;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="backup_all">
+      <button type="submit" class="btn btn-primary" style="padding: 10px 20px; font-size: 16px;">
+        📦 Создать резервную копию всех графиков
+      </button>
+    </form>
+  </div>
+
+  {% if messages %}
+  <div style="margin-bottom: 20px;">
+    {% for message in messages %}
+    <div style="padding: 12px; margin-bottom: 10px; border-radius: 4px; {% if message.tags == 'success' %}background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;{% else %}background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <h2>Резервные копии ({{ backups_count }})</h2>
+
+  {% if backups %}
+  <div style="overflow-x: auto;">
+    <table style="width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+      <thead>
+        <tr style="background-color: #f5f5f5; border-bottom: 2px solid #ddd;">
+          <th style="padding: 12px; text-align: left; font-weight: 600;">Имя файла</th>
+          <th style="padding: 12px; text-align: left; font-weight: 600;">Размер</th>
+          <th style="padding: 12px; text-align: left; font-weight: 600;">Дата создания</th>
+          <th style="padding: 12px; text-align: center; font-weight: 600;">Действие</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for backup in backups %}
+        <tr style="border-bottom: 1px solid #eee; {% cycle 'background-color: white;' 'background-color: #fafafa;' %}">
+          <td style="padding: 12px; font-family: monospace; font-size: 13px;">{{ backup.filename }}</td>
+          <td style="padding: 12px;">{{ backup.size }}</td>
+          <td style="padding: 12px;">{{ backup.modified }}</td>
+          <td style="padding: 12px; text-align: center;">
+            <form method="post" style="display: inline;" onsubmit="return confirm('Восстановить график из этой резервной копии? Текущий график будет перезаписан.');">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="restore">
+              <input type="hidden" name="backup_filename" value="{{ backup.filename }}">
+              <button type="submit" class="btn btn-sm" style="padding: 6px 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                ↩️ Восстановить
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color: #999; font-style: italic;">Резервные копии не найдены. Нажми кнопку выше, чтобы создать первую.</p>
+  {% endif %}
+
+  <div style="margin-top: 30px; padding: 15px; background-color: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px;">
+    <strong>ℹ️ Информация:</strong>
+    <ul style="margin: 10px 0 0 20px; padding-left: 0;">
+      <li>Каждый клик на "Создать резервную копию" сохраняет текущее состояние всех графиков</li>
+      <li>При восстановлении текущий график будет полностью перезаписан</li>
+      <li>Автоматические резервные копии создаются также при сохранении графика (последние 30 дней)</li>
+      <li>Резервные копии хранятся в папке: <code>schedules/backups/</code></li>
+    </ul>
+  </div>
+
+  <div style="margin-top: 20px;">
+    <a href="/cabinet/" style="padding: 10px 20px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">← Вернуться в кабинет</a>
+  </div>
+</div>
+
+<style>
+  .btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.2s;
+  }
+
+  .btn:hover {
+    background-color: #0056b3;
+  }
+
+  .btn-primary {
+    background-color: #28a745;
+  }
+
+  .btn-primary:hover {
+    background-color: #218838;
+  }
+
+  .btn-sm {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+
+  code {
+    background-color: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+  }
+</style>
+{% endblock %}

@@ -20,7 +20,10 @@
 {% endif %}
 <p class="muted">Роль: <strong>администратор</strong>. Логин: <code>{{ admin_username }}</code></p>
 <p class="muted">Пароль учётки задаётся в окружении / секретах (<code>BIOTA_ADMIN_PASSWORD</code>), как в Streamlit.</p>
-<p><a class="btn" href="/admin/">Открыть Django Admin</a></p>
+<p>
+  <a class="btn" href="/admin/">Открыть Django Admin</a>
+  <a class="btn" href="/cabinet/backups/" style="background-color: #17a2b8;">📦 Резервные копии графиков</a>
+</p>
 
 <form method="post" action="">
   {% csrf_token %}
