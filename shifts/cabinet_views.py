@@ -264,8 +264,32 @@ def schedule_backups_view(request):
     if request.method == "POST":
         action = request.POST.get("action", "").strip()
 
+        # Загрузить файл резервной копии
+        if action == "upload":
+            uploaded_file = request.FILES.get("backup_file")
+            if not uploaded_file:
+                messages.error(request, "Выберите файл для загрузки")
+                return redirect("/cabinet/backups/")
+
+            if not uploaded_file.name.endswith(".xlsx"):
+                messages.error(request, "Файл должен быть в формате .xlsx")
+                return redirect("/cabinet/backups/")
+
+            try:
+                # Сохраняем загруженный файл в папку бэкапов
+                backup_path = backups_dir / uploaded_file.name
+                with open(backup_path, "wb") as f:
+                    for chunk in uploaded_file.chunks():
+                        f.write(chunk)
+
+                messages.success(request, f"Резервная копия загружена: {uploaded_file.name}")
+            except Exception as exc:
+                messages.error(request, f"Ошибка при загрузке: {exc}")
+
+            return redirect("/cabinet/backups/")
+
         # Создать резервную копию всех графиков
-        if action == "backup_all":
+        elif action == "backup_all":
             try:
                 # Находим все файлы schedule_*.xlsx в основной папке
                 main_dir = SCHEDULE_DIR
@@ -338,3 +362,29 @@ def schedule_backups_view(request):
     }
 
     return render(request, "shifts/schedule_backups.html", ctx)
+
+
+@biota_login_required
+@require_http_methods(["GET"])
+def schedule_backup_download(request, filename: str):
+    """Скачать резервную копию графика."""
+    from biota_shifts.config import SCHEDULE_DIR
+
+    # Проверяем, что пользователь админ
+    if not _is_admin(biota_user(request)):
+        return HttpResponse("Доступ запрещен", status=403)
+
+    # Проверяем имя файла (защита от directory traversal)
+    if ".." in filename or "/" in filename or "\\" in filename:
+        return HttpResponse("Некорректное имя файла", status=400)
+
+    backup_path = SCHEDULE_DIR / "backups" / filename
+
+    if not backup_path.exists() or not backup_path.is_file():
+        return HttpResponse("Файл не найден", status=404)
+
+    # Отправляем файл
+    with open(backup_path, "rb") as f:
+        response = HttpResponse(f.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
