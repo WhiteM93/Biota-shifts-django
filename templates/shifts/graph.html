@@ -109,7 +109,9 @@
 
 <div class="graph-main-column">
 <div class="schedule-wrap">
-<form method="post" action="" id="graph-save-form" class="graph-form--readonly">
+<form method="post" action="" id="graph-save-form" class="graph-form--readonly"
+  data-dep-mode="{% if dep_mode_pick %}pick{% else %}all{% endif %}"
+  data-pos-mode="{% if pos_mode_pick %}pick{% else %}all{% endif %}">
   {% csrf_token %}
   <input type="hidden" name="action" value="save">
   <input type="hidden" name="year" value="{{ year }}">
@@ -151,7 +153,7 @@
         <td class="{% if cell.key in non_working_days %}non-work-col{% endif %} {% if cell.is_prev_month %}prev-month-col{% endif %} {% if cell.is_today %}today-col{% endif %}">
           <input
             type="text"
-            name="cell_{{ row.i }}_{{ cell.key }}"
+            name="cell_{{ row.code }}_{{ cell.key }}"
             value="{{ cell.val }}"
             maxlength="4"
             autocomplete="off"
@@ -173,7 +175,7 @@
 
 </div>
 
-<link rel="stylesheet" href="{% static "shifts/css/graph.css" %}">
+<link rel="stylesheet" href="{% static "shifts/css/graph.css" %}?v=2">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
   (function () {
@@ -197,12 +199,9 @@
     var saveTimer = null;
     var isSaving = false;
     var queued = false;
+    var pendingSaveDone = null;
     var dragFill = null;
-    var depModeInputs = document.querySelectorAll('input[name="dep_mode"]');
-    var depTarget = document.querySelector('[data-mode-target="dep"]');
     var hiddenDepMode = form.querySelector('input[name="dep_mode"][type="hidden"]');
-    var posModeInputs = document.querySelectorAll('input[name="pos_mode"]');
-    var posTarget = document.querySelector('[data-mode-target="pos"]');
     var hiddenPosMode = form.querySelector('input[name="pos_mode"][type="hidden"]');
     // Снапшот фильтров: захватывается в момент первого изменения ячейки,
     // чтобы сохранение использовало ТЕ ЖЕ фильтры, что и GET при отображении таблицы.
@@ -212,14 +211,30 @@
     var filterSnapshot = null;
 
     function captureFilterSnapshot() {
-      // Берём фильтры прямо из скрытых полей save-формы (которые соответствуют
-      // текущей отображаемой таблице — они инициализируются из GET-параметров).
-      // НЕ читаем из filter-form, потому что она может уже измениться.
-      var depMode = (hiddenDepMode && hiddenDepMode.value) || 'all';
-      var deps = Array.from(form.querySelectorAll('input[name="dep"]')).map(function(i) { return i.value; });
-      var posMode = (hiddenPosMode && hiddenPosMode.value) || 'all';
-      var positions = Array.from(form.querySelectorAll('input[name="pos"]')).map(function(i) { return i.value; });
+      // Фильтры с момента отрисовки таблицы (data-* + скрытые поля save-формы).
+      var depMode = form.getAttribute("data-dep-mode") || (hiddenDepMode && hiddenDepMode.value) || "all";
+      var posMode = form.getAttribute("data-pos-mode") || (hiddenPosMode && hiddenPosMode.value) || "all";
+      var deps = Array.from(form.querySelectorAll('input[name="dep"]')).map(function (i) { return i.value; });
+      var positions = Array.from(form.querySelectorAll('input[name="pos"]')).map(function (i) { return i.value; });
       filterSnapshot = { depMode: depMode, deps: deps, posMode: posMode, positions: positions };
+    }
+
+    function markDirty(input) {
+      if (!input) return;
+      input.setAttribute("data-dirty", "1");
+    }
+
+    function clearDirtyFlags() {
+      form.querySelectorAll('.day-input[data-dirty="1"]').forEach(function (inp) {
+        inp.removeAttribute("data-dirty");
+      });
+    }
+
+    function setCellValue(input, value) {
+      if (!input || isLockedInput(input)) return;
+      input.value = value;
+      applyColor(input);
+      markDirty(input);
     }
     var canEdit = document.body && document.body.getAttribute("data-biota-can-edit") === "1";
     var editing = false;
@@ -310,9 +325,7 @@
       var left = Math.min(a, b);
       var right = Math.max(a, b);
       for (var i = left; i <= right; i += 1) {
-        if (isLockedInput(row[i])) continue;
-        row[i].value = value;
-        applyColor(row[i]);
+        setCellValue(row[i], value);
       }
       refreshShiftCounts();
     }
@@ -328,9 +341,7 @@
       var top = Math.min(a, b);
       var bot = Math.max(a, b);
       for (var j = top; j <= bot; j += 1) {
-        if (isLockedInput(col[j])) continue;
-        col[j].value = value;
-        applyColor(col[j]);
+        setCellValue(col[j], value);
       }
       refreshShiftCounts();
     }
@@ -339,7 +350,17 @@
       return !!(inp && (inp.getAttribute("data-locked") === "1" || inp.classList.contains("day-input--locked")));
     }
 
+    var filterPanel = document.getElementById("graph-filter-panel");
+
     function applyGraphEditingState() {
+      var pageRoot = document.getElementById("graph-page-root");
+      var hideFilters = !!editing;
+      if (pageRoot) pageRoot.classList.toggle("graph-page--editing", hideFilters);
+      if (filterPanel) {
+        filterPanel.hidden = hideFilters;
+        filterPanel.setAttribute("aria-hidden", hideFilters ? "true" : "false");
+      }
+      syncGraphStickyOffset();
       form.querySelectorAll(".day-input").forEach(function (inp) {
         inp.readOnly = !canEdit || !editing || isLockedInput(inp);
       });
@@ -361,7 +382,7 @@
       updatePaletteActive();
       if (statusEl) {
         if (canEdit && editing) {
-          statusEl.textContent = "Изменения сохраняются автоматически.";
+          statusEl.textContent = "Режим редактирования. Нажмите ✏️ ещё раз — сохранить и выйти.";
         } else {
           statusEl.textContent = canEdit ? "График только для просмотра." : "Режим исполнителя: только просмотр и скачивание.";
         }
@@ -369,91 +390,172 @@
       }
     }
 
-    function saveNow() {
+    function applyFilterSnapshot(snap) {
+      if (!snap) return;
+      if (hiddenDepMode) hiddenDepMode.value = snap.depMode;
+      if (hiddenPosMode) hiddenPosMode.value = snap.posMode;
+      form.querySelectorAll('input[name="dep"]').forEach(function (inp) { inp.remove(); });
+      snap.deps.forEach(function (dep) {
+        var ni = document.createElement("input");
+        ni.type = "hidden";
+        ni.name = "dep";
+        ni.value = dep;
+        form.appendChild(ni);
+      });
+      form.querySelectorAll('input[name="pos"]').forEach(function (inp) { inp.remove(); });
+      snap.positions.forEach(function (pos) {
+        var ni = document.createElement("input");
+        ni.type = "hidden";
+        ni.name = "pos";
+        ni.value = pos;
+        form.appendChild(ni);
+      });
+    }
+
+    function ensureFilterSnapshot() {
+      if (!filterSnapshot) captureFilterSnapshot();
+      return filterSnapshot;
+    }
+
+    function appendSaveMeta(fd) {
+      var csrf = form.querySelector('input[name="csrfmiddlewaretoken"]');
+      if (csrf) fd.append("csrfmiddlewaretoken", csrf.value);
+      fd.append("action", "save");
+      var yearInp = form.querySelector('input[name="year"]');
+      var monthInp = form.querySelector('input[name="month"]');
+      if (yearInp) fd.append("year", yearInp.value);
+      if (monthInp) fd.append("month", monthInp.value);
+      if (hiddenDepMode) fd.append("dep_mode", hiddenDepMode.value);
+      if (hiddenPosMode) fd.append("pos_mode", hiddenPosMode.value);
+      form.querySelectorAll('input[name="dep"]').forEach(function (inp) {
+        fd.append("dep", inp.value);
+      });
+      form.querySelectorAll('input[name="pos"]').forEach(function (inp) {
+        fd.append("pos", inp.value);
+      });
+    }
+
+    function buildSaveFormData() {
+      applyFilterSnapshot(ensureFilterSnapshot());
+      var fd = new FormData();
+      appendSaveMeta(fd);
+      var dirty = form.querySelectorAll('.day-input[data-dirty="1"]');
+      if (!dirty.length) {
+        return null;
+      }
+      dirty.forEach(function (inp) {
+        if (inp.name) fd.append(inp.name, inp.value || "");
+      });
+      return fd;
+    }
+
+    function flushSave() {
       if (!canEdit || !editing) return;
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      saveNow();
+    }
+
+    function hasDirtyCells() {
+      return form.querySelectorAll('.day-input[data-dirty="1"]').length > 0;
+    }
+
+    function performSave(done) {
+      if (!canEdit) {
+        if (done) done(false);
+        return;
+      }
+      var body = buildSaveFormData();
+      if (!body) {
+        if (done) done(true);
+        return;
+      }
       if (isSaving) {
         queued = true;
+        if (done) pendingSaveDone = done;
         return;
       }
       isSaving = true;
       setStatus("Сохранение...", "#c9d4f0");
-
-      // Используем снапшот фильтров, захваченный при первом изменении ячейки.
-      // КРИТИЧНО: нельзя читать из #graph-filter-form, т.к. пользователь мог уже
-      // сменить фильтр — тогда POST пошёл бы с новыми фильтрами, а ячейки
-      // соответствуют старому виду → данные запишутся не тем сотрудникам.
-      var snap = filterSnapshot;
-      if (snap) {
-        if (hiddenDepMode) hiddenDepMode.value = snap.depMode;
-        if (hiddenPosMode) hiddenPosMode.value = snap.posMode;
-        var depInputs = form.querySelectorAll('input[name="dep"]');
-        depInputs.forEach(function(inp) { inp.remove(); });
-        snap.deps.forEach(function(dep) {
-          var ni = document.createElement('input');
-          ni.type = 'hidden'; ni.name = 'dep'; ni.value = dep;
-          form.appendChild(ni);
-        });
-        var posInputs = form.querySelectorAll('input[name="pos"]');
-        posInputs.forEach(function(inp) { inp.remove(); });
-        snap.positions.forEach(function(pos) {
-          var ni = document.createElement('input');
-          ni.type = 'hidden'; ni.name = 'pos'; ni.value = pos;
-          form.appendChild(ni);
-        });
-      }
 
       fetch(window.location.href, {
         method: "POST",
         headers: {
           "X-Requested-With": "XMLHttpRequest"
         },
-        body: new FormData(form)
+        body: body
       })
         .then(function (r) { return r.json(); })
         .then(function (data) {
-          if (data && data.ok) {
+          var ok = !!(data && data.ok);
+          if (ok) {
             setStatus("Сохранено", "#b8f5c8");
-            filterSnapshot = null; // Сбрасываем снапшот после успешного сохранения
+            clearDirtyFlags();
+            filterSnapshot = null;
           } else {
             setStatus("Ошибка сохранения", "var(--bio-error-soft)");
           }
+          if (done) done(ok);
         })
         .catch(function () {
           setStatus("Ошибка сохранения", "var(--bio-error-soft)");
+          if (done) done(false);
         })
         .finally(function () {
           isSaving = false;
           if (queued) {
             queued = false;
-            // Захватываем свежий снапшот для очередного сохранения,
-            // т.к. предыдущий уже был очищен после успешного сохранения
-            if (!filterSnapshot) captureFilterSnapshot();
-            saveNow();
+            var cb = pendingSaveDone;
+            pendingSaveDone = null;
+            if (cb) {
+              performSave(cb);
+            } else if (editing) {
+              if (!filterSnapshot) captureFilterSnapshot();
+              saveNow();
+            }
           }
         });
     }
 
+    function saveNow() {
+      if (!canEdit || !editing) return;
+      performSave(null);
+    }
+
+    function finishExitEdit() {
+      editing = false;
+      brushOn = false;
+      brushVal = "";
+      if (editToggle) editToggle.disabled = false;
+      applyGraphEditingState();
+    }
+
+    function exitEditWithSave() {
+      if (!canEdit || !editing) return;
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      if (editToggle) editToggle.disabled = true;
+      if (!hasDirtyCells()) {
+        finishExitEdit();
+        return;
+      }
+      performSave(function (ok) {
+        finishExitEdit();
+        if (!ok) {
+          setStatus("Не удалось сохранить. Включите редактирование и повторите.", "var(--bio-error-soft)");
+        }
+      });
+    }
+
     function scheduleSave() {
       if (!canEdit || !editing) return;
-      // Захватываем состояние фильтров при ПЕРВОМ изменении (до debounce-задержки).
-      // Это гарантирует что saveNow() сохранит с теми же фильтрами, что показывала таблица.
       if (!filterSnapshot) captureFilterSnapshot();
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(saveNow, 600);
-    }
-
-    function syncDepModeVisibility() {
-      var picked = document.querySelector('input[name="dep_mode"][value="pick"]');
-      var isPick = !!(picked && picked.checked);
-      if (depTarget) depTarget.classList.toggle("is-hidden", !isPick);
-      if (hiddenDepMode) hiddenDepMode.value = isPick ? "pick" : "all";
-    }
-
-    function syncPosModeVisibility() {
-      var picked = document.querySelector('input[name="pos_mode"][value="pick"]');
-      var isPick = !!(picked && picked.checked);
-      if (posTarget) posTarget.classList.toggle("is-hidden", !isPick);
-      if (hiddenPosMode) hiddenPosMode.value = isPick ? "pick" : "all";
     }
 
     form.querySelectorAll(".day-input").forEach(function (input) {
@@ -461,19 +563,23 @@
         if (event.button !== 0) return;
         if (!canEdit || !editing) return;
         if (isLockedInput(input)) return;
+        event.preventDefault();
+        if (!filterSnapshot) captureFilterSnapshot();
         if (brushOn) {
-          input.value = brushVal;
-          applyColor(input);
+          setCellValue(input, brushVal);
           dragFill = {
             startInput: input,
             sourceValue: brushVal,
+            isBrush: true,
           };
           return;
         }
         applyColor(input);
+        markDirty(input);
         dragFill = {
           startInput: input,
           sourceValue: input.value || "",
+          isBrush: false,
         };
       });
       input.addEventListener("mouseenter", function () {
@@ -482,22 +588,26 @@
         var start = dragFill.startInput;
         if (start.closest("tr") === input.closest("tr")) {
           fillRowRange(start, input, dragFill.sourceValue);
-        } else if (start.getAttribute("data-day") === input.getAttribute("data-day")) {
+        } else if (!dragFill.isBrush && start.getAttribute("data-day") === input.getAttribute("data-day")) {
+          // Заливка столбца только без кисти (иначе «н» попадает всем в этот день)
           fillColumnRange(start, input, dragFill.sourceValue);
         }
       });
       input.addEventListener("input", function () {
         applyColor(input);
+        markDirty(input);
         refreshShiftCounts();
         scheduleSave();
       });
       input.addEventListener("change", function () {
         applyColor(input);
+        markDirty(input);
         refreshShiftCounts();
         scheduleSave();
       });
       input.addEventListener("blur", function () {
         applyColor(input);
+        markDirty(input);
         refreshShiftCounts();
         scheduleSave();
       });
@@ -505,25 +615,34 @@
 
     document.addEventListener("mouseup", function () {
       if (!dragFill) return;
+      var wasBrush = dragFill.isBrush;
       dragFill = null;
       if (canEdit && editing) {
         refreshShiftCounts();
-        scheduleSave();
+        if (wasBrush) flushSave();
+        else scheduleSave();
       }
     });
 
     applyGraphEditingState();
     if (editToggle) {
       editToggle.addEventListener("click", function () {
-        editing = !editing;
+        if (!canEdit) return;
+        if (editing) {
+          exitEditWithSave();
+          return;
+        }
+        editing = true;
+        captureFilterSnapshot();
         applyGraphEditingState();
       });
     }
 
     if (codePalette) {
       codePalette.querySelectorAll(".graph-code-btn").forEach(function (btn) {
-        btn.addEventListener("click", function () {
+        btn.addEventListener("click", function (e) {
           if (!canEdit || !editing) return;
+          e.preventDefault();
           if (btn.hasAttribute("data-code")) {
             var selectedCode = btn.getAttribute("data-code") || "";
             if (brushOn && brushVal === selectedCode) {
@@ -532,6 +651,7 @@
             } else {
               brushOn = true;
               brushVal = selectedCode;
+              captureFilterSnapshot();
             }
           }
           syncBrushHint();
@@ -547,29 +667,6 @@
         if (uploadSubmitBtn) uploadSubmitBtn.hidden = !hasFile;
       });
     }
-
-    depModeInputs.forEach(function (el) {
-      el.addEventListener("change", function () {
-        if (el.name === "dep_mode" && el.value === "pick" && el.checked && depTarget) {
-          depTarget.querySelectorAll('input[type="checkbox"][name="dep"]').forEach(function (cb) {
-            cb.checked = false;
-          });
-        }
-        syncDepModeVisibility();
-      });
-    });
-    syncDepModeVisibility();
-    posModeInputs.forEach(function (el) {
-      el.addEventListener("change", function () {
-        if (el.name === "pos_mode" && el.value === "pick" && el.checked && posTarget) {
-          posTarget.querySelectorAll('input[type="checkbox"][name="pos"]').forEach(function (cb) {
-            cb.checked = false;
-          });
-        }
-        syncPosModeVisibility();
-      });
-    });
-    syncPosModeVisibility();
 
     // Filter panel collapse (CSS grid — без max-height/scrollHeight)
     (function () {
@@ -676,8 +773,16 @@
     var filterForm = document.getElementById("graph-filter-form");
     if (filterForm) {
       filterForm.addEventListener("submit", function () {
-        if (canEdit && editing) {
-          try { navigator.sendBeacon(window.location.href, new FormData(form)); } catch (e) {}
+        if (!canEdit || !editing) return;
+        if (saveTimer) {
+          clearTimeout(saveTimer);
+          saveTimer = null;
+        }
+        var beaconBody = buildSaveFormData();
+        if (beaconBody) {
+          try {
+            navigator.sendBeacon(window.location.href, beaconBody);
+          } catch (e) {}
         }
       });
     }

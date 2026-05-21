@@ -1,6 +1,9 @@
 """Страница «График» — как в Streamlit: таблица по дням, сохранение Excel, выгрузка/загрузка."""
+from __future__ import annotations
+
 from datetime import date, datetime
 
+import pandas as pd
 from django.contrib import messages
 from django.http import HttpResponse
 from django.http import JsonResponse
@@ -121,6 +124,73 @@ def _parse_sort_mode(request, *, from_post: bool) -> str:
     return "dept"
 
 
+def _norm_emp_code(val) -> str:
+    """Единый строковый код для имён полей формы и поиска в DataFrame."""
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return ""
+    if isinstance(val, float) and val == int(val):
+        return str(int(val))
+    s = str(val).strip()
+    if s.endswith(".0") and s[:-2].isdigit():
+        return s[:-2]
+    return s
+
+
+def _schedule_day_col_keys(day_columns) -> list[str]:
+    return [str(d) for d in day_columns]
+
+
+def _parse_schedule_cell_post_key(key: str, day_col_keys: list[str]) -> tuple[str, str] | None:
+    """
+    Разбор POST-поля cell_<код>_<день>.
+    Код сотрудника не содержит «_»; день — p1/p2/p3 или число (1, 01, …).
+    """
+    if not key.startswith("cell_"):
+        return None
+    rest = key[5:]
+    if not rest:
+        return None
+    for col_key in sorted(day_col_keys, key=len, reverse=True):
+        suffix = f"_{col_key}"
+        if rest.endswith(suffix):
+            code = rest[: -len(suffix)]
+            if code:
+                return code, col_key
+    return None
+
+
+def apply_schedule_cells_from_post(full_schedule_df, request, *, year: int, month: int):
+    """
+    Записывает ячейки из POST в full_schedule_df по коду сотрудника (Код),
+    без привязки к индексу строки в отфильтрованной таблице.
+    """
+    day_columns = sort_schedule_day_columns(
+        [c for c in full_schedule_df.columns if is_schedule_day_column(c)], year, month
+    )
+    col_keys = _schedule_day_col_keys(day_columns)
+    code_series = full_schedule_df["Код"].map(_norm_emp_code)
+
+    for key in request.POST:
+        parsed = _parse_schedule_cell_post_key(key, col_keys)
+        if not parsed:
+            continue
+        code, col_key = parsed
+        code = _norm_emp_code(code)
+        if col_key in PREV_MONTH_KEYS:
+            continue
+        if col_key not in full_schedule_df.columns:
+            continue
+        raw = (request.POST.get(key) or "").strip().lower()
+        if raw not in SCHEDULE_CODES:
+            raw = ""
+        match = code_series == code
+        if not match.any():
+            continue
+        full_idx = full_schedule_df.index[match][0]
+        full_schedule_df.at[full_idx, col_key] = raw
+    return full_schedule_df
+
+
 def _sort_graph_rows(
     df,
     dep_rank: dict[str, int],
@@ -193,56 +263,11 @@ def graph_view(request):
                 messages.error(request, f"Не удалось прочитать файл: {exc}")
             return redirect(f"/graph/?year={y}&month={m}")
 
-        # save
+        # save — ячейки привязаны к коду сотрудника (cell_<Код>_<день>), не к индексу строки
         full_schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
-        schedule_df = _schedule_with_department(full_schedule_df, employees_df)
-        all_deps = apply_department_order(
-            sorted(schedule_df["Отдел"].unique().tolist()),
-            load_department_order(),
+        full_schedule_df = apply_schedule_cells_from_post(
+            full_schedule_df, request, year=y, month=m
         )
-        all_positions = apply_position_order(
-            sorted(schedule_df["Должность"].unique().tolist()),
-            load_position_order(),
-        )
-        selected_deps, _dep_mode = _extract_selected_deps(request, all_deps, from_post=True)
-        selected_positions, _pos_mode = _extract_selected_positions(
-            request, all_positions, from_post=True
-        )
-        dep_rank = _dept_rank_map(all_deps)
-        pos_rank = _pos_rank_map(all_positions)
-        filtered = schedule_df[
-            schedule_df["Отдел"].isin(selected_deps)
-            & schedule_df["Должность"].isin(selected_positions)
-        ].copy()
-        filtered = _sort_graph_rows(filtered, dep_rank, pos_rank)
-        # КРИТИЧНО: сохраняем оригинальные индексы ДО reset_index
-        # Эти индексы соответствуют позициям в full_schedule_df
-        filtered_orig_indices = filtered.index.tolist()
-        filtered = filtered.reset_index(drop=True)
-
-        day_columns = sort_schedule_day_columns(
-            [c for c in full_schedule_df.columns if is_schedule_day_column(c)], y, m
-        )
-
-        # После reset_index, индексы в filtered это 0, 1, 2, 3...
-        # которые совпадают с i в цикле и с cell_i_d на клиенте
-        for i in range(len(filtered)):
-            # filtered_orig_indices[i] это индекс в full_schedule_df ДЕ сортировки по dep_rank/pos_rank
-            full_idx = filtered_orig_indices[i]
-
-            for d in day_columns:
-                # ВАЖНО: конвертируем d в string для консистентности с GET обработчиком
-                col_key = str(d)
-                if col_key in PREV_MONTH_KEYS:
-                    continue
-                key = f"cell_{i}_{col_key}"
-                if key not in request.POST:
-                    continue
-                raw = (request.POST.get(key) or "").strip().lower()
-                if raw not in SCHEDULE_CODES:
-                    raw = ""
-                # Используем col_key для доступа к DataFrame
-                full_schedule_df.at[full_idx, col_key] = raw
         full_schedule_df = biota_schedule.apply_prev_month_tail_from_previous_schedule(
             full_schedule_df, employees_df, y, m
         )
@@ -344,7 +369,7 @@ def graph_view(request):
             {
                 "i": i,
                 "order": row.get("Порядок", ""),
-                "code": row.get("Код", ""),
+                "code": _norm_emp_code(row.get("Код", "")),
                 "name": row.get("Сотрудник", ""),
                 "department": row.get("Отдел", "Без отдела"),
                 "department_class": dep_color_map.get(str(row.get("Отдел", "Без отдела")), "dept-c1"),
