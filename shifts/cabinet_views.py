@@ -253,8 +253,6 @@ def cabinet_view(request):
 @require_http_methods(["GET", "POST"])
 def schedule_backups_view(request):
     """Управление резервными копиями графиков."""
-    from .auth_utils import biota_admin_required
-
     # Проверяем, что пользователь админ
     if not _is_admin(biota_user(request)):
         messages.error(request, "Доступ запрещен")
