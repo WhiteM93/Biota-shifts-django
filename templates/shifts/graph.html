@@ -204,6 +204,23 @@
     var posModeInputs = document.querySelectorAll('input[name="pos_mode"]');
     var posTarget = document.querySelector('[data-mode-target="pos"]');
     var hiddenPosMode = form.querySelector('input[name="pos_mode"][type="hidden"]');
+    // Снапшот фильтров: захватывается в момент первого изменения ячейки,
+    // чтобы сохранение использовало ТЕ ЖЕ фильтры, что и GET при отображении таблицы.
+    // Проблема без снапшота: если пользователь изменит фильтр ПОСЛЕ правки но ДО сохранения
+    // (debounce 600мс), saveNow() возьмёт новые фильтры → строки сдвинутся → данные
+    // запишутся не тем сотрудникам.
+    var filterSnapshot = null;
+
+    function captureFilterSnapshot() {
+      // Берём фильтры прямо из скрытых полей save-формы (которые соответствуют
+      // текущей отображаемой таблице — они инициализируются из GET-параметров).
+      // НЕ читаем из filter-form, потому что она может уже измениться.
+      var depMode = (hiddenDepMode && hiddenDepMode.value) || 'all';
+      var deps = Array.from(form.querySelectorAll('input[name="dep"]')).map(function(i) { return i.value; });
+      var posMode = (hiddenPosMode && hiddenPosMode.value) || 'all';
+      var positions = Array.from(form.querySelectorAll('input[name="pos"]')).map(function(i) { return i.value; });
+      filterSnapshot = { depMode: depMode, deps: deps, posMode: posMode, positions: positions };
+    }
     var canEdit = document.body && document.body.getAttribute("data-biota-can-edit") === "1";
     var editing = false;
     var editToggle = document.getElementById("graph-edit-toggle");
@@ -361,42 +378,29 @@
       isSaving = true;
       setStatus("Сохранение...", "#c9d4f0");
 
-      // Синхронизировать текущие значения фильтров перед сохранением
-      if (hiddenDepMode) {
-        var currentDepMode = document.querySelector('#graph-filter-form input[name="dep_mode"]');
-        if (currentDepMode) {
-          hiddenDepMode.value = currentDepMode.value;
-        }
+      // Используем снапшот фильтров, захваченный при первом изменении ячейки.
+      // КРИТИЧНО: нельзя читать из #graph-filter-form, т.к. пользователь мог уже
+      // сменить фильтр — тогда POST пошёл бы с новыми фильтрами, а ячейки
+      // соответствуют старому виду → данные запишутся не тем сотрудникам.
+      var snap = filterSnapshot;
+      if (snap) {
+        if (hiddenDepMode) hiddenDepMode.value = snap.depMode;
+        if (hiddenPosMode) hiddenPosMode.value = snap.posMode;
+        var depInputs = form.querySelectorAll('input[name="dep"]');
+        depInputs.forEach(function(inp) { inp.remove(); });
+        snap.deps.forEach(function(dep) {
+          var ni = document.createElement('input');
+          ni.type = 'hidden'; ni.name = 'dep'; ni.value = dep;
+          form.appendChild(ni);
+        });
+        var posInputs = form.querySelectorAll('input[name="pos"]');
+        posInputs.forEach(function(inp) { inp.remove(); });
+        snap.positions.forEach(function(pos) {
+          var ni = document.createElement('input');
+          ni.type = 'hidden'; ni.name = 'pos'; ni.value = pos;
+          form.appendChild(ni);
+        });
       }
-      if (hiddenPosMode) {
-        var currentPosMode = document.querySelector('#graph-filter-form input[name="pos_mode"]');
-        if (currentPosMode) {
-          hiddenPosMode.value = currentPosMode.value;
-        }
-      }
-
-      // Обновить все значения dep и pos из фильтра
-      var depInputs = form.querySelectorAll('input[name="dep"]');
-      depInputs.forEach(function(inp) { inp.remove(); });
-      var filterDepInputs = document.querySelectorAll('#graph-filter-form input[name="dep"]');
-      filterDepInputs.forEach(function(inp) {
-        var newInput = document.createElement('input');
-        newInput.type = 'hidden';
-        newInput.name = 'dep';
-        newInput.value = inp.value;
-        form.appendChild(newInput);
-      });
-
-      var posInputs = form.querySelectorAll('input[name="pos"]');
-      posInputs.forEach(function(inp) { inp.remove(); });
-      var filterPosInputs = document.querySelectorAll('#graph-filter-form input[name="pos"]');
-      filterPosInputs.forEach(function(inp) {
-        var newInput = document.createElement('input');
-        newInput.type = 'hidden';
-        newInput.name = 'pos';
-        newInput.value = inp.value;
-        form.appendChild(newInput);
-      });
 
       fetch(window.location.href, {
         method: "POST",
@@ -409,6 +413,7 @@
         .then(function (data) {
           if (data && data.ok) {
             setStatus("Сохранено", "#b8f5c8");
+            filterSnapshot = null; // Сбрасываем снапшот после успешного сохранения
           } else {
             setStatus("Ошибка сохранения", "var(--bio-error-soft)");
           }
@@ -420,6 +425,9 @@
           isSaving = false;
           if (queued) {
             queued = false;
+            // Захватываем свежий снапшот для очередного сохранения,
+            // т.к. предыдущий уже был очищен после успешного сохранения
+            if (!filterSnapshot) captureFilterSnapshot();
             saveNow();
           }
         });
@@ -427,6 +435,9 @@
 
     function scheduleSave() {
       if (!canEdit || !editing) return;
+      // Захватываем состояние фильтров при ПЕРВОМ изменении (до debounce-задержки).
+      // Это гарантирует что saveNow() сохранит с теми же фильтрами, что показывала таблица.
+      if (!filterSnapshot) captureFilterSnapshot();
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(saveNow, 600);
     }
