@@ -60,3 +60,11 @@ class ProductInlineSaveTests(TestCase):
         pp = PlannedProduct.objects.filter(naladki_product_id=self.product.pk).first()
         self.assertIsNotNone(pp)
         self.assertEqual(pp.workpiece_type, "laser")
+
+    def test_inline_update_product_name_does_not_500(self):
+        """Смена названия наладки синхронизирует план (select_for_update только в atomic)."""
+        res = self._post_inline({"product_name": "Наладка после переименования"})
+        self.assertEqual(res.status_code, 200, res.content[:500])
+        self.assertTrue(res.json().get("ok"), res.json())
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.name, "Наладка после переименования")

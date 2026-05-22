@@ -33,7 +33,10 @@ from .models import (
     normalize_product_setup_gcode_system,
     product_setup_gcode_inline_parts,
 )
-from .plan_naladki_bridge import sync_plan_piece_for_naladki_in_same_transaction
+from .plan_naladki_bridge import (
+    ensure_plan_piece_for_naladki_product,
+    sync_plan_piece_for_naladki_in_same_transaction,
+)
 from .product_plan_sync import (
     apply_product_plan_post,
     plan_card_summary,
@@ -1198,7 +1201,7 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
     if product_update_fields:
         product.save(update_fields=product_update_fields + ["updated_at"])
     if product_meta_changed:
-        sync_plan_piece_for_naladki_in_same_transaction(product.pk)
+        ensure_plan_piece_for_naladki_product(product.pk)
     rows_json = (request.POST.get("rows_json") or "").strip()
     if rows_json:
         try:
