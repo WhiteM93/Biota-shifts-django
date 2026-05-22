@@ -1,6 +1,6 @@
 /* product_detail_module.js — extracted from product_detail.html ES module block, uses data island #pd-options */
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { TrackballControls } from "three/addons/controls/TrackballControls.js";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
 
 const PD = (function () {
@@ -93,9 +93,56 @@ const PD = (function () {
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z, 1e-6);
     camera.position.set(center.x + maxDim * 1.2, center.y + maxDim * 0.85, center.z + maxDim * 1.35);
-    controls.target.copy(center);
-    camera.lookAt(controls.target);
+    if (controls.target) controls.target.copy(center);
+    camera.lookAt(center);
     controls.update();
+    if (controls.target0) controls.target0.copy(controls.target);
+    if (controls.position0) controls.position0.copy(camera.position);
+    if (controls.up0) controls.up0.copy(camera.up);
+  }
+
+  const cadPixelRatioCap = 2;
+
+  /** Только canvas: блокируем прокрутку страницы колесом (без своего pointer capture). */
+  function bindCadWheelGuard(canvas) {
+    if (!canvas || canvas.dataset.cadWheelGuard === "1") return;
+    canvas.dataset.cadWheelGuard = "1";
+    canvas.addEventListener(
+      "wheel",
+      function (e) {
+        e.preventDefault();
+      },
+      { passive: false }
+    );
+    canvas.addEventListener("contextmenu", function (e) {
+      e.preventDefault();
+    });
+  }
+
+  /** Trackball: свободный обзор и инерция; без своего pointer capture (только Orbit/Trackball на canvas). */
+  function createCadControls(camera, domElement) {
+    const controls = new TrackballControls(camera, domElement);
+    controls.rotateSpeed = 3.2;
+    controls.zoomSpeed = 1.2;
+    controls.panSpeed = 0.75;
+    controls.staticMoving = false;
+    controls.dynamicDampingFactor = 0.2;
+    bindCadWheelGuard(domElement);
+    return controls;
+  }
+
+  function bindCadViewReset(hostEl, controls, getRoot) {
+    if (!hostEl || hostEl.dataset.cadDblclickBound === "1") return;
+    hostEl.dataset.cadDblclickBound = "1";
+    hostEl.addEventListener("dblclick", function () {
+      const root = typeof getRoot === "function" ? getRoot() : null;
+      if (root && controls) {
+        fitCameraToObject(controls.object, controls, root);
+      } else if (typeof controls.reset === "function") {
+        controls.reset();
+        controls.update();
+      }
+    });
   }
 
   /** Контур граней + flat shading на меше */
@@ -120,7 +167,7 @@ const PD = (function () {
     const w = Math.max(targetHost.clientWidth || 200, 120);
     const camera = new THREE.PerspectiveCamera(50, w / h, 0.005, 1e7);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cadPixelRatioCap));
     renderer.setClearColor(0x000000, 0);
     renderer.setSize(w, h);
     if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -139,12 +186,8 @@ const PD = (function () {
     fill.position.set(-8, 2, -6);
     scene.add(fill);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.minAzimuthAngle = -Infinity;
-    controls.maxAzimuthAngle = Infinity;
-    controls.minPolarAngle = -Infinity;
-    controls.maxPolarAngle = Infinity;
+    const controls = createCadControls(camera, renderer.domElement);
+    let miniRoot = null;
 
     new STLLoader().load(
       new URL(url, window.location.origin).href,
@@ -165,6 +208,7 @@ const PD = (function () {
         const root = new THREE.Group();
         root.add(mesh);
         scene.add(root);
+        miniRoot = root;
         fitCameraToObject(camera, controls, root);
       },
       undefined,
@@ -172,17 +216,21 @@ const PD = (function () {
         targetHost.innerHTML = '<p class="muted" style="padding:8px;margin:0;">Не удалось загрузить STL.</p>';
       }
     );
+    bindCadViewReset(targetHost, controls, function () {
+      return miniRoot;
+    });
     function onResize() {
       const rw = targetHost.clientWidth;
       const rh = targetHost.clientHeight || 220;
       camera.aspect = rw / rh;
       camera.updateProjectionMatrix();
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cadPixelRatioCap));
       renderer.setSize(rw, rh);
     }
     window.addEventListener("resize", onResize);
+    let miniRaf = 0;
     (function tick() {
-      requestAnimationFrame(tick);
+      miniRaf = requestAnimationFrame(tick);
       controls.update();
       renderer.render(scene, camera);
     })();
@@ -200,7 +248,7 @@ const PD = (function () {
     const w0 = Math.max(host.clientWidth || 200, 200);
     const camera = new THREE.PerspectiveCamera(50, w0 / h0, 0.005, 1e7);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cadPixelRatioCap));
     renderer.setClearColor(0x000000, 0);
     renderer.setSize(w0, h0);
     if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -223,19 +271,17 @@ const PD = (function () {
     rim.position.set(0, -6, 10);
     scene.add(rim);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.minAzimuthAngle = -Infinity;
-    controls.maxAzimuthAngle = Infinity;
-    controls.minPolarAngle = -Infinity;
-    controls.maxPolarAngle = Infinity;
+    const controls = createCadControls(camera, renderer.domElement);
+    bindCadViewReset(host, controls, function () {
+      return cadViewerState && cadViewerState.root ? cadViewerState.root : null;
+    });
 
     function onResize() {
       const w = host.clientWidth;
       const h = host.clientHeight || 260;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cadPixelRatioCap));
       renderer.setSize(w, h);
     }
     window.addEventListener("resize", onResize);

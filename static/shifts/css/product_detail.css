@@ -2534,7 +2534,12 @@ html[data-theme="dawn"] {
     );
     overflow: hidden;
     position: relative;
+    touch-action: none;
+    cursor: grab;
     transition: border-color 0.25s ease, background 0.3s ease;
+  }
+  .product-cad-viewport:active {
+    cursor: grabbing;
   }
   .product-cad-viewport .product-cad-loading {
     padding: 12px;
