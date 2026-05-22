@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import cabinet_views
+from . import graph_mobile_views
 from . import graph_views
 from . import hours_views
 from . import employee_payroll_views
@@ -15,6 +16,7 @@ urlpatterns = [
     path("", views.login_view, name="root"),
     path("home/", views.home_view, name="home"),
     path("graph/", graph_views.graph_view, name="graph"),
+    path("graph/mobile/", graph_mobile_views.graph_mobile_view, name="graph_mobile"),
     path("graph/download/", graph_views.graph_download, name="graph_download"),
     path("hours/", hours_views.hours_view, name="hours"),
     path("hours/excel/", hours_views.hours_excel, name="hours_excel"),

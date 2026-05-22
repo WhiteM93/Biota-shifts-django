@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'shifts/css/graph_mobile.css' %}">
+<div class="gm-page">
+  <header class="gm-header">
+    <a class="gm-icon-btn" href="{{ desktop_graph_url }}" aria-label="Полный график" title="Полный график">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <div class="gm-header__center">
+      <p class="gm-header__kicker">График</p>
+      <p class="gm-header__month">{{ month_name_upper }} {{ year }}</p>
+    </div>
+    <div class="gm-month-picker-wrap">
+      <button type="button" class="gm-icon-btn" id="gm-month-open" aria-expanded="false" aria-haspopup="dialog" aria-controls="gm-month-picker" aria-label="Выбрать месяц" title="Выбрать месяц">⋯</button>
+      <div class="gm-month-picker" id="gm-month-picker" hidden role="dialog" aria-label="Месяцы {{ month_picker_year }}">
+        <p class="gm-month-picker__year">{{ month_picker_year }}</p>
+        <div class="gm-month-picker__grid">
+          {% for m in month_picker_choices %}
+          <a href="{{ m.href }}" class="gm-month-picker__item{% if m.is_selected %} is-selected{% endif %}{% if m.is_current %} is-current{% endif %}">{{ m.label }}</a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <h1 class="gm-title">График работы</h1>
+
+  <nav class="gm-week" id="gm-week-strip" aria-label="Дни графика">
+    {% for d in week_strip %}
+    <a
+      href="{{ d.href }}"
+      class="gm-week__day{% if d.is_selected %} is-selected{% endif %}{% if d.is_weekend %} is-weekend{% endif %}{% if d.is_non_working %} is-holiday{% endif %}{% if not d.in_sheet %} is-outside{% endif %}"
+    >
+      <span class="gm-week__wd">{{ d.weekday }}</span>
+      <span class="gm-week__num">{{ d.day_label }}</span>
+    </a>
+    {% endfor %}
+  </nav>
+
+  <section class="gm-today">
+    <h2 class="gm-today__title">{{ today_label }}</h2>
+    <div class="gm-stats">
+      <div class="gm-stat gm-stat--day">
+        <span class="gm-stat__label">Дневных</span>
+        <span class="gm-stat__value">{{ day_shift_count }}</span>
+      </div>
+      <div class="gm-stat gm-stat--night">
+        <span class="gm-stat__label">Ночных</span>
+        <span class="gm-stat__value">{{ night_shift_count }}</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="gm-groups" aria-label="Сотрудники по типу смены">
+    {% if not has_day_column %}
+    <p class="gm-empty">Нет колонки графика для выбранной даты в этом месяце.</p>
+    {% elif not groups %}
+    <p class="gm-empty">На этот день в графике нет отметок (д, н, от, б, п, кп).</p>
+    {% else %}
+    {% for g in groups %}
+    <div class="gm-group {{ g.css_mod }}">
+      <div class="gm-group__head">
+        <span class="gm-group__icon" aria-hidden="true">{{ g.icon }}</span>
+        <span class="gm-group__title">{{ g.title }}</span>
+        <span class="gm-group__count">{{ g.count }}</span>
+      </div>
+      <ul class="gm-group__list">
+        {% for name in g.names %}
+        <li class="gm-group__item">{{ name }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </section>
+
+  <footer class="gm-footer">
+    <a class="gm-footer__link" href="{{ desktop_graph_url }}">Открыть полный график</a>
+  </footer>
+</div>
+<script>
+(function () {
+  var strip = document.getElementById("gm-week-strip");
+  if (strip) {
+    var sel = strip.querySelector(".gm-week__day.is-selected");
+    if (sel) {
+      requestAnimationFrame(function () {
+        sel.scrollIntoView({ inline: "center", block: "nearest" });
+      });
+    }
+
+    strip.addEventListener(
+      "wheel",
+      function (e) {
+        if (strip.scrollWidth <= strip.clientWidth + 1) return;
+        if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+        e.preventDefault();
+        strip.scrollLeft += e.deltaY;
+      },
+      { passive: false }
+    );
+
+    var dragActive = false;
+    var dragMoved = false;
+    var dragStartX = 0;
+    var dragStartScroll = 0;
+
+    strip.addEventListener("mousedown", function (e) {
+      if (e.button !== 0) return;
+      dragActive = true;
+      dragMoved = false;
+      dragStartX = e.pageX;
+      dragStartScroll = strip.scrollLeft;
+      strip.classList.add("is-dragging");
+    });
+
+    window.addEventListener("mousemove", function (e) {
+      if (!dragActive) return;
+      var dx = e.pageX - dragStartX;
+      if (Math.abs(dx) > 4) dragMoved = true;
+      if (!dragMoved) return;
+      e.preventDefault();
+      strip.scrollLeft = dragStartScroll - dx;
+    });
+
+    function endDrag() {
+      if (!dragActive) return;
+      dragActive = false;
+      strip.classList.remove("is-dragging");
+    }
+
+    window.addEventListener("mouseup", endDrag);
+    window.addEventListener("mouseleave", endDrag);
+
+    strip.addEventListener(
+      "click",
+      function (e) {
+        if (dragMoved) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      },
+      true
+    );
+  }
+})();
+
+(function () {
+  var openBtn = document.getElementById("gm-month-open");
+  var panel = document.getElementById("gm-month-picker");
+  if (!openBtn || !panel) return;
+
+  function closePicker() {
+    panel.hidden = true;
+    openBtn.setAttribute("aria-expanded", "false");
+  }
+
+  function openPicker() {
+    panel.hidden = false;
+    openBtn.setAttribute("aria-expanded", "true");
+  }
+
+  openBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    if (panel.hidden) openPicker();
+    else closePicker();
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!panel.hidden && !panel.contains(e.target) && e.target !== openBtn) {
+      closePicker();
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closePicker();
+  });
+})();
+</script>
+{% endblock %}
