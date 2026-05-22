@@ -1692,6 +1692,15 @@ def inventory_view(request):
             movements__comment__icontains=arrival_supplier,
         ).distinct()
 
+    stock_category_total = 0
+    stock_filtered_count = 0
+    if panel == "stock":
+        stock_category_qs = ToolItem.objects.filter(is_deleted=False, category=filter_category)
+        if not show_all:
+            stock_category_qs = stock_category_qs.filter(quantity__gt=0)
+        stock_category_total = stock_category_qs.count()
+        stock_filtered_count = qs.count()
+
     option_source_qs = ToolItem.objects.filter(is_deleted=False)
     if not show_all:
         option_source_qs = option_source_qs.filter(quantity__gt=0)
@@ -2038,6 +2047,8 @@ def inventory_view(request):
         "is_admin_user": is_admin_user,
         "can_manage_stock": can_manage_stock,
         "can_rollback_stock": is_admin_user,
+        "stock_filtered_count": stock_filtered_count,
+        "stock_category_total": stock_category_total,
         "panel": panel,
         "employee_options": employee_options,
         "defect_records": defects_qs[:300],

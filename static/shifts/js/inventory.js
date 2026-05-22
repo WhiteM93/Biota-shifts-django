@@ -7,6 +7,75 @@ var INV = (function () {
 })();
 
 (function () {
+  var DELETE_STEPS = 5;
+  var STEP_CLASS_PREFIX = "btn-inv-delete--s";
+
+  function resetDeleteButton(btn) {
+    btn.setAttribute("data-step", "0");
+    btn.className = "btn btn-inv-delete btn-inv-delete--s0";
+    btn.setAttribute("aria-label", "Удалить: 0 из " + DELETE_STEPS);
+    btn.title = "Удалить: нажмите " + DELETE_STEPS + " раз";
+  }
+
+  function setDeleteStep(btn, step) {
+    btn.setAttribute("data-step", String(step));
+    btn.className = "btn btn-inv-delete " + STEP_CLASS_PREFIX + step;
+    btn.setAttribute("aria-label", "Удалить: " + step + " из " + DELETE_STEPS);
+    btn.title = step < DELETE_STEPS
+      ? "Удалить: ещё " + (DELETE_STEPS - step) + " наж."
+      : "Подтвердить удаление";
+  }
+
+  document.querySelectorAll(".inv-stock-delete-form").forEach(function (form) {
+    var btn = form.querySelector(".btn-inv-delete");
+    if (!btn) return;
+    resetDeleteButton(btn);
+    btn.addEventListener("click", function () {
+      var step = parseInt(btn.getAttribute("data-step") || "0", 10) + 1;
+      if (step < DELETE_STEPS) {
+        setDeleteStep(btn, step);
+        return;
+      }
+      setDeleteStep(btn, DELETE_STEPS);
+      if (window.confirm("Удалить эту позицию склада?")) {
+        form.submit();
+      } else {
+        resetDeleteButton(btn);
+      }
+    });
+  });
+})();
+
+(function () {
+  var exportBtn = document.getElementById("inv-stock-export-csv");
+  var tableWrap = document.querySelector(".inv-stock-table-wrap table.data-grid");
+  if (exportBtn && tableWrap) {
+    exportBtn.addEventListener("click", function () {
+      var rows = [];
+      var headers = [];
+      tableWrap.querySelectorAll("thead th").forEach(function (th) {
+        headers.push((th.textContent || "").trim().replace(/\s+/g, " "));
+      });
+      if (headers.length) rows.push(headers);
+      tableWrap.querySelectorAll("tbody tr").forEach(function (tr) {
+        var cells = [];
+        tr.querySelectorAll("td").forEach(function (td) {
+          cells.push('"' + (td.textContent || "").trim().replace(/"/g, '""').replace(/\s+/g, " ") + '"');
+        });
+        if (cells.length) rows.push(cells.join(";"));
+      });
+      if (rows.length < 2) return;
+      var blob = new Blob(["\uFEFF" + rows.join("\r\n")], { type: "text/csv;charset=utf-8" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "sklad_" + (new Date().toISOString().slice(0, 10)) + ".csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+  }
+})();
+
+(function () {
   var form = document.getElementById("inventory-stock-filter-form");
   if (!form) return;
   var sel = form.querySelector(".js-stock-filter-tool-material");
