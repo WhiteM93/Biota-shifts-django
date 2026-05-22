@@ -9,6 +9,12 @@ from biota_shifts.auth import (
 
 def biota_session(request):
     """В шапке: для admin — «имя для отображения» из сессии, если задано (как в Streamlit)."""
+    try:
+        from django.conf import settings
+
+        static_asset_version = getattr(settings, "STATIC_ASSET_VERSION", "1")
+    except Exception:
+        static_asset_version = "1"
     u = (request.session.get("biota_username") or "").strip()
     if not u:
         return {
@@ -18,6 +24,7 @@ def biota_session(request):
             "biota_can_edit": True,
             "biota_is_admin": False,
             "biota_machines_quick_edit": False,
+            "static_asset_version": static_asset_version,
         }
     nav = nav_permissions_for_user(u)
     adn = (request.session.get("admin_display_name") or "").strip()
@@ -30,6 +37,7 @@ def biota_session(request):
         "biota_is_admin": is_admin,
         "biota_machines_quick_edit": machines_quick_edit_for_user(u),
     }
+    payload["static_asset_version"] = static_asset_version
     if is_admin and adn:
         return {"biota_username": adn, **payload}
     return {"biota_username": u, **payload}

@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/graph_mobile.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
 {% block content %}
-<link rel="stylesheet" href="{% static 'shifts/css/graph_mobile.css' %}">
 <div class="gm-page">
   <header class="gm-header">
     <a class="gm-icon-btn" href="{{ desktop_graph_url }}" aria-label="Полный график" title="Полный график">

@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
 {% block content %}
-<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}">
 
 <div class="cabinet-subpage">
   <a class="cabinet-subpage__back" href="{% url 'cabinet' %}">← Кабинет администратора</a>

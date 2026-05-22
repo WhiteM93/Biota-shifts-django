@@ -2,8 +2,11 @@
 {% load static %}
 {% load inventory_tags static %}
 
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/inventory.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
 {% block content %}
-<link rel="stylesheet" href="{% static 'shifts/css/inventory.css' %}">
 <div class="inv-page{% if panel == 'stock' %} inv-page--stock{% endif %}">
 {% if panel != "defects" and panel != "payroll" and panel != "employees" %}
 <nav class="inv-tabs" aria-label="Разделы склада">

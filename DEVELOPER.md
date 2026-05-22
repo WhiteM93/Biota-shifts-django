@@ -140,7 +140,7 @@
 ## Продакшен-заметки
 
 - Запуск через **gunicorn** (зависимость есть). Настрой `DJANGO_DEBUG=0`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`.
-- `collectstatic` → `staticfiles/`, раздача через nginx.
+- `collectstatic` → `staticfiles/`, раздача через nginx. После крупных правок CSS: `python manage.py collectstatic --clear --noinput` (иначе в `staticfiles/` могут остаться старые файлы). В шаблонах версия: `STATIC_ASSET_VERSION` (env) / `?v=` в ссылках на CSS.
 - `X_FRAME_OPTIONS = "SAMEORIGIN"` — сознательно для PDF в `<iframe>/<object>` на том же домене.
 - Большое число полей на формах табеля: `DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000`.
 

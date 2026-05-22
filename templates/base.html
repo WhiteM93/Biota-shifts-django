@@ -12,7 +12,8 @@
   <script>
     (function(){try{var k='biotaSiteTheme',l=localStorage.getItem('adminTestLabTheme');if(l&&!localStorage.getItem(k))localStorage.setItem(k,l);var v=localStorage.getItem(k);document.documentElement.setAttribute('data-theme',v==='dawn'?'dawn':'night');}catch(e){document.documentElement.setAttribute('data-theme','night');}})();
   </script>
-  <link rel="stylesheet" href="{% static 'css/biota_global.css' %}">
+  <link rel="stylesheet" href="{% static 'css/biota_global.css' %}?v={{ static_asset_version }}">
+  {% block extra_styles %}{% endblock %}
 </head>
 <body class="{% if auth_page %}auth-page{% endif %}" data-biota-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}">
   {% if not hide_nav %}

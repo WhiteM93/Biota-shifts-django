@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/home.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
 {% block content %}
-<link rel="stylesheet" href="{% static 'shifts/css/home.css' %}">
 
 <div class="home-page">
 
