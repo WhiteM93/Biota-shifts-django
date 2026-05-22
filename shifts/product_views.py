@@ -1125,6 +1125,174 @@ def product_name_suggestions_view(request):
     return JsonResponse({"ok": True, "items": scored})
 
 
+def _post_bool(val) -> bool:
+    if isinstance(val, bool):
+        return val
+    s = str(val).strip().lower()
+    return s in ("1", "true", "yes", "on")
+
+
+def _product_inline_update_setup(request, product: Product) -> JsonResponse:
+    setup_id_raw = (request.POST.get("setup_id") or "").strip()
+    setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+    setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+    if not setup:
+        return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+    editable_fields = (
+        "name",
+        "binding_x",
+        "binding_y",
+        "binding_z",
+        "gcode_system",
+        "workpiece",
+        "material",
+        "size",
+        "setup_notes",
+    )
+    changed_setup_fields: list[str] = []
+    for field in editable_fields:
+        if field not in request.POST:
+            continue
+        raw = (request.POST.get(field) or "").strip()
+        if field == "gcode_system":
+            raw = normalize_product_setup_gcode_system(raw)
+        setattr(setup, field, raw)
+        changed_setup_fields.append(field)
+    if "binding_extra_blocks_json" in request.POST:
+        new_extra = _safe_binding_extra_blocks_from_json(
+            request.POST.get("binding_extra_blocks_json") or "[]"
+        )
+        setup.binding_extra_blocks = _merge_binding_extra_block_photos(
+            new_extra, getattr(setup, "binding_extra_blocks", None)
+        )
+        if "binding_extra_blocks" not in changed_setup_fields:
+            changed_setup_fields.append("binding_extra_blocks")
+    if changed_setup_fields:
+        setup.save(update_fields=list(dict.fromkeys(changed_setup_fields + ["updated_at"])))
+    product_meta_changed: list[str] = []
+    if "product_name" in request.POST:
+        nm = (request.POST.get("product_name") or "").strip()[:300]
+        if not nm:
+            return JsonResponse({"ok": False, "error": "Укажите название наладки."}, status=400)
+        if Product.objects.filter(name__iexact=nm).exclude(pk=product.pk).exists():
+            return JsonResponse(
+                {"ok": False, "error": "Наладка с таким названием уже существует."},
+                status=400,
+            )
+        if nm != (product.name or "").strip():
+            product.name = nm
+            product_meta_changed.append("name")
+    if "product_description" in request.POST:
+        desc = (request.POST.get("product_description") or "").strip()
+        if desc != (product.description or "").strip():
+            product.description = desc
+            product_meta_changed.append("description")
+    product_drawing_update: list[str] = []
+    if "drawing_blank_size" in request.POST:
+        product.drawing_blank_size = (request.POST.get("drawing_blank_size") or "").strip()[:180]
+        product_drawing_update.append("drawing_blank_size")
+    if "drawing_blank_type" in request.POST:
+        product.drawing_blank_type = (request.POST.get("drawing_blank_type") or "").strip()[:220]
+        product_drawing_update.append("drawing_blank_type")
+    product_update_fields = list(dict.fromkeys(product_meta_changed + product_drawing_update))
+    if product_update_fields:
+        product.save(update_fields=product_update_fields + ["updated_at"])
+    if product_meta_changed:
+        sync_plan_piece_for_naladki_in_same_transaction(product.pk)
+    rows_json = (request.POST.get("rows_json") or "").strip()
+    if rows_json:
+        try:
+            rows = json.loads(rows_json)
+        except Exception:
+            return JsonResponse({"ok": False, "error": "Некорректные данные таблицы инструмента."}, status=400)
+        if not isinstance(rows, list):
+            return JsonResponse({"ok": False, "error": "Некорректный формат таблицы инструмента."}, status=400)
+        parsed_rows: list[dict] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            row_tool_number = str((row.get("tool_number") or "")).strip()
+            row_correction_enabled = _post_bool(row.get("correction_enabled"))
+            row_kor_n = str((row.get("kor_n") or "")).strip()
+            row_kor_d = str((row.get("kor_d") or "")).strip()
+            row_tool_type = str((row.get("tool_type") or "")).strip()
+            row_diameter = _normalize_tool_diameter_for_storage(
+                str((row.get("diameter") or "")).strip(), row_tool_type
+            )
+            row_overhang = _normalize_tool_overhang_for_storage(str((row.get("overhang") or "")).strip())
+            row_note = str((row.get("note") or "")).strip()
+            row_vals = (row_tool_number, row_kor_n, row_kor_d, row_tool_type, row_diameter, row_overhang, row_note)
+            if all(v == "" for v in row_vals) and not row_correction_enabled:
+                continue
+            parsed_rows.append(
+                {
+                    "tool_number": row_tool_number,
+                    "correction_enabled": row_correction_enabled,
+                    "kor_n": row_kor_n,
+                    "kor_d": row_kor_d,
+                    "tool_type": row_tool_type,
+                    "diameter": row_diameter,
+                    "overhang": row_overhang,
+                    "note": row_note,
+                }
+            )
+        indexed = list(enumerate(parsed_rows))
+        indexed.sort(key=lambda p: (_tool_row_dict_sort_tuple(p[1]), p[0]))
+        ProductSetupToolRow.objects.filter(setup=setup).delete()
+        for idx, (_, pr) in enumerate(indexed):
+            ProductSetupToolRow.objects.create(
+                setup=setup,
+                sort_order=idx,
+                tool_number=pr["tool_number"],
+                correction_enabled=pr["correction_enabled"],
+                kor_n=pr["kor_n"],
+                kor_d=pr["kor_d"],
+                tool_type=pr["tool_type"],
+                diameter=pr["diameter"],
+                overhang=pr["overhang"],
+                tap_hole_type="",
+                name=pr["note"],
+            )
+    out: dict = {
+        "ok": True,
+        "setup": {
+            "id": setup.pk,
+            "name": setup.name or "",
+            "binding_x": setup.binding_x or "—",
+            "binding_y": setup.binding_y or "—",
+            "binding_z": setup.binding_z or "—",
+            "gcode_system": setup.gcode_system or "G54",
+            "workpiece": setup.workpiece or "—",
+            "material": setup.material or "—",
+            "size": setup.size or "—",
+            "setup_notes": (setup.setup_notes or "").strip(),
+            "binding_extra_blocks": _safe_binding_extra_blocks_from_json(
+                json.dumps(getattr(setup, "binding_extra_blocks", None) or [])
+            ),
+        },
+        "product_drawing": {
+            "drawing_blank_size": (product.drawing_blank_size or "").strip() or "—",
+            "drawing_blank_type": (product.drawing_blank_type or "").strip() or "—",
+        },
+        "product": {
+            "name": (product.name or "").strip(),
+            "description": (product.description or "").strip(),
+        },
+    }
+    if (request.POST.get("sync_plan_from_inline") or "").strip() == "1":
+        plan_err = validate_product_plan_post(request.POST)
+        if plan_err:
+            return JsonResponse({"ok": False, "error": plan_err}, status=400)
+        perr = apply_product_plan_post(product, request.POST)
+        if perr:
+            return JsonResponse({"ok": False, "error": perr}, status=400)
+        pp = plan_piece_for_naladki_card(product)
+        out["plan_summary"] = plan_card_summary(pp, product)
+        out["plan_pk"] = pp.pk if pp else None
+        out["plan_inline_state"] = plan_inline_state_payload(product)
+    return JsonResponse(out)
+
+
 @biota_login_required
 @nav_permission_required("products")
 @write_permission_required
@@ -1428,163 +1596,13 @@ def product_detail_view(request, pk: int):
             return JsonResponse(out)
 
         if action == "inline_update_setup":
-            setup_id_raw = (request.POST.get("setup_id") or "").strip()
-            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
-            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
-            if not setup:
-                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
-            editable_fields = (
-                "name",
-                "binding_x",
-                "binding_y",
-                "binding_z",
-                "gcode_system",
-                "workpiece",
-                "material",
-                "size",
-                "setup_notes",
-            )
-            changed_setup_fields: list[str] = []
-            for field in editable_fields:
-                if field not in request.POST:
-                    continue
-                raw = (request.POST.get(field) or "").strip()
-                if field == "gcode_system":
-                    raw = normalize_product_setup_gcode_system(raw)
-                setattr(setup, field, raw)
-                changed_setup_fields.append(field)
-            if "binding_extra_blocks_json" in request.POST:
-                new_extra = _safe_binding_extra_blocks_from_json(
-                    request.POST.get("binding_extra_blocks_json") or "[]"
+            try:
+                return _product_inline_update_setup(request, product)
+            except Exception as save_exc:
+                return JsonResponse(
+                    {"ok": False, "error": f"Ошибка сохранения: {save_exc}"},
+                    status=500,
                 )
-                setup.binding_extra_blocks = _merge_binding_extra_block_photos(
-                    new_extra, getattr(setup, "binding_extra_blocks", None)
-                )
-                if "binding_extra_blocks" not in changed_setup_fields:
-                    changed_setup_fields.append("binding_extra_blocks")
-            setup.save(update_fields=list(changed_setup_fields) + ["updated_at"])
-            product_meta_changed: list[str] = []
-            if "product_name" in request.POST:
-                nm = (request.POST.get("product_name") or "").strip()[:300]
-                if not nm:
-                    return JsonResponse({"ok": False, "error": "Укажите название наладки."}, status=400)
-                if Product.objects.filter(name__iexact=nm).exclude(pk=product.pk).exists():
-                    return JsonResponse(
-                        {"ok": False, "error": "Наладка с таким названием уже существует."},
-                        status=400,
-                    )
-                if nm != (product.name or "").strip():
-                    product.name = nm
-                    product_meta_changed.append("name")
-            if "product_description" in request.POST:
-                desc = (request.POST.get("product_description") or "").strip()
-                if desc != (product.description or "").strip():
-                    product.description = desc
-                    product_meta_changed.append("description")
-            product_drawing_update: list[str] = []
-            if "drawing_blank_size" in request.POST:
-                product.drawing_blank_size = (request.POST.get("drawing_blank_size") or "").strip()[:180]
-                product_drawing_update.append("drawing_blank_size")
-            if "drawing_blank_type" in request.POST:
-                product.drawing_blank_type = (request.POST.get("drawing_blank_type") or "").strip()[:220]
-                product_drawing_update.append("drawing_blank_type")
-            product_update_fields = list(dict.fromkeys(product_meta_changed + product_drawing_update))
-            if product_update_fields:
-                product.save(update_fields=product_update_fields + ["updated_at"])
-            if product_meta_changed:
-                sync_plan_piece_for_naladki_in_same_transaction(product.pk)
-            rows_json = (request.POST.get("rows_json") or "").strip()
-            if rows_json:
-                try:
-                    rows = json.loads(rows_json)
-                except Exception:
-                    return JsonResponse({"ok": False, "error": "Некорректные данные таблицы инструмента."}, status=400)
-                if not isinstance(rows, list):
-                    return JsonResponse({"ok": False, "error": "Некорректный формат таблицы инструмента."}, status=400)
-                parsed_rows: list[dict] = []
-                for row in rows:
-                    if not isinstance(row, dict):
-                        continue
-                    row_tool_number = str((row.get("tool_number") or "")).strip()
-                    row_correction_enabled = bool(row.get("correction_enabled"))
-                    row_kor_n = str((row.get("kor_n") or "")).strip()
-                    row_kor_d = str((row.get("kor_d") or "")).strip()
-                    row_tool_type = str((row.get("tool_type") or "")).strip()
-                    row_diameter = _normalize_tool_diameter_for_storage(
-                        str((row.get("diameter") or "")).strip(), row_tool_type
-                    )
-                    row_overhang = _normalize_tool_overhang_for_storage(str((row.get("overhang") or "")).strip())
-                    row_note = str((row.get("note") or "")).strip()
-                    row_vals = (row_tool_number, row_kor_n, row_kor_d, row_tool_type, row_diameter, row_overhang, row_note)
-                    if all(v == "" for v in row_vals) and not row_correction_enabled:
-                        continue
-                    parsed_rows.append(
-                        {
-                            "tool_number": row_tool_number,
-                            "correction_enabled": row_correction_enabled,
-                            "kor_n": row_kor_n,
-                            "kor_d": row_kor_d,
-                            "tool_type": row_tool_type,
-                            "diameter": row_diameter,
-                            "overhang": row_overhang,
-                            "note": row_note,
-                        }
-                    )
-                indexed = list(enumerate(parsed_rows))
-                indexed.sort(key=lambda p: (_tool_row_dict_sort_tuple(p[1]), p[0]))
-                ProductSetupToolRow.objects.filter(setup=setup).delete()
-                for idx, (_, pr) in enumerate(indexed):
-                    ProductSetupToolRow.objects.create(
-                        setup=setup,
-                        sort_order=idx,
-                        tool_number=pr["tool_number"],
-                        correction_enabled=pr["correction_enabled"],
-                        kor_n=pr["kor_n"],
-                        kor_d=pr["kor_d"],
-                        tool_type=pr["tool_type"],
-                        diameter=pr["diameter"],
-                        overhang=pr["overhang"],
-                        tap_hole_type="",
-                        name=pr["note"],
-                    )
-            out: dict = {
-                "ok": True,
-                "setup": {
-                    "id": setup.pk,
-                    "name": setup.name or "",
-                    "binding_x": setup.binding_x or "—",
-                    "binding_y": setup.binding_y or "—",
-                    "binding_z": setup.binding_z or "—",
-                    "gcode_system": setup.gcode_system or "G54",
-                    "workpiece": setup.workpiece or "—",
-                    "material": setup.material or "—",
-                    "size": setup.size or "—",
-                    "setup_notes": (setup.setup_notes or "").strip(),
-                    "binding_extra_blocks": _safe_binding_extra_blocks_from_json(
-                        json.dumps(getattr(setup, "binding_extra_blocks", None) or [])
-                    ),
-                },
-                "product_drawing": {
-                    "drawing_blank_size": (product.drawing_blank_size or "").strip() or "—",
-                    "drawing_blank_type": (product.drawing_blank_type or "").strip() or "—",
-                },
-                "product": {
-                    "name": (product.name or "").strip(),
-                    "description": (product.description or "").strip(),
-                },
-            }
-            if (request.POST.get("sync_plan_from_inline") or "").strip() == "1":
-                plan_err = validate_product_plan_post(request.POST)
-                if plan_err:
-                    return JsonResponse({"ok": False, "error": plan_err}, status=400)
-                perr = apply_product_plan_post(product, request.POST)
-                if perr:
-                    return JsonResponse({"ok": False, "error": perr}, status=400)
-                pp = plan_piece_for_naladki_card(product)
-                out["plan_summary"] = plan_card_summary(pp, product)
-                out["plan_pk"] = pp.pk if pp else None
-                out["plan_inline_state"] = plan_inline_state_payload(product)
-            return JsonResponse(out)
         return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
     setup_photos = list(product.setup_photos.filter(setup__isnull=True))
     setups = list(product.setups.prefetch_related("tools", "program_files"))

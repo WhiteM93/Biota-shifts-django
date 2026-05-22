@@ -385,7 +385,13 @@ def apply_product_plan_post(product: Product, post: Any) -> str | None:
             )
         if not pp:
             ensure_plan_piece_for_naladki_product(product.pk)
-            pp = PlannedProduct.objects.select_for_update().get(naladki_product_id=product.pk)
+            pp = (
+                PlannedProduct.objects.select_for_update()
+                .filter(naladki_product_id=product.pk)
+                .first()
+            )
+        if not pp:
+            return "Не удалось связать карточку наладки с планом. Обновите страницу."
 
         t = normalize_plan_product_type(post.get("product_type") or post.get("plan_product_type") or "")
         is_asm, is_pki = flags_from_plan_product_type(t)

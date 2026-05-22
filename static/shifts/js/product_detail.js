@@ -301,6 +301,15 @@ var PD = (function () {
       if (grid) grid.classList.toggle("is-drawing-only", false);
       if (savePreviewBlock) savePreviewBlock.hidden = false;
       if (downloadsBlock) downloadsBlock.hidden = false;
+      var sideProgramWrap = document.getElementById("product-side-programs");
+      if (sideProgramWrap) {
+        var isSetupTab = /^setup-\d+$/.test(tabName || "");
+        sideProgramWrap.hidden = !isSetupTab;
+        sideProgramWrap.querySelectorAll(".product-side-program-files").forEach(function (el) {
+          var isMatch = el.getAttribute("data-setup-tab") === tabName;
+          el.hidden = !isMatch;
+        });
+      }
       document.querySelectorAll(".product-side-notes-panel").forEach(function (el) {
         var isMatch = el.getAttribute("data-notes-for-tab") === tabName;
         el.hidden = !isMatch;
@@ -1335,7 +1344,9 @@ var PD = (function () {
       clone.querySelectorAll(".setup-program-files-inline").forEach(function (wrap) {
         if (!clearValues) return;
         var ul = wrap.querySelector(".setup-program-files-list");
-        if (ul) ul.innerHTML = '<li class="setup-program-file-empty muted">—</li>';
+        if (ul) ul.innerHTML = "";
+        var emptyMsg = wrap.querySelector(".setup-program-tab-empty-msg");
+        if (emptyMsg) emptyMsg.hidden = false;
         wrap.querySelectorAll(".js-setup-program-file-delete").forEach(function (b) {
           if (b.remove) b.remove();
         });
@@ -1732,7 +1743,7 @@ var PD = (function () {
     }
 
     function appendPlanFieldsToPayload(payload, planWrap) {
-      if (!planWrap) return;
+      if (!planWrap) return true;
 
       // Проверить наличие каскадной формы
       var cascadeFormContainer = planWrap.querySelector("[data-plan-cascade-form]");
@@ -1743,9 +1754,12 @@ var PD = (function () {
         // Валидировать форму
         var validation = cascadeManager.validateForm();
         if (!validation.valid) {
-          // Ошибка валидации - не отправлять
-          console.warn("Cascade form validation errors:", validation.errors);
-          return;
+          var planMsg =
+            validation.errors && validation.errors.length
+              ? validation.errors.join("\n")
+              : "Заполните поля плана перед сохранением.";
+          alert(planMsg);
+          return false;
         }
 
         // Получить payload из менеджера
@@ -1763,18 +1777,18 @@ var PD = (function () {
         payload.append("workpiece_size", formData.workpiece_size || "");
         payload.append("workpiece_type_enum", formData.workpiece_type_enum || "");
 
-        return;
+        return true;
       }
 
       // Fallback на старый способ для совместимости
       var planTypeEl = planWrap ? planWrap.querySelector(".js-plan-inline-product-type") : null;
-      if (!planWrap || !planTypeEl) return;
+      if (!planWrap || !planTypeEl) return true;
       var ptype = (planTypeEl.value || "made").trim();
       var wpSel = planWrap.querySelector(".js-plan-inline-workpiece");
       var wpVal = wpSel ? (wpSel.value || "").trim() : "";
       /* Без типа заготовки для «Изделие» сервер отклонит sync_plan; сохраняем только наладку, план не трогаем. */
       if (ptype === "made" && !wpVal) {
-        return;
+        return true;
       }
       payload.append("sync_plan_from_inline", "1");
       payload.append("plan_product_type", ptype);
@@ -1786,6 +1800,7 @@ var PD = (function () {
       payload.append("plan_material", matVal);
       payload.append("made_material", matVal);
       payload.append("laser_material_marking", matVal);
+      return true;
     }
 
     function fillBindingSpecBoxFromData(box, blk) {
@@ -1947,7 +1962,28 @@ var PD = (function () {
       }
     }
 
-    function buildInlineSetupPayload(setupId, panelSetup, includePlan) {
+    function appendProductMetaFields(payload) {
+      var pnameEl = (detailGrid || root).querySelector('[data-field-text="product_name"]');
+      if (pnameEl) payload.append("product_name", (pnameEl.textContent || "").replace(/\s+/g, " ").trim());
+      var pdescEl = (detailGrid || root).querySelector('[data-field-text="product_description"]');
+      if (pdescEl) {
+        var emptyLabel = (pdescEl.getAttribute("data-empty-label") || "Описание не задано.").trim();
+        var descText = (pdescEl.textContent || "").replace(/\s+/g, " ").trim();
+        var descHtml = (pdescEl.innerHTML || "").trim();
+        payload.append(
+          "product_description",
+          !descText || descText === emptyLabel ? "" : descHtml
+        );
+      }
+    }
+
+    function buildInlineSetupPayload(setupId, panelSetup, saveOpts) {
+      if (typeof saveOpts === "boolean") {
+        saveOpts = { productMeta: saveOpts, planSync: saveOpts };
+      }
+      saveOpts = saveOpts || {};
+      var productMeta = !!saveOpts.productMeta;
+      var planSync = !!saveOpts.planSync;
       var payload = new FormData();
       payload.append("action", "inline_update_setup");
       payload.append("setup_id", setupId);
@@ -1997,19 +2033,10 @@ var PD = (function () {
         payload.append("setup_notes", "");
         payload.append("rows_json", "[]");
       }
-      if (includePlan) {
-        appendPlanFieldsToPayload(payload, productDetailPlanWrap());
-        var pnameEl = (detailGrid || root).querySelector('[data-field-text="product_name"]');
-        if (pnameEl) payload.append("product_name", (pnameEl.textContent || "").replace(/\s+/g, " ").trim());
-        var pdescEl = (detailGrid || root).querySelector('[data-field-text="product_description"]');
-        if (pdescEl) {
-          var emptyLabel = (pdescEl.getAttribute("data-empty-label") || "Описание не задано.").trim();
-          var descText = (pdescEl.textContent || "").replace(/\s+/g, " ").trim();
-          var descHtml = (pdescEl.innerHTML || "").trim();
-          payload.append(
-            "product_description",
-            !descText || descText === emptyLabel ? "" : descHtml
-          );
+      if (productMeta) appendProductMetaFields(payload);
+      if (planSync) {
+        if (!appendPlanFieldsToPayload(payload, productDetailPlanWrap())) {
+          return null;
         }
       }
       return payload;
@@ -2025,17 +2052,23 @@ var PD = (function () {
         alert(
           "Сервер вернул не JSON (HTTP " +
             res.status +
-            "). Обычно это редирект из‑за прав или истекшей сессии — обновите страницу и войдите снова." +
+            "). Обычно это редирект из‑за прав, истекшей сессии или ошибка на сервере — обновите страницу и войдите снова." +
             (snippet ? "\n\nФрагмент ответа:\n" + snippet : "")
         );
         return null;
       }
+      var data = null;
       try {
-        return await res.json();
+        data = await res.json();
       } catch (e) {
         alert("Не удалось разобрать JSON в ответе сервера. Обновите страницу.");
         return null;
       }
+      if (!res.ok || !data || !data.ok) {
+        alert((data && data.error) || "Не удалось сохранить (HTTP " + res.status + ").");
+        return null;
+      }
+      return data;
     }
 
     var deleteSetupBtn = document.getElementById("setup-inline-delete-setup-btn");
@@ -2111,8 +2144,11 @@ var PD = (function () {
         for (var i = 0; i < ids.length; i++) {
           var sid = ids[i];
           var panelSetup = root.querySelector("#panel-setup-" + sid);
-          var includePlan = i === 0;
-          var payload = buildInlineSetupPayload(sid, panelSetup, includePlan);
+          var payload = buildInlineSetupPayload(sid, panelSetup, {
+            productMeta: i === 0,
+            planSync: false,
+          });
+          if (!payload) return;
           var res = await fetch(window.location.href, {
             method: "POST",
             headers: {
@@ -2124,10 +2160,6 @@ var PD = (function () {
           });
           var data = await readJsonInlineSaveResponse(res);
           if (!data) return;
-          if (!res.ok || !data.ok) {
-            alert(data.error || "Не удалось сохранить.");
-            return;
-          }
           try {
             applyInlineUpdateResponseToDom(sid, data);
           } catch (domErr) {
@@ -2157,7 +2189,11 @@ var PD = (function () {
       }
       var sidOne = slugMatch[1];
       var setupTab = root.querySelector('.product-tab[data-tab="' + tabSlug + '"]');
-      var payloadOne = buildInlineSetupPayload(sidOne, panel, true);
+      var payloadOne = buildInlineSetupPayload(sidOne, panel, {
+        productMeta: true,
+        planSync: false,
+      });
+      if (!payloadOne) return;
       var resOne = await fetch(window.location.href, {
         method: "POST",
         headers: {
@@ -2169,10 +2205,6 @@ var PD = (function () {
       });
       var dataOne = await readJsonInlineSaveResponse(resOne);
       if (!dataOne) return;
-      if (!resOne.ok || !dataOne.ok) {
-        alert(dataOne.error || "Не удалось сохранить.");
-        return;
-      }
       try {
         applyInlineUpdateResponseToDom(sidOne, dataOne);
         if (setupTab) updateSetupTabLabelFromResponse(setupTab, dataOne);
@@ -2884,45 +2916,50 @@ var PD = (function () {
     }
 
     function renderSetupProgramFilesList(panel, setupId, data) {
-      if (!data || !panel) return;
-      var wrap = panel.querySelector('.setup-program-files-inline[data-setup-id="' + setupId + '"]');
-      if (!wrap) return;
-      var ul = wrap.querySelector(".setup-program-files-list");
-      if (!ul) return;
+      if (!data || !setupId) return;
+      var wraps = document.querySelectorAll('.setup-program-files-inline[data-setup-id="' + setupId + '"]');
+      if (!wraps.length) return;
+      var editMode =
+        !!(panel && panel.getAttribute("data-inline-edit-mode") === "1") ||
+        !!root.querySelector('.product-tab-panel[data-inline-edit-mode="1"]') ||
+        document.body.classList.contains("setup-inline-edit-enabled");
       var files = data.program_files || [];
-      var editMode = panel.getAttribute("data-inline-edit-mode") === "1";
-      ul.textContent = "";
-      if (!files.length) {
-        var li0 = document.createElement("li");
-        li0.className = "setup-program-file-empty muted";
-        li0.textContent = "—";
-        ul.appendChild(li0);
-      } else {
-        files.forEach(function (f) {
-          var li = document.createElement("li");
-          li.className = "setup-program-file-item";
-          li.setAttribute("data-program-file-id", String(f.id));
-          var a = document.createElement("a");
-          a.href = f.url || "#";
-          a.setAttribute("download", "");
-          a.className = "setup-program-file-link";
-          a.textContent = f.name || "";
-          li.appendChild(a);
-          if (editMode) {
-            var del = document.createElement("button");
-            del.type = "button";
-            del.className = "btn btn-ghost setup-program-file-delete js-setup-program-file-delete";
-            del.setAttribute("data-program-file-id", String(f.id));
-            del.setAttribute("data-setup-id", String(setupId));
-            del.title = "Удалить файл";
-            del.setAttribute("aria-label", "Удалить файл программы");
-            del.innerHTML = '<i class="fi fi-br-cross ui-icon" aria-hidden="true"></i>';
-            li.appendChild(del);
-          }
-          ul.appendChild(li);
-        });
-      }
-      var emptyMsg = panel.querySelector(".setup-program-tab-empty-msg");
+      wraps.forEach(function (wrap) {
+        var ul = wrap.querySelector(".setup-program-files-list");
+        if (!ul) return;
+        var isSide = wrap.classList.contains("product-side-program-files");
+        ul.textContent = "";
+        if (!files.length) {
+          /* пустой список — текст в .setup-program-tab-empty-msg */
+        } else {
+          files.forEach(function (f) {
+            var li = document.createElement("li");
+            li.className = "setup-program-file-item" + (isSide ? " setup-program-file-item-side" : "");
+            li.setAttribute("data-program-file-id", String(f.id));
+            var a = document.createElement("a");
+            a.href = f.url || "#";
+            a.setAttribute("download", "");
+            a.className = isSide ? "btn product-btn-program setup-side-program-download" : "setup-program-file-link";
+            a.textContent = f.name || "";
+            li.appendChild(a);
+            if (editMode) {
+              var del = document.createElement("button");
+              del.type = "button";
+              del.className = "btn btn-ghost setup-program-file-delete js-setup-program-file-delete";
+              del.setAttribute("data-program-file-id", String(f.id));
+              del.setAttribute("data-setup-id", String(setupId));
+              del.title = "Удалить файл";
+              del.setAttribute("aria-label", "Удалить файл программы");
+              del.innerHTML = '<i class="fi fi-br-cross ui-icon" aria-hidden="true"></i>';
+              li.appendChild(del);
+            }
+            ul.appendChild(li);
+          });
+        }
+      });
+      var emptyMsg = document.querySelector(
+        '.product-side-program-files[data-setup-id="' + setupId + '"] .setup-program-tab-empty-msg'
+      );
       if (emptyMsg) emptyMsg.hidden = files.length > 0;
     }
 
@@ -2960,6 +2997,11 @@ var PD = (function () {
         var setupId = input.getAttribute("data-setup-program-input") || "";
         if (!setupId) return;
         var panel = input.closest(".product-tab-panel");
+        if (!panel) {
+          var activeTabBtn = root.querySelector(".product-tab.is-active");
+          var tabSlug = activeTabBtn ? activeTabBtn.getAttribute("data-tab") : "";
+          if (tabSlug) panel = root.querySelector('.product-tab-panel[data-panel="' + tabSlug + '"]');
+        }
         await uploadSetupProgramFile(setupId, file, panel);
         input.value = "";
     }

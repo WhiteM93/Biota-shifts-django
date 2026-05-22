@@ -1207,6 +1207,75 @@ html[data-theme="dawn"] {
     color: var(--bio-body-fg);
     text-decoration: underline;
   }
+  .product-side-programs {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .product-side-program-files[hidden] {
+    display: none !important;
+  }
+  .product-side-program-files .setup-program-meta-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+  }
+  .product-side-program-files .setup-program-tab-empty-msg {
+    margin: 0;
+    font-size: 13px;
+    text-align: center;
+  }
+  .product-side-program-files .setup-program-files-list-side {
+    gap: 6px;
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  .setup-program-file-item-side {
+    align-items: stretch;
+    gap: 6px;
+    position: relative;
+  }
+  .product-side-program-files .setup-side-program-download {
+    background: linear-gradient(180deg, var(--bio-btn-primary-bg1) 0%, var(--bio-btn-primary-bg2) 100%);
+    border: 1px solid var(--bio-nav-refresh-border);
+    color: #fff;
+    border-radius: 8px;
+    box-shadow: var(--bio-btn-sm-shadow);
+    padding: 8px 10px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .product-side-program-files .setup-side-program-download:hover,
+  .product-side-program-files .setup-side-program-download:focus {
+    filter: brightness(1.06);
+    color: #fff;
+  }
+  .product-side-program-files .js-setup-program-file-delete {
+    display: none !important;
+  }
+  .setup-inline-edit-enabled .product-side-program-files .js-setup-program-file-delete {
+    display: inline-flex !important;
+  }
+  .setup-program-file-item-side .setup-program-file-delete {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+  }
+  .product-side-program-files .setup-program-upload-wrap {
+    display: none;
+    flex: 0 0 100%;
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+  }
+  .setup-inline-edit-enabled .product-side-program-files .setup-program-upload-wrap {
+    display: inline-flex;
+  }
   .setup-program-upload-wrap {
     display: inline-flex;
     align-items: center;
@@ -3498,6 +3567,7 @@ html[data-theme="dawn"] .product-drawing-description:focus {
 
 #product-detail-side #product-cad-block,
 #product-detail-side #product-downloads-block,
+#product-detail-side .product-side-program-files,
 #product-detail-side .product-side-notes-panel {
   background: var(--pd-glass-bg);
   border: 1px solid var(--pd-glass-border);
@@ -3511,6 +3581,7 @@ html[data-theme="dawn"] .product-drawing-description:focus {
 
 #product-detail-side #product-cad-block:hover,
 #product-detail-side #product-downloads-block:hover,
+#product-detail-side .product-side-program-files:hover,
 #product-detail-side .product-side-notes-panel:hover {
   border-color: rgba(var(--pd-accent-rgb), 0.22);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
@@ -3554,6 +3625,17 @@ html[data-theme="dawn"] .product-drawing-description:focus {
 #product-detail-side #product-downloads-block::before {
   display: block;
   content: "Файлы";
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--pd-text-muted);
+  margin: 0 0 14px;
+}
+
+#product-detail-side .product-side-program-files::before {
+  display: block;
+  content: "Программы";
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;

@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=19">
+<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=22">
 <div class="product-detail-grid{% if tab_default == 'drawing' %} has-meta-column{% endif %}"{% if setups %} data-product-has-setups="1"{% endif %}>
   <div class="product-detail-main">
 
@@ -43,6 +43,7 @@
       <span class="nav-spacer" style="flex:1 1 auto;"></span>
       <a href="#" class="btn btn-ghost" id="setup-export-specs-btn" target="_blank" rel="noopener" hidden>PDF параметры</a>
       <a href="#" class="btn btn-ghost" id="setup-export-photos-btn" target="_blank" rel="noopener" hidden>PDF фото 3x5</a>
+      <a href="#" download class="btn btn-ghost product-btn-program" id="product-program-download" hidden>Скачать программу</a>
       <button type="button" class="btn product-btn-edit-mode" id="setup-inline-edit-btn">Быстрое редактирование</button>
       {% endif %}
     </div>
@@ -358,9 +359,6 @@
           <button type="button" class="btn btn-ghost js-add-empty-photo-block" data-setup-id="{{ setup.pk }}">+ Блок фото</button>
         </div>
         {% endif %}
-        {% if not setup.has_any_program %}
-        <p class="muted setup-program-tab-empty-msg">Программы не загружены.</p>
-        {% endif %}
       </section>
       {% endfor %}
 
@@ -457,7 +455,7 @@
   "tool_type_choices": [{% for v, lbl in tool_type_choices %}{"value":"{{ v|escapejs }}","label":"{{ lbl|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
 }</script>
 <script src="{% static 'shifts/js/plan-cascade-form.js' %}" defer></script>
-<script src="{% static 'shifts/js/product_detail.js' %}?v=18" defer></script>
+<script src="{% static 'shifts/js/product_detail.js' %}?v=23" defer></script>
 
 {% if cad_inline_preview or has_setup_preview_stl %}
 <script type="importmap">
