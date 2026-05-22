@@ -61,6 +61,28 @@ def _schedule_dir() -> Path:
 
 SCHEDULE_DIR = _schedule_dir()
 
+
+def _inventory_backup_dir() -> Path:
+    """Папка резервных копий склада: env BIOTA_INVENTORY_BACKUP_DIR или ./inventory_backups."""
+    override = (os.getenv("BIOTA_INVENTORY_BACKUP_DIR") or "").strip()
+    p = Path(override) if override else (APP_DIR / "inventory_backups")
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+INVENTORY_BACKUP_DIR = _inventory_backup_dir()
+
+
+def _regulations_backup_dir() -> Path:
+    """Папка резервных копий регламентов: env BIOTA_REGULATIONS_BACKUP_DIR или ./regulations_backups."""
+    override = (os.getenv("BIOTA_REGULATIONS_BACKUP_DIR") or "").strip()
+    p = Path(override) if override else (APP_DIR / "regulations_backups")
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+REGULATIONS_BACKUP_DIR = _regulations_backup_dir()
+
 ADMIN_USERNAME = _config_str("BIOTA_ADMIN_USERNAME", "admin") or "admin"
 _users_env = (os.getenv("BIOTA_USERS_STORE") or "").strip()
 USERS_STORE_PATH = Path(_users_env) if _users_env else (APP_DIR / ".biota_users.json")

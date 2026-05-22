@@ -9,7 +9,7 @@ from django.views.decorators.http import require_http_methods
 from django.http import HttpResponse
 
 from biota_shifts import db as biota_db
-from biota_shifts.config import SCHEDULE_DIR
+from biota_shifts.config import INVENTORY_BACKUP_DIR, REGULATIONS_BACKUP_DIR, SCHEDULE_DIR
 from biota_shifts.auth import (
     ADMIN_USERNAME,
     NAV_KEYS,
@@ -386,5 +386,254 @@ def schedule_backup_download(request, filename: str):
     # Отправляем файл
     with open(backup_path, "rb") as f:
         response = HttpResponse(f.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+
+@biota_login_required
+@require_http_methods(["GET", "POST"])
+def inventory_backups_view(request):
+    """Управление резервными копиями склада (JSON)."""
+    from shifts.inventory_backup import (
+        InventoryBackupError,
+        backup_filename_now,
+        export_inventory_payload,
+        is_safe_backup_filename,
+        list_backup_files,
+        parse_inventory_backup_bytes,
+        restore_inventory_from_payload,
+        write_backup_file,
+    )
+
+    if not _is_admin(biota_user(request)):
+        messages.error(request, "Доступ запрещен")
+        return redirect("/cabinet/")
+
+    backups_dir = INVENTORY_BACKUP_DIR
+
+    if request.method == "POST":
+        action = request.POST.get("action", "").strip()
+
+        if action == "upload":
+            uploaded_file = request.FILES.get("backup_file")
+            if not uploaded_file:
+                messages.error(request, "Выберите файл для загрузки")
+                return redirect("/cabinet/inventory-backups/")
+
+            if not uploaded_file.name.endswith(".json"):
+                messages.error(request, "Файл должен быть в формате .json")
+                return redirect("/cabinet/inventory-backups/")
+
+            try:
+                raw = uploaded_file.read()
+                parse_inventory_backup_bytes(raw)
+                safe_name = uploaded_file.name
+                if not is_safe_backup_filename(safe_name):
+                    safe_name = backup_filename_now()
+                backup_path = backups_dir / safe_name
+                backup_path.write_bytes(raw)
+                messages.success(request, f"Резервная копия загружена: {safe_name}")
+            except InventoryBackupError as exc:
+                messages.error(request, str(exc))
+            except Exception as exc:
+                messages.error(request, f"Ошибка при загрузке: {exc}")
+
+            return redirect("/cabinet/inventory-backups/")
+
+        if action == "backup_now":
+            try:
+                path = write_backup_file(backups_dir)
+                payload = export_inventory_payload()
+                tools_n = len(payload["tool_items"])
+                messages.success(
+                    request,
+                    f"Резервная копия склада создана: {path.name} ({tools_n} позиций инструмента)",
+                )
+            except Exception as exc:
+                messages.error(request, f"Ошибка при создании резервной копии: {exc}")
+
+            return redirect("/cabinet/inventory-backups/")
+
+        if action == "restore":
+            backup_filename = request.POST.get("backup_filename", "").strip()
+            if not is_safe_backup_filename(backup_filename):
+                messages.error(request, "Некорректное имя файла")
+                return redirect("/cabinet/inventory-backups/")
+
+            backup_path = backups_dir / backup_filename
+            if not backup_path.exists() or not backup_path.is_file():
+                messages.error(request, "Резервная копия не найдена")
+                return redirect("/cabinet/inventory-backups/")
+
+            try:
+                write_backup_file(backups_dir, filename=f"inventory_before_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+                raw = backup_path.read_bytes()
+                payload = parse_inventory_backup_bytes(raw)
+                stats = restore_inventory_from_payload(payload)
+                messages.success(
+                    request,
+                    "Склад восстановлен из резервной копии: "
+                    f"{stats['tools']} позиций, {stats['movements']} движений, "
+                    f"{stats['purchases']} заявок на закупку.",
+                )
+            except InventoryBackupError as exc:
+                messages.error(request, str(exc))
+            except Exception as exc:
+                messages.error(request, f"Ошибка при восстановлении: {exc}")
+
+            return redirect("/cabinet/inventory-backups/")
+
+    backups = list_backup_files(backups_dir)
+    ctx = {
+        "backups": backups,
+        "backups_count": len(backups),
+        "backups_dir": str(backups_dir.resolve()),
+    }
+    return render(request, "shifts/inventory_backups.html", ctx)
+
+
+@biota_login_required
+@require_http_methods(["GET"])
+def inventory_backup_download(request, filename: str):
+    """Скачать резервную копию склада на диск / флешку."""
+    from shifts.inventory_backup import is_safe_backup_filename
+
+    if not _is_admin(biota_user(request)):
+        return HttpResponse("Доступ запрещен", status=403)
+
+    if not is_safe_backup_filename(filename):
+        return HttpResponse("Некорректное имя файла", status=400)
+
+    backup_path = INVENTORY_BACKUP_DIR / filename
+    if not backup_path.exists() or not backup_path.is_file():
+        return HttpResponse("Файл не найден", status=404)
+
+    with open(backup_path, "rb") as f:
+        response = HttpResponse(f.read(), content_type="application/json; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+
+@biota_login_required
+@require_http_methods(["GET", "POST"])
+def regulations_backups_view(request):
+    """Управление резервными копиями регламентов (JSON)."""
+    from regulations.regulations_backup import (
+        RegulationsBackupError,
+        backup_filename_now,
+        export_regulations_payload,
+        is_safe_backup_filename,
+        list_backup_files,
+        parse_regulations_backup_bytes,
+        restore_regulations_from_payload,
+        write_backup_file,
+    )
+
+    if not _is_admin(biota_user(request)):
+        messages.error(request, "Доступ запрещен")
+        return redirect("/cabinet/")
+
+    backups_dir = REGULATIONS_BACKUP_DIR
+
+    if request.method == "POST":
+        action = request.POST.get("action", "").strip()
+
+        if action == "upload":
+            uploaded_file = request.FILES.get("backup_file")
+            if not uploaded_file:
+                messages.error(request, "Выберите файл для загрузки")
+                return redirect("/cabinet/regulations-backups/")
+
+            if not uploaded_file.name.endswith(".json"):
+                messages.error(request, "Файл должен быть в формате .json")
+                return redirect("/cabinet/regulations-backups/")
+
+            try:
+                raw = uploaded_file.read()
+                parse_regulations_backup_bytes(raw)
+                safe_name = uploaded_file.name
+                if not is_safe_backup_filename(safe_name):
+                    safe_name = backup_filename_now()
+                backup_path = backups_dir / safe_name
+                backup_path.write_bytes(raw)
+                messages.success(request, f"Резервная копия загружена: {safe_name}")
+            except RegulationsBackupError as exc:
+                messages.error(request, str(exc))
+            except Exception as exc:
+                messages.error(request, f"Ошибка при загрузке: {exc}")
+
+            return redirect("/cabinet/regulations-backups/")
+
+        if action == "backup_all":
+            try:
+                path = write_backup_file(backups_dir)
+                payload = export_regulations_payload()
+                plans_n = len(payload["regulation_plans"])
+                messages.success(
+                    request,
+                    f"Резервная копия регламентов создана: {path.name} ({plans_n} записей)",
+                )
+            except Exception as exc:
+                messages.error(request, f"Ошибка при создании резервных копий: {exc}")
+
+            return redirect("/cabinet/regulations-backups/")
+
+        if action == "restore":
+            backup_filename = request.POST.get("backup_filename", "").strip()
+            if not is_safe_backup_filename(backup_filename):
+                messages.error(request, "Некорректное имя файла")
+                return redirect("/cabinet/regulations-backups/")
+
+            backup_path = backups_dir / backup_filename
+            if not backup_path.exists() or not backup_path.is_file():
+                messages.error(request, "Резервная копия не найдена")
+                return redirect("/cabinet/regulations-backups/")
+
+            try:
+                write_backup_file(
+                    backups_dir,
+                    filename=f"regulations_before_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                )
+                raw = backup_path.read_bytes()
+                payload = parse_regulations_backup_bytes(raw)
+                stats = restore_regulations_from_payload(payload)
+                messages.success(
+                    request,
+                    f"Регламенты восстановлены из резервной копии: {stats['plans']} записей.",
+                )
+            except RegulationsBackupError as exc:
+                messages.error(request, str(exc))
+            except Exception as exc:
+                messages.error(request, f"Ошибка при восстановлении: {exc}")
+
+            return redirect("/cabinet/regulations-backups/")
+
+    backups = list_backup_files(backups_dir)
+    ctx = {
+        "backups": backups,
+        "backups_count": len(backups),
+        "backups_dir": str(backups_dir.resolve()),
+    }
+    return render(request, "shifts/regulations_backups.html", ctx)
+
+
+@biota_login_required
+@require_http_methods(["GET"])
+def regulations_backup_download(request, filename: str):
+    """Скачать резервную копию регламентов."""
+    from regulations.regulations_backup import is_safe_backup_filename
+
+    if not _is_admin(biota_user(request)):
+        return HttpResponse("Доступ запрещен", status=403)
+
+    if not is_safe_backup_filename(filename):
+        return HttpResponse("Некорректное имя файла", status=400)
+
+    backup_path = REGULATIONS_BACKUP_DIR / filename
+    if not backup_path.exists() or not backup_path.is_file():
+        return HttpResponse("Файл не найден", status=404)
+
+    with open(backup_path, "rb") as f:
+        response = HttpResponse(f.read(), content_type="application/json; charset=utf-8")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response

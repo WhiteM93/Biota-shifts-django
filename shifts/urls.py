@@ -49,6 +49,18 @@ urlpatterns = [
     path("cabinet/", cabinet_views.cabinet_view, name="cabinet"),
     path("cabinet/backups/", cabinet_views.schedule_backups_view, name="schedule_backups"),
     path("cabinet/backups/download/<str:filename>/", cabinet_views.schedule_backup_download, name="schedule_backup_download"),
+    path("cabinet/inventory-backups/", cabinet_views.inventory_backups_view, name="inventory_backups"),
+    path(
+        "cabinet/inventory-backups/download/<str:filename>/",
+        cabinet_views.inventory_backup_download,
+        name="inventory_backup_download",
+    ),
+    path("cabinet/regulations-backups/", cabinet_views.regulations_backups_view, name="regulations_backups"),
+    path(
+        "cabinet/regulations-backups/download/<str:filename>/",
+        cabinet_views.regulations_backup_download,
+        name="regulations_backup_download",
+    ),
     path("refresh-cache/", views.refresh_db_cache, name="refresh_cache"),
     path("accounts/login/", views.login_view, name="login"),
     path("accounts/register/", views.register_view, name="register"),

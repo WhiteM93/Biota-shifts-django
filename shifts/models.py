@@ -815,6 +815,31 @@ class UserInventoryStockFilterPrefs(models.Model):
         return self.username
 
 
+class UserHomeLowStockPrefs(models.Model):
+    """Порог и тип инструмента для блока «Мало на складе» на главной."""
+
+    username = models.CharField(max_length=200, unique=True, db_index=True, verbose_name="Аккаунт")
+    category = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        verbose_name="Категория (пусто — все)",
+    )
+    max_qty = models.PositiveSmallIntegerField(
+        default=10,
+        verbose_name="Показывать остаток меньше (шт.)",
+    )
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        verbose_name = "Главная: фильтр мало на складе"
+        verbose_name_plural = "Главная: фильтры мало на складе"
+
+    def __str__(self) -> str:
+        cat = self.category or "все"
+        return f"{self.username} · {cat} · <{self.max_qty}"
+
+
 DEFECT_PAYROLL_ADJUST_KIND_CHOICES = [
     ("bonus_percent", "Премия, % от начисления по табелю"),
     ("bonus_rub", "Премия, ₽ (фикс)"),

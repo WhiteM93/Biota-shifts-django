@@ -24,7 +24,7 @@ from biota_shifts import schedule as biota_schedule
 from biota_shifts.schedule import employee_label_row
 
 from .auth_utils import biota_login_required, biota_user, post_login_redirect, write_permission_required
-from .models import ToolItem
+from .home_low_stock import apply_home_low_stock_context
 
 
 def _df_columns_rows(df: pd.DataFrame):
@@ -163,18 +163,21 @@ def home_view(request):
     }
 
     can_inventory = nav_permissions_for_user(user or "").get("inventory", True)
-    if can_inventory:
-        ctx["low_stock_items"] = list(
-            ToolItem.objects.filter(quantity__lt=10)
-            .select_related("end_mill_spec", "tap_spec")
-            .order_by("quantity", "category", "name")[:100]
+
+    def _render_home():
+        apply_home_low_stock_context(
+            ctx,
+            username=user,
+            query=request.GET,
+            can_inventory=can_inventory,
         )
+        return render(request, "shifts/home.html", ctx)
 
     if employees_df.empty:
         ctx["dashboard_error"] = (
             "Нет сотрудников для сводки — проверьте права доступа или справочник в БД."
         )
-        return render(request, "shifts/home.html", ctx)
+        return _render_home()
 
     ref_emp = biota_logic.normalize_emp_code(employees_df.iloc[0]["emp_code"]) or str(
         employees_df.iloc[0]["emp_code"]
@@ -182,7 +185,7 @@ def home_view(request):
     year_options = biota_db.merged_year_options(cfg, ref_emp)
     if not year_options:
         ctx["dashboard_error"] = "Не удалось получить список годов (графики и БД)."
-        return render(request, "shifts/home.html", ctx)
+        return _render_home()
 
     now = datetime.now()
     try:
@@ -204,7 +207,7 @@ def home_view(request):
     ctx["month_name"] = MONTH_NAMES_RU[m]
 
     if not nav_permissions_for_user(user or "").get("skud", True):
-        return render(request, "shifts/home.html", ctx)
+        return _render_home()
 
     _month_home = date(y, m, 1)
     _sd_h, _ed_h = biota_schedule.month_bounds(_month_home)
@@ -212,7 +215,7 @@ def home_view(request):
         _sched_home = biota_schedule.load_schedule_table(employees_df, y, m)
     except Exception as exc:
         ctx["dashboard_error"] = f"Не удалось загрузить график: {exc}"
-        return render(request, "shifts/home.html", ctx)
+        return _render_home()
 
     _emp_m = employees_df.copy()
     _emp_m["emp_code"] = _emp_m["emp_code"].map(biota_logic.normalize_emp_code)
@@ -221,7 +224,7 @@ def home_view(request):
     _codes_all = _emp_m["emp_code"].tolist()
     if not _codes_all:
         ctx["dashboard_error"] = "Нет ни одного кода сотрудника после нормализации — проверьте emp_code в БД."
-        return render(request, "shifts/home.html", ctx)
+        return _render_home()
 
     try:
         _per_emp = biota_logic.late_early_minutes_per_employee_month(
@@ -229,7 +232,7 @@ def home_view(request):
         )
     except Exception as exc:
         ctx["dashboard_error"] = f"Не удалось построить сводку: {exc}"
-        return render(request, "shifts/home.html", ctx)
+        return _render_home()
 
     _merged = _emp_m.merge(_per_emp, on="emp_code", how="left")
     _merged["Опоздания (мин)"] = _merged["Опоздания (мин)"].fillna(0).astype(int)
@@ -263,7 +266,7 @@ def home_view(request):
     ctx["top10_rows"] = tr
     ctx["top10_empty"] = _top10.empty
 
-    return render(request, "shifts/home.html", ctx)
+    return _render_home()
 
 
 @biota_login_required

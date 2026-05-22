@@ -9,21 +9,23 @@
 
   <header class="cabinet-hero">
     <p class="cabinet-hero__eyebrow">Резервное копирование</p>
-    <h1>Графики смен</h1>
-    <p class="cabinet-section__lead" style="margin:0;color:var(--bio-muted);">Excel-файлы <code>schedule_YYYY_MM.xlsx</code> — создайте копию, скачайте на флешку или восстановите при сбое.</p>
+    <h1>Регламенты</h1>
+    <p class="cabinet-section__lead" style="margin:0;color:var(--bio-muted);">
+      Данные регламентов (перерывы, ползунки, смены) хранятся в базе сайта. Копия — один JSON-файл: скачайте на флешку и восстановите при сбое.
+    </p>
   </header>
 
   <div class="cabinet-backup-toolbar">
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="backup_all">
-      <button type="submit" class="btn">📦 Создать копию всех графиков</button>
+      <button type="submit" class="btn">📦 Создать резервную копию регламентов</button>
     </form>
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
       <input type="hidden" name="action" value="upload">
       <label class="btn-upload">
-        <input type="file" name="backup_file" accept=".xlsx" onchange="this.form.submit();">
+        <input type="file" name="backup_file" accept=".json,application/json" onchange="this.form.submit();">
         📂 Загрузить с диска
       </label>
     </form>
@@ -52,8 +54,8 @@
               <td>{{ backup.size }}</td>
               <td>{{ backup.modified }}</td>
               <td class="actions">
-                <a href="{% url 'schedule_backup_download' backup.filename %}" class="btn btn-sm">⬇ Скачать</a>
-                <form method="post" style="display:inline;" onsubmit="return confirm('Восстановить график из этой копии? Текущий график будет перезаписан.');">
+                <a href="{% url 'regulations_backup_download' backup.filename %}" class="btn btn-sm">⬇ Скачать</a>
+                <form method="post" style="display:inline;" onsubmit="return confirm('Восстановить регламенты из этой копии? Текущие данные будут полностью заменены. Перед восстановлением создаётся страховочная копия.');">
                   {% csrf_token %}
                   <input type="hidden" name="action" value="restore">
                   <input type="hidden" name="backup_filename" value="{{ backup.filename }}">
@@ -66,7 +68,7 @@
         </table>
       </div>
       {% else %}
-      <p class="cabinet-empty-state">Копий пока нет. Нажмите «Создать копию всех графиков».</p>
+      <p class="cabinet-empty-state">Копий пока нет. Нажмите «Создать резервную копию регламентов».</p>
       {% endif %}
     </div>
   </section>
@@ -74,9 +76,10 @@
   <div class="cabinet-info-box">
     <strong>Как это работает</strong>
     <ul>
-      <li>Каждое сохранение графика также создаёт автокопию (хранятся последние ~20 на месяц)</li>
-      <li>При восстановлении текущий файл месяца полностью заменяется выбранной копией</li>
-      <li>Файлы на сервере: <code>schedules/backups/</code></li>
+      <li>В копию входят все записи регламентов: сотрудник, смена, окна перерывов, доп. ползунки, закрепление строки</li>
+      <li>«Скачать» сохраняет JSON на компьютер или флешку</li>
+      <li>При восстановлении текущие регламенты заменяются целиком; перед этим создаётся <code>regulations_before_restore_*.json</code></li>
+      <li>Файлы на сервере: <code>{{ backups_dir }}</code></li>
     </ul>
   </div>
 </div>
