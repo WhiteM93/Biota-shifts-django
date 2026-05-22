@@ -39,6 +39,10 @@ html[data-theme="dawn"] .calc-page {
   max-width: 1060px;
   margin: 0 auto;
   padding: 24px 18px 60px;
+  color-scheme: dark;
+}
+html[data-theme="dawn"] .calc-page {
+  color-scheme: light;
 }
 
 /* ── Шапка ── */
@@ -107,11 +111,11 @@ html[data-theme="dawn"] .calc-page {
   pointer-events: none;
 }
 
-/* ── Панель ── */
+/* ── Панель (без transform — иначе native <select> рисует список не под полем) ── */
 .calc-panel { animation: calcFadeIn 0.22s ease; }
 @keyframes calcFadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* ── Формула ── */
@@ -422,19 +426,59 @@ html[data-theme="dawn"] .calc-page {
 .calc-modes-toolbar {
   display: flex; align-items: flex-end; gap: 12px;
   flex-wrap: wrap; margin-bottom: 14px;
+  position: relative;
+  z-index: 3;
 }
 .calc-field-inline { display: flex; flex-direction: column; gap: 5px; min-width: 200px; }
-.calc-sel {
+.calc-modes-mode-field[hidden] {
+  display: none !important;
+}
+.calc-modes-mode-hint {
+  flex: 1 1 220px;
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--bio-text-muted);
   background: var(--bio-input-bg);
+  border: 1px solid var(--bio-input-border);
+  border-radius: 8px;
+}
+.calc-sel {
+  width: 100%;
+  min-height: 39px;
+  background-color: var(--bio-input-bg);
   border: 1.5px solid var(--bio-input-border);
   border-radius: 8px;
-  color: var(--bio-text);
+  color: var(--bio-input-fg);
   font-size: 14px;
-  padding: 8px 12px;
+  padding: 8px 36px 8px 12px;
   box-sizing: border-box;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239bb0d8' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
 }
-.calc-sel:focus { outline: none; border-color: var(--ca); box-shadow: 0 0 0 3px var(--ca-glow); }
+html[data-theme="dawn"] .calc-sel {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6258' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
+}
+.calc-sel:hover {
+  border-color: var(--bio-input-hover-border);
+  background-color: var(--bio-input-focus-bg);
+}
+.calc-sel:focus {
+  outline: none;
+  border-color: var(--bio-input-focus-border);
+  box-shadow: 0 0 0 3px var(--bio-input-focus-ring);
+  background-color: var(--bio-input-focus-bg);
+}
+.calc-sel option {
+  background: var(--bio-input-bg);
+  color: var(--bio-input-fg);
+}
 .calc-add-btn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 8px 18px;
@@ -451,27 +495,38 @@ html[data-theme="dawn"] .calc-page {
 
 /* ── Таблица режимов ── */
 .calc-modes-table-wrap {
-  overflow-x: auto;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
+  overflow: visible;
+  background: var(--bio-input-bg);
+  border: 1px solid var(--bio-input-border);
   border-radius: 14px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  position: relative;
+  z-index: 1;
+}
+.calc-modes-table-scroll {
+  overflow-x: auto;
+  border-radius: inherit;
 }
 .calc-modes-table {
   width: 100%; border-collapse: collapse; min-width: 540px;
+}
+.calc-modes-table--mill {
+  min-width: 1080px;
 }
 .calc-modes-table thead th {
   font-size: 11px; font-weight: 600;
   text-transform: uppercase; letter-spacing: .06em;
   color: var(--bio-text-muted);
   padding: 12px 12px 10px;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--bio-input-border);
+  background: color-mix(in srgb, var(--bio-input-focus-border) 8%, var(--bio-input-bg));
   white-space: nowrap; text-align: left;
 }
 .calc-modes-table tbody tr {
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--bio-input-border);
   animation: rowSlideIn 0.22s ease;
+}
+.calc-modes-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--bio-input-focus-border) 4%, transparent);
 }
 .calc-modes-table tbody tr:last-child { border-bottom: none; }
 @keyframes rowSlideIn {
@@ -479,22 +534,53 @@ html[data-theme="dawn"] .calc-page {
   to   { opacity: 1; transform: translateX(0); }
 }
 .calc-modes-table td { padding: 8px 12px; vertical-align: middle; }
+.mc-type  { min-width: 130px; }
 .mc-dim   { width: 76px; }
 .mc-mat   { width: 120px; }
 .mc-pitch { width: 100px; }
-.mc-n     { width: 110px; }
-.mc-f     { width: 110px; }
+.mc-n     { width: 100px; }
+.mc-f     { width: 100px; }
+.mc-mill-d    { width: 72px; }
+.mc-mill-z    { width: 56px; }
+.mc-mill-feed { width: 96px; }
+.mc-mill-ae   { width: 80px; }
+.mc-mill-ap   { width: 80px; }
+.mc-mill-op   { min-width: 108px; }
 .mc-del   { width: 40px; }
 
 .mc-inp {
   width: 100%; box-sizing: border-box;
-  background: transparent;
-  border: 1.5px solid transparent;
+  background: var(--bio-input-bg);
+  border: 1.5px solid var(--bio-input-border);
   border-radius: 7px;
-  color: var(--bio-text);
+  color: var(--bio-input-fg);
   font-size: 13px; padding: 5px 8px;
   transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
   -moz-appearance: textfield;
+}
+select.mc-inp {
+  cursor: pointer;
+  padding-right: 28px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%239bb0d8' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+html[data-theme="dawn"] select.mc-inp {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6258' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
+}
+select.mc-inp option {
+  background: var(--bio-input-bg);
+  color: var(--bio-input-fg);
+}
+input.mc-inp:not([type="number"]) {
+  background: transparent;
+  border-color: transparent;
+}
+input.mc-inp[type="number"] {
+  background: var(--bio-input-bg);
+  border-color: var(--bio-input-border);
 }
 .mc-inp::-webkit-outer-spin-button,
 .mc-inp::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -505,8 +591,10 @@ html[data-theme="dawn"] .calc-page {
   box-shadow: 0 0 0 3px var(--ca-glow);
 }
 .mc-inp:hover:not(:focus) {
+  border-color: var(--bio-input-hover-border);
+}
+input.mc-inp:hover:not(:focus) {
   background: var(--bio-input-bg);
-  border-color: var(--bio-input-border);
 }
 .mc-f-cell {
   font-size: 15px; font-weight: 800;

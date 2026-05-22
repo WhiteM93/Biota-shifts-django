@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import pandas as pd
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
@@ -127,6 +127,16 @@ def _load_schedule_for_user(request, year: int, month: int) -> pd.DataFrame:
 @nav_permission_required("graph")
 @require_http_methods(["GET"])
 def graph_mobile_view(request):
+    from .graph_device import (
+        clear_desktop_graph_cookie,
+        desktop_graph_url,
+        prefers_desktop_graph,
+        prefers_mobile_graph,
+    )
+
+    if prefers_desktop_graph(request) and not prefers_mobile_graph(request):
+        return redirect(desktop_graph_url(request))
+
     try:
         selected = _parse_selected_date(request)
         year, month = selected.year, selected.month
@@ -229,7 +239,7 @@ def graph_mobile_view(request):
             }
         )
 
-    return render(
+    resp = render(
         request,
         "shifts/graph_mobile.html",
         {
@@ -245,8 +255,11 @@ def graph_mobile_view(request):
             "night_shift_count": night_shift_count,
             "groups": groups,
             "has_day_column": bool(selected_col),
-            "desktop_graph_url": f"{reverse('graph')}?year={year}&month={month}",
+            "desktop_graph_url": desktop_graph_url(request, year=year, month=month),
             "month_picker_year": picker_year,
             "month_picker_choices": month_picker_choices,
         },
     )
+    if prefers_mobile_graph(request):
+        clear_desktop_graph_cookie(resp)
+    return resp

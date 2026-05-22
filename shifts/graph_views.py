@@ -214,6 +214,25 @@ def _sort_graph_rows(
 @write_permission_required
 @require_http_methods(["GET", "POST"])
 def graph_view(request):
+    if request.method == "GET":
+        from .graph_device import (
+            apply_desktop_graph_query_redirect,
+            is_mobile_user_agent,
+            prefers_desktop_graph,
+            prefers_mobile_graph,
+            redirect_to_mobile_graph,
+        )
+
+        if prefers_mobile_graph(request):
+            return redirect_to_mobile_graph(request)
+
+        desk_redirect = apply_desktop_graph_query_redirect(request)
+        if desk_redirect is not None:
+            return desk_redirect
+
+        if is_mobile_user_agent(request) and not prefers_desktop_graph(request):
+            return redirect_to_mobile_graph(request)
+
     now = datetime.now()
     default_y, default_m = now.year, now.month
     try:

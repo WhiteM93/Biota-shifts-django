@@ -2,7 +2,8 @@
 {% load static %}
 
 {% block content %}
-<script type="application/json" id="calc-products-json">{{ products_json }}</script>
+<script type="application/json" id="calc-products-json">{{ products_json|safe }}</script>
+<script type="application/json" id="calc-cutting-modes-json">{{ cutting_modes_json|safe }}</script>
 
 <div class="calc-page">
 
@@ -225,29 +226,35 @@
   ══════════════════════════════════════ -->
   <div class="calc-panel" id="calc-panel-modes" hidden>
 
-    <!-- Формула F = n × p -->
-    <div class="calc-formula-card calc-formula-card--modes">
-      <div class="calc-formula-label">Формула подачи</div>
-      <div class="calc-formula-body">
-        <span class="cf-result">F</span>
-        <span class="cf-eq">=</span>
-        <span class="cf-term">n</span>
-        <span class="cf-op">×</span>
-        <span class="cf-term">p</span>
+    <div class="calc-formula-card calc-formula-card--modes" id="m-formula-card">
+      <div id="m-formula-thread">
+        <div class="calc-formula-label">Формула подачи (резьба)</div>
+        <div class="calc-formula-body">
+          <span class="cf-result">F</span>
+          <span class="cf-eq">=</span>
+          <span class="cf-term">n</span>
+          <span class="cf-op">×</span>
+          <span class="cf-term">p</span>
+        </div>
+        <div class="calc-formula-desc">
+          подача (мм/мин) = обороты (об/мин) × шаг резьбы (мм)
+        </div>
       </div>
-      <div class="calc-formula-desc">
-        подача (мм/мин) = обороты (об/мин) × шаг резьбы (мм)
+      <div id="m-formula-mill" hidden>
+        <div class="calc-formula-label">Режимы фрезерования</div>
+        <div class="calc-formula-desc">
+          Обороты, подача и глубины (ae / ap) задаются в строке. Типы фрез — со склада.
+        </div>
       </div>
     </div>
 
     <!-- Шапка таблицы -->
     <div class="calc-modes-toolbar">
-      <div class="calc-field-inline">
-        <label class="calc-label">Тип инструмента</label>
-        <select id="m-tool-type" class="calc-sel">
-          <option value="tap">Метчик / Раскатник</option>
-        </select>
+      <div class="calc-field-inline calc-modes-mode-field" id="m-mode-field" hidden>
+        <label class="calc-label" for="m-tool-type">Режим расчёта</label>
+        <select id="m-tool-type" class="calc-sel calc-sel--toolbar" aria-label="Режим расчёта"></select>
       </div>
+      <p class="calc-modes-mode-hint" id="m-mode-hint"></p>
       <button type="button" class="calc-add-btn" id="m-add-row">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
@@ -258,20 +265,12 @@
 
     <!-- Таблица -->
     <div class="calc-modes-table-wrap">
+      <div class="calc-modes-table-scroll">
       <table class="calc-modes-table" id="m-table">
-        <thead>
-          <tr>
-            <th>Инструмент</th>
-            <th class="mc-dim">M</th>
-            <th class="mc-mat">Материал</th>
-            <th class="mc-pitch">Шаг p, мм</th>
-            <th class="mc-n">n, об/мин</th>
-            <th class="mc-f">F, мм/мин</th>
-            <th class="mc-del"></th>
-          </tr>
-        </thead>
+        <thead id="m-thead"></thead>
         <tbody id="m-tbody"></tbody>
       </table>
+      </div>
     </div>
 
     <div class="calc-modes-empty" id="m-empty-hint">
@@ -445,19 +444,236 @@
   /* ════════════════════════════════
      ВКЛАДКА 2 — РЕЖИМЫ РЕЗАНИЯ
   ════════════════════════════════ */
+  var CUTTING_MODES = (function () {
+    var fallback = {
+      modes: [
+        { id: "thread", label: "Резьба", form: "thread", tool_types: ["Метчик", "Раскатник", "Резьбофреза"] },
+        {
+          id: "end_mill", label: "Фрезы", form: "end_mill",
+          tool_types: ["Концевая фреза", "Обдирочная фреза", "Т-образная фреза", "Радиусная фреза", "Сферическая фреза"],
+          operation_types: [
+            { id: "rough", label: "Черновой" },
+            { id: "adaptive", label: "Адаптив" },
+            { id: "finish", label: "Чистовой" }
+          ],
+          tool_presets: {}
+        }
+      ],
+      materials: [
+        { id: "steel", label: "Сталь" },
+        { id: "steel_hard", label: "Сталь зак." },
+        { id: "alum", label: "Алюминий" },
+        { id: "cast_iron", label: "Чугун" },
+        { id: "brass", label: "Латунь" },
+        { id: "titan", label: "Нерж./Титан" }
+      ]
+    };
+    try {
+      var el = document.getElementById("calc-cutting-modes-json");
+      if (!el || !el.textContent.trim()) return fallback;
+      var data = JSON.parse(el.textContent);
+      if (!data.modes || !data.modes.length) return fallback;
+      return data;
+    } catch (e) { return fallback; }
+  })();
+
   var mAddBtn = document.getElementById("m-add-row");
   var mTbody  = document.getElementById("m-tbody");
+  var mThead  = document.getElementById("m-thead");
+  var mTable  = document.getElementById("m-table");
   var mEmpty  = document.getElementById("m-empty-hint");
-  var LS_KEY  = "calc_modes_tap_v2";
+  var mModeSel = document.getElementById("m-tool-type");
+  var mFormulaThread = document.getElementById("m-formula-thread");
+  var mFormulaMill = document.getElementById("m-formula-mill");
+  var currentModeId = (CUTTING_MODES.modes[0] && CUTTING_MODES.modes[0].id) || "thread";
+
+  function lsKey() { return "calc_modes_" + currentModeId + "_v4"; }
+
+  function currentMode() {
+    var modes = CUTTING_MODES.modes || [];
+    for (var i = 0; i < modes.length; i++) {
+      if (modes[i].id === currentModeId) return modes[i];
+    }
+    return modes[0] || null;
+  }
+
+  function isThreadForm() {
+    var m = currentMode();
+    return m && m.form === "thread";
+  }
+
+  function isMillForm() {
+    var m = currentMode();
+    return m && m.form === "end_mill";
+  }
+
+  var mModeField = document.getElementById("m-mode-field");
+  var mModeHint  = document.getElementById("m-mode-hint");
+
+  function initModeSelect() {
+    if (!mModeSel) return;
+    mModeSel.innerHTML = "";
+    (CUTTING_MODES.modes || []).forEach(function (m) {
+      var o = mk("option");
+      o.value = m.id;
+      o.textContent = m.label;
+      if (m.id === currentModeId) o.selected = true;
+      mModeSel.appendChild(o);
+    });
+  }
+
+  function syncModeToolbar() {
+    var modes = CUTTING_MODES.modes || [];
+    var mode = currentMode();
+    if (modes.length === 1 && mode) {
+      currentModeId = mode.id;
+      if (mModeField) mModeField.hidden = true;
+      if (mModeHint) {
+        mModeHint.hidden = false;
+        mModeHint.textContent = mode.hint || "";
+      }
+    } else if (modes.length > 1) {
+      if (mModeField) mModeField.hidden = false;
+      if (mModeHint) mModeHint.hidden = true;
+      initModeSelect();
+    } else {
+      if (mModeField) mModeField.hidden = true;
+      if (mModeHint) {
+        mModeHint.hidden = false;
+        mModeHint.textContent = "Нет режимов — добавьте инструменты на склад.";
+      }
+    }
+  }
+
+  function syncFormulaCard() {
+    if (mFormulaThread) mFormulaThread.hidden = !isThreadForm();
+    if (mFormulaMill) mFormulaMill.hidden = !isMillForm();
+  }
+
+  function buildThead() {
+    if (!mThead) return;
+    var tr = mk("tr");
+    var cols;
+    if (isThreadForm()) {
+      cols = [
+        { label: "Инструмент", cls: "mc-type" },
+        { label: "M", cls: "mc-dim" },
+        { label: "Материал", cls: "mc-mat" },
+        { label: "Шаг p, мм", cls: "mc-pitch" },
+        { label: "n, об/мин", cls: "mc-n" },
+        { label: "F, мм/мин", cls: "mc-f" },
+        { label: "", cls: "mc-del" }
+      ];
+    } else {
+      cols = [
+        { label: "Инструмент", cls: "mc-type" },
+        { label: "D, мм", cls: "mc-mill-d" },
+        { label: "Материал", cls: "mc-mat" },
+        { label: "Z", cls: "mc-mill-z" },
+        { label: "n, об/мин", cls: "mc-n" },
+        { label: "F, мм/мин", cls: "mc-mill-feed" },
+        { label: "ae, мм", cls: "mc-mill-ae" },
+        { label: "ap, мм", cls: "mc-mill-ap" },
+        { label: "Обработка", cls: "mc-mill-op" },
+        { label: "", cls: "mc-del" }
+      ];
+    }
+    cols.forEach(function (c) {
+      var th = mk("th");
+      if (c.cls) th.className = c.cls;
+      th.textContent = c.label;
+      tr.appendChild(th);
+    });
+    mThead.innerHTML = "";
+    mThead.appendChild(tr);
+  }
+
+  function applyTableFormClass() {
+    if (!mTable) return;
+    mTable.classList.toggle("calc-modes-table--thread", isThreadForm());
+    mTable.classList.toggle("calc-modes-table--mill", isMillForm());
+  }
 
   function syncEmpty() { mEmpty.hidden = mTbody.rows.length > 0; }
 
-  function calcRow(tr) {
+  function mk(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
+
+  function mkMatSelect(data) {
+    var matSel = mk("select", "mc-inp m-inp-mat");
+    (CUTTING_MODES.materials || []).forEach(function (pair) {
+      var o = mk("option"); o.value = pair.id; o.textContent = pair.label;
+      if (data && data.mat === pair.id) o.selected = true;
+      matSel.appendChild(o);
+    });
+    return matSel;
+  }
+
+  function mkTypeSelect(data) {
+    var sel = mk("select", "mc-inp m-inp-type");
+    var toolTypes = (currentMode() && currentMode().tool_types) || [];
+    toolTypes.forEach(function (v) {
+      var o = mk("option"); o.value = v; o.textContent = v;
+      if (data && data.type === v) o.selected = true;
+      sel.appendChild(o);
+    });
+    return sel;
+  }
+
+  function mkNumInp(cls, placeholder, val) {
+    var inp = mk("input", "mc-inp " + cls);
+    inp.type = "number";
+    inp.step = "any";
+    inp.min = "0";
+    inp.placeholder = placeholder;
+    if (val !== undefined && val !== null && val !== "") inp.value = val;
+    return inp;
+  }
+
+  function bindRowInputs(tr, inputs, onChange) {
+    inputs.forEach(function (el) {
+      el.addEventListener("input", onChange);
+      el.addEventListener("change", onChange);
+    });
+  }
+
+  function removeRow(tr) {
+    tr.style.opacity = "0";
+    tr.style.transform = "translateX(10px)";
+    tr.style.transition = "opacity .18s, transform .18s";
+    setTimeout(function () { tr.remove(); syncEmpty(); saveTable(); }, 180);
+  }
+
+  function appendDelCell(tr) {
+    var delBtn = mk("button", "mc-del-btn");
+    delBtn.type = "button";
+    delBtn.textContent = "×";
+    delBtn.title = "Удалить строку";
+    delBtn.addEventListener("click", function () { removeRow(tr); });
+    var td = mk("td");
+    td.appendChild(delBtn);
+    tr.appendChild(td);
+  }
+
+  function applyMillPreset(tr, typeVal) {
+    var mode = currentMode();
+    if (!mode || !mode.tool_presets) return;
+    var list = mode.tool_presets[typeVal];
+    if (!list || !list.length) return;
+    var preset = list[0];
+    var dInp = tr.querySelector(".m-inp-d");
+    var zInp = tr.querySelector(".m-inp-flutes");
+    if (dInp && !dInp.value && preset.d) dInp.value = preset.d;
+    if (zInp && !zInp.value && preset.flutes) zInp.value = preset.flutes;
+  }
+
+  function calcThreadRow(tr) {
     var n = parseFloat(tr.querySelector(".m-inp-n").value);
     var p = parseFloat(tr.querySelector(".m-inp-p").value);
     var fCell = tr.querySelector(".mc-f-cell");
+    if (!fCell) return;
     if (isNaN(n) || isNaN(p) || n <= 0 || p <= 0) {
-      fCell.textContent = "—"; fCell.classList.add("is-empty");
+      fCell.textContent = "—";
+      fCell.classList.add("is-empty");
     } else {
       var F = n * p;
       fCell.textContent = Number.isInteger(F) ? F : F.toFixed(2);
@@ -468,85 +684,157 @@
   function saveTable() {
     var rows = [];
     Array.prototype.forEach.call(mTbody.rows, function (tr) {
-      var g = function(cls) { var e = tr.querySelector("." + cls); return e ? e.value : ""; };
-      rows.push({ type: g("m-inp-type"), m: g("m-inp-m"), mat: g("m-inp-mat"), pitch: g("m-inp-p"), n: g("m-inp-n") });
+      var g = function (cls) {
+        var e = tr.querySelector("." + cls);
+        return e ? e.value : "";
+      };
+      if (isThreadForm()) {
+        rows.push({ type: g("m-inp-type"), m: g("m-inp-m"), mat: g("m-inp-mat"), pitch: g("m-inp-p"), n: g("m-inp-n") });
+      } else {
+        rows.push({
+          type: g("m-inp-type"), d: g("m-inp-d"), mat: g("m-inp-mat"), flutes: g("m-inp-flutes"),
+          n: g("m-inp-n"), feed: g("m-inp-feed"), ae: g("m-inp-ae"), ap: g("m-inp-ap"), op: g("m-inp-op")
+        });
+      }
     });
-    try { localStorage.setItem(LS_KEY, JSON.stringify(rows)); } catch(e) {}
+    try { localStorage.setItem(lsKey(), JSON.stringify(rows)); } catch (e) {}
   }
 
-  function mk(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
+  function appendTd(tr, el) {
+    var td = mk("td");
+    td.appendChild(el);
+    tr.appendChild(td);
+    return el;
+  }
 
-  function addRow(data) {
+  function addThreadRow(data) {
     var tr = mk("tr");
+    var sel = mkTypeSelect(data);
+    appendTd(tr, sel);
 
-    /* Тип */
-    var sel = mk("select", "mc-inp m-inp-type");
-    ["Метчик","Раскатник"].forEach(function (v) {
-      var o = mk("option"); o.value = v; o.textContent = v;
-      if (data && data.type === v) o.selected = true;
-      sel.appendChild(o);
-    });
-    var td1 = mk("td"); td1.appendChild(sel); tr.appendChild(td1);
-
-    /* M */
     var mInp = mk("input", "mc-inp m-inp-m");
-    mInp.type = "text"; mInp.placeholder = "M6";
+    mInp.type = "text";
+    mInp.placeholder = "M6";
     if (data && data.m) mInp.value = data.m;
-    var td2 = mk("td"); td2.appendChild(mInp); tr.appendChild(td2);
+    appendTd(tr, mInp);
 
-    /* Материал */
-    var matSel = mk("select", "mc-inp m-inp-mat");
-    [["steel","Сталь"],["steel_hard","Сталь зак."],["alum","Алюминий"],
-     ["cast_iron","Чугун"],["brass","Латунь"],["titan","Нерж./Титан"]
-    ].forEach(function (pair) {
-      var o = mk("option"); o.value = pair[0]; o.textContent = pair[1];
-      if (data && data.mat === pair[0]) o.selected = true;
-      matSel.appendChild(o);
-    });
-    var td3 = mk("td"); td3.appendChild(matSel); tr.appendChild(td3);
+    var matSel = mkMatSelect(data);
+    appendTd(tr, matSel);
 
-    /* Шаг */
-    var pInp = mk("input","mc-inp m-inp-p");
-    pInp.type = "number"; pInp.step = "0.001"; pInp.min = "0"; pInp.placeholder = "мм";
-    if (data && data.pitch) pInp.value = data.pitch;
-    var td4 = mk("td"); td4.appendChild(pInp); tr.appendChild(td4);
+    var pInp = mkNumInp("m-inp-p", "мм", data && data.pitch);
+    appendTd(tr, pInp);
 
-    /* n */
-    var nInp = mk("input","mc-inp m-inp-n");
-    nInp.type = "number"; nInp.step = "1"; nInp.min = "0"; nInp.placeholder = "об/мин";
-    if (data && data.n) nInp.value = data.n;
-    var td5 = mk("td"); td5.appendChild(nInp); tr.appendChild(td5);
+    var nInp = mkNumInp("m-inp-n", "об/мин", data && data.n);
+    appendTd(tr, nInp);
 
-    /* F */
-    var fTd = mk("td"); fTd.className = "mc-f-cell is-empty"; fTd.textContent = "—"; tr.appendChild(fTd);
+    var fTd = mk("td");
+    fTd.className = "mc-f-cell is-empty";
+    fTd.textContent = "—";
+    tr.appendChild(fTd);
 
-    /* Удалить */
-    var delBtn = mk("button", "mc-del-btn"); delBtn.type = "button"; delBtn.textContent = "×";
-    delBtn.title = "Удалить строку";
-    delBtn.addEventListener("click", function () {
-      tr.style.opacity = "0"; tr.style.transform = "translateX(10px)"; tr.style.transition = "opacity .18s, transform .18s";
-      setTimeout(function () { tr.remove(); syncEmpty(); saveTable(); }, 180);
-    });
-    var td7 = mk("td"); td7.appendChild(delBtn); tr.appendChild(td7);
-
-    [sel, mInp, matSel, pInp, nInp].forEach(function (el) {
-      el.addEventListener("input",  function () { calcRow(tr); saveTable(); });
-      el.addEventListener("change", function () { calcRow(tr); saveTable(); });
+    appendDelCell(tr);
+    bindRowInputs(tr, [sel, mInp, matSel, pInp, nInp], function () {
+      calcThreadRow(tr);
+      saveTable();
     });
 
     mTbody.appendChild(tr);
-    syncEmpty(); calcRow(tr);
+    syncEmpty();
+    calcThreadRow(tr);
     if (!data) pInp.focus();
+  }
+
+  function addMillRow(data) {
+    var tr = mk("tr");
+    var mode = currentMode();
+    var sel = mkTypeSelect(data);
+    sel.addEventListener("change", function () {
+      applyMillPreset(tr, sel.value);
+      saveTable();
+    });
+    appendTd(tr, sel);
+
+    var dInp = mkNumInp("m-inp-d", "мм", data && data.d);
+    appendTd(tr, dInp);
+
+    var matSel = mkMatSelect(data);
+    appendTd(tr, matSel);
+
+    var zInp = mkNumInp("m-inp-flutes", "Z", data && data.flutes);
+    zInp.step = "1";
+    appendTd(tr, zInp);
+
+    var nInp = mkNumInp("m-inp-n", "об/мин", data && data.n);
+    appendTd(tr, nInp);
+
+    var feedInp = mkNumInp("m-inp-feed", "мм/мин", data && data.feed);
+    appendTd(tr, feedInp);
+
+    var aeInp = mkNumInp("m-inp-ae", "бок", data && data.ae);
+    appendTd(tr, aeInp);
+
+    var apInp = mkNumInp("m-inp-ap", "выс", data && data.ap);
+    appendTd(tr, apInp);
+
+    var opSel = mk("select", "mc-inp m-inp-op");
+    (mode && mode.operation_types || []).forEach(function (op) {
+      var o = mk("option");
+      o.value = op.id;
+      o.textContent = op.label;
+      if (data && data.op === op.id) o.selected = true;
+      opSel.appendChild(o);
+    });
+    appendTd(tr, opSel);
+
+    appendDelCell(tr);
+    bindRowInputs(tr, [sel, dInp, matSel, zInp, nInp, feedInp, aeInp, apInp, opSel], saveTable);
+
+    mTbody.appendChild(tr);
+    if (!data && sel.value) applyMillPreset(tr, sel.value);
+    syncEmpty();
+    if (!data) dInp.focus();
+  }
+
+  function addRow(data) {
+    if (isMillForm()) addMillRow(data);
+    else addThreadRow(data);
+  }
+
+  function switchMode() {
+    buildThead();
+    applyTableFormClass();
+    syncFormulaCard();
+    syncModeToolbar();
+    reloadTableFromStorage();
   }
 
   mAddBtn.addEventListener("click", function () { addRow(null); });
 
-  /* Загрузка */
-  try {
-    var saved = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
-    if (Array.isArray(saved) && saved.length) saved.forEach(function (d) { addRow(d); });
-  } catch(e) {}
-  syncEmpty();
+  function reloadTableFromStorage() {
+    mTbody.innerHTML = "";
+    try {
+      if (currentModeId === "thread" && !localStorage.getItem(lsKey())) {
+        var legacy = localStorage.getItem("calc_modes_tap_v2");
+        if (legacy) localStorage.setItem(lsKey(), legacy);
+      }
+      if (currentModeId === "thread" && !localStorage.getItem(lsKey())) {
+        var legacy3 = localStorage.getItem("calc_modes_thread_v3");
+        if (legacy3) localStorage.setItem(lsKey(), legacy3);
+      }
+      var saved = JSON.parse(localStorage.getItem(lsKey()) || "[]");
+      if (Array.isArray(saved) && saved.length) saved.forEach(function (d) { addRow(d); });
+    } catch (e) {}
+    syncEmpty();
+  }
+
+  if (mModeSel) {
+    mModeSel.addEventListener("change", function () {
+      currentModeId = mModeSel.value || currentModeId;
+      switchMode();
+    });
+  }
+
+  switchMode();
 
 })();
 </script>

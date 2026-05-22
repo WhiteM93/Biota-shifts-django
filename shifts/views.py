@@ -311,6 +311,9 @@ def calculator_view(request):
             "setups": setups_data,
         })
 
+    from .calculator_modes import cutting_modes_payload
+
     return render(request, "shifts/calculator.html", {
         "products_json": _json.dumps(products_data, ensure_ascii=False),
+        "cutting_modes_json": _json.dumps(cutting_modes_payload(), ensure_ascii=False),
     })
