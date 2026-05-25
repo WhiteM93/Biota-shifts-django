@@ -38,6 +38,7 @@ from .models import (
     StockMovement,
     TapSpec,
     ToolItem,
+    ToolMaterialExtra,
     UserInventoryStockFilterPrefs,
     PurchaseRequest,
     EmployeeDefectRecord,
@@ -53,6 +54,48 @@ from .models import (
 
 TOOL_MATERIAL_FILTER_OTHER = "__other__"
 _TOOL_MATERIAL_STD_KEYS = frozenset(k for k, _ in TOOL_MATERIAL_TYPES)
+
+
+_ARRIVAL_REQUIRED_DIAMETER: dict[str, tuple[str, str]] = {
+    "drill": ("dr_diameter_mm", "диаметр D (мм) для сверла"),
+    "end_mill": ("em_diameter_mm", "диаметр D (мм) для фрезы"),
+    "center_drill": ("cd_diameter_mm", "диаметр D (мм) для центровки"),
+    "countersink": ("cs_diameter_mm", "диаметр D (мм) для зенкера"),
+}
+
+
+def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
+    category = (row.get("category") or "").strip()
+    spec = _ARRIVAL_REQUIRED_DIAMETER.get(category)
+    if not spec:
+        return []
+    key, label = spec
+    if _to_decimal_or_none(row.get(key)) is None:
+        return [f"Строка {idx}: укажите {label}."]
+    return []
+
+
+def _register_tool_material_extra(value: str) -> str | None:
+    v = (value or "").strip()[:80]
+    if not v or v in _TOOL_MATERIAL_STD_KEYS or v == TOOL_MATERIAL_FILTER_OTHER:
+        return None
+    ToolMaterialExtra.objects.get_or_create(value=v)
+    return v
+
+
+def _tool_material_extra_options(*, tools_qs=None, extra_candidate: str = "") -> list[str]:
+    qs = tools_qs if tools_qs is not None else ToolItem.objects.all()
+    from_tools = {
+        v
+        for v in qs.exclude(tool_material="").values_list("tool_material", flat=True).distinct()
+        if v and v not in _TOOL_MATERIAL_STD_KEYS and v != TOOL_MATERIAL_FILTER_OTHER
+    }
+    from_vocab = set(ToolMaterialExtra.objects.values_list("value", flat=True))
+    out = sorted(from_tools | from_vocab)
+    cand = (extra_candidate or "").strip()[:80]
+    if cand and cand not in _TOOL_MATERIAL_STD_KEYS and cand not in out:
+        out = sorted(set(out) | {cand})
+    return out
 
 
 def _log_inventory_stock_event(
@@ -808,6 +851,7 @@ def inventory_view(request):
             tool.save(update_fields=["main_diameter_mm", "updated_at"])
         elif field == "tool_material":
             tool.tool_material = (value_raw or "")[:80]
+            _register_tool_material_extra(tool.tool_material)
             tool.save(update_fields=["tool_material", "updated_at"])
         elif field == "coating_type":
             tool.coating_type = value_raw or "none"
@@ -829,6 +873,14 @@ def inventory_view(request):
             details={"tool_id": tool.id, "field": field, "value": value_raw[:200]},
         )
         return JsonResponse({"ok": True})
+
+    if action == "register_tool_material_extra":
+        if not can_manage_stock:
+            return JsonResponse({"ok": False, "error": "Недостаточно прав."}, status=403)
+        saved = _register_tool_material_extra(request.POST.get("value") or "")
+        if not saved:
+            return JsonResponse({"ok": False, "error": "Укажите непустой материал (не из стандартного списка)."}, status=400)
+        return JsonResponse({"ok": True, "value": saved})
 
     if action == "process_issue_outcome":
         issue_id = _to_int(request.POST.get("issue_id"), 0)
@@ -901,6 +953,7 @@ def inventory_view(request):
         movement_date_raw = (request.POST.get("movement_date") or "").strip()
         comment = (request.POST.get("comment") or "").strip()
         tool_material = (request.POST.get("tool_material") or "").strip()
+        _register_tool_material_extra(tool_material)
         coating_type = (request.POST.get("coating_type") or "none").strip()
         work_material = (request.POST.get("work_material") or "").strip()
         main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
@@ -1037,6 +1090,15 @@ def inventory_view(request):
             messages.error(request, "Добавьте хотя бы одну строку прихода.")
             return redirect(f"{request.path}?panel=arrival")
 
+        validation_errors: list[str] = []
+        for idx, row in enumerate(rows, start=1):
+            if not isinstance(row, dict):
+                continue
+            validation_errors.extend(_arrival_bulk_row_validation_errors(row, idx))
+        if validation_errors:
+            messages.error(request, "; ".join(validation_errors[:10]))
+            return redirect(f"{request.path}?panel=arrival")
+
         created_count = 0
         with transaction.atomic():
             for row in rows:
@@ -1048,6 +1110,7 @@ def inventory_view(request):
                 comment = (row.get("comment") or "").strip()
                 supplier_name = (row.get("supplier_name") or "").strip()
                 tool_material = (row.get("tool_material") or "").strip()
+                _register_tool_material_extra(tool_material)
                 coating_type = (row.get("coating_type") or "none").strip()
                 work_material = (row.get("work_material") or "").strip()
                 main_diameter_mm = _to_decimal_or_none(row.get("main_diameter_mm"))
@@ -1768,17 +1831,11 @@ def inventory_view(request):
         _distinct_numeric_values(option_source_qs.filter(category="drill"), "drill_spec__angle_deg")
     )
 
-    tool_material_extra_options = sorted(
-        {
-            v
-            for v in option_source_qs.exclude(tool_material="").values_list("tool_material", flat=True).distinct()
-            if v and v not in _TOOL_MATERIAL_STD_KEYS and v != TOOL_MATERIAL_FILTER_OTHER
-        }
+    tool_material_extra_options = _tool_material_extra_options(
+        tools_qs=option_source_qs,
+        extra_candidate=tool_material,
     )
     extras_set = set(tool_material_extra_options)
-    if tool_material and tool_material not in _TOOL_MATERIAL_STD_KEYS and tool_material not in extras_set:
-        tool_material_extra_options = sorted(extras_set | {tool_material})
-        extras_set = set(tool_material_extra_options)
 
     if tm_param == TOOL_MATERIAL_FILTER_OTHER:
         tm_custom_input = tm_custom_param

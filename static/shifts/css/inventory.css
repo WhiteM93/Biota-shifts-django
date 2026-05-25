@@ -24,6 +24,226 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 4px 0 40px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* ——— История склада (карточки, адаптив) ——— */
+.inv-history-intro {
+  margin-top: -6px;
+  margin-bottom: 10px;
+}
+
+.inv-history-wrap {
+  max-width: 100%;
+  min-width: 0;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--bio-table-wrap-border);
+  border-radius: 8px;
+  background: var(--bio-surface-panel, transparent);
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.inv-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.inv-history-card {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--bio-surface-item-border);
+  background: var(--bio-surface-item);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.inv-history-card--empty {
+  text-align: center;
+  padding: 20px 14px;
+  background: transparent;
+  border-style: dashed;
+}
+
+.inv-history-card.is-reverted {
+  opacity: 0.78;
+}
+
+.inv-history-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.inv-history-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  border: 1px solid transparent;
+}
+
+.inv-history-card--issue .inv-history-badge {
+  background: color-mix(in srgb, #3a9a8f 22%, var(--bio-surface-item));
+  border-color: color-mix(in srgb, #3a9a8f 45%, transparent);
+  color: var(--bio-body-fg);
+}
+
+.inv-history-card--restock .inv-history-badge {
+  background: color-mix(in srgb, #4caf6a 20%, var(--bio-surface-item));
+  border-color: color-mix(in srgb, #4caf6a 40%, transparent);
+  color: var(--bio-body-fg);
+}
+
+.inv-history-card--writeoff .inv-history-badge {
+  background: color-mix(in srgb, #d9563a 18%, var(--bio-surface-item));
+  border-color: color-mix(in srgb, #d9563a 38%, transparent);
+  color: var(--bio-body-fg);
+}
+
+.inv-history-card--evt-tool_edit .inv-history-badge,
+.inv-history-card--evt-privilege_stock .inv-history-badge {
+  background: color-mix(in srgb, #6b8ec4 20%, var(--bio-surface-item));
+  border-color: color-mix(in srgb, #6b8ec4 40%, transparent);
+}
+
+.inv-history-card--evt-tool_delete .inv-history-badge {
+  background: color-mix(in srgb, #d9563a 16%, var(--bio-surface-item));
+  border-color: color-mix(in srgb, #d9563a 35%, transparent);
+}
+
+.inv-history-card--evt-rollback .inv-history-badge {
+  background: color-mix(in srgb, #e8a04a 18%, var(--bio-surface-item));
+  border-color: color-mix(in srgb, #e8a04a 38%, transparent);
+}
+
+.inv-history-card__when {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bio-muted);
+  white-space: nowrap;
+}
+
+.inv-history-card__title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.inv-history-card__sub {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--bio-muted);
+}
+
+.inv-history-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+@media (min-width: 480px) {
+  .inv-history-facts {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 18px;
+  }
+}
+
+.inv-history-qty {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.inv-history-fact__label {
+  display: inline-block;
+  margin-right: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--bio-muted);
+}
+
+.inv-history-card__meta-line {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--bio-muted);
+  line-height: 1.4;
+}
+
+.inv-history-card__meta-line--warn {
+  color: color-mix(in srgb, #e8a04a 70%, var(--bio-muted));
+}
+
+.inv-history-card__note {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  border-radius: 6px;
+  border: 1px solid var(--bio-input-border);
+  background: var(--bio-surface-deep);
+}
+
+.inv-history-card__details {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  border-radius: 6px;
+  border: 1px solid var(--bio-input-border);
+  background: var(--bio-surface-deep);
+  color: var(--bio-body-fg);
+}
+
+.inv-history-card__actions {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bio-surface-item-border);
+}
+
+.inv-history-rollback-form {
+  margin: 0;
+}
+
+@media (min-width: 720px) {
+  .inv-history-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+  }
+
+  .inv-history-card--empty {
+    grid-column: 1 / -1;
+  }
 }
 
 .inv-page--stock {
@@ -748,6 +968,16 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
     min-width: 110px;
     box-sizing: border-box;
   }
+
+  .arrival-bulk-table td.short-col input,
+  .arrival-bulk-table td.short-col select,
+  .arrival-bulk-table td.qty-col input,
+  .arrival-bulk-table td.tap-step-col input,
+  .arrival-bulk-table td.tap-tpi-col input,
+  .arrival-bulk-table td.tap-l-col input,
+  .arrival-bulk-table td.tap-lc-col input {
+    min-width: 0;
+  }
   .arrival-bulk-table [data-k="quantity"] { min-width: 72px; }
   .arrival-bulk-table [data-k="movement_date"] { min-width: 140px; }
   .arrival-bulk-table select[data-k="work_material"],
@@ -792,11 +1022,66 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
     padding-right: 2px;
     text-align: center;
   }
+  .inv-arrival-errors {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, #d9563a 45%, var(--bio-input-border));
+    background: color-mix(in srgb, #d9563a 14%, var(--bio-surface-item));
+    color: var(--bio-body-fg);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .arrival-bulk-table input.is-invalid,
+  .arrival-bulk-table select.is-invalid {
+    border-color: #d9563a;
+    box-shadow: 0 0 0 1px color-mix(in srgb, #d9563a 40%, transparent);
+  }
+
   .arrival-bulk-table th.short-col,
   .arrival-bulk-table td.short-col {
-    width: 4.5ch;
-    min-width: 4.5ch;
+    width: 5ch;
+    min-width: 5ch;
+    max-width: 5.5ch;
     text-align: center;
+  }
+
+  .arrival-bulk-table td.short-col input.arrival-diam-input,
+  .arrival-bulk-table td.short-col input[data-k="dr_diameter_mm"],
+  .arrival-bulk-table td.short-col input[data-k="em_diameter_mm"],
+  .arrival-bulk-table td.short-col input[data-k="cd_diameter_mm"],
+  .arrival-bulk-table td.short-col input[data-k="cs_diameter_mm"] {
+    min-width: 0;
+    width: 100%;
+    max-width: 5ch;
+    padding: 4px 2px;
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .arrival-bulk-table td.tm-cell-tool-material {
+    max-width: 10rem;
+    width: 10rem;
+    min-width: 0;
+    white-space: normal;
+    vertical-align: middle;
+  }
+
+  .arrival-bulk-table td.tm-cell-tool-material select[data-k="tool_material"] {
+    min-width: 0;
+    width: 100%;
+    max-width: 10rem;
+    font-size: 11px;
+    padding-left: 3px;
+    padding-right: 3px;
+  }
+
+  .arrival-bulk-table td.tm-cell-tool-material .tm-tool-material-custom {
+    min-width: 0;
+    width: 100%;
+    max-width: 10rem;
+    font-size: 11px;
   }
   .arrival-bulk-table th.tap-size-col,
   .arrival-bulk-table td.tap-size-col { width: 79px; min-width: 79px; text-align: center; }
@@ -818,8 +1103,9 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
   .arrival-bulk-table td.tap-l-col { width: 4ch; min-width: 4ch; text-align: center; }
   .arrival-bulk-table th.tap-lc-col,
   .arrival-bulk-table td.tap-lc-col { width: 4ch; min-width: 4ch; text-align: center; }
-  .arrival-bulk-table td.short-col input {
-    min-width: 4.5ch;
+  .arrival-bulk-table td.short-col input:not(.arrival-diam-input):not([data-k="dr_diameter_mm"]):not([data-k="em_diameter_mm"]):not([data-k="cd_diameter_mm"]):not([data-k="cs_diameter_mm"]) {
+    min-width: 0;
+    max-width: 5ch;
     text-align: center;
   }
   .arrival-bulk-table select[data-k="mill_type"] {

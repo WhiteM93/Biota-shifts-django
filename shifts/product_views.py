@@ -28,6 +28,7 @@ from .models import (
     ProductNote,
     ProductSetup,
     ProductSetupPhoto,
+    ProductDrawingFile,
     ProductSetupProgramFile,
     ProductSetupToolRow,
     normalize_product_setup_gcode_system,
@@ -257,6 +258,47 @@ def _read_program_file_for_display(program_file) -> tuple[str | None, bool]:
     if len(raw) > MAX_PROGRAM_DISPLAY_BYTES:
         return None, True
     return raw.decode("utf-8", errors="replace"), False
+
+
+def _product_drawing_files_qs(product: Product):
+    return product.drawing_files.order_by("sort_order", "id")
+
+
+def _append_product_drawing_file(product: Product, uploaded_file) -> ProductDrawingFile:
+    if not uploaded_file:
+        raise ValueError("empty file")
+    raw_name = (getattr(uploaded_file, "name", "") or "").replace("\\", "/").rsplit("/", 1)[-1]
+    ext = raw_name.rsplit(".", 1)[-1].lower() if "." in raw_name else ""
+    if ext != "pdf":
+        raise ValueError("pdf required")
+    last = _product_drawing_files_qs(product).aggregate(m=Max("sort_order"))["m"]
+    n = (last if last is not None else -1) + 1
+    base = raw_name or f"drawing_{uuid.uuid4().hex[:10]}.pdf"
+    row = ProductDrawingFile(
+        product=product,
+        sort_order=n,
+        original_filename=base[:255],
+    )
+    row.save()
+    row.file.save(base, uploaded_file, save=True)
+    product.save(update_fields=["updated_at"])
+    return row
+
+
+def _drawing_files_payload(product: Product) -> dict:
+    files_out = []
+    for row in _product_drawing_files_qs(product):
+        if not row.file:
+            continue
+        files_out.append(
+            {
+                "id": row.pk,
+                "url": row.file.url,
+                "name": row.display_name,
+                "title": row.download_title,
+            }
+        )
+    return {"drawing_files": files_out}
 
 
 def _setup_program_files_qs(setup: ProductSetup):
@@ -1301,7 +1343,7 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
 @write_permission_required
 @require_http_methods(["GET", "POST"])
 def product_detail_view(request, pk: int):
-    product = get_object_or_404(Product, pk=pk)
+    product = get_object_or_404(Product.objects.prefetch_related("drawing_files"), pk=pk)
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
         if action == "create_setup":
@@ -1581,6 +1623,32 @@ def product_detail_view(request, pk: int):
             out["ok"] = True
             return JsonResponse(out)
 
+        if action == "inline_append_product_drawing":
+            drawing_file = request.FILES.get("drawing_file")
+            if not drawing_file:
+                return JsonResponse({"ok": False, "error": "Выберите PDF-файл."}, status=400)
+            try:
+                _append_product_drawing_file(product, drawing_file)
+            except ValueError:
+                return JsonResponse({"ok": False, "error": "Для чертежа нужен файл PDF."}, status=400)
+            except Exception:
+                return JsonResponse({"ok": False, "error": "Не удалось сохранить чертёж."}, status=400)
+            out = _drawing_files_payload(product)
+            out["ok"] = True
+            return JsonResponse(out)
+
+        if action == "inline_delete_product_drawing_file":
+            fid_raw = (request.POST.get("drawing_file_id") or "").strip()
+            fid = int(fid_raw) if fid_raw.isdigit() else 0
+            row = ProductDrawingFile.objects.filter(pk=fid, product=product).first()
+            if not row:
+                return JsonResponse({"ok": False, "error": "Файл не найден."}, status=404)
+            row.delete()
+            product.save(update_fields=["updated_at"])
+            out = _drawing_files_payload(product)
+            out["ok"] = True
+            return JsonResponse(out)
+
         if action == "inline_delete_setup_program_file":
             setup_id_raw = (request.POST.get("setup_id") or "").strip()
             setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
@@ -1608,6 +1676,8 @@ def product_detail_view(request, pk: int):
                 )
         return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
     setup_photos = list(product.setup_photos.filter(setup__isnull=True))
+    product.drawing_file_list = list(_product_drawing_files_qs(product))
+    product.has_any_drawing = bool(product.drawing_file_list)
     setups = list(product.setups.prefetch_related("tools", "program_files"))
     for setup in setups:
         setup.tab_slug = f"setup-{setup.pk}"

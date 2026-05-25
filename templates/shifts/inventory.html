@@ -812,6 +812,7 @@
     {% csrf_token %}
     <input type="hidden" name="action" value="add_arrival_bulk">
     <input type="hidden" name="rows_json" id="arrival-bulk-rows-json">
+    <div class="inv-arrival-errors" id="arrival-bulk-errors" hidden role="alert"></div>
     <div id="arrival-bulk-groups"></div>
     <div class="filter-actions"><button type="submit" class="btn">Оприходовать</button></div>
   </form>
@@ -1388,83 +1389,65 @@
 
 {% if panel == "history" %}
 <h3 id="history-block">История склада</h3>
-<p class="muted" style="margin-top:-6px;">Движения остатков, правки и удаления позиций, выдача права на склад, откаты.</p>
-<div class="table-wrap">
-  <table class="data-grid">
-    <thead>
-      <tr>
-        <th>Когда</th>
-        <th>Тип</th>
-        <th>Инструмент / запись</th>
-        <th>Кол-во / сотрудник / аккаунт</th>
-        <th>Комментарий / детали</th>
-        {% if can_rollback_stock %}<th style="width:1%;white-space:nowrap;"></th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
+<p class="muted inv-history-intro">Движения остатков, правки и удаления позиций, выдача права на склад, откаты.</p>
+<div class="inv-history-wrap">
+  <ul class="inv-history-list">
       {% for row in inventory_history %}
       {% if row.kind == "movement" %}
       {% with m=row.movement %}
-      <tr{% if m.is_reverted %} class="muted"{% endif %}>
-        <td>
-          {{ m.created_at|date:"d.m.Y H:i" }}
-          <div class="muted" style="font-size:12px;">дата операции: {{ m.movement_date }}</div>
-        </td>
-        <td>
-          {{ m.get_movement_type_display }}
-          {% if m.is_reverted %}
-            <div class="muted" style="font-size:12px;">откат{% if m.reverted_at %}: {{ m.reverted_at|date:"d.m.Y H:i" }}{% endif %}{% if m.reverted_by %} · {{ m.reverted_by }}{% endif %}</div>
-          {% endif %}
-        </td>
-        <td>
-          <div>{{ m.tool.get_category_display }}</div>
-          <div class="muted" style="font-size:12px;">
-            {% if m.tool.category == "end_mill" and m.tool.end_mill_spec %}{{ m.tool.end_mill_spec.get_mill_type_display }}{% elif m.tool.category == "tap" and m.tool.tap_spec %}{{ m.tool.tap_spec.get_tap_type_display }}{% elif m.tool.category == "center_drill" and m.tool.center_drill_spec %}Центровка {{ m.tool.center_drill_spec.angle_deg }}°{% elif m.tool.category == "countersink" and m.tool.countersink_spec %}Зенкер {{ m.tool.countersink_spec.get_countersink_type_display }} {{ m.tool.countersink_spec.angle_deg }}°{% elif m.tool.category == "drill" and m.tool.drill_spec %}Сверло {{ m.tool.drill_spec.angle_deg }}°{% else %}-{% endif %}
-          </div>
-          <div>{{ m.tool.name }}{% if m.tool.is_deleted %} <span class="muted">(удалено{% if m.tool.deleted_by %}: {{ m.tool.deleted_by }}{% endif %})</span>{% endif %}</div>
-        </td>
-        <td>
-          <strong>{{ m.quantity }}</strong> шт.
-          <div class="muted" style="font-size:12px;">{{ m.employee_name|default:"—" }}</div>
-          <div class="muted" style="font-size:12px;">{{ m.created_by_account|default:"—" }}</div>
-        </td>
-        <td>{{ m.comment|default:"—"|linebreaksbr }}</td>
-        {% if can_rollback_stock %}
-        <td>
-          {% if row.show_rollback %}
-          <form method="post" action="{% url 'inventory' %}" style="margin:0;" onsubmit="return confirm('Откатить это движение? Склад будет скорректирован.');">
+      <li class="inv-history-card inv-history-card--movement inv-history-card--{{ m.movement_type }}{% if m.is_reverted %} is-reverted{% endif %}">
+        <div class="inv-history-card__head">
+          <span class="inv-history-badge">{{ m.get_movement_type_display }}</span>
+          <time class="inv-history-card__when" datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|date:"d.m.Y H:i" }}</time>
+        </div>
+        <p class="inv-history-card__title">{{ m.tool.name }}{% if m.tool.is_deleted %} <span class="muted">(удалено{% if m.tool.deleted_by %}: {{ m.tool.deleted_by }}{% endif %})</span>{% endif %}</p>
+        <p class="inv-history-card__sub">{{ m.tool.get_category_display }} · {% if m.tool.category == "end_mill" and m.tool.end_mill_spec %}{{ m.tool.end_mill_spec.get_mill_type_display }}{% elif m.tool.category == "tap" and m.tool.tap_spec %}{{ m.tool.tap_spec.get_tap_type_display }}{% elif m.tool.category == "center_drill" and m.tool.center_drill_spec %}Центровка {{ m.tool.center_drill_spec.angle_deg }}°{% elif m.tool.category == "countersink" and m.tool.countersink_spec %}Зенкер {{ m.tool.countersink_spec.get_countersink_type_display }} {{ m.tool.countersink_spec.angle_deg }}°{% elif m.tool.category == "drill" and m.tool.drill_spec %}Сверло {{ m.tool.drill_spec.angle_deg }}°{% else %}—{% endif %}</p>
+        <div class="inv-history-facts">
+          <span class="inv-history-qty"><strong>{{ m.quantity }}</strong> шт.</span>
+          {% if m.employee_name %}<span class="inv-history-fact"><span class="inv-history-fact__label">Сотрудник</span> {{ m.employee_name }}</span>{% endif %}
+          {% if m.created_by_account %}<span class="inv-history-fact"><span class="inv-history-fact__label">Аккаунт</span> {{ m.created_by_account }}</span>{% endif %}
+        </div>
+        <p class="inv-history-card__meta-line">Дата операции: {{ m.movement_date|date:"d.m.Y" }}</p>
+        {% if m.is_reverted %}
+        <p class="inv-history-card__meta-line inv-history-card__meta-line--warn">Откат{% if m.reverted_at %}: {{ m.reverted_at|date:"d.m.Y H:i" }}{% endif %}{% if m.reverted_by %} · {{ m.reverted_by }}{% endif %}</p>
+        {% endif %}
+        {% if m.comment %}
+        <p class="inv-history-card__note">{{ m.comment|linebreaksbr }}</p>
+        {% endif %}
+        {% if can_rollback_stock and row.show_rollback %}
+        <div class="inv-history-card__actions">
+          <form method="post" action="{% url 'inventory' %}" class="inv-history-rollback-form" onsubmit="return confirm('Откатить это движение? Склад будет скорректирован.');">
             {% csrf_token %}
             <input type="hidden" name="action" value="rollback_stock_movement">
             <input type="hidden" name="movement_id" value="{{ m.id }}">
             <button type="submit" class="btn btn-sm">Откатить</button>
           </form>
-          {% else %}
-            <span class="muted">—</span>
-          {% endif %}
-        </td>
+        </div>
         {% endif %}
-      </tr>
+      </li>
       {% endwith %}
       {% else %}
       {% with e=row.event %}
-      <tr>
-        <td>{{ e.created_at|date:"d.m.Y H:i" }}</td>
-        <td>{{ e.get_event_type_display }}</td>
-        <td>
-          {{ e.summary }}
-          {% if e.tool %}<div class="muted" style="font-size:12px;">{{ e.tool.name }}</div>{% endif %}
-        </td>
-        <td><span class="muted">{{ e.actor_username|default:"—" }}</span></td>
-        <td>{% if e.details %}<code style="font-size:11px;word-break:break-all;">{{ e.details }}</code>{% else %}—{% endif %}</td>
-        {% if can_rollback_stock %}<td></td>{% endif %}
-      </tr>
+      <li class="inv-history-card inv-history-card--event inv-history-card--evt-{{ e.event_type }}">
+        <div class="inv-history-card__head">
+          <span class="inv-history-badge">{{ e.get_event_type_display }}</span>
+          <time class="inv-history-card__when" datetime="{{ e.created_at|date:'c' }}">{{ e.created_at|date:"d.m.Y H:i" }}</time>
+        </div>
+        <p class="inv-history-card__title">{{ e.summary }}</p>
+        {% if e.tool %}<p class="inv-history-card__sub">{{ e.tool.name }}</p>{% endif %}
+        {% if e.actor_username %}
+        <p class="inv-history-card__meta-line"><span class="inv-history-fact__label">Кто</span> {{ e.actor_username }}</p>
+        {% endif %}
+        {% if e.details %}
+        <pre class="inv-history-card__details">{{ e.details }}</pre>
+        {% endif %}
+      </li>
       {% endwith %}
       {% endif %}
       {% empty %}
-      <tr><td colspan="{% if can_rollback_stock %}6{% else %}5{% endif %}" class="muted">Пока нет записей в истории.</td></tr>
+      <li class="inv-history-card inv-history-card--empty muted">Пока нет записей в истории.</li>
       {% endfor %}
-    </tbody>
-  </table>
+  </ul>
 </div>
 {% endif %}
 </div>

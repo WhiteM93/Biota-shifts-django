@@ -52,6 +52,17 @@ html[data-theme="night"] .gm-header__kicker {
   color: #9a9a9a;
 }
 
+html[data-theme="night"] .gm-header__month {
+  color: var(--bio-muted);
+}
+
+.gm-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .gm-icon-btn {
   display: inline-flex;
   align-items: center;
@@ -66,6 +77,16 @@ html[data-theme="night"] .gm-header__kicker {
   font-size: 18px;
   line-height: 1;
   flex-shrink: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.gm-icon-btn__svg {
+  display: block;
+}
+
+.gm-theme-btn {
+  font-size: 17px;
 }
 
 html[data-theme="night"] .gm-icon-btn {
@@ -76,7 +97,6 @@ html[data-theme="night"] .gm-icon-btn {
 
 .gm-month-picker-wrap {
   position: relative;
-  flex-shrink: 0;
 }
 
 .gm-month-picker {
@@ -220,9 +240,17 @@ html[data-theme="night"] .gm-week__day {
   border-color: var(--bio-surface-item-border);
 }
 
-.gm-week__day.is-weekend:not(.is-selected) {
+.gm-week__day.is-weekend:not(.is-selected),
+.gm-week__day.is-holiday:not(.is-selected) {
   background: #f3efe6;
   border-color: #ebe5d8;
+}
+
+html[data-theme="night"] .gm-week__day.is-weekend:not(.is-selected),
+html[data-theme="night"] .gm-week__day.is-holiday:not(.is-selected) {
+  background: var(--bio-schedule-alt-col);
+  border-color: var(--bio-schedule-alt-col2);
+  color: var(--bio-body-fg);
 }
 
 .gm-week__day.is-selected {
@@ -392,10 +420,17 @@ html[data-theme="night"] .gm-group__item {
   margin: 0;
   padding: 16px;
   border-radius: 12px;
+  border: 1px solid #e8e8e4;
   background: #fff;
   color: #666;
   font-size: 14px;
   line-height: 1.45;
+}
+
+html[data-theme="night"] .gm-empty {
+  background: var(--bio-surface-item);
+  border-color: var(--bio-surface-item-border);
+  color: var(--bio-muted);
 }
 
 .gm-footer {

@@ -15,8 +15,12 @@
       <p class="gm-header__kicker">График</p>
       <p class="gm-header__month">{{ month_name_upper }} {{ year }}</p>
     </div>
-    <div class="gm-month-picker-wrap">
-      <button type="button" class="gm-icon-btn" id="gm-month-open" aria-expanded="false" aria-haspopup="dialog" aria-controls="gm-month-picker" aria-label="Выбрать месяц" title="Выбрать месяц">⋯</button>
+    <div class="gm-header__actions">
+      <button type="button" class="gm-icon-btn gm-theme-btn" id="biota-theme-toggle" aria-pressed="false" title="Тема «Рассвет» (светлая)">☾</button>
+      <div class="gm-month-picker-wrap">
+      <button type="button" class="gm-icon-btn" id="gm-month-open" aria-expanded="false" aria-haspopup="dialog" aria-controls="gm-month-picker" aria-label="Выбрать месяц" title="Выбрать месяц">
+        <svg class="gm-icon-btn__svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      </button>
       <div class="gm-month-picker" id="gm-month-picker" hidden role="dialog" aria-label="Месяцы {{ month_picker_year }}">
         <p class="gm-month-picker__year">{{ month_picker_year }}</p>
         <div class="gm-month-picker__grid">
@@ -24,6 +28,7 @@
           <a href="{{ m.href }}" class="gm-month-picker__item{% if m.is_selected %} is-selected{% endif %}{% if m.is_current %} is-current{% endif %}">{{ m.label }}</a>
           {% endfor %}
         </div>
+      </div>
       </div>
     </div>
   </header>
@@ -172,7 +177,7 @@
   });
 
   document.addEventListener("click", function (e) {
-    if (!panel.hidden && !panel.contains(e.target) && e.target !== openBtn) {
+    if (!panel.hidden && !panel.contains(e.target) && !openBtn.contains(e.target)) {
       closePicker();
     }
   });

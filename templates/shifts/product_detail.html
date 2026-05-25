@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=22">
+<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=27">
 <div class="product-detail-grid{% if tab_default == 'drawing' %} has-meta-column{% endif %}"{% if setups %} data-product-has-setups="1"{% endif %}>
   <div class="product-detail-main">
 
@@ -27,7 +27,7 @@
       </label>
       </div>
       {% if biota_can_edit %}
-      <button type="button" class="btn btn-ghost product-setup-inline-delete-btn" id="setup-inline-delete-setup-btn" hidden title="Удалить выбранную установку" aria-label="Удалить выбранную установку">Удалить установку</button>
+      <button type="button" class="btn btn-ghost product-setup-inline-delete-btn js-phased-delete" id="setup-inline-delete-setup-btn" hidden title="Удалить выбранную установку" aria-label="Удалить выбранную установку">Удалить установку</button>
       {% endif %}
       {% elif biota_can_edit %}
       <form method="post" action="{% url 'product_detail' product.pk %}" style="display:inline;">
@@ -43,7 +43,6 @@
       <span class="nav-spacer" style="flex:1 1 auto;"></span>
       <a href="#" class="btn btn-ghost" id="setup-export-specs-btn" target="_blank" rel="noopener" hidden>PDF параметры</a>
       <a href="#" class="btn btn-ghost" id="setup-export-photos-btn" target="_blank" rel="noopener" hidden>PDF фото 3x5</a>
-      <a href="#" download class="btn btn-ghost product-btn-program" id="product-program-download" hidden>Скачать программу</a>
       <button type="button" class="btn product-btn-edit-mode" id="setup-inline-edit-btn">Быстрое редактирование</button>
       {% endif %}
     </div>
@@ -51,12 +50,12 @@
       <section class="product-tab-panel product-tab-panel--drawing-placeholder" id="panel-drawing" data-panel="drawing" data-inline-edit-mode="0" role="tabpanel" aria-label="Изделие" {% if tab_default != 'drawing' %}hidden{% endif %}></section>
       {% for setup in setups %}
       <section class="product-tab-panel" id="panel-setup-{{ setup.pk }}" data-panel="{{ setup.tab_slug }}" data-inline-edit-mode="0" role="tabpanel" aria-labelledby="tab-setup-{{ setup.pk }}" {% if tab_default != setup.tab_slug %}hidden{% endif %}>
-        <div class="product-setup-panel-title">
-          <span class="muted">Название установки:</span>
-          <span class="product-setup-name" data-field-text="name">{{ setup.name }}</span>
-        </div>
         <div class="product-setup-specs">
           <div class="product-setup-left-col">
+            <div class="product-setup-panel-title">
+              <span class="muted">Название установки:</span>
+              <span class="product-setup-name" data-field-text="name">{{ setup.name }}</span>
+            </div>
             <div class="product-setup-spec-group">
               <h5>Привязки</h5>
               <div class="setup-meta-bindings-layout">
@@ -70,7 +69,7 @@
                 <div class="setup-spec-box">
                 <div class="setup-spec-box-controls" hidden>
                   <button type="button" class="btn btn-ghost js-setup-spec-copy setup-spec-copy-btn" title="Копировать блок" aria-label="Копировать блок"><i class="fi fi-rr-copy ui-icon" aria-hidden="true"></i></button>
-                  <button type="button" class="btn btn-ghost js-setup-spec-remove setup-spec-remove-btn" title="Удалить блок" aria-label="Удалить блок"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
+                  <button type="button" class="btn btn-ghost js-setup-spec-remove setup-spec-remove-btn js-phased-delete" title="Удалить блок" aria-label="Удалить блок"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
                 </div>
                 <div class="setup-spec-col setup-spec-col-bindings">
                   <div class="setup-row-photo setup-row-photo-binding">
@@ -147,7 +146,7 @@
                 <div class="setup-spec-box setup-spec-box-extra" data-extra-block-index="{{ forloop.counter0 }}">
                 <div class="setup-spec-box-controls" hidden>
                   <button type="button" class="btn btn-ghost js-setup-spec-copy setup-spec-copy-btn" title="Копировать блок" aria-label="Копировать блок"><i class="fi fi-rr-copy ui-icon" aria-hidden="true"></i></button>
-                  <button type="button" class="btn btn-ghost js-setup-spec-remove setup-spec-remove-btn" title="Удалить блок" aria-label="Удалить блок"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
+                  <button type="button" class="btn btn-ghost js-setup-spec-remove setup-spec-remove-btn js-phased-delete" title="Удалить блок" aria-label="Удалить блок"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
                 </div>
                 <div class="setup-spec-col setup-spec-col-bindings">
                   <div class="setup-row-photo setup-row-photo-binding">
@@ -303,7 +302,7 @@
                       <div class="setup-tools-row-actions-cell-inner">
                         <button
                           type="button"
-                          class="btn btn-ghost setup-tools-remove-row-btn js-setup-tools-remove-row"
+                          class="btn btn-ghost setup-tools-remove-row-btn js-setup-tools-remove-row js-phased-delete"
                           title="Удалить строку"
                           aria-label="Удалить строку инструмента"
                         >
@@ -347,7 +346,7 @@
             {% if biota_can_edit %}
             <div class="setup-photo-inline-controls" hidden>
               <button type="button" class="btn btn-ghost js-setup-photo-save-caption" title="Сохранить подпись">Сохранить</button>
-              <button type="button" class="btn btn-ghost js-setup-photo-delete" title="Удалить блок">×</button>
+              <button type="button" class="btn btn-ghost js-setup-photo-delete js-phased-delete" title="Удалить блок">×</button>
             </div>
             {% endif %}
           </figure>
@@ -455,7 +454,7 @@
   "tool_type_choices": [{% for v, lbl in tool_type_choices %}{"value":"{{ v|escapejs }}","label":"{{ lbl|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
 }</script>
 <script src="{% static 'shifts/js/plan-cascade-form.js' %}" defer></script>
-<script src="{% static 'shifts/js/product_detail.js' %}?v=23" defer></script>
+<script src="{% static 'shifts/js/product_detail.js' %}?v=24" defer></script>
 
 {% if cad_inline_preview or has_setup_preview_stl %}
 <script type="importmap">

@@ -6,6 +6,63 @@ var PD = (function () {
   } catch (e) { return {}; }
 })();
 
+var PHASED_DELETE_STEPS = 3;
+
+function phasedDeleteReset(btn) {
+  if (!btn) return;
+  var base = btn.getAttribute("data-phased-delete-base") || btn.className;
+  btn.setAttribute("data-phased-delete-step", "0");
+  btn.className = base + " btn-phased-delete--s0";
+  btn.setAttribute("aria-label", "Удалить: нажмите " + PHASED_DELETE_STEPS + " раз");
+  btn.title = "Удалить: нажмите " + PHASED_DELETE_STEPS + " раз";
+}
+
+function phasedDeleteSetStep(btn, step) {
+  var base = btn.getAttribute("data-phased-delete-base") || "";
+  btn.setAttribute("data-phased-delete-step", String(step));
+  btn.className = base + " btn-phased-delete--s" + step;
+  btn.setAttribute("aria-label", "Удалить: " + step + " из " + PHASED_DELETE_STEPS);
+  btn.title =
+    step < PHASED_DELETE_STEPS
+      ? "Удалить: ещё " + (PHASED_DELETE_STEPS - step) + " наж."
+      : "Подтвердить удаление";
+}
+
+function phasedDeleteInit(btn) {
+  if (!btn || btn.getAttribute("data-phased-delete-base")) return;
+  btn.setAttribute("data-phased-delete-base", btn.className);
+  phasedDeleteReset(btn);
+}
+
+function phasedDeleteInitAll(scope) {
+  var root = scope || document;
+  root.querySelectorAll(".js-phased-delete").forEach(phasedDeleteInit);
+}
+
+function phasedDeleteResetAll(scope) {
+  var root = scope || document;
+  root.querySelectorAll(".js-phased-delete").forEach(function (btn) {
+    if (btn.getAttribute("data-phased-delete-base")) phasedDeleteReset(btn);
+  });
+}
+
+function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
+  phasedDeleteInit(btn);
+  var step = parseInt(btn.getAttribute("data-phased-delete-step") || "0", 10) + 1;
+  if (step < PHASED_DELETE_STEPS) {
+    phasedDeleteSetStep(btn, step);
+    return false;
+  }
+  phasedDeleteSetStep(btn, PHASED_DELETE_STEPS);
+  if (confirmMsg && !window.confirm(confirmMsg)) {
+    phasedDeleteReset(btn);
+    return false;
+  }
+  phasedDeleteReset(btn);
+  if (onFinal) onFinal();
+  return true;
+}
+
   (function () {
     document.querySelectorAll(".js-print-setup-html").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -520,7 +577,8 @@ var PD = (function () {
         if (!btn) return;
         ev.preventDefault();
         var id = (btn.getAttribute("data-note-id") || "").trim();
-        if (!id || !window.confirm("Удалить эту заметку?")) return;
+        if (!id) return;
+        phasedDeleteHandleClick(btn, "Удалить эту заметку?", async function () {
         var fd = new FormData();
         fd.append("action", "delete_product_note");
         fd.append("note_id", id);
@@ -548,6 +606,7 @@ var PD = (function () {
         } catch (_err) {
           alert("Ошибка сети.");
         }
+        });
       });
     }
     initProductNoteDeletes();
@@ -576,6 +635,7 @@ var PD = (function () {
     var root = document.getElementById("product-tabs");
     var detailGrid = document.querySelector(".product-detail-grid");
     if (!root) return;
+    phasedDeleteInitAll(document);
     var inlineEditMode = false;
 
     function productDetailMetaEl() {
@@ -821,13 +881,14 @@ var PD = (function () {
       innerActions.className = "setup-tools-row-actions-cell-inner";
       var btnRm = document.createElement("button");
       btnRm.type = "button";
-      btnRm.className = "btn btn-ghost setup-tools-remove-row-btn js-setup-tools-remove-row";
+      btnRm.className = "btn btn-ghost setup-tools-remove-row-btn js-setup-tools-remove-row js-phased-delete";
       btnRm.title = "Удалить строку";
       btnRm.setAttribute("aria-label", "Удалить строку инструмента");
       var icRm = document.createElement("i");
       icRm.className = "fi fi-br-cross ui-icon";
       icRm.setAttribute("aria-hidden", "true");
       btnRm.appendChild(icRm);
+      phasedDeleteInit(btnRm);
       innerActions.appendChild(btnRm);
       tdActions.appendChild(innerActions);
       tr.appendChild(tdActions);
@@ -1325,6 +1386,11 @@ var PD = (function () {
       var clone = sourceBox.cloneNode(true);
       clone.classList.remove("setup-spec-box-extra");
       clone.classList.add("setup-spec-box-extra");
+      clone.querySelectorAll(".js-phased-delete").forEach(function (b) {
+        b.removeAttribute("data-phased-delete-base");
+        b.removeAttribute("data-phased-delete-step");
+        phasedDeleteInit(b);
+      });
       clone.removeAttribute("data-extra-block-index");
       clone.querySelectorAll("[data-field-text]").forEach(function (el) {
         var field = el.getAttribute("data-field-text") || "";
@@ -1535,6 +1601,10 @@ var PD = (function () {
         if (inlineEditMode) btn.removeAttribute("hidden");
         else btn.setAttribute("hidden", "hidden");
       });
+      document.querySelectorAll(".product-drawing-upload-btn").forEach(function (btn) {
+        if (inlineEditMode) btn.removeAttribute("hidden");
+        else btn.setAttribute("hidden", "hidden");
+      });
       var planSumAll = productDetailPlanWrap();
       if (planSumAll && planSumAll.querySelector("[data-product-plan-summary]")) {
         syncSetupPlanInlineVisibility(planSumAll.querySelector("[data-product-plan-summary]"));
@@ -1550,6 +1620,8 @@ var PD = (function () {
       }
       syncDrawingPanelQuickEdit(inlineEditMode);
       syncInlineDeleteSetupBtn();
+      if (inlineEditMode) phasedDeleteInitAll(document);
+      else phasedDeleteResetAll(document);
       window.dispatchEvent(new CustomEvent("setup-inline-edit-mode", { detail: { enabled: inlineEditMode } }));
     }
 
@@ -1585,6 +1657,9 @@ var PD = (function () {
         btn.setAttribute("hidden", "hidden");
       });
       document.querySelectorAll(".setup-program-upload-btn").forEach(function (btn) {
+        btn.setAttribute("hidden", "hidden");
+      });
+      document.querySelectorAll(".product-drawing-upload-btn").forEach(function (btn) {
         btn.setAttribute("hidden", "hidden");
       });
       root.querySelectorAll(".setup-gcode-value").forEach(function (wrap) {
@@ -2073,47 +2148,47 @@ var PD = (function () {
 
     var deleteSetupBtn = document.getElementById("setup-inline-delete-setup-btn");
     if (deleteSetupBtn) {
+      phasedDeleteInit(deleteSetupBtn);
       deleteSetupBtn.addEventListener("click", async function () {
         if (!inlineEditMode) return;
         var sel = document.getElementById("setup-tab-select");
         var val = sel ? sel.value : "";
         var m = /^setup-(\d+)$/.exec(val || "");
         if (!m) return;
-        if (
-          !window.confirm(
-            "Удалить эту установку? Все данные вкладки (фото, инструмент, заметки по ней) будут удалены безвозвратно."
-          )
-        ) {
-          return;
-        }
-        if (!(getCookie("csrftoken") || "").trim()) {
-          alert("Не найден CSRF-токен в cookies (csrftoken). Обновите страницу.");
-          return;
-        }
-        var fd = new FormData();
-        fd.append("action", "inline_delete_setup");
-        fd.append("setup_id", m[1]);
-        try {
-          var res = await fetch(window.location.href, {
-            method: "POST",
-            headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
-            body: fd,
-            credentials: "same-origin",
-          });
-          var data = await readJsonInlineSaveResponse(res);
-          if (!data) return;
-          if (!res.ok || !data.ok) {
-            alert(data.error || "Не удалось удалить установку.");
-            return;
+        phasedDeleteHandleClick(
+          deleteSetupBtn,
+          "Удалить эту установку? Все данные вкладки (фото, инструмент, заметки по ней) будут удалены безвозвратно.",
+          async function () {
+            if (!(getCookie("csrftoken") || "").trim()) {
+              alert("Не найден CSRF-токен в cookies (csrftoken). Обновите страницу.");
+              return;
+            }
+            var fd = new FormData();
+            fd.append("action", "inline_delete_setup");
+            fd.append("setup_id", m[1]);
+            try {
+              var res = await fetch(window.location.href, {
+                method: "POST",
+                headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+                body: fd,
+                credentials: "same-origin",
+              });
+              var data = await readJsonInlineSaveResponse(res);
+              if (!data) return;
+              if (!res.ok || !data.ok) {
+                alert(data.error || "Не удалось удалить установку.");
+                return;
+              }
+              if (data.redirect) {
+                window.location.href = data.redirect;
+                return;
+              }
+              window.location.reload();
+            } catch (_err) {
+              alert("Ошибка сети при удалении установки.");
+            }
           }
-          if (data.redirect) {
-            window.location.href = data.redirect;
-            return;
-          }
-          window.location.reload();
-        } catch (_err) {
-          alert("Ошибка сети при удалении установки.");
-        }
+        );
       });
     }
 
@@ -2256,17 +2331,20 @@ var PD = (function () {
       if (removeToolRow) {
         if (!inlineEditMode) return;
         e.preventDefault();
-        var rowRm = removeToolRow.closest("tr");
-        var panelRm = removeToolRow.closest(".product-tab-panel");
-        var tbodyRm = rowRm && rowRm.parentNode;
-        if (!rowRm || !panelRm || !tbodyRm) return;
-        if (tbodyRm.querySelectorAll("tr").length <= 1) {
-          alert("Нельзя удалить последнюю строку таблицы инструмента.");
-          return;
-        }
-        rowRm.remove();
-        syncRowOrderDisplay(panelRm);
-        syncToolOverrideClasses(panelRm);
+        phasedDeleteHandleClick(removeToolRow, "", function () {
+          var rowRm = removeToolRow.closest("tr");
+          var panelRm = removeToolRow.closest(".product-tab-panel");
+          var tbodyRm = rowRm && rowRm.parentNode;
+          if (!rowRm || !panelRm || !tbodyRm) return;
+          if (tbodyRm.querySelectorAll("tr").length <= 1) {
+            alert("Нельзя удалить последнюю строку таблицы инструмента.");
+            phasedDeleteReset(removeToolRow);
+            return;
+          }
+          rowRm.remove();
+          syncRowOrderDisplay(panelRm);
+          syncToolOverrideClasses(panelRm);
+        });
         return;
       }
       var addToolBtn = el.closest && el.closest(".js-setup-tools-add-row");
@@ -2309,19 +2387,23 @@ var PD = (function () {
       var removeBtn = e.target && e.target.closest ? e.target.closest(".js-setup-spec-remove") : null;
       if (removeBtn) {
         if (!inlineEditMode) return;
-        var boxToRemove = removeBtn.closest(".setup-spec-box");
-        var panelForRemove = activeSetupPanel();
-        if (!boxToRemove || !panelForRemove) return;
-        var stackForRemove = panelForRemove.querySelector(".setup-spec-stack");
-        if (!stackForRemove) return;
-        var boxes = Array.from(stackForRemove.querySelectorAll(".setup-spec-box:not(.setup-spec-box-header)"));
-        if (boxes.length <= 1) {
-          alert("Нельзя удалить последний блок.");
-          return;
-        }
-        var stackRemoved = boxToRemove.parentNode;
-        boxToRemove.remove();
-        if (stackRemoved) reindexExtraBindingBlocks(stackRemoved);
+        e.preventDefault();
+        phasedDeleteHandleClick(removeBtn, "", function () {
+          var boxToRemove = removeBtn.closest(".setup-spec-box");
+          var panelForRemove = activeSetupPanel();
+          if (!boxToRemove || !panelForRemove) return;
+          var stackForRemove = panelForRemove.querySelector(".setup-spec-stack");
+          if (!stackForRemove) return;
+          var boxes = Array.from(stackForRemove.querySelectorAll(".setup-spec-box:not(.setup-spec-box-header)"));
+          if (boxes.length <= 1) {
+            alert("Нельзя удалить последний блок.");
+            phasedDeleteReset(removeBtn);
+            return;
+          }
+          var stackRemoved = boxToRemove.parentNode;
+          boxToRemove.remove();
+          if (stackRemoved) reindexExtraBindingBlocks(stackRemoved);
+        });
         return;
       }
       if (!addBtn && !copyBtn) return;
@@ -2496,69 +2578,100 @@ var PD = (function () {
         return;
       }
 
+      var btnDrawingFileDel = e.target.closest(".js-product-drawing-file-delete");
+      if (btnDrawingFileDel) {
+        e.preventDefault();
+        var didDel = btnDrawingFileDel.getAttribute("data-drawing-file-id") || "";
+        if (!didDel) return;
+        phasedDeleteHandleClick(btnDrawingFileDel, "Удалить этот чертёж?", async function () {
+          var fdDrawDel = new FormData();
+          fdDrawDel.append("action", "inline_delete_product_drawing_file");
+          fdDrawDel.append("drawing_file_id", didDel);
+          var resDrawDel = await fetch(window.location.href, {
+            method: "POST",
+            headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+            body: fdDrawDel,
+            credentials: "same-origin",
+          });
+          var dataDrawDel = await resDrawDel.json();
+          if (!resDrawDel.ok || !dataDrawDel.ok) {
+            alert(dataDrawDel.error || "Не удалось удалить чертёж.");
+            return;
+          }
+          renderProductDrawingFilesList(dataDrawDel);
+        });
+        return;
+      }
+
       var btnProgFileDel = e.target.closest(".js-setup-program-file-delete");
       if (btnProgFileDel) {
-        if (!confirm("Удалить этот файл программы?")) return;
+        e.preventDefault();
         var sidDel = btnProgFileDel.getAttribute("data-setup-id") || "";
         var pidDel = btnProgFileDel.getAttribute("data-program-file-id") || "";
         if (!sidDel || !pidDel) return;
-        var fdProgDel = new FormData();
-        fdProgDel.append("action", "inline_delete_setup_program_file");
-        fdProgDel.append("setup_id", sidDel);
-        fdProgDel.append("program_file_id", pidDel);
-        var resProgDel = await fetch(window.location.href, {
-          method: "POST",
-          headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
-          body: fdProgDel,
-          credentials: "same-origin",
-        });
-        var dataProgDel = await resProgDel.json();
-        if (!resProgDel.ok || !dataProgDel.ok) {
-          alert(dataProgDel.error || "Не удалось удалить файл.");
-          return;
-        }
-        var panelProg = btnProgFileDel.closest(".product-tab-panel");
-        renderSetupProgramFilesList(panelProg, sidDel, dataProgDel);
-        var tabProg = document.getElementById("tab-setup-" + sidDel);
-        if (tabProg) {
-          if (dataProgDel.program_url) {
-            tabProg.setAttribute("data-program-url", dataProgDel.program_url);
-            tabProg.setAttribute("data-program-filename", dataProgDel.program_filename || "");
-          } else {
-            tabProg.removeAttribute("data-program-url");
-            tabProg.removeAttribute("data-program-filename");
+        phasedDeleteHandleClick(btnProgFileDel, "Удалить этот файл программы?", async function () {
+          var fdProgDel = new FormData();
+          fdProgDel.append("action", "inline_delete_setup_program_file");
+          fdProgDel.append("setup_id", sidDel);
+          fdProgDel.append("program_file_id", pidDel);
+          var resProgDel = await fetch(window.location.href, {
+            method: "POST",
+            headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+            body: fdProgDel,
+            credentials: "same-origin",
+          });
+          var dataProgDel = await resProgDel.json();
+          if (!resProgDel.ok || !dataProgDel.ok) {
+            alert(dataProgDel.error || "Не удалось удалить файл.");
+            return;
           }
-        }
-        var tabNameNow = (root.querySelector(".product-tab.is-active") || {}).getAttribute("data-tab") || "";
-        setProgramDownloadByTab(tabNameNow);
+          var panelProg = btnProgFileDel.closest(".product-tab-panel");
+          renderSetupProgramFilesList(panelProg, sidDel, dataProgDel);
+          var tabProg = document.getElementById("tab-setup-" + sidDel);
+          if (tabProg) {
+            if (dataProgDel.program_url) {
+              tabProg.setAttribute("data-program-url", dataProgDel.program_url);
+              tabProg.setAttribute("data-program-filename", dataProgDel.program_filename || "");
+            } else {
+              tabProg.removeAttribute("data-program-url");
+              tabProg.removeAttribute("data-program-filename");
+            }
+          }
+          var tabNameNow = (root.querySelector(".product-tab.is-active") || {}).getAttribute("data-tab") || "";
+          setProgramDownloadByTab(tabNameNow);
+        });
         return;
       }
 
       var btnDelete = e.target.closest(".js-setup-photo-delete");
       if (btnDelete) {
+        e.preventDefault();
         var figureDel = btnDelete.closest(".setup-photo-figure");
         if (!figureDel) return;
         var photoIdDel = figureDel.getAttribute("data-photo-id") || "";
         if (!photoIdDel) {
+          phasedDeleteHandleClick(btnDelete, "", function () {
+            figureDel.remove();
+          });
+          return;
+        }
+        phasedDeleteHandleClick(btnDelete, "Удалить блок фото?", async function () {
+          var fdDel = new FormData();
+          fdDel.append("action", "inline_delete_setup_photo");
+          fdDel.append("photo_id", photoIdDel);
+          var resDel = await fetch(window.location.href, {
+            method: "POST",
+            headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+            body: fdDel,
+            credentials: "same-origin",
+          });
+          var dataDel = await resDel.json();
+          if (!resDel.ok || !dataDel.ok) {
+            alert(dataDel.error || "Не удалось удалить.");
+            return;
+          }
           figureDel.remove();
-          return;
-        }
-        if (!confirm("Удалить блок фото?")) return;
-        var fdDel = new FormData();
-        fdDel.append("action", "inline_delete_setup_photo");
-        fdDel.append("photo_id", photoIdDel);
-        var resDel = await fetch(window.location.href, {
-          method: "POST",
-          headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
-          body: fdDel,
-          credentials: "same-origin",
         });
-        var dataDel = await resDel.json();
-        if (!resDel.ok || !dataDel.ok) {
-          alert(dataDel.error || "Не удалось удалить.");
-          return;
-        }
-        figureDel.remove();
         return;
       }
 
@@ -2582,9 +2695,11 @@ var PD = (function () {
           '<figcaption class="muted"><input type="text" class="js-new-photo-caption" placeholder="Описание" style="width:100%;"/></figcaption>' +
           '<div class="setup-photo-inline-controls">' +
             '<button type="button" class="btn btn-ghost js-save-new-photo">Сохранить</button>' +
-            '<button type="button" class="btn btn-ghost js-setup-photo-delete">×</button>' +
+            '<button type="button" class="btn btn-ghost js-setup-photo-delete js-phased-delete">×</button>' +
           '</div>';
         photosWrap.appendChild(draft);
+        var delDraftBtn = draft.querySelector(".js-setup-photo-delete");
+        if (delDraftBtn) phasedDeleteInit(delDraftBtn);
         return;
       }
 
@@ -2617,6 +2732,13 @@ var PD = (function () {
           }
         }
         if (input) input.click();
+      }
+
+      var btnDrawingUpload = e.target.closest(".product-drawing-upload-btn");
+      if (btnDrawingUpload) {
+        var drawInput = document.querySelector(".product-drawing-upload-input");
+        if (drawInput) drawInput.click();
+        return;
       }
 
       var btnProgramUpload = e.target.closest(".setup-program-upload-btn");
@@ -2675,11 +2797,13 @@ var PD = (function () {
           '<figcaption class="muted setup-photo-caption is-inline-edit" data-caption-editable="1" contenteditable="true" spellcheck="true" title="Двойной щелчок — открыть фото">' + (ph.caption || "") + '</figcaption>' +
           '<div class="setup-photo-inline-controls" hidden>' +
             '<button type="button" class="btn btn-ghost js-setup-photo-save-caption" title="Сохранить подпись">Сохранить</button>' +
-            '<button type="button" class="btn btn-ghost js-setup-photo-delete" title="Удалить блок">×</button>' +
+            '<button type="button" class="btn btn-ghost js-setup-photo-delete js-phased-delete" title="Удалить блок">×</button>' +
           '</div>';
         if (inlineEditMode) {
           draftFig.setAttribute("draggable", "true");
         }
+        var delSavedPh = draftFig.querySelector(".js-setup-photo-delete");
+        if (delSavedPh) phasedDeleteInit(delSavedPh);
       }
     });
 
@@ -2915,6 +3039,75 @@ var PD = (function () {
         input.value = "";
     }
 
+    function renderProductDrawingFilesList(data) {
+      if (!data) return;
+      var wrap = document.getElementById("product-side-drawings");
+      if (!wrap) return;
+      var ul = wrap.querySelector(".product-drawing-files-list");
+      if (!ul) return;
+      var editMode = document.body.classList.contains("setup-inline-edit-enabled");
+      var files = data.drawing_files || [];
+      ul.textContent = "";
+      files.forEach(function (f) {
+        var li = document.createElement("li");
+        li.className = "product-drawing-file-item";
+        li.setAttribute("data-drawing-file-id", String(f.id));
+        var label = f.name || "чертёж.pdf";
+        var a = document.createElement("a");
+        a.href = f.url || "#";
+        a.setAttribute("download", "");
+        a.className = "btn product-btn-secondary product-side-drawing-download";
+        a.textContent = label;
+        if (f.title) a.title = f.title;
+        li.appendChild(a);
+        var actions = document.createElement("div");
+        actions.className = "product-drawing-file-actions";
+        var preview = document.createElement("a");
+        preview.href = f.url || "#";
+        preview.target = "_blank";
+        preview.rel = "noopener noreferrer";
+        preview.className = "btn btn-ghost product-drawing-preview-btn";
+        preview.title = "Открыть в новой вкладке";
+        preview.setAttribute("aria-label", "Открыть " + label);
+        preview.innerHTML = '<i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>';
+        actions.appendChild(preview);
+        if (editMode) {
+          var del = document.createElement("button");
+          del.type = "button";
+          del.className = "btn btn-ghost product-drawing-delete-btn js-product-drawing-file-delete js-phased-delete";
+          del.setAttribute("data-drawing-file-id", String(f.id));
+          del.title = "Удалить чертёж";
+          del.setAttribute("aria-label", "Удалить чертёж");
+          del.innerHTML = '<i class="fi fi-br-cross ui-icon" aria-hidden="true"></i>';
+          phasedDeleteInit(del);
+          actions.appendChild(del);
+        }
+        li.appendChild(actions);
+        ul.appendChild(li);
+      });
+      var emptyMsg = wrap.querySelector(".product-drawing-tab-empty-msg");
+      if (emptyMsg) emptyMsg.hidden = files.length > 0;
+    }
+
+    async function uploadProductDrawingFile(file) {
+      if (!file) return;
+      var fd = new FormData();
+      fd.append("action", "inline_append_product_drawing");
+      fd.append("drawing_file", file);
+      var res = await fetch(window.location.href, {
+        method: "POST",
+        headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+        body: fd,
+        credentials: "same-origin",
+      });
+      var data = await res.json();
+      if (!res.ok || !data.ok) {
+        alert(data.error || "Не удалось загрузить чертёж.");
+        return;
+      }
+      renderProductDrawingFilesList(data);
+    }
+
     function renderSetupProgramFilesList(panel, setupId, data) {
       if (!data || !setupId) return;
       var wraps = document.querySelectorAll('.setup-program-files-inline[data-setup-id="' + setupId + '"]');
@@ -2945,12 +3138,13 @@ var PD = (function () {
             if (editMode) {
               var del = document.createElement("button");
               del.type = "button";
-              del.className = "btn btn-ghost setup-program-file-delete js-setup-program-file-delete";
+              del.className = "btn btn-ghost setup-program-file-delete js-setup-program-file-delete js-phased-delete";
               del.setAttribute("data-program-file-id", String(f.id));
               del.setAttribute("data-setup-id", String(setupId));
               del.title = "Удалить файл";
               del.setAttribute("aria-label", "Удалить файл программы");
               del.innerHTML = '<i class="fi fi-br-cross ui-icon" aria-hidden="true"></i>';
+              phasedDeleteInit(del);
               li.appendChild(del);
             }
             ul.appendChild(li);
@@ -3019,6 +3213,12 @@ var PD = (function () {
       }
       if (input.classList.contains("setup-program-upload-input")) {
         handleProgramUploadInputChange(input);
+        return;
+      }
+      if (input.classList.contains("product-drawing-upload-input")) {
+        var drawFile = input.files && input.files[0];
+        if (drawFile) uploadProductDrawingFile(drawFile);
+        input.value = "";
       }
     });
     document.addEventListener("dragover", function (e) {

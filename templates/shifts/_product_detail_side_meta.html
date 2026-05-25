@@ -71,34 +71,32 @@
   </div>
   {% endif %}
 
-  {% if product.drawing_pdf %}
-  <div class="product-download-row" data-product-asset-row="drawing_pdf">
-    <a href="{{ product.drawing_pdf.url }}" download class="btn product-btn-secondary product-download-main-btn">Скачать чертёж (PDF)</a>
-    <div class="product-download-row-actions">
-      <a href="{{ product.drawing_pdf.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost product-download-preview-btn" title="Открыть чертёж в новой вкладке" aria-label="Открыть чертёж в новой вкладке">
-        <i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>
-      </a>
+  <div class="product-side-drawings" id="product-side-drawings" aria-label="Чертежи изделия">
+    <div class="product-side-drawings-meta">
+      <ul class="product-drawing-files-list">
+        {% for df in product.drawing_file_list %}
+        <li class="product-drawing-file-item" data-drawing-file-id="{{ df.pk }}">
+          <a href="{{ df.file.url }}" download class="btn product-btn-secondary product-side-drawing-download" title="{{ df.download_title }}">{{ df.display_name }}</a>
+          <div class="product-drawing-file-actions">
+            <a href="{{ df.file.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost product-drawing-preview-btn" title="Открыть в новой вкладке" aria-label="Открыть {{ df.display_name }}">
+              <i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>
+            </a>
+            {% if biota_can_edit %}
+            <button type="button" class="btn btn-ghost product-drawing-delete-btn js-product-drawing-file-delete js-phased-delete" data-drawing-file-id="{{ df.pk }}" title="Удалить чертёж" aria-label="Удалить чертёж"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
+            {% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="muted product-drawing-tab-empty-msg"{% if product.has_any_drawing %} hidden{% endif %}>Чертежи не загружены</p>
       {% if biota_can_edit %}
-      <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Заменить PDF" aria-label="Заменить PDF">
-        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
-      </button>
+      <span class="product-drawing-upload-wrap setup-program-upload-wrap">
+        <button type="button" class="btn btn-ghost product-drawing-upload-btn setup-program-upload-btn" title="Добавить чертёж PDF" aria-label="Добавить чертёж PDF" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+        <input type="file" class="product-drawing-upload-input" accept=".pdf,application/pdf" hidden />
+      </span>
       {% endif %}
     </div>
-    {% if biota_can_edit %}
-    <input type="file" class="js-product-asset-file-input" data-field-name="drawing_pdf" accept=".pdf,application/pdf" hidden />
-    {% endif %}
   </div>
-  {% elif biota_can_edit %}
-  <div class="product-download-row" data-product-asset-row="drawing_pdf">
-    <span class="muted product-download-placeholder">Чертёж (PDF) не загружен</span>
-    <div class="product-download-row-actions">
-      <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Загрузить PDF" aria-label="Загрузить PDF">
-        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
-      </button>
-    </div>
-    <input type="file" class="js-product-asset-file-input" data-field-name="drawing_pdf" accept=".pdf,application/pdf" hidden />
-  </div>
-  {% endif %}
 </div>
 {% if setups %}
 <div class="product-side-programs" id="product-side-programs" aria-label="Программы установок">
@@ -110,7 +108,7 @@
         <li class="setup-program-file-item setup-program-file-item-side" data-program-file-id="{{ pf.pk }}">
           <a href="{{ pf.file.url }}" download class="btn product-btn-program setup-side-program-download">{{ pf.display_name }}</a>
           {% if biota_can_edit %}
-          <button type="button" class="btn btn-ghost setup-program-file-delete js-setup-program-file-delete" data-program-file-id="{{ pf.pk }}" data-setup-id="{{ setup.pk }}" title="Удалить файл" aria-label="Удалить файл программы"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-ghost setup-program-file-delete js-setup-program-file-delete js-phased-delete" data-program-file-id="{{ pf.pk }}" data-setup-id="{{ setup.pk }}" title="Удалить файл" aria-label="Удалить файл программы"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
           {% endif %}
         </li>
         {% endfor %}

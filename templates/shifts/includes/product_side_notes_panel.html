@@ -12,7 +12,7 @@
         {% if username and biota_is_admin or note.author_username == username %}
         <button
           type="button"
-          class="btn product-drawing-notes__delete js-product-note-delete"
+          class="btn product-drawing-notes__delete js-product-note-delete js-phased-delete"
           data-note-id="{{ note.pk }}"
           title="Удалить заметку"
           aria-label="Удалить заметку"

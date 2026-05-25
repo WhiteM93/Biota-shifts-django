@@ -510,9 +510,104 @@ var INV = (function () {
   }
 
   var toolMaterialFilterOther = INV.tool_material_filter_other;
-  var toolMaterialOptions = [{ value: "", label: "Неизвестно" }].concat(
-    (INV.tool_material_types || []).map(function (x) { return { value: x.value, label: x.label }; })
-  ).concat([{ value: toolMaterialFilterOther, label: "Другое" }]);
+  var arrivalCsrfEl = form.querySelector('input[name="csrfmiddlewaretoken"]');
+  var arrivalCsrfToken = arrivalCsrfEl ? arrivalCsrfEl.value : "";
+
+  function loadToolMaterialExtrasFromPage() {
+    try {
+      var el = document.getElementById("stock-tool-material-extras-json");
+      var parsed = el ? JSON.parse(el.textContent || "[]") : [];
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch (_e) {
+      return [];
+    }
+  }
+
+  function buildArrivalToolMaterialOptions() {
+    var base = [{ value: "", label: "Неизвестно" }].concat(
+      (INV.tool_material_types || []).map(function (x) { return { value: x.value, label: x.label }; })
+    );
+    var std = {};
+    base.forEach(function (o) { std[o.value] = true; });
+    loadToolMaterialExtrasFromPage().forEach(function (v) {
+      if (!v || std[v] || v === toolMaterialFilterOther) return;
+      base.push({ value: v, label: v });
+      std[v] = true;
+    });
+    base.push({ value: toolMaterialFilterOther, label: "Другое" });
+    return base;
+  }
+
+  var toolMaterialOptions = buildArrivalToolMaterialOptions();
+
+  function addExtraToToolMaterialOptions(value) {
+    var v = (value || "").trim();
+    if (!v || v === toolMaterialFilterOther) return;
+    if (toolMaterialOptions.some(function (o) { return o.value === v; })) return;
+    var otherIdx = -1;
+    for (var i = 0; i < toolMaterialOptions.length; i += 1) {
+      if (toolMaterialOptions[i].value === toolMaterialFilterOther) {
+        otherIdx = i;
+        break;
+      }
+    }
+    var opt = { value: v, label: v };
+    if (otherIdx >= 0) toolMaterialOptions.splice(otherIdx, 0, opt);
+    else toolMaterialOptions.push(opt);
+  }
+
+  function ensureToolMaterialSelectOption(sel, value) {
+    var v = (value || "").trim();
+    if (!v) return;
+    addExtraToToolMaterialOptions(v);
+    var found = Array.prototype.some.call(sel.options, function (o) { return o.value === v; });
+    if (!found) {
+      var otherOpt = Array.prototype.find.call(sel.options, function (o) {
+        return o.value === toolMaterialFilterOther;
+      });
+      var o = document.createElement("option");
+      o.value = v;
+      o.textContent = v;
+      if (otherOpt) sel.insertBefore(o, otherOpt);
+      else sel.appendChild(o);
+    }
+    sel.value = v;
+  }
+
+  function registerToolMaterialExtra(value) {
+    var v = (value || "").trim();
+    if (!v) return Promise.resolve(null);
+    var body = new URLSearchParams();
+    body.set("action", "register_tool_material_extra");
+    body.set("value", v);
+    if (arrivalCsrfToken) body.set("csrfmiddlewaretoken", arrivalCsrfToken);
+    return fetch(form.getAttribute("action") || window.location.pathname, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: body.toString(),
+      credentials: "same-origin",
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.ok && data.value) return data.value;
+        return null;
+      })
+      .catch(function () { return null; });
+  }
+
+  function applyCustomToolMaterial(tmSel, tmCustom) {
+    var v = (tmCustom.value || "").trim();
+    if (!v || tmSel.value !== toolMaterialFilterOther) return;
+    registerToolMaterialExtra(v).then(function (saved) {
+      var use = saved || v;
+      ensureToolMaterialSelectOption(tmSel, use);
+      tmCustom.value = "";
+      tmCustom.style.display = "none";
+    });
+  }
 
   var coatingOptions = (INV.coating_types || []).map(function (x) { return { value: x.value, label: x.label }; });
 
@@ -657,6 +752,63 @@ var INV = (function () {
     }).join("");
   }
 
+  function arrivalRequiredDiamCell(dataKey) {
+    return (
+      '<td class="short-col"><input type="number" step="0.01" min="0.01" class="arrival-diam-input" data-k="' +
+      dataKey +
+      '" required aria-required="true" title="Обязательно">'
+    );
+  }
+
+  var arrivalDiamRequiredByCategory = {
+    drill: { key: "dr_diameter_mm", label: "диаметр D (мм) для сверла" },
+    end_mill: { key: "em_diameter_mm", label: "диаметр D (мм) для фрезы" },
+    center_drill: { key: "cd_diameter_mm", label: "диаметр D (мм) для центровки" },
+    countersink: { key: "cs_diameter_mm", label: "диаметр D (мм) для зенкера" },
+  };
+
+  function clearArrivalBulkErrors() {
+    var box = document.getElementById("arrival-bulk-errors");
+    if (box) {
+      box.hidden = true;
+      box.textContent = "";
+    }
+    groupsWrap.querySelectorAll(".is-invalid").forEach(function (el) {
+      el.classList.remove("is-invalid");
+    });
+  }
+
+  function showArrivalBulkError(message) {
+    var box = document.getElementById("arrival-bulk-errors");
+    if (!box) return;
+    box.textContent = message;
+    box.hidden = !message;
+    if (message) box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  function isPositiveNumberField(el) {
+    if (!el) return false;
+    var v = String(el.value || "").trim().replace(",", ".");
+    if (!v) return false;
+    var n = parseFloat(v);
+    return !isNaN(n) && n > 0;
+  }
+
+  function validateArrivalBulkRows() {
+    var issues = [];
+    groupsWrap.querySelectorAll("tr[data-arrival-row]").forEach(function (tr, i) {
+      var cat = tr.getAttribute("data-category") || "";
+      var spec = arrivalDiamRequiredByCategory[cat];
+      if (!spec) return;
+      var el = tr.querySelector('[data-k="' + spec.key + '"]');
+      if (!isPositiveNumberField(el)) {
+        if (el) el.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + (i + 1) + ": укажите " + spec.label + ".", el: el });
+      }
+    });
+    return issues;
+  }
+
   function ensureGroup(cat) {
     var groupId = "arrival-group-" + cat;
     var group = document.getElementById(groupId);
@@ -698,7 +850,7 @@ var INV = (function () {
     var cells = [];
     if (cat === "end_mill") {
       cells.push('<td><select data-k="mill_type">' + buildOptionsHtml(INV.end_mill_types || []) + '</select></td>');
-      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_diameter_mm"></td>');
+      cells.push(arrivalRequiredDiamCell("em_diameter_mm"));
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_corner_radius_mm"></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_overall_length_mm"></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_cutting_length_mm"></td>');
@@ -723,7 +875,7 @@ var INV = (function () {
       cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "center_drill") {
-      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cd_diameter_mm"></td>');
+      cells.push(arrivalRequiredDiamCell("cd_diameter_mm"));
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cd_overall_length_mm"></td>');
       cells.push('<td class="short-col"><select data-k="cd_angle_deg">' + buildOptionsHtml(INV.center_drill_angles || []) + '</select></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
@@ -733,7 +885,7 @@ var INV = (function () {
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "countersink") {
       cells.push('<td><select data-k="cs_type">' + buildOptionsHtml(INV.countersink_types || []) + '</select></td>');
-      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cs_diameter_mm"></td>');
+      cells.push(arrivalRequiredDiamCell("cs_diameter_mm"));
       cells.push('<td class="short-col"><select data-k="cs_angle_deg">' + buildOptionsHtml(INV.countersink_angles || []) + '</select></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cs_overall_length_mm"></td>');
       cells.push('<td class="short-col"><input type="number" data-k="cs_flutes_count"></td>');
@@ -743,7 +895,7 @@ var INV = (function () {
       cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else {
-      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_diameter_mm"></td>');
+      cells.push(arrivalRequiredDiamCell("dr_diameter_mm"));
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_overall_length_mm"></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_cutting_length_mm"></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_angle_deg"></td>');
@@ -774,6 +926,15 @@ var INV = (function () {
       tmCustom.style.display = isO ? "block" : "none";
       if (!isO) tmCustom.value = "";
     });
+    tmCustom.addEventListener("blur", function () {
+      applyCustomToolMaterial(tmSel, tmCustom);
+    });
+    tmCustom.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        tmCustom.blur();
+      }
+    });
     tr.querySelector(".co-cell").appendChild(buildColoredCoatingSelect("none"));
     tr.querySelector(".wm-cell").appendChild(buildColoredWmSelect(""));
     body.appendChild(tr);
@@ -783,7 +944,35 @@ var INV = (function () {
   categorySelect.addEventListener("change", function () {
     // Влияет только на категорию новых строк.
   });
+
+  var arrivalBlock = document.getElementById("arrival-block");
+  if (arrivalBlock) {
+    arrivalBlock.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter") return;
+      var t = e.target;
+      if (!t) return;
+      if (t.tagName === "TEXTAREA") return;
+      if (t.type === "submit" || (t.tagName === "BUTTON" && (t.type || "") === "submit")) return;
+      e.preventDefault();
+    });
+  }
+
+  groupsWrap.addEventListener("input", function (e) {
+    var t = e.target;
+    if (!t || !t.classList || !t.classList.contains("is-invalid")) return;
+    if (isPositiveNumberField(t)) t.classList.remove("is-invalid");
+  });
+
   form.addEventListener("submit", function (e) {
+    clearArrivalBulkErrors();
+    var issues = validateArrivalBulkRows();
+    if (issues.length) {
+      e.preventDefault();
+      showArrivalBulkError(issues.map(function (x) { return x.msg; }).join(" "));
+      if (issues[0].el) issues[0].el.focus();
+      return;
+    }
+
     var rows = [];
     groupsWrap.querySelectorAll("tr[data-arrival-row]").forEach(function (tr) {
       var row = { category: tr.getAttribute("data-category") || "" };
@@ -803,10 +992,23 @@ var INV = (function () {
     });
     if (!rows.length) {
       e.preventDefault();
+      showArrivalBulkError("Добавьте хотя бы одну строку прихода.");
       return;
     }
     rowsJsonInput.value = JSON.stringify(rows);
+    showArrivalBulkError("");
   });
+
+  form.addEventListener("submit", function () {
+    groupsWrap.querySelectorAll(".tm-tool-material-custom").forEach(function (cin) {
+      var tr = cin.closest("tr[data-arrival-row]");
+      if (!tr) return;
+      var sel = tr.querySelector('select[data-k="tool_material"]');
+      if (!sel || sel.value !== toolMaterialFilterOther) return;
+      var v = (cin.value || "").trim();
+      if (v) ensureToolMaterialSelectOption(sel, v);
+    });
+  }, true);
 
   groupsWrap.addEventListener("click", function (e) {
     var rm = e.target.closest(".js-arrival-row-remove");

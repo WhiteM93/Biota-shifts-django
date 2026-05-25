@@ -509,6 +509,21 @@ class DrillSpec(models.Model):
         return f"Сверло Ø{self.diameter_mm} / {self.angle_deg}°"
 
 
+class ToolMaterialExtra(models.Model):
+    """Пользовательские обозначения материала инструмента (вне стандартного справочника)."""
+
+    value = models.CharField(max_length=80, unique=True, verbose_name="Материал")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("value",)
+        verbose_name = "Материал инструмента (доп.)"
+        verbose_name_plural = "Материалы инструмента (доп.)"
+
+    def __str__(self):
+        return self.value
+
+
 class StockMovement(models.Model):
     movement_type = models.CharField(
         max_length=16,
@@ -1219,6 +1234,80 @@ class ProductSetupProgramFile(models.Model):
         if not self.file:
             return ""
         return short_setup_program_file_label(self.file.name or "")
+
+
+def drawing_file_display_name(stored_path: str, original: str = "") -> str:
+    """Имя для кнопки: исходное при загрузке или без служебного суффикса хранилища."""
+    raw = (original or "").strip()
+    if not raw:
+        base = os.path.basename((stored_path or "").replace("\\", "/"))
+        if not base:
+            return ""
+        stem, ext = os.path.splitext(base)
+        if ext.lower() != ".pdf":
+            ext = ".pdf"
+        # Django при коллизии: «Имя_a1b2c3d.остаток.pdf» → убрать _[a-zA-Z0-9]{5,12} перед точкой в stem
+        stem = re.sub(r"_([a-zA-Z0-9]{5,12})(?=\.)", "", stem)
+        stem = re.sub(r"_([a-zA-Z0-9]{5,12})$", "", stem)
+        raw = (stem + ext) if stem else base
+    if len(raw) > 52:
+        return short_setup_program_file_label(raw)
+    return raw
+
+
+class ProductDrawingFile(models.Model):
+    """PDF-чертёж изделия; может быть несколько файлов."""
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="drawing_files",
+        verbose_name="Изделие",
+    )
+    file = models.FileField(
+        upload_to="products/drawings/",
+        verbose_name="Чертёж (PDF)",
+        validators=[FileExtensionValidator(["pdf"])],
+    )
+    original_filename = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name="Имя при загрузке",
+    )
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Чертёж изделия (PDF)"
+        verbose_name_plural = "Чертежи изделия (PDF)"
+
+    def __str__(self) -> str:
+        return self.display_name or f"#{self.pk}"
+
+    def delete(self, using=None, keep_parents=False):
+        if self.file:
+            try:
+                self.file.delete(save=False)
+            except Exception:
+                pass
+        super().delete(using=using, keep_parents=keep_parents)
+
+    @property
+    def display_name(self) -> str:
+        if not self.file and not self.original_filename:
+            return ""
+        return drawing_file_display_name(self.file.name if self.file else "", self.original_filename)
+
+    @property
+    def download_title(self) -> str:
+        """Полное имя для подсказки при наведении."""
+        if self.original_filename.strip():
+            return self.original_filename.strip()
+        if self.file:
+            return os.path.basename(self.file.name or "")
+        return ""
 
 
 class ProductSetupToolRow(models.Model):
