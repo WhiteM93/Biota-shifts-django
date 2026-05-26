@@ -34,6 +34,38 @@
   margin-bottom: 10px;
 }
 
+.inv-history-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  margin-bottom: 10px;
+  max-width: 28rem;
+}
+
+.inv-history-filter .field {
+  margin: 0;
+  min-width: 10rem;
+}
+
+.inv-history-filter .field > span {
+  display: block;
+  font-size: 11px;
+  color: var(--bio-muted);
+  margin-bottom: 4px;
+}
+
+.inv-history-filter select {
+  width: 100%;
+  min-width: 10rem;
+  font-size: 13px;
+}
+
+.inv-history-filter__reset {
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+
 .inv-history-wrap {
   max-width: 100%;
   min-width: 0;

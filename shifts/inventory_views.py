@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal, InvalidOperation
 import json
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.db import transaction
@@ -75,6 +76,15 @@ from .models import (
 TOOL_MATERIAL_FILTER_OTHER = "__other__"
 _TOOL_MATERIAL_STD_KEYS = frozenset(k for k, _ in TOOL_MATERIAL_TYPES)
 _INVENTORY_CATEGORIES = frozenset({"end_mill", "tap", "center_drill", "countersink", "drill", "insert"})
+_HISTORY_MOVEMENT_TYPES = frozenset({"issue", "restock", "writeoff"})
+
+
+def _history_panel_redirect(request):
+    params: dict[str, str] = {"panel": "history"}
+    ht = (request.GET.get("history_movement_type") or request.POST.get("history_movement_type") or "").strip()
+    if ht in _HISTORY_MOVEMENT_TYPES:
+        params["history_movement_type"] = ht
+    return redirect(f"{request.path}?{urlencode(params)}")
 
 
 _ARRIVAL_REQUIRED_DIAMETER: dict[str, tuple[str, str]] = {
@@ -632,17 +642,17 @@ def inventory_view(request):
     if action == "rollback_stock_movement":
         if not is_admin_user:
             messages.error(request, "Откат движений доступен только администратору.")
-            return redirect(f"{request.path}?panel=history")
+            return _history_panel_redirect(request)
         mid = _to_int(request.POST.get("movement_id"), 0)
         if mid <= 0:
             messages.error(request, "Не указана запись для отката.")
-            return redirect(f"{request.path}?panel=history")
+            return _history_panel_redirect(request)
         ok_rb, err_rb = _rollback_stock_movement(mid, username)
         if ok_rb:
             messages.success(request, "Движение откатано, запись добавлена в историю.")
         else:
             messages.error(request, err_rb or "Не удалось выполнить откат.")
-        return redirect(f"{request.path}?panel=history")
+        return _history_panel_redirect(request)
 
     employee_options = []
     employee_department_map = {}
@@ -2168,7 +2178,11 @@ def inventory_view(request):
                 persist[_ik] = _norm_stock_int_filter_str(persist.get(_ik) or "")
         _save_inventory_stock_filter_prefs(username, persist, category=filter_category)
 
-    mv_hist = list(
+    history_movement_type = (request.GET.get("history_movement_type") or "").strip()
+    if history_movement_type not in _HISTORY_MOVEMENT_TYPES:
+        history_movement_type = ""
+
+    mv_qs = (
         StockMovement.objects.select_related(
             "tool",
             "tool__end_mill_spec",
@@ -2176,11 +2190,19 @@ def inventory_view(request):
             "tool__center_drill_spec",
             "tool__countersink_spec",
             "tool__drill_spec",
+            "tool__insert_spec",
         )
         .prefetch_related("issue_outcomes")
-        .order_by("-created_at")[:80]
+        .order_by("-created_at")
     )
-    ev_hist = list(InventoryStockEvent.objects.select_related("tool", "stock_movement").order_by("-created_at")[:80])
+    if history_movement_type:
+        mv_qs = mv_qs.filter(movement_type=history_movement_type)
+    mv_hist = list(mv_qs[:120])
+    ev_hist: list[InventoryStockEvent] = []
+    if not history_movement_type:
+        ev_hist = list(
+            InventoryStockEvent.objects.select_related("tool", "stock_movement").order_by("-created_at")[:80]
+        )
     timeline: list[dict] = []
     for m in mv_hist:
         timeline.append(
@@ -2258,7 +2280,13 @@ def inventory_view(request):
             "work_material": work_material,
             "arrival_supplier": arrival_supplier,
             "show_all": show_all,
+            "history_movement_type": history_movement_type,
         },
+        "history_movement_types": [
+            ("restock", "Пополнение"),
+            ("writeoff", "Списание"),
+            ("issue", "Выдача"),
+        ],
         "end_mill_filter_options": {
             "diameters": end_mill_diameters,
             "overall_lengths": end_mill_overall_lengths,

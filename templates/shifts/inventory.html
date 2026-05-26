@@ -1669,6 +1669,21 @@
 {% if panel == "history" %}
 <h3 id="history-block">История склада</h3>
 <p class="muted inv-history-intro">Движения остатков, правки и удаления позиций, выдача права на склад, откаты.</p>
+<form method="get" class="inv-history-filter auto-submit-form" id="inventory-history-filter-form">
+  <input type="hidden" name="panel" value="history">
+  <label class="field">
+    <span>Тип операции</span>
+    <select name="history_movement_type" aria-label="Фильтр по типу операции">
+      <option value="" {% if not filters.history_movement_type %}selected{% endif %}>Все</option>
+      {% for key, label in history_movement_types %}
+      <option value="{{ key }}" {% if filters.history_movement_type == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if filters.history_movement_type %}
+  <a class="btn btn-sm btn-ghost inv-history-filter__reset" href="{% url 'inventory' %}?panel=history">Сбросить</a>
+  {% endif %}
+</form>
 <div class="inv-history-wrap">
   <ul class="inv-history-list">
       {% for row in inventory_history %}
@@ -1698,6 +1713,7 @@
           <form method="post" action="{% url 'inventory' %}" class="inv-history-rollback-form" onsubmit="return confirm('Откатить это движение? Склад будет скорректирован.');">
             {% csrf_token %}
             <input type="hidden" name="action" value="rollback_stock_movement">
+            {% if filters.history_movement_type %}<input type="hidden" name="history_movement_type" value="{{ filters.history_movement_type }}">{% endif %}
             <input type="hidden" name="movement_id" value="{{ m.id }}">
             <button type="submit" class="btn btn-sm">Откатить</button>
           </form>
@@ -1724,7 +1740,7 @@
       {% endwith %}
       {% endif %}
       {% empty %}
-      <li class="inv-history-card inv-history-card--empty muted">Пока нет записей в истории.</li>
+      <li class="inv-history-card inv-history-card--empty muted">{% if filters.history_movement_type %}Нет записей по выбранному типу операции.{% else %}Пока нет записей в истории.{% endif %}</li>
       {% endfor %}
   </ul>
 </div>

@@ -1,4 +1,5 @@
 """Тесты склада: мультивыбор материала обработки, пластинки, приход, отображение."""
+from datetime import date
 from decimal import Decimal
 
 from django.test import Client, TestCase
@@ -10,6 +11,7 @@ from shifts.models import (
     DrillSpec,
     EndMillSpec,
     InsertSpec,
+    StockMovement,
     ToolItem,
     normalize_work_material_codes,
     work_material_display_text,
@@ -174,3 +176,29 @@ class InventoryViewTests(TestCase):
         self.assertIn(f'value="{t1.id}"', content)
         self.assertNotIn(f'value="{t2.id}"', content)
         self.assertIn("wm-p", content)
+
+    def test_history_filters_by_movement_type(self):
+        tool = ToolItem.objects.create(category="drill", name="d-hist", work_material="P", quantity=10)
+        today = date.today()
+        StockMovement.objects.create(
+            movement_type="restock", tool=tool, quantity=5, movement_date=today, created_by_account="admin"
+        )
+        StockMovement.objects.create(
+            movement_type="issue", tool=tool, quantity=2, movement_date=today, created_by_account="admin"
+        )
+        StockMovement.objects.create(
+            movement_type="writeoff", tool=tool, quantity=1, movement_date=today, created_by_account="admin"
+        )
+        base = reverse("inventory") + "?panel=history"
+        all_resp = self.client.get(base)
+        self.assertEqual(all_resp.status_code, 200)
+        all_html = all_resp.content.decode("utf-8", errors="replace")
+        self.assertIn("Пополнение", all_html)
+        self.assertIn("Выдача", all_html)
+        self.assertIn("Списание", all_html)
+
+        issue_resp = self.client.get(base + "&history_movement_type=issue")
+        issue_html = issue_resp.content.decode("utf-8", errors="replace")
+        self.assertIn("Выдача", issue_html)
+        self.assertNotIn("inv-history-card--restock", issue_html)
+        self.assertNotIn("inv-history-card--writeoff", issue_html)
