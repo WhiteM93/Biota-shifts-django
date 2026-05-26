@@ -1,5 +1,6 @@
 from django import template
-from shifts.models import COATING_TYPES, COATING_TYPE_TOOLTIPS
+from shifts.insert_constants import INSERT_MACHINING_APPLICATIONS
+from shifts.models import COATING_TYPES, COATING_TYPE_TOOLTIPS, WORK_MATERIAL_TYPES
 
 register = template.Library()
 
@@ -28,3 +29,21 @@ def coating_hover(code: object) -> str:
 def coating_hover_title(code):
     """То же, что coating_hover, только как filter для цепочки |escapejs."""
     return _coating_hover_str(code)
+
+
+_WM_LABELS = dict(WORK_MATERIAL_TYPES)
+_MACH_LABELS = dict(INSERT_MACHINING_APPLICATIONS)
+
+
+@register.filter
+def work_material_tooltip(code):
+    """Подсказка для одного кода материала обработки (P, M, K…)."""
+    c = (code or "").strip().upper()
+    return _WM_LABELS.get(c, c)
+
+
+@register.filter
+def insert_machining_tooltip(code):
+    """Подсказка для вида обработки пластины (1, 2, 3)."""
+    c = (code or "").strip()
+    return _MACH_LABELS.get(c, c)

@@ -502,6 +502,121 @@
   font-weight: 700;
 }
 
+.inv-page--stock .inv-stock-grid td.inv-stock-wm-cell {
+  white-space: normal;
+  line-height: 1.2;
+  vertical-align: middle;
+  min-width: 3.75rem;
+  max-width: 4rem;
+  padding: 3px 2px;
+}
+
+/* до 4 меток МО в один ряд (как в приходе, компактнее) */
+.inv-page--stock .inv-stock-wm-squares {
+  display: grid;
+  grid-template-columns: repeat(4, 13px);
+  gap: 1px;
+  justify-content: center;
+  width: fit-content;
+  max-width: calc(4 * 13px + 3 * 1px);
+  margin: 0 auto;
+}
+
+.inv-page--stock .inv-stock-wm-squares .wm-square {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  min-width: 0;
+  max-width: 13px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--bio-input-border, #c9d1e0);
+  border-radius: 2px;
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  box-sizing: border-box;
+  box-shadow: none;
+  transform: none;
+  overflow: hidden;
+}
+
+.inv-page--stock .inv-stock-wm-squares .wm-square.wm-pw {
+  grid-column: span 2;
+  width: calc(2 * 13px + 1px);
+  max-width: calc(2 * 13px + 1px);
+  font-size: 6px;
+  letter-spacing: -0.04em;
+}
+
+.inv-page--stock .inv-stock-wm-squares .wm-square.wm-p {
+  background: #2f72ff;
+  color: #fff;
+  border-color: #2f72ff;
+}
+.inv-page--stock .inv-stock-wm-squares .wm-square.wm-m {
+  background: #f6b93b;
+  color: #111;
+  border-color: #f6b93b;
+}
+.inv-page--stock .inv-stock-wm-squares .wm-square.wm-k {
+  background: #e25a5a;
+  color: #fff;
+  border-color: #e25a5a;
+}
+.inv-page--stock .inv-stock-wm-squares .wm-square.wm-n {
+  background: #2bb673;
+  color: #fff;
+  border-color: #2bb673;
+}
+.inv-page--stock .inv-stock-wm-squares .wm-square.wm-s {
+  background: #8f7cff;
+  color: #fff;
+  border-color: #8f7cff;
+}
+.inv-page--stock .inv-stock-wm-squares .wm-square.wm-h {
+  background: #6d6d6d;
+  color: #fff;
+  border-color: #6d6d6d;
+}
+.inv-page--stock .inv-stock-wm-squares .wm-square.wm-pw {
+  background: #eef2f7;
+  color: #1a1d21;
+  border-color: #c5cdd6;
+}
+
+.inv-page--stock .inv-stock-grid--insert th,
+.inv-page--stock .inv-stock-grid--insert td {
+  text-align: center;
+}
+
+.inv-page--stock .inv-stock-grid--insert .insert-code-col {
+  width: 2.4rem;
+  min-width: 2.4rem;
+}
+
+.inv-page--stock .inv-stock-grid--insert .insert-app-col .insert-mach-badge {
+  display: inline-block;
+  min-width: 1.1rem;
+  padding: 1px 5px;
+  margin: 0 2px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--bio-filter-border, #dce3ef);
+  color: var(--bio-body-fg, #1a1d21);
+  cursor: help;
+}
+
+.inv-page--stock .inv-stock-grid--insert td[title],
+.inv-page--stock .inv-stock-grid--insert .wm-square[title],
+.inv-page--stock .inv-stock-grid--insert .coating-cell[title] {
+  cursor: help;
+}
+
 .inv-page--stock .inv-stock-grid .coating-inline-label {
   display: block;
   font-size: 9px;
@@ -728,12 +843,12 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
     font-size: 14px;
     color: var(--bio-subheading);
   }
-  #issue-outcome-block td.issue-tool-meta {
+  #issue-outcome-block:not(.inv-outcome-page) td.issue-tool-meta {
     white-space: normal;
     min-width: 460px;
     line-height: 1.3;
   }
-  #issue-outcome-block .issue-tool-meta-line {
+  #issue-outcome-block:not(.inv-outcome-page) .issue-tool-meta-line {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -951,7 +1066,27 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
     max-width: 100%;
     box-sizing: border-box;
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: visible;
+  }
+  #arrival-bulk-groups,
+  #arrival-bulk-form,
+  #arrival-block {
+    overflow: visible;
+  }
+  .arrival-bulk-table tbody tr {
+    position: relative;
+    z-index: 0;
+  }
+  .arrival-bulk-table tbody tr:focus-within {
+    z-index: 80;
+  }
+  .arrival-group:has(.arrival-bulk-table select:focus) {
+    position: relative;
+    z-index: 90;
+  }
+  #arrival-bulk-form .filter-actions {
+    position: relative;
+    z-index: 0;
   }
   .arrival-bulk-table {
     width: 100%;
@@ -962,11 +1097,20 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
     white-space: nowrap;
     vertical-align: middle;
   }
+  .arrival-bulk-table thead th[title],
+  .inv-stock-grid th[title] {
+    cursor: help;
+  }
   .arrival-bulk-table input,
   .arrival-bulk-table select {
     width: 100%;
     min-width: 110px;
     box-sizing: border-box;
+    padding: 4px 4px;
+    font-size: 13px;
+    line-height: 1.2;
+    min-height: 28px;
+    height: 28px;
   }
 
   .arrival-bulk-table td.short-col input,
@@ -1055,8 +1199,8 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
     min-width: 0;
     width: 100%;
     max-width: 5ch;
-    padding: 4px 2px;
-    font-size: 13px;
+    padding-left: 2px;
+    padding-right: 2px;
     text-align: center;
   }
 
@@ -1110,15 +1254,11 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
   }
   .arrival-bulk-table select[data-k="mill_type"] {
     font-size: clamp(10px, 1.2vw, 13px);
-    line-height: 1.2;
-    padding: 6px 8px;
   }
   .arrival-bulk-table select[data-k="thread_standard"],
   .arrival-bulk-table select[data-k="hole_type"],
   .arrival-bulk-table select[data-k="tap_type"] {
     font-size: clamp(10px, 1.2vw, 13px);
-    line-height: 1.2;
-    padding: 6px 8px;
     text-align: center;
     text-align-last: center;
   }
@@ -1246,6 +1386,321 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
   .arrival-bulk-table select.arrival-wm-select.wm-s { background: #8f7cff; color: #fff; }
   .arrival-bulk-table select.arrival-wm-select.wm-h { background: #6d6d6d; color: #fff; }
   .arrival-bulk-table select.arrival-wm-select.wm-pw { background: #f0f4f8; color: #1a1d21; border: 1px solid #c5cdd6; }
+
+  /* Пластинки — приход: значения по центру ячейки */
+  #arrival-group-insert .arrival-bulk-table thead th {
+    text-align: center;
+  }
+  #arrival-group-insert .arrival-bulk-table tbody td {
+    text-align: center;
+  }
+  #arrival-group-insert .arrival-bulk-table select[data-k="ins_family"],
+  #arrival-group-insert .arrival-bulk-table select[data-k="ins_shape"],
+  #arrival-group-insert .arrival-bulk-table select[data-k="ins_edge_code"],
+  #arrival-group-insert .arrival-bulk-table select[data-k="ins_thickness_code"],
+  #arrival-group-insert .arrival-bulk-table select[data-k="ins_nose_code"],
+  #arrival-group-insert .arrival-bulk-table input[data-k="ins_grade"],
+  #arrival-group-insert .arrival-bulk-table .ins-family-custom,
+  #arrival-group-insert .arrival-bulk-table td.tm-cell-tool-material select,
+  #arrival-group-insert .arrival-bulk-table td.tm-cell-tool-material .tm-tool-material-custom,
+  #arrival-group-insert .arrival-bulk-table select.arrival-coating-select,
+  #arrival-group-insert .arrival-bulk-table select.arrival-wm-select,
+  #arrival-group-insert .arrival-bulk-table input[data-k="quantity"] {
+    text-align: center;
+    text-align-last: center;
+  }
+  #arrival-group-insert .arrival-bulk-table td.ins-family-cell {
+    text-align: center;
+    overflow: visible;
+  }
+  .ins-family-cell .arrival-field-combo {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .arrival-field-combo-native {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+    clip-path: inset(50%) !important;
+  }
+  .arrival-field-combo-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    max-width: 100%;
+    min-height: 28px;
+    height: 28px;
+    padding: 4px 6px;
+    box-sizing: border-box;
+    text-align: left;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.25;
+    color: var(--bio-input-fg, var(--bio-body-fg));
+    background: var(--bio-input-bg, #fff);
+    border: 1px solid var(--bio-input-border, #c9d1e0);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .arrival-field-combo-btn:hover {
+    border-color: var(--bio-input-focus-border, #5c709f);
+  }
+  .arrival-field-combo-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--bio-input-fg, var(--bio-body-fg));
+  }
+  .arrival-field-combo-chevron {
+    flex: 0 0 auto;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--bio-muted, #6b7280);
+    opacity: 0.85;
+  }
+  .arrival-field-combo.is-open .arrival-field-combo-chevron {
+    transform: rotate(180deg);
+  }
+  .arrival-field-combo-panel {
+    position: fixed;
+    z-index: 10000;
+    max-height: min(280px, 50vh);
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--bio-input-border, #c9d1e0);
+    border-radius: 8px;
+    background: var(--bio-input-bg, #fff);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  }
+  body > .arrival-field-combo-panel {
+    z-index: 10050;
+  }
+  .arrival-field-combo-panel[hidden] {
+    display: none !important;
+  }
+  .arrival-combo-opt {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    border: 0;
+    border-bottom: 1px solid var(--bio-table-cell-border, rgba(0, 0, 0, 0.06));
+    background: transparent;
+    color: var(--bio-input-fg, var(--bio-body-fg));
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.3;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .arrival-combo-opt:hover,
+  .arrival-combo-opt:focus {
+    background: color-mix(in srgb, var(--bio-input-focus-border, #5c709f) 12%, transparent);
+    outline: none;
+  }
+  /* L / S / R — код ISO (2–3 символа), без нативной стрелки */
+  #arrival-group-insert .arrival-bulk-table th.insert-code-col,
+  #arrival-group-insert .arrival-bulk-table td.insert-code-col {
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  #arrival-group-insert .arrival-bulk-table td.insert-code-col select[data-k="ins_edge_code"],
+  #arrival-group-insert .arrival-bulk-table td.insert-code-col select[data-k="ins_thickness_code"],
+  #arrival-group-insert .arrival-bulk-table td.insert-code-col select[data-k="ins_nose_code"] {
+    min-width: 0 !important;
+    width: 100%;
+    max-width: 100%;
+    padding-left: 2px;
+    padding-right: 2px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    text-align: center;
+    text-align-last: center;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: none;
+    cursor: pointer;
+  }
+  #arrival-group-insert .arrival-bulk-table td.insert-code-col select[data-k="ins_edge_code"]::-ms-expand,
+  #arrival-group-insert .arrival-bulk-table td.insert-code-col select[data-k="ins_thickness_code"]::-ms-expand,
+  #arrival-group-insert .arrival-bulk-table td.insert-code-col select[data-k="ins_nose_code"]::-ms-expand {
+    display: none;
+  }
+  #arrival-group-insert .arrival-bulk-table td.insert-code-col:focus-within {
+    position: relative;
+    z-index: 100;
+  }
+
+  /* Пластинки: вид обработки (иконки) + уже материал инструмента */
+  #arrival-group-insert .arrival-bulk-table th.insert-app-col,
+  #arrival-group-insert .arrival-bulk-table td.insert-app-col {
+    width: 76px;
+    min-width: 76px;
+    max-width: 76px;
+    padding-left: 4px;
+    padding-right: 4px;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  #arrival-group-insert .arrival-bulk-table th.tm-col-tool-material,
+  #arrival-group-insert .arrival-bulk-table td.tm-cell-tool-material {
+    max-width: 6.5rem;
+    width: 6.5rem;
+    min-width: 5.5rem;
+  }
+
+  #arrival-group-insert .arrival-bulk-table td.tm-cell-tool-material select[data-k="tool_material"],
+  #arrival-group-insert .arrival-bulk-table td.tm-cell-tool-material .tm-tool-material-custom {
+    max-width: 6.5rem;
+    font-size: 10px;
+  }
+
+  .insert-app-picker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    flex-wrap: nowrap;
+  }
+
+  .insert-app-opt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    margin: 0;
+    border: 1px solid var(--bio-input-border, #c9d1e0);
+    border-radius: 6px;
+    background: var(--bio-input-bg, #fff);
+    color: var(--bio-body-fg, #eaf0ff);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, color 0.15s;
+  }
+
+  .insert-app-opt:hover {
+    border-color: var(--bio-input-focus-border, #7c8cff);
+    background: color-mix(in srgb, var(--bio-input-focus-border, #7c8cff) 12%, var(--bio-input-bg, #fff));
+  }
+
+  .insert-app-opt.is-active {
+    border-color: var(--bio-input-focus-border, #7c8cff);
+    background: color-mix(in srgb, var(--bio-input-focus-border, #7c8cff) 22%, var(--bio-input-bg, #fff));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--bio-input-focus-border, #7c8cff) 28%, transparent);
+  }
+
+  html[data-theme="dawn"] .insert-app-opt {
+    color: var(--bio-body-fg, #3c362f);
+  }
+
+  html[data-theme="dawn"] .insert-app-opt.is-active {
+    background: color-mix(in srgb, var(--bio-input-focus-border, #0d9488) 18%, var(--bio-input-bg, #fffefb));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--bio-input-focus-border, #0d9488) 25%, transparent);
+  }
+
+  .insert-app-icon {
+    display: block;
+    flex-shrink: 0;
+    pointer-events: none;
+  }
+
+  .insert-app-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .insert-app-opt.is-invalid,
+  .insert-app-picker:has([data-k="ins_machining_app"].is-invalid) .insert-app-opt {
+    border-color: #d9563a;
+  }
+
+  .arrival-wm-multi-picker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    max-width: 5.5rem;
+  }
+
+  .arrival-wm-opt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 3px;
+    margin: 0;
+    border: 1px solid var(--bio-input-border, #c9d1e0);
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+    opacity: 0.72;
+  }
+
+  .arrival-wm-opt:hover {
+    opacity: 1;
+    border-color: var(--bio-input-focus-border, #7c8cff);
+  }
+
+  .arrival-wm-opt.is-active {
+    opacity: 1;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--bio-input-focus-border, #7c8cff) 35%, transparent);
+    border-color: var(--bio-body-fg, #1a1d21);
+  }
+
+  .arrival-wm-multi-picker:has([data-k="work_material"].is-invalid) .arrival-wm-opt {
+    border-color: #d9563a;
+  }
+
+  .arrival-bulk-table td.wm-cell {
+    min-width: 5.5rem;
+    max-width: 5.75rem;
+    padding: 4px 3px;
+    vertical-align: middle;
+  }
+
+  .arrival-bulk-table td.wm-cell .arrival-wm-multi-picker {
+    margin: 0 auto;
+  }
+
   .arrival-inline-coating .swatch {
     width: 16px;
     height: 16px;
@@ -1269,7 +1724,9 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
     .arrival-bulk-table select {
       min-width: 88px;
       font-size: 12px;
-      padding: 5px 6px;
+      padding: 4px 5px;
+      min-height: 26px;
+      height: 26px;
     }
   }
   @media (max-width: 540px) {
@@ -1583,29 +2040,6 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
       min-height: 34px;
       padding: 7px 10px;
       font-size: 12px;
-    }
-    #issue-outcome-block .issue-inline-form > div {
-      display: grid !important;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-      align-items: stretch !important;
-    }
-    #issue-outcome-block .issue-inline-form input[type="date"],
-    #issue-outcome-block .issue-inline-form input[type="text"],
-    #issue-outcome-block .issue-inline-form .btn {
-      grid-column: 1 / -1;
-      width: 100% !important;
-      min-width: 0 !important;
-    }
-    #issue-outcome-block .issue-inline-form input[type="number"] {
-      width: 100% !important;
-      min-width: 0 !important;
-    }
-    #issue-outcome-block td[style*="min-width"] {
-      min-width: 0 !important;
-    }
-    #issue-outcome-block .issue-candidate-row td {
-      white-space: nowrap;
     }
     .defect-cell-input {
       min-width: 88px;

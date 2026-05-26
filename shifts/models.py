@@ -109,12 +109,63 @@ WORK_MATERIAL_TYPES = [
     ("PW", "Пластик (белый)"),
 ]
 
+WORK_MATERIAL_CODE_ORDER = tuple(k for k, _ in WORK_MATERIAL_TYPES)
+WORK_MATERIAL_CODE_SET = frozenset(WORK_MATERIAL_CODE_ORDER)
+_WORK_MATERIAL_LABELS = dict(WORK_MATERIAL_TYPES)
+
+
+def normalize_work_material_codes(raw) -> str:
+    """Один или несколько кодов ISO: «P», «P,M,K»."""
+    if isinstance(raw, (list, tuple)):
+        parts = [str(x).strip().upper() for x in raw]
+    else:
+        parts = [p.strip().upper() for p in str(raw or "").replace(" ", "").split(",") if p.strip()]
+    seen: set[str] = set()
+    out: list[str] = []
+    for p in parts:
+        if p not in WORK_MATERIAL_CODE_SET or p in seen:
+            continue
+        seen.add(p)
+        out.append(p)
+    out.sort(key=lambda x: WORK_MATERIAL_CODE_ORDER.index(x))
+    return ",".join(out)
+
+
+def work_material_display_text(value: str) -> str:
+    codes = [p.strip() for p in (value or "").split(",") if p.strip()]
+    if not codes:
+        return ""
+    return ", ".join(_WORK_MATERIAL_LABELS.get(c, c) for c in codes)
+
 PURCHASE_STATUSES = [
     ("processing", "В обработке"),
     ("ordered", "Заказано"),
     ("delivered", "Доставлено"),
     ("stocked", "Реализовано на складе"),
 ]
+
+from .insert_constants import (
+    INSERT_MACHINING_APPLICATIONS,
+    normalize_insert_machining_apps,
+    INSERT_MOUNTING_CHIP,
+    INSERT_MOUNTING_VALUES,
+    INSERT_NOSE_RADIUS_CODES,
+    INSERT_RELIEF_ANGLES,
+    INSERT_RELIEF_VALUES,
+    INSERT_SHAPES,
+    INSERT_SHAPE_VALUES,
+    INSERT_TOLERANCE_CLASSES,
+    INSERT_TOLERANCE_VALUES,
+    MILLING_INSERT_FAMILIES,
+    INSERT_EDGE_LENGTH_CODES,
+    INSERT_THICKNESS_CODES,
+    build_insert_display_name,
+    build_iso_designation,
+    normalize_milling_family,
+    edge_length_mm_from_code,
+    nose_radius_mm_from_code,
+    thickness_mm_from_code,
+)
 
 
 class ToolItem(models.Model):
@@ -126,6 +177,7 @@ class ToolItem(models.Model):
             ("center_drill", "Центровки"),
             ("countersink", "Зенкера"),
             ("drill", "Сверла"),
+            ("insert", "Пластинки"),
         ],
         verbose_name="Категория",
     )
@@ -180,6 +232,15 @@ class ToolItem(models.Model):
                 return str(label)
         return v
 
+    def work_material_codes_list(self) -> list[str]:
+        return [p.strip() for p in (self.work_material or "").split(",") if p.strip()]
+
+    def get_work_materials_display(self) -> str:
+        return work_material_display_text(self.work_material)
+
+    def work_material_code_title(self, code: str) -> str:
+        return _WORK_MATERIAL_LABELS.get((code or "").strip().upper(), code or "")
+
     def issue_select_label(self) -> str:
         """Строка для выпадающего списка выдачи: те же параметры, что в строке таблицы склада по категории."""
 
@@ -200,10 +261,8 @@ class ToolItem(models.Model):
             return str(self.get_coating_type_display())
 
         def work_mat_txt() -> str:
-            wm = (self.work_material or "").strip()
-            if not wm:
-                return "—"
-            return str(self.get_work_material_display())
+            txt = self.get_work_materials_display()
+            return txt if txt else "—"
 
         def main_d() -> str:
             return fmt_mm(self.main_diameter_mm) if self.main_diameter_mm is not None else "—"
@@ -291,6 +350,21 @@ class ToolItem(models.Model):
                 work_mat_txt(),
                 f"ост {self.quantity}",
                 self.name,
+            ]
+        elif cat == "insert":
+            ins = getattr(self, "insert_spec", None)
+            segs = [
+                self.get_category_display(),
+                (ins.milling_family.upper() if ins and ins.milling_family else "—"),
+                (ins.insert_shape if ins else "—"),
+                (ins.cutting_edge_length_code if ins and ins.cutting_edge_length_code else "—"),
+                (ins.thickness_code if ins and ins.thickness_code else "—"),
+                (ins.nose_radius_code if ins and ins.nose_radius_code else "—"),
+                (ins.get_machining_applications_display() if ins else "—"),
+                (ins.chipbreaker_grade if ins and ins.chipbreaker_grade else "—"),
+                coating_txt(),
+                work_mat_txt(),
+                f"ост {self.quantity}",
             ]
         else:
             segs = [self.get_category_display(), self.name, f"ост {self.quantity}"]
@@ -408,6 +482,18 @@ class ToolItem(models.Model):
                 if dr.angle_deg is not None:
                     specs_parts.append(f"∠={fmt_mm(dr.angle_deg)}°")
                 specs_parts.append(f"Dосн={main_d()}")
+        elif cat == "insert":
+            ins = getattr(self, "insert_spec", None)
+            tool_type = self.get_category_display()
+            if ins:
+                if (ins.iso_designation or "").strip():
+                    specs_parts.append(ins.iso_designation.strip())
+                if ins.cutting_edge_length_mm is not None:
+                    specs_parts.append(f"L={fmt_mm(ins.cutting_edge_length_mm)} мм")
+                if ins.thickness_mm is not None:
+                    specs_parts.append(f"S={fmt_mm(ins.thickness_mm)} мм")
+                if ins.nose_radius_mm is not None:
+                    specs_parts.append(f"R={fmt_mm(ins.nose_radius_mm)} мм")
         else:
             tool_type = self.get_category_display()
             specs_parts = [self.name] if (self.name or "").strip() else []
@@ -507,6 +593,144 @@ class DrillSpec(models.Model):
 
     def __str__(self):
         return f"Сверло Ø{self.diameter_mm} / {self.angle_deg}°"
+
+
+class InsertSpec(models.Model):
+    tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="insert_spec")
+    insert_shape = models.CharField(max_length=1, choices=INSERT_SHAPES, default="C", verbose_name="Форма (ISO)")
+    relief_angle = models.CharField(max_length=1, choices=INSERT_RELIEF_ANGLES, default="N", verbose_name="Задний угол")
+    tolerance_class = models.CharField(max_length=1, choices=INSERT_TOLERANCE_CLASSES, default="M", verbose_name="Допуск")
+    mounting_chip = models.CharField(max_length=1, choices=INSERT_MOUNTING_CHIP, default="G", verbose_name="Крепление / СЛ")
+    cutting_edge_length_code = models.CharField(max_length=2, blank=True, default="", verbose_name="Код длины кромки")
+    cutting_edge_length_mm = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True, verbose_name="Длина кромки, мм"
+    )
+    thickness_code = models.CharField(max_length=2, blank=True, default="", verbose_name="Код толщины")
+    thickness_mm = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, verbose_name="Толщина, мм")
+    nose_radius_code = models.CharField(max_length=2, blank=True, default="", verbose_name="Код R вершины")
+    nose_radius_mm = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, verbose_name="R вершины, мм")
+    iso_designation = models.CharField(max_length=32, blank=True, default="", verbose_name="Маркировка ISO")
+    milling_family = models.CharField(
+        max_length=24, blank=True, default="", choices=MILLING_INSERT_FAMILIES, verbose_name="Семейство"
+    )
+    chipbreaker_grade = models.CharField(max_length=40, blank=True, default="", verbose_name="Стужколом / сплав")
+    machining_application = models.CharField(
+        max_length=7,
+        blank=True,
+        default="",
+        verbose_name="Вид обработки",
+    )
+
+    class Meta:
+        verbose_name = "Параметры пластины"
+        verbose_name_plural = "Параметры пластин"
+
+    def __str__(self):
+        return self.iso_designation or build_iso_designation(
+            self.insert_shape,
+            self.relief_angle,
+            self.tolerance_class,
+            self.mounting_chip,
+            self.cutting_edge_length_code,
+            self.thickness_code,
+            self.nose_radius_code,
+        )
+
+    def sync_derived_fields(self) -> None:
+        self.cutting_edge_length_mm = edge_length_mm_from_code(self.cutting_edge_length_code)
+        self.thickness_mm = thickness_mm_from_code(self.thickness_code)
+        self.nose_radius_mm = nose_radius_mm_from_code(self.nose_radius_code)
+        self.iso_designation = build_iso_designation(
+            self.insert_shape,
+            self.relief_angle,
+            self.tolerance_class,
+            self.mounting_chip,
+            self.cutting_edge_length_code,
+            self.thickness_code,
+            self.nose_radius_code,
+        )
+
+    @property
+    def machining_application_codes_list(self) -> list[str]:
+        return [p.strip() for p in (self.machining_application or "").split(",") if p.strip()]
+
+    def get_machining_applications_display(self) -> str:
+        labels = dict(INSERT_MACHINING_APPLICATIONS)
+        return ", ".join(labels.get(c, c) for c in self.machining_application_codes_list)
+
+    def get_machining_application_label(self, code: str) -> str:
+        return dict(INSERT_MACHINING_APPLICATIONS).get((code or "").strip(), code or "")
+
+    def _iso_code_cell_title(self, tip_key: str, code: str, mm) -> str:
+        from shifts.insert_constants import INSERT_COLUMN_TOOLTIPS
+
+        tip = INSERT_COLUMN_TOOLTIPS.get(tip_key, tip_key)
+        c = (code or "").strip()
+        if not c or c == "-":
+            return tip
+        if mm is not None:
+            from decimal import Decimal
+
+            if isinstance(mm, Decimal):
+                s = format(mm, "f").rstrip("0").rstrip(".")
+            else:
+                s = str(mm)
+            return f"{tip}: {c} ({s} мм)"
+        return f"{tip}: {c}"
+
+    def cutting_edge_length_cell_title(self) -> str:
+        return self._iso_code_cell_title(
+            "edge_l", self.cutting_edge_length_code, self.cutting_edge_length_mm
+        )
+
+    def thickness_cell_title(self) -> str:
+        return self._iso_code_cell_title("thickness_s", self.thickness_code, self.thickness_mm)
+
+    def nose_radius_cell_title(self) -> str:
+        return self._iso_code_cell_title("radius_r", self.nose_radius_code, self.nose_radius_mm)
+
+    def insert_shape_cell_title(self) -> str:
+        from shifts.insert_constants import INSERT_COLUMN_TOOLTIPS
+
+        tip = INSERT_COLUMN_TOOLTIPS.get("shape", "Форма")
+        label = self.get_insert_shape_display()
+        if label:
+            return f"{tip}: {self.insert_shape} — {label}"
+        return tip
+
+    def milling_family_cell_title(self) -> str:
+        from shifts.insert_constants import INSERT_COLUMN_TOOLTIPS, MILLING_INSERT_FAMILIES
+
+        tip = INSERT_COLUMN_TOOLTIPS.get("family", "Семейство")
+        fam = (self.milling_family or "").strip()
+        if not fam:
+            return tip
+        labels = dict(MILLING_INSERT_FAMILIES)
+        label = labels.get(fam, fam)
+        return f"{tip}: {label}"
+
+    def chipbreaker_grade_cell_title(self) -> str:
+        from shifts.insert_constants import INSERT_COLUMN_TOOLTIPS
+
+        tip = INSERT_COLUMN_TOOLTIPS.get("grade", "Сплав")
+        grade = (self.chipbreaker_grade or "").strip()
+        if grade:
+            return f"{tip}: {grade}"
+        return tip
+
+    def save(self, *args, **kwargs):
+        if self.insert_shape not in INSERT_SHAPE_VALUES:
+            self.insert_shape = "C"
+        if self.relief_angle not in INSERT_RELIEF_VALUES:
+            self.relief_angle = "N"
+        if self.tolerance_class not in INSERT_TOLERANCE_VALUES:
+            self.tolerance_class = "M"
+        if self.mounting_chip not in INSERT_MOUNTING_VALUES:
+            self.mounting_chip = "G"
+        self.machining_application = normalize_insert_machining_apps(self.machining_application)
+        self.milling_family = normalize_milling_family(self.milling_family)
+        self.sync_derived_fields()
+        super().save(*args, **kwargs)
 
 
 class ToolMaterialExtra(models.Model):

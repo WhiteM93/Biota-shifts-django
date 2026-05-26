@@ -510,6 +510,230 @@ var INV = (function () {
   }
 
   var toolMaterialFilterOther = INV.tool_material_filter_other;
+  var insertFamilyOther = INV.insert_family_other || "OTHER";
+  function normalizeInsertFamilyValue(v) {
+    return (v || "").trim().toUpperCase();
+  }
+
+  function buildInsertFamilyCellHtml() {
+    var opts = buildOptionsHtml(INV.milling_insert_families || []);
+    return (
+      '<div class="arrival-field-combo js-arrival-field-combo">' +
+      '<select data-k="ins_family" class="arrival-field-combo-native" tabindex="-1" aria-hidden="true">' +
+      opts +
+      "</select>" +
+      '<button type="button" class="arrival-field-combo-btn js-arrival-combo-btn" aria-haspopup="listbox" aria-expanded="false">' +
+      '<span class="arrival-field-combo-text js-arrival-combo-text">— не указано —</span>' +
+      '<span class="arrival-field-combo-chevron" aria-hidden="true"></span>' +
+      "</button>" +
+      '<div class="arrival-field-combo-panel js-arrival-combo-panel" hidden role="listbox"></div>' +
+      "</div>" +
+      '<input type="text" class="ins-family-custom" data-k="ins_family_custom" maxlength="24" ' +
+      'placeholder="APMT" style="display:none;margin-top:4px;max-width:100%;text-transform:uppercase">'
+    );
+  }
+
+  function arrivalComboResetPanel(wrap) {
+    var panel = wrap && wrap.querySelector(".js-arrival-combo-panel");
+    if (panel) panel.removeAttribute("data-built");
+  }
+
+  function arrivalComboPanelEl(wrap) {
+    return (wrap && wrap._floatingPanel) || (wrap && wrap.querySelector(".js-arrival-combo-panel"));
+  }
+
+  function arrivalComboClose(wrap) {
+    if (!wrap) return;
+    wrap.classList.remove("is-open");
+    var panel = arrivalComboPanelEl(wrap);
+    var btn = wrap.querySelector(".js-arrival-combo-btn");
+    if (panel) {
+      panel.hidden = true;
+      panel.style.position = "";
+      panel.style.left = "";
+      panel.style.top = "";
+      panel.style.width = "";
+      panel.style.right = "";
+      panel.style.zIndex = "";
+      if (panel.parentNode === document.body) {
+        wrap.appendChild(panel);
+      }
+    }
+    wrap._floatingPanel = null;
+    if (btn) btn.setAttribute("aria-expanded", "false");
+  }
+
+  function arrivalComboUpdateLabel(wrap, sel) {
+    var textEl = wrap && wrap.querySelector(".js-arrival-combo-text");
+    if (!textEl || !sel) return;
+    var opt = sel.options[sel.selectedIndex];
+    textEl.textContent = opt ? (opt.textContent || "").trim() : "";
+  }
+
+  function arrivalComboPositionPanel(wrap) {
+    var panel = arrivalComboPanelEl(wrap);
+    var btn = wrap.querySelector(".js-arrival-combo-btn");
+    if (!panel || !btn) return;
+    var rect = btn.getBoundingClientRect();
+    var width = Math.max(rect.width, 140);
+    panel.style.position = "fixed";
+    panel.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)) + "px";
+    panel.style.top = rect.bottom + 4 + "px";
+    panel.style.width = width + "px";
+    panel.style.right = "auto";
+    panel.style.zIndex = "10000";
+    requestAnimationFrame(function () {
+      var pr = panel.getBoundingClientRect();
+      if (pr.bottom > window.innerHeight - 8) {
+        panel.style.top = Math.max(8, rect.top - pr.height - 4) + "px";
+      }
+    });
+  }
+
+  function arrivalComboEnsurePanel(wrap, sel) {
+    var panel = wrap && wrap.querySelector(".js-arrival-combo-panel");
+    if (!sel || !panel || panel.getAttribute("data-built") === "1") return;
+    panel.setAttribute("data-built", "1");
+    panel.innerHTML = "";
+    Array.prototype.forEach.call(sel.options, function (opt, idx) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "arrival-combo-opt";
+      b.setAttribute("role", "option");
+      b.setAttribute("data-opt-index", String(idx));
+      b.textContent = (opt.textContent || "").trim() || opt.value;
+      panel.appendChild(b);
+    });
+    panel.addEventListener("click", function (e) {
+      var ob = e.target.closest(".arrival-combo-opt");
+      if (!ob || !panel.contains(ob)) return;
+      var idx = parseInt(ob.getAttribute("data-opt-index"), 10);
+      if (isNaN(idx) || idx < 0) return;
+      sel.selectedIndex = idx;
+      try {
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+      } catch (_eCh) {}
+      arrivalComboUpdateLabel(wrap, sel);
+      arrivalComboClose(wrap);
+    });
+  }
+
+  function arrivalComboOpen(wrap, sel) {
+    document.querySelectorAll(".js-arrival-field-combo.is-open").forEach(function (w) {
+      if (w !== wrap) arrivalComboClose(w);
+    });
+    arrivalComboEnsurePanel(wrap, sel);
+    var panel = wrap.querySelector(".js-arrival-combo-panel");
+    var btn = wrap.querySelector(".js-arrival-combo-btn");
+    if (!panel || !btn) return;
+    wrap._floatingPanel = panel;
+    document.body.appendChild(panel);
+    wrap.classList.add("is-open");
+    panel.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+    arrivalComboPositionPanel(wrap);
+  }
+
+  function arrivalComboBindUi(wrap, sel) {
+    var btn = wrap && wrap.querySelector(".js-arrival-combo-btn");
+    if (!wrap || !sel || !btn || btn.getAttribute("data-bound") === "1") return;
+    btn.setAttribute("data-bound", "1");
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (wrap.classList.contains("is-open")) {
+        arrivalComboClose(wrap);
+        return;
+      }
+      window.setTimeout(function () {
+        arrivalComboOpen(wrap, sel);
+      }, 0);
+    });
+    sel.addEventListener("change", function () {
+      arrivalComboUpdateLabel(wrap, sel);
+    });
+    arrivalComboUpdateLabel(wrap, sel);
+    if (!window.__arrivalComboDocBound) {
+      window.__arrivalComboDocBound = true;
+      document.addEventListener("mousedown", function (e) {
+        document.querySelectorAll(".js-arrival-field-combo.is-open").forEach(function (w) {
+          var panel = arrivalComboPanelEl(w);
+          var btn = w.querySelector(".js-arrival-combo-btn");
+          if (btn && btn.contains(e.target)) return;
+          if (panel && panel.contains(e.target)) return;
+          if (w.contains(e.target)) return;
+          arrivalComboClose(w);
+        });
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key !== "Escape") return;
+        document.querySelectorAll(".js-arrival-field-combo.is-open").forEach(arrivalComboClose);
+      });
+      window.addEventListener("resize", function () {
+        document.querySelectorAll(".js-arrival-field-combo.is-open").forEach(function (w) {
+          arrivalComboPositionPanel(w);
+        });
+      });
+      window.addEventListener(
+        "scroll",
+        function () {
+          document.querySelectorAll(".js-arrival-field-combo.is-open").forEach(function (w) {
+            arrivalComboPositionPanel(w);
+          });
+        },
+        true
+      );
+    }
+  }
+
+  function ensureInsertFamilySelectOption(sel, value) {
+    var v = normalizeInsertFamilyValue(value);
+    if (!v || v === insertFamilyOther) return;
+    var found = Array.prototype.some.call(sel.options, function (o) {
+      return o.value === v;
+    });
+    if (!found) {
+      var otherOpt = Array.prototype.find.call(sel.options, function (o) {
+        return o.value === insertFamilyOther;
+      });
+      var o = document.createElement("option");
+      o.value = v;
+      o.textContent = v;
+      if (otherOpt) sel.insertBefore(o, otherOpt);
+      else sel.appendChild(o);
+    }
+    sel.value = v;
+    var wrap = sel.closest(".js-arrival-field-combo");
+    if (wrap) {
+      arrivalComboResetPanel(wrap);
+      arrivalComboUpdateLabel(wrap, sel);
+    }
+  }
+
+  function wireInsertFamilyCell(cell) {
+    var wrap = cell.querySelector(".js-arrival-field-combo");
+    var sel = cell.querySelector('select[data-k="ins_family"]');
+    var cin = cell.querySelector('[data-k="ins_family_custom"]');
+    if (wrap && sel) arrivalComboBindUi(wrap, sel);
+    if (!sel || !cin) return;
+    function syncCustom() {
+      var isOther = sel.value === insertFamilyOther;
+      cin.style.display = isOther ? "block" : "none";
+      if (!isOther) cin.value = "";
+    }
+    sel.addEventListener("change", syncCustom);
+    cin.addEventListener("input", function () {
+      var start = cin.selectionStart;
+      var end = cin.selectionEnd;
+      var before = cin.value;
+      cin.value = normalizeInsertFamilyValue(before);
+      if (start != null && end != null) {
+        var delta = cin.value.length - before.length;
+        cin.setSelectionRange(Math.max(0, start + delta), Math.max(0, end + delta));
+      }
+    });
+    syncCustom();
+  }
   var arrivalCsrfEl = form.querySelector('input[name="csrfmiddlewaretoken"]');
   var arrivalCsrfToken = arrivalCsrfEl ? arrivalCsrfEl.value : "";
 
@@ -520,6 +744,32 @@ var INV = (function () {
       return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
     } catch (_e) {
       return [];
+    }
+  }
+
+  var insertToolMaterialStdKeys = { "": true, carbide: true, hss: true, hss_co: true };
+
+  function buildArrivalInsertAlloyMaterialOptions() {
+    var base = [{ value: "", label: "—" }];
+    (INV.insert_chipbreaker_grades || []).forEach(function (g) {
+      base.push({ value: g, label: g });
+    });
+    base.push({ value: toolMaterialFilterOther, label: "Другое" });
+    return base;
+  }
+
+  function resolveInsertArrivalRowMaterials(row) {
+    if ((row.category || "") !== "insert") return;
+    var tm = (row.tool_material || "").trim();
+    if (tm && !insertToolMaterialStdKeys[tm]) {
+      row.ins_grade = tm;
+      row.tool_material = "carbide";
+    } else if (!tm) {
+      row.ins_grade = "";
+      row.tool_material = "";
+    } else {
+      row.ins_grade = "";
+      row.tool_material = tm;
     }
   }
 
@@ -612,7 +862,7 @@ var INV = (function () {
   var coatingOptions = (INV.coating_types || []).map(function (x) { return { value: x.value, label: x.label }; });
 
   var coatingSelectOptions = [
-    { value: "none", label: "⬜ Без покрытия", bg: "#aab3c7", color: "#0f172a" },
+    { value: "none", label: "нет", bg: "#aab3c7", color: "#0f172a" },
     { value: "yellow", label: "🟨 Жёлтое", bg: "#f6c343", color: "#0f172a" },
     { value: "brown", label: "🟫 Коричн.", bg: "#8b5a2b", color: "#ffffff" },
     { value: "black", label: "⬛ Чёрное", bg: "#151515", color: "#ffffff" },
@@ -735,7 +985,16 @@ var INV = (function () {
 
   function buildOptionsHtml(items) {
     return items.map(function (x) {
-      return '<option value="' + x.value + '">' + x.label + '</option>';
+      return '<option value="' + x.value + '">' + x.label + "</option>";
+    }).join("");
+  }
+
+  function buildInsertIsoCodeOptionsHtml(items) {
+    return (items || []).map(function (x) {
+      var code = x.value || "";
+      var full = x.label || code;
+      var titleAttr = full !== code ? ' title="' + String(full).replace(/"/g, "&quot;") + '"' : "";
+      return '<option value="' + code + '"' + titleAttr + ">" + code + "</option>";
     }).join("");
   }
 
@@ -766,6 +1025,26 @@ var INV = (function () {
     center_drill: { key: "cd_diameter_mm", label: "диаметр D (мм) для центровки" },
     countersink: { key: "cs_diameter_mm", label: "диаметр D (мм) для зенкера" },
   };
+
+  function validateInsertRow(tr, rowIndex) {
+    var bad = false;
+    ["ins_shape", "ins_edge_code", "ins_thickness_code", "ins_nose_code", "ins_machining_app"].forEach(function (k) {
+        var el = tr.querySelector('[data-k="' + k + '"]');
+        if (!el || !(el.value || "").trim()) {
+          if (el) el.classList.add("is-invalid");
+          bad = true;
+        }
+      }
+    );
+    return bad
+      ? [
+          {
+            msg: "Строка " + rowIndex + ": для пластины укажите форму, L, S, R и вид обработки.",
+            el: null,
+          },
+        ]
+      : [];
+  }
 
   function clearArrivalBulkErrors() {
     var box = document.getElementById("arrival-bulk-errors");
@@ -798,6 +1077,18 @@ var INV = (function () {
     var issues = [];
     groupsWrap.querySelectorAll("tr[data-arrival-row]").forEach(function (tr, i) {
       var cat = tr.getAttribute("data-category") || "";
+      var wmEl = tr.querySelector('[data-k="work_material"]');
+      if (!wmEl || !(wmEl.value || "").trim()) {
+        if (wmEl) wmEl.classList.add("is-invalid");
+        issues.push({
+          msg: "Строка " + (i + 1) + ": укажите хотя бы одну группу материала обработки (P, M, K…).",
+          el: wmEl,
+        });
+      }
+      if (cat === "insert") {
+        issues = issues.concat(validateInsertRow(tr, i + 1));
+        return;
+      }
       var spec = arrivalDiamRequiredByCategory[cat];
       if (!spec) return;
       var el = tr.querySelector('[data-k="' + spec.key + '"]');
@@ -809,6 +1100,214 @@ var INV = (function () {
     return issues;
   }
 
+  var arrivalGroupTitles = {
+    end_mill: "Фрезы",
+    tap: "Резьбовой инструмент",
+    center_drill: "Центровки",
+    countersink: "Зенкера",
+    drill: "Сверла",
+    insert: "Пластинки",
+  };
+
+  var insertColTips = INV.insert_column_tooltips || {};
+
+  function escapeThTitle(s) {
+    return String(s || "").replace(/"/g, "&quot;");
+  }
+
+  function insertArrivalTh(key, label, cls) {
+    var tip = insertColTips[key];
+    var c = cls ? ' class="' + cls + '"' : "";
+    var ti = tip ? ' title="' + escapeThTitle(tip) + '"' : "";
+    return "<th" + c + ti + ">" + label + "</th>";
+  }
+
+  function escAttr(s) {
+    return String(s || "").replace(/[&<>"']/g, function (c) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+    });
+  }
+
+  function insertMachiningAppIconSvg(app) {
+    var svgOpen = '<svg class="insert-app-icon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">';
+    if (app === "1") {
+      return (
+        svgOpen +
+        '<path fill="currentColor" d="M10 2.2 12.4 6h4l-3.4 2.5 1.3 4.5L10 10.8 6.7 13l1.3-4.5L4.6 6h4L10 2.2z"/></svg>'
+      );
+    }
+    if (app === "2") {
+      return (
+        svgOpen +
+        '<path fill="currentColor" d="M2.5 2.5h5v15h-5v-15zm10 0h5v15h-5v-15zM7.5 8.5h5v3h-5v-3z"/></svg>'
+      );
+    }
+    return svgOpen + '<circle cx="10" cy="10" r="7.2" fill="currentColor"/></svg>';
+  }
+
+  function parseCsvCodes(raw) {
+    return String(raw || "")
+      .split(",")
+      .map(function (s) {
+        return s.trim();
+      })
+      .filter(Boolean);
+  }
+
+  function syncMultiToggleHidden(picker, btnSelector, hidden, attrName) {
+    var vals = [];
+    picker.querySelectorAll(btnSelector + ".is-active").forEach(function (btn) {
+      var v = btn.getAttribute(attrName);
+      if (v) vals.push(v);
+    });
+    vals.sort();
+    hidden.value = vals.join(",");
+    hidden.classList.remove("is-invalid");
+  }
+
+  function buildInsertMachiningAppCellHtml(defaultCsv) {
+    var apps = INV.insert_machining_applications || [
+      { value: "1", label: "Чистовая" },
+      { value: "2", label: "Получистовая" },
+      { value: "3", label: "Черновая" },
+    ];
+    var selected = {};
+    parseCsvCodes(defaultCsv || "").forEach(function (v) {
+      selected[v] = true;
+    });
+    var parts = ['<td class="insert-app-col"><div class="insert-app-picker" role="group" aria-label="Вид обработки">'];
+    apps.forEach(function (a) {
+      var active = selected[a.value] ? " is-active" : "";
+      parts.push(
+        '<button type="button" class="insert-app-opt' +
+          active +
+          '" data-app="' +
+          escAttr(a.value) +
+          '" title="' +
+          escAttr(a.label) +
+          '" aria-pressed="' +
+          (selected[a.value] ? "true" : "false") +
+          '">' +
+          insertMachiningAppIconSvg(a.value) +
+          '<span class="insert-app-sr">' +
+          escAttr(a.label) +
+          "</span></button>"
+      );
+    });
+    parts.push('<input type="hidden" data-k="ins_machining_app" value="' + escAttr(parseCsvCodes(defaultCsv).join(",")) + '">');
+    parts.push("</div></td>");
+    return parts.join("");
+  }
+
+  function wireInsertMachiningAppPicker(tr) {
+    var picker = tr.querySelector(".insert-app-picker");
+    if (!picker) return;
+    var hidden = picker.querySelector('[data-k="ins_machining_app"]');
+    if (!hidden) return;
+    picker.querySelectorAll(".insert-app-opt").forEach(function (btn) {
+      btn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        btn.classList.toggle("is-active");
+        btn.setAttribute("aria-pressed", btn.classList.contains("is-active") ? "true" : "false");
+        syncMultiToggleHidden(picker, ".insert-app-opt", hidden, "data-app");
+      });
+    });
+  }
+
+  var arrivalWmMultiTheme = {
+    P: { bg: "#2f72ff", color: "#fff" },
+    M: { bg: "#f6b93b", color: "#111" },
+    K: { bg: "#e25a5a", color: "#fff" },
+    N: { bg: "#2bb673", color: "#fff" },
+    S: { bg: "#8f7cff", color: "#fff" },
+    H: { bg: "#6d6d6d", color: "#fff" },
+    PW: { bg: "#eef2f7", color: "#1a1d21" },
+  };
+
+  function buildArrivalWmMultiPickerHtml(selectedCsv) {
+    var selected = {};
+    parseCsvCodes(selectedCsv || "").forEach(function (v) {
+      selected[v] = true;
+    });
+    var opts = [
+      { value: "P", label: "P" },
+      { value: "M", label: "M" },
+      { value: "K", label: "K" },
+      { value: "N", label: "N" },
+      { value: "S", label: "S" },
+      { value: "H", label: "H" },
+      { value: "PW", label: "PW" },
+    ];
+    var parts = ['<div class="arrival-wm-multi-picker" role="group" aria-label="Материал обработки">'];
+    opts.forEach(function (o) {
+      var active = selected[o.value] ? " is-active" : "";
+      var theme = arrivalWmMultiTheme[o.value] || {};
+      var style =
+        theme.bg ? ' style="background:' + theme.bg + ";color:" + (theme.color || "#fff") + ';"' : "";
+      var title = wmOptionTitles[o.value] || o.label;
+      parts.push(
+        '<button type="button" class="arrival-wm-opt arrival-wm-opt--' +
+          o.value.toLowerCase() +
+          active +
+          '" data-wm="' +
+          escAttr(o.value) +
+          '" title="' +
+          escAttr(title) +
+          '" aria-pressed="' +
+          (selected[o.value] ? "true" : "false") +
+          '"' +
+          style +
+          ">" +
+          escAttr(o.label) +
+          "</button>"
+      );
+    });
+    parts.push(
+      '<input type="hidden" data-k="work_material" value="' + escAttr(parseCsvCodes(selectedCsv).join(",")) + '">'
+    );
+    parts.push("</div>");
+    return parts.join("");
+  }
+
+  function wireArrivalWmMultiPicker(tr) {
+    var picker = tr.querySelector(".arrival-wm-multi-picker");
+    if (!picker) return;
+    var hidden = picker.querySelector('[data-k="work_material"]');
+    if (!hidden) return;
+    picker.querySelectorAll(".arrival-wm-opt").forEach(function (btn) {
+      btn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        btn.classList.toggle("is-active");
+        btn.setAttribute("aria-pressed", btn.classList.contains("is-active") ? "true" : "false");
+        syncMultiToggleHidden(picker, ".arrival-wm-opt", hidden, "data-wm");
+      });
+    });
+  }
+
+  var arrivalGroupHeadHtml = {
+    end_mill: '<tr><th>Тип фрезы</th><th class="short-col">D</th><th class="short-col">R</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    tap: '<tr><th class="tap-size-col">Размер</th><th class="tap-std-col">Стандарт</th><th class="tap-step-col">Шаг</th><th class="tap-tpi-col">TPI</th><th class="tap-l-col">L</th><th class="tap-lc-col">Lc</th><th class="tap-hole-col">Тип</th><th>Тип инструмента</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    center_drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    countersink: '<tr><th>Тип</th><th class="short-col">D</th><th class="short-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    insert:
+      "<tr>" +
+      insertArrivalTh("family", "Семейство") +
+      insertArrivalTh("shape", "Форма") +
+      insertArrivalTh("edge_l", "L", "short-col insert-code-col") +
+      insertArrivalTh("thickness_s", "S", "short-col insert-code-col") +
+      insertArrivalTh("radius_r", "R", "short-col insert-code-col") +
+      insertArrivalTh("machining_application", "Обр.", "insert-app-col") +
+      insertArrivalTh("tool_material", "Сплав", "stack-words tm-col-tool-material") +
+      insertArrivalTh("coating", "Покрытие") +
+      insertArrivalTh("work_material", "Материал<br>обработки", "stack-words") +
+      insertArrivalTh("quantity", "Кол-во", "qty-col") +
+      insertArrivalTh("row_remove", "×") +
+      "</tr>",
+  };
+
   function ensureGroup(cat) {
     var groupId = "arrival-group-" + cat;
     var group = document.getElementById(groupId);
@@ -816,16 +1315,8 @@ var INV = (function () {
     group = document.createElement("div");
     group.className = "arrival-group";
     group.id = groupId;
-    var title = cat === "end_mill" ? "Фрезы" : (cat === "tap" ? "Резьбовой инструмент" : (cat === "center_drill" ? "Центровки" : (cat === "countersink" ? "Зенкера" : "Сверла")));
-    var headHtml = cat === "end_mill"
-      ? '<tr><th>Тип фрезы</th><th class="short-col">D</th><th class="short-col">R</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
-      : (cat === "tap"
-          ? '<tr><th class="tap-size-col">Размер</th><th class="tap-std-col">Стандарт</th><th class="tap-step-col">Шаг</th><th class="tap-tpi-col">TPI</th><th class="tap-l-col">L</th><th class="tap-lc-col">Lc</th><th class="tap-hole-col">Тип</th><th>Тип инструмента</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
-          : (cat === "center_drill"
-              ? '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
-              : (cat === "countersink"
-                  ? '<tr><th>Тип</th><th class="short-col">D</th><th class="short-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>'
-                  : '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>')));
+    var title = arrivalGroupTitles[cat] || "Инструмент";
+    var headHtml = arrivalGroupHeadHtml[cat] || arrivalGroupHeadHtml.drill;
     group.innerHTML = '' +
       '<h4>' + title + '</h4>' +
       '<div class="table-wrap arrival-bulk-table-wrap">' +
@@ -839,8 +1330,13 @@ var INV = (function () {
   }
 
   function addRow() {
-    var cat = categorySelect.value || "end_mill";
-    if (cat !== "end_mill" && cat !== "tap" && cat !== "center_drill" && cat !== "countersink" && cat !== "drill") return;
+    var cat = (categorySelect.value || "").trim();
+    if (!cat) {
+      showArrivalBulkError("Сначала выберите категорию инструмента.");
+      categorySelect.focus();
+      return;
+    }
+    if (!arrivalGroupTitles[cat]) return;
     var group = ensureGroup(cat);
     var body = group.querySelector(".arrival-group-body");
     var tr = document.createElement("tr");
@@ -894,7 +1390,18 @@ var INV = (function () {
       cells.push('<td class="co-cell"></td>');
       cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
-    } else {
+    } else if (cat === "insert") {
+      cells.push('<td class="ins-family-cell">' + buildInsertFamilyCellHtml() + "</td>");
+      cells.push('<td><select data-k="ins_shape" required>' + buildOptionsHtml(INV.insert_shapes || []) + '</select></td>');
+      cells.push('<td class="short-col insert-code-col"><select data-k="ins_edge_code" required>' + buildInsertIsoCodeOptionsHtml(INV.insert_edge_length_codes || []) + "</select></td>");
+      cells.push('<td class="short-col insert-code-col"><select data-k="ins_thickness_code" required>' + buildInsertIsoCodeOptionsHtml(INV.insert_thickness_codes || []) + "</select></td>");
+      cells.push('<td class="short-col insert-code-col"><select data-k="ins_nose_code" required>' + buildInsertIsoCodeOptionsHtml(INV.insert_nose_radius_codes || []) + "</select></td>");
+      cells.push(buildInsertMachiningAppCellHtml(""));
+      cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
+      cells.push('<td class="co-cell"></td>');
+      cells.push('<td class="wm-cell"></td>');
+      cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+    } else if (cat === "drill") {
       cells.push(arrivalRequiredDiamCell("dr_diameter_mm"));
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_overall_length_mm"></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_cutting_length_mm"></td>');
@@ -907,8 +1414,13 @@ var INV = (function () {
     }
     cells.push('<td><button type="button" class="btn btn-ghost js-arrival-row-remove">×</button></td>');
     tr.innerHTML = cells.join("");
+    var insFamilyCell = tr.querySelector(".ins-family-cell");
+    if (insFamilyCell) wireInsertFamilyCell(insFamilyCell);
+    wireInsertMachiningAppPicker(tr);
     var tmCell = tr.querySelector(".tm-cell-tool-material");
-    tmCell.appendChild(buildSelect(toolMaterialOptions, ""));
+    var tmOpts = cat === "insert" ? buildArrivalInsertAlloyMaterialOptions() : toolMaterialOptions;
+    var tmDefault = "";
+    tmCell.appendChild(buildSelect(tmOpts, tmDefault));
     var tmSel = tmCell.querySelector("select");
     tmSel.setAttribute("data-k", "tool_material");
     var tmCustom = document.createElement("input");
@@ -936,13 +1448,15 @@ var INV = (function () {
       }
     });
     tr.querySelector(".co-cell").appendChild(buildColoredCoatingSelect("none"));
-    tr.querySelector(".wm-cell").appendChild(buildColoredWmSelect(""));
+    var wmCell = tr.querySelector(".wm-cell");
+    wmCell.innerHTML = buildArrivalWmMultiPickerHtml("");
+    wireArrivalWmMultiPicker(tr);
     body.appendChild(tr);
   }
 
   addBtn.addEventListener("click", addRow);
   categorySelect.addEventListener("change", function () {
-    // Влияет только на категорию новых строк.
+    clearArrivalBulkErrors();
   });
 
   var arrivalBlock = document.getElementById("arrival-block");
@@ -978,16 +1492,24 @@ var INV = (function () {
       var row = { category: tr.getAttribute("data-category") || "" };
       tr.querySelectorAll("[data-k]").forEach(function (el) {
         var k = el.getAttribute("data-k");
-        if (k === "tool_material_custom") return;
+        if (k === "tool_material_custom" || k === "ins_family_custom") return;
         if (k === "tool_material" && (el.value || "") === toolMaterialFilterOther) {
           var cin = tr.querySelector('[data-k="tool_material_custom"]');
           row.tool_material = (cin && cin.value || "").trim();
+        } else if (k === "ins_family") {
+          if ((el.value || "") === insertFamilyOther) {
+            var fin = tr.querySelector('[data-k="ins_family_custom"]');
+            row.ins_family = normalizeInsertFamilyValue(fin && fin.value || "");
+          } else {
+            row.ins_family = normalizeInsertFamilyValue(el.value || "");
+          }
         } else {
           row[k] = (el.value || "").trim();
         }
       });
       row.movement_date = (arrivalDateInput.value || "").trim();
       row.supplier_name = (supplierSelect.value || "").trim();
+      resolveInsertArrivalRowMaterials(row);
       rows.push(row);
     });
     if (!rows.length) {
@@ -1000,6 +1522,14 @@ var INV = (function () {
   });
 
   form.addEventListener("submit", function () {
+    groupsWrap.querySelectorAll(".ins-family-custom").forEach(function (cin) {
+      var tr = cin.closest("tr[data-arrival-row]");
+      if (!tr) return;
+      var sel = tr.querySelector('select[data-k="ins_family"]');
+      if (!sel || sel.value !== insertFamilyOther) return;
+      var v = normalizeInsertFamilyValue(cin.value || "");
+      if (v) ensureInsertFamilySelectOption(sel, v);
+    });
     groupsWrap.querySelectorAll(".tm-tool-material-custom").forEach(function (cin) {
       var tr = cin.closest("tr[data-arrival-row]");
       if (!tr) return;
@@ -1095,9 +1625,23 @@ var INV = (function () {
       return '<span class="coating-cell">' + inner + "</span>";
     }
     if (field === "work_material") {
-      var cls = v ? ("wm-" + v.toLowerCase()) : "";
-      var wmLbl = workMaterialLabels[v] || "";
-      return v ? ('<span class="wm-badge ' + cls + '" title="' + escapeHtml(wmLbl) + '">' + escapeHtml(v) + "</span>") : "-";
+      var codes = parseCsvCodes(v);
+      if (!codes.length) return "-";
+      return codes
+        .map(function (code) {
+          var cls = "wm-" + code.toLowerCase();
+          var wmLbl = workMaterialLabels[code] || "";
+          return (
+            '<span class="wm-badge ' +
+            cls +
+            '" title="' +
+            escapeHtml(wmLbl) +
+            '">' +
+            escapeHtml(code) +
+            "</span>"
+          );
+        })
+        .join(" ");
     }
     if (field === "em_diameter_mm") return "Ø" + v.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
     if (field === "quantity") return "<strong>" + escapeHtml(v) + "</strong>";
@@ -1242,6 +1786,61 @@ var INV = (function () {
     });
   }
 
+  function activateWorkMaterialCell(cell, current) {
+    cell.innerHTML = buildArrivalWmMultiPickerHtml(current);
+    var picker = cell.querySelector(".arrival-wm-multi-picker");
+    var hidden = picker && picker.querySelector('[data-k="work_material"]');
+    if (!picker || !hidden) return;
+    activeCell = cell;
+    picker.querySelectorAll(".arrival-wm-opt").forEach(function (btn) {
+      btn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        btn.classList.toggle("is-active");
+        btn.setAttribute("aria-pressed", btn.classList.contains("is-active") ? "true" : "false");
+        syncMultiToggleHidden(picker, ".arrival-wm-opt", hidden, "data-wm");
+      });
+    });
+    var cancelled = false;
+    function revert() {
+      cancelled = true;
+      cell.innerHTML = formatCell("work_material", cell.getAttribute("data-value") || "");
+      activeCell = null;
+    }
+    function commit() {
+      if (cancelled || activeCell !== cell) return;
+      var val = (hidden.value || "").trim();
+      if (!val) {
+        alert("Выберите хотя бы одну группу материала обработки.");
+        return;
+      }
+      saveCell(cell, val, hidden);
+    }
+    cell.addEventListener(
+      "keydown",
+      function (e) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          revert();
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commit();
+        }
+      },
+      { once: false }
+    );
+    setTimeout(function () {
+      document.addEventListener(
+        "click",
+        function onDocClick(e) {
+          if (!cell.contains(e.target)) commit();
+        },
+        { once: true }
+      );
+    }, 0);
+  }
+
   function activate(cell) {
     if (activeCell === cell) return;
     if (activeCell) return;
@@ -1250,6 +1849,10 @@ var INV = (function () {
     var current = cell.getAttribute("data-value") || "";
     if (field === "tool_material" && type === "select") {
       activateToolMaterialCell(cell, current);
+      return;
+    }
+    if (field === "work_material") {
+      activateWorkMaterialCell(cell, current);
       return;
     }
     var editor = (type === "select") ? buildSelect(field, current) : document.createElement("input");

@@ -24,6 +24,23 @@ from .auth_utils import (
     inventory_route_nav_access_required,
     write_permission_required,
 )
+from .insert_constants import (
+    INSERT_EDGE_LENGTH_CODES,
+    INSERT_NOSE_RADIUS_CODES,
+    INSERT_RELIEF_ANGLES,
+    INSERT_SHAPES,
+    INSERT_THICKNESS_CODES,
+    INSERT_TOLERANCE_CLASSES,
+    INSERT_COLUMN_TOOLTIPS,
+    INSERT_FAMILY_OTHER,
+    INSERT_GRADE_OTHER,
+    INSERT_MACHINING_APPLICATIONS,
+    MILLING_INSERT_FAMILIES,
+    merge_insert_chipbreaker_grades,
+    normalize_insert_machining_apps,
+    build_insert_display_name,
+    normalize_milling_family,
+)
 from .models import (
     CENTER_DRILL_ANGLES,
     COUNTERSINK_ANGLES,
@@ -34,6 +51,7 @@ from .models import (
     END_MILL_TYPES,
     CenterDrillSpec,
     EndMillSpec,
+    InsertSpec,
     InventoryStockEvent,
     StockMovement,
     TapSpec,
@@ -50,10 +68,13 @@ from .models import (
     TOOL_MATERIAL_TYPES,
     WORK_MATERIAL_TYPES,
     PURCHASE_STATUSES,
+    normalize_work_material_codes,
+    work_material_display_text,
 )
 
 TOOL_MATERIAL_FILTER_OTHER = "__other__"
 _TOOL_MATERIAL_STD_KEYS = frozenset(k for k, _ in TOOL_MATERIAL_TYPES)
+_INVENTORY_CATEGORIES = frozenset({"end_mill", "tap", "center_drill", "countersink", "drill", "insert"})
 
 
 _ARRIVAL_REQUIRED_DIAMETER: dict[str, tuple[str, str]] = {
@@ -66,13 +87,29 @@ _ARRIVAL_REQUIRED_DIAMETER: dict[str, tuple[str, str]] = {
 
 def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
     category = (row.get("category") or "").strip()
+    errs: list[str] = []
+    if category in _INVENTORY_CATEGORIES:
+        if not normalize_work_material_codes(row.get("work_material")):
+            errs.append(f"Строка {idx}: укажите хотя бы одну группу материала обработки (P, M, K…).")
+    if category == "insert":
+        shape = (row.get("ins_shape") or "").strip()
+        edge = (row.get("ins_edge_code") or "").strip()
+        th = (row.get("ins_thickness_code") or "").strip()
+        nr = (row.get("ins_nose_code") or "").strip()
+        mach = normalize_insert_machining_apps(
+            row.get("ins_machining_app") or row.get("machining_application")
+        )
+        if not shape or not edge or not th or not nr:
+            errs.append(f"Строка {idx}: для пластины укажите форму, L (длина), S (толщина) и R (радиус).")
+        if not mach:
+            errs.append(f"Строка {idx}: укажите хотя бы один вид обработки (чистовая / получистовая / черновая).")
+        return errs
     spec = _ARRIVAL_REQUIRED_DIAMETER.get(category)
-    if not spec:
-        return []
-    key, label = spec
-    if _to_decimal_or_none(row.get(key)) is None:
-        return [f"Строка {idx}: укажите {label}."]
-    return []
+    if spec:
+        key, label = spec
+        if _to_decimal_or_none(row.get(key)) is None:
+            errs.append(f"Строка {idx}: укажите {label}.")
+    return errs
 
 
 def _register_tool_material_extra(value: str) -> str | None:
@@ -265,6 +302,14 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "drill_overall_length_mm",
         "drill_cutting_length_mm",
         "drill_angle_deg",
+        "ins_shape",
+        "ins_relief",
+        "ins_tolerance",
+        "ins_edge_code",
+        "ins_thickness_code",
+        "ins_nose_code",
+        "ins_family",
+        "ins_grade",
         "arrival_supplier",
         "tool_material",
         "tool_material_custom",
@@ -344,6 +389,19 @@ _STOCK_KEYS_BY_CATEGORY = {
     ),
     "drill": frozenset(
         {"drill_diameter_mm", "drill_overall_length_mm", "drill_cutting_length_mm", "drill_angle_deg"}
+    ),
+    "insert": frozenset(
+        {
+            "ins_shape",
+            "ins_relief",
+            "ins_tolerance",
+            "ins_edge_code",
+            "ins_thickness_code",
+            "ins_nose_code",
+            "ins_family",
+            "ins_grade",
+            "ins_iso",
+        }
     ),
 }
 _STOCK_DECIMAL_PARAM_KEYS = frozenset(
@@ -445,7 +503,7 @@ def _fmt_unknown(v, prefix: str = "") -> str:
 
 def _build_end_mill_name(diameter_mm, flutes_count, tool_material: str, work_material: str) -> str:
     tool_mat_label = dict(TOOL_MATERIAL_TYPES).get(tool_material, tool_material)
-    work_mat_label = dict(WORK_MATERIAL_TYPES).get(work_material, work_material)
+    work_mat_label = work_material_display_text(work_material) or work_material
     parts = [f"Фреза D{_fmt_unknown(diameter_mm)}", f"{_fmt_unknown(flutes_count)} кром."]
     if tool_mat_label:
         parts.append(tool_mat_label)
@@ -478,6 +536,68 @@ def _build_drill_name(diameter_mm, overall_length_mm, cutting_length_mm, angle_d
         f"Lc{_fmt_unknown(cutting_length_mm)} / "
         f"{_fmt_unknown(angle_deg)}°"
     )
+
+
+def _milling_family_from_request(data) -> str:
+    sel = (data.get("ins_family") or data.get("milling_family") or "").strip()
+    if sel == INSERT_FAMILY_OTHER:
+        return normalize_milling_family(data.get("ins_family_custom") or "")
+    return normalize_milling_family(sel)
+
+
+def _insert_spec_fields_from_mapping(data: dict) -> dict:
+    return {
+        "insert_shape": (data.get("ins_shape") or data.get("insert_shape") or "C").strip()[:1] or "C",
+        "relief_angle": (data.get("ins_relief") or data.get("relief_angle") or "N").strip()[:1] or "N",
+        "tolerance_class": (data.get("ins_tolerance") or data.get("tolerance_class") or "M").strip()[:1] or "M",
+        "mounting_chip": (data.get("ins_mounting") or data.get("mounting_chip") or "G").strip()[:1] or "G",
+        "cutting_edge_length_code": (data.get("ins_edge_code") or data.get("cutting_edge_length_code") or "").strip()[:2],
+        "thickness_code": (data.get("ins_thickness_code") or data.get("thickness_code") or "").strip()[:2],
+        "nose_radius_code": (data.get("ins_nose_code") or data.get("nose_radius_code") or "").strip()[:2],
+        "milling_family": _milling_family_from_request(data),
+        "chipbreaker_grade": (data.get("ins_grade") or data.get("chipbreaker_grade") or "").strip()[:40],
+        "machining_application": normalize_insert_machining_apps(
+            data.get("ins_machining_app") or data.get("machining_application")
+        ),
+    }
+
+
+def _find_insert_tool_match(tool_material, coating_type, work_material, main_diameter_mm, spec_fields: dict):
+    return (
+        ToolItem.objects.select_for_update()
+        .filter(
+            category="insert",
+            tool_material=tool_material,
+            coating_type=coating_type,
+            work_material=work_material,
+            main_diameter_mm=main_diameter_mm,
+            insert_spec__insert_shape=spec_fields["insert_shape"],
+            insert_spec__cutting_edge_length_code=spec_fields["cutting_edge_length_code"],
+            insert_spec__thickness_code=spec_fields["thickness_code"],
+            insert_spec__nose_radius_code=spec_fields["nose_radius_code"],
+            insert_spec__milling_family=spec_fields["milling_family"],
+            insert_spec__chipbreaker_grade=spec_fields["chipbreaker_grade"],
+            insert_spec__machining_application=spec_fields["machining_application"],
+        )
+        .first()
+    )
+
+
+def _create_insert_tool(quantity, tool_material, coating_type, work_material, main_diameter_mm, spec_fields: dict) -> ToolItem:
+    spec = InsertSpec(**spec_fields)
+    spec.sync_derived_fields()
+    tool = ToolItem.objects.create(
+        category="insert",
+        name=build_insert_display_name(spec.iso_designation, spec.milling_family, spec.chipbreaker_grade),
+        tool_material=tool_material,
+        coating_type=coating_type,
+        work_material=work_material,
+        main_diameter_mm=main_diameter_mm,
+        quantity=quantity,
+    )
+    spec.tool = tool
+    spec.save()
+    return tool
 
 
 @biota_login_required
@@ -605,7 +725,7 @@ def inventory_view(request):
         quantity = _to_int(request.POST.get("quantity"), 0)
         tool_material = (request.POST.get("tool_material") or "").strip()
         coating_type = (request.POST.get("coating_type") or "none").strip()
-        work_material = (request.POST.get("work_material") or "").strip()
+        work_material = normalize_work_material_codes(request.POST.get("work_material"))
         main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
         if diameter_mm <= 0 or overall_length_mm <= 0 or cutting_length_mm <= 0 or flutes_count <= 0 or quantity <= 0:
             messages.error(request, "Для фрезы заполните параметры корректно (числа больше нуля).")
@@ -642,7 +762,7 @@ def inventory_view(request):
         quantity = _to_int(request.POST.get("quantity"), 0)
         tool_material = (request.POST.get("tool_material") or "").strip()
         coating_type = (request.POST.get("coating_type") or "none").strip()
-        work_material = (request.POST.get("work_material") or "").strip()
+        work_material = normalize_work_material_codes(request.POST.get("work_material"))
         main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
         if not size_label or overall_length_mm <= 0 or cutting_length_mm <= 0 or quantity <= 0:
             messages.error(request, "Для метчика заполните размер, длины и количество.")
@@ -753,6 +873,7 @@ def inventory_view(request):
                 "center_drill_spec",
                 "countersink_spec",
                 "drill_spec",
+                "insert_spec",
             )
             .filter(id=tool_id, is_deleted=False)
             .first()
@@ -763,7 +884,7 @@ def inventory_view(request):
 
         tool.tool_material = (request.POST.get("tool_material") or "").strip()
         tool.coating_type = (request.POST.get("coating_type") or "none").strip()
-        tool.work_material = (request.POST.get("work_material") or "").strip()
+        tool.work_material = normalize_work_material_codes(request.POST.get("work_material"))
         tool.main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
         tool.quantity = max(0, _to_int(request.POST.get("quantity"), tool.quantity))
 
@@ -804,6 +925,19 @@ def inventory_view(request):
             tool.drill_spec.cutting_length_mm = _to_decimal_or_none(request.POST.get("dr_cutting_length_mm"))
             tool.drill_spec.angle_deg = _to_decimal_or_none(request.POST.get("dr_angle_deg"))
             tool.drill_spec.save()
+        elif tool.category == "insert" and tool.insert_spec:
+            ins = tool.insert_spec
+            ins.insert_shape = (request.POST.get("ins_shape") or ins.insert_shape or "C").strip()[:1]
+            ins.relief_angle = (request.POST.get("ins_relief") or ins.relief_angle or "N").strip()[:1]
+            ins.tolerance_class = (request.POST.get("ins_tolerance") or ins.tolerance_class or "M").strip()[:1]
+            ins.mounting_chip = (request.POST.get("ins_mounting") or ins.mounting_chip or "G").strip()[:1]
+            ins.cutting_edge_length_code = (request.POST.get("ins_edge_code") or ins.cutting_edge_length_code or "").strip()[:2]
+            ins.thickness_code = (request.POST.get("ins_thickness_code") or ins.thickness_code or "").strip()[:2]
+            ins.nose_radius_code = (request.POST.get("ins_nose_code") or ins.nose_radius_code or "").strip()[:2]
+            ins.milling_family = _milling_family_from_request(request.POST) or normalize_milling_family(ins.milling_family)
+            ins.chipbreaker_grade = (request.POST.get("ins_grade") or ins.chipbreaker_grade or "").strip()[:40]
+            ins.save()
+            tool.name = build_insert_display_name(ins.iso_designation, ins.milling_family, ins.chipbreaker_grade)
 
         tool.save()
         _log_inventory_stock_event(
@@ -857,7 +991,7 @@ def inventory_view(request):
             tool.coating_type = value_raw or "none"
             tool.save(update_fields=["coating_type", "updated_at"])
         elif field == "work_material":
-            tool.work_material = value_raw
+            tool.work_material = normalize_work_material_codes(value_raw)
             tool.save(update_fields=["work_material", "updated_at"])
         elif field == "quantity":
             tool.quantity = max(0, _to_int(value_raw, tool.quantity))
@@ -955,7 +1089,7 @@ def inventory_view(request):
         tool_material = (request.POST.get("tool_material") or "").strip()
         _register_tool_material_extra(tool_material)
         coating_type = (request.POST.get("coating_type") or "none").strip()
-        work_material = (request.POST.get("work_material") or "").strip()
+        work_material = normalize_work_material_codes(request.POST.get("work_material"))
         main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
         if category not in {"end_mill", "tap"} or quantity <= 0:
             messages.error(request, "Укажите тип инструмента и количество для прихода.")
@@ -1112,9 +1246,9 @@ def inventory_view(request):
                 tool_material = (row.get("tool_material") or "").strip()
                 _register_tool_material_extra(tool_material)
                 coating_type = (row.get("coating_type") or "none").strip()
-                work_material = (row.get("work_material") or "").strip()
+                work_material = normalize_work_material_codes(row.get("work_material"))
                 main_diameter_mm = _to_decimal_or_none(row.get("main_diameter_mm"))
-                if category not in {"end_mill", "tap", "center_drill", "countersink", "drill"} or quantity <= 0:
+                if category not in _INVENTORY_CATEGORIES or quantity <= 0:
                     continue
                 try:
                     movement_date = date.fromisoformat(movement_date_raw)
@@ -1308,7 +1442,7 @@ def inventory_view(request):
                             flutes_count=flutes_count,
                             size_label=size_label,
                         )
-                else:
+                elif category == "drill":
                     diameter_mm = _to_decimal_or_none(row.get("dr_diameter_mm"))
                     overall_length_mm = _to_decimal_or_none(row.get("dr_overall_length_mm"))
                     cutting_length_mm = _to_decimal_or_none(row.get("dr_cutting_length_mm"))
@@ -1348,6 +1482,20 @@ def inventory_view(request):
                             cutting_length_mm=cutting_length_mm,
                             angle_deg=angle_deg,
                         )
+                elif category == "insert":
+                    spec_fields = _insert_spec_fields_from_mapping(row)
+                    tool = _find_insert_tool_match(
+                        tool_material, coating_type, work_material, main_diameter_mm, spec_fields
+                    )
+                    if tool:
+                        tool.quantity += quantity
+                        tool.save(update_fields=["quantity", "updated_at"])
+                    else:
+                        tool = _create_insert_tool(
+                            quantity, tool_material, coating_type, work_material, main_diameter_mm, spec_fields
+                        )
+                else:
+                    continue
                 StockMovement.objects.create(
                     movement_type="restock",
                     tool=tool,
@@ -1608,7 +1756,7 @@ def inventory_view(request):
     if not show_all:
         qs = qs.filter(quantity__gt=0)
     filter_category = (_sq("category") or "end_mill").strip()
-    if filter_category not in {"end_mill", "tap", "center_drill", "countersink", "drill"}:
+    if filter_category not in _INVENTORY_CATEGORIES:
         filter_category = "end_mill"
     qs = qs.filter(category=filter_category)
 
@@ -1639,6 +1787,15 @@ def inventory_view(request):
     drill_overall_length_raw = _sq("drill_overall_length_mm")
     drill_cutting_length_raw = _sq("drill_cutting_length_mm")
     drill_angle_raw = _sq("drill_angle_deg")
+    ins_shape_raw = _sq("ins_shape")
+    ins_relief_raw = _sq("ins_relief")
+    ins_tolerance_raw = _sq("ins_tolerance")
+    ins_edge_code_raw = _sq("ins_edge_code")
+    ins_thickness_code_raw = _sq("ins_thickness_code")
+    ins_nose_code_raw = _sq("ins_nose_code")
+    ins_family_raw = _sq("ins_family")
+    ins_grade_raw = _sq("ins_grade")
+    ins_iso_raw = _sq("ins_iso")
     arrival_supplier = _sq("arrival_supplier")
 
     tm_param = _sq("tool_material")
@@ -1742,13 +1899,38 @@ def inventory_view(request):
             drill_angle = _to_decimal(drill_angle_raw, Decimal("0"))
             if drill_angle > 0:
                 qs = qs.filter(drill_spec__angle_deg=drill_angle)
+    elif filter_category == "insert":
+        if ins_shape_raw:
+            qs = qs.filter(insert_spec__insert_shape=ins_shape_raw)
+        if ins_relief_raw:
+            qs = qs.filter(insert_spec__relief_angle=ins_relief_raw)
+        if ins_tolerance_raw:
+            qs = qs.filter(insert_spec__tolerance_class=ins_tolerance_raw)
+        if ins_edge_code_raw:
+            qs = qs.filter(insert_spec__cutting_edge_length_code=ins_edge_code_raw)
+        if ins_thickness_code_raw:
+            qs = qs.filter(insert_spec__thickness_code=ins_thickness_code_raw)
+        if ins_nose_code_raw:
+            qs = qs.filter(insert_spec__nose_radius_code=ins_nose_code_raw)
+        if ins_family_raw:
+            qs = qs.filter(insert_spec__milling_family=ins_family_raw)
+        if ins_grade_raw:
+            qs = qs.filter(insert_spec__chipbreaker_grade__iexact=ins_grade_raw)
+        if ins_iso_raw:
+            qs = qs.filter(insert_spec__iso_designation__iexact=ins_iso_raw)
 
     if tool_material:
         qs = qs.filter(tool_material=tool_material)
     if coating_type:
         qs = qs.filter(coating_type=coating_type)
     if work_material:
-        qs = qs.filter(work_material=work_material)
+        wm = work_material.strip()
+        qs = qs.filter(
+            Q(work_material=wm)
+            | Q(work_material__startswith=f"{wm},")
+            | Q(work_material__endswith=f",{wm}")
+            | Q(work_material__contains=f",{wm},")
+        )
     if arrival_supplier:
         qs = qs.filter(
             movements__movement_type="restock",
@@ -1830,6 +2012,20 @@ def inventory_view(request):
     drill_angles = _sorted_unique_decimal_strings(
         _distinct_numeric_values(option_source_qs.filter(category="drill"), "drill_spec__angle_deg")
     )
+    insert_shapes = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__insert_shape")
+    insert_reliefs = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__relief_angle")
+    insert_tolerances = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__tolerance_class")
+    insert_edge_codes = _distinct_text_values(
+        option_source_qs.filter(category="insert"), "insert_spec__cutting_edge_length_code"
+    )
+    insert_thickness_codes = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__thickness_code")
+    insert_nose_codes = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__nose_radius_code")
+    insert_families = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__milling_family")
+    insert_grades_db = _distinct_text_values(
+        option_source_qs.filter(category="insert"), "insert_spec__chipbreaker_grade"
+    )
+    insert_grades = merge_insert_chipbreaker_grades(insert_grades_db)
+    insert_isos = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__iso_designation")
 
     tool_material_extra_options = _tool_material_extra_options(
         tools_qs=option_source_qs,
@@ -1857,7 +2053,15 @@ def inventory_view(request):
 
     issue_candidates = list(
         StockMovement.objects.filter(movement_type="issue")
-        .select_related("tool", "tool__end_mill_spec", "tool__tap_spec", "tool__center_drill_spec", "tool__countersink_spec", "tool__drill_spec")
+        .select_related(
+            "tool",
+            "tool__end_mill_spec",
+            "tool__tap_spec",
+            "tool__center_drill_spec",
+            "tool__countersink_spec",
+            "tool__drill_spec",
+            "tool__insert_spec",
+        )
         .annotate(
             processed_qty=Coalesce(
                 Sum("issue_outcomes__quantity"),
@@ -2002,7 +2206,9 @@ def inventory_view(request):
     inventory_history = timeline[:120]
 
     ctx = {
-        "tool_items": qs.select_related("end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec", "drill_spec"),
+        "tool_items": qs.select_related(
+            "end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec", "drill_spec", "insert_spec"
+        ),
         "movements": mv_hist[:50],
         "inventory_history": inventory_history,
         "thread_standards": THREAD_STANDARDS,
@@ -2036,6 +2242,15 @@ def inventory_view(request):
             "drill_overall_length_mm": _norm_stock_decimal_str(drill_overall_length_raw),
             "drill_cutting_length_mm": _norm_stock_decimal_str(drill_cutting_length_raw),
             "drill_angle_deg": _norm_stock_decimal_str(drill_angle_raw),
+            "ins_shape": ins_shape_raw,
+            "ins_relief": ins_relief_raw,
+            "ins_tolerance": ins_tolerance_raw,
+            "ins_edge_code": ins_edge_code_raw,
+            "ins_thickness_code": ins_thickness_code_raw,
+            "ins_nose_code": ins_nose_code_raw,
+            "ins_family": ins_family_raw,
+            "ins_grade": ins_grade_raw,
+            "ins_iso": ins_iso_raw,
             "tool_material": tool_material,
             "tool_material_custom": tm_custom_input,
             "tool_material_select": tool_material_select,
@@ -2084,6 +2299,30 @@ def inventory_view(request):
             "cutting_lengths": drill_cutting_lengths,
             "angles": drill_angles,
         },
+        "insert_filter_options": {
+            "shapes": insert_shapes,
+            "reliefs": insert_reliefs,
+            "tolerances": insert_tolerances,
+            "edge_codes": insert_edge_codes,
+            "thickness_codes": insert_thickness_codes,
+            "nose_codes": insert_nose_codes,
+            "families": insert_families,
+            "grades": insert_grades,
+            "isos": insert_isos,
+        },
+        "insert_shapes": INSERT_SHAPES,
+        "insert_relief_angles": INSERT_RELIEF_ANGLES,
+        "insert_tolerance_classes": INSERT_TOLERANCE_CLASSES,
+        "insert_edge_length_codes": INSERT_EDGE_LENGTH_CODES,
+        "insert_thickness_codes": INSERT_THICKNESS_CODES,
+        "insert_nose_radius_codes": INSERT_NOSE_RADIUS_CODES,
+        "insert_machining_applications": INSERT_MACHINING_APPLICATIONS,
+        "milling_insert_families": MILLING_INSERT_FAMILIES,
+        "insert_family_other": INSERT_FAMILY_OTHER,
+        "insert_grade_other": INSERT_GRADE_OTHER,
+        "insert_chipbreaker_grades": insert_grades,
+        "insert_column_tooltips": INSERT_COLUMN_TOOLTIPS,
+        "insert_column_tooltips_json": json.dumps(INSERT_COLUMN_TOOLTIPS, ensure_ascii=False),
         "tool_material_types": TOOL_MATERIAL_TYPES,
         "tool_material_extra_options": tool_material_extra_options,
         "tool_material_filter_other": TOOL_MATERIAL_FILTER_OTHER,
@@ -2091,7 +2330,9 @@ def inventory_view(request):
         "coating_types": COATING_TYPES,
         "work_material_types": WORK_MATERIAL_TYPES,
         "today": date.today().isoformat(),
-        "movement_tool_options": ToolItem.objects.select_related("end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec", "drill_spec").filter(is_deleted=False).order_by("category", "name"),
+        "movement_tool_options": ToolItem.objects.select_related(
+            "end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec", "drill_spec", "insert_spec"
+        ).filter(is_deleted=False).order_by("category", "name"),
         "issue_candidates": issue_candidates,
         "purchase_requests": purchase_qs[:300],
         "purchase_statuses": PURCHASE_STATUSES,

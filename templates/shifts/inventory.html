@@ -4,10 +4,16 @@
 
 {% block extra_styles %}
 <link rel="stylesheet" href="{% static 'shifts/css/inventory.css' %}?v={{ static_asset_version }}">
+{% if panel == "arrival" %}
+<link rel="stylesheet" href="{% static 'shifts/css/inventory_arrival.css' %}?v={{ static_asset_version }}">
+{% endif %}
+{% if panel == "issue_outcome" %}
+<link rel="stylesheet" href="{% static 'shifts/css/inventory_outcome.css' %}?v={{ static_asset_version }}">
+{% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="inv-page{% if panel == 'stock' %} inv-page--stock{% endif %}">
+<div class="inv-page{% if panel == 'stock' %} inv-page--stock{% endif %}{% if panel == 'arrival' %} inv-page--arrival{% endif %}{% if panel == 'issue_outcome' %} inv-page--issue-outcome{% endif %}">
 {% if panel != "defects" and panel != "payroll" and panel != "employees" %}
 <nav class="inv-tabs" aria-label="Разделы склада">
   <a class="inv-tab {% if panel == 'stock' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=stock">Склад</a>
@@ -20,7 +26,7 @@
   <a class="inv-tab {% if panel == 'purchases' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=purchases">Закупки</a>
 </nav>
 {% endif %}
-{% if panel != "defects" and panel != "payroll" and panel != "employees" and panel != "stock" %}
+{% if panel != "defects" and panel != "payroll" and panel != "employees" and panel != "stock" and panel != "arrival" and panel != "issue_outcome" %}
 <h2 style="margin-top:0;">Склад инструмента</h2>
 <p class="muted">Отображается один тип инструмента за раз (по умолчанию: фрезы), только с остатком больше 0.</p>
 {% endif %}
@@ -161,8 +167,8 @@
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
         </td>
-        <td data-sort="{{ t.work_material|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
-          {% if t.work_material %}<span class="wm-badge wm-{{ t.work_material|lower }}" title="{{ t.get_work_material_display }}">{{ t.work_material }}</span>{% else %}-{% endif %}
+        <td class="inv-stock-wm-cell{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.work_material|default:'-' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
+          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -219,8 +225,8 @@
         <td data-sort="{{ t.coating_type }}">
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
         </td>
-        <td data-sort="{{ t.work_material|default:'-' }}">
-          {% if t.work_material %}<span class="wm-badge wm-{{ t.work_material|lower }}" title="{{ t.get_work_material_display }}">{{ t.work_material }}</span>{% else %}-{% endif %}
+        <td class="inv-stock-wm-cell" data-sort="{{ t.work_material|default:'-' }}">
+          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -267,8 +273,8 @@
         <td data-sort="{{ t.coating_type }}">
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
         </td>
-        <td data-sort="{{ t.work_material|default:'-' }}">
-          {% if t.work_material %}<span class="wm-badge wm-{{ t.work_material|lower }}" title="{{ t.get_work_material_display }}">{{ t.work_material }}</span>{% else %}-{% endif %}
+        <td class="inv-stock-wm-cell" data-sort="{{ t.work_material|default:'-' }}">
+          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -302,6 +308,7 @@
         <th class="sortable">D осн, мм</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
+        <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
         {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
       </tr>
@@ -319,6 +326,66 @@
         <td>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}">
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
+        </td>
+        <td class="inv-stock-wm-cell" data-sort="{{ t.work_material|default:'-' }}">
+          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
+        </td>
+        <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
+        {% if can_manage_stock %}
+        <td class="inv-stock-col-delete">
+          <form method="post" class="inv-stock-delete-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_tool_item">
+            <input type="hidden" name="tool_id" value="{{ t.id }}">
+            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить: 0 из 5" title="Удалить: нажмите 5 раз">
+              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            </button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% empty %}
+      <tr><td colspan="{% if can_manage_stock %}12{% else %}11{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% elif filters.category == "insert" %}
+  {% with tips=insert_column_tooltips %}
+  <table class="data-grid inv-stock-grid inv-stock-grid--insert js-sortable-table">
+    <thead>
+      <tr>
+        <th class="sortable" title="{{ tips.family }}">Семейство</th>
+        <th class="sortable" title="{{ tips.shape }}">Форма</th>
+        <th class="sortable insert-code-col" title="{{ tips.edge_l }}">L</th>
+        <th class="sortable insert-code-col" title="{{ tips.thickness_s }}">S</th>
+        <th class="sortable insert-code-col" title="{{ tips.radius_r }}">R</th>
+        <th class="sortable insert-app-col" title="Вид обработки">Обр.</th>
+        <th class="sortable" title="{{ tips.grade }}">Сплав</th>
+        <th class="sortable" title="{{ tips.coating }}">Покрытие</th>
+        <th class="sortable" title="{{ tips.work_material }}">Материал обработки</th>
+        <th class="sortable" title="{{ tips.stock_qty }}">Остаток</th>
+        {% if can_manage_stock %}<th class="inv-stock-col-delete" title="{{ tips.delete }}">Удалить</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tool_items %}
+      <tr>
+        <td data-sort="{{ t.insert_spec.milling_family|default:'-' }}" title="{{ t.insert_spec.milling_family_cell_title }}">{{ t.insert_spec.milling_family|default:"-"|upper }}</td>
+        <td data-sort="{{ t.insert_spec.insert_shape|default:'-' }}" title="{{ t.insert_spec.insert_shape_cell_title }}">{{ t.insert_spec.insert_shape|default:"-" }}</td>
+        <td class="insert-code-col" data-sort="{{ t.insert_spec.cutting_edge_length_code|default:'-' }}" title="{{ t.insert_spec.cutting_edge_length_cell_title }}">{{ t.insert_spec.cutting_edge_length_code|default:"-" }}</td>
+        <td class="insert-code-col" data-sort="{{ t.insert_spec.thickness_code|default:'-' }}" title="{{ t.insert_spec.thickness_cell_title }}">{{ t.insert_spec.thickness_code|default:"-" }}</td>
+        <td class="insert-code-col" data-sort="{{ t.insert_spec.nose_radius_code|default:'-' }}" title="{{ t.insert_spec.nose_radius_cell_title }}">{{ t.insert_spec.nose_radius_code|default:"-" }}</td>
+        <td class="insert-app-col" data-sort="{{ t.insert_spec.machining_application|default:'-' }}">
+          {% for app in t.insert_spec.machining_application_codes_list %}
+          <span class="insert-mach-badge" title="{{ app|insert_machining_tooltip }}">{{ app }}</span>
+          {% empty %}-{% endfor %}
+        </td>
+        <td data-sort="{{ t.insert_spec.chipbreaker_grade|default:'-' }}" title="{{ t.insert_spec.chipbreaker_grade_cell_title }}">{{ t.insert_spec.chipbreaker_grade|default:"-" }}</td>
+        <td data-sort="{{ t.coating_type }}">
+          {% with ct=t.coating_type|default:'none' %}<span class="coating-cell" title="{{ ct|coating_hover_title }}"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
+        </td>
+        <td class="inv-stock-wm-cell" data-sort="{{ t.work_material|default:'-' }}">
+          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -339,7 +406,8 @@
       {% endfor %}
     </tbody>
   </table>
-  {% else %}
+  {% endwith %}
+  {% elif filters.category == "drill" %}
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
@@ -367,8 +435,8 @@
         <td data-sort="{{ t.coating_type }}">
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
         </td>
-        <td data-sort="{{ t.work_material|default:'-' }}">
-          {% if t.work_material %}<span class="wm-badge wm-{{ t.work_material|lower }}" title="{{ t.get_work_material_display }}">{{ t.work_material }}</span>{% else %}-{% endif %}
+        <td class="inv-stock-wm-cell" data-sort="{{ t.work_material|default:'-' }}">
+          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}"><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -412,6 +480,7 @@
         <option value="center_drill" {% if filters.category == "center_drill" %}selected{% endif %}>Центровки</option>
         <option value="countersink" {% if filters.category == "countersink" %}selected{% endif %}>Зенкера</option>
         <option value="drill" {% if filters.category == "drill" %}selected{% endif %}>Сверла</option>
+        <option value="insert" {% if filters.category == "insert" %}selected{% endif %}>Пластинки</option>
       </select>
     </label>
     <label class="field"><span>Показывать нулевые остатки</span>
@@ -654,9 +723,96 @@
         {% endfor %}
       </select>
     </label>
+    {% elif filters.category == "insert" %}
+    {% with tips=insert_column_tooltips %}
+    <label class="field"><span title="{{ tips.iso }}">Маркировка ISO</span>
+      <select name="ins_iso" title="{{ tips.iso }}">
+        <option value="">Все</option>
+        {% for v in insert_filter_options.isos %}
+        <option value="{{ v }}" {% if filters.ins_iso == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.shape }}">Форма</span>
+      <select name="ins_shape" title="{{ tips.shape }}">
+        <option value="">Все</option>
+        {% for key, label in insert_shapes %}
+          {% if key in insert_filter_options.shapes %}
+          <option value="{{ key }}" {% if filters.ins_shape == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.relief }}">Задний угол</span>
+      <select name="ins_relief" title="{{ tips.relief }}">
+        <option value="">Все</option>
+        {% for key, label in insert_relief_angles %}
+          {% if key in insert_filter_options.reliefs %}
+          <option value="{{ key }}" {% if filters.ins_relief == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.tolerance }}">Допуск</span>
+      <select name="ins_tolerance" title="{{ tips.tolerance }}">
+        <option value="">Все</option>
+        {% for key, label in insert_tolerance_classes %}
+          {% if key in insert_filter_options.tolerances %}
+          <option value="{{ key }}" {% if filters.ins_tolerance == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.edge_l }}">L (длина)</span>
+      <select name="ins_edge_code" title="{{ tips.edge_l }}">
+        <option value="">Все</option>
+        {% for v in insert_filter_options.edge_codes %}
+        <option value="{{ v }}" {% if filters.ins_edge_code == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.thickness_s }}">S (толщина)</span>
+      <select name="ins_thickness_code" title="{{ tips.thickness_s }}">
+        <option value="">Все</option>
+        {% for key, label in insert_thickness_codes %}
+          {% if key in insert_filter_options.thickness_codes %}
+          <option value="{{ key }}" {% if filters.ins_thickness_code == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.radius_r }}">R (радиус)</span>
+      <select name="ins_nose_code" title="{{ tips.radius_r }}">
+        <option value="">Все</option>
+        {% for key, label in insert_nose_radius_codes %}
+          {% if key in insert_filter_options.nose_codes %}
+          <option value="{{ key }}" {% if filters.ins_nose_code == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.family }}">Семейство</span>
+      <select name="ins_family" title="{{ tips.family }}">
+        <option value="">Все</option>
+        {% for key, label in milling_insert_families %}
+          {% if key in insert_filter_options.families or not key %}
+          <option value="{{ key }}" {% if filters.ins_family == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.grade }}">Сплав / стружколом</span>
+      <select name="ins_grade" title="{{ tips.grade }}">
+        <option value="">Все</option>
+        {% for v in insert_filter_options.grades %}
+        <option value="{{ v }}" {% if filters.ins_grade == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endwith %}
     {% endif %}
-    <label class="field"><span>Материал инструмента</span>
-      <select name="tool_material" class="js-stock-filter-tool-material">
+    <label class="field"><span{% if filters.category == "insert" %} title="{{ insert_column_tooltips.tool_material }}"{% endif %}>Материал инструмента</span>
+      <select name="tool_material" class="js-stock-filter-tool-material"{% if filters.category == "insert" %} title="{{ insert_column_tooltips.tool_material }}"{% endif %}>
         <option value="">Все</option>
         {% for key, label in tool_material_types %}
         <option value="{{ key }}" {% if filters.tool_material_select == key %}selected{% endif %}>{{ label }}</option>
@@ -669,8 +825,8 @@
       <input type="text" name="tool_material_custom" maxlength="80" class="js-stock-filter-tool-material-custom" placeholder="Свой вариант, до 80 символов" value="{{ filters.tool_material_custom }}" autocomplete="off" {% if filters.tool_material_select != tool_material_filter_other %}style="display:none;margin-top:6px;max-width:100%;"{% else %}style="margin-top:6px;max-width:100%;"{% endif %} />
     </label>
     <div class="field">
-      <span>Материал покрытия</span>
-      <div class="coating-picker">
+      <span{% if filters.category == "insert" %} title="{{ insert_column_tooltips.coating }}"{% endif %}>Материал покрытия</span>
+      <div class="coating-picker"{% if filters.category == "insert" %} title="{{ insert_column_tooltips.coating }}"{% endif %}>
         <label class="coating-chip">
           <input type="radio" name="coating_type" value="" {% if not filters.coating_type %}checked{% endif %}>
           <span class="swatch swatch-all" title="Все"></span>
@@ -683,8 +839,8 @@
         {% endfor %}
       </div>
     </div>
-    <div class="field"><span>Материал обработки</span>
-      <div class="wm-picker">
+    <div class="field"><span{% if filters.category == "insert" %} title="{{ insert_column_tooltips.work_material }}"{% endif %}>Материал обработки</span>
+      <div class="wm-picker"{% if filters.category == "insert" %} title="{{ insert_column_tooltips.work_material }}"{% endif %}>
         <label class="wm-chip">
           <input type="radio" name="work_material" value="" {% if not filters.work_material %}checked{% endif %}>
           <span class="wm-square wm-all">Все</span>
@@ -723,6 +879,7 @@
         <option value="center_drill">Центровки</option>
         <option value="countersink">Зенкера</option>
         <option value="drill">Сверла</option>
+        <option value="insert">Пластинки</option>
       </select>
     </label>
     <label class="field"><span>Поиск инструмента</span>
@@ -777,44 +934,97 @@
 
 {% if panel == "arrival" %}
 {% if biota_can_edit %}
-<div class="filter-panel" id="arrival-block">
-  <h3>Приход инструмента по счёту</h3>
-  <p class="muted" style="margin-top:0;">Выбери категорию, добавь строки кнопкой "+" и заполни таблицу. Все строки оприходуются одной кнопкой.</p>
-  <div class="arrival-bulk-top">
-    <label class="field">
-      <span>Категория инструмента</span>
-      <select class="js-arrival-bulk-category" id="arrival-bulk-category">
-        <option value="">Выбрать...</option>
-        <option value="end_mill">Фрезы</option>
-        <option value="tap">Резьбовой инструмент</option>
-        <option value="center_drill">Центровки</option>
-        <option value="countersink">Зенкера</option>
-        <option value="drill">Сверла</option>
-      </select>
-    </label>
-    <label class="field">
-      <span>Дата прихода</span>
-      <input type="date" id="arrival-bulk-date" value="{{ today }}">
-    </label>
-    <label class="field">
-      <span>От кого</span>
-      <select id="arrival-bulk-supplier">
-        <option value="">Выбрать...</option>
-        <option value="ООО МВ">ООО МВ</option>
-        <option value="ИП Иванов">ИП Иванов</option>
-        <option value="ИП Игнатьев">ИП Игнатьев</option>
-        <option value="ИП Ясинов">ИП Ясинов</option>
-      </select>
-    </label>
-    <button type="button" class="btn btn-ghost" id="arrival-bulk-add-row">+</button>
+<div class="inv-arrival-page" id="arrival-block">
+  <header class="inv-arrival-header">
+    <div class="inv-arrival-header-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v12"/>
+        <path d="M8 11l4 4 4-4"/>
+        <path d="M4 21h16"/>
+        <path d="M7 21v-4h10v4"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="inv-arrival-title">Приход на склад</h1>
+      <p class="inv-arrival-subtitle">Оприходование инструмента по счёту поставщика</p>
+    </div>
+  </header>
+
+  <div class="inv-arrival-hint-card">
+    <div class="inv-arrival-hint-label">Как заполнить</div>
+    <p class="inv-arrival-hint-text">Выберите категорию и параметры прихода, нажмите <strong>+</strong>, заполните строки в таблице и нажмите «Оприходовать» — все позиции сохранятся одной операцией.</p>
   </div>
-  <form method="post" id="arrival-bulk-form">
+
+  <form method="post" id="arrival-bulk-form" class="inv-arrival-form">
     {% csrf_token %}
     <input type="hidden" name="action" value="add_arrival_bulk">
     <input type="hidden" name="rows_json" id="arrival-bulk-rows-json">
+
+    <section class="inv-arrival-glass-card inv-arrival-toolbar-card">
+      <div class="inv-arrival-card-header">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <rect x="3" y="3" width="14" height="14" rx="2"/>
+          <line x1="7" y1="8" x2="13" y2="8"/>
+          <line x1="7" y1="11" x2="11" y2="11"/>
+        </svg>
+        <span>Параметры прихода</span>
+      </div>
+      <div class="inv-arrival-toolbar">
+        <div class="inv-arrival-field">
+          <label class="inv-arrival-label" for="arrival-bulk-category">Категория инструмента</label>
+          <div class="inv-arrival-select-wrap">
+            <select class="inv-arrival-sel js-arrival-bulk-category" id="arrival-bulk-category">
+              <option value="">Выбрать...</option>
+              <option value="end_mill">Фрезы</option>
+              <option value="tap">Резьбовой инструмент</option>
+              <option value="center_drill">Центровки</option>
+              <option value="countersink">Зенкера</option>
+              <option value="drill">Сверла</option>
+              <option value="insert">Пластинки</option>
+            </select>
+          </div>
+        </div>
+        <div class="inv-arrival-field">
+          <label class="inv-arrival-label" for="arrival-bulk-date">Дата прихода</label>
+          <input type="date" class="inv-arrival-inp" id="arrival-bulk-date" value="{{ today }}">
+        </div>
+        <div class="inv-arrival-field">
+          <label class="inv-arrival-label" for="arrival-bulk-supplier">Поставщик</label>
+          <div class="inv-arrival-select-wrap">
+            <select class="inv-arrival-sel" id="arrival-bulk-supplier">
+              <option value="">Выбрать...</option>
+              <option value="ООО МВ">ООО МВ</option>
+              <option value="ИП Иванов">ИП Иванов</option>
+              <option value="ИП Игнатьев">ИП Игнатьев</option>
+              <option value="ИП Ясинов">ИП Ясинов</option>
+            </select>
+          </div>
+        </div>
+        <div class="inv-arrival-field inv-arrival-field--add">
+          <span class="inv-arrival-label inv-arrival-label--ghost">Строка</span>
+          <button type="button" class="inv-arrival-add-btn" id="arrival-bulk-add-row" title="Добавить строку">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <line x1="10" y1="4" x2="10" y2="16"/>
+              <line x1="4" y1="10" x2="16" y2="10"/>
+            </svg>
+            <span>Добавить</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
     <div class="inv-arrival-errors" id="arrival-bulk-errors" hidden role="alert"></div>
-    <div id="arrival-bulk-groups"></div>
-    <div class="filter-actions"><button type="submit" class="btn">Оприходовать</button></div>
+
+    <div id="arrival-bulk-groups" class="inv-arrival-groups"></div>
+
+    <footer class="inv-arrival-submit-bar">
+      <button type="submit" class="inv-arrival-submit-btn">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M4 10l4 4 8-8"/>
+        </svg>
+        Оприходовать на склад
+      </button>
+    </footer>
   </form>
 </div>
 {% else %}
@@ -824,143 +1034,212 @@
 
 {% if panel == "issue_outcome" %}
 {% if biota_can_edit %}
-<div class="filter-panel" id="issue-outcome-block">
-  <h3>Списание / Возврат по выдаче</h3>
-  <p class="muted" style="margin-top:0;">Выбери конкретную выдачу и укажи, сколько вернулось и сколько списано.</p>
-  <form method="post" class="filter-grid">
-    {% csrf_token %}
-    <input type="hidden" name="action" value="process_issue_outcome">
-    <label class="field"><span>Поиск инструмента</span>
-      <input type="text" id="issue-search-input" placeholder="Например: 1, 1.0, M6, D1">
-    </label>
-    <label class="field issue-tool-field"><span>Выданная позиция</span>
-      <div class="issue-tool-combo js-issue-tool-combo">
-        <select name="issue_id" id="issue-id-select" required class="issue-tool-combo-native" tabindex="-1" aria-hidden="true">
-          <option value="">Выбрать...</option>
-          {% for iss in issue_candidates %}
-          {% with card=iss.tool.issue_combo_card coat=iss.tool.coating_type|default:'none' %}
-          <option
-            value="{{ iss.id }}"
-            data-category="{{ iss.tool.category }}"
-            data-issue-type="{{ card.tool_type|escape }}"
-            data-issue-specs="{{ card.specs|escape }}"
-            data-issue-material="{{ card.material|escape }}"
-            data-issue-qty="{{ iss.tool.qty|default:'' }}"
-            data-issue-coating-type="{{ coat|escape }}"
-            data-issue-coating-title="{{ coat|coating_hover_title|escape }}"
-            data-issue-wm="{{ iss.tool.work_material|default:''|escape }}"
-            data-issue-wm-title="{% if iss.tool.work_material %}{{ iss.tool.get_work_material_display|escape }}{% endif %}"
-            data-issue-extra="кому: {{ iss.employee_name|default:'-'|escape }} · {{ iss.movement_date|date:'d.m.Y' }} · выдано {{ iss.quantity }} · ост. {{ iss.remaining_qty }}"
-          >{{ iss.tool.issue_select_label }}</option>
-          {% endwith %}
-          {% endfor %}
-        </select>
-        <button
-          type="button"
-          class="issue-tool-combo-btn js-issue-tool-combo-btn"
-          aria-haspopup="listbox"
-          aria-expanded="false"
-          aria-controls="issue-id-combo-listbox"
-        >
-          <span class="issue-tool-combo-btn-text js-issue-tool-combo-text">Выбрать...</span>
-          <span class="issue-tool-combo-chevron" aria-hidden="true"></span>
-        </button>
-        <div id="issue-id-combo-listbox" class="issue-tool-combo-panel js-issue-tool-combo-panel" hidden role="listbox" aria-labelledby="issue-id-combo-trigger"></div>
-      </div>
-    </label>
-    <label class="field"><span>Вернулось на склад, шт</span><input type="number" name="returned_qty" min="0" value="0"></label>
-    <label class="field"><span>Списано, шт</span><input type="number" name="writeoff_qty" min="0" value="0"></label>
-    <label class="field"><span>Сотрудник</span><input type="text" name="employee_name" placeholder="ФИО"></label>
-    <label class="field"><span>Дата</span><input type="date" name="movement_date" value="{{ today }}" required></label>
-    <label class="field"><span>Комментарий (обязательно)</span><input type="text" name="comment" placeholder="Причина списания/возврата" required></label>
-    <div class="filter-actions"><button type="submit" class="btn">Провести операцию</button></div>
-  </form>
+<div class="inv-outcome-page" id="issue-outcome-block">
+  <header class="inv-outcome-header">
+    <div class="inv-outcome-header-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 16l-4-4 4-4"/>
+        <path d="M17 8l4 4-4 4"/>
+        <path d="M12 4v16"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="inv-outcome-title">Списание и возврат</h1>
+      <p class="inv-outcome-subtitle">Оформление по активным выдачам инструмента</p>
+    </div>
+  </header>
 
-  <h4 style="margin:16px 0 8px;">Активные выдачи (быстрое оформление)</h4>
-  <p class="muted" style="margin-top:0;">Нажми на строку и сразу оформи частичный возврат/списание по этой выдаче.</p>
-  <div class="table-wrap">
-    <table class="data-grid">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Дата</th>
-          <th>Кому выдали</th>
-          <th>Инструмент</th>
-          <th>Выдано</th>
-          <th>Осталось</th>
-          <th>Быстрое оформление</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for iss in issue_candidates %}
-        <tr class="issue-candidate-row" data-issue-id="{{ iss.id }}">
-          <td>#{{ iss.id }}</td>
-          <td>{{ iss.movement_date }}</td>
-          <td>{{ iss.employee_name|default:"-" }}</td>
-          <td class="issue-tool-meta">
-            <div class="issue-tool-meta-line">
-              <strong>{{ iss.tool.get_category_display }}</strong>
-              {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}
-                | {{ iss.tool.end_mill_spec.get_mill_type_display }}
-                | D {{ iss.tool.end_mill_spec.diameter_mm|default:"-"|floatformat:"-2" }}
-                | R {{ iss.tool.end_mill_spec.corner_radius_mm|default:"-"|floatformat:"-2" }}
-                | L {{ iss.tool.end_mill_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
-                | Lc {{ iss.tool.end_mill_spec.cutting_length_mm|default:"-"|floatformat:"-2" }}
-                | Z {{ iss.tool.end_mill_spec.flutes_count|default:"-" }}
-              {% elif iss.tool.category == "tap" and iss.tool.tap_spec %}
-                | {{ iss.tool.tap_spec.get_tap_type_display }}
-                | {{ iss.tool.tap_spec.size_label|default:"-" }}
-                | шаг {{ iss.tool.tap_spec.pitch_mm|default:"-" }}
-                | TPI {{ iss.tool.tap_spec.tpi|default:"-" }}
-                | L {{ iss.tool.tap_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
-                | Lc {{ iss.tool.tap_spec.cutting_length_mm|default:"-"|floatformat:"-2" }}
-              {% elif iss.tool.category == "center_drill" and iss.tool.center_drill_spec %}
-                | Центровка {{ iss.tool.center_drill_spec.angle_deg }}°
-                | D {{ iss.tool.center_drill_spec.diameter_mm|default:"-"|floatformat:"-2" }}
-                | L {{ iss.tool.center_drill_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
-              {% elif iss.tool.category == "countersink" and iss.tool.countersink_spec %}
-                | Зенкер {{ iss.tool.countersink_spec.get_countersink_type_display }}
-                | D {{ iss.tool.countersink_spec.diameter_mm|default:"-"|floatformat:"-2" }}
-                | угол {{ iss.tool.countersink_spec.angle_deg|default:"-" }}
-                | L {{ iss.tool.countersink_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
-                | Z {{ iss.tool.countersink_spec.flutes_count|default:"-" }}
-                {% if iss.tool.countersink_spec.size_label %}| {{ iss.tool.countersink_spec.size_label }}{% endif %}
-              {% elif iss.tool.category == "drill" and iss.tool.drill_spec %}
-                | Сверло {{ iss.tool.drill_spec.angle_deg|default:"-"|floatformat:"-2" }}°
-                | D {{ iss.tool.drill_spec.diameter_mm|default:"-"|floatformat:"-2" }}
-                | L {{ iss.tool.drill_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
-                | Lc {{ iss.tool.drill_spec.cutting_length_mm|default:"-"|floatformat:"-2" }}
-              {% endif %}
-              | D осн {{ iss.tool.main_diameter_mm|default:"-"|floatformat:"-2" }}
-              <span style="margin-left:8px;">{{ iss.tool.get_tool_material_display|default:"-" }}</span>
-              {% with ct=iss.tool.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
-              {% if iss.tool.work_material %}<span class="wm-badge wm-{{ iss.tool.work_material|lower }}" title="{{ iss.tool.get_work_material_display }}">{{ iss.tool.work_material }}</span>{% else %}<span class="muted">-</span>{% endif %}
-            </div>
-          </td>
-          <td>{{ iss.quantity }}</td>
-          <td><strong>{{ iss.remaining_qty }}</strong></td>
-          <td style="min-width: 340px;">
-            <form method="post" class="issue-inline-form">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="process_issue_outcome">
-              <input type="hidden" name="issue_id" value="{{ iss.id }}">
-              <input type="hidden" name="employee_name" value="{{ iss.employee_name|default:'' }}">
-              <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                <input type="number" name="returned_qty" min="0" max="{{ iss.remaining_qty }}" value="0" title="Возврат" placeholder="Возврат" style="width:80px;">
-                <input type="number" name="writeoff_qty" min="0" max="{{ iss.remaining_qty }}" value="0" title="Списание" placeholder="Списание" style="width:80px;">
-                <input type="date" name="movement_date" value="{{ today }}" required style="width:145px;">
-                <input type="text" name="comment" required placeholder="Комментарий" style="min-width:160px; flex:1 1 160px;">
-                <button type="submit" class="btn">Провести</button>
-              </div>
-            </form>
-          </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="7" class="muted">Нет активных выдач для обработки.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="inv-outcome-hint-card">
+    <div class="inv-outcome-hint-label">Как заполнить</div>
+    <p class="inv-outcome-hint-text">Выберите выдачу, укажите <strong>возврат</strong> на склад и/или <strong>списание</strong>, добавьте комментарий. Сумма не должна превышать остаток по выдаче. Ниже — быстрое оформление прямо из таблицы.</p>
   </div>
+
+  <section class="inv-outcome-glass-card">
+    <div class="inv-outcome-card-header">
+      <svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" aria-hidden="true">
+        <path d="M2 4h12M2 8h8M2 12h10"/>
+      </svg>
+      Оформление операции
+    </div>
+    <form method="post" class="inv-outcome-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="process_issue_outcome">
+      <div class="inv-outcome-form-grid">
+        <div class="inv-outcome-field">
+          <label class="inv-outcome-label" for="issue-search-input">Поиск</label>
+          <input type="text" class="inv-outcome-inp" id="issue-search-input" placeholder="1, M6, D10…">
+        </div>
+        <div class="inv-outcome-field inv-outcome-field--tool issue-tool-field">
+          <span class="inv-outcome-label">Выданная позиция</span>
+          <div class="issue-tool-combo js-issue-tool-combo">
+            <select name="issue_id" id="issue-id-select" required class="issue-tool-combo-native" tabindex="-1" aria-hidden="true">
+              <option value="">Выбрать...</option>
+              {% for iss in issue_candidates %}
+              {% with card=iss.tool.issue_combo_card coat=iss.tool.coating_type|default:'none' %}
+              <option
+                value="{{ iss.id }}"
+                data-category="{{ iss.tool.category }}"
+                data-issue-type="{{ card.tool_type|escape }}"
+                data-issue-specs="{{ card.specs|escape }}"
+                data-issue-material="{{ card.material|escape }}"
+                data-issue-qty="{{ iss.tool.qty|default:'' }}"
+                data-issue-coating-type="{{ coat|escape }}"
+                data-issue-coating-title="{{ coat|coating_hover_title|escape }}"
+                data-issue-wm="{{ iss.tool.work_material|default:''|escape }}"
+                data-issue-wm-title="{% if iss.tool.work_material %}{{ iss.tool.get_work_material_display|escape }}{% endif %}"
+                data-issue-extra="кому: {{ iss.employee_name|default:'-'|escape }} · {{ iss.movement_date|date:'d.m.Y' }} · выдано {{ iss.quantity }} · ост. {{ iss.remaining_qty }}"
+              >{{ iss.tool.issue_select_label }}</option>
+              {% endwith %}
+              {% endfor %}
+            </select>
+            <button
+              type="button"
+              class="issue-tool-combo-btn js-issue-tool-combo-btn"
+              id="issue-id-combo-trigger"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="issue-id-combo-listbox"
+            >
+              <span class="issue-tool-combo-btn-text js-issue-tool-combo-text">Выбрать...</span>
+              <span class="issue-tool-combo-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="issue-id-combo-listbox" class="issue-tool-combo-panel js-issue-tool-combo-panel" hidden role="listbox" aria-labelledby="issue-id-combo-trigger"></div>
+          </div>
+        </div>
+        <div class="inv-outcome-field">
+          <label class="inv-outcome-label" for="outcome-returned-qty">Возврат, шт</label>
+          <input type="number" class="inv-outcome-inp inv-outcome-inp--return" id="outcome-returned-qty" name="returned_qty" min="0" value="0">
+        </div>
+        <div class="inv-outcome-field">
+          <label class="inv-outcome-label" for="outcome-writeoff-qty">Списание, шт</label>
+          <input type="number" class="inv-outcome-inp inv-outcome-inp--writeoff" id="outcome-writeoff-qty" name="writeoff_qty" min="0" value="0">
+        </div>
+        <div class="inv-outcome-field">
+          <label class="inv-outcome-label" for="outcome-employee">Сотрудник</label>
+          <input type="text" class="inv-outcome-inp" id="outcome-employee" name="employee_name" placeholder="ФИО">
+        </div>
+        <div class="inv-outcome-field">
+          <label class="inv-outcome-label" for="outcome-date">Дата</label>
+          <input type="date" class="inv-outcome-inp" id="outcome-date" name="movement_date" value="{{ today }}" required>
+        </div>
+        <div class="inv-outcome-field inv-outcome-field--wide">
+          <label class="inv-outcome-label" for="outcome-comment">Комментарий</label>
+          <input type="text" class="inv-outcome-inp" id="outcome-comment" name="comment" placeholder="Причина списания или возврата" required>
+        </div>
+      </div>
+      <footer class="inv-outcome-submit-bar">
+        <button type="submit" class="inv-outcome-submit-btn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M4 10h12M11 5l5 5-5 5"/>
+          </svg>
+          Провести операцию
+        </button>
+      </footer>
+    </form>
+  </section>
+
+  <section class="inv-outcome-glass-card inv-outcome-list-card">
+    <div class="inv-outcome-card-header">
+      <svg viewBox="0 0 16 16" fill="none" stroke-width="1.5" aria-hidden="true">
+        <rect x="2" y="3" width="12" height="11" rx="1.5"/>
+        <path d="M2 7h12M5 3v4M11 3v4"/>
+      </svg>
+      Активные выдачи
+    </div>
+    <p class="inv-outcome-list-hint">Карточки как в истории: вся информация видна без горизонтальной прокрутки. Клик по карточке подставляет выдачу в форму выше.</p>
+    <div class="inv-outcome-list-wrap">
+      <ul class="inv-outcome-list">
+        {% for iss in issue_candidates %}
+        <li class="inv-outcome-card issue-candidate-row" data-issue-id="{{ iss.id }}">
+          <div class="inv-outcome-card__head">
+            <span class="inv-outcome-badge">Выдача #{{ iss.id }}</span>
+            <time class="inv-outcome-card__when" datetime="{{ iss.movement_date|date:'Y-m-d' }}">{{ iss.movement_date|date:"d.m.Y" }}</time>
+          </div>
+          <p class="inv-outcome-card__title">{{ iss.employee_name|default:"—" }}</p>
+          <p class="inv-outcome-card__spec issue-tool-meta-line">
+            <strong>{{ iss.tool.get_category_display }}</strong>
+            {% if iss.tool.category == "end_mill" and iss.tool.end_mill_spec %}
+              · {{ iss.tool.end_mill_spec.get_mill_type_display }}
+              · D {{ iss.tool.end_mill_spec.diameter_mm|default:"-"|floatformat:"-2" }}
+              · R {{ iss.tool.end_mill_spec.corner_radius_mm|default:"-"|floatformat:"-2" }}
+              · L {{ iss.tool.end_mill_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
+              · Lc {{ iss.tool.end_mill_spec.cutting_length_mm|default:"-"|floatformat:"-2" }}
+              · Z {{ iss.tool.end_mill_spec.flutes_count|default:"-" }}
+            {% elif iss.tool.category == "tap" and iss.tool.tap_spec %}
+              · {{ iss.tool.tap_spec.get_tap_type_display }}
+              · {{ iss.tool.tap_spec.size_label|default:"-" }}
+              · шаг {{ iss.tool.tap_spec.pitch_mm|default:"-" }}
+              · TPI {{ iss.tool.tap_spec.tpi|default:"-" }}
+              · L {{ iss.tool.tap_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
+              · Lc {{ iss.tool.tap_spec.cutting_length_mm|default:"-"|floatformat:"-2" }}
+            {% elif iss.tool.category == "center_drill" and iss.tool.center_drill_spec %}
+              · Центровка {{ iss.tool.center_drill_spec.angle_deg }}°
+              · D {{ iss.tool.center_drill_spec.diameter_mm|default:"-"|floatformat:"-2" }}
+              · L {{ iss.tool.center_drill_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
+            {% elif iss.tool.category == "countersink" and iss.tool.countersink_spec %}
+              · Зенкер {{ iss.tool.countersink_spec.get_countersink_type_display }}
+              · D {{ iss.tool.countersink_spec.diameter_mm|default:"-"|floatformat:"-2" }}
+              · угол {{ iss.tool.countersink_spec.angle_deg|default:"-" }}
+              · L {{ iss.tool.countersink_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
+              · Z {{ iss.tool.countersink_spec.flutes_count|default:"-" }}
+              {% if iss.tool.countersink_spec.size_label %}· {{ iss.tool.countersink_spec.size_label }}{% endif %}
+            {% elif iss.tool.category == "drill" and iss.tool.drill_spec %}
+              · Сверло {{ iss.tool.drill_spec.angle_deg|default:"-"|floatformat:"-2" }}°
+              · D {{ iss.tool.drill_spec.diameter_mm|default:"-"|floatformat:"-2" }}
+              · L {{ iss.tool.drill_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
+              · Lc {{ iss.tool.drill_spec.cutting_length_mm|default:"-"|floatformat:"-2" }}
+            {% endif %}
+            · D осн {{ iss.tool.main_diameter_mm|default:"-"|floatformat:"-2" }}
+          </p>
+          <div class="inv-outcome-card__chips">
+            <span class="inv-outcome-chip-mat" title="Материал инструмента: {{ iss.tool.get_tool_material_display|default:'—' }}">{{ iss.tool.get_tool_material_display|default:"—" }}</span>
+            {% with ct=iss.tool.coating_type|default:'none' %}
+            <span class="coating-cell inv-outcome-chip-coat" title="Покрытие: {{ ct|coating_hover_title }}">
+              <span class="coating-dot swatch-{{ ct }}" aria-hidden="true"></span>
+            </span>
+            {% endwith %}
+            {% for wm in iss.tool.work_material_codes_list %}
+            <span class="wm-badge wm-{{ wm|lower }}" title="Материал обработки: {{ iss.tool.get_work_materials_display }}">{{ wm }}</span>
+            {% endfor %}
+          </div>
+          <div class="inv-outcome-facts">
+            <span class="inv-outcome-qty"><span class="inv-outcome-fact__label">Выдано</span> <strong>{{ iss.quantity }}</strong> шт.</span>
+            <span class="inv-outcome-qty inv-outcome-qty--remain"><span class="inv-outcome-fact__label">Осталось</span> <strong>{{ iss.remaining_qty }}</strong> шт.</span>
+          </div>
+          <form method="post" class="issue-inline-form inv-outcome-card__form" id="outcome-form-{{ iss.id }}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="process_issue_outcome">
+            <input type="hidden" name="issue_id" value="{{ iss.id }}">
+            <input type="hidden" name="employee_name" value="{{ iss.employee_name|default:'' }}">
+            <div class="inv-outcome-card__fields">
+              <label class="inv-outcome-field-mini inv-outcome-field-mini--return">
+                <span class="inv-outcome-field-mini__label">Возв.</span>
+                <input type="number" class="inv-outcome-inp inv-outcome-inp--qty inv-outcome-inp--return" name="returned_qty" min="0" max="{{ iss.remaining_qty }}" value="0">
+              </label>
+              <label class="inv-outcome-field-mini inv-outcome-field-mini--writeoff">
+                <span class="inv-outcome-field-mini__label">Спис.</span>
+                <input type="number" class="inv-outcome-inp inv-outcome-inp--qty inv-outcome-inp--writeoff" name="writeoff_qty" min="0" max="{{ iss.remaining_qty }}" value="0">
+              </label>
+              <label class="inv-outcome-field-mini inv-outcome-field-mini--date">
+                <span class="inv-outcome-field-mini__label">Дата</span>
+                <input type="date" class="inv-outcome-inp inv-outcome-inp--date-cell" name="movement_date" value="{{ today }}" required>
+              </label>
+            </div>
+            <div class="inv-outcome-card__footer">
+              <label class="inv-outcome-field-mini inv-outcome-field-mini--comment">
+                <span class="inv-outcome-field-mini__label">Коммент.</span>
+                <input type="text" class="inv-outcome-inp inv-outcome-inp--comment-cell" name="comment" required placeholder="Причина">
+              </label>
+              <button type="submit" class="inv-outcome-submit-btn inv-outcome-submit-btn--inline">Провести</button>
+            </div>
+          </form>
+        </li>
+        {% empty %}
+        <li class="inv-outcome-card inv-outcome-card--empty muted">Нет активных выдач для обработки.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
 </div>
 {% else %}
 <p class="muted">Режим исполнителя: только просмотр и скачивание.</p>
@@ -1463,7 +1742,19 @@
   "tap_tool_types": [{% for key, label in tap_tool_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "center_drill_angles": [{% for key, label in center_drill_angles %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "countersink_types": [{% for key, label in countersink_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
-  "countersink_angles": [{% for key, label in countersink_angles %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
+  "countersink_angles": [{% for key, label in countersink_angles %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_shapes": [{% for key, label in insert_shapes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_relief_angles": [{% for key, label in insert_relief_angles %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_tolerance_classes": [{% for key, label in insert_tolerance_classes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_edge_length_codes": [{% for key, label in insert_edge_length_codes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_thickness_codes": [{% for key, label in insert_thickness_codes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_nose_radius_codes": [{% for key, label in insert_nose_radius_codes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_machining_applications": [{% for key, label in insert_machining_applications %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "milling_insert_families": [{% for key, label in milling_insert_families %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_family_other": "{{ insert_family_other|escapejs }}",
+  "insert_grade_other": "{{ insert_grade_other|escapejs }}",
+  "insert_chipbreaker_grades": [{% for g in insert_chipbreaker_grades %}"{{ g|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_column_tooltips": {{ insert_column_tooltips_json|safe }}
 }</script>
 <script src="{% static 'shifts/js/inventory.js' %}" defer></script>
 {% endblock %}
