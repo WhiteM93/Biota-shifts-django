@@ -25,6 +25,25 @@ from .auth_utils import (
     inventory_route_nav_access_required,
     write_permission_required,
 )
+from .collet_constants import (
+    COLLET_THREAD_STANDARDS,
+    COLLET_THREADING_SERIES,
+    COLLET_THREADING_USE,
+    COLLET_TYPES,
+    COLLET_TYPE_TOOLTIPS,
+    ER_CLAMP_RANGES,
+    ER_COLLET_SIZES,
+    COLLET_ER_G_INNER_DIAMETERS,
+    build_collet_display_name,
+    normalize_collet_er_g_inner_diameter,
+    normalize_collet_square_size,
+    normalize_collet_thread_standard,
+    normalize_collet_threading_series,
+    normalize_collet_threading_use,
+    normalize_collet_type,
+    normalize_er_clamp_range,
+    normalize_er_collet_size,
+)
 from .insert_constants import (
     INSERT_EDGE_LENGTH_CODES,
     INSERT_NOSE_RADIUS_CODES,
@@ -52,6 +71,7 @@ from .models import (
     END_MILL_TYPES,
     CenterDrillSpec,
     EndMillSpec,
+    ColletSpec,
     InsertSpec,
     InventoryStockEvent,
     StockMovement,
@@ -75,7 +95,7 @@ from .models import (
 
 TOOL_MATERIAL_FILTER_OTHER = "__other__"
 _TOOL_MATERIAL_STD_KEYS = frozenset(k for k, _ in TOOL_MATERIAL_TYPES)
-_INVENTORY_CATEGORIES = frozenset({"end_mill", "tap", "center_drill", "countersink", "drill", "insert"})
+_INVENTORY_CATEGORIES = frozenset({"end_mill", "tap", "center_drill", "countersink", "drill", "insert", "collet"})
 _HISTORY_MOVEMENT_TYPES = frozenset({"issue", "restock", "writeoff"})
 
 
@@ -98,9 +118,34 @@ _ARRIVAL_REQUIRED_DIAMETER: dict[str, tuple[str, str]] = {
 def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
     category = (row.get("category") or "").strip()
     errs: list[str] = []
-    if category in _INVENTORY_CATEGORIES:
+    if category in _INVENTORY_CATEGORIES and category != "collet":
         if not normalize_work_material_codes(row.get("work_material")):
             errs.append(f"Строка {idx}: укажите хотя бы одну группу материала обработки (P, M, K…).")
+    if category == "collet":
+        ct = normalize_collet_type(row.get("collet_type"))
+        if not ct:
+            errs.append(f"Строка {idx}: укажите тип цанги.")
+            return errs
+        if ct == "er":
+            if not normalize_er_collet_size(row.get("collet_er_size")):
+                errs.append(f"Строка {idx}: укажите размер ER (ER32, ER16…).")
+            if not normalize_er_clamp_range(row.get("collet_clamp_range")):
+                errs.append(f"Строка {idx}: укажите диапазон зажима (3-4, 4-5…).")
+        elif ct == "er_g":
+            if not normalize_er_collet_size(row.get("collet_er_size")):
+                errs.append(f"Строка {idx}: укажите размер ER (ER16, ER32…).")
+            if not normalize_collet_er_g_inner_diameter(
+                row.get("collet_inner_diameter") or row.get("collet_square_size")
+            ):
+                errs.append(f"Строка {idx}: укажите внутренний диаметр.")
+        elif ct == "threading":
+            if not normalize_collet_threading_use(row.get("collet_threading_use")):
+                errs.append(f"Строка {idx}: укажите назначение (метчики / плашки).")
+            if not normalize_collet_threading_series(row.get("collet_threading_series")):
+                errs.append(f"Строка {idx}: укажите серию (TC820, GT12…).")
+            if not normalize_collet_thread_standard(row.get("collet_thread_standard")):
+                errs.append(f"Строка {idx}: укажите стандарт резьбы (DIN371, ISO…).")
+        return errs
     if category == "insert":
         shape = (row.get("ins_shape") or "").strip()
         edge = (row.get("ins_edge_code") or "").strip()
@@ -320,6 +365,15 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "ins_nose_code",
         "ins_family",
         "ins_grade",
+        "ins_iso",
+        "collet_type",
+        "collet_er_size",
+        "collet_clamp_range",
+        "collet_square_size",
+        "collet_inner_diameter",
+        "collet_thread_standard",
+        "collet_threading_use",
+        "collet_threading_series",
         "arrival_supplier",
         "tool_material",
         "tool_material_custom",
@@ -411,6 +465,18 @@ _STOCK_KEYS_BY_CATEGORY = {
             "ins_family",
             "ins_grade",
             "ins_iso",
+        }
+    ),
+    "collet": frozenset(
+        {
+            "collet_type",
+            "collet_er_size",
+            "collet_clamp_range",
+            "collet_square_size",
+            "collet_inner_diameter",
+            "collet_thread_standard",
+            "collet_threading_use",
+            "collet_threading_series",
         }
     ),
 }
@@ -607,6 +673,83 @@ def _create_insert_tool(quantity, tool_material, coating_type, work_material, ma
     )
     spec.tool = tool
     spec.save()
+    return tool
+
+
+def _collet_spec_fields_from_row(row: dict) -> dict:
+    aa_raw = row.get("collet_high_precision_aa") or row.get("high_precision_aa")
+    return {
+        "collet_type": normalize_collet_type(row.get("collet_type")),
+        "er_size": normalize_er_collet_size(row.get("collet_er_size") or row.get("er_size")),
+        "clamp_range": normalize_er_clamp_range(row.get("collet_clamp_range") or row.get("clamp_range")),
+        "high_precision_aa": str(aa_raw).lower() in ("1", "true", "on", "yes"),
+        "square_size": "",
+        "inner_diameter": normalize_collet_er_g_inner_diameter(
+            row.get("collet_inner_diameter") or row.get("collet_square_size") or row.get("inner_diameter")
+        ),
+        "thread_standard": normalize_collet_thread_standard(
+            row.get("collet_thread_standard") or row.get("thread_standard")
+        ),
+        "threading_use": normalize_collet_threading_use(
+            row.get("collet_threading_use") or row.get("threading_use")
+        ),
+        "threading_series": normalize_collet_threading_series(
+            row.get("collet_threading_series") or row.get("threading_series")
+        ),
+        "thread_size_label": (row.get("collet_thread_size") or row.get("thread_size_label") or "").strip()[:32],
+        "diameter_mm": _to_decimal_or_none(row.get("collet_diameter_mm") or row.get("diameter_mm")),
+        "size_label": (row.get("collet_size_label") or row.get("size_label") or "").strip()[:64],
+    }
+
+
+def _find_collet_tool_match(spec_fields: dict):
+    return (
+        ToolItem.objects.select_for_update()
+        .filter(
+            category="collet",
+            tool_material="",
+            coating_type="none",
+            work_material="",
+            collet_spec__collet_type=spec_fields["collet_type"],
+            collet_spec__er_size=spec_fields["er_size"],
+            collet_spec__clamp_range=spec_fields["clamp_range"],
+            collet_spec__high_precision_aa=spec_fields["high_precision_aa"],
+            collet_spec__inner_diameter=spec_fields["inner_diameter"],
+            collet_spec__thread_standard=spec_fields["thread_standard"],
+            collet_spec__threading_use=spec_fields["threading_use"],
+            collet_spec__threading_series=spec_fields["threading_series"],
+            collet_spec__thread_size_label=spec_fields["thread_size_label"],
+            collet_spec__diameter_mm=spec_fields["diameter_mm"],
+            collet_spec__size_label=spec_fields["size_label"],
+        )
+        .first()
+    )
+
+
+def _create_collet_tool(quantity, spec_fields: dict) -> ToolItem:
+    name = build_collet_display_name(
+        collet_type=spec_fields["collet_type"],
+        er_size=spec_fields["er_size"],
+        clamp_range=spec_fields["clamp_range"],
+        high_precision_aa=spec_fields["high_precision_aa"],
+        square_size=spec_fields["square_size"],
+        inner_diameter=spec_fields["inner_diameter"],
+        thread_standard=spec_fields["thread_standard"],
+        threading_use=spec_fields["threading_use"],
+        threading_series=spec_fields["threading_series"],
+        thread_size_label=spec_fields["thread_size_label"],
+        diameter_mm=spec_fields["diameter_mm"],
+        size_label=spec_fields["size_label"],
+    )
+    tool = ToolItem.objects.create(
+        category="collet",
+        name=name,
+        tool_material="",
+        coating_type="none",
+        work_material="",
+        quantity=quantity,
+    )
+    ColletSpec.objects.create(tool=tool, **spec_fields)
     return tool
 
 
@@ -1504,6 +1647,16 @@ def inventory_view(request):
                         tool = _create_insert_tool(
                             quantity, tool_material, coating_type, work_material, main_diameter_mm, spec_fields
                         )
+                elif category == "collet":
+                    spec_fields = _collet_spec_fields_from_row(row)
+                    if not spec_fields["collet_type"]:
+                        continue
+                    tool = _find_collet_tool_match(spec_fields)
+                    if tool:
+                        tool.quantity += quantity
+                        tool.save(update_fields=["quantity", "updated_at"])
+                    else:
+                        tool = _create_collet_tool(quantity, spec_fields)
                 else:
                     continue
                 StockMovement.objects.create(
@@ -1806,6 +1959,14 @@ def inventory_view(request):
     ins_family_raw = _sq("ins_family")
     ins_grade_raw = _sq("ins_grade")
     ins_iso_raw = _sq("ins_iso")
+    collet_type_raw = _sq("collet_type")
+    collet_er_size_raw = _sq("collet_er_size")
+    collet_clamp_range_raw = _sq("collet_clamp_range")
+    collet_square_size_raw = _sq("collet_square_size")
+    collet_inner_diameter_raw = _sq("collet_inner_diameter")
+    collet_thread_standard_raw = _sq("collet_thread_standard")
+    collet_threading_use_raw = _sq("collet_threading_use")
+    collet_threading_series_raw = _sq("collet_threading_series")
     arrival_supplier = _sq("arrival_supplier")
 
     tm_param = _sq("tool_material")
@@ -1928,12 +2089,29 @@ def inventory_view(request):
             qs = qs.filter(insert_spec__chipbreaker_grade__iexact=ins_grade_raw)
         if ins_iso_raw:
             qs = qs.filter(insert_spec__iso_designation__iexact=ins_iso_raw)
+    elif filter_category == "collet":
+        if collet_type_raw:
+            qs = qs.filter(collet_spec__collet_type=collet_type_raw)
+        if collet_er_size_raw:
+            qs = qs.filter(collet_spec__er_size=collet_er_size_raw)
+        if collet_clamp_range_raw:
+            qs = qs.filter(collet_spec__clamp_range=collet_clamp_range_raw)
+        if collet_inner_diameter_raw:
+            qs = qs.filter(collet_spec__inner_diameter=collet_inner_diameter_raw)
+        elif collet_square_size_raw:
+            qs = qs.filter(collet_spec__inner_diameter=normalize_collet_er_g_inner_diameter(collet_square_size_raw))
+        if collet_thread_standard_raw:
+            qs = qs.filter(collet_spec__thread_standard=collet_thread_standard_raw)
+        if collet_threading_use_raw:
+            qs = qs.filter(collet_spec__threading_use=collet_threading_use_raw)
+        if collet_threading_series_raw:
+            qs = qs.filter(collet_spec__threading_series=collet_threading_series_raw)
 
-    if tool_material:
+    if tool_material and filter_category != "collet":
         qs = qs.filter(tool_material=tool_material)
-    if coating_type:
+    if coating_type and filter_category != "collet":
         qs = qs.filter(coating_type=coating_type)
-    if work_material:
+    if work_material and filter_category != "collet":
         wm = work_material.strip()
         qs = qs.filter(
             Q(work_material=wm)
@@ -2071,6 +2249,7 @@ def inventory_view(request):
             "tool__countersink_spec",
             "tool__drill_spec",
             "tool__insert_spec",
+            "tool__collet_spec",
         )
         .annotate(
             processed_qty=Coalesce(
@@ -2191,6 +2370,7 @@ def inventory_view(request):
             "tool__countersink_spec",
             "tool__drill_spec",
             "tool__insert_spec",
+            "tool__collet_spec",
         )
         .prefetch_related("issue_outcomes")
         .order_by("-created_at")
@@ -2229,7 +2409,13 @@ def inventory_view(request):
 
     ctx = {
         "tool_items": qs.select_related(
-            "end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec", "drill_spec", "insert_spec"
+            "end_mill_spec",
+            "tap_spec",
+            "center_drill_spec",
+            "countersink_spec",
+            "drill_spec",
+            "insert_spec",
+            "collet_spec",
         ),
         "movements": mv_hist[:50],
         "inventory_history": inventory_history,
@@ -2273,6 +2459,14 @@ def inventory_view(request):
             "ins_family": ins_family_raw,
             "ins_grade": ins_grade_raw,
             "ins_iso": ins_iso_raw,
+            "collet_type": collet_type_raw,
+            "collet_er_size": collet_er_size_raw,
+            "collet_clamp_range": collet_clamp_range_raw,
+            "collet_square_size": collet_square_size_raw,
+            "collet_inner_diameter": collet_inner_diameter_raw,
+            "collet_thread_standard": collet_thread_standard_raw,
+            "collet_threading_use": collet_threading_use_raw,
+            "collet_threading_series": collet_threading_series_raw,
             "tool_material": tool_material,
             "tool_material_custom": tm_custom_input,
             "tool_material_select": tool_material_select,
@@ -2351,6 +2545,19 @@ def inventory_view(request):
         "insert_chipbreaker_grades": insert_grades,
         "insert_column_tooltips": INSERT_COLUMN_TOOLTIPS,
         "insert_column_tooltips_json": json.dumps(INSERT_COLUMN_TOOLTIPS, ensure_ascii=False),
+        "collet_types": COLLET_TYPES,
+        "collet_types_ui": [
+            {"value": k, "label": lbl, "tip": COLLET_TYPE_TOOLTIPS.get(k, "")}
+            for k, lbl in COLLET_TYPES
+        ],
+        "collet_type_tooltips": COLLET_TYPE_TOOLTIPS,
+        "collet_type_tooltips_json": json.dumps(COLLET_TYPE_TOOLTIPS, ensure_ascii=False),
+        "er_collet_sizes": ER_COLLET_SIZES,
+        "er_clamp_ranges": ER_CLAMP_RANGES,
+        "collet_er_g_inner_diameters": COLLET_ER_G_INNER_DIAMETERS,
+        "collet_thread_standards": COLLET_THREAD_STANDARDS,
+        "collet_threading_series": COLLET_THREADING_SERIES,
+        "collet_threading_use": COLLET_THREADING_USE,
         "tool_material_types": TOOL_MATERIAL_TYPES,
         "tool_material_extra_options": tool_material_extra_options,
         "tool_material_filter_other": TOOL_MATERIAL_FILTER_OTHER,
@@ -2359,7 +2566,13 @@ def inventory_view(request):
         "work_material_types": WORK_MATERIAL_TYPES,
         "today": date.today().isoformat(),
         "movement_tool_options": ToolItem.objects.select_related(
-            "end_mill_spec", "tap_spec", "center_drill_spec", "countersink_spec", "drill_spec", "insert_spec"
+            "end_mill_spec",
+            "tap_spec",
+            "center_drill_spec",
+            "countersink_spec",
+            "drill_spec",
+            "insert_spec",
+            "collet_spec",
         ).filter(is_deleted=False).order_by("category", "name"),
         "issue_candidates": issue_candidates,
         "purchase_requests": purchase_qs[:300],

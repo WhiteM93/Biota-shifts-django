@@ -144,6 +144,14 @@ PURCHASE_STATUSES = [
     ("stocked", "Реализовано на складе"),
 ]
 
+from .collet_constants import (
+    COLLET_ER_G_INNER_DIAMETERS,
+    COLLET_THREAD_STANDARDS,
+    COLLET_THREADING_SERIES,
+    COLLET_THREADING_USE,
+    COLLET_TYPES,
+    COLLET_TYPE_TOOLTIPS,
+)
 from .insert_constants import (
     INSERT_MACHINING_APPLICATIONS,
     normalize_insert_machining_apps,
@@ -178,6 +186,7 @@ class ToolItem(models.Model):
             ("countersink", "Зенкера"),
             ("drill", "Сверла"),
             ("insert", "Пластинки"),
+            ("collet", "Цанги"),
         ],
         verbose_name="Категория",
     )
@@ -366,6 +375,14 @@ class ToolItem(models.Model):
                 work_mat_txt(),
                 f"ост {self.quantity}",
             ]
+        elif cat == "collet":
+            cl = getattr(self, "collet_spec", None)
+            segs = [
+                self.get_category_display(),
+                (cl.get_collet_type_display() if cl else "—"),
+                (str(cl) if cl else "—"),
+                f"ост {self.quantity}",
+            ]
         else:
             segs = [self.get_category_display(), self.name, f"ост {self.quantity}"]
 
@@ -494,6 +511,15 @@ class ToolItem(models.Model):
                     specs_parts.append(f"S={fmt_mm(ins.thickness_mm)} мм")
                 if ins.nose_radius_mm is not None:
                     specs_parts.append(f"R={fmt_mm(ins.nose_radius_mm)} мм")
+        elif cat == "collet":
+            cl = getattr(self, "collet_spec", None)
+            tool_type = (
+                f"{self.get_category_display()} · {cl.get_collet_type_display()}"
+                if cl
+                else self.get_category_display()
+            )
+            if cl:
+                specs_parts.append(str(cl))
         else:
             tool_type = self.get_category_display()
             specs_parts = [self.name] if (self.name or "").strip() else []
@@ -730,6 +756,99 @@ class InsertSpec(models.Model):
         self.machining_application = normalize_insert_machining_apps(self.machining_application)
         self.milling_family = normalize_milling_family(self.milling_family)
         self.sync_derived_fields()
+        super().save(*args, **kwargs)
+
+
+class ColletSpec(models.Model):
+    tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="collet_spec")
+    collet_type = models.CharField(max_length=16, choices=COLLET_TYPES, verbose_name="Тип цанги")
+    er_size = models.CharField(max_length=8, blank=True, default="", verbose_name="Размер ER")
+    clamp_range = models.CharField(max_length=16, blank=True, default="", verbose_name="Диапазон зажима")
+    high_precision_aa = models.BooleanField(default=False, verbose_name="Высокоточная (AA)")
+    square_size = models.CharField(max_length=16, blank=True, default="", verbose_name="Квадрат, мм")
+    inner_diameter = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        choices=COLLET_ER_G_INNER_DIAMETERS,
+        verbose_name="Внутренний Ø, мм",
+    )
+    thread_standard = models.CharField(
+        max_length=16, blank=True, default="", choices=COLLET_THREAD_STANDARDS, verbose_name="Стандарт резьбы"
+    )
+    threading_use = models.CharField(
+        max_length=8,
+        blank=True,
+        default="",
+        choices=COLLET_THREADING_USE,
+        verbose_name="Назначение",
+    )
+    threading_series = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        choices=COLLET_THREADING_SERIES,
+        verbose_name="Серия",
+    )
+    thread_size_label = models.CharField(max_length=32, blank=True, default="", verbose_name="Размер резьбы")
+    diameter_mm = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True, verbose_name="Диаметр, мм"
+    )
+    size_label = models.CharField(max_length=64, blank=True, default="", verbose_name="Параметры")
+
+    class Meta:
+        verbose_name = "Параметры цанги"
+        verbose_name_plural = "Параметры цанг"
+
+    def __str__(self):
+        from shifts.collet_constants import build_collet_display_name
+
+        return build_collet_display_name(
+            collet_type=self.collet_type,
+            er_size=self.er_size,
+            clamp_range=self.clamp_range,
+            high_precision_aa=self.high_precision_aa,
+            square_size=self.square_size,
+            inner_diameter=self.inner_diameter,
+            thread_standard=self.thread_standard,
+            threading_use=self.threading_use,
+            threading_series=self.threading_series,
+            thread_size_label=self.thread_size_label,
+            diameter_mm=self.diameter_mm,
+            size_label=self.size_label,
+        )
+
+    @property
+    def collet_type_tip(self) -> str:
+        return COLLET_TYPE_TOOLTIPS.get(self.collet_type, "")
+
+    def save(self, *args, **kwargs):
+        from shifts.collet_constants import (
+            COLLET_TYPE_VALUES,
+            normalize_collet_er_g_inner_diameter,
+            normalize_collet_square_size,
+            normalize_collet_thread_standard,
+            normalize_collet_threading_series,
+            normalize_collet_threading_use,
+            normalize_collet_type,
+            normalize_er_clamp_range,
+            normalize_er_collet_size,
+        )
+
+        self.collet_type = normalize_collet_type(self.collet_type) or "er"
+        if self.collet_type not in COLLET_TYPE_VALUES:
+            self.collet_type = "er"
+        self.er_size = normalize_er_collet_size(self.er_size)
+        self.clamp_range = normalize_er_clamp_range(self.clamp_range)
+        self.square_size = normalize_collet_square_size(self.square_size)
+        self.inner_diameter = normalize_collet_er_g_inner_diameter(self.inner_diameter)
+        if self.collet_type == "er_g" and not self.inner_diameter and self.square_size:
+            self.inner_diameter = normalize_collet_er_g_inner_diameter(self.square_size)
+        self.thread_standard = normalize_collet_thread_standard(self.thread_standard)
+        self.threading_use = normalize_collet_threading_use(self.threading_use)
+        self.threading_series = normalize_collet_threading_series(self.threading_series)
+        self.thread_size_label = (self.thread_size_label or "").strip()[:32]
+        self.size_label = (self.size_label or "").strip()[:64]
         super().save(*args, **kwargs)
 
 

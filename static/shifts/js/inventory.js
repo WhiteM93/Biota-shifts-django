@@ -497,6 +497,9 @@ var INV = (function () {
 })();
 (function () {
   var categorySelect = document.getElementById("arrival-bulk-category");
+  var colletTypeSelect = document.getElementById("arrival-collet-type");
+  var colletTypeWrap = document.getElementById("arrival-collet-type-wrap");
+  var colletGroupPrefix = "collet_";
   var arrivalDateInput = document.getElementById("arrival-bulk-date");
   var supplierSelect = document.getElementById("arrival-bulk-supplier");
   var addBtn = document.getElementById("arrival-bulk-add-row");
@@ -1077,6 +1080,10 @@ var INV = (function () {
     var issues = [];
     groupsWrap.querySelectorAll("tr[data-arrival-row]").forEach(function (tr, i) {
       var cat = tr.getAttribute("data-category") || "";
+      if (cat === "collet") {
+        issues = issues.concat(validateColletRow(tr, i + 1, tr.getAttribute("data-collet-type")));
+        return;
+      }
       var wmEl = tr.querySelector('[data-k="work_material"]');
       if (!wmEl || !(wmEl.value || "").trim()) {
         if (wmEl) wmEl.classList.add("is-invalid");
@@ -1107,13 +1114,153 @@ var INV = (function () {
     countersink: "Зенкера",
     drill: "Сверла",
     insert: "Пластинки",
+    collet: "Цанги",
   };
 
-  var insertColTips = INV.insert_column_tooltips || {};
+  (INV.collet_types || []).forEach(function (o) {
+    arrivalGroupTitles[colletGroupPrefix + o.value] = "Цанги — " + o.label;
+  });
+
+  function arrivalGroupDiagramUrl(groupKey) {
+    var urls = INV.collet_type_diagram_urls || {};
+    if (groupKey.indexOf(colletGroupPrefix) !== 0) return "";
+    return urls[groupKey.slice(colletGroupPrefix.length)] || "";
+  }
 
   function escapeThTitle(s) {
     return String(s || "").replace(/"/g, "&quot;");
   }
+
+  var colletArrivalHeadHtml = {
+    er: "<tr><th>ER</th><th>Зажим Ø</th><th>AA</th><th class=\"qty-col\">Кол-во</th><th></th></tr>",
+    er_g:
+      "<tr><th>ER</th><th title=\"" +
+      escapeThTitle((INV.collet_type_tooltips && INV.collet_type_tooltips.er_g) || "") +
+      "\">Ø внутр.</th><th class=\"qty-col\">Кол-во</th><th></th></tr>",
+    threading:
+      "<tr><th>Назначение</th><th>Серия</th><th>Стандарт</th><th class=\"qty-col\">Кол-во</th><th></th></tr>",
+    _default: "<tr><th>ER</th><th>Параметры</th><th class=\"qty-col\">Кол-во</th><th></th></tr>",
+  };
+
+  function toggleColletTypeWrap() {
+    if (!colletTypeWrap) return;
+    colletTypeWrap.hidden = (categorySelect.value || "") !== "collet";
+  }
+
+  function buildColletCells(colletType) {
+    var cells = [];
+    var erGtip = (INV.collet_type_tooltips && INV.collet_type_tooltips.er_g) || "";
+    if (colletType === "er") {
+      cells.push(
+        "<td><select data-k=\"collet_er_size\" required>" +
+          '<option value="">—</option>' +
+          buildOptionsHtml(INV.er_collet_sizes || []) +
+          "</select></td>"
+      );
+      cells.push(
+        "<td><select data-k=\"collet_clamp_range\" required>" +
+          '<option value="">—</option>' +
+          buildOptionsHtml(INV.er_clamp_ranges || []) +
+          "</select></td>"
+      );
+      cells.push(
+        '<td class="collet-aa-col"><label class="collet-aa-label" title="Высокоточная (AA)">' +
+          '<input type="checkbox" data-k="collet_high_precision_aa" value="1"> AA</label></td>'
+      );
+    } else if (colletType === "er_g") {
+      cells.push(
+        "<td><select data-k=\"collet_er_size\" required>" +
+          '<option value="">—</option>' +
+          buildOptionsHtml(INV.er_collet_sizes || []) +
+          "</select></td>"
+      );
+      cells.push(
+        '<td><select data-k="collet_inner_diameter" required title="' +
+          escapeThTitle(erGtip) +
+          '">' +
+          '<option value="">—</option>' +
+          buildOptionsHtml(INV.collet_er_g_inner_diameters || []) +
+          "</select></td>"
+      );
+    } else if (colletType === "threading") {
+      cells.push(
+        "<td><select data-k=\"collet_threading_use\" required>" +
+          '<option value="">—</option>' +
+          buildOptionsHtml(INV.collet_threading_use || []) +
+          "</select></td>"
+      );
+      cells.push(
+        "<td><select data-k=\"collet_threading_series\" required>" +
+          '<option value="">—</option>' +
+          buildOptionsHtml(INV.collet_threading_series || []) +
+          "</select></td>"
+      );
+      cells.push(
+        "<td><select data-k=\"collet_thread_standard\" required>" +
+          '<option value="">—</option>' +
+          buildOptionsHtml(INV.collet_thread_standards || []) +
+          "</select></td>"
+      );
+    } else {
+      cells.push(
+        '<td><select data-k="collet_er_size"><option value="">—</option>' +
+          buildOptionsHtml(INV.er_collet_sizes || []) +
+          "</select></td>"
+      );
+      cells.push(
+        '<td><input type="text" data-k="collet_size_label" maxlength="64" placeholder="Параметры"></td>'
+      );
+    }
+    cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+    return cells;
+  }
+
+  function validateColletRow(tr, rowIndex, colletType) {
+    var issues = [];
+    var ct = colletType || tr.getAttribute("data-collet-type") || "";
+    if (ct === "er") {
+      var erEl = tr.querySelector('[data-k="collet_er_size"]');
+      var clampEl = tr.querySelector('[data-k="collet_clamp_range"]');
+      if (!erEl || !(erEl.value || "").trim()) {
+        if (erEl) erEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите размер ER.", el: erEl });
+      }
+      if (!clampEl || !(clampEl.value || "").trim()) {
+        if (clampEl) clampEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите диапазон зажима.", el: clampEl });
+      }
+    } else if (ct === "er_g") {
+      var erGEl = tr.querySelector('[data-k="collet_er_size"]');
+      var idEl = tr.querySelector('[data-k="collet_inner_diameter"]');
+      if (!erGEl || !(erGEl.value || "").trim()) {
+        if (erGEl) erGEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите размер ER.", el: erGEl });
+      }
+      if (!idEl || !(idEl.value || "").trim()) {
+        if (idEl) idEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите внутренний диаметр.", el: idEl });
+      }
+    } else if (ct === "threading") {
+      var useEl = tr.querySelector('[data-k="collet_threading_use"]');
+      var seriesEl = tr.querySelector('[data-k="collet_threading_series"]');
+      var stdEl = tr.querySelector('[data-k="collet_thread_standard"]');
+      if (!useEl || !(useEl.value || "").trim()) {
+        if (useEl) useEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите назначение (метчики / плашки).", el: useEl });
+      }
+      if (!seriesEl || !(seriesEl.value || "").trim()) {
+        if (seriesEl) seriesEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите серию (TC820, GT12…).", el: seriesEl });
+      }
+      if (!stdEl || !(stdEl.value || "").trim()) {
+        if (stdEl) stdEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите стандарт резьбы.", el: stdEl });
+      }
+    }
+    return issues;
+  }
+
+  var insertColTips = INV.insert_column_tooltips || {};
 
   function insertArrivalTh(key, label, cls) {
     var tip = insertColTips[key];
@@ -1308,17 +1455,41 @@ var INV = (function () {
       "</tr>",
   };
 
-  function ensureGroup(cat) {
-    var groupId = "arrival-group-" + cat;
+  function ensureGroup(groupKey) {
+    var groupId = "arrival-group-" + groupKey;
     var group = document.getElementById(groupId);
     if (group) return group;
     group = document.createElement("div");
     group.className = "arrival-group";
     group.id = groupId;
-    var title = arrivalGroupTitles[cat] || "Инструмент";
-    var headHtml = arrivalGroupHeadHtml[cat] || arrivalGroupHeadHtml.drill;
-    group.innerHTML = '' +
-      '<h4>' + title + '</h4>' +
+    var title = arrivalGroupTitles[groupKey] || "Инструмент";
+    var headHtml;
+    if (groupKey.indexOf(colletGroupPrefix) === 0) {
+      var sub = groupKey.slice(colletGroupPrefix.length);
+      headHtml = colletArrivalHeadHtml[sub] || colletArrivalHeadHtml._default;
+    } else {
+      headHtml = arrivalGroupHeadHtml[groupKey] || arrivalGroupHeadHtml.drill;
+    }
+    var diagramUrl = arrivalGroupDiagramUrl(groupKey);
+    var headingHtml =
+      '<div class="arrival-group-heading">' +
+      "<h4>" +
+      title +
+      "</h4>";
+    if (diagramUrl) {
+      headingHtml +=
+        '<figure class="arrival-group-diagram">' +
+        '<img src="' +
+        escapeThTitle(diagramUrl) +
+        '" alt="' +
+        escapeThTitle(title) +
+        '" class="arrival-group-diagram__img" loading="lazy" decoding="async">' +
+        "</figure>";
+    }
+    headingHtml += "</div>";
+    group.innerHTML =
+      "" +
+      headingHtml +
       '<div class="table-wrap arrival-bulk-table-wrap">' +
         '<table class="data-grid arrival-bulk-table">' +
           '<thead>' + headHtml + '</thead>' +
@@ -1336,13 +1507,26 @@ var INV = (function () {
       categorySelect.focus();
       return;
     }
-    if (!arrivalGroupTitles[cat]) return;
-    var group = ensureGroup(cat);
+    var groupKey = cat;
+    var colletType = "";
+    if (cat === "collet") {
+      colletType = (colletTypeSelect && colletTypeSelect.value) || "";
+      colletType = colletType.trim();
+      if (!colletType) {
+        showArrivalBulkError("Сначала выберите тип цанги.");
+        if (colletTypeSelect) colletTypeSelect.focus();
+        return;
+      }
+      groupKey = colletGroupPrefix + colletType;
+    }
+    if (!arrivalGroupTitles[groupKey]) return;
+    var group = ensureGroup(groupKey);
     var body = group.querySelector(".arrival-group-body");
     var tr = document.createElement("tr");
     arrivalRowSeq += 1;
     tr.setAttribute("data-arrival-row", "1");
     tr.setAttribute("data-category", cat);
+    if (colletType) tr.setAttribute("data-collet-type", colletType);
     var cells = [];
     if (cat === "end_mill") {
       cells.push('<td><select data-k="mill_type">' + buildOptionsHtml(INV.end_mill_types || []) + '</select></td>');
@@ -1401,6 +1585,8 @@ var INV = (function () {
       cells.push('<td class="co-cell"></td>');
       cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+    } else if (cat === "collet") {
+      cells = buildColletCells(colletType);
     } else if (cat === "drill") {
       cells.push(arrivalRequiredDiamCell("dr_diameter_mm"));
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_overall_length_mm"></td>');
@@ -1414,6 +1600,10 @@ var INV = (function () {
     }
     cells.push('<td><button type="button" class="btn btn-ghost js-arrival-row-remove">×</button></td>');
     tr.innerHTML = cells.join("");
+    if (cat === "collet") {
+      body.appendChild(tr);
+      return;
+    }
     var insFamilyCell = tr.querySelector(".ins-family-cell");
     if (insFamilyCell) wireInsertFamilyCell(insFamilyCell);
     wireInsertMachiningAppPicker(tr);
@@ -1457,7 +1647,9 @@ var INV = (function () {
   addBtn.addEventListener("click", addRow);
   categorySelect.addEventListener("change", function () {
     clearArrivalBulkErrors();
+    toggleColletTypeWrap();
   });
+  toggleColletTypeWrap();
 
   var arrivalBlock = document.getElementById("arrival-block");
   if (arrivalBlock) {
@@ -1490,9 +1682,15 @@ var INV = (function () {
     var rows = [];
     groupsWrap.querySelectorAll("tr[data-arrival-row]").forEach(function (tr) {
       var row = { category: tr.getAttribute("data-category") || "" };
+      var colletTypeAttr = tr.getAttribute("data-collet-type");
+      if (colletTypeAttr) row.collet_type = colletTypeAttr;
       tr.querySelectorAll("[data-k]").forEach(function (el) {
         var k = el.getAttribute("data-k");
         if (k === "tool_material_custom" || k === "ins_family_custom") return;
+        if (el.type === "checkbox") {
+          row[k] = el.checked ? "1" : "";
+          return;
+        }
         if (k === "tool_material" && (el.value || "") === toolMaterialFilterOther) {
           var cin = tr.querySelector('[data-k="tool_material_custom"]');
           row.tool_material = (cin && cin.value || "").trim();
