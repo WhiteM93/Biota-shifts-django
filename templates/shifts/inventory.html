@@ -1614,16 +1614,17 @@
   <div class="filter-grid">
     <div class="field defect-date-filter" id="defect-date-filter">
       <div class="defect-date-mode-btns">
-        <button type="button" class="defect-date-mode-btn is-active" data-mode="day">День</button>
-        <button type="button" class="defect-date-mode-btn" data-mode="range">Период</button>
+        <button type="button" class="defect-date-mode-btn{% if defect_filters.date_mode != 'range' %} is-active{% endif %}" data-mode="day">День</button>
+        <button type="button" class="defect-date-mode-btn{% if defect_filters.date_mode == 'range' %} is-active{% endif %}" data-mode="range">Период</button>
       </div>
       <div class="defect-date-inputs">
-        <input type="date" id="defect-date-single" class="defect-date-single" value="{{ defect_filters.date_from }}">
-        <span class="defect-date-range" id="defect-date-range" style="display:none">
+        <input type="date" id="defect-date-single" class="defect-date-single" value="{{ defect_filters.date_from }}"{% if defect_filters.date_mode == 'range' %} style="display:none"{% endif %}>
+        <span class="defect-date-range" id="defect-date-range"{% if defect_filters.date_mode != 'range' %} style="display:none"{% endif %}>
           <input type="date" id="defect-date-from-inp" value="{{ defect_filters.date_from }}">
           <span class="defect-date-sep">—</span>
           <input type="date" id="defect-date-to-inp" value="{{ defect_filters.date_to }}">
         </span>
+        <input type="hidden" name="defect_date_mode" id="defect-date-mode-val" value="{{ defect_filters.date_mode|default:'day' }}">
         <input type="hidden" name="defect_date_from" id="defect-date-from-val" value="{{ defect_filters.date_from }}">
         <input type="hidden" name="defect_date_to" id="defect-date-to-val" value="{{ defect_filters.date_to }}">
       </div>
@@ -1649,8 +1650,9 @@
   var toInp = document.getElementById("defect-date-to-inp");
   var fromVal = document.getElementById("defect-date-from-val");
   var toVal = document.getElementById("defect-date-to-val");
+  var modeVal = document.getElementById("defect-date-mode-val");
   var form = wrap.closest("form");
-  var mode = (fromVal.value && toVal.value && fromVal.value !== toVal.value) ? "range" : "day";
+  var mode = (modeVal && modeVal.value === "range") ? "range" : "day";
 
   function syncHidden() {
     if (mode === "day") {
@@ -1662,18 +1664,31 @@
     }
   }
 
-  function setMode(m) {
+  function setMode(m, opts) {
+    opts = opts || {};
     mode = m;
+    if (modeVal) modeVal.value = m;
     modeBtns.forEach(function(b){ b.classList.toggle("is-active", b.dataset.mode === m); });
     singleInp.style.display = m === "day" ? "" : "none";
-    rangeWrap.style.display = m === "range" ? "" : "none";
+    rangeWrap.style.display = m === "range" ? "flex" : "none";
+    if (m === "range" && opts.primeRange && singleInp.value) {
+      if (!fromInp.value) fromInp.value = singleInp.value;
+      if (!toInp.value) toInp.value = singleInp.value;
+    }
+    if (m === "day" && opts.primeDay) {
+      if (fromInp.value) singleInp.value = fromInp.value;
+      else if (toInp.value) singleInp.value = toInp.value;
+    }
     syncHidden();
   }
 
   modeBtns.forEach(function(btn){
     btn.addEventListener("click", function(){
-      setMode(btn.dataset.mode);
-      if (fromVal.value || toVal.value) form.submit();
+      var next = btn.dataset.mode;
+      setMode(next, { primeRange: next === "range", primeDay: next === "day" });
+      if (modeVal) {
+        modeVal.dispatchEvent(new Event("change", { bubbles: true }));
+      }
     });
   });
 

@@ -1234,18 +1234,18 @@ html[data-theme="dawn"] .chk {
 }
 
 .auth-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .auth-page .container {
   width: 100%;
-  max-width: 420px;
-  padding: 16px;
+  max-width: 440px;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
+/* Старые классы auth-card — для совместимости; основной стиль в shifts/css/auth.css */
 .auth-card {
   border: 1px solid var(--bio-auth-card-border);
   border-radius: 7px;
@@ -1400,7 +1400,8 @@ html[data-theme="dawn"] .chk {
 
   .auth-page .container {
     max-width: 100%;
-    padding: 12px;
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
   }
 
   .auth-card {

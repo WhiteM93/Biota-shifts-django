@@ -2277,6 +2277,9 @@ def inventory_view(request):
 
     defect_date_from = (request.GET.get("defect_date_from") or "").strip()
     defect_date_to = (request.GET.get("defect_date_to") or "").strip()
+    defect_date_mode = (request.GET.get("defect_date_mode") or "day").strip()
+    if defect_date_mode not in ("day", "range"):
+        defect_date_mode = "day"
     defect_department = (request.GET.get("defect_department") or "").strip()
     defects_qs = EmployeeDefectRecord.objects.all()
     if not is_admin_user:
@@ -2594,6 +2597,7 @@ def inventory_view(request):
         "defect_filters": {
             "date_from": defect_date_from,
             "date_to": defect_date_to,
+            "date_mode": defect_date_mode,
             "department": defect_department,
         },
         "defect_department_options": defect_department_options,
