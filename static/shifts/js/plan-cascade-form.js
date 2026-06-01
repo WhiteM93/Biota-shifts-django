@@ -208,7 +208,8 @@ class PlanCascadeFormManager {
         visible.add('workpiece_size');
       }
     } else if (product_type === 'assembly') {
-      // Путь: Сборка - только тип изделия, больше ничего
+      visible.add('material');
+      visible.add('workpiece_size');
     } else if (product_type === 'pki') {
       // Путь: ПКИ (в типе изделия)
       visible.add('material');
@@ -252,73 +253,44 @@ class PlanCascadeFormManager {
    * @returns {Object} - {valid: boolean, errors: string[]}
    */
   validateForm() {
+    this.syncStateFromDOM();
     const errors = [];
-    const { product_type, workpiece_type, laser_thickness, material, workpiece_size, workpiece_type_enum } = this.state;
+    const visible = new Set(this.getVisibleFieldsForState());
+    const { product_type, workpiece_type, laser_thickness, material, workpiece_size, workpiece_type_enum } =
+      this.state;
 
-    // Тип изделия - обязателен
-    if (!product_type) {
+    if (visible.has('product_type') && !product_type) {
       errors.push('Выберите тип изделия');
       return { valid: false, errors };
     }
 
-    if (product_type === 'made') {
-      // Для Изделия - вид заготовки обязателен
-      if (!workpiece_type) {
-        errors.push('Выберите вид заготовки');
-        return { valid: false, errors };
-      }
+    if (visible.has('workpiece_type') && !workpiece_type) {
+      errors.push('Выберите вид заготовки');
+      return { valid: false, errors };
+    }
 
-      if (workpiece_type === 'laser') {
-        // Лазерная резка: толщина и материал обязательны
-        if (!laser_thickness) {
-          errors.push('Укажите толщину листа');
-        }
-        if (!laser_thickness || parseFloat(laser_thickness) <= 0 || parseFloat(laser_thickness) >= 500) {
-          errors.push('Толщина должна быть между 0 и 500 мм');
-        }
-        if (!material) {
-          errors.push('Выберите или введите материал');
-        }
-      } else if (workpiece_type === 'preparatory') {
-        // Ленточная пила: материал, размер, тип заготовки обязательны
-        if (!material) {
-          errors.push('Выберите или введите материал');
-        }
-        if (!workpiece_size) {
-          errors.push('Укажите размер заготовки');
-        }
-        if (!workpiece_type_enum) {
-          errors.push('Выберите тип заготовки');
-        }
-      } else if (workpiece_type === 'pki') {
-        // ПКИ (вид заготовки): материал и размер обязательны
-        if (!material) {
-          errors.push('Выберите или введите материал');
-        }
-        if (!workpiece_size) {
-          errors.push('Укажите размер заготовки');
-        }
+    if (visible.has('laser_thickness')) {
+      const thick = parseFloat(String(laser_thickness || '').replace(',', '.'));
+      if (!laser_thickness || Number.isNaN(thick) || thick <= 0 || thick >= 500) {
+        errors.push('Укажите толщину листа от 0 до 500 мм');
       }
-    } else if (product_type === 'assembly') {
-      if (!material) {
-        errors.push('Укажите материал для сборки');
-      }
-      if (!workpiece_size) {
-        errors.push('Укажите размер заготовки для сборки');
-      }
-    } else if (product_type === 'pki') {
-      // ПКИ (тип): материал и размер обязательны
-      if (!material) {
-        errors.push('Выберите или введите материал');
-      }
-      if (!workpiece_size) {
-        errors.push('Укажите размер заготовки');
-      }
+    }
+
+    if (visible.has('material') && !String(material || '').trim()) {
+      errors.push('Укажите материал');
+    }
+
+    if (visible.has('workpiece_size') && !String(workpiece_size || '').trim()) {
+      errors.push('Укажите размер заготовки');
+    }
+
+    if (visible.has('workpiece_type_enum') && !String(workpiece_type_enum || '').trim()) {
+      errors.push('Выберите тип заготовки (плита / круг / пруток)');
     }
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 

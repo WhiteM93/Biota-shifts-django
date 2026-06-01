@@ -1327,14 +1327,16 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
     if (request.POST.get("sync_plan_from_inline") or "").strip() == "1":
         plan_err = validate_product_plan_post(request.POST)
         if plan_err:
-            return JsonResponse({"ok": False, "error": plan_err}, status=400)
-        perr = apply_product_plan_post(product, request.POST)
-        if perr:
-            return JsonResponse({"ok": False, "error": perr}, status=400)
-        pp = plan_piece_for_naladki_card(product)
-        out["plan_summary"] = plan_card_summary(pp, product)
-        out["plan_pk"] = pp.pk if pp else None
-        out["plan_inline_state"] = plan_inline_state_payload(product)
+            out["plan_sync_error"] = plan_err
+        else:
+            perr = apply_product_plan_post(product, request.POST)
+            if perr:
+                out["plan_sync_error"] = perr
+            else:
+                pp = plan_piece_for_naladki_card(product)
+                out["plan_summary"] = plan_card_summary(pp, product)
+                out["plan_pk"] = pp.pk if pp else None
+                out["plan_inline_state"] = plan_inline_state_payload(product)
     return JsonResponse(out)
 
 

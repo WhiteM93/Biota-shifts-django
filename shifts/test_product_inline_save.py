@@ -68,3 +68,25 @@ class ProductInlineSaveTests(TestCase):
         self.assertTrue(res.json().get("ok"), res.json())
         self.product.refresh_from_db()
         self.assertEqual(self.product.name, "Наладка после переименования")
+
+    def test_inline_preparatory_plan_fields_persist(self):
+        """Каскад плана (ленточная пила) сохраняется вместе с sync_plan_from_inline."""
+        res = self._post_inline(
+            {
+                "workpiece_type": "preparatory",
+                "material": "40Х",
+                "plan_material": "40Х",
+                "workpiece_size": "120x80x20",
+                "workpiece_type_enum": "plate",
+            }
+        )
+        self.assertEqual(res.status_code, 200, res.content[:500])
+        body = res.json()
+        self.assertTrue(body.get("ok"), body)
+        pp = PlannedProduct.objects.filter(naladki_product_id=self.product.pk).first()
+        self.assertIsNotNone(pp)
+        self.assertEqual(pp.workpiece_type, "preparatory")
+        self.assertEqual(pp.workpiece_size, "120x80x20")
+        self.assertEqual(pp.workpiece_type_enum, "plate")
+        self.setup.refresh_from_db()
+        self.assertEqual(self.setup.material, "40Х")

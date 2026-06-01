@@ -1823,35 +1823,23 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
       // Проверить наличие каскадной формы
       var cascadeFormContainer = planWrap.querySelector("[data-plan-cascade-form]");
       if (cascadeFormContainer && cascadeFormContainer._cascadeFormManager) {
-        // Использовать новую каскадную форму
         var cascadeManager = cascadeFormContainer._cascadeFormManager;
-
-        // Валидировать форму
+        cascadeManager.syncStateFromDOM();
         var validation = cascadeManager.validateForm();
-        if (!validation.valid) {
-          var planMsg =
-            validation.errors && validation.errors.length
-              ? validation.errors.join("\n")
-              : "Заполните поля плана перед сохранением.";
-          alert(planMsg);
-          return false;
+        if (validation.valid) {
+          var formData = cascadeManager.getFormPayload();
+          payload.append("sync_plan_from_inline", "1");
+          payload.append("product_type", formData.product_type || "");
+          payload.append("plan_product_type", formData.product_type || "");
+          payload.append("workpiece_type", formData.workpiece_type || "");
+          payload.append("laser_thickness", formData.laser_thickness || "");
+          payload.append("laser_sheet_thickness_mm", formData.laser_thickness || "");
+          payload.append("material", formData.material || "");
+          payload.append("plan_material", formData.material || "");
+          payload.append("workpiece_size", formData.workpiece_size || "");
+          payload.append("workpiece_type_enum", formData.workpiece_type_enum || "");
         }
-
-        // Получить payload из менеджера
-        var formData = cascadeManager.getFormPayload();
-
-        // Добавить в payload FormData
-        payload.append("sync_plan_from_inline", "1");
-        payload.append("product_type", formData.product_type || "");
-        payload.append("plan_product_type", formData.product_type || "");
-        payload.append("workpiece_type", formData.workpiece_type || "");
-        payload.append("laser_thickness", formData.laser_thickness || "");
-        payload.append("laser_sheet_thickness_mm", formData.laser_thickness || "");
-        payload.append("material", formData.material || "");
-        payload.append("plan_material", formData.material || "");
-        payload.append("workpiece_size", formData.workpiece_size || "");
-        payload.append("workpiece_type_enum", formData.workpiece_type_enum || "");
-
+        /* Наладку сохраняем всегда; план — только если поля плана валидны. */
         return true;
       }
 
@@ -2143,6 +2131,11 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
         alert((data && data.error) || "Не удалось сохранить (HTTP " + res.status + ").");
         return null;
       }
+      if (data.plan_sync_error) {
+        alert(
+          "Наладка сохранена, но план не обновлён:\n" + data.plan_sync_error
+        );
+      }
       return data;
     }
 
@@ -2221,7 +2214,7 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
           var panelSetup = root.querySelector("#panel-setup-" + sid);
           var payload = buildInlineSetupPayload(sid, panelSetup, {
             productMeta: i === 0,
-            planSync: false,
+            planSync: i === 0,
           });
           if (!payload) return;
           var res = await fetch(window.location.href, {
@@ -2266,7 +2259,7 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
       var setupTab = root.querySelector('.product-tab[data-tab="' + tabSlug + '"]');
       var payloadOne = buildInlineSetupPayload(sidOne, panel, {
         productMeta: true,
-        planSync: false,
+        planSync: true,
       });
       if (!payloadOne) return;
       var resOne = await fetch(window.location.href, {

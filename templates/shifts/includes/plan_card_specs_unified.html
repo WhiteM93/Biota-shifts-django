@@ -54,7 +54,7 @@
         </div>
 
         <!-- Поле 4: Материал (видно для made с выбранным видом заготовки и для pki) -->
-        <div class="form-field form-field--cascade" data-field="material" data-show-when="product_type=made&workpiece_type=laser|product_type=made&workpiece_type=preparatory|product_type=made&workpiece_type=pki|product_type=pki">
+        <div class="form-field form-field--cascade" data-field="material" data-show-when="product_type=made&workpiece_type=laser|product_type=made&workpiece_type=preparatory|product_type=made&workpiece_type=pki|product_type=pki|product_type=assembly">
           <label class="form-label muted">Материал</label>
           <input type="text" class="plan-cascade-material" data-field="material"
                  value="{{ plan_material_value|default:'' }}"
@@ -69,7 +69,7 @@
         </div>
 
         <!-- Поле 5: Размер заготовки (видно если нужен размер) -->
-        <div class="form-field form-field--cascade" data-field="workpiece_size" data-show-when="product_type=made&workpiece_type=preparatory|product_type=made&workpiece_type=pki|product_type=pki">
+        <div class="form-field form-field--cascade" data-field="workpiece_size" data-show-when="product_type=made&workpiece_type=preparatory|product_type=made&workpiece_type=pki|product_type=pki|product_type=assembly">
           <label class="form-label muted">Размер заготовки</label>
           <input type="text" class="plan-cascade-workpiece-size" data-field="workpiece_size"
                  value="{{ plan_workpiece_size_value|default:'' }}"

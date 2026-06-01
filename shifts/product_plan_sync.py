@@ -480,9 +480,8 @@ def apply_product_plan_post(product: Product, post: Any) -> str | None:
             ]
         )
 
-        # Синхронизировать материал с первой установкой (если это путь "made")
-        if t == "made" and plan_mat:
-            wp = (post.get("workpiece_type") or "").strip()
+        # Материал для ленточной пилы / сборки / ПКИ хранится в первой установке
+        if plan_mat and t in ("made", "assembly", "pki"):
             setup0 = (
                 ProductSetup.objects.filter(product_id=product.pk)
                 .order_by("sort_order", "id")
