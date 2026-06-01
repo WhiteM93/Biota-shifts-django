@@ -1976,10 +1976,10 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
           var clientErr =
             (check.errors && check.errors.length)
               ? check.errors.join("\n")
-              : "Заполните все поля плана в блоке слева (тип изделия, вид заготовки, материал и т.д.).";
+              : "Заполните параметры изделия слева (тип, вид заготовки, материал и т.д.).";
           showProductSaveNotice({
             type: "error",
-            title: "План не сохранён",
+            title: "Параметры не сохранены",
             message: clientErr,
             focusPlan: true,
           });
@@ -1987,7 +1987,7 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
         }
       }
       var fd = new FormData();
-      fd.append("action", "inline_save_product_plan");
+      fd.append("action", "inline_save_product_specs");
       var csrf = getCookie("csrftoken");
       if (csrf) fd.append("csrfmiddlewaretoken", csrf);
       if (!appendPlanFieldsToFormData(fd, formData)) {
@@ -2004,7 +2004,7 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
       });
       return readJsonInlineSaveResponse(res, {
         focusPlan: true,
-        errorTitle: "План не сохранён",
+        errorTitle: "Параметры не сохранены",
       });
     }
 
@@ -2292,7 +2292,7 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
       if (data.plan_sync_error) {
         showProductSaveNotice({
           type: "warn",
-          title: "Наладка сохранена, план — нет",
+          title: "Наладка сохранена, параметры — нет",
           message: data.plan_sync_error,
           focusPlan: true,
         });
@@ -2369,11 +2369,13 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
         clearPlanSaveBanner();
         showProductSaveNotice({
           type: "success",
-          title: "План сохранён",
-          message: "Производственная позиция (тип, заготовка, материал) записана.",
+          title: "Параметры сохранены",
+          message: "Тип изделия, заготовка и материал записаны в карточку.",
         });
-        if (planSave.plan_summary) syncProductPlanSummaryBlocks(planSave.plan_summary);
-        if (planSave.plan_inline_state) applyPlanInlineStateToQuickEdits(planSave.plan_inline_state);
+        var specsState = planSave.specs_inline_state || planSave.plan_inline_state;
+        var specsSummary = planSave.specs_summary || planSave.plan_summary;
+        if (specsSummary) syncProductPlanSummaryBlocks(specsSummary);
+        if (specsState) applyPlanInlineStateToQuickEdits(specsState);
       }
       var currentTab = getCurrentTabName();
       if (currentTab === "drawing") {

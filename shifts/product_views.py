@@ -34,16 +34,12 @@ from .models import (
     normalize_product_setup_gcode_system,
     product_setup_gcode_inline_parts,
 )
-from .plan_naladki_bridge import (
-    ensure_plan_piece_for_naladki_product,
-    sync_plan_piece_for_naladki_in_same_transaction,
-)
+from .plan_naladki_bridge import ensure_plan_piece_for_naladki_product
 from .product_plan_sync import (
     apply_product_plan_post,
     plan_card_summary,
     plan_form_context,
     plan_inline_state_payload,
-    plan_piece_for_naladki_card,
     validate_product_plan_post,
 )
 
@@ -1088,18 +1084,14 @@ def create_product_with_defaults() -> Product:
             description="",
             drawing_blank_size="",
             drawing_blank_type="",
+            card_product_type="made",
+            card_workpiece_type=NEW_PRODUCT_DEFAULT_WORKPIECE,
         )
         ProductSetup.objects.create(
             product=product,
             name="Установка 1",
             sort_order=0,
         )
-        sync_plan_piece_for_naladki_in_same_transaction(product.pk)
-        plan_post = QueryDict(mutable=True)
-        plan_post["plan_product_type"] = "made"
-        plan_post["workpiece_type"] = NEW_PRODUCT_DEFAULT_WORKPIECE
-        plan_post["made_material"] = ""
-        apply_product_plan_post(product, plan_post)
     return product
 
 
@@ -1333,10 +1325,10 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
             if perr:
                 out["plan_sync_error"] = perr
             else:
-                pp = plan_piece_for_naladki_card(product)
-                out["plan_summary"] = plan_card_summary(pp, product)
-                out["plan_pk"] = pp.pk if pp else None
+                out["plan_summary"] = plan_card_summary(product)
+                out["specs_summary"] = out["plan_summary"]
                 out["plan_inline_state"] = plan_inline_state_payload(product)
+                out["specs_inline_state"] = out["plan_inline_state"]
     return JsonResponse(out)
 
 
@@ -1434,20 +1426,22 @@ def product_detail_view(request, pk: int):
             new_f = getattr(product, field_name)
             return JsonResponse({"ok": True, "field": field_name, "url": new_f.url if new_f else ""})
 
-        if action == "inline_save_product_plan":
+        if action in ("inline_save_product_plan", "inline_save_product_specs"):
             plan_err = validate_product_plan_post(request.POST)
             if plan_err:
                 return JsonResponse({"ok": False, "error": plan_err}, status=400)
             err = apply_product_plan_post(product, request.POST)
             if err:
                 return JsonResponse({"ok": False, "error": err}, status=400)
-            pp = plan_piece_for_naladki_card(product)
+            summary = plan_card_summary(product)
+            state = plan_inline_state_payload(product)
             return JsonResponse(
                 {
                     "ok": True,
-                    "plan_summary": plan_card_summary(pp, product),
-                    "plan_pk": pp.pk if pp else None,
-                    "plan_inline_state": plan_inline_state_payload(product),
+                    "plan_summary": summary,
+                    "specs_summary": summary,
+                    "plan_inline_state": state,
+                    "specs_inline_state": state,
                 }
             )
         if action == "inline_update_setup_photo_caption":

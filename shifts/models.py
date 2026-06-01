@@ -1304,6 +1304,45 @@ class Product(models.Model):
         verbose_name="Тип заготовки (изделие)",
         help_text="Общее описание типа заготовки по изделию; отображается на вкладке «Изделие».",
     )
+    card_product_type = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        verbose_name="Тип изделия (карточка)",
+        help_text="Деталь / сборка / ПКИ — блок параметров на вкладке «Изделие».",
+    )
+    card_workpiece_type = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        choices=PLANNED_PRODUCT_WORKPIECE_TYPE_CHOICES,
+        verbose_name="Вид заготовки (карточка)",
+    )
+    card_laser_thickness_mm = models.DecimalField(
+        max_digits=8,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        verbose_name="Толщина листа (карточка), мм",
+    )
+    card_material = models.CharField(
+        max_length=240,
+        blank=True,
+        default="",
+        verbose_name="Материал (карточка)",
+    )
+    card_workpiece_size = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        verbose_name="Размер заготовки (карточка)",
+    )
+    card_workpiece_type_enum = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        verbose_name="Тип заготовки — плита/круг/пруток (карточка)",
+    )
     program_file = models.FileField(
         upload_to="products/programs/",
         blank=True,

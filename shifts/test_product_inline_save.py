@@ -1,8 +1,8 @@
-"""Сохранение наладки при выходе из быстрого редактирования (inline_update_setup + план)."""
+"""Сохранение карточки изделия: параметры (каскад) и наладка."""
 
 from django.test import Client, TestCase
 
-from shifts.models import PlannedProduct, ProductSetup
+from shifts.models import Product, ProductSetup
 from shifts.product_views import create_product_with_defaults
 
 
@@ -55,14 +55,14 @@ class ProductInlineSaveTests(TestCase):
         body = res.json()
         self.assertTrue(body.get("ok"), body)
 
-    def test_inline_update_setup_creates_plan_link(self):
+    def test_inline_update_setup_persists_card_specs(self):
         self._post_inline()
-        pp = PlannedProduct.objects.filter(naladki_product_id=self.product.pk).first()
-        self.assertIsNotNone(pp)
-        self.assertEqual(pp.workpiece_type, "laser")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.card_product_type, "made")
+        self.assertEqual(self.product.card_workpiece_type, "laser")
+        self.assertEqual(self.product.card_material, "Ст3")
 
     def test_inline_update_product_name_does_not_500(self):
-        """Смена названия наладки синхронизирует план (select_for_update только в atomic)."""
         res = self._post_inline({"product_name": "Наладка после переименования"})
         self.assertEqual(res.status_code, 200, res.content[:500])
         self.assertTrue(res.json().get("ok"), res.json())
@@ -73,7 +73,7 @@ class ProductInlineSaveTests(TestCase):
         res = self.client.post(
             f"/products/{self.product.pk}/",
             {
-                "action": "inline_save_product_plan",
+                "action": "inline_save_product_specs",
                 "product_type": "",
                 "workpiece_type": "",
             },
@@ -83,11 +83,11 @@ class ProductInlineSaveTests(TestCase):
         err = res.json().get("error", "").lower()
         self.assertIn("тип изделия", err)
 
-    def test_inline_save_product_plan_action(self):
+    def test_inline_save_product_specs_action(self):
         res = self.client.post(
             f"/products/{self.product.pk}/",
             {
-                "action": "inline_save_product_plan",
+                "action": "inline_save_product_specs",
                 "product_type": "made",
                 "workpiece_type": "preparatory",
                 "material": "40Х",
@@ -99,11 +99,12 @@ class ProductInlineSaveTests(TestCase):
         self.assertEqual(res.status_code, 200, res.content[:500])
         body = res.json()
         self.assertTrue(body.get("ok"), body)
-        pp = PlannedProduct.objects.filter(naladki_product_id=self.product.pk).first()
-        self.assertEqual(pp.workpiece_type_enum, "rod")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.card_workpiece_type, "preparatory")
+        self.assertEqual(self.product.card_workpiece_type_enum, "rod")
+        self.assertEqual(self.product.card_material, "40Х")
 
-    def test_inline_preparatory_plan_fields_persist(self):
-        """Каскад плана (ленточная пила) сохраняется вместе с sync_plan_from_inline."""
+    def test_inline_preparatory_specs_persist_after_reload(self):
         res = self._post_inline(
             {
                 "workpiece_type": "preparatory",
@@ -114,12 +115,11 @@ class ProductInlineSaveTests(TestCase):
             }
         )
         self.assertEqual(res.status_code, 200, res.content[:500])
-        body = res.json()
-        self.assertTrue(body.get("ok"), body)
-        pp = PlannedProduct.objects.filter(naladki_product_id=self.product.pk).first()
-        self.assertIsNotNone(pp)
-        self.assertEqual(pp.workpiece_type, "preparatory")
-        self.assertEqual(pp.workpiece_size, "120x80x20")
-        self.assertEqual(pp.workpiece_type_enum, "plate")
+        self.assertTrue(res.json().get("ok"), res.json())
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.card_workpiece_type, "preparatory")
+        self.assertEqual(self.product.card_workpiece_size, "120x80x20")
+        self.assertEqual(self.product.card_workpiece_type_enum, "plate")
+        self.assertEqual(self.product.card_material, "40Х")
         self.setup.refresh_from_db()
         self.assertEqual(self.setup.material, "40Х")
