@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from urllib.parse import quote
 
 import pandas as pd
 from django.conf import settings
@@ -24,6 +25,12 @@ from biota_shifts import schedule as biota_schedule
 from biota_shifts.schedule import employee_label_row
 
 from .auth_utils import biota_login_required, biota_user, post_login_redirect, write_permission_required
+from .email_verification import (
+    login_block_reason,
+    send_verification_by_email_address,
+    send_verification_email,
+    verify_email_token,
+)
 from .home_low_stock import apply_home_low_stock_context
 
 
@@ -63,11 +70,19 @@ def login_view(request):
         if _credentials_match(username, password):
             if not _is_admin(username):
                 rec = _resolve_registered_user(username)
-                if not rec or not rec.get("approved", True):
+                block = login_block_reason(rec)
+                if block == "email_unverified":
+                    err = (
+                        "Подтвердите email по ссылке из письма. "
+                        "Если письма нет — запросите повторную отправку ниже."
+                    )
+                elif block == "admin_pending" or not rec:
                     err = (
                         "Учётная запись ожидает подтверждения администратором. "
-                        "После подтверждения вы сможете войти."
+                        "После подтверждения email и одобрения администратора вы сможете войти."
                     )
+                elif block:
+                    err = "Вход временно недоступен для этой учётной записи."
                 else:
                     request.session["biota_username"] = username
                     if remember_me:
@@ -84,6 +99,8 @@ def login_view(request):
                 return redirect(post_login_redirect(ADMIN_USERNAME, next_url))
         if not err:
             err = "Неверный логин или пароль"
+    resend_ok = request.GET.get("resend") == "ok"
+    resend_err = request.GET.get("resend_err", "")
     return render(
         request,
         "shifts/login.html",
@@ -93,21 +110,133 @@ def login_view(request):
             "remember_me": remember_me,
             "hide_nav": True,
             "auth_page": True,
+            "resend_ok": resend_ok,
+            "resend_err": resend_err,
         },
     )
+
+
+def _register_form_context(*, err: str, legacy: bool, form_values: dict | None = None) -> dict:
+    vals = form_values or {}
+    return {
+        "error": err,
+        "hide_nav": True,
+        "auth_page": True,
+        "legacy_form": legacy,
+        "form_username": vals.get("username", ""),
+        "form_email": vals.get("email", ""),
+    }
 
 
 @require_http_methods(["GET", "HEAD", "POST"])
 def register_view(request):
     err = ""
+    form_values: dict[str, str] = {}
+    if request.method == "POST":
+        username = (request.POST.get("username") or "").strip()
+        email = (request.POST.get("email") or "").strip()
+        p1 = request.POST.get("password") or ""
+        p2 = request.POST.get("password2") or ""
+        form_values = {"username": username, "email": email}
+        if p1 != p2:
+            err = "Пароли не совпадают"
+        else:
+            ok, msg = _register_user(username, p1, email=email, require_email=True)
+            if ok:
+                sent_ok, send_err, debug_link = send_verification_email(username, request=request)
+                request.session["register_pending_user"] = username
+                request.session["register_email_sent"] = sent_ok
+                request.session["register_email_error"] = "" if sent_ok else send_err
+                if settings.DEBUG and debug_link:
+                    request.session["register_verify_debug_link"] = debug_link
+                else:
+                    request.session.pop("register_verify_debug_link", None)
+                return redirect("register_pending")
+            err = msg
+    return render(
+        request,
+        "shifts/register.html",
+        _register_form_context(err=err, legacy=False, form_values=form_values),
+    )
+
+
+@require_http_methods(["GET", "HEAD", "POST"])
+@require_http_methods(["GET", "HEAD"])
+def register_pending_view(request):
+    username = (request.session.pop("register_pending_user", None) or "").strip()
+    email_sent = request.session.pop("register_email_sent", False)
+    email_error = (request.session.pop("register_email_error", None) or "").strip()
+    debug_link = (request.session.pop("register_verify_debug_link", None) or "").strip()
+    if not username:
+        return redirect("login")
+    rec = _resolve_registered_user(username)
+    email_display = (rec.get("email") or "").strip() if rec else ""
+    return render(
+        request,
+        "shifts/register_pending.html",
+        {
+            "hide_nav": True,
+            "auth_page": True,
+            "pending_username": username,
+            "pending_email": email_display,
+            "email_sent": email_sent,
+            "email_error": email_error,
+            "debug_verify_link": debug_link if settings.DEBUG else "",
+        },
+    )
+
+
+@require_http_methods(["GET", "HEAD"])
+def verify_email_view(request, token: str):
+    ok, msg = verify_email_token(token)
+    return render(
+        request,
+        "shifts/verify_email.html",
+        {
+            "hide_nav": True,
+            "auth_page": True,
+            "verified_ok": ok,
+            "message": msg if not ok else "Email подтверждён. После одобрения администратором можно войти в систему.",
+        },
+    )
+
+
+@require_http_methods(["GET", "HEAD", "POST"])
+def resend_verification_view(request):
+    err = ""
+    ok = False
+    if request.method == "POST":
+        email = (request.POST.get("email") or "").strip()
+        username = (request.POST.get("username") or "").strip()
+        if username:
+            ok, err = send_verification_email(username, request=request)[:2]
+        elif email:
+            ok, err = send_verification_by_email_address(email, request=request)
+        else:
+            err = "Укажите логин или email."
+        if ok:
+            return redirect(f"{reverse('login')}?resend=ok")
+        return redirect(f"{reverse('login')}?resend_err={quote(err)}")
+    return render(
+        request,
+        "shifts/resend_verification.html",
+        {"hide_nav": True, "auth_page": True, "error": err, "success": ok},
+    )
+
+
+def register_legacy_view(request):
+    """Прежняя форма: только логин и пароль (без обязательного email)."""
+    err = ""
+    form_values: dict[str, str] = {}
     if request.method == "POST":
         username = (request.POST.get("username") or "").strip()
         p1 = request.POST.get("password") or ""
         p2 = request.POST.get("password2") or ""
+        form_values = {"username": username}
         if p1 != p2:
             err = "Пароли не совпадают"
         else:
-            ok, msg = _register_user(username, p1)
+            ok, msg = _register_user(username, p1, require_email=False)
             if ok:
                 messages.success(
                     request,
@@ -118,7 +247,7 @@ def register_view(request):
     return render(
         request,
         "shifts/register.html",
-        {"error": err, "hide_nav": True, "auth_page": True},
+        _register_form_context(err=err, legacy=True, form_values=form_values),
     )
 
 

@@ -85,13 +85,21 @@
     <div class="cabinet-section__body">
       {% if pending_registrations %}
       <ul class="pending-reg-list">
-        {% for login in pending_registrations %}
+        {% for item in pending_registrations %}
         <li class="pending-reg-item">
-          <code>{{ login }}</code>
+          <span class="pending-reg-item__who">
+            <code>{{ item.login }}</code>
+            {% if item.email %}<span class="muted pending-reg-item__email">{{ item.email }}</span>{% endif %}
+            {% if item.email and not item.email_verified %}
+            <span class="pending-reg-badge pending-reg-badge--warn">email не подтверждён</span>
+            {% elif item.email %}
+            <span class="pending-reg-badge pending-reg-badge--ok">email подтверждён</span>
+            {% endif %}
+          </span>
           <form method="post" action="" class="pending-reg-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="admin_approve_registration">
-            <input type="hidden" name="approve_login" value="{{ login }}">
+            <input type="hidden" name="approve_login" value="{{ item.login }}">
             <button type="submit" class="btn">Подтвердить</button>
           </form>
         </li>
@@ -403,6 +411,9 @@
             </label>
             <label>Email
               <input type="email" name="email" value="{{ profile_email }}" maxlength="200">
+              {% if profile_email and not profile_email_verified %}
+              <span class="muted">Email не подтверждён — проверьте почту или <a href="{% url 'resend_verification' %}">запросите письмо снова</a>.</span>
+              {% endif %}
             </label>
           </div>
           <div class="cabinet-form-actions">

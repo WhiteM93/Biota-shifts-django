@@ -18,7 +18,11 @@
     </div>
     <div>
       <h1 class="auth-title">Регистрация</h1>
-      <p class="auth-subtitle">Логин: латиница, цифры, _. Пароль — от 8 символов.</p>
+      {% if legacy_form %}
+      <p class="auth-subtitle">Только логин и пароль (как раньше). Email можно добавить позже в личном кабинете.</p>
+      {% else %}
+      <p class="auth-subtitle">Логин — для входа. На email придёт ссылка для подтверждения; затем администратор одобрит учётную запись.</p>
+      {% endif %}
     </div>
   </header>
 
@@ -32,8 +36,15 @@
 
       <label class="auth-field">
         <span class="auth-label">Логин</span>
-        <input class="auth-input" name="username" autocomplete="username" required minlength="3" maxlength="32" autofocus>
+        <input class="auth-input" name="username" value="{{ form_username }}" autocomplete="username" required minlength="3" maxlength="32" pattern="[a-zA-Z0-9_]{3,32}" title="3–32 символа: латиница, цифры, _" autofocus>
       </label>
+
+      {% if not legacy_form %}
+      <label class="auth-field">
+        <span class="auth-label">Email</span>
+        <input class="auth-input" name="email" type="email" value="{{ form_email }}" autocomplete="email" required maxlength="200" inputmode="email">
+      </label>
+      {% endif %}
 
       <label class="auth-field">
         <span class="auth-label">Пароль</span>
@@ -48,7 +59,14 @@
       <button class="auth-submit-btn" type="submit">Зарегистрироваться</button>
     </form>
 
-    <p class="auth-footer">Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a></p>
+    <p class="auth-footer">
+      Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a>
+      {% if legacy_form %}
+      · <a href="{% url 'register' %}">Регистрация с email</a>
+      {% else %}
+      · <a href="{% url 'register_legacy' %}">Старая форма (без email)</a>
+      {% endif %}
+    </p>
 
     <div class="auth-theme-row">
       <button type="button" class="nav-theme-btn" id="biota-theme-toggle" aria-pressed="false" title="Тема «Рассвет» (светлая)">☾</button>

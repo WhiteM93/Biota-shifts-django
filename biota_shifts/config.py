@@ -87,6 +87,8 @@ ADMIN_USERNAME = _config_str("BIOTA_ADMIN_USERNAME", "admin") or "admin"
 _users_env = (os.getenv("BIOTA_USERS_STORE") or "").strip()
 USERS_STORE_PATH = Path(_users_env) if _users_env else (APP_DIR / ".biota_users.json")
 _USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,32}$")
+# Практичная проверка email (не RFC-полная, достаточно для регистрации).
+_EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
 
 def _admin_password() -> str:

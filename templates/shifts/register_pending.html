@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/auth.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <header class="auth-header">
+    <div class="auth-header-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+        <polyline points="22,6 12,13 2,6"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="auth-title">Проверьте почту</h1>
+      <p class="auth-subtitle">Регистрация для логина <strong>{{ pending_username }}</strong> принята.</p>
+    </div>
+  </header>
+
+  <section class="auth-glass-card">
+    {% if email_sent %}
+    <p class="auth-hint">
+      На адрес <strong>{{ pending_email }}</strong> отправлено письмо со ссылкой для подтверждения email.
+      Ссылка действует 48 часов.
+    </p>
+    {% else %}
+    <p class="auth-alert" role="alert">
+      Не удалось отправить письмо{% if email_error %}: {{ email_error }}{% endif %}.
+      Запросите повторную отправку на <a href="{% url 'resend_verification' %}">отдельной странице</a> или у администратора.
+    </p>
+    {% endif %}
+
+    <ol class="auth-steps">
+      <li>Подтвердите email по ссылке из письма.</li>
+      <li>Дождитесь одобрения учётной записи администратором в личном кабинете.</li>
+      <li>Войдите по логину и паролю.</li>
+    </ol>
+
+    {% if debug_verify_link %}
+    <p class="auth-debug-link">
+      <span class="muted">Режим разработки — ссылка подтверждения:</span><br>
+      <a href="{{ debug_verify_link }}">{{ debug_verify_link }}</a>
+    </p>
+    {% endif %}
+
+    <p class="auth-footer">
+      <a href="{% url 'login' %}">К странице входа</a>
+      · <a href="{% url 'resend_verification' %}">Отправить письмо снова</a>
+    </p>
+
+    <div class="auth-theme-row">
+      <button type="button" class="nav-theme-btn" id="biota-theme-toggle" aria-pressed="false" title="Тема «Рассвет» (светлая)">☾</button>
+    </div>
+  </section>
+</div>
+{% endblock %}

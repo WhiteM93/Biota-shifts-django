@@ -286,6 +286,40 @@ a.cabinet-quick-card:hover {
   background: var(--bio-surface-item);
 }
 
+.pending-reg-item__who {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pending-reg-item__email {
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.pending-reg-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: lowercase;
+}
+
+.pending-reg-badge--warn {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.pending-reg-badge--ok {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
 .pending-reg-item code {
   font-size: 14px;
   font-weight: 600;

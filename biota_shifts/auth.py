@@ -19,6 +19,7 @@ except ImportError:
 from biota_shifts.config import (
     ADMIN_USERNAME,
     USERS_STORE_PATH,
+    _EMAIL_RE,
     _USERNAME_RE,
     _admin_password,
     _config_str,
@@ -82,6 +83,9 @@ def _verify_auth_cookie(token: str) -> str | None:
     rec = _resolve_registered_user(username)
     if rec:
         if not rec.get("approved", True):
+            return None
+        em = _normalize_email(rec.get("email") or "")
+        if em and not rec.get("email_verified", True):
             return None
         return username
     return None
@@ -202,7 +206,42 @@ def _credentials_match(user: str, password: str) -> bool:
     return _pbkdf2_verify(password, rec.get("salt_hex", ""), rec.get("hash_hex", ""))
 
 
-def _register_user(username: str, password: str) -> tuple[bool, str]:
+def _normalize_email(raw: str) -> str:
+    return (raw or "").strip().casefold()
+
+
+def _validate_email_format(email: str) -> tuple[bool, str]:
+    em = _normalize_email(email)
+    if not em:
+        return False, "Укажите email."
+    if len(em) > 200:
+        return False, "Email слишком длинный (не более 200 символов)."
+    if not _EMAIL_RE.match(em):
+        return False, "Некорректный формат email."
+    return True, em
+
+
+def _find_username_by_email(email: str, *, exclude_username: str | None = None) -> str | None:
+    em = _normalize_email(email)
+    if not em:
+        return None
+    ex = (exclude_username or "").strip().casefold()
+    store = _load_users_store()
+    for login, rec in store.items():
+        if ex and str(login).strip().casefold() == ex:
+            continue
+        if _normalize_email(rec.get("email") or "") == em:
+            return str(login)
+    return None
+
+
+def _register_user(
+    username: str,
+    password: str,
+    *,
+    email: str = "",
+    require_email: bool = False,
+) -> tuple[bool, str]:
     u = username.strip()
     if not _USERNAME_RE.match(u):
         return False, "Логин: 3–32 символа, только латиница, цифры и _"
@@ -210,6 +249,23 @@ def _register_user(username: str, password: str) -> tuple[bool, str]:
         return False, "Логин «admin» зарезервирован"
     if len(password) < 8:
         return False, "Пароль не короче 8 символов"
+    email_norm = ""
+    if require_email:
+        ok_em, em_or_err = _validate_email_format(email)
+        if not ok_em:
+            return False, em_or_err
+        email_norm = em_or_err
+        taken = _find_username_by_email(email_norm)
+        if taken:
+            return False, "Этот email уже используется другой учётной записью."
+    elif (email or "").strip():
+        ok_em, em_or_err = _validate_email_format(email)
+        if not ok_em:
+            return False, em_or_err
+        email_norm = em_or_err
+        taken = _find_username_by_email(email_norm)
+        if taken:
+            return False, "Этот email уже используется другой учётной записью."
     store = _load_users_store()
     if u in store:
         return False, "Такой логин уже занят"
@@ -219,9 +275,10 @@ def _register_user(username: str, password: str) -> tuple[bool, str]:
         "hash_hex": hash_hex,
         "created_at": datetime.now(MSK).strftime("%Y-%m-%d %H:%M"),
         "approved": False,
+        "email_verified": not bool(email_norm),
         "role": USER_ROLE_MANAGER,
         "display_name": "",
-        "email": "",
+        "email": email_norm,
         "access_scope": "none",
         "allowed_department": "",
         "allowed_area": "",
@@ -262,9 +319,25 @@ def _update_registered_profile(username: str, display_name: str, email: str) -> 
     store = _load_users_store()
     if username not in store:
         return False, "Профиль не найден"
+    em_raw = (email or "").strip()
+    email_norm = ""
+    if em_raw:
+        ok_em, em_or_err = _validate_email_format(em_raw)
+        if not ok_em:
+            return False, em_or_err
+        email_norm = em_or_err
+        taken = _find_username_by_email(email_norm, exclude_username=username)
+        if taken:
+            return False, "Этот email уже используется другой учётной записью."
     rec = store[username]
     rec["display_name"] = display_name.strip()[:200]
-    rec["email"] = email.strip()[:200]
+    prev_email = _normalize_email(rec.get("email") or "")
+    rec["email"] = email_norm
+    if email_norm != prev_email:
+        rec["email_verified"] = not bool(email_norm)
+        rec["email_verify_token_hash"] = ""
+        rec["email_verify_expires_at"] = ""
+        rec.pop("email_verified_at", None)
     store[username] = rec
     _save_users_store(store)
     return True, ""

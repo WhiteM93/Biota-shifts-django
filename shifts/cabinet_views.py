@@ -187,8 +187,17 @@ def cabinet_view(request):
         ctx["system_health"] = collect_system_health()
         priv_store = _load_users_store()
         ctx["pending_registrations"] = sorted(
-            [k for k, v in priv_store.items() if not v.get("approved", True)],
-            key=lambda x: str(x).lower(),
+            [
+                {
+                    "login": k,
+                    "email": (v.get("email") or "").strip(),
+                    "email_verified": not (v.get("email") or "").strip()
+                    or bool(v.get("email_verified", True)),
+                }
+                for k, v in priv_store.items()
+                if not v.get("approved", True)
+            ],
+            key=lambda x: str(x["login"]).lower(),
         )
         ctx["admin_display_name"] = (request.session.get("admin_display_name") or "").strip()
         ctx["priv_users"] = sorted(priv_store.keys())
@@ -244,6 +253,9 @@ def cabinet_view(request):
         ctx["profile_role"] = "исполнитель" if role == USER_ROLE_EXECUTOR else "руководитель"
         ctx["profile_display_name"] = (rec.get("display_name") or "").strip()
         ctx["profile_email"] = (rec.get("email") or "").strip()
+        ctx["profile_email_verified"] = not (rec.get("email") or "").strip() or bool(
+            rec.get("email_verified", True)
+        )
         ctx["profile_missing"] = not bool(rec)
 
     return render(request, "shifts/cabinet.html", ctx)

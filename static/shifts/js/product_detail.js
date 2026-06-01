@@ -2106,17 +2106,6 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
     function applyInlineUpdateResponseToDom(setupId, data) {
       if (!data || !data.setup) return;
       if (data.product) applyProductMetaToDom(data.product);
-      if (data.product_drawing) {
-        var pd = data.product_drawing;
-        var pds = root.querySelector("#plan-product-drawing-blank-size");
-        var pdt = root.querySelector("#plan-product-drawing-blank-type");
-        if (pds && Object.prototype.hasOwnProperty.call(pd, "drawing_blank_size")) {
-          pds.textContent = pd.drawing_blank_size || "—";
-        }
-        if (pdt && Object.prototype.hasOwnProperty.call(pd, "drawing_blank_type")) {
-          pdt.textContent = pd.drawing_blank_type || "—";
-        }
-      }
       var scopes = [];
       var pSetup = root.querySelector("#panel-setup-" + setupId);
       if (pSetup) scopes.push(pSetup);
@@ -2192,16 +2181,6 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
       var payload = new FormData();
       payload.append("action", "inline_update_setup");
       payload.append("setup_id", setupId);
-      var pdsEl = root.querySelector("#plan-product-drawing-blank-size");
-      var pdtEl = root.querySelector("#plan-product-drawing-blank-type");
-      if (pdsEl) {
-        var s = (pdsEl.textContent || "").replace(/\s+/g, " ").trim();
-        payload.append("drawing_blank_size", s === "—" ? "" : s);
-      }
-      if (pdtEl) {
-        var tt = (pdtEl.textContent || "").replace(/\s+/g, " ").trim();
-        payload.append("drawing_blank_type", tt === "—" ? "" : tt);
-      }
       if (panelSetup) {
         ["workpiece", "size", "material"].forEach(function (name) {
           var el = panelSetup.querySelector('[data-field-text="' + name + '"]');

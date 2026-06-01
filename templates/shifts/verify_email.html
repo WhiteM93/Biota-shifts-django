@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/auth.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <header class="auth-header">
+    <div>
+      <h1 class="auth-title">{% if verified_ok %}Email подтверждён{% else %}Не удалось подтвердить{% endif %}</h1>
+    </div>
+  </header>
+
+  <section class="auth-glass-card">
+    <p class="{% if verified_ok %}auth-hint{% else %}auth-alert{% endif %}" role="status">{{ message }}</p>
+    <p class="auth-footer"><a href="{% url 'login' %}">Перейти ко входу</a></p>
+  </section>
+</div>
+{% endblock %}

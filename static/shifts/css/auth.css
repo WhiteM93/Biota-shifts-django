@@ -299,6 +299,30 @@ html[data-theme="dawn"] .auth-alert {
   }
 }
 
+.auth-hint {
+  margin: 0 0 1rem;
+  line-height: 1.5;
+  color: var(--au-text-muted, #9ca3af);
+}
+
+.auth-steps {
+  margin: 0 0 1.25rem;
+  padding-left: 1.25rem;
+  line-height: 1.55;
+}
+
+.auth-debug-link {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+.auth-or {
+  text-align: center;
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .auth-shell {
     animation: none;

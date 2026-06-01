@@ -29,24 +29,17 @@
     color: var(--bio-field-label, #8fa4c8);
   }
   .plan-unified-specs-grid {
-    display: grid;
-    grid-template-columns: 260px 260px;
-    gap: 14px 22px;
-    align-items: start;
+    display: block;
+    max-width: 100%;
   }
-  .plan-unified-specs-grid__left,
-  .plan-unified-specs-grid__right {
-    width: 260px;
+  .plan-unified-specs-grid__left {
+    width: 100%;
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
   }
   @media (max-width: 720px) {
-    .plan-unified-specs-grid {
-      grid-template-columns: 1fr;
-    }
-    .plan-unified-specs-grid__left,
-    .plan-unified-specs-grid__right {
+    .plan-unified-specs-grid__left {
       width: 100%;
     }
     .plan-unified-specs-grid__left .setup-meta-plan-block,
@@ -55,50 +48,6 @@
     .plan-unified-specs-grid__left .setup-plan-quick-readonly > .setup-plan-summary-line {
       width: 100%;
     }
-  }
-  .plan-unified-specs-grid__right .setup-plan-summary-line.setup-plan-line--blank-size {
-    display: grid;
-    grid-template-columns: minmax(112px, 38%) minmax(0, 1fr);
-    column-gap: 10px;
-    align-items: start;
-    padding: 3px 0;
-  }
-  .plan-unified-specs-grid__right .setup-plan-line--blank-size + .setup-plan-line--blank-size {
-    text-align: left;
-  }
-  .plan-unified-specs-grid__right .setup-plan-summary-line.setup-plan-line--blank-size > .setup-plan-blank-size-label {
-    display: flex;
-    flex-flow: row;
-    justify-content: center;
-    align-items: center;
-    font-weight: 600;
-    color: var(--bio-field-label, #8fa4c8);
-  }
-  #plan-product-drawing-blank-size-label {
-    align-items: flex-end;
-    text-align: right;
-    font-size: 13px;
-  }
-  #plan-product-drawing-blank-type-label {
-    font-size: 14px;
-  }
-  .plan-unified-specs-grid__right .setup-plan-summary-line {
-    margin-bottom: 8px;
-  }
-  .plan-unified-specs-grid__right .setup-plan-summary-line:last-child {
-    margin-bottom: 0;
-  }
-  .plan-unified-specs-grid__right .setup-plan-line--blank-size .setup-plan-summary-cell {
-    width: 135px;
-    max-width: 100%;
-    box-sizing: border-box;
-    margin-top: 0;
-    font-weight: normal;
-  }
-  #plan-product-drawing-blank-size,
-  #plan-product-drawing-blank-type {
-    font-weight: normal;
-    font-style: italic;
   }
   output.setup-drawing-workpiece-mirror,
   .setup-drawing-workpiece-mirror {

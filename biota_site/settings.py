@@ -200,3 +200,21 @@ BIOTA_ADMIN_PASSWORD = os.getenv("BIOTA_ADMIN_PASSWORD", "")
 BIOTA_AUTH_COOKIE_SECRET = os.getenv("BIOTA_AUTH_COOKIE_SECRET", "")
 BIOTA_USERS_STORE = os.getenv("BIOTA_USERS_STORE", "")
 BIOTA_SCHEDULE_DIR = os.getenv("BIOTA_SCHEDULE_DIR", "")
+BIOTA_SITE_URL = (os.getenv("BIOTA_SITE_URL") or "").strip()
+
+# Почта: подтверждение регистрации. Без SMTP в DEBUG письма в консоль runserver.
+_email_backend = (os.getenv("DJANGO_EMAIL_BACKEND") or "").strip()
+if not _email_backend:
+    _email_backend = (
+        "django.core.mail.backends.console.EmailBackend"
+        if DEBUG
+        else "django.core.mail.backends.smtp.EmailBackend"
+    )
+EMAIL_BACKEND = _email_backend
+EMAIL_HOST = os.getenv("DJANGO_EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.getenv("DJANGO_EMAIL_PORT", "587") or "587")
+EMAIL_HOST_USER = os.getenv("DJANGO_EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("DJANGO_EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = (os.getenv("DJANGO_EMAIL_USE_TLS") or "1").strip().lower() not in ("0", "false", "no")
+EMAIL_USE_SSL = (os.getenv("DJANGO_EMAIL_USE_SSL") or "").strip().lower() in ("1", "true", "yes")
+DEFAULT_FROM_EMAIL = os.getenv("DJANGO_DEFAULT_FROM_EMAIL", "noreply@biota.local")
