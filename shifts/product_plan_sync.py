@@ -18,8 +18,9 @@ from .plan_naladki_bridge import ensure_plan_piece_for_naladki_product, finalize
 
 
 def normalize_plan_product_type(raw: str | None) -> str:
-    t = (raw or "made").strip().lower()
-    return t if t in ("made", "assembly", "pki") else "made"
+    """Пустая строка остаётся пустой (не подставляем made по умолчанию)."""
+    t = (raw or "").strip().lower()
+    return t if t in ("made", "assembly", "pki") else ""
 
 
 def flags_from_plan_product_type(t: str) -> tuple[bool, bool]:
@@ -180,17 +181,11 @@ def validate_product_plan_post(post: Any) -> str | None:
             if not workpiece_size:
                 return "Укажите размер заготовки."
 
-    # Путь 2: Сборка
+    # Путь 2: Сборка (размер опционален)
     elif product_type == "assembly":
-        # Проверить материал
         material = (post.get("material") or post.get("plan_material") or "").strip()
         if not material:
             return "Укажите материал для сборки."
-
-        # Проверить размер заготовки
-        workpiece_size = (post.get("workpiece_size") or "").strip()
-        if not workpiece_size:
-            return "Укажите размер заготовки для сборки."
 
     # Путь 3: ПКИ (тип изделия)
     elif product_type == "pki":
@@ -394,6 +389,8 @@ def apply_product_plan_post(product: Product, post: Any) -> str | None:
             return "Не удалось связать карточку наладки с планом. Обновите страницу."
 
         t = normalize_plan_product_type(post.get("product_type") or post.get("plan_product_type") or "")
+        if not t:
+            return "Выберите тип изделия (Деталь, Сборка или ПКИ)."
         is_asm, is_pki = flags_from_plan_product_type(t)
 
         pp.name = nm_plan or pp.name

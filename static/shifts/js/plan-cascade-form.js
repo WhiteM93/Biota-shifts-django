@@ -300,6 +300,9 @@ class PlanCascadeFormManager {
    */
   syncFromServer(data) {
     if (!data) return;
+    if (!data.product_type && data.plan_product_type) {
+      data = Object.assign({}, data, { product_type: data.plan_product_type });
+    }
 
     Object.entries(data).forEach(([key, value]) => {
       if (key in this.state) {
@@ -335,7 +338,10 @@ class PlanCascadeFormManager {
   }
 }
 
-// Экспортировать класс если используется модульная система
+// Глобально для product_detail.js (обычный <script defer>, не bundler)
+if (typeof window !== 'undefined') {
+  window.PlanCascadeFormManager = PlanCascadeFormManager;
+}
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = PlanCascadeFormManager;
 }

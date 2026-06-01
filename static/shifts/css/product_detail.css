@@ -4102,3 +4102,190 @@ html[data-theme="dawn"] .product-drawing-description:focus {
   border-radius: 16px !important;
   box-shadow: none !important;
 }
+
+/* ── Уведомления сохранения (план / наладка) ── */
+.pd-save-notices {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 12000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.pd-save-notice {
+  pointer-events: auto;
+  padding: 12px 40px 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--pd-glass-border);
+  background: var(--pd-glass-bg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--pd-text);
+  animation: pdSaveNoticeIn 0.22s ease;
+}
+@keyframes pdSaveNoticeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.pd-save-notice__title {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.pd-save-notice__msg { margin: 0; opacity: 0.92; }
+.pd-save-notice__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--pd-text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+.pd-save-notice__close:hover { background: rgba(255, 255, 255, 0.08); }
+.pd-save-notice--error {
+  border-color: rgba(248, 113, 113, 0.55);
+  background: color-mix(in srgb, #f87171 12%, var(--pd-glass-bg));
+}
+.pd-save-notice--warn {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: color-mix(in srgb, #fbbf24 10%, var(--pd-glass-bg));
+}
+.pd-save-notice--success {
+  border-color: rgba(52, 211, 153, 0.5);
+  background: color-mix(in srgb, #34d399 10%, var(--pd-glass-bg));
+}
+.pd-plan-save-banner {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.pd-plan-save-banner--error {
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: color-mix(in srgb, #f87171 14%, transparent);
+  color: var(--pd-text);
+}
+.pd-plan-save-banner--success {
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  background: color-mix(in srgb, #34d399 12%, transparent);
+}
+.plan-cascade-form-container.has-save-error {
+  outline: 2px solid rgba(248, 113, 113, 0.65);
+  outline-offset: 4px;
+  border-radius: 10px;
+}
+
+/* ── Уведомления сохранения (план / наладка) ── */
+.pd-save-notices {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 12000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.pd-save-notice {
+  pointer-events: auto;
+  padding: 12px 40px 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--pd-glass-border);
+  background: var(--pd-glass-bg);
+  color: var(--pd-text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  font-size: 13px;
+  line-height: 1.45;
+  animation: pdSaveNoticeIn 0.22s ease;
+}
+
+@keyframes pdSaveNoticeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pd-save-notice strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.pd-save-notice p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.pd-save-notice__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.pd-save-notice__close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pd-save-notice--error {
+  border-color: rgba(248, 113, 113, 0.55);
+  background: color-mix(in srgb, #f87171 14%, var(--pd-glass-bg));
+}
+
+.pd-save-notice--warn {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: color-mix(in srgb, #fbbf24 12%, var(--pd-glass-bg));
+}
+
+.pd-save-notice--success {
+  border-color: rgba(52, 211, 153, 0.5);
+  background: color-mix(in srgb, #34d399 12%, var(--pd-glass-bg));
+}
+
+.pd-plan-save-banner {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pd-plan-save-banner--error {
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: color-mix(in srgb, #f87171 12%, var(--pd-input-bg, var(--pd-glass-bg)));
+  color: var(--pd-text);
+}
+
+.pd-plan-save-banner--success {
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  background: color-mix(in srgb, #34d399 10%, var(--pd-input-bg, var(--pd-glass-bg)));
+  color: var(--pd-text);
+}
+
+.plan-cascade-form-container.has-save-error {
+  outline: 2px solid rgba(248, 113, 113, 0.65);
+  outline-offset: 4px;
+  border-radius: 10px;
+}

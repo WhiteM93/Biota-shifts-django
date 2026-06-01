@@ -637,6 +637,93 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
     if (!root) return;
     phasedDeleteInitAll(document);
     var inlineEditMode = false;
+    var saveNoticeTimers = [];
+
+    function escapeHtmlText(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function ensureSaveNoticesHost() {
+      var host = document.getElementById("pd-save-notices");
+      if (host) return host;
+      host = document.createElement("div");
+      host.id = "pd-save-notices";
+      host.className = "pd-save-notices";
+      host.setAttribute("aria-live", "polite");
+      host.setAttribute("role", "status");
+      document.body.appendChild(host);
+      return host;
+    }
+
+    function clearPlanSaveBanner() {
+      var planWrap = productDetailPlanWrap();
+      if (!planWrap) return;
+      var banner = planWrap.querySelector(".pd-plan-save-banner");
+      if (banner) banner.remove();
+      var form = planWrap.querySelector("[data-plan-cascade-form]");
+      if (form) form.classList.remove("has-save-error");
+    }
+
+    function showPlanSaveBanner(message, kind) {
+      var planWrap = productDetailPlanWrap();
+      if (!planWrap || !message) return;
+      clearPlanSaveBanner();
+      var banner = document.createElement("div");
+      banner.className = "pd-plan-save-banner pd-plan-save-banner--" + (kind || "error");
+      banner.setAttribute("role", "alert");
+      banner.textContent = message;
+      var form = planWrap.querySelector("[data-plan-cascade-form]");
+      var anchor = form || planWrap.querySelector(".plan-unified-specs-grid__left") || planWrap;
+      anchor.insertBefore(banner, anchor.firstChild);
+      if (kind === "error" && form) form.classList.add("has-save-error");
+    }
+
+    function showProductSaveNotice(opts) {
+      opts = opts || {};
+      var type = opts.type || "error";
+      var title = opts.title || (type === "success" ? "Готово" : "Не сохранено");
+      var message = opts.message || "";
+      if (!message) return;
+
+      if (opts.focusPlan) {
+        showPlanSaveBanner(message, type === "success" ? "success" : "error");
+        var meta = productDetailMetaEl();
+        if (meta) {
+          try {
+            meta.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          } catch (_e) {
+            meta.scrollIntoView();
+          }
+        }
+      }
+
+      var host = ensureSaveNoticesHost();
+      var note = document.createElement("div");
+      note.className = "pd-save-notice pd-save-notice--" + type;
+      note.style.position = "relative";
+      note.innerHTML =
+        '<span class="pd-save-notice__title">' +
+        escapeHtmlText(title) +
+        "</span>" +
+        '<p class="pd-save-notice__msg">' +
+        escapeHtmlText(message) +
+        "</p>" +
+        '<button type="button" class="pd-save-notice__close" aria-label="Закрыть">×</button>';
+      var closeBtn = note.querySelector(".pd-save-notice__close");
+      function removeNote() {
+        if (note.parentNode) note.parentNode.removeChild(note);
+      }
+      if (closeBtn) closeBtn.addEventListener("click", removeNote);
+      host.appendChild(note);
+
+      var ttl = type === "success" ? 4500 : 12000;
+      var timerId = window.setTimeout(removeNote, ttl);
+      saveNoticeTimers.push(timerId);
+    }
 
     function productDetailMetaEl() {
       return document.getElementById("product-detail-meta");
@@ -1705,10 +1792,7 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
 
     // Инициализация каскадной формы (в #product-detail-meta, вне #product-tabs)
     forEachPlanCascadeForm(function (formContainer) {
-      if (formContainer._cascadeFormManager) return;
-      if (typeof PlanCascadeFormManager !== "undefined") {
-        formContainer._cascadeFormManager = new PlanCascadeFormManager(formContainer);
-      }
+      ensurePlanCascadeManager(formContainer);
     });
 
     root.addEventListener(
@@ -1817,53 +1901,111 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
       return raw.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
     }
 
-    function appendPlanFieldsToPayload(payload, planWrap) {
-      if (!planWrap) return true;
+    function ensurePlanCascadeManager(formContainer) {
+      if (!formContainer) return null;
+      if (formContainer._cascadeFormManager) return formContainer._cascadeFormManager;
+      var Ctor = typeof PlanCascadeFormManager !== "undefined"
+        ? PlanCascadeFormManager
+        : (typeof window !== "undefined" ? window.PlanCascadeFormManager : null);
+      if (!Ctor) return null;
+      formContainer._cascadeFormManager = new Ctor(formContainer);
+      return formContainer._cascadeFormManager;
+    }
 
-      // Проверить наличие каскадной формы
-      var cascadeFormContainer = planWrap.querySelector("[data-plan-cascade-form]");
-      if (cascadeFormContainer && cascadeFormContainer._cascadeFormManager) {
-        var cascadeManager = cascadeFormContainer._cascadeFormManager;
-        cascadeManager.syncStateFromDOM();
-        var validation = cascadeManager.validateForm();
-        if (validation.valid) {
-          var formData = cascadeManager.getFormPayload();
-          payload.append("sync_plan_from_inline", "1");
-          payload.append("product_type", formData.product_type || "");
-          payload.append("plan_product_type", formData.product_type || "");
-          payload.append("workpiece_type", formData.workpiece_type || "");
-          payload.append("laser_thickness", formData.laser_thickness || "");
-          payload.append("laser_sheet_thickness_mm", formData.laser_thickness || "");
-          payload.append("material", formData.material || "");
-          payload.append("plan_material", formData.material || "");
-          payload.append("workpiece_size", formData.workpiece_size || "");
-          payload.append("workpiece_type_enum", formData.workpiece_type_enum || "");
-        }
-        /* Наладку сохраняем всегда; план — только если поля плана валидны. */
-        return true;
+    function collectPlanCascadeFormData(planWrap) {
+      if (!planWrap) return null;
+      var container = planWrap.querySelector("[data-plan-cascade-form]");
+      if (!container) return null;
+
+      var mgr = ensurePlanCascadeManager(container);
+      if (mgr) {
+        mgr.syncStateFromDOM();
+        return mgr.getFormPayload();
       }
 
-      // Fallback на старый способ для совместимости
-      var planTypeEl = planWrap ? planWrap.querySelector(".js-plan-inline-product-type") : null;
-      if (!planWrap || !planTypeEl) return true;
-      var ptype = (planTypeEl.value || "made").trim();
-      var wpSel = planWrap.querySelector(".js-plan-inline-workpiece");
-      var wpVal = wpSel ? (wpSel.value || "").trim() : "";
-      /* Без типа заготовки для «Изделие» сервер отклонит sync_plan; сохраняем только наладку, план не трогаем. */
-      if (ptype === "made" && !wpVal) {
-        return true;
+      function fieldVal(name) {
+        var el = container.querySelector('[data-field="' + name + '"]');
+        return el && el.value != null ? String(el.value).trim() : "";
       }
-      payload.append("sync_plan_from_inline", "1");
-      payload.append("plan_product_type", ptype);
-      payload.append("workpiece_type", wpVal);
-      var thickIn = planWrap.querySelector(".js-plan-inline-laser-thick");
-      payload.append("laser_sheet_thickness_mm", thickIn ? (thickIn.value || "").trim() : "");
-      var matIn = planWrap.querySelector(".js-plan-inline-material");
-      var matVal = matIn ? (matIn.value || "").trim() : "";
-      payload.append("plan_material", matVal);
-      payload.append("made_material", matVal);
-      payload.append("laser_material_marking", matVal);
+      return {
+        product_type: fieldVal("product_type"),
+        workpiece_type: fieldVal("workpiece_type"),
+        laser_thickness: fieldVal("laser_thickness"),
+        material: fieldVal("material"),
+        workpiece_size: fieldVal("workpiece_size"),
+        workpiece_type_enum: fieldVal("workpiece_type_enum"),
+      };
+    }
+
+    function appendPlanFieldsToFormData(payload, formData) {
+      if (!formData || !formData.product_type) return false;
+      payload.append("product_type", formData.product_type || "");
+      payload.append("plan_product_type", formData.product_type || "");
+      payload.append("workpiece_type", formData.workpiece_type || "");
+      payload.append("laser_thickness", formData.laser_thickness || "");
+      payload.append("laser_sheet_thickness_mm", formData.laser_thickness || "");
+      payload.append("material", formData.material || "");
+      payload.append("plan_material", formData.material || "");
+      payload.append("made_material", formData.material || "");
+      payload.append("laser_material_marking", formData.material || "");
+      payload.append("workpiece_size", formData.workpiece_size || "");
+      payload.append("workpiece_type_enum", formData.workpiece_type_enum || "");
       return true;
+    }
+
+    function appendPlanFieldsToPayload(payload, planWrap) {
+      var formData = collectPlanCascadeFormData(planWrap);
+      if (!formData || !formData.product_type) return true;
+      if (appendPlanFieldsToFormData(payload, formData)) {
+        payload.append("sync_plan_from_inline", "1");
+      }
+      return true;
+    }
+
+    async function saveProductPlanCascadeOnly() {
+      var planWrap = productDetailPlanWrap();
+      var formData = collectPlanCascadeFormData(planWrap);
+      if (!formData || !formData.product_type) {
+        return { ok: true, skipped: true };
+      }
+      var container = planWrap && planWrap.querySelector("[data-plan-cascade-form]");
+      var mgr = container ? ensurePlanCascadeManager(container) : null;
+      if (mgr) {
+        var check = mgr.validateForm();
+        if (!check.valid) {
+          var clientErr =
+            (check.errors && check.errors.length)
+              ? check.errors.join("\n")
+              : "Заполните все поля плана в блоке слева (тип изделия, вид заготовки, материал и т.д.).";
+          showProductSaveNotice({
+            type: "error",
+            title: "План не сохранён",
+            message: clientErr,
+            focusPlan: true,
+          });
+          return { ok: false, skipped: false, error: clientErr };
+        }
+      }
+      var fd = new FormData();
+      fd.append("action", "inline_save_product_plan");
+      var csrf = getCookie("csrftoken");
+      if (csrf) fd.append("csrfmiddlewaretoken", csrf);
+      if (!appendPlanFieldsToFormData(fd, formData)) {
+        return { ok: true, skipped: true };
+      }
+      var res = await fetch(window.location.href, {
+        method: "POST",
+        body: fd,
+        headers: {
+          "X-CSRFToken": getCookie("csrftoken"),
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        credentials: "same-origin",
+      });
+      return readJsonInlineSaveResponse(res, {
+        focusPlan: true,
+        errorTitle: "План не сохранён",
+      });
     }
 
     function fillBindingSpecBoxFromData(box, blk) {
@@ -2105,36 +2247,55 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
       return payload;
     }
 
-    async function readJsonInlineSaveResponse(res) {
+    async function readJsonInlineSaveResponse(res, opts) {
+      opts = opts || {};
       var ct = (res.headers.get("content-type") || "").toLowerCase();
       if (ct.indexOf("application/json") === -1) {
         var snippet = "";
         try {
           snippet = (await res.text()).replace(/\s+/g, " ").trim().slice(0, 160);
         } catch (_) {}
-        alert(
-          "Сервер вернул не JSON (HTTP " +
+        showProductSaveNotice({
+          type: "error",
+          title: opts.errorTitle || "Ошибка сохранения",
+          message:
+            "Сервер вернул не JSON (HTTP " +
             res.status +
-            "). Обычно это редирект из‑за прав, истекшей сессии или ошибка на сервере — обновите страницу и войдите снова." +
-            (snippet ? "\n\nФрагмент ответа:\n" + snippet : "")
-        );
+            "). Обновите страницу или войдите снова." +
+            (snippet ? " " + snippet : ""),
+          focusPlan: !!opts.focusPlan,
+        });
         return null;
       }
       var data = null;
       try {
         data = await res.json();
       } catch (e) {
-        alert("Не удалось разобрать JSON в ответе сервера. Обновите страницу.");
+        showProductSaveNotice({
+          type: "error",
+          title: opts.errorTitle || "Ошибка сохранения",
+          message: "Не удалось разобрать ответ сервера. Обновите страницу.",
+          focusPlan: !!opts.focusPlan,
+        });
         return null;
       }
       if (!res.ok || !data || !data.ok) {
-        alert((data && data.error) || "Не удалось сохранить (HTTP " + res.status + ").");
+        var errText = (data && data.error) || "Не удалось сохранить (HTTP " + res.status + ").";
+        showProductSaveNotice({
+          type: "error",
+          title: opts.errorTitle || "Ошибка сохранения",
+          message: errText,
+          focusPlan: !!opts.focusPlan || !!(data && data.error),
+        });
         return null;
       }
       if (data.plan_sync_error) {
-        alert(
-          "Наладка сохранена, но план не обновлён:\n" + data.plan_sync_error
-        );
+        showProductSaveNotice({
+          type: "warn",
+          title: "Наладка сохранена, план — нет",
+          message: data.plan_sync_error,
+          focusPlan: true,
+        });
       }
       return data;
     }
@@ -2200,6 +2361,20 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
         alert("Не найден CSRF-токен в cookies (csrftoken). Обновите страницу или проверьте настройки браузера для этого сайта.");
         return;
       }
+      var planSave = await saveProductPlanCascadeOnly();
+      if (planSave && !planSave.skipped && !planSave.ok) {
+        return;
+      }
+      if (planSave && planSave.ok && !planSave.skipped) {
+        clearPlanSaveBanner();
+        showProductSaveNotice({
+          type: "success",
+          title: "План сохранён",
+          message: "Производственная позиция (тип, заготовка, материал) записана.",
+        });
+        if (planSave.plan_summary) syncProductPlanSummaryBlocks(planSave.plan_summary);
+        if (planSave.plan_inline_state) applyPlanInlineStateToQuickEdits(planSave.plan_inline_state);
+      }
       var currentTab = getCurrentTabName();
       if (currentTab === "drawing") {
         var ids = getInlineSetupIds();
@@ -2214,7 +2389,7 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
           var panelSetup = root.querySelector("#panel-setup-" + sid);
           var payload = buildInlineSetupPayload(sid, panelSetup, {
             productMeta: i === 0,
-            planSync: i === 0,
+            planSync: false,
           });
           if (!payload) return;
           var res = await fetch(window.location.href, {
@@ -2240,6 +2415,11 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
         }
         if (planSummaryOut) syncProductPlanSummaryBlocks(planSummaryOut);
         if (planInlineOut) applyPlanInlineStateToQuickEdits(planInlineOut);
+        showProductSaveNotice({
+          type: "success",
+          title: "Сохранено",
+          message: "Изменения наладки и изделия записаны.",
+        });
         exitInlineEditAfterSave();
         return;
       }
@@ -2259,7 +2439,7 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
       var setupTab = root.querySelector('.product-tab[data-tab="' + tabSlug + '"]');
       var payloadOne = buildInlineSetupPayload(sidOne, panel, {
         productMeta: true,
-        planSync: true,
+        planSync: false,
       });
       if (!payloadOne) return;
       var resOne = await fetch(window.location.href, {
@@ -2281,6 +2461,11 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
       }
       if (dataOne.plan_summary) syncProductPlanSummaryBlocks(dataOne.plan_summary);
       if (dataOne.plan_inline_state) applyPlanInlineStateToQuickEdits(dataOne.plan_inline_state);
+      showProductSaveNotice({
+        type: "success",
+        title: "Сохранено",
+        message: "Изменения установки записаны.",
+      });
       exitInlineEditAfterSave();
       } catch (e) {
         console.error(e);

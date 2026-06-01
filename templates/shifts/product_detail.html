@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=27">
+<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=29">
 <div class="product-detail-grid{% if tab_default == 'drawing' %} has-meta-column{% endif %}"{% if setups %} data-product-has-setups="1"{% endif %}>
   <div class="product-detail-main">
 
@@ -454,7 +454,7 @@
   "tool_type_choices": [{% for v, lbl in tool_type_choices %}{"value":"{{ v|escapejs }}","label":"{{ lbl|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
 }</script>
 <script src="{% static 'shifts/js/plan-cascade-form.js' %}" defer></script>
-<script src="{% static 'shifts/js/product_detail.js' %}?v=24" defer></script>
+<script src="{% static 'shifts/js/product_detail.js' %}?v=27" defer></script>
 
 {% if cad_inline_preview or has_setup_preview_stl %}
 <script type="importmap">
