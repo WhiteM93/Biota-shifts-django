@@ -290,27 +290,46 @@ def _register_user(
     return True, ""
 
 
-def _approve_registration(username: str) -> tuple[bool, str]:
-    """Подтверждение регистрации в ЛК админа: можно входить в приложение."""
+def _store_key_for_username(username: str, store: dict[str, dict] | None = None) -> str | None:
     u = (username or "").strip()
     if not u:
-        return False, "Пустой логин"
+        return None
+    data = store if store is not None else _load_users_store()
+    if u in data:
+        return u
+    ul = u.lower()
+    for k in data:
+        if str(k).strip().lower() == ul:
+            return str(k)
+    return None
+
+
+def _approve_registration(username: str) -> tuple[bool, str]:
+    """Подтверждение регистрации в ЛК админа: можно входить в приложение."""
     store = _load_users_store()
-    key = None
-    if u in store:
-        key = u
-    else:
-        ul = u.lower()
-        for k in store:
-            if str(k).strip().lower() == ul:
-                key = str(k)
-                break
+    key = _store_key_for_username(username, store)
     if not key:
         return False, "Пользователь не найден"
     rec = store[key]
     rec["approved"] = True
     rec["approved_at"] = datetime.now(MSK).strftime("%Y-%m-%d %H:%M")
     store[key] = rec
+    _save_users_store(store)
+    return True, ""
+
+
+def _delete_registered_user(username: str) -> tuple[bool, str]:
+    """Удаление учётной записи из .biota_users.json (только не admin)."""
+    u = (username or "").strip()
+    if not u:
+        return False, "Пустой логин"
+    if _is_admin(u):
+        return False, "Учётную запись администратора удалить нельзя"
+    store = _load_users_store()
+    key = _store_key_for_username(u, store)
+    if not key:
+        return False, "Пользователь не найден"
+    del store[key]
     _save_users_store(store)
     return True, ""
 

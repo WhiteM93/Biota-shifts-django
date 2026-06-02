@@ -96,12 +96,21 @@
             <span class="pending-reg-badge pending-reg-badge--ok">email подтверждён</span>
             {% endif %}
           </span>
-          <form method="post" action="" class="pending-reg-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="admin_approve_registration">
-            <input type="hidden" name="approve_login" value="{{ item.login }}">
-            <button type="submit" class="btn">Подтвердить</button>
-          </form>
+          <div class="pending-reg-actions">
+            <form method="post" action="" class="pending-reg-form">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="admin_approve_registration">
+              <input type="hidden" name="approve_login" value="{{ item.login }}">
+              <button type="submit" class="btn">Подтвердить</button>
+            </form>
+            <form method="post" action="" class="pending-reg-form"
+                  onsubmit="return confirm('Удалить учётную запись «{{ item.login }}»? Восстановить будет нельзя.');">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="admin_delete_user">
+              <input type="hidden" name="delete_login" value="{{ item.login }}">
+              <button type="submit" class="btn btn-danger">Удалить</button>
+            </form>
+          </div>
         </li>
         {% endfor %}
       </ul>
@@ -282,6 +291,16 @@
           <button type="submit" class="btn">Сохранить права</button>
         </div>
       </form>
+
+      {% if priv_selected %}
+      <form method="post" action="" class="cab-delete-user"
+            onsubmit="return confirm('Удалить учётную запись «{{ priv_selected }}»? Восстановить будет нельзя.');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="admin_delete_user">
+        <input type="hidden" name="delete_login" value="{{ priv_selected }}">
+        <button type="submit" class="btn btn-danger">Удалить учётную запись</button>
+      </form>
+      {% endif %}
       {% endif %}
     </div>
   </section>

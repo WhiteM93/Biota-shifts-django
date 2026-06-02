@@ -330,8 +330,31 @@ a.cabinet-quick-card:hover {
   color: var(--bio-emp-code-fg);
 }
 
+.pending-reg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .pending-reg-form {
   margin: 0;
+}
+
+.cab-delete-user {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--bio-surface-item-border);
+}
+
+.btn-danger {
+  color: #fff;
+  background: #b91c1c;
+  border-color: #991b1b;
+}
+
+.btn-danger:hover {
+  background: #991b1b;
 }
 
 .pending-reg-empty {
