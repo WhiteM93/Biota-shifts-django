@@ -186,9 +186,7 @@ def send_verification_email(username: str, request=None) -> tuple[bool, str, str
     if settings.DEBUG or email_uses_console_backend():
         logger.info("Email verification link for %s: %s", login, link)
 
-    show_link = settings.DEBUG or email_uses_console_backend()
-    debug_link = link if show_link else ""
-    return True, "", debug_link
+    return True, "", ""
 
 
 def send_verification_by_email_address(email: str, request=None) -> tuple[bool, str]:

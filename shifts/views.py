@@ -144,14 +144,11 @@ def register_view(request):
         else:
             ok, msg = _register_user(username, p1, email=email, require_email=True)
             if ok:
-                sent_ok, send_err, debug_link = send_verification_email(username, request=request)
+                sent_ok, send_err, _debug_link = send_verification_email(username, request=request)
                 request.session["register_pending_user"] = username
                 request.session["register_email_sent"] = sent_ok
                 request.session["register_email_error"] = "" if sent_ok else send_err
-                if debug_link:
-                    request.session["register_verify_debug_link"] = debug_link
-                else:
-                    request.session.pop("register_verify_debug_link", None)
+                request.session.pop("register_verify_debug_link", None)
                 return redirect("register_pending")
             err = msg
     return render(
@@ -166,7 +163,7 @@ def register_pending_view(request):
     username = (request.session.pop("register_pending_user", None) or "").strip()
     email_sent = request.session.pop("register_email_sent", False)
     email_error = (request.session.pop("register_email_error", None) or "").strip()
-    debug_link = (request.session.pop("register_verify_debug_link", None) or "").strip()
+    request.session.pop("register_verify_debug_link", None)
     if not username:
         return redirect("login")
     rec = _resolve_registered_user(username)
@@ -181,7 +178,6 @@ def register_pending_view(request):
             "pending_email": email_display,
             "email_sent": email_sent,
             "email_error": email_error,
-            "debug_verify_link": debug_link,
             "email_console_only": email_uses_console_backend(),
         },
     )

@@ -23,8 +23,8 @@
   <section class="auth-glass-card">
     {% if email_sent and email_console_only %}
     <p class="auth-hint">
-      <strong>Реальная почта не настроена.</strong> Письмо не попадёт во входящие — ссылка для подтверждения ниже
-      (и в журнале сервера: консоль <code>runserver</code> или лог gunicorn).
+      <strong>Реальная почта не настроена.</strong> Письмо не попадёт во входящие — текст письма только в журнале сервера
+      (<code>runserver</code> или лог gunicorn).
     </p>
     {% elif email_sent %}
     <p class="auth-hint">
@@ -43,13 +43,6 @@
       <li>Дождитесь одобрения учётной записи администратором в личном кабинете.</li>
       <li>Войдите по логину и паролю.</li>
     </ol>
-
-    {% if debug_verify_link %}
-    <p class="auth-debug-link">
-      <span class="muted">Ссылка подтверждения (если письмо не пришло):</span><br>
-      <a href="{{ debug_verify_link }}">{{ debug_verify_link }}</a>
-    </p>
-    {% endif %}
 
     <p class="auth-footer">
       <a href="{% url 'login' %}">К странице входа</a>
