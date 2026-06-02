@@ -21,10 +21,15 @@
   </header>
 
   <section class="auth-glass-card">
-    {% if email_sent %}
+    {% if email_sent and email_console_only %}
+    <p class="auth-hint">
+      <strong>Реальная почта не настроена.</strong> Письмо не попадёт во входящие — ссылка для подтверждения ниже
+      (и в журнале сервера: консоль <code>runserver</code> или лог gunicorn).
+    </p>
+    {% elif email_sent %}
     <p class="auth-hint">
       На адрес <strong>{{ pending_email }}</strong> отправлено письмо со ссылкой для подтверждения email.
-      Ссылка действует 48 часов.
+      Ссылка действует 48 часов. Проверьте папку «Спам».
     </p>
     {% else %}
     <p class="auth-alert" role="alert">
@@ -41,7 +46,7 @@
 
     {% if debug_verify_link %}
     <p class="auth-debug-link">
-      <span class="muted">Режим разработки — ссылка подтверждения:</span><br>
+      <span class="muted">Ссылка подтверждения (если письмо не пришло):</span><br>
       <a href="{{ debug_verify_link }}">{{ debug_verify_link }}</a>
     </p>
     {% endif %}

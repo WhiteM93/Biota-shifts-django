@@ -26,6 +26,7 @@ from biota_shifts.schedule import employee_label_row
 
 from .auth_utils import biota_login_required, biota_user, post_login_redirect, write_permission_required
 from .email_verification import (
+    email_uses_console_backend,
     login_block_reason,
     send_verification_by_email_address,
     send_verification_email,
@@ -147,7 +148,7 @@ def register_view(request):
                 request.session["register_pending_user"] = username
                 request.session["register_email_sent"] = sent_ok
                 request.session["register_email_error"] = "" if sent_ok else send_err
-                if settings.DEBUG and debug_link:
+                if debug_link:
                     request.session["register_verify_debug_link"] = debug_link
                 else:
                     request.session.pop("register_verify_debug_link", None)
@@ -160,7 +161,6 @@ def register_view(request):
     )
 
 
-@require_http_methods(["GET", "HEAD", "POST"])
 @require_http_methods(["GET", "HEAD"])
 def register_pending_view(request):
     username = (request.session.pop("register_pending_user", None) or "").strip()
@@ -181,7 +181,8 @@ def register_pending_view(request):
             "pending_email": email_display,
             "email_sent": email_sent,
             "email_error": email_error,
-            "debug_verify_link": debug_link if settings.DEBUG else "",
+            "debug_verify_link": debug_link,
+            "email_console_only": email_uses_console_backend(),
         },
     )
 

@@ -24,6 +24,12 @@ from biota_shifts.constants import MSK
 logger = logging.getLogger(__name__)
 
 VERIFY_TOKEN_TTL_HOURS = 48
+
+
+def email_uses_console_backend() -> bool:
+    """True — письма не уходят в интернет, только в лог/консоль Django."""
+    backend = (getattr(settings, "EMAIL_BACKEND", "") or "").lower()
+    return "console" in backend
 RESEND_COOLDOWN_MINUTES = 2
 
 
@@ -177,10 +183,11 @@ def send_verification_email(username: str, request=None) -> tuple[bool, str, str
         logger.exception("verify email send failed for %s", login)
         return False, f"Не удалось отправить письмо: {exc}", ""
 
-    if settings.DEBUG:
+    if settings.DEBUG or email_uses_console_backend():
         logger.info("Email verification link for %s: %s", login, link)
 
-    debug_link = link if settings.DEBUG else ""
+    show_link = settings.DEBUG or email_uses_console_backend()
+    debug_link = link if show_link else ""
     return True, "", debug_link
 
 
