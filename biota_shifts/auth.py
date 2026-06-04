@@ -657,13 +657,15 @@ def employees_df_for_nav(username: str | None, nav_key: str, employees_df: pd.Da
     """Список сотрудников для раздела: nav_dep_filters по разделу; для «Сотрудники» при access_scope «none» не обнуляем список до фильтра отделов из кабинета Django."""
     if employees_df is None or getattr(employees_df, "empty", True):
         return employees_df
+    nk = (nav_key or "").strip()
+    if nk == "graph":
+        return employees_df
     u = (username or "").strip()
     if not u or _is_admin(u):
         return employees_df
     rec = _resolve_registered_user(u)
     if rec is None:
         return employees_df.iloc[0:0].copy()
-    nk = (nav_key or "").strip()
     if nk in ("products", "machines"):
         return employees_df
     base = employees_df
@@ -691,10 +693,6 @@ def employees_df_for_nav(username: str | None, nav_key: str, employees_df: pd.Da
 
 def _access_scope_description(rec: dict) -> str:
     scope = _user_access_scope_value(rec)
-    nd = _nav_department_filters_map(rec or {})
-    if nd:
-        keys = ", ".join(NAV_LABELS_RU.get(k, k) for k in sorted(nd.keys()))
-        return f"Фильтр по отделам настроен для разделов: {keys}"
     if scope in ("none", ""):
         return "Нет доступа к данным — администратор ещё не назначил права"
     if scope == "department":

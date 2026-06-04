@@ -217,8 +217,6 @@ def graph_view(request):
     if request.method == "GET":
         from .graph_device import (
             apply_desktop_graph_query_redirect,
-            is_mobile_user_agent,
-            prefers_desktop_graph,
             prefers_mobile_graph,
             redirect_to_mobile_graph,
         )
@@ -229,9 +227,6 @@ def graph_view(request):
         desk_redirect = apply_desktop_graph_query_redirect(request)
         if desk_redirect is not None:
             return desk_redirect
-
-        if is_mobile_user_agent(request) and not prefers_desktop_graph(request):
-            return redirect_to_mobile_graph(request)
 
     now = datetime.now()
     default_y, default_m = now.year, now.month
@@ -261,6 +256,14 @@ def graph_view(request):
     if request.method == "POST":
         action = (request.POST.get("action") or "save").strip().lower()
         y, m = _parse_year_month(request, default_year=default_y, default_month=default_m)
+        post_dep_mode = (request.POST.get("dep_mode") or "all").strip()
+        post_pos_mode = (request.POST.get("pos_mode") or "all").strip()
+        if action in ("save", "upload") and (post_dep_mode != "all" or post_pos_mode != "all"):
+            messages.error(
+                request,
+                "Редактирование и загрузка доступны только при фильтрах «Все» (отделы и должности).",
+            )
+            return redirect(f"/graph/?year={y}&month={m}")
 
         if action == "upload":
             upl = request.FILES.get("schedule_file")
@@ -412,6 +415,7 @@ def graph_view(request):
             "all_positions": all_positions,
             "sel_positions": selected_positions,
             "pos_mode_pick": pos_mode != "all",
+            "graph_edit_allowed": dep_mode == "all" and pos_mode == "all",
             "day_headers": day_headers,
             "non_working_days": non_working_days,
             "table_rows": table_rows,

@@ -487,6 +487,31 @@ a.cabinet-quick-card:hover {
   color: var(--bio-muted);
 }
 
+.cab-priv-nav-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px 16px;
+  margin-bottom: 16px;
+}
+
+.cab-priv-nav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--bio-filter-border);
+  background: var(--bio-surface-item);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.cab-priv-nav-item input {
+  width: auto;
+  margin: 0;
+}
+
 .cab-nav-block {
   margin: 0 0 12px;
   padding: 12px 14px;

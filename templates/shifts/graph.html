@@ -96,7 +96,7 @@
 </div>
 
 <div class="graph-body">
-{% if biota_can_edit %}
+{% if biota_can_edit and graph_edit_allowed %}
 <aside class="graph-side-toolbar" id="graph-side-toolbar" aria-label="Редактирование графика">
   <button type="button" class="btn btn-edit-unlock graph-side-toolbar__edit" id="graph-edit-toggle" aria-label="Режим редактирования" title="Режим редактирования">🔒</button>
   <div class="graph-code-palette" id="graph-code-palette" aria-label="Код для ячеек" hidden>
@@ -115,7 +115,8 @@
 <div class="schedule-wrap">
 <form method="post" action="" id="graph-save-form" class="graph-form--readonly"
   data-dep-mode="{% if dep_mode_pick %}pick{% else %}all{% endif %}"
-  data-pos-mode="{% if pos_mode_pick %}pick{% else %}all{% endif %}">
+  data-pos-mode="{% if pos_mode_pick %}pick{% else %}all{% endif %}"
+  data-graph-edit-allowed="{% if graph_edit_allowed %}1{% else %}0{% endif %}">
   {% csrf_token %}
   <input type="hidden" name="action" value="save">
   <input type="hidden" name="year" value="{{ year }}">
@@ -172,7 +173,7 @@
     </tbody>
   </table>
 </form>
-<p id="graph-save-status" class="muted graph-save-status">{% if biota_can_edit %}График только для просмотра.{% else %}Режим исполнителя: только просмотр и скачивание.{% endif %}</p>
+<p id="graph-save-status" class="muted graph-save-status">{% if not biota_can_edit %}Режим исполнителя: только просмотр и скачивание.{% elif not graph_edit_allowed %}Редактирование доступно только при фильтрах «Все» (отделы и должности).{% else %}График только для просмотра.{% endif %}</p>
 </div>
 </div>
 </div>
@@ -241,7 +242,33 @@
       markDirty(input);
     }
     var canEdit = document.body && document.body.getAttribute("data-biota-can-edit") === "1";
+    var graphEditAllowed = form.getAttribute("data-graph-edit-allowed") === "1";
+    var filterDepModeInput = document.getElementById("fp-dep-mode-val");
+    var filterPosModeInput = document.getElementById("fp-pos-mode-val");
     var editing = false;
+
+    function filtersAllSelected() {
+      var depMode = (filterDepModeInput && filterDepModeInput.value) || form.getAttribute("data-dep-mode") || "all";
+      var posMode = (filterPosModeInput && filterPosModeInput.value) || form.getAttribute("data-pos-mode") || "all";
+      return depMode === "all" && posMode === "all";
+    }
+
+    function syncSaveFormFilterMeta() {
+      if (!filterDepModeInput || !filterPosModeInput) return;
+      var depAll = filterDepModeInput.value === "all";
+      var posAll = filterPosModeInput.value === "all";
+      form.setAttribute("data-dep-mode", depAll ? "all" : "pick");
+      form.setAttribute("data-pos-mode", posAll ? "all" : "pick");
+      graphEditAllowed = depAll && posAll;
+      form.setAttribute("data-graph-edit-allowed", graphEditAllowed ? "1" : "0");
+      if (hiddenDepMode) hiddenDepMode.value = filterDepModeInput.value;
+      if (hiddenPosMode) hiddenPosMode.value = filterPosModeInput.value;
+      if (!graphEditAllowed && editing) {
+        exitEditWithSave();
+      } else {
+        applyGraphEditingState();
+      }
+    }
     var editToggle = document.getElementById("graph-edit-toggle");
     var codePalette = document.getElementById("graph-code-palette");
     var brushOn = false;
@@ -378,7 +405,7 @@
       if (codePalette) {
         codePalette.hidden = !editing;
       }
-      if (!canEdit || !editing) {
+      if (!canEdit || !graphEditAllowed || !editing) {
         brushOn = false;
         brushVal = "";
       }
@@ -387,8 +414,12 @@
       if (statusEl) {
         if (canEdit && editing) {
           statusEl.textContent = "Режим редактирования. Нажмите ✏️ ещё раз — сохранить и выйти.";
+        } else if (!canEdit) {
+          statusEl.textContent = "Режим исполнителя: только просмотр и скачивание.";
+        } else if (!graphEditAllowed) {
+          statusEl.textContent = "Редактирование доступно только при фильтрах «Все» (отделы и должности).";
         } else {
-          statusEl.textContent = canEdit ? "График только для просмотра." : "Режим исполнителя: только просмотр и скачивание.";
+          statusEl.textContent = "График только для просмотра.";
         }
         statusEl.style.color = "";
       }
@@ -454,7 +485,7 @@
     }
 
     function flushSave() {
-      if (!canEdit || !editing) return;
+      if (!canEdit || !graphEditAllowed || !editing) return;
       if (saveTimer) {
         clearTimeout(saveTimer);
         saveTimer = null;
@@ -467,7 +498,7 @@
     }
 
     function performSave(done) {
-      if (!canEdit) {
+      if (!canEdit || !graphEditAllowed || !editing) {
         if (done) done(false);
         return;
       }
@@ -524,7 +555,7 @@
     }
 
     function saveNow() {
-      if (!canEdit || !editing) return;
+      if (!canEdit || !graphEditAllowed || !editing) return;
       performSave(null);
     }
 
@@ -556,7 +587,7 @@
     }
 
     function scheduleSave() {
-      if (!canEdit || !editing) return;
+      if (!canEdit || !graphEditAllowed || !editing) return;
       if (!filterSnapshot) captureFilterSnapshot();
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(saveNow, 600);
@@ -565,7 +596,7 @@
     form.querySelectorAll(".day-input").forEach(function (input) {
       input.addEventListener("mousedown", function (event) {
         if (event.button !== 0) return;
-        if (!canEdit || !editing) return;
+        if (!canEdit || !graphEditAllowed || !editing) return;
         if (isLockedInput(input)) return;
         event.preventDefault();
         if (!filterSnapshot) captureFilterSnapshot();
@@ -621,7 +652,7 @@
       if (!dragFill) return;
       var wasBrush = dragFill.isBrush;
       dragFill = null;
-      if (canEdit && editing) {
+      if (canEdit && graphEditAllowed && editing) {
         refreshShiftCounts();
         if (wasBrush) flushSave();
         else scheduleSave();
@@ -630,8 +661,9 @@
 
     applyGraphEditingState();
     if (editToggle) {
+      editToggle.disabled = !canEdit || !graphEditAllowed;
       editToggle.addEventListener("click", function () {
-        if (!canEdit) return;
+        if (!canEdit || !graphEditAllowed) return;
         if (editing) {
           exitEditWithSave();
           return;
@@ -645,7 +677,7 @@
     if (codePalette) {
       codePalette.querySelectorAll(".graph-code-btn").forEach(function (btn) {
         btn.addEventListener("click", function (e) {
-          if (!canEdit || !editing) return;
+          if (!canEdit || !graphEditAllowed || !editing) return;
           e.preventDefault();
           if (btn.hasAttribute("data-code")) {
             var selectedCode = btn.getAttribute("data-code") || "";
@@ -712,9 +744,14 @@
 
         function updateLabel() {
           var checked = cbs.filter(function (cb) { return cb.checked; });
-          if (checked.length === 0) {
+          var total = cbs.length;
+          var allChecked = total > 0 && checked.length === total;
+          if (allChecked) {
             txtEl.textContent = "Все";
             modeInput.value = "all";
+          } else if (checked.length === 0) {
+            txtEl.textContent = "Не выбрано";
+            modeInput.value = "pick";
           } else if (checked.length <= 2) {
             txtEl.textContent = checked.map(function (cb) { return cb.value; }).join(", ");
             modeInput.value = "pick";
@@ -754,23 +791,32 @@
           if (allBtn) allBtn.addEventListener("click", function (e) {
             e.stopPropagation();
             cbs.forEach(function (cb) { cb.checked = true; });
-            changed = true; updateLabel();
+            changed = true;
+            updateLabel();
           });
           if (noneBtn) noneBtn.addEventListener("click", function (e) {
             e.stopPropagation();
             cbs.forEach(function (cb) { cb.checked = false; });
-            changed = true; updateLabel();
+            changed = true;
+            updateLabel();
           });
         }
         document.addEventListener("click", function (e) {
           if (isOpen && !dd.contains(e.target)) closePanel(true);
         });
         document.addEventListener("keydown", function (e) { if (e.key === "Escape" && isOpen) closePanel(true); });
+        if (modeInput.value === "all" && cbs.length) {
+          cbs.forEach(function (cb) { cb.checked = true; });
+        }
         updateLabel();
       }
 
       initDropdown("fp-dd-dep", "fp-dep-mode-val", "fp-dep-txt");
       initDropdown("fp-dd-pos", "fp-pos-mode-val", "fp-pos-txt");
+      syncSaveFormFilterMeta();
+      if (filterForm) {
+        filterForm.addEventListener("change", syncSaveFormFilterMeta);
+      }
     })();
 
     // Если есть несохранённые правки — отправить через sendBeacon перед навигацией

@@ -185,7 +185,7 @@
   <section class="cabinet-section" id="cabinet-privileges">
     <div class="cabinet-section__head">
       <h2>Права пользователей</h2>
-      <p class="cabinet-section__lead">Новые аккаунты ждут подтверждения. Ниже — доступ к разделам меню и фильтр по отделам внутри раздела.</p>
+      <p class="cabinet-section__lead">Новые аккаунты ждут подтверждения. Ниже — доступ к разделам меню (галочка = раздел виден в навигации).</p>
     </div>
     <div class="cabinet-section__body">
       {% if not priv_users %}
@@ -218,50 +218,16 @@
           </label>
         </div>
 
-        <p class="cab-priv-hint">
-          Разделы меню: снимите галочку, чтобы скрыть раздел.
-          {% if dep_opts %}
-          Для каждого включённого раздела отметьте отделы — в разделе будут видны только они. Если ни одной галочки нет — сотрудников из этого раздела не будет видно.
-          {% else %}
-          Сейчас нет списка цехов из Biota — доступны только переключатели разделов.
-          {% endif %}
-        </p>
-        {% if not dep_opts %}
-        <p class="muted" style="margin-bottom:12px;">Нет цехов в справочнике — сетка отделов скрыта; при сохранении привязка к отделам не меняется.</p>
-        {% endif %}
+        <p class="cab-priv-hint">Снимите галочку у раздела, чтобы скрыть его в меню. В графике и других разделах по умолчанию видны все отделы и должности.</p>
 
+        <div class="cab-priv-nav-list">
         {% for row in priv_nav_rows %}
-        <div class="cab-nav-block">
-          <div class="cab-nav-head">
-            <label class="chk" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
-              <input type="checkbox" name="priv_nav" value="{{ row.key }}" {% if row.on %}checked{% endif %}>
-              <span><strong>{{ row.label }}</strong></span>
-            </label>
-            {% if dep_opts and row.key != "products" and row.key != "machines" %}
-            <span class="cab-nav-bulk">
-              <button type="button" class="btn js-cab-dep-all" data-nav-key="{{ row.key }}">Все</button>
-              <button type="button" class="btn js-cab-dep-none" data-nav-key="{{ row.key }}">Снять всё</button>
-            </span>
-            {% endif %}
-          </div>
-          <div class="cab-check-grid">
-            {% if row.key == "products" %}
-            <p class="muted" style="margin:4px 0 0;">Раздел «Наладки» не привязан к отделам.</p>
-            {% elif row.key == "machines" %}
-            <p class="muted" style="margin:4px 0 0;">Раздел «Станки» не привязан к отделам.</p>
-            {% elif dep_opts %}
-            {% for d in dep_opts %}
-            <label class="chk">
-              <input type="checkbox" name="priv_nav_dep__{{ row.key }}" value="{{ d }}" {% if d in row.dep_selected %}checked{% endif %}>
-              {{ d }}
-            </label>
-            {% endfor %}
-            {% else %}
-            <p class="muted" style="margin:4px 0 0;">Цеха из Biota не загружены — отметки отделов недоступны.</p>
-            {% endif %}
-          </div>
-        </div>
+        <label class="cab-priv-nav-item chk">
+          <input type="checkbox" name="priv_nav" value="{{ row.key }}" {% if row.on %}checked{% endif %}>
+          <span>{{ row.label }}</span>
+        </label>
         {% endfor %}
+        </div>
 
         <div class="cab-nav-block cab-extra-priv">
           <div class="cab-nav-head"><strong>Склад</strong></div>
@@ -379,24 +345,6 @@
       initOrderList("pos-order-list", "pos-order-text");
     })();
   </script>
-  <script>
-    (function () {
-      function deptBoxesInBlock(block) {
-        return block.querySelectorAll('input[type="checkbox"][name^="priv_nav_dep__"]');
-      }
-      document.addEventListener("click", function (event) {
-        var allBtn = event.target.closest(".js-cab-dep-all");
-        var noneBtn = event.target.closest(".js-cab-dep-none");
-        var btn = allBtn || noneBtn;
-        if (!btn) return;
-        var block = btn.closest(".cab-nav-block");
-        if (!block) return;
-        var on = Boolean(allBtn);
-        deptBoxesInBlock(block).forEach(function (cb) { cb.checked = on; });
-      });
-    })();
-  </script>
-
 {% else %}
 
   <header class="cabinet-hero">

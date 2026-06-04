@@ -6,7 +6,9 @@ from datetime import date, datetime
 import pandas as pd
 import psycopg
 
-from biota_shifts.config import _config_str, biota_db_env
+from biota_shifts.config import APP_DIR, _config_str, biota_db_env
+
+GRAPH_DEMO_EMPLOYEES_PATH = APP_DIR / "local" / "graph_demo_employees.json"
 
 
 def employee_active_where_suffix() -> str:
@@ -40,6 +42,12 @@ def _fallback_to_local_enabled() -> bool:
     """Разрешает локальный fallback при недоступности BIOTA_DB."""
     raw = (_config_str("BIOTA_DB_LOCAL_FALLBACK", "1") or "").strip().lower()
     return raw not in {"0", "false", "no", "off"}
+
+
+def _graph_demo_forced() -> bool:
+    """Справочник из local/graph_demo_employees.json (после create_graph_demo_local)."""
+    raw = (_config_str("BIOTA_GRAPH_DEMO") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
 
 
 def _demo_data_enabled() -> bool:
@@ -134,6 +142,23 @@ def _load_employees_uncached(db_key: tuple) -> pd.DataFrame:
 
 def _demo_employees() -> pd.DataFrame:
     """Демо-данные для локальной работы без BIOTA_DB."""
+    if GRAPH_DEMO_EMPLOYEES_PATH.is_file():
+        try:
+            import json
+
+            raw = json.loads(GRAPH_DEMO_EMPLOYEES_PATH.read_text(encoding="utf-8"))
+            if isinstance(raw, list) and raw:
+                cols = [
+                    "emp_code",
+                    "last_name",
+                    "first_name",
+                    "department_name",
+                    "position_name",
+                    "area_name",
+                ]
+                return pd.DataFrame(raw, columns=cols)
+        except Exception as exc:
+            _log.warning("graph demo employees file ignored: %s", exc)
     rows = [
         ("1001", "Иванов",    "Иван",     "Механический цех", "Токарь 5р.",       "Участок А"),
         ("1002", "Петров",    "Пётр",     "Механический цех", "Фрезеровщик 4р.",  "Участок А"),
@@ -153,6 +178,8 @@ def _demo_employees() -> pd.DataFrame:
 
 
 def load_employees(cfg: dict) -> pd.DataFrame:
+    if _graph_demo_forced() and GRAPH_DEMO_EMPLOYEES_PATH.is_file():
+        return _demo_employees()
     try:
         return _load_employees_uncached(_db_cache_key(cfg))
     except Exception as exc:
