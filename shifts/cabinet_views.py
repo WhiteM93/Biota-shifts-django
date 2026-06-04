@@ -17,7 +17,9 @@ from biota_shifts.auth import (
     USER_ROLE_CHOICES,
     USER_ROLE_EXECUTOR,
     USER_ROLE_MANAGER,
+    NAV_KEYS_NO_DEPT_FILTER,
     _access_scope_description,
+    _nav_department_filters_map,
     _approve_registration,
     _change_password_registered,
     _delete_registered_user,
@@ -78,7 +80,19 @@ def cabinet_view(request):
                 target_role = (request.POST.get("priv_role") or USER_ROLE_MANAGER).strip()
                 sel_nav = request.POST.getlist("priv_nav")
                 nav_map = {k: (k in sel_nav) for k in NAV_KEYS}
-                nav_dep_filters: dict[str, list[str]] = {}
+                dep_opts = sorted(employees_full["department_name"].unique().tolist()) if not employees_full.empty else []
+                allowed_dep_set = set(dep_opts)
+                if dep_opts:
+                    nav_dep_filters: dict[str, list[str]] = {}
+                    for k in NAV_KEYS:
+                        if not nav_map.get(k, True):
+                            continue
+                        if k in ("products", "machines") or k in NAV_KEYS_NO_DEPT_FILTER:
+                            continue
+                        picked = [d for d in request.POST.getlist(f"priv_nav_dep__{k}") if d in allowed_dep_set]
+                        nav_dep_filters[k] = picked
+                else:
+                    nav_dep_filters = None
                 store_before = _load_users_store()
                 old_inv = bool((store_before.get(target) or {}).get("inventory_stock_manage"))
                 inv_flag = (request.POST.get("priv_inventory_stock_manage") or "0").strip() == "1"
@@ -222,17 +236,25 @@ def cabinet_view(request):
             USER_ROLE_EXECUTOR: "Исполнитель (только просмотр/скачивание)",
         }
         ctx["priv_nav"] = _pn
+        _ndf = _nav_department_filters_map(pr) if ctx["priv_selected"] else {}
+        raw_ndf = pr.get("nav_dep_filters") if isinstance(pr.get("nav_dep_filters"), dict) else {}
         ctx["priv_stock_manage"] = bool(pr.get("inventory_stock_manage"))
         ctx["priv_machines_quick_edit"] = bool(pr.get("machines_quick_edit"))
-        ctx["priv_nav_rows"] = [
-            {
-                "key": k,
-                "label": NAV_LABELS_RU.get(k, k),
-                "on": _pn.get(k, True),
-                "locked": False,
-            }
-            for k in NAV_KEYS
-        ]
+        ctx["priv_nav_rows"] = []
+        for k in NAV_KEYS:
+            sel_deps = [d for d in (_ndf.get(k) or []) if d in dep_opts]
+            if ctx["priv_selected"] and k == "payroll" and k not in raw_ndf:
+                sel_deps = [d for d in (_ndf.get("defects") or []) if d in dep_opts]
+            ctx["priv_nav_rows"].append(
+                {
+                    "key": k,
+                    "label": NAV_LABELS_RU.get(k, k),
+                    "on": _pn.get(k, True),
+                    "locked": False,
+                    "dep_selected": sel_deps,
+                    "no_dept_filter": k in NAV_KEYS_NO_DEPT_FILTER,
+                }
+            )
     else:
         rec = _resolve_registered_user(user) or {}
         ctx["profile_login"] = user

@@ -501,6 +501,9 @@ def _filter_employees_for_user(full_df: pd.DataFrame, username: str) -> pd.DataF
 
 
 # Разделы меню Django (кроме личного кабинета): права в JSON users.*.nav
+# Разделы без привязки к отделам в кабинете (всегда полный справочник / фильтр на странице).
+NAV_KEYS_NO_DEPT_FILTER = ("graph", "regulations")
+
 NAV_KEYS = (
     "home",
     "graph",
@@ -658,7 +661,7 @@ def employees_df_for_nav(username: str | None, nav_key: str, employees_df: pd.Da
     if employees_df is None or getattr(employees_df, "empty", True):
         return employees_df
     nk = (nav_key or "").strip()
-    if nk == "graph":
+    if nk in NAV_KEYS_NO_DEPT_FILTER:
         return employees_df
     u = (username or "").strip()
     if not u or _is_admin(u):
@@ -693,6 +696,15 @@ def employees_df_for_nav(username: str | None, nav_key: str, employees_df: pd.Da
 
 def _access_scope_description(rec: dict) -> str:
     scope = _user_access_scope_value(rec)
+    nd = _nav_department_filters_map(rec or {})
+    if nd:
+        keys = ", ".join(
+            NAV_LABELS_RU.get(k, k)
+            for k in sorted(nd.keys())
+            if k not in NAV_KEYS_NO_DEPT_FILTER
+        )
+        if keys:
+            return f"Фильтр по отделам настроен для разделов: {keys}"
     if scope in ("none", ""):
         return "Нет доступа к данным — администратор ещё не назначил права"
     if scope == "department":
