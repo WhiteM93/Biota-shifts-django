@@ -78,7 +78,7 @@
         <section class="pr-panel pr-panel--cal">
           <div class="pr-panel__head">
             <h2 class="pr-panel__title">{{ month_name }} — табель</h2>
-            <p class="pr-panel__hint">д/н — график · Д/Н — часы к оплате · Таб. — часы в табеле</p>
+            <p class="pr-panel__hint">Число — день · метка — как в графике · Таб. — часы · итоги Дн/Нч — внизу календаря</p>
           </div>
           <div class="pr-panel__body">
             {% include "shifts/_payroll_month_calendar.html" with payroll_day_editable=True calendar_weeks=calendar_weeks advance_last_day=advance_last_day %}
@@ -88,27 +88,20 @@
 
       <div class="pr-rail">
         {% include "shifts/_payroll_summary_panel.html" with payroll_summary_static=False %}
-
+        <div class="pr-rail__aside-scroll">
       <aside class="pr-aside" aria-label="Параметры расчёта">
         <details class="pr-section" open>
-          <summary>Параметры расчёта</summary>
-          <div class="pr-section__inner">
+          <summary>Параметры</summary>
+          <div class="pr-section__inner pr-section__inner--params">
+            <label class="pr-input-row pr-input-row--compact pr-input-row--advance">
+              <span class="pr-input-row__label">Аванс ₽</span>
+              <input type="text" name="advance_rub" inputmode="decimal" value="{{ settlement.advance_rub }}" class="payroll-live-field pr-input-row__control" id="payroll-advance-rub-input" autocomplete="off">
+            </label>
             {% include "shifts/_payroll_side_params.html" %}
           </div>
         </details>
-
-        <details class="pr-section" open>
-          <summary>Аванс</summary>
-          <div class="pr-section__inner pr-section__inner--tight">
-            <label class="pr-input-row">
-              <span class="pr-input-row__label">Аванс, ₽</span>
-              <input type="text" name="advance_rub" inputmode="decimal" value="{{ settlement.advance_rub }}" class="payroll-live-field pr-input-row__control" id="payroll-advance-rub-input" autocomplete="off">
-            </label>
-          </div>
-        </details>
-
-        <button type="submit" class="btn pr-form__save">Сохранить расчёт</button>
       </aside>
+        </div>
       </div>
     </div>
   </form>

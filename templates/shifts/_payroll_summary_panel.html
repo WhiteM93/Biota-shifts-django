@@ -5,50 +5,38 @@
       <span id="payroll-pl-total">{% if payroll_summary_static %}{{ totals.total }}{% else %}—{% endif %}</span>
       <span class="pr-summary__cur">₽</span>
     </p>
-    <span class="pr-summary__hero-hint">сумма = дн×дн.ставка + ноч×ноч.ставка; итог = 50% + доли + премия − штраф ₽</span>
   </div>
 
-  <p class="pr-summary__slice-title">С 1 по {{ advance_last_day }} число (аванс)</p>
-  <ul class="pr-summary__list pr-summary__list--slice">
-    <li class="pr-summary__row--slice">
-      <span class="pr-summary__name">По табелю</span>
-      <span class="pr-summary__val" id="payroll-pl-until20-payout">{% if payroll_summary_static %}{{ advance_slice.tab_payout_rub }}{% else %}—{% endif %} ₽</span>
-    </li>
-    <li>
-      <span class="pr-summary__name">Начисление по ставкам</span>
-      <span class="pr-summary__val" id="payroll-pl-until20-gross">{% if payroll_summary_static %}{{ advance_slice.gross_accrual_rub }}{% else %}—{% endif %} ₽</span>
-    </li>
-    <li>
-      <span class="pr-summary__name">Часы таб. / СКУД</span>
-      <span class="pr-summary__val"><span id="payroll-pl-until20-tab-h">{% if payroll_summary_static %}{{ advance_slice.total_tab_hours }}{% else %}—{% endif %}</span> / <span id="payroll-pl-until20-skud-h">{% if payroll_summary_static %}{{ advance_slice.total_skud_hours }}{% else %}—{% endif %}</span> ч</span>
-    </li>
-  </ul>
+  <div class="pr-summary__block">
+    <h3 class="pr-summary__block-title">С 1 по {{ advance_last_day }} (аванс)</h3>
+    <ul class="pr-summary__list">
+      <li><span class="pr-summary__name">По табелю</span><span class="pr-summary__val" id="payroll-pl-until20-payout">{% if payroll_summary_static %}{{ advance_slice.tab_payout_rub }}{% else %}—{% endif %} ₽</span></li>
+      <li><span class="pr-summary__name">Начисление</span><span class="pr-summary__val" id="payroll-pl-until20-gross">{% if payroll_summary_static %}{{ advance_slice.gross_accrual_rub }}{% else %}—{% endif %} ₽</span></li>
+      <li><span class="pr-summary__name">Часы таб. / СКУД</span><span class="pr-summary__val"><span id="payroll-pl-until20-tab-h">{% if payroll_summary_static %}{{ advance_slice.total_tab_hours }}{% else %}—{% endif %}</span> / <span id="payroll-pl-until20-skud-h">{% if payroll_summary_static %}{{ advance_slice.total_skud_hours }}{% else %}—{% endif %}</span> ч</span></li>
+    </ul>
+  </div>
 
-  <p class="pr-summary__slice-title pr-summary__slice-title--month">За весь месяц</p>
-  <ul class="pr-summary__list pr-summary__list--compact">
-    <li><span class="pr-summary__name">Дн. / ноч. часы</span><span class="pr-summary__val"><span id="payroll-pl-day-h">{% if payroll_summary_static %}{{ totals.total_day_hours }}{% else %}—{% endif %}</span> / <span id="payroll-pl-night-h">{% if payroll_summary_static %}{{ totals.total_night_hours }}{% else %}—{% endif %}</span> ч</span></li>
-    <li><span class="pr-summary__name">Сумма (дн+ноч)</span><span class="pr-summary__val" id="payroll-pl-base">{% if payroll_summary_static %}{{ totals.base_tab }}{% else %}—{% endif %}</span></li>
-    <li><span class="pr-summary__name">50% гарантия</span><span class="pr-summary__val" id="payroll-pl-guaranteed">{% if payroll_summary_static %}{{ totals.guaranteed_rub }}{% else %}—{% endif %}</span></li>
-    <li><span class="pr-summary__name">Доли 20+20+10</span><span class="pr-summary__val" id="payroll-pl-slices">{% if payroll_summary_static %}{{ totals.slices_rub }}{% else %}—{% endif %}</span></li>
-    <li><span class="pr-summary__name">По табелю</span><span class="pr-summary__val" id="payroll-pl-tab-pay">{% if payroll_summary_static %}{{ totals.tab_payout }}{% else %}—{% endif %}</span></li>
-    <li><span class="pr-summary__name">Часы таб / СКУД</span><span class="pr-summary__val"><span id="payroll-pl-tab-h">{% if payroll_summary_static %}{{ totals.total_tab_hours }}{% else %}—{% endif %}</span> / <span id="payroll-pl-skud-h">{% if payroll_summary_static %}{{ totals.total_skud_hours }}{% else %}—{% endif %}</span></span></li>
-    <li class="pr-summary__row--accent"><span class="pr-summary__name">После аванса</span><span class="pr-summary__val" id="payroll-pl-remainder-after">{% if payroll_summary_static %}{{ remainder_after_advance }}{% else %}—{% endif %}</span></li>
-  </ul>
-
-  <details class="pr-summary__more">
-    <summary>Премии и штрафы</summary>
-    <ul class="pr-summary__list pr-summary__list--dense">
-      {% if not payroll_summary_static %}
-      <li><span class="pr-summary__name">Премия (итого)</span><span class="pr-summary__val" id="payroll-pl-bonus-total">—</span></li>
-      <li><span class="pr-summary__name">Премия % от суммы</span><span class="pr-summary__val" id="payroll-pl-bonus-pct">—</span></li>
-      <li><span class="pr-summary__name">Премия ₽</span><span class="pr-summary__val" id="payroll-pl-bonus-rub">—</span></li>
-      <li><span class="pr-summary__name">Штрафы</span><span class="pr-summary__val" id="payroll-pl-pen-total">—</span></li>
-      <li class="pr-summary__row--muted"><span class="pr-summary__name">Справ. по СКУД (месяц)</span><span class="pr-summary__val" id="payroll-pl-total-skud">—</span></li>
-      {% endif %}
+  <div class="pr-summary__block">
+    <h3 class="pr-summary__block-title">За весь месяц</h3>
+    <ul class="pr-summary__list">
+      <li><span class="pr-summary__name">Дн. / ноч. часы</span><span class="pr-summary__val"><span id="payroll-pl-day-h">{% if payroll_summary_static %}{{ totals.total_day_hours }}{% else %}—{% endif %}</span> / <span id="payroll-pl-night-h">{% if payroll_summary_static %}{{ totals.total_night_hours }}{% else %}—{% endif %}</span> ч</span></li>
+      <li><span class="pr-summary__name">Сумма (дн+ноч)</span><span class="pr-summary__val" id="payroll-pl-base">{% if payroll_summary_static %}{{ totals.base_tab }}{% else %}—{% endif %} ₽</span></li>
+      <li><span class="pr-summary__name">50% гарантия</span><span class="pr-summary__val" id="payroll-pl-guaranteed">{% if payroll_summary_static %}{{ totals.guaranteed_rub }}{% else %}—{% endif %} ₽</span></li>
+      <li><span class="pr-summary__name">Доли (кач+рез+реж)</span><span class="pr-summary__val" id="payroll-pl-slices">{% if payroll_summary_static %}{{ totals.slices_rub }}{% else %}—{% endif %} ₽</span></li>
+      <li class="pr-summary__row--emph"><span class="pr-summary__name">По табелю</span><span class="pr-summary__val" id="payroll-pl-tab-pay">{% if payroll_summary_static %}{{ totals.tab_payout }}{% else %}—{% endif %} ₽</span></li>
+      <li><span class="pr-summary__name">Премия</span><span class="pr-summary__val" id="payroll-pl-bonus-total">{% if payroll_summary_static %}{{ totals.bonus_total }}{% else %}—{% endif %} ₽</span></li>
+      <li class="pr-summary__row--sub"><span class="pr-summary__name">в т.ч. % от суммы</span><span class="pr-summary__val" id="payroll-pl-bonus-pct">{% if payroll_summary_static %}{{ totals.bonus_pct_amount }}{% else %}—{% endif %} ₽</span></li>
+      <li class="pr-summary__row--sub"><span class="pr-summary__name">в т.ч. премия ₽</span><span class="pr-summary__val" id="payroll-pl-bonus-rub">{% if payroll_summary_static %}{{ totals.bonus_rub }}{% else %}—{% endif %} ₽</span></li>
+      <li><span class="pr-summary__name">Штраф ₽</span><span class="pr-summary__val" id="payroll-pl-pen-rub">{% if payroll_summary_static %}{{ totals.penalty_rub }}{% else %}—{% endif %} ₽</span></li>
+      <li><span class="pr-summary__name">Часы таб. / СКУД</span><span class="pr-summary__val"><span id="payroll-pl-tab-h">{% if payroll_summary_static %}{{ totals.total_tab_hours }}{% else %}—{% endif %}</span> / <span id="payroll-pl-skud-h">{% if payroll_summary_static %}{{ totals.total_skud_hours }}{% else %}—{% endif %}</span> ч</span></li>
+      <li class="pr-summary__row--accent"><span class="pr-summary__name">После аванса</span><span class="pr-summary__val" id="payroll-pl-remainder-after">{% if payroll_summary_static %}{{ remainder_after_advance }}{% else %}—{% endif %} ₽</span></li>
       <li class="pr-summary__row--warn" id="pr-chip-overpay"{% if payroll_summary_static and advance_overpayment <= 0 %} hidden{% endif %}{% if not payroll_summary_static %} hidden{% endif %}>
-        <span class="pr-summary__name">Переплата по авансу</span>
+        <span class="pr-summary__name">Переплата аванса</span>
         <span class="pr-summary__val"><span id="payroll-pl-advance-over">{% if payroll_summary_static and advance_overpayment > 0 %}{{ advance_overpayment }}{% else %}—{% endif %}</span> ₽</span>
       </li>
+      <li class="pr-summary__row--muted"><span class="pr-summary__name">Справ. итог по СКУД</span><span class="pr-summary__val" id="payroll-pl-total-skud">{% if payroll_summary_static %}—{% else %}—{% endif %} ₽</span></li>
     </ul>
-  </details>
+  </div>
+
+  <p class="pr-summary__formula">Сумма = дн.ч×дн.ставка + ноч.ч×ноч.ставка · Итог = 50% + доли + премия − штраф</p>
 </section>

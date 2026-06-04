@@ -244,11 +244,8 @@
     if (el) el.textContent = fmtRu(t.bonus_pct_amount);
     el = document.getElementById('payroll-pl-bonus-rub');
     if (el) el.textContent = fmtRu(t.bonus_rub);
-    el = document.getElementById('payroll-pl-pen-total');
-    if (el)
-      el.textContent = fmtRu(
-        round2((Number(t.penalties) || 0) + (Number(t.penalty_rub) || 0))
-      );
+    el = document.getElementById('payroll-pl-pen-rub');
+    if (el) el.textContent = fmtRu(t.penalty_rub);
     el = document.getElementById('payroll-pl-total');
     if (el) el.textContent = fmtRu(t.total);
     el = document.getElementById('payroll-pl-total-skud');
@@ -289,25 +286,9 @@
     return x.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
   }
 
-  function updateCalendarSplitHours() {
-    var byDate = tabHoursByDate();
-    rows.forEach(function (r) {
-      var iso = r.date_iso;
-      var h = byDate[iso] || 0;
-      var split = tabDayNightHours(shiftKindForRow(r), h);
-      var cell = form.querySelector('.pr-cal__split[data-date-iso="' + iso + '"]');
-      if (!cell) return;
-      var elD = cell.querySelector('.js-pr-day-h');
-      var elN = cell.querySelector('.js-pr-night-h');
-      if (elD) elD.textContent = fmtHours(split.day);
-      if (elN) elN.textContent = fmtHours(split.night);
-    });
-  }
-
   function refresh() {
     var monthTotals = computeTotalsCore({});
     renderTotals(monthTotals);
-    updateCalendarSplitHours();
     var elDay = document.getElementById('pr-cal-foot-day');
     var elNight = document.getElementById('pr-cal-foot-night');
     var elTab = document.getElementById('pr-cal-foot-tab');

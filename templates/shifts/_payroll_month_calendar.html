@@ -6,26 +6,42 @@
   <div class="pr-cal__week">
     {% for row in week %}
     {% if row %}
-    <div class="pr-cal__day{% if row.weekday == 'сб' or row.weekday == 'вс' %} pr-cal__day--we{% endif %}" role="gridcell">
-      <div class="pr-cal__top">
-        <span class="pr-cal__num">{{ row.date.day }}</span>
-      {% if row.graph_shift == "д" %}<span class="pr-badge pr-badge--d" title="День">д</span>
-      {% elif row.graph_shift == "н" %}<span class="pr-badge pr-badge--n" title="Ночь">н</span>
-      {% elif row.graph != "—" %}<span class="pr-badge pr-badge--raw" title="Код графика">{{ row.graph }}</span>
-      {% else %}<span class="pr-badge pr-badge--empty">—</span>{% endif %}
-      </div>
-      <div class="pr-cal__skud" title="СКУД">С {{ row.skud_h }}</div>
-      <div class="pr-cal__split" data-date-iso="{{ row.date_iso }}">
-        <span class="pr-cal__dn pr-cal__dn--d" title="Дневные часы к оплате">Д <span class="js-pr-day-h">{{ row.tab_day_h }}</span></span>
-        <span class="pr-cal__dn pr-cal__dn--n" title="Ночные часы к оплате">Н <span class="js-pr-night-h">{{ row.tab_night_h }}</span></span>
-      </div>
-      <div class="pr-cal__tab">
-        {% if payroll_day_editable %}
-        <input type="text" class="payroll-tab-day-input" name="tab_{{ row.date_iso }}" value="{{ row.tab_h }}" inputmode="decimal" aria-label="Табель {{ row.date_iso }}"
-          {% if profile.shift_hours and row.tab_h >= profile.shift_hours|add:profile.shift_hours %}title="Праздник: {{ profile.shift_hours|add:profile.shift_hours }} ч к оплате (2× смена по коду д/н в графике)"{% endif %}>
+    <div class="pr-cal__day{% if row.weekday == 'сб' or row.weekday == 'вс' %} pr-cal__day--we{% endif %}{% if row.graph_shift == 'д' %} pr-cal__day--graph-d{% elif row.graph_shift == 'н' %} pr-cal__day--graph-n{% endif %}" role="gridcell">
+      <div class="pr-cal__head">
+        <span class="pr-cal__num" aria-hidden="true">{{ row.date.day }}</span>
+        {% if row.graph_shift == "д" %}
+        <span class="pr-graph-chip pr-graph-chip--d" title="Дневная смена">д</span>
+        {% elif row.graph_shift == "н" %}
+        <span class="pr-graph-chip pr-graph-chip--n" title="Ночная смена">н</span>
+        {% elif row.graph == "от" %}
+        <span class="pr-graph-chip pr-graph-chip--ot" title="Отпуск">от</span>
+        {% elif row.graph == "б" %}
+        <span class="pr-graph-chip pr-graph-chip--b" title="Больничный">б</span>
+        {% elif row.graph == "п" %}
+        <span class="pr-graph-chip pr-graph-chip--p" title="Прогул">п</span>
+        {% elif row.graph == "кп" %}
+        <span class="pr-graph-chip pr-graph-chip--kp" title="Компенсация">кп</span>
+        {% elif row.graph != "—" %}
+        <span class="pr-graph-chip pr-graph-chip--other" title="Код графика">{{ row.graph }}</span>
         {% else %}
-        <span class="pr-cal__tab-val">{{ row.tab_h }}</span>
+        <span class="pr-graph-chip pr-graph-chip--empty" title="Нет смены">—</span>
         {% endif %}
+      </div>
+
+      <div class="pr-cal__body">
+        <div class="pr-cal__skud" title="Часы СКУД">
+          <span class="pr-cal__lbl">СКУД</span>
+          <span class="pr-cal__val">{{ row.skud_h }}</span>
+        </div>
+        <div class="pr-cal__tab">
+          <label class="pr-cal__tab-lbl" for="tab-{{ row.date_iso }}">Таб.</label>
+          {% if payroll_day_editable %}
+          <input type="text" class="payroll-tab-day-input" id="tab-{{ row.date_iso }}" name="tab_{{ row.date_iso }}" value="{{ row.tab_h }}" inputmode="decimal" aria-label="Табель {{ row.date_iso }}"
+            title="{% if profile.shift_hours and row.tab_h >= profile.shift_hours|add:profile.shift_hours %}Праздник: в расчёте {{ row.tab_day_h }} дн. + {{ row.tab_night_h }} ноч. ч (2× смена){% else %}Часы табеля{% endif %}">
+          {% else %}
+          <span class="pr-cal__tab-val" id="tab-{{ row.date_iso }}">{{ row.tab_h }}</span>
+          {% endif %}
+        </div>
       </div>
     </div>
     {% else %}
