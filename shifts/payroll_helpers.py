@@ -147,6 +147,45 @@ def payroll_hourly_rate_for_shift(profile, shift_kind: str) -> Decimal:
     return day_rate
 
 
+def _profile_shift_hours_int(profile, default: int = 8) -> int:
+    raw = getattr(profile, "shift_hours", None)
+    if isinstance(raw, bool):
+        return default
+    if isinstance(raw, (int, float)):
+        try:
+            return max(0, int(raw))
+        except (TypeError, ValueError):
+            return default
+    return default
+
+
+def payroll_day_accrual_rub(profile, shift_kind: str, tab_h) -> Decimal:
+    """Начисление за день: часы × ставка; при 2× смене (24 ч) — 12 ч день + 12 ч ночь."""
+    D = Decimal
+    h = D(str(tab_h or 0))
+    if h <= 0:
+        return D("0")
+    sh_int = _profile_shift_hours_int(profile)
+    sh = D(str(sh_int))
+    day_r = profile.hourly_rate_day if profile.hourly_rate_day is not None else D("0")
+    night_r = profile.hourly_rate_night if profile.hourly_rate_night is not None else D("0")
+    if sh > 0 and h >= sh * D("2") - D("0.01"):
+        return (sh * day_r + sh * night_r).quantize(D("0.01"))
+    rate = night_r if shift_kind == "н" else day_r
+    return (h * rate).quantize(D("0.01"))
+
+
+def schedule_cell_display(cell) -> str:
+    """Буква из графика для отображения (д/н или как в ячейке)."""
+    kind = payroll_schedule_shift_kind(cell)
+    if kind:
+        return kind
+    if cell is None or (isinstance(cell, float) and pd.isna(cell)):
+        return ""
+    s = str(cell).strip()
+    return s[:4] if s else ""
+
+
 def payroll_calendar_weeks(day_rows: list[dict]) -> list[list[dict | None]]:
     """Недели месяца для календарной сетки (пн–вс), ячейки None — пусто."""
     if not day_rows:
@@ -195,6 +234,7 @@ def payroll_day_rows(
         dk = dd.isoformat()
         raw_cell = schedule_cell_for_day(row, d)
         shift_kind = payroll_schedule_shift_kind(raw_cell)
+        graph_disp = schedule_cell_display(raw_cell) or "—"
         sk = float(skud_by_day.get(dk, 0.0))
         default_tab = default_tab_hours_for_schedule_cell(raw_cell, shift_hours)
         tab = effective_tab_hours(tab_by_day.get(dk), default_tab)
@@ -203,7 +243,7 @@ def payroll_day_rows(
                 "date": dd,
                 "date_iso": dk,
                 "weekday": wdays[dd.weekday()],
-                "graph": shift_kind or "—",
+                "graph": graph_disp,
                 "graph_shift": shift_kind,
                 "skud_h": round(sk, 2),
                 "tab_h": tab,
@@ -275,8 +315,7 @@ def payroll_gross_tab_skud_through_day(
         sk = D(str(r.get("skud_h") or 0))
         tab_sum += h
         skud_sum += sk
-        rate = payroll_hourly_rate_for_shift(profile, str(r.get("graph_shift") or ""))
-        gross += h * rate
+        gross += payroll_day_accrual_rub(profile, str(r.get("graph_shift") or ""), h)
     return {
         "total_tab_hours": tab_sum.quantize(D("0.01")),
         "total_skud_hours": skud_sum.quantize(D("0.01")),
@@ -427,7 +466,7 @@ def compute_payroll_totals(
         sk = D(str(r.get("skud_h") or 0))
         tab_sum += h
         skud_sum += sk
-        base += h * payroll_hourly_rate_for_shift(profile, str(r.get("graph_shift") or ""))
+        base += payroll_day_accrual_rub(profile, str(r.get("graph_shift") or ""), h)
 
     side = effective_side_payroll_fields(settlement, dadj)
     q = side["penalty_quality_pct"]

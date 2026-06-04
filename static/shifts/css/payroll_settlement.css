@@ -562,6 +562,20 @@
   font-weight: 500;
 }
 
+.pr-badge--raw {
+  background: rgba(107, 159, 255, 0.2);
+  color: var(--bio-body-fg);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.pr-summary__hero-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--bio-muted);
+}
+
 /* —— Боковая колонка: секции —— */
 .pr-aside {
   display: flex;

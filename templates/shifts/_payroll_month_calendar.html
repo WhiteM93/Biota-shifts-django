@@ -9,9 +9,10 @@
     <div class="pr-cal__day{% if row.weekday == 'сб' or row.weekday == 'вс' %} pr-cal__day--we{% endif %}" role="gridcell">
       <div class="pr-cal__top">
         <span class="pr-cal__num">{{ row.date.day }}</span>
-        {% if row.graph_shift == "д" %}<span class="pr-badge pr-badge--d" title="День">д</span>
-        {% elif row.graph_shift == "н" %}<span class="pr-badge pr-badge--n" title="Ночь">н</span>
-        {% else %}<span class="pr-badge pr-badge--empty">—</span>{% endif %}
+      {% if row.graph_shift == "д" %}<span class="pr-badge pr-badge--d" title="День">д</span>
+      {% elif row.graph_shift == "н" %}<span class="pr-badge pr-badge--n" title="Ночь">н</span>
+      {% elif row.graph != "—" %}<span class="pr-badge pr-badge--raw" title="Код графика">{{ row.graph }}</span>
+      {% else %}<span class="pr-badge pr-badge--empty">—</span>{% endif %}
       </div>
       <div class="pr-cal__skud" title="СКУД">С {{ row.skud_h }}</div>
       <div class="pr-cal__tab">

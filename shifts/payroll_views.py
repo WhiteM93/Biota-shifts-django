@@ -369,7 +369,19 @@ def payroll_settlement_view(request, emp_code: str):
         totals["total"], settlement.advance_rub
     )
     advance_last_day = min(20, last_d)
-    advance_slice = payroll_gross_tab_skud_through_day(profile, day_rows, advance_last_day)
+    advance_totals = compute_payroll_totals(
+        profile,
+        settlement,
+        day_rows,
+        through_day=advance_last_day,
+        defect_adjust_sum_by_kind=defect_adj_sums or None,
+    )
+    advance_slice = {
+        "total_tab_hours": advance_totals["total_tab_hours"],
+        "total_skud_hours": advance_totals["total_skud_hours"],
+        "gross_accrual_rub": advance_totals["base_tab"],
+        "tab_payout_rub": advance_totals["tab_payout"],
+    }
     tab_month_sum = sum(float(r.get("tab_h") or 0) for r in day_rows)
     defect_month = {
         "count": int(defect_agg.get("cnt") or 0),

@@ -10,6 +10,7 @@ from shifts.payroll_helpers import (
     default_tab_hours_for_schedule_cell,
     effective_tab_hours,
     payroll_calendar_weeks,
+    payroll_day_accrual_rub,
     payroll_hourly_rate_for_shift,
     payroll_schedule_shift_kind,
 )
@@ -36,6 +37,16 @@ class PayrollTabDefaultTests(SimpleTestCase):
         self.assertEqual(effective_tab_hours(None, 12.0), 12.0)
         self.assertEqual(effective_tab_hours(8, 12.0), 8.0)
         self.assertEqual(effective_tab_hours(0, 0.0), 0.0)
+
+
+class PayrollDayAccrualTests(SimpleTestCase):
+    def test_double_shift_splits_day_and_night(self):
+        profile = MagicMock()
+        profile.shift_hours = 12
+        profile.hourly_rate_day = Decimal("450")
+        profile.hourly_rate_night = Decimal("500")
+        self.assertEqual(payroll_day_accrual_rub(profile, "д", 24), Decimal("11400.00"))
+        self.assertEqual(payroll_day_accrual_rub(profile, "д", 12), Decimal("5400.00"))
 
 
 class PayrollRateTests(SimpleTestCase):
@@ -73,6 +84,7 @@ class PayrollTotalsTests(SimpleTestCase):
         profile = MagicMock()
         profile.hourly_rate_day = Decimal("100")
         profile.hourly_rate_night = Decimal("200")
+        profile.shift_hours = 8
         settlement = MagicMock()
         settlement.penalty_quality_pct = 20
         settlement.penalty_result_pct = 20

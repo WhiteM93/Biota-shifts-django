@@ -25,6 +25,16 @@
     return kind === 'н' ? nightRate : dayRate;
   }
 
+  function dayAccrualRub(kind, tabH) {
+    var h = Number(tabH) || 0;
+    if (h <= 0) return 0;
+    var sh = shiftHours;
+    if (sh > 0 && h >= sh * 2 - 0.01) {
+      return round2(sh * dayRate + sh * nightRate);
+    }
+    return round2(h * rateForShiftKind(kind));
+  }
+
   function defaultTabForRow(r) {
     if (r.default_tab_h != null && !isNaN(Number(r.default_tab_h))) {
       return Number(r.default_tab_h);
@@ -78,7 +88,7 @@
       var sk = Number(r.skud_h) || 0;
       tabSum += h;
       skudSum += sk;
-      base += h * rateForShiftKind(shiftKindForRow(r));
+      base += dayAccrualRub(shiftKindForRow(r), h);
     });
     base = round2(base);
     skudSum = round2(skudSum);
@@ -155,7 +165,7 @@
     var base = 0;
     rows.forEach(function (r) {
       var sk = Number(r.skud_h) || 0;
-      base += sk * rateForShiftKind(shiftKindForRow(r));
+      base += dayAccrualRub(shiftKindForRow(r), sk);
     });
     base = round2(base);
     var qMax = 20;
@@ -213,34 +223,16 @@
     });
   }
 
-  function computeGrossThroughAdvanceDay() {
-    var byDate = tabHoursByDate();
-    var tabSum = 0;
-    var skudSum = 0;
-    var gross = 0;
-    rows.forEach(function (r) {
-      if (!dayOkForAdvance(r)) return;
-      var h = byDate[r.date_iso] || 0;
-      var sk = Number(r.skud_h) || 0;
-      tabSum += h;
-      skudSum += sk;
-      gross += h * rateForShiftKind(shiftKindForRow(r));
-    });
-    return {
-      total_tab_hours: round2(tabSum),
-      total_skud_hours: round2(skudSum),
-      gross_accrual_rub: round2(gross),
-    };
-  }
-
-  function renderGrossSlice(s) {
+  function renderGrossSlice(sliceTotals) {
     var el;
     el = document.getElementById('payroll-pl-until20-tab-h');
-    if (el) el.textContent = fmtRu(s.total_tab_hours);
+    if (el) el.textContent = fmtRu(sliceTotals.total_tab_hours);
     el = document.getElementById('payroll-pl-until20-skud-h');
-    if (el) el.textContent = fmtRu(s.total_skud_hours);
+    if (el) el.textContent = fmtRu(sliceTotals.total_skud_hours);
     el = document.getElementById('payroll-pl-until20-gross');
-    if (el) el.textContent = fmtRu(s.gross_accrual_rub);
+    if (el) el.textContent = fmtRu(sliceTotals.base_tab);
+    el = document.getElementById('payroll-pl-until20-payout');
+    if (el) el.textContent = fmtRu(sliceTotals.tab_payout);
   }
 
   function renderTotals(t) {
@@ -297,8 +289,14 @@
 
   var scheduled = null;
   function refresh() {
-    renderTotals(computeTotalsCore({}));
-    renderGrossSlice(computeGrossThroughAdvanceDay());
+    var monthTotals = computeTotalsCore({});
+    renderTotals(monthTotals);
+    renderGrossSlice(
+      computeTotalsCore({
+        dayPred: dayOkForAdvance,
+        includeFixedRub: false,
+      })
+    );
   }
   function scheduleRefresh() {
     if (scheduled) clearTimeout(scheduled);
