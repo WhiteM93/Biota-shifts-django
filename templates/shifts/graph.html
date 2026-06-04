@@ -205,7 +205,6 @@
     var isSaving = false;
     var queued = false;
     var pendingSaveDone = null;
-    var dragFill = null;
     var hiddenDepMode = form.querySelector('input[name="dep_mode"][type="hidden"]');
     var hiddenPosMode = form.querySelector('input[name="pos_mode"][type="hidden"]');
     // Снапшот фильтров: захватывается в момент первого изменения ячейки,
@@ -224,13 +223,32 @@
       filterSnapshot = { depMode: depMode, deps: deps, posMode: posMode, positions: positions };
     }
 
+    function normalizedCellVal(input) {
+      return (input && input.value ? input.value : "").trim().toLowerCase();
+    }
+
+    function captureEditBaseline() {
+      form.querySelectorAll(".day-input").forEach(function (inp) {
+        inp.setAttribute("data-baseline", normalizedCellVal(inp));
+      });
+    }
+
+    function cellNeedsSave(input) {
+      if (!input || !input.name || isLockedInput(input)) return false;
+      if (input.getAttribute("data-dirty") === "1") return true;
+      var base = input.getAttribute("data-baseline");
+      if (base === null || base === undefined) return false;
+      return normalizedCellVal(input) !== base;
+    }
+
     function markDirty(input) {
       if (!input) return;
       input.setAttribute("data-dirty", "1");
     }
 
-    function clearDirtyFlags() {
-      form.querySelectorAll('.day-input[data-dirty="1"]').forEach(function (inp) {
+    function commitBaselines() {
+      form.querySelectorAll(".day-input").forEach(function (inp) {
+        inp.setAttribute("data-baseline", normalizedCellVal(inp));
         inp.removeAttribute("data-dirty");
       });
     }
@@ -377,6 +395,88 @@
       refreshShiftCounts();
     }
 
+    var dragFill = null;
+    var lastDragHoverInput = null;
+    var lastActiveCell = null;
+    var pointerDown = false;
+    var pointerDownInput = null;
+
+    function rememberActiveCell(input) {
+      if (input && !isLockedInput(input)) lastActiveCell = input;
+    }
+
+    function activeCellTarget() {
+      if (lastActiveCell && form.contains(lastActiveCell) && !isLockedInput(lastActiveCell)) {
+        return lastActiveCell;
+      }
+      var ae = document.activeElement;
+      if (ae && form.contains(ae) && ae.classList.contains("day-input") && !isLockedInput(ae)) {
+        return ae;
+      }
+      return null;
+    }
+
+    function applyBrushToCell(input) {
+      if (!brushOn || !input || isLockedInput(input)) return;
+      setCellValue(input, brushVal);
+    }
+
+    function applyDragToInput(input) {
+      if (!dragFill || !input || isLockedInput(input)) return;
+      var start = dragFill.startInput;
+      if (start.closest("tr") === input.closest("tr")) {
+        fillRowRange(start, input, dragFill.sourceValue);
+      } else if (start.getAttribute("data-day") === input.getAttribute("data-day")) {
+        fillColumnRange(start, input, dragFill.sourceValue);
+      }
+    }
+
+    function onDocumentDragMove(event) {
+      if (!dragFill) return;
+      var input = null;
+      if (document.elementFromPoint) {
+        var el = document.elementFromPoint(event.clientX, event.clientY);
+        input = el && el.closest ? el.closest(".day-input") : null;
+      }
+      if (!input || !form.contains(input) || input === lastDragHoverInput) return;
+      lastDragHoverInput = input;
+      applyDragToInput(input);
+    }
+
+    function endDragFill() {
+      dragFill = null;
+      lastDragHoverInput = null;
+      pointerDown = false;
+      pointerDownInput = null;
+      document.removeEventListener("mousemove", onDocumentDragMove);
+      document.removeEventListener("mouseup", onPointerUp);
+    }
+
+    function onPointerMove(event) {
+      if (!pointerDown || !pointerDownInput) return;
+      if (!dragFill) {
+        if (brushOn) {
+          dragFill = {
+            startInput: pointerDownInput,
+            sourceValue: brushVal,
+            isBrush: true,
+          };
+        } else {
+          dragFill = {
+            startInput: pointerDownInput,
+            sourceValue: pointerDownInput.value || "",
+            isBrush: false,
+          };
+        }
+      }
+      onDocumentDragMove(event);
+    }
+
+    function onPointerUp() {
+      endDragFill();
+      if (canEdit && graphEditAllowed && editing) refreshShiftCounts();
+    }
+
     function isLockedInput(inp) {
       return !!(inp && (inp.getAttribute("data-locked") === "1" || inp.classList.contains("day-input--locked")));
     }
@@ -413,7 +513,7 @@
       updatePaletteActive();
       if (statusEl) {
         if (canEdit && editing) {
-          statusEl.textContent = "Режим редактирования. Нажмите ✏️ ещё раз — сохранить и выйти.";
+          statusEl.textContent = "Сначала код слева, потом клики по ячейкам. Смена кода не трогает уже заполненные. ✏️ — сохранить.";
         } else if (!canEdit) {
           statusEl.textContent = "Режим исполнителя: только просмотр и скачивание.";
         } else if (!graphEditAllowed) {
@@ -456,6 +556,16 @@
       var csrf = form.querySelector('input[name="csrfmiddlewaretoken"]');
       if (csrf) fd.append("csrfmiddlewaretoken", csrf.value);
       fd.append("action", "save");
+      var dirtyN = 0;
+      var changedN = 0;
+      form.querySelectorAll(".day-input").forEach(function (inp) {
+        if (inp.getAttribute("data-dirty") === "1") dirtyN += 1;
+        if (cellNeedsSave(inp)) changedN += 1;
+      });
+      var visN = form.querySelectorAll(".day-input:not(.day-input--locked)").length;
+      fd.append("_debug_dirty_count", String(dirtyN));
+      fd.append("_debug_changed_count", String(changedN));
+      fd.append("_debug_visible_count", String(visN));
       var yearInp = form.querySelector('input[name="year"]');
       var monthInp = form.querySelector('input[name="month"]');
       if (yearInp) fd.append("year", yearInp.value);
@@ -474,11 +584,14 @@
       applyFilterSnapshot(ensureFilterSnapshot());
       var fd = new FormData();
       appendSaveMeta(fd);
-      var dirty = form.querySelectorAll('.day-input[data-dirty="1"]');
-      if (!dirty.length) {
+      var toSave = [];
+      form.querySelectorAll(".day-input").forEach(function (inp) {
+        if (cellNeedsSave(inp)) toSave.push(inp);
+      });
+      if (!toSave.length) {
         return null;
       }
-      dirty.forEach(function (inp) {
+      toSave.forEach(function (inp) {
         if (inp.name) fd.append(inp.name, inp.value || "");
       });
       return fd;
@@ -486,23 +599,27 @@
 
     function flushSave() {
       if (!canEdit || !graphEditAllowed || !editing) return;
-      if (saveTimer) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-      }
-      saveNow();
+      refreshShiftCounts();
     }
 
-    function hasDirtyCells() {
-      return form.querySelectorAll('.day-input[data-dirty="1"]').length > 0;
+    function hasPendingChanges() {
+      var pending = false;
+      form.querySelectorAll(".day-input").forEach(function (inp) {
+        if (cellNeedsSave(inp)) pending = true;
+      });
+      return pending;
     }
 
-    function performSave(done) {
+    function performSave(done, reloadAfter) {
       if (!canEdit || !graphEditAllowed || !editing) {
         if (done) done(false);
         return;
       }
       var body = buildSaveFormData();
+      var pendingCount = 0;
+      form.querySelectorAll(".day-input").forEach(function (inp) {
+        if (cellNeedsSave(inp)) pendingCount += 1;
+      });
       if (!body) {
         if (done) done(true);
         return;
@@ -514,6 +631,28 @@
       }
       isSaving = true;
       setStatus("Сохранение...", "#c9d4f0");
+      if (window.SectionDebugLog) {
+        var dirtyN = 0;
+        var changedN = 0;
+        var sample = [];
+        form.querySelectorAll(".day-input").forEach(function (inp) {
+          if (inp.getAttribute("data-dirty") === "1") dirtyN += 1;
+          if (cellNeedsSave(inp)) {
+            changedN += 1;
+            if (sample.length < 20 && inp.name) sample.push(inp.name + "=" + (inp.value || ""));
+          }
+        });
+        SectionDebugLog.log("client_save_start", "Сохранение: изменено " + changedN + ", dirty " + dirtyN, {
+          dirty: dirtyN,
+          changed: changedN,
+          visible: form.querySelectorAll(".day-input:not(.day-input--locked)").length,
+          sample: sample
+        });
+      }
+
+      if (reloadAfter) {
+        body.append("_save_reload", "1");
+      }
 
       fetch(window.location.href, {
         method: "POST",
@@ -526,16 +665,29 @@
         .then(function (data) {
           var ok = !!(data && data.ok);
           if (ok) {
-            setStatus("Сохранено", "#b8f5c8");
-            clearDirtyFlags();
+            var n = (data && data.applied_cells) || pendingCount;
+            setStatus("Сохранено: " + n + " яч.", "#b8f5c8");
+            commitBaselines();
             filterSnapshot = null;
+            if (window.SectionDebugLog) {
+              SectionDebugLog.log("client_save_ok", "Сохранено " + n + " яч.", data || {});
+            }
+            if (reloadAfter) {
+              window.setTimeout(function () { window.location.reload(); }, 400);
+            }
           } else {
             setStatus("Ошибка сохранения", "var(--bio-error-soft)");
+            if (window.SectionDebugLog) {
+              SectionDebugLog.log("client_save_fail", "Ответ без ok", data || {});
+            }
           }
           if (done) done(ok);
         })
-        .catch(function () {
+        .catch(function (err) {
           setStatus("Ошибка сохранения", "var(--bio-error-soft)");
+          if (window.SectionDebugLog) {
+            SectionDebugLog.log("client_save_fail", "Сеть: " + (err && err.message ? err.message : "error"), {});
+          }
           if (done) done(false);
         })
         .finally(function () {
@@ -544,19 +696,9 @@
             queued = false;
             var cb = pendingSaveDone;
             pendingSaveDone = null;
-            if (cb) {
-              performSave(cb);
-            } else if (editing) {
-              if (!filterSnapshot) captureFilterSnapshot();
-              saveNow();
-            }
+            if (cb) performSave(cb);
           }
         });
-    }
-
-    function saveNow() {
-      if (!canEdit || !graphEditAllowed || !editing) return;
-      performSave(null);
     }
 
     function finishExitEdit() {
@@ -565,6 +707,7 @@
       brushVal = "";
       if (editToggle) editToggle.disabled = false;
       applyGraphEditingState();
+      if (window.SectionDebugLog) SectionDebugLog.log("client_edit_off", "Редактирование выключено", {});
     }
 
     function exitEditWithSave() {
@@ -574,59 +717,53 @@
         saveTimer = null;
       }
       if (editToggle) editToggle.disabled = true;
-      if (!hasDirtyCells()) {
+      if (!hasPendingChanges()) {
         finishExitEdit();
         return;
       }
       performSave(function (ok) {
-        finishExitEdit();
         if (!ok) {
+          if (editToggle) editToggle.disabled = false;
           setStatus("Не удалось сохранить. Включите редактирование и повторите.", "var(--bio-error-soft)");
+          return;
         }
-      });
+        finishExitEdit();
+      }, true);
     }
 
     function scheduleSave() {
       if (!canEdit || !graphEditAllowed || !editing) return;
-      if (!filterSnapshot) captureFilterSnapshot();
-      if (saveTimer) clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveNow, 600);
+      refreshShiftCounts();
     }
 
     form.querySelectorAll(".day-input").forEach(function (input) {
+      input.addEventListener("focus", function () {
+        rememberActiveCell(input);
+      });
+      input.addEventListener("click", function (event) {
+        if (!canEdit || !graphEditAllowed || !editing) return;
+        rememberActiveCell(input);
+        if (brushOn) {
+          event.preventDefault();
+          applyBrushToCell(input);
+          refreshShiftCounts();
+        }
+      });
       input.addEventListener("mousedown", function (event) {
         if (event.button !== 0) return;
         if (!canEdit || !graphEditAllowed || !editing) return;
         if (isLockedInput(input)) return;
-        event.preventDefault();
+        rememberActiveCell(input);
         if (!filterSnapshot) captureFilterSnapshot();
+        pointerDown = true;
+        pointerDownInput = input;
+        lastDragHoverInput = input;
         if (brushOn) {
-          setCellValue(input, brushVal);
-          dragFill = {
-            startInput: input,
-            sourceValue: brushVal,
-            isBrush: true,
-          };
-          return;
+          event.preventDefault();
+          applyBrushToCell(input);
         }
-        applyColor(input);
-        markDirty(input);
-        dragFill = {
-          startInput: input,
-          sourceValue: input.value || "",
-          isBrush: false,
-        };
-      });
-      input.addEventListener("mouseenter", function () {
-        if (!dragFill) return;
-        if (isLockedInput(input)) return;
-        var start = dragFill.startInput;
-        if (start.closest("tr") === input.closest("tr")) {
-          fillRowRange(start, input, dragFill.sourceValue);
-        } else if (!dragFill.isBrush && start.getAttribute("data-day") === input.getAttribute("data-day")) {
-          // Заливка столбца только без кисти (иначе «н» попадает всем в этот день)
-          fillColumnRange(start, input, dragFill.sourceValue);
-        }
+        document.addEventListener("mousemove", onPointerMove);
+        document.addEventListener("mouseup", onPointerUp);
       });
       input.addEventListener("input", function () {
         applyColor(input);
@@ -648,17 +785,6 @@
       });
     });
 
-    document.addEventListener("mouseup", function () {
-      if (!dragFill) return;
-      var wasBrush = dragFill.isBrush;
-      dragFill = null;
-      if (canEdit && graphEditAllowed && editing) {
-        refreshShiftCounts();
-        if (wasBrush) flushSave();
-        else scheduleSave();
-      }
-    });
-
     applyGraphEditingState();
     if (editToggle) {
       editToggle.disabled = !canEdit || !graphEditAllowed;
@@ -670,7 +796,9 @@
         }
         editing = true;
         captureFilterSnapshot();
+        captureEditBaseline();
         applyGraphEditingState();
+        if (window.SectionDebugLog) SectionDebugLog.log("client_edit_on", "Редактирование включено", {});
       });
     }
 
@@ -681,13 +809,20 @@
           e.preventDefault();
           if (btn.hasAttribute("data-code")) {
             var selectedCode = btn.getAttribute("data-code") || "";
+            var target = activeCellTarget();
             if (brushOn && brushVal === selectedCode) {
               brushOn = false;
               brushVal = "";
             } else {
               brushOn = true;
               brushVal = selectedCode;
-              captureFilterSnapshot();
+              if (!filterSnapshot) captureFilterSnapshot();
+              // Только пустая выбранная ячейка — иначе смена кода затирает последнюю заполненную
+              if (target && normalizedCellVal(target) === "") {
+                applyBrushToCell(target);
+                rememberActiveCell(target);
+                refreshShiftCounts();
+              }
             }
           }
           syncBrushHint();
@@ -926,4 +1061,7 @@
     }
   })();
 </script>
+{% if biota_is_admin %}
+{% include "shifts/includes/section_debug_log_panel.html" with debug_log_section="graph" debug_log_title="График" %}
+{% endif %}
 {% endblock %}

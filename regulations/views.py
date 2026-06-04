@@ -27,6 +27,12 @@ from shifts.graph_views import (
     _sort_graph_rows,
 )
 from shifts.position_order import apply_position_order, load_position_order
+from shifts.section_action_log import (
+    EVT_SERVER_REG_META,
+    EVT_SERVER_REG_SAVE,
+    SECTION_REGULATIONS,
+    record_from_request,
+)
 
 from .models import RegulationPlan
 
@@ -571,6 +577,13 @@ def regulations_api_save(request):
         )
         updated += n
 
+    record_from_request(
+        request,
+        SECTION_REGULATIONS,
+        EVT_SERVER_REG_SAVE,
+        f"API save: обновлено строк {updated}, в запросе {len(items)}",
+        {"updated": updated, "items_in_request": len(items)},
+    )
     return JsonResponse({"ok": True, "updated": updated, "saved_at": datetime.now().isoformat(timespec="seconds")})
 
 
@@ -610,4 +623,11 @@ def regulations_api_meta(request):
             if obj:
                 updated_rows.append(_row_json(obj))
 
+    record_from_request(
+        request,
+        SECTION_REGULATIONS,
+        EVT_SERVER_REG_META,
+        f"API meta: изменено {changed}",
+        {"changed": changed, "updates": len(updates)},
+    )
     return JsonResponse({"ok": True, "changed": changed, "rows": updated_rows})

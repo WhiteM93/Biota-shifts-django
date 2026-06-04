@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import cabinet_views
+from . import debug_log_views
 from . import graph_mobile_views
 from . import graph_views
 from . import hours_views
@@ -48,6 +49,8 @@ urlpatterns = [
     path("products/<int:pk>/setups/<int:setup_pk>/pdf/<str:mode>/", product_views.product_setup_pdf_export_view, name="product_setup_pdf_export"),
     path("products/<int:pk>/save-list-preview/", product_views.product_save_list_preview_view, name="product_save_list_preview"),
     path("products/<int:pk>/", product_views.product_detail_view, name="product_detail"),
+    path("debug-log/ingest/", debug_log_views.debug_log_ingest, name="debug_log_ingest"),
+    path("debug-log/list/", debug_log_views.debug_log_list, name="debug_log_list"),
     path("cabinet/", cabinet_views.cabinet_view, name="cabinet"),
     path("cabinet/backups/", cabinet_views.schedule_backups_view, name="schedule_backups"),
     path("cabinet/backups/download/<str:filename>/", cabinet_views.schedule_backup_download, name="schedule_backup_download"),

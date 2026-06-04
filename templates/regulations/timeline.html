@@ -211,6 +211,10 @@
     if (saveBtn) {
       saveBtn.addEventListener("click", function () {
         st.textContent = "…";
+        if (window.SectionDebugLog) {
+          var n = document.querySelectorAll(".reg-track[data-id]").length;
+          SectionDebugLog.log("client_save_start", "Сохранение регламента, строк " + n, { tracks: n });
+        }
         window.saveRegTimeline("{% url 'regulations_api_save' %}", "", getCookie)
           .then(function (d) {
             var n = d.updated || 0;
@@ -219,9 +223,15 @@
                 ? "Сервер принял запрос, обновлено строк: 0 (все строки 🔒 или нет изменений)."
                 : "Сохранено (" + n + ")";
             st.style.color = n === 0 ? "#e8d48a" : "#b8f5c8";
+            if (window.SectionDebugLog) {
+              SectionDebugLog.log("client_save_ok", "Сохранено строк: " + n, d || {});
+            }
           })
           .catch(function (e) {
             st.textContent = "Ошибка: " + (e && e.message ? e.message : e);
+            if (window.SectionDebugLog) {
+              SectionDebugLog.log("client_save_fail", e && e.message ? e.message : String(e), {});
+            }
             st.style.color = "var(--bio-error-soft)";
           });
       });
@@ -314,11 +324,17 @@
         regEditBtn.textContent = on ? "Закончить редактирование" : "Включить редактирование";
         regEditBtn.classList.toggle("is-editing-on", on);
         if (window.syncRegTimelineEditingUi) window.syncRegTimelineEditingUi();
+        if (window.SectionDebugLog) {
+          SectionDebugLog.log(on ? "client_edit_on" : "client_edit_off", on ? "Редактирование вкл." : "Редактирование выкл.", {});
+        }
       });
       if (window.syncRegTimelineEditingUi) window.syncRegTimelineEditingUi();
     }
   })();
 </script>
+{% if biota_is_admin %}
+{% include "shifts/includes/section_debug_log_panel.html" with debug_log_section="regulations" debug_log_title="Регламенты" %}
+{% endif %}
 <script>
   (function () {
     var f = document.querySelector("form.reg-toolbar-form.auto-submit-form");

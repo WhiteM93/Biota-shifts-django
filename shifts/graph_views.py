@@ -26,6 +26,14 @@ from .auth_utils import biota_login_required, biota_user, nav_permission_require
 from .department_order import apply_department_order, load_department_order
 from .position_order import apply_position_order, load_position_order
 from .ru_work_calendar import is_ru_non_working_day
+from .section_action_log import (
+    EVT_SERVER_GRAPH_REJECT,
+    EVT_SERVER_GRAPH_UPLOAD,
+    analyze_graph_save_post,
+    log_graph_save,
+    record_from_request,
+    SECTION_GRAPH,
+)
 
 
 DEPT_COLOR_CLASSES = [
@@ -259,6 +267,13 @@ def graph_view(request):
         post_dep_mode = (request.POST.get("dep_mode") or "all").strip()
         post_pos_mode = (request.POST.get("pos_mode") or "all").strip()
         if action in ("save", "upload") and (post_dep_mode != "all" or post_pos_mode != "all"):
+            record_from_request(
+                request,
+                SECTION_GRAPH,
+                EVT_SERVER_GRAPH_REJECT,
+                f"Отклонено {action}: dep_mode={post_dep_mode}, pos_mode={post_pos_mode}",
+                {"action": action, "dep_mode": post_dep_mode, "pos_mode": post_pos_mode},
+            )
             messages.error(
                 request,
                 "Редактирование и загрузка доступны только при фильтрах «Все» (отделы и должности).",
@@ -277,7 +292,14 @@ def graph_view(request):
                 imported = biota_schedule.apply_prev_month_tail_from_previous_schedule(
                     imported, employees_df, y, m
                 )
-                biota_schedule.save_schedule_table(imported, y, m)
+                saved_path = biota_schedule.save_schedule_table(imported, y, m)
+                record_from_request(
+                    request,
+                    SECTION_GRAPH,
+                    EVT_SERVER_GRAPH_UPLOAD,
+                    f"Загрузка Excel: {upl.name}",
+                    {"file": upl.name, "saved": saved_path.name, "rows": len(imported)},
+                )
                 messages.success(request, f"График загружен из файла ({upl.name}).")
             except ValueError as err:
                 messages.error(request, str(err))
@@ -295,8 +317,19 @@ def graph_view(request):
         )
         full_schedule_df = full_schedule_df.sort_values(["Порядок", "Код"]).reset_index(drop=True)
         saved_path = biota_schedule.save_schedule_table(full_schedule_df, y, m)
+        stats = log_graph_save(
+            request, full_schedule_df, year=y, month=m, saved_name=saved_path.name
+        )
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return JsonResponse({"ok": True, "saved": saved_path.name})
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "saved": saved_path.name,
+                    "applied_cells": stats.get("applied_cells", 0),
+                    "post_cell_fields": stats.get("post_cell_fields", 0),
+                    "reload": (request.POST.get("_save_reload") or "").strip() == "1",
+                }
+            )
         messages.success(request, f"Сохранено: {saved_path.name}")
         return redirect(f"/graph/?year={y}&month={m}")
 

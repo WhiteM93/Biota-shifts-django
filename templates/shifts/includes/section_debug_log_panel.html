@@ -1,0 +1,23 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'shifts/css/section-debug-log.css' %}?v=1">
+<button type="button" class="section-debug-log-toggle" id="section-debug-log-toggle" aria-expanded="false" title="Журнал действий (админ)">📋 Лог</button>
+<div class="section-debug-log-panel" id="section-debug-log-panel" role="dialog" aria-label="Журнал действий">
+  <div class="section-debug-log-panel__head">
+    <span>Журнал · {{ debug_log_title|default:"раздел" }}</span>
+    <div class="section-debug-log-panel__tools">
+      <label><input type="checkbox" id="section-debug-log-trace"> Подробно</label>
+    </div>
+  </div>
+  <div class="section-debug-log-list" id="section-debug-log-list"></div>
+</div>
+<script src="{% static 'shifts/js/section-debug-log.js' %}?v=1"></script>
+<script>
+  (function () {
+    if (!window.SectionDebugLogInit) return;
+    window.SectionDebugLog = window.SectionDebugLogInit({
+      section: "{{ debug_log_section }}",
+      ingestUrl: "{% url 'debug_log_ingest' %}",
+      listUrl: "{% url 'debug_log_list' %}"
+    });
+  })();
+</script>

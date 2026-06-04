@@ -940,6 +940,32 @@ class InventoryStockEvent(models.Model):
         return f"{self.get_event_type_display()} · {self.summary[:80]}"
 
 
+class SectionActionLog(models.Model):
+    """Журнал действий на «График» и «Регламенты» (просмотр админом)."""
+
+    SECTION_GRAPH = "graph"
+    SECTION_REGULATIONS = "regulations"
+    SECTION_CHOICES = [
+        (SECTION_GRAPH, "График"),
+        (SECTION_REGULATIONS, "Регламенты"),
+    ]
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Когда")
+    section = models.CharField(max_length=16, choices=SECTION_CHOICES, db_index=True)
+    event_type = models.CharField(max_length=32, db_index=True, verbose_name="Тип")
+    actor_username = models.CharField(max_length=120, verbose_name="Кто")
+    summary = models.CharField(max_length=500, verbose_name="Кратко")
+    details = models.JSONField(default=dict, blank=True, verbose_name="Детали")
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = "Журнал графика/регламентов"
+        verbose_name_plural = "Журнал графика/регламентов"
+
+    def __str__(self):
+        return f"{self.section} · {self.summary[:80]}"
+
+
 class PurchaseRequest(models.Model):
     requested_item = models.CharField(max_length=255, verbose_name="Что закупить")
     store_link = models.URLField(blank=True, verbose_name="Ссылка на магазин")
