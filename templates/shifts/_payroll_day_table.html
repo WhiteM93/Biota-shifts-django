@@ -1,0 +1,33 @@
+<table class="pr-day-table">
+  <colgroup>
+    <col class="col-day"><col class="col-graph"><col class="col-skud"><col class="col-tab">
+  </colgroup>
+  <thead>
+    <tr>
+      <th class="col-day">День</th>
+      <th class="col-graph">Гр.</th>
+      <th class="col-skud">СКУД</th>
+      <th class="col-tab">Таб.</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in day_rows %}
+    <tr class="{% if row.weekday == 'сб' or row.weekday == 'вс' %}pr-row--weekend{% endif %}{% if row.date.day <= advance_last_day %} pr-row--advance{% endif %}">
+      <td class="col-day" title="{{ row.date_iso }}">{{ row.date.day }}&nbsp;{{ row.weekday }}</td>
+      <td class="col-graph">
+        {% if row.graph_shift == "д" %}<span class="pr-badge pr-badge--d" title="Дневная">д</span>
+        {% elif row.graph_shift == "н" %}<span class="pr-badge pr-badge--n" title="Ночная">н</span>
+        {% else %}<span class="pr-badge pr-badge--empty">—</span>{% endif %}
+      </td>
+      <td class="col-skud">{{ row.skud_h }}</td>
+      <td class="col-tab">
+        {% if payroll_day_editable %}
+        <input type="text" class="payroll-tab-day-input" name="tab_{{ row.date_iso }}" value="{{ row.tab_h }}" inputmode="decimal" aria-label="Табель {{ row.date_iso }}">
+        {% else %}
+        {{ row.tab_h }}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

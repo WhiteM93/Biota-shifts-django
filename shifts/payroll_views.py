@@ -26,11 +26,14 @@ from .models import (
     EmployeePayrollProfile,
     EmployeePayrollSettlement,
 )
+from biota_shifts.schedule import load_schedule_table, schedule_path
+
 from .payroll_helpers import (
     compute_payroll_totals,
     distribute_month_tab_hours,
     effective_side_payroll_fields,
     parse_payroll_year_month,
+    payroll_calendar_weeks,
     payroll_day_rows,
     payroll_gross_tab_skud_through_day,
     payroll_year_options_for_employees,
@@ -38,6 +41,7 @@ from .payroll_helpers import (
     skud_hours_for_payroll_month,
     stored_side_payroll_fields_from_effective,
     sum_defect_payroll_adjustments_for_defects,
+    tab_by_day_from_schedule,
 )
 
 
@@ -118,13 +122,13 @@ def payroll_settlement_view(request, emp_code: str):
     skud_day = skud_by_day_all.get(ec, {})
 
     schedule_df = pd.DataFrame()
-    if pay_df is not None and not pay_df.empty:
+    schedule_emp_df = full if full is not None and not getattr(full, "empty", True) else pay_df
+    if schedule_emp_df is not None and not getattr(schedule_emp_df, "empty", True):
         try:
-            from biota_shifts import schedule as biota_schedule
-
-            schedule_df = biota_schedule.load_schedule_table(pay_df, year, month)
+            schedule_df = load_schedule_table(schedule_emp_df, year, month)
         except Exception:
             schedule_df = pd.DataFrame()
+    schedule_file_exists = schedule_path(year, month).exists()
 
     profile, _ = EmployeePayrollProfile.objects.get_or_create(emp_code=ec, defaults={"shift_hours": 8})
     settlement, _ = EmployeePayrollSettlement.objects.get_or_create(
@@ -230,6 +234,22 @@ def payroll_settlement_view(request, emp_code: str):
                 messages.success(request, "Корректировка по браку сохранена.")
             return redirect(f"{reverse('payroll_settlement', args=[ec])}?year={my}&month={mm}")
 
+        if (request.POST.get("payroll_action") or "").strip() == "sync_schedule":
+            sync_rows = payroll_day_rows(
+                ec, year, month, pay_df, tab, skud_day, schedule_df, shift_hours=profile.shift_hours
+            )
+            settlement.tab_by_day = tab_by_day_from_schedule(sync_rows)
+            settlement.updated_by = username
+            settlement.save(update_fields=["tab_by_day", "updated_by", "updated_at"])
+            if any(r.get("graph_shift") for r in sync_rows):
+                messages.success(request, "Табель обновлён по графику за месяц.")
+            else:
+                messages.warning(
+                    request,
+                    "В графике нет смен д/н за этот месяц — сначала заполните раздел «График».",
+                )
+            return redirect(f"{reverse('payroll_settlement', args=[ec])}?year={year}&month={month}")
+
         _, last_d_adj = calendar.monthrange(year, month)
         if label:
             defect_ids_for_save = list(
@@ -299,7 +319,9 @@ def payroll_settlement_view(request, emp_code: str):
     ).first()
 
     _, last_d = calendar.monthrange(year, month)
-    day_rows = payroll_day_rows(ec, year, month, pay_df, tab, skud_day, schedule_df)
+    day_rows = payroll_day_rows(
+        ec, year, month, pay_df, tab, skud_day, schedule_df, shift_hours=profile.shift_hours
+    )
     if label:
         defect_qs = (
             EmployeeDefectRecord.objects.filter(
@@ -371,14 +393,23 @@ def payroll_settlement_view(request, emp_code: str):
             {
                 "date_iso": r["date_iso"],
                 "graph": str(r.get("graph") or ""),
+                "graph_shift": str(r.get("graph_shift") or ""),
                 "skud_h": float(r.get("skud_h") or 0),
+                "default_tab_h": float(r.get("default_tab_h") or 0),
             }
             for r in day_rows
         ],
+        "shift_hours": int(profile.shift_hours or 8),
         "advance_last_day": advance_last_day,
     }
 
     side_effective = effective_side_payroll_fields(settlement, defect_adj_sums or None)
+
+    calendar_weeks = payroll_calendar_weeks(day_rows)
+    schedule_missing = not schedule_file_exists or not any(
+        str(r.get("graph_shift") or "") for r in day_rows
+    )
+    graph_url = f"{reverse('graph')}?year={year}&month={month}"
 
     return render(
         request,
@@ -393,6 +424,10 @@ def payroll_settlement_view(request, emp_code: str):
             "year_choices": year_options,
             "month_choices": month_choices,
             "day_rows": day_rows,
+            "calendar_weeks": calendar_weeks,
+            "schedule_missing": schedule_missing,
+            "schedule_file_exists": schedule_file_exists,
+            "graph_url": graph_url,
             "totals": totals,
             "advance_slice": advance_slice,
             "advance_last_day": advance_last_day,

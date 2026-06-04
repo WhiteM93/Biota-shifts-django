@@ -1,0 +1,31 @@
+<div class="pr-cal" role="grid" aria-label="Табель по дням месяца">
+  <div class="pr-cal__dow" aria-hidden="true">
+    <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span class="pr-cal__dow--we">сб</span><span class="pr-cal__dow--we">вс</span>
+  </div>
+  {% for week in calendar_weeks %}
+  <div class="pr-cal__week">
+    {% for row in week %}
+    {% if row %}
+    <div class="pr-cal__day{% if row.weekday == 'сб' or row.weekday == 'вс' %} pr-cal__day--we{% endif %}" role="gridcell">
+      <div class="pr-cal__top">
+        <span class="pr-cal__num">{{ row.date.day }}</span>
+        {% if row.graph_shift == "д" %}<span class="pr-badge pr-badge--d" title="День">д</span>
+        {% elif row.graph_shift == "н" %}<span class="pr-badge pr-badge--n" title="Ночь">н</span>
+        {% else %}<span class="pr-badge pr-badge--empty">—</span>{% endif %}
+      </div>
+      <div class="pr-cal__skud" title="СКУД">С {{ row.skud_h }}</div>
+      <div class="pr-cal__tab">
+        {% if payroll_day_editable %}
+        <input type="text" class="payroll-tab-day-input" name="tab_{{ row.date_iso }}" value="{{ row.tab_h }}" inputmode="decimal" aria-label="Табель {{ row.date_iso }}">
+        {% else %}
+        <span class="pr-cal__tab-val">{{ row.tab_h }}</span>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="pr-cal__day pr-cal__day--pad" aria-hidden="true"></div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>

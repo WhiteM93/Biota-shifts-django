@@ -1,268 +1,885 @@
-.payroll-settlement-form {
-    margin-top: 0;
-  }
-  .payroll-settlement-layout {
-    display: grid;
-    gap: 16px;
-    align-items: start;
-    width: 100%;
-    box-sizing: border-box;
-  }
-  .payroll-settlement-editor-outer {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(300px, 430px);
-    gap: 16px;
-    align-items: stretch;
-    width: 100%;
-    box-sizing: border-box;
-  }
-  .payroll-settlement-layout--editor {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
-    align-items: stretch;
-  }
-  .payroll-settlement-layout--readonly {
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
-  }
-  @media (max-width: 1180px) {
-    .payroll-settlement-editor-outer {
-      grid-template-columns: 1fr;
-    }
-  }
-  @media (max-width: 900px) {
-    .payroll-settlement-layout--editor,
-    .payroll-settlement-layout--readonly {
-      grid-template-columns: 1fr;
-    }
-  }
-  .payroll-settlement-col-table,
-  .payroll-settlement-col-side,
-  .payroll-settlement-col-defect {
-    min-width: 0;
-  }
-  .payroll-settlement-col-table,
-  .payroll-settlement-col-side {
-    display: flex;
-  }
-  .payroll-settlement-col-defect {
-    display: flex;
-  }
-  .payroll-table-card.filter-panel,
-  .payroll-side-card.filter-panel,
-  .payroll-defect-card.filter-panel {
-    margin: 0;
-    height: 100%;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-  }
-  .payroll-side-card.filter-panel {
-    max-width: 420px;
-  }
-  .payroll-side-card {
-    text-align: center;
-  }
-  .payroll-side-card .field {
-    align-items: center;
-    text-align: center;
-  }
-  .payroll-side-card .field input,
-  .payroll-side-card .field select {
-    text-align: center;
-  }
-  .payroll-side-card ul {
-    text-align: left;
-    display: inline-block;
-  }
-  @media (max-width: 1180px) {
-    .payroll-side-card.filter-panel {
-      max-width: none;
-    }
-  }
-  .payroll-side-card .filter-panel {
-    margin-top: 12px;
-  }
-  .payroll-advance-panel {
-    padding-bottom: 14px;
-    margin-bottom: 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  }
-  .payroll-advance-panel > h3:first-child {
-    margin-top: 0;
-  }
-  .payroll-side-card > h3:first-of-type,
-  .payroll-table-card > h3:first-of-type {
-    margin-top: 0;
-  }
-  .payroll-tab-day-input.is-month-locked {
-    opacity: 0.65;
-    pointer-events: none;
-  }
-  .payroll-settlement-col-table .table-wrap.payroll-table-wrap {
-    display: block;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
+/* Расчёт ЗП — компактная страница сотрудника */
+
+.pr-page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 0 28px;
+  box-sizing: border-box;
+}
+
+/* —— Шапка —— */
+.pr-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--bio-filter-border);
+  background: var(--bio-surface-panel);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+}
+
+.pr-toolbar__back {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bio-nav-link);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pr-toolbar__back:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.pr-toolbar__identity {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.pr-toolbar__name {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--bio-heading-accent);
+}
+
+.pr-toolbar__meta {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--bio-caption-soft);
+}
+
+.pr-toolbar__rates {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--bio-muted);
+}
+
+.pr-toolbar__rates strong {
+  color: var(--bio-body-fg);
+  font-weight: 600;
+}
+
+.pr-toolbar__period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 10px;
+  margin: 0;
+}
+
+.pr-toolbar__period .field {
+  margin: 0;
+}
+
+.pr-toolbar__period .field > span {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--bio-caption-soft);
+  margin-bottom: 2px;
+}
+
+.pr-toolbar__period select {
+  min-width: 6.5rem;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+.pr-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-left: auto;
+}
+
+.pr-toolbar__actions .pr-mark-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.pr-toolbar__marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.pr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  border: 1px solid var(--bio-btn-ghost-border);
+  background: var(--bio-btn-ghost-bg);
+  color: var(--bio-muted);
+}
+
+.pr-chip--on {
+  background: #d6b20a;
+  border-color: #d6b20a;
+  color: #1a1300;
+}
+
+.pr-chip--warn {
+  background: rgba(220, 80, 60, 0.15);
+  border-color: rgba(220, 80, 60, 0.45);
+  color: #ffb4a8;
+}
+
+.pr-mark-buttons .btn {
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+.pr-mark-buttons .payroll-mark-btn-on {
+  background: #d6b20a;
+  border-color: #d6b20a;
+  color: #1a1300;
+}
+
+/* —— Правая колонка: итоги + параметры —— */
+.pr-rail {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 58px;
+  align-self: flex-start;
+  max-height: calc(100vh - 72px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 720px) {
+  .pr-rail {
+    position: static;
     max-height: none;
-    box-sizing: border-box;
-    overflow-x: auto;
-    overflow-y: visible;
-    -webkit-overflow-scrolling: touch;
+    flex: 1 1 100%;
+    max-width: none;
   }
-  .payroll-day-table.data-grid {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0 !important;
-    table-layout: fixed;
-    border-collapse: collapse;
+}
+
+.pr-summary {
+  border-radius: 10px;
+  border: 1px solid rgba(214, 178, 10, 0.35);
+  background: linear-gradient(160deg, rgba(214, 178, 10, 0.1) 0%, var(--bio-surface-panel) 55%);
+  overflow: hidden;
+}
+
+.pr-summary__hero {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--bio-table-cell-border);
+  text-align: center;
+}
+
+.pr-summary__hero-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bio-caption-soft);
+}
+
+.pr-summary__hero-value {
+  margin: 4px 0 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--bio-heading-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.pr-summary__cur {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--bio-muted);
+}
+
+.pr-summary__slice-title {
+  margin: 10px 0 4px;
+  padding: 0 12px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--bio-caption-soft);
+}
+
+.pr-summary__slice-title--month {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bio-table-cell-border);
+}
+
+.pr-summary__list--slice {
+  padding-top: 2px;
+  padding-bottom: 4px;
+}
+
+.pr-summary__row--slice .pr-summary__val {
+  font-size: 1.05rem;
+  color: var(--bio-heading-accent);
+}
+
+.pr-summary__list--compact {
+  padding-top: 4px;
+}
+
+.pr-summary__more {
+  border-top: 1px solid var(--bio-table-cell-border);
+}
+
+.pr-summary__more > summary {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bio-caption-soft);
+  cursor: pointer;
+  list-style: none;
+}
+
+.pr-summary__more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pr-summary__more[open] > summary {
+  color: var(--bio-heading-accent);
+}
+
+.pr-summary__group-label {
+  margin: 0;
+  padding: 8px 12px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--bio-caption-soft);
+}
+
+.pr-summary__list {
+  margin: 0;
+  padding: 4px 12px 10px;
+  list-style: none;
+}
+
+.pr-summary__list--dense {
+  padding-top: 0;
+  padding-bottom: 8px;
+}
+
+.pr-summary__list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.pr-summary__list li:last-child {
+  border-bottom: none;
+}
+
+.pr-summary__name {
+  color: var(--bio-muted);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pr-summary__val {
+  font-weight: 700;
+  color: var(--bio-body-fg);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pr-summary__row--accent .pr-summary__val {
+  color: var(--bio-heading-accent);
+  font-size: 1.05rem;
+}
+
+.pr-summary__row--warn .pr-summary__val {
+  color: #ffb4a8;
+}
+
+.pr-summary__row--muted .pr-summary__name,
+.pr-summary__row--muted .pr-summary__val {
+  font-size: 11px;
+  color: var(--bio-caption-soft);
+  font-weight: 500;
+}
+
+/* —— Основная сетка —— */
+.pr-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .pr-body {
+    grid-template-columns: 1fr;
   }
-  .payroll-day-table th,
-  .payroll-day-table td {
-    text-align: center;
-    vertical-align: middle;
-    white-space: normal;
-    padding: 4px 6px;
+}
+
+.pr-main {
+  min-width: 0;
+}
+
+.pr-aside {
+  width: 100%;
+  min-width: 0;
+}
+
+.pr-alert {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(220, 160, 40, 0.45);
+  background: rgba(220, 160, 40, 0.08);
+}
+
+.pr-alert p {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--bio-body-fg);
+}
+
+.pr-alert__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pr-panel {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--bio-filter-border);
+  background: var(--bio-surface-panel);
+  overflow: hidden;
+}
+
+.pr-panel--cal .pr-panel__body {
+  padding: 6px 8px 10px;
+}
+
+.pr-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--bio-table-cell-border);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.pr-panel__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bio-heading-accent);
+}
+
+.pr-panel__hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--bio-caption-soft);
+  line-height: 1.35;
+}
+
+.pr-panel__body {
+  padding: 0;
+}
+
+.pr-panel__body--pad {
+  padding: 10px 12px;
+}
+
+/* —— Календарь месяца —— */
+.pr-cal {
+  width: 100%;
+}
+
+.pr-cal__dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+  padding: 0 2px;
+}
+
+.pr-cal__dow span {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--bio-caption-soft);
+}
+
+.pr-cal__dow--we {
+  color: var(--bio-muted);
+}
+
+.pr-cal__week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.pr-cal__day {
+  min-height: 4.5rem;
+  padding: 4px 5px 5px;
+  border-radius: 6px;
+  border: 1px solid var(--bio-surface-item-border);
+  background: var(--bio-surface-item);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  box-sizing: border-box;
+}
+
+.pr-cal__day--pad {
+  visibility: hidden;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.pr-cal__day--we {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+
+.pr-cal__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.pr-cal__num {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bio-heading-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.pr-cal__skud {
+  font-size: 10px;
+  color: var(--bio-caption-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.pr-cal__tab {
+  margin-top: auto;
+}
+
+.pr-cal__tab input.payroll-tab-day-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 4px;
+  font-size: 11px;
+  text-align: center;
+}
+
+.pr-cal__tab-val {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.payroll-tab-day-input.is-month-locked {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .pr-cal__day {
+    min-height: 3.75rem;
+    padding: 3px;
   }
-  .payroll-day-table th {
-    font-size: 11px;
-    line-height: 1.25;
-    font-weight: 600;
+  .pr-cal__skud {
+    display: none;
   }
-  .payroll-day-table .col-date { width: 7.25rem; }
-  .payroll-day-table .col-dow { width: 2.5rem; }
-  .payroll-day-table .col-graph { width: 3rem; }
-  .payroll-day-table .col-skud { width: 4.25rem; }
-  .payroll-day-table .col-tab { width: 4.75rem; }
-  .payroll-day-table .col-tab input.payroll-tab-day-input {
-    width: 100%;
-    max-width: 4.25rem;
-    margin: 0 auto;
-    display: block;
-    text-align: center;
-  }
-  .payroll-day-table--ro .col-tab { width: 4.25rem; }
-  .payroll-defect-card {
-    max-height: min(78vh, 960px);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .payroll-defect-entry {
-    margin-top: 14px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-  }
-  .payroll-defect-entry:first-of-type {
-    margin-top: 0;
-    padding-top: 0;
-    border-top: none;
-  }
-  .payroll-defect-entry-title {
-    margin: 0 0 8px 0;
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 1.35;
-  }
-  .payroll-defect-dl {
-    margin: 0;
-    display: grid;
-    grid-template-columns: minmax(7rem, 42%) 1fr;
-    gap: 6px 12px;
-    font-size: 13px;
-    line-height: 1.45;
-  }
-  .payroll-defect-dl dt {
-    margin: 0;
-    color: var(--bio-caption-soft);
-    font-weight: 500;
-  }
-  .payroll-defect-dl dd {
-    margin: 0;
-    word-break: break-word;
-  }
-  .payroll-settlement-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 14px;
-    align-items: center;
-    margin: 0 0 10px 0;
-    font-size: 14px;
-    line-height: 1.45;
-  }
-  .payroll-settlement-nav a {
-    color: var(--bio-nav-link);
-    font-weight: 600;
-    text-decoration: none;
-  }
-  .payroll-settlement-nav a:hover {
-    color: #fff;
-    text-decoration: underline;
-  }
-  .payroll-settlement-header-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 10px;
-  }
-  .payroll-settlement-header-row .payroll-settlement-nav {
-    margin: 0;
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .payroll-settlement-header-row .btn-payroll-settings {
-    flex: 0 0 auto;
-    white-space: nowrap;
-  }
-  .payroll-settlement-period-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 12px 20px;
-    margin-top: 10px;
-  }
-  .payroll-period-form {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px 16px;
-    align-items: flex-end;
-    margin: 0;
-  }
-  .payroll-period-form .field {
-    margin-bottom: 0;
-  }
-  .payroll-period-form select {
-    min-width: 10rem;
-  }
-  .payroll-settlement-period-block {
-    margin-top: 10px;
-  }
-  .payroll-settlement-mark-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px 16px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--bio-table-cell-border);
-  }
-  .payroll-mark-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    margin: 0;
-  }
-  .payroll-mark-buttons .payroll-mark-btn-on {
-    background: #d6b20a;
-    border-color: #d6b20a;
-    color: #1a1300;
-  }
-  .payroll-defect-adj-form {
-    border-top: 1px solid var(--bio-table-cell-border);
-    padding-top: 10px;
-  }
-  .payroll-defect-adj-form .field span {
-    font-size: 12px;
-  }
+}
+
+.pr-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.pr-badge--d {
+  background: #fff;
+  color: #1a1a1a;
+}
+
+.pr-badge--n {
+  background: #ffff00;
+  color: #1a1a1a;
+}
+
+.pr-badge--empty {
+  background: transparent;
+  color: var(--bio-caption-soft);
+  font-weight: 500;
+}
+
+/* —— Боковая колонка: секции —— */
+.pr-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pr-section {
+  border-radius: 10px;
+  border: 1px solid var(--bio-filter-border);
+  background: var(--bio-surface-panel);
+  overflow: hidden;
+}
+
+.pr-section > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bio-heading-accent);
+  background: rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid transparent;
+  user-select: none;
+}
+
+.pr-section[open] > summary {
+  border-bottom-color: var(--bio-table-cell-border);
+}
+
+.pr-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pr-section > summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.15s ease;
+  color: var(--bio-caption-soft);
+}
+
+.pr-section[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.pr-section__inner {
+  padding: 10px 12px;
+}
+
+.pr-section__inner--tight {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* —— Боковая форма: ползунки и поля —— */
+.pr-params {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pr-params__block {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.pr-params__legend {
+  padding: 0;
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--bio-heading-accent);
+}
+
+.pr-params__hint {
+  margin: 0 0 10px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--bio-caption-soft);
+}
+
+.pr-params__block--last {
+  margin-bottom: 0;
+}
+
+.pr-slider {
+  display: block;
+  margin: 0 0 12px;
+  cursor: pointer;
+}
+
+.pr-slider:last-child {
+  margin-bottom: 0;
+}
+
+.pr-slider__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.pr-slider__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bio-body-fg);
+}
+
+.pr-slider__value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bio-heading-accent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pr-slider__value output {
+  font: inherit;
+}
+
+.pr-slider__input {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  accent-color: #6b9fff;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.pr-slider__input::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6b9fff;
+  border: 2px solid var(--bio-surface-panel);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.pr-slider__input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6b9fff;
+  border: 2px solid var(--bio-surface-panel);
+}
+
+.pr-slider__ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--bio-caption-soft);
+}
+
+.pr-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 0;
+}
+
+.pr-input-row__label {
+  flex: 0 0 auto;
+  min-width: 5.5rem;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bio-body-fg);
+}
+
+.pr-input-row__control {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  padding: 6px 8px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+
+.pr-note {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--bio-muted);
+}
+
+.pr-note strong {
+  color: var(--bio-body-fg);
+}
+
+.pr-mini-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.pr-mini-grid dt {
+  margin: 0;
+  color: var(--bio-caption-soft);
+}
+
+.pr-mini-grid dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--bio-body-fg);
+}
+
+.pr-form__save {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* —— Брак —— */
+.pr-defects {
+  margin-top: 12px;
+}
+
+.pr-defects > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--bio-filter-border);
+  background: var(--bio-surface-panel);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bio-heading-accent);
+}
+
+.pr-defects[open] > summary {
+  border-radius: 10px 10px 0 0;
+  border-bottom: none;
+}
+
+.pr-defects > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pr-defects__body {
+  padding: 12px 14px;
+  border: 1px solid var(--bio-filter-border);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  background: var(--bio-surface-panel);
+  max-height: min(50vh, 480px);
+  overflow-y: auto;
+}
+
+.pr-defect-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bio-btn-ghost-bg);
+  color: var(--bio-muted);
+}
+
+/* Брак — записи (совместимость с partial) */
+.payroll-defect-entry {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.payroll-defect-entry:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.payroll-defect-entry-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.payroll-defect-dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(6rem, 38%) 1fr;
+  gap: 4px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.payroll-defect-dl dt {
+  margin: 0;
+  color: var(--bio-caption-soft);
+  font-weight: 500;
+}
+
+.payroll-defect-dl dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.payroll-defect-adj-form {
+  border-top: 1px solid var(--bio-table-cell-border);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.payroll-defect-adj-form .field span {
+  font-size: 11px;
+}
+
+/* Read-only */

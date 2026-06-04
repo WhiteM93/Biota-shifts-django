@@ -11,10 +11,10 @@ import pandas as pd
 from biota_shifts import db as biota_db
 from biota_shifts import logic as biota_logic
 from biota_shifts.auth import employees_df_for_nav
-from biota_shifts.constants import MONTH_NAMES_RU
+from biota_shifts.constants import MONTH_NAMES_RU, SCHEDULE_CODES
 from biota_shifts.emp_codes import normalize_emp_code
 from biota_shifts import schedule as biota_schedule
-from biota_shifts.schedule import employee_label_row, sanitize_schedule_cell
+from biota_shifts.schedule import employee_label_row
 
 
 def parse_payroll_year_month(request) -> tuple[int, int]:
@@ -84,6 +84,95 @@ def skud_hours_for_payroll_month(
     return totals, by_day
 
 
+def schedule_cell_for_day(row, day: int):
+    """Значение ячейки графика для календарного дня (колонки «1»…«31» или int)."""
+    if row is None:
+        return None
+    for key in (str(day), day, f"{day:02d}"):
+        if key in row.index:
+            return row.get(key)
+    day_s = str(day)
+    for col in row.index:
+        if str(col).strip() == day_s:
+            return row.get(col)
+    return None
+
+
+def effective_tab_hours(raw_tab, default_tab: float) -> float:
+    """Часы табеля: сохранённое значение или авто из графика.
+
+    Сохранённый 0 не блокирует подстановку, если по графику должна быть смена (default_tab > 0).
+    """
+    if raw_tab is None:
+        return default_tab
+    try:
+        tab = float(raw_tab)
+    except (TypeError, ValueError):
+        return default_tab
+    if tab == 0 and default_tab > 0:
+        return default_tab
+    return tab
+
+
+def payroll_schedule_shift_kind(cell) -> str:
+    """Код смены для расчёта ЗП: «д», «н» или пусто (не рабочая смена)."""
+    if cell is None or (isinstance(cell, float) and pd.isna(cell)):
+        return ""
+    s = str(cell).strip().lower()
+    if s in ("н", "n"):
+        return "н"
+    if s in ("д", "d"):
+        return "д"
+    if s in SCHEDULE_CODES:
+        if s == "н":
+            return "н"
+        if s == "д":
+            return "д"
+    return ""
+
+
+def default_tab_hours_for_schedule_cell(cell, shift_hours: int) -> float:
+    """Часы табеля по умолчанию: длительность смены из настроек сотрудника на рабочие д/н."""
+    sh = max(0, int(shift_hours or 0))
+    return float(sh) if payroll_schedule_shift_kind(cell) in ("д", "н") else 0.0
+
+
+def payroll_hourly_rate_for_shift(profile, shift_kind: str) -> Decimal:
+    """Ставка ₽/ч по типу смены (дневная / ночная)."""
+    D = Decimal
+    day_rate = profile.hourly_rate_day if profile.hourly_rate_day is not None else D("0")
+    night_rate = profile.hourly_rate_night if profile.hourly_rate_night is not None else D("0")
+    if shift_kind == "н":
+        return night_rate
+    return day_rate
+
+
+def payroll_calendar_weeks(day_rows: list[dict]) -> list[list[dict | None]]:
+    """Недели месяца для календарной сетки (пн–вс), ячейки None — пусто."""
+    if not day_rows:
+        return []
+    first = day_rows[0]["date"]
+    by_day = {r["date"].day: r for r in day_rows}
+    weeks: list[list[dict | None]] = []
+    for week in calendar.Calendar(firstweekday=0).monthdayscalendar(first.year, first.month):
+        weeks.append([by_day.get(d) if d else None for d in week])
+    return weeks
+
+
+def tab_by_day_from_schedule(day_rows: list[dict]) -> dict[str, float]:
+    """Словарь часов табеля из графика (д/н → длительность смены)."""
+    out: dict[str, float] = {}
+    for r in day_rows:
+        dk = str(r.get("date_iso") or "")
+        if not dk:
+            continue
+        if r.get("graph_shift"):
+            out[dk] = round(float(r.get("default_tab_h") or 0), 2)
+        else:
+            out[dk] = 0.0
+    return out
+
+
 def payroll_day_rows(
     emp_code: str,
     year: int,
@@ -92,6 +181,8 @@ def payroll_day_rows(
     tab_by_day: dict[str, Any],
     skud_by_day: dict[str, float],
     schedule_df: pd.DataFrame,
+    *,
+    shift_hours: int = 8,
 ) -> list[dict]:
     """Строки по дням месяца: дата, график, часы СКУД, часы табеля (редактируемые)."""
     ec = normalize_emp_code(emp_code)
@@ -102,26 +193,21 @@ def payroll_day_rows(
     for d in range(1, last_d + 1):
         dd = date(year, month, d)
         dk = dd.isoformat()
-        code = ""
-        if row is not None and str(d) in row.index:
-            code = sanitize_schedule_cell(row.get(str(d)))
+        raw_cell = schedule_cell_for_day(row, d)
+        shift_kind = payroll_schedule_shift_kind(raw_cell)
         sk = float(skud_by_day.get(dk, 0.0))
-        raw_tab = tab_by_day.get(dk)
-        if raw_tab is None:
-            tab = sk
-        else:
-            try:
-                tab = float(raw_tab)
-            except (TypeError, ValueError):
-                tab = sk
+        default_tab = default_tab_hours_for_schedule_cell(raw_cell, shift_hours)
+        tab = effective_tab_hours(tab_by_day.get(dk), default_tab)
         out.append(
             {
                 "date": dd,
                 "date_iso": dk,
                 "weekday": wdays[dd.weekday()],
-                "graph": code or "—",
+                "graph": shift_kind or "—",
+                "graph_shift": shift_kind,
                 "skud_h": round(sk, 2),
                 "tab_h": tab,
+                "default_tab_h": default_tab,
             }
         )
     return out
@@ -173,8 +259,6 @@ def payroll_gross_tab_skud_through_day(
 ) -> dict[str, Decimal]:
     """За календарные дни 1…through_day: часы табеля, СКУД и сумма h×ставка (д/н), без премий и штрафов."""
     D = Decimal
-    day_rate = profile.hourly_rate_day if profile.hourly_rate_day is not None else D("0")
-    night_rate = profile.hourly_rate_night if profile.hourly_rate_night is not None else D("0")
     tab_sum = D("0")
     skud_sum = D("0")
     gross = D("0")
@@ -191,8 +275,7 @@ def payroll_gross_tab_skud_through_day(
         sk = D(str(r.get("skud_h") or 0))
         tab_sum += h
         skud_sum += sk
-        g = str(r.get("graph") or "").strip().lower()
-        rate = night_rate if g == "н" else day_rate
+        rate = payroll_hourly_rate_for_shift(profile, str(r.get("graph_shift") or ""))
         gross += h * rate
     return {
         "total_tab_hours": tab_sum.quantize(D("0.01")),
@@ -327,8 +410,6 @@ def compute_payroll_totals(
     """
     D = Decimal
     dadj = defect_adjust_sum_by_kind
-    day_rate = profile.hourly_rate_day if profile.hourly_rate_day is not None else D("0")
-    night_rate = profile.hourly_rate_night if profile.hourly_rate_night is not None else D("0")
     base = D("0")
     skud_sum = D("0")
     tab_sum = D("0")
@@ -346,9 +427,7 @@ def compute_payroll_totals(
         sk = D(str(r.get("skud_h") or 0))
         tab_sum += h
         skud_sum += sk
-        g = str(r.get("graph") or "").strip().lower()
-        rate = night_rate if g == "н" else day_rate
-        base += h * rate
+        base += h * payroll_hourly_rate_for_shift(profile, str(r.get("graph_shift") or ""))
 
     side = effective_side_payroll_fields(settlement, dadj)
     q = side["penalty_quality_pct"]

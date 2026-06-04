@@ -7,13 +7,16 @@
 {% if panel == "arrival" %}
 <link rel="stylesheet" href="{% static 'shifts/css/inventory_arrival.css' %}?v={{ static_asset_version }}">
 {% endif %}
+{% if panel == "payroll" %}
+<link rel="stylesheet" href="{% static 'shifts/css/inventory_payroll.css' %}?v={{ static_asset_version }}">
+{% endif %}
 {% if panel == "issue_outcome" %}
 <link rel="stylesheet" href="{% static 'shifts/css/inventory_outcome.css' %}?v={{ static_asset_version }}">
 {% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="inv-page{% if panel == 'stock' %} inv-page--stock{% endif %}{% if panel == 'arrival' %} inv-page--arrival{% endif %}{% if panel == 'issue_outcome' %} inv-page--issue-outcome{% endif %}">
+<div class="inv-page{% if panel == 'stock' %} inv-page--stock{% endif %}{% if panel == 'arrival' %} inv-page--arrival{% endif %}{% if panel == 'issue_outcome' %} inv-page--issue-outcome{% endif %}{% if panel == 'payroll' %} inv-page--payroll{% endif %}">
 {% if panel != "defects" and panel != "payroll" and panel != "employees" %}
 <nav class="inv-tabs" aria-label="Разделы склада">
   <a class="inv-tab {% if panel == 'stock' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=stock">Склад</a>
@@ -32,58 +35,65 @@
 {% endif %}
 
 {% if panel == "payroll" %}
-<div class="filter-panel" style="margin-top:0;">
-  <h2 style="margin-top:0;">Расчёт заработной платы</h2>
-  <p class="muted" style="margin-bottom:0;">Сотрудники из отделов, доступных по правам «Расчёт ЗП». Часы СКУД за выбранный месяц — по отметкам (как в «Часы по дням»). Нажмите на сотрудника для расчёта по табелю. Колонки «Аванс» и «ЗП»: отметки ставятся в карточке расчёта сотрудника за этот месяц.</p>
-  <form method="get" class="filter-grid" style="margin-top:12px;align-items:flex-end;">
-    <input type="hidden" name="panel" value="payroll">
-    <label class="field"><span>Год</span>
-      <select name="year">
-        {% for y in payroll_year_options %}
-        <option value="{{ y }}" {% if y == payroll_year %}selected{% endif %}>{{ y }}</option>
+<section class="inv-payroll">
+  <header class="inv-payroll__head">
+    <h2>Расчёт заработной платы</h2>
+    <p class="inv-payroll__lead">Сотрудники по вашим правам «Расчёт ЗП». Клик по ФИО — табель и расчёт за {{ payroll_month_name }} {{ payroll_year }}. Отметки «Аванс» и «ЗП» — в карточке сотрудника.</p>
+    <form method="get" class="inv-payroll__toolbar">
+      <input type="hidden" name="panel" value="payroll">
+      <label class="field"><span>Год</span>
+        <select name="year">
+          {% for y in payroll_year_options %}
+          <option value="{{ y }}" {% if y == payroll_year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field"><span>Месяц</span>
+        <select name="month">
+          {% for mm, mname in month_choices_payroll %}
+          <option value="{{ mm }}" {% if mm == payroll_month %}selected{% endif %}>{{ mname }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit" class="btn">Показать</button>
+    </form>
+  </header>
+
+  {% if payroll_rows %}
+  <p class="inv-payroll__meta">В списке: {{ payroll_rows|length }} · {{ payroll_month_name }} {{ payroll_year }}</p>
+  {% endif %}
+
+  <div class="inv-payroll-table-wrap">
+    <table class="inv-payroll-table">
+      <thead>
+        <tr>
+          <th class="col-code">Код</th>
+          <th class="col-name">Сотрудник</th>
+          <th class="col-dept">Отдел</th>
+          <th class="col-hours" title="Часы по отметкам СКУД за {{ payroll_month_name }} {{ payroll_year }}">СКУД, ч</th>
+          <th class="col-st" title="Аванс учтён">Аванс</th>
+          <th class="col-st" title="Расчёт ЗП закрыт">ЗП</th>
+          <th class="col-action" aria-label="Действие"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in payroll_rows %}
+        <tr>
+          <td class="col-code" data-label="Код">{{ row.emp_code }}</td>
+          <td class="col-name" data-label="Сотрудник"><a href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">{{ row.label }}</a></td>
+          <td class="col-dept" data-label="Отдел">{{ row.department_name|default:"—" }}</td>
+          <td class="col-hours" data-label="СКУД, ч">{{ row.skud_hours }}</td>
+          <td class="col-st" data-label="Аванс">{% if row.payroll_advance_ok %}<span class="inv-payroll-ok" title="Аванс учтён">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td class="col-st" data-label="ЗП">{% if row.payroll_month_ok %}<span class="inv-payroll-ok" title="Расчёт закрыт">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td class="col-action" data-label=""><a class="btn btn-sm" href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">Расчёт</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="muted" style="padding:16px;text-align:center;">Нет сотрудников для расчёта (права по отделам или недоступна БД Biota).</td></tr>
         {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span>Месяц</span>
-      <select name="month">
-        {% for mm, mname in month_choices_payroll %}
-        <option value="{{ mm }}" {% if mm == payroll_month %}selected{% endif %}>{{ mname }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <div class="filter-actions"><button type="submit" class="btn">Показать</button></div>
-  </form>
-</div>
-<div class="table-wrap">
-  <table class="data-grid inventory-payroll-table">
-    <thead>
-      <tr>
-        <th class="inv-payroll-code">Код</th>
-        <th class="inv-payroll-name">Сотрудник</th>
-        <th class="inv-payroll-dept">Отдел</th>
-        <th class="inv-payroll-hours">Часы СКУД за {{ payroll_month_name }} {{ payroll_year }}</th>
-        <th class="inv-payroll-st" title="Аванс за месяц учтён">Аванс</th>
-        <th class="inv-payroll-st" title="Расчёт ЗП за месяц завершён">ЗП</th>
-        <th class="inv-payroll-action"></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in payroll_rows %}
-      <tr>
-        <td class="inv-payroll-code">{{ row.emp_code }}</td>
-        <td class="inv-payroll-name"><a href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">{{ row.label }}</a></td>
-        <td class="inv-payroll-dept">{{ row.department_name|default:"—" }}</td>
-        <td class="inv-payroll-hours">{{ row.skud_hours }}</td>
-        <td class="inv-payroll-st">{% if row.payroll_advance_ok %}<span class="inv-payroll-ok" title="Аванс учтён">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td class="inv-payroll-st">{% if row.payroll_month_ok %}<span class="inv-payroll-ok" title="Расчёт ЗП закрыт">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td class="inv-payroll-action"><a class="btn btn-sm" href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">Расчёт</a></td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="7" class="muted">Нет сотрудников для расчёта (права по отделам или недоступна БД Biota).</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+      </tbody>
+    </table>
+  </div>
+</section>
 {% endif %}
 
 {% if panel == "employees" %}
