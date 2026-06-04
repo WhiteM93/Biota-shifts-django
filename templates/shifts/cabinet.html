@@ -120,188 +120,89 @@
     </div>
   </section>
 
-  <section class="cabinet-section" id="cabinet-dept-order">
-    <div class="cabinet-section__head">
-      <h2>Порядок отделов</h2>
-      <p class="cabinet-section__lead">Для раздела «График»: сначала отдел (в этом порядке), затем фамилия А–Я. Перетащите строку или используйте стрелки.</p>
-    </div>
-    <div class="cabinet-section__body">
-      <form method="post" action="">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="admin_dept_order">
-        <input type="hidden" name="dept_order_text" id="dept-order-text" value="">
-        <div class="dept-order-box">
-          <ul class="dept-order-list" id="dept-order-list">
-            {% for dep in dep_order_current %}
-            <li class="dept-item" data-dep="{{ dep }}" draggable="true">
-              <span class="dept-drag-handle" title="Перетащить">⋮⋮</span>
-              <span class="dept-name">{{ dep }}</span>
-              <span class="dept-item-actions">
-                <button type="button" class="btn dept-move" data-dir="up" title="Вверх">↑</button>
-                <button type="button" class="btn dept-move" data-dir="down" title="Вниз">↓</button>
-              </span>
-            </li>
-            {% endfor %}
-          </ul>
-        </div>
-        <div class="cabinet-form-actions">
-          <button type="submit" class="btn">Сохранить порядок отделов</button>
-        </div>
-      </form>
-    </div>
-  </section>
-
-  <section class="cabinet-section" id="cabinet-pos-order">
-    <div class="cabinet-section__head">
-      <h2>Порядок должностей</h2>
-      <p class="cabinet-section__lead">При сортировке «Сначала должность» строки упорядочиваются по этому списку, затем по отделу и фамилии.</p>
-    </div>
-    <div class="cabinet-section__body">
-      <form method="post" action="">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="admin_pos_order">
-        <input type="hidden" name="pos_order_text" id="pos-order-text" value="">
-        <div class="dept-order-box">
-          <ul class="dept-order-list" id="pos-order-list">
-            {% for pos in pos_order_current %}
-            <li class="dept-item" data-dep="{{ pos }}" draggable="true">
-              <span class="dept-drag-handle" title="Перетащить">⋮⋮</span>
-              <span class="dept-name">{{ pos }}</span>
-              <span class="dept-item-actions">
-                <button type="button" class="btn dept-move" data-dir="up" title="Вверх">↑</button>
-                <button type="button" class="btn dept-move" data-dir="down" title="Вниз">↓</button>
-              </span>
-            </li>
-            {% endfor %}
-          </ul>
-        </div>
-        <div class="cabinet-form-actions">
-          <button type="submit" class="btn">Сохранить порядок должностей</button>
-        </div>
-      </form>
-    </div>
-  </section>
-
   <section class="cabinet-section" id="cabinet-privileges">
     <div class="cabinet-section__head">
-      <h2>Права пользователей</h2>
-      <p class="cabinet-section__lead">Новые аккаунты ждут подтверждения. Ниже — доступ к разделам меню (галочка = раздел виден в навигации).</p>
+      <h2>Права доступа</h2>
     </div>
     <div class="cabinet-section__body">
       {% if not priv_users %}
-      <p class="muted">Пока нет зарегистрированных пользователей (файл пользователей пуст).</p>
+      <p class="muted">Нет пользователей.</p>
       {% else %}
-      <form method="get" action="" class="cab-pick">
-        <label>Выбор пользователя (просмотр текущих прав)
-          <select name="priv_user" onchange="this.form.submit()">
-            {% for u in priv_users %}
-            <option value="{{ u }}" {% if u == priv_selected %}selected{% endif %}>{{ u }}</option>
-            {% endfor %}
-          </select>
-        </label>
-      </form>
-
-      <form method="post" action="">
+      <form method="post" action="" id="cab-priv-form" class="cab-priv">
         {% csrf_token %}
         <input type="hidden" name="action" value="admin_privileges">
         <input type="hidden" name="priv_user" value="{{ priv_selected }}">
+        <input type="hidden" name="priv_inventory_stock_manage" value="0">
+        <input type="hidden" name="priv_machines_quick_edit" value="0">
 
-        <div class="cab-priv-toolbar">
-          <label>Тип аккаунта
-            <select name="priv_role">
+        <div class="cab-priv__toolbar">
+          <label class="cab-priv__field">
+            <span class="cab-priv__lbl">Пользователь</span>
+            <select class="cab-priv__sel" id="cab-priv-user-jump" data-base-url="">
+              {% for u in priv_users %}
+              <option value="{{ u }}" {% if u == priv_selected %}selected{% endif %}>{{ u }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="cab-priv__field">
+            <span class="cab-priv__lbl">Роль</span>
+            <select class="cab-priv__sel" name="priv_role">
               {% for r in priv_role_choices %}
               <option value="{{ r }}" {% if r == priv_role %}selected{% endif %}>
-                {% if r == "executor" %}Исполнитель (только просмотр/скачивание){% else %}Руководитель{% endif %}
+                {% if r == "executor" %}Исполнитель{% else %}Руководитель{% endif %}
               </option>
               {% endfor %}
             </select>
           </label>
+          <div class="cab-priv__actions">
+            <button type="submit" class="btn">Сохранить</button>
+            {% if priv_selected %}
+            <button type="submit" class="btn btn-danger" form="cab-priv-delete-form"
+              onclick="return confirm('Удалить «{{ priv_selected }}»?');">Удалить</button>
+            {% endif %}
+          </div>
         </div>
 
-        <p class="cab-priv-hint">
-          Снимите галочку у раздела, чтобы скрыть его в меню.
-          {% if dep_opts %}
-          Для каждого включённого раздела отметьте отделы — в разделе будут видны только они. Если ни одной галочки нет — сотрудников из этого раздела не будет видно.
-          Разделы «График» и «Регламенты» всегда без ограничения по отделам в кабинете (фильтр на странице графика — отдельно).
-          {% else %}
-          Сейчас нет списка цехов из Biota — доступны только переключатели разделов.
-          {% endif %}
-        </p>
-        {% if not dep_opts %}
-        <p class="muted" style="margin-bottom:12px;">Нет цехов в справочнике — сетка отделов скрыта; при сохранении привязка к отделам не меняется.</p>
-        {% endif %}
-
-        {% for row in priv_nav_rows %}
-        <div class="cab-nav-block">
-          <div class="cab-nav-head">
-            <label class="chk" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+        <div class="cab-priv__sections" role="group" aria-label="Разделы меню">
+          {% for row in priv_nav_rows %}
+          <div class="cab-priv__item{% if not row.on %} is-off{% endif %}" data-nav-key="{{ row.key }}">
+            <label class="cab-priv__row">
               <input type="checkbox" name="priv_nav" value="{{ row.key }}" {% if row.on %}checked{% endif %}>
-              <span><strong>{{ row.label }}</strong></span>
+              <span class="cab-priv__name">{{ row.label }}</span>
             </label>
-            {% if dep_opts and not row.no_dept_filter and row.key != "products" and row.key != "machines" %}
-            <span class="cab-nav-bulk">
-              <button type="button" class="btn js-cab-dep-all" data-nav-key="{{ row.key }}">Все</button>
-              <button type="button" class="btn js-cab-dep-none" data-nav-key="{{ row.key }}">Снять всё</button>
-            </span>
+            {% if row.extra_toggle %}
+            <label class="cab-priv__sub">
+              <input type="checkbox" name="{{ row.extra_toggle.field }}" value="1" {% if row.extra_toggle.on %}checked{% endif %}>
+              <span>{{ row.extra_toggle.label }}</span>
+            </label>
+            {% endif %}
+            {% if row.has_dept_picker %}
+            <details class="cab-priv__deps">
+              <summary>Отделы <span class="cab-priv__dep-n" data-dep-count>{{ row.dep_count }}/{{ dep_opts|length }}</span></summary>
+              <p class="cab-priv__dep-tools">
+                <button type="button" class="cab-priv__link js-cab-dep-all">Все</button>
+                <button type="button" class="cab-priv__link js-cab-dep-none">Сброс</button>
+              </p>
+              <div class="cab-priv__dep-chips">
+                {% for d in dep_opts %}
+                <label class="chk cab-priv__chip">
+                  <input type="checkbox" name="priv_nav_dep__{{ row.key }}" value="{{ d }}" {% if d in row.dep_selected %}checked{% endif %}>
+                  {{ d }}
+                </label>
+                {% endfor %}
+              </div>
+            </details>
             {% endif %}
           </div>
-          <div class="cab-check-grid">
-            {% if row.key == "products" %}
-            <p class="muted" style="margin:4px 0 0;">Раздел «Наладки» не привязан к отделам.</p>
-            {% elif row.key == "machines" %}
-            <p class="muted" style="margin:4px 0 0;">Раздел «Станки» не привязан к отделам.</p>
-            {% elif row.no_dept_filter %}
-            <p class="muted" style="margin:4px 0 0;">Все отделы — ограничение в кабинете не настраивается.</p>
-            {% elif dep_opts %}
-            {% for d in dep_opts %}
-            <label class="chk">
-              <input type="checkbox" name="priv_nav_dep__{{ row.key }}" value="{{ d }}" {% if d in row.dep_selected %}checked{% endif %}>
-              {{ d }}
-            </label>
-            {% endfor %}
-            {% else %}
-            <p class="muted" style="margin:4px 0 0;">Цеха из Biota не загружены — отметки отделов недоступны.</p>
-            {% endif %}
-          </div>
-        </div>
-        {% endfor %}
-
-        <div class="cab-nav-block cab-extra-priv">
-          <div class="cab-nav-head"><strong>Склад</strong></div>
-          <p class="muted" style="margin:6px 0 8px;font-size:13px;">
-            Редактирование и удаление позиций на вкладке «Склад» без статуса администратора. Изменения попадают в «Историю».
-          </p>
-          <input type="hidden" name="priv_inventory_stock_manage" value="0">
-          <label class="chk" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" name="priv_inventory_stock_manage" value="1" {% if priv_stock_manage %}checked{% endif %}>
-            <span>Редактирование и удаление позиций склада</span>
-          </label>
-        </div>
-
-        <div class="cab-nav-block cab-extra-priv">
-          <div class="cab-nav-head"><strong>Станки</strong></div>
-          <p class="muted" style="margin:6px 0 8px;font-size:13px;">
-            Кнопка «Быстрое редактирование» на странице «Станки» (правки в браузере пользователя).
-          </p>
-          <input type="hidden" name="priv_machines_quick_edit" value="0">
-          <label class="chk" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" name="priv_machines_quick_edit" value="1" {% if priv_machines_quick_edit %}checked{% endif %}>
-            <span>Быстрое редактирование на странице «Станки»</span>
-          </label>
-        </div>
-
-        <div class="cabinet-form-actions">
-          <button type="submit" class="btn">Сохранить права</button>
+          {% endfor %}
         </div>
       </form>
 
       {% if priv_selected %}
-      <form method="post" action="" class="cab-delete-user"
-            onsubmit="return confirm('Удалить учётную запись «{{ priv_selected }}»? Восстановить будет нельзя.');">
+      <form method="post" action="" id="cab-priv-delete-form" hidden>
         {% csrf_token %}
         <input type="hidden" name="action" value="admin_delete_user">
         <input type="hidden" name="delete_login" value="{{ priv_selected }}">
-        <button type="submit" class="btn btn-danger">Удалить учётную запись</button>
       </form>
       {% endif %}
       {% endif %}
@@ -378,24 +279,57 @@
 
         syncHidden();
       }
-      initOrderList("dept-order-list", "dept-order-text");
-      initOrderList("pos-order-list", "pos-order-text");
     })();
   </script>
   <script>
     (function () {
-      function deptBoxesInBlock(block) {
-        return block.querySelectorAll('input[type="checkbox"][name^="priv_nav_dep__"]');
+      var userSel = document.getElementById("cab-priv-user-jump");
+      if (userSel) {
+        userSel.addEventListener("change", function () {
+          var u = encodeURIComponent(userSel.value || "");
+          var q = window.location.search.replace(/^\?/, "").split("&").filter(function (p) {
+            return p && p.indexOf("priv_user=") !== 0;
+          });
+          q.unshift("priv_user=" + u);
+          window.location.href = window.location.pathname + "?" + q.join("&") + "#cabinet-privileges";
+        });
       }
+      function deptBoxes(item) {
+        return item.querySelectorAll('input[type="checkbox"][name^="priv_nav_dep__"]');
+      }
+      function syncDepCount(item) {
+        var el = item.querySelector("[data-dep-count]");
+        if (!el) return;
+        var boxes = deptBoxes(item);
+        var n = 0;
+        boxes.forEach(function (cb) { if (cb.checked) n += 1; });
+        el.textContent = n + "/" + boxes.length;
+      }
+      function syncItem(item) {
+        var nav = item.querySelector('input[name="priv_nav"]');
+        var on = nav && nav.checked;
+        item.classList.toggle("is-off", !on);
+        var deps = item.querySelector(".cab-priv__deps");
+        if (deps) deps.hidden = !on;
+        syncDepCount(item);
+      }
+      document.querySelectorAll("#cabinet-privileges .cab-priv__item").forEach(function (item) {
+        syncItem(item);
+        var nav = item.querySelector('input[name="priv_nav"]');
+        if (nav) nav.addEventListener("change", function () { syncItem(item); });
+        deptBoxes(item).forEach(function (cb) {
+          cb.addEventListener("change", function () { syncDepCount(item); });
+        });
+      });
       document.addEventListener("click", function (event) {
         var allBtn = event.target.closest(".js-cab-dep-all");
         var noneBtn = event.target.closest(".js-cab-dep-none");
         var btn = allBtn || noneBtn;
         if (!btn) return;
-        var block = btn.closest(".cab-nav-block");
-        if (!block) return;
-        var on = Boolean(allBtn);
-        deptBoxesInBlock(block).forEach(function (cb) { cb.checked = on; });
+        var item = btn.closest(".cab-priv__item");
+        if (!item) return;
+        deptBoxes(item).forEach(function (cb) { cb.checked = Boolean(allBtn); });
+        syncDepCount(item);
       });
     })();
   </script>

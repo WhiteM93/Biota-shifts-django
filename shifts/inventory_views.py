@@ -1918,10 +1918,18 @@ def inventory_view(request):
     qs = ToolItem.objects.filter(is_deleted=False)
     if not show_all:
         qs = qs.filter(quantity__gt=0)
-    filter_category = (_sq("category") or "end_mill").strip()
-    if filter_category not in _INVENTORY_CATEGORIES:
+    if "category" in stock_req:
+        cat_raw = _sq("category")
+        if cat_raw in ("", "all"):
+            filter_category = ""
+        elif cat_raw in _INVENTORY_CATEGORIES:
+            filter_category = cat_raw
+        else:
+            filter_category = "end_mill"
+    else:
         filter_category = "end_mill"
-    qs = qs.filter(category=filter_category)
+    if filter_category:
+        qs = qs.filter(category=filter_category)
 
     diameter_mm_raw = _sq("diameter_mm")
     mill_overall_length_raw = _sq("mill_overall_length_mm")
@@ -1979,7 +1987,7 @@ def inventory_view(request):
     coating_type = _sq("coating_type")
     work_material = _sq("work_material")
 
-    if filter_category == "end_mill":
+    if filter_category and filter_category == "end_mill":
         if diameter_mm_raw:
             diameter_mm = _to_decimal(diameter_mm_raw, Decimal("0"))
             if diameter_mm > 0:
@@ -2128,7 +2136,9 @@ def inventory_view(request):
     stock_category_total = 0
     stock_filtered_count = 0
     if panel == "stock":
-        stock_category_qs = ToolItem.objects.filter(is_deleted=False, category=filter_category)
+        stock_category_qs = ToolItem.objects.filter(is_deleted=False)
+        if filter_category:
+            stock_category_qs = stock_category_qs.filter(category=filter_category)
         if not show_all:
             stock_category_qs = stock_category_qs.filter(quantity__gt=0)
         stock_category_total = stock_category_qs.count()
@@ -2137,7 +2147,8 @@ def inventory_view(request):
     option_source_qs = ToolItem.objects.filter(is_deleted=False)
     if not show_all:
         option_source_qs = option_source_qs.filter(quantity__gt=0)
-    option_source_qs = option_source_qs.filter(category=filter_category)
+    if filter_category:
+        option_source_qs = option_source_qs.filter(category=filter_category)
 
     end_mill_diameters = _sorted_unique_decimal_strings(
         _distinct_numeric_values(option_source_qs.filter(category="end_mill"), "end_mill_spec__diameter_mm")
@@ -2419,7 +2430,7 @@ def inventory_view(request):
             "drill_spec",
             "insert_spec",
             "collet_spec",
-        ),
+        ).order_by("category", "name"),
         "movements": mv_hist[:50],
         "inventory_history": inventory_history,
         "thread_standards": THREAD_STANDARDS,

@@ -535,6 +535,20 @@ NAV_LABELS_RU = {
     "machines": "Станки",
     "calculator": "Калькулятор",
 }
+NAV_LABELS_SHORT = {
+    "home": "Главная",
+    "graph": "График",
+    "hours": "Часы",
+    "skud": "СКУД",
+    "inventory": "Склад",
+    "defects": "Брак",
+    "payroll": "Зарплата",
+    "employees": "Сотрудники",
+    "regulations": "Регламенты",
+    "products": "Наладки",
+    "machines": "Станки",
+    "calculator": "Калькулятор",
+}
 
 
 def inventory_stock_manage_for_user(username: str | None) -> bool:

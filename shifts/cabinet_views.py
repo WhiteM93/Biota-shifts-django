@@ -14,6 +14,7 @@ from biota_shifts.auth import (
     ADMIN_USERNAME,
     NAV_KEYS,
     NAV_LABELS_RU,
+    NAV_LABELS_SHORT,
     USER_ROLE_CHOICES,
     USER_ROLE_EXECUTOR,
     USER_ROLE_MANAGER,
@@ -33,8 +34,8 @@ from biota_shifts.auth import (
     user_role_for_username,
 )
 from shifts.models import InventoryStockEvent
-from .department_order import apply_department_order, load_department_order, save_department_order
-from .position_order import apply_position_order, load_position_order, save_position_order
+from .department_order import apply_department_order, load_department_order
+from .position_order import apply_position_order, load_position_order
 from .db_health import collect_system_health
 
 from .auth_utils import biota_login_required, biota_user
@@ -139,24 +140,6 @@ def cabinet_view(request):
                 else:
                     messages.error(request, err)
                 return redirect("cabinet")
-            if action == "admin_dept_order":
-                raw = request.POST.get("dept_order_text") or ""
-                parts = [p.strip() for p in raw.replace("\r", "\n").replace(",", "\n").split("\n")]
-                dep_opts = sorted(employees_full["department_name"].unique().tolist()) if not employees_full.empty else []
-                allowed = set(dep_opts)
-                cleaned = [p for p in parts if p and p in allowed]
-                save_department_order(cleaned)
-                messages.success(request, "Порядок отделов сохранен.")
-                return redirect("cabinet")
-            if action == "admin_pos_order":
-                raw = request.POST.get("pos_order_text") or ""
-                parts = [p.strip() for p in raw.replace("\r", "\n").replace(",", "\n").split("\n")]
-                pos_opts = sorted(employees_full["position_name"].unique().tolist()) if not employees_full.empty else []
-                allowed = set(pos_opts)
-                cleaned = [p for p in parts if p and p in allowed]
-                save_position_order(cleaned)
-                messages.success(request, "Порядок должностей сохранен.")
-                return redirect("cabinet")
         else:
             if action == "profile":
                 dn = request.POST.get("display_name") or ""
@@ -212,16 +195,12 @@ def cabinet_view(request):
         ctx["admin_display_name"] = (request.session.get("admin_display_name") or "").strip()
         ctx["priv_users"] = sorted(priv_store.keys())
         dep_opts = sorted(employees_full["department_name"].unique().tolist()) if not employees_full.empty else []
-        dep_order = apply_department_order(dep_opts, load_department_order())
+        dep_opts = apply_department_order(dep_opts, load_department_order())
         pos_opts = sorted(employees_full["position_name"].unique().tolist()) if not employees_full.empty else []
-        pos_order = apply_position_order(pos_opts, load_position_order())
+        pos_opts = apply_position_order(pos_opts, load_position_order())
         area_opts = _distinct_area_tokens(employees_full["area_name"]) if not employees_full.empty else []
         ctx["dep_opts"] = dep_opts
-        ctx["dep_order_current"] = dep_order
-        ctx["dep_order_text"] = "\n".join(dep_order)
         ctx["pos_opts"] = pos_opts
-        ctx["pos_order_current"] = pos_order
-        ctx["pos_order_text"] = "\n".join(pos_order)
         ctx["area_opts"] = area_opts
         sel = (request.GET.get("priv_user") or "").strip()
         if sel not in priv_store and ctx["priv_users"]:
@@ -245,14 +224,35 @@ def cabinet_view(request):
             sel_deps = [d for d in (_ndf.get(k) or []) if d in dep_opts]
             if ctx["priv_selected"] and k == "payroll" and k not in raw_ndf:
                 sel_deps = [d for d in (_ndf.get("defects") or []) if d in dep_opts]
+            has_dept_picker = bool(
+                dep_opts
+                and k not in ("products", "machines")
+                and k not in NAV_KEYS_NO_DEPT_FILTER
+            )
+            extra_toggle = None
+            if k == "inventory":
+                extra_toggle = {
+                    "field": "priv_inventory_stock_manage",
+                    "label": "Редактирование склада",
+                    "on": ctx["priv_stock_manage"],
+                }
+            elif k == "machines":
+                extra_toggle = {
+                    "field": "priv_machines_quick_edit",
+                    "label": "Быстрое редактирование",
+                    "on": ctx["priv_machines_quick_edit"],
+                }
             ctx["priv_nav_rows"].append(
                 {
                     "key": k,
-                    "label": NAV_LABELS_RU.get(k, k),
+                    "label": NAV_LABELS_SHORT.get(k, NAV_LABELS_RU.get(k, k)),
                     "on": _pn.get(k, True),
                     "locked": False,
                     "dep_selected": sel_deps,
+                    "dep_count": len(sel_deps),
+                    "has_dept_picker": has_dept_picker,
                     "no_dept_filter": k in NAV_KEYS_NO_DEPT_FILTER,
+                    "extra_toggle": extra_toggle,
                 }
             )
     else:

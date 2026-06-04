@@ -14,9 +14,6 @@
   <form method="get" action="{% url 'regulations_page' %}" class="reg-toolbar-form auto-submit-form">
     <input type="hidden" name="shift" value="{{ reg_shift }}">
     <div class="reg-toolbar-group">
-      <label class="field"><span>Месяц</span>
-        <input type="month" name="month" value="{{ plan_month_value }}" required>
-      </label>
       <div class="reg-toolbar-meta">
         
         {% if biota_ok and emp_count is not None %}
@@ -24,18 +21,6 @@
         {% endif %}
       </div>
     </div>
-    {% if reg_filter_deps %}
-    <div class="reg-mode-row">
-      <span class="reg-mode-label">Отделы:</span>
-      <label class="reg-inline"><input type="radio" name="dep_mode" value="all" {% if not reg_dep_mode_pick %}checked{% endif %}> Все</label>
-      <label class="reg-inline"><input type="radio" name="dep_mode" value="pick" {% if reg_dep_mode_pick %}checked{% endif %}> По списку</label>
-    </div>
-    <div class="reg-check-row {% if not reg_dep_mode_pick %}is-hidden{% endif %}" data-reg-dep-target>
-      {% for d in reg_filter_deps %}
-      <label class="chk"><input type="checkbox" name="dep" value="{{ d }}" {% if d in reg_sel_deps %}checked{% endif %}> {{ d }}</label>
-      {% endfor %}
-    </div>
-    {% endif %}
   </form>
   <div class="reg-toolbar-actions">
     <a class="btn" href="{% url 'regulations_excel' %}?shift={{ reg_shift }}{{ reg_dep_qs }}"
@@ -47,14 +32,11 @@
       {% csrf_token %}
       
       <input type="hidden" name="shift" value="{{ reg_shift }}">
-      {% if post_dep_mode %}<input type="hidden" name="dep_mode" value="{{ post_dep_mode }}">{% endif %}
-      {% for d in post_dep_list %}<input type="hidden" name="dep" value="{{ d }}">{% endfor %}
       <button type="submit" name="action" value="from_catalog" class="btn"
         {% if not biota_ok %}disabled title="Нет связи со справочником Biota"{% endif %}>Заполнить из Biota</button>
     </form>
     {% endif %}
     <button type="button" class="btn btn-print-sheet" id="reg-print-btn" title="Диалог печати браузера (можно сохранить в PDF)">Печать</button>
-    <button type="button" class="btn btn-png-export" id="reg-png-btn" title="Снимок шкалы в тёмном оформлении (PNG)"{% if not rows %} disabled{% endif %}>PNG (тёмная тема)</button>
     {% if biota_can_edit %}
     <button type="button" class="btn btn-edit-unlock" id="reg-edit-toggle">Включить редактирование</button>
     <button type="button" class="btn reg-save-btn" id="reg-save" disabled>Сохранить на сервер</button>
@@ -181,9 +163,8 @@
 
 </div>
 
-<link rel="stylesheet" href="{% static "regulations/css/timeline.css" %}">
+<link rel="stylesheet" href="{% static "regulations/css/timeline.css" %}?v={{ static_asset_version }}">
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="{% static 'regulations/timeline.js' %}?v=10"></script>
 <script>
   (function () {
@@ -242,69 +223,6 @@
         window.print();
       });
     }
-    var regPngBtn = document.getElementById("reg-png-btn");
-    if (regPngBtn) {
-      regPngBtn.addEventListener("click", function () {
-        if (typeof html2canvas !== "function") {
-          window.alert("Не удалось загрузить библиотеку снимка. Проверьте сеть и обновите страницу.");
-          return;
-        }
-        var root = document.getElementById("reg-timeline-root");
-        var pageRoot = document.getElementById("reg-page-root");
-        var themeBtn = document.getElementById("reg-theme-toggle");
-        if (!root || !pageRoot) return;
-        var hadLight = pageRoot.classList.contains("theme-light");
-        if (hadLight) {
-          pageRoot.classList.remove("theme-light");
-          if (themeBtn) {
-            themeBtn.classList.remove("is-active");
-            themeBtn.textContent = "Светлая (Ч/Б)";
-          }
-        }
-        regPngBtn.disabled = true;
-        var w = root.getBoundingClientRect().width;
-        var scale = w > 1600 ? 1 : 2;
-        function restoreTheme() {
-          if (hadLight) {
-            pageRoot.classList.add("theme-light");
-            if (themeBtn) {
-              themeBtn.classList.add("is-active");
-              themeBtn.textContent = "Обычная тема";
-            }
-          }
-          regPngBtn.disabled = {% if not rows %}true{% else %}false{% endif %};
-        }
-        function run() {
-          html2canvas(root, {
-            scale: scale,
-            useCORS: true,
-            allowTaint: false,
-            logging: false,
-            backgroundColor: "#121722",
-            scrollX: 0,
-            scrollY: 0
-          })
-            .then(function (canvas) {
-              restoreTheme();
-              try {
-                var a = document.createElement("a");
-                a.download = "reglament_{{ reg_shift }}.png";
-                a.href = canvas.toDataURL("image/png");
-                a.click();
-              } catch (e) {
-                window.alert("Не удалось сформировать файл PNG.");
-              }
-            })
-            .catch(function () {
-              restoreTheme();
-              window.alert("Не удалось создать снимок регламента.");
-            });
-        }
-        requestAnimationFrame(function () {
-          requestAnimationFrame(run);
-        });
-      });
-    }
     var regPageRoot = document.getElementById("reg-page-root");
     var regThemeBtn = document.getElementById("reg-theme-toggle");
     if (regPageRoot && regThemeBtn) {
@@ -335,24 +253,4 @@
 {% if biota_is_admin %}
 {% include "shifts/includes/section_debug_log_panel.html" with debug_log_section="regulations" debug_log_title="Регламенты" %}
 {% endif %}
-<script>
-  (function () {
-    var f = document.querySelector("form.reg-toolbar-form.auto-submit-form");
-    if (!f) return;
-    function syncDepRow() {
-      var pick = f.querySelector('input[name="dep_mode"][value="pick"]');
-      var row = f.querySelector("[data-reg-dep-target]");
-      if (row) row.classList.toggle("is-hidden", !(pick && pick.checked));
-    }
-    f.addEventListener("change", function (ev) {
-      var t = ev.target;
-      if (t && t.name === "dep_mode" && t.value === "pick" && t.checked) {
-        var row = f.querySelector("[data-reg-dep-target]");
-        if (row) row.querySelectorAll('input[name="dep"]').forEach(function (cb) { cb.checked = false; });
-      }
-      syncDepRow();
-    });
-    syncDepRow();
-  })();
-</script>
 {% endblock %}
