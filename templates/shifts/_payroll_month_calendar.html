@@ -15,9 +15,14 @@
       {% else %}<span class="pr-badge pr-badge--empty">—</span>{% endif %}
       </div>
       <div class="pr-cal__skud" title="СКУД">С {{ row.skud_h }}</div>
+      <div class="pr-cal__split" data-date-iso="{{ row.date_iso }}">
+        <span class="pr-cal__dn pr-cal__dn--d" title="Дневные часы к оплате">Д <span class="js-pr-day-h">{{ row.tab_day_h }}</span></span>
+        <span class="pr-cal__dn pr-cal__dn--n" title="Ночные часы к оплате">Н <span class="js-pr-night-h">{{ row.tab_night_h }}</span></span>
+      </div>
       <div class="pr-cal__tab">
         {% if payroll_day_editable %}
-        <input type="text" class="payroll-tab-day-input" name="tab_{{ row.date_iso }}" value="{{ row.tab_h }}" inputmode="decimal" aria-label="Табель {{ row.date_iso }}">
+        <input type="text" class="payroll-tab-day-input" name="tab_{{ row.date_iso }}" value="{{ row.tab_h }}" inputmode="decimal" aria-label="Табель {{ row.date_iso }}"
+          {% if profile.shift_hours and row.tab_h >= profile.shift_hours|add:profile.shift_hours %}title="Праздник: {{ profile.shift_hours|add:profile.shift_hours }} ч к оплате (2× смена по коду д/н в графике)"{% endif %}>
         {% else %}
         <span class="pr-cal__tab-val">{{ row.tab_h }}</span>
         {% endif %}
@@ -29,4 +34,9 @@
     {% endfor %}
   </div>
   {% endfor %}
+  <div class="pr-cal__foot" aria-live="polite">
+    <span class="pr-cal__foot-item">Дн. <strong id="pr-cal-foot-day">{% if totals %}{{ totals.total_day_hours }}{% else %}—{% endif %}</strong> ч</span>
+    <span class="pr-cal__foot-item">Ноч. <strong id="pr-cal-foot-night">{% if totals %}{{ totals.total_night_hours }}{% else %}—{% endif %}</strong> ч</span>
+    <span class="pr-cal__foot-item pr-cal__foot-item--muted">Таб. <strong id="pr-cal-foot-tab">{% if totals %}{{ totals.total_tab_hours }}{% else %}—{% endif %}</strong> ч</span>
+  </div>
 </div>

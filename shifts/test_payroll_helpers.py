@@ -12,7 +12,9 @@ from shifts.payroll_helpers import (
     payroll_calendar_weeks,
     payroll_day_accrual_rub,
     payroll_hourly_rate_for_shift,
+    payroll_payout_parts_from_base,
     payroll_schedule_shift_kind,
+    payroll_tab_day_night_hours,
 )
 
 
@@ -39,14 +41,45 @@ class PayrollTabDefaultTests(SimpleTestCase):
         self.assertEqual(effective_tab_hours(0, 0.0), 0.0)
 
 
-class PayrollDayAccrualTests(SimpleTestCase):
-    def test_double_shift_splits_day_and_night(self):
+class PayrollDayNightHoursTests(SimpleTestCase):
+    def test_split_day_night_and_holiday_double(self):
         profile = MagicMock()
         profile.shift_hours = 12
-        profile.hourly_rate_day = Decimal("450")
-        profile.hourly_rate_night = Decimal("500")
-        self.assertEqual(payroll_day_accrual_rub(profile, "д", 24), Decimal("11400.00"))
-        self.assertEqual(payroll_day_accrual_rub(profile, "д", 12), Decimal("5400.00"))
+        self.assertEqual(payroll_tab_day_night_hours(profile, "д", 12), (Decimal("12"), Decimal("0")))
+        self.assertEqual(payroll_tab_day_night_hours(profile, "н", 12), (Decimal("0"), Decimal("12")))
+        self.assertEqual(payroll_tab_day_night_hours(profile, "д", 24), (Decimal("24"), Decimal("0")))
+        self.assertEqual(payroll_tab_day_night_hours(profile, "н", 24), (Decimal("0"), Decimal("24")))
+
+
+class PayrollDayAccrualTests(SimpleTestCase):
+    def test_holiday_double_pay_one_shift_rate(self):
+        profile = MagicMock()
+        profile.shift_hours = 12
+        profile.hourly_rate_day = Decimal("500")
+        profile.hourly_rate_night = Decimal("1000")
+        self.assertEqual(payroll_day_accrual_rub(profile, "д", 24), Decimal("12000.00"))
+        self.assertEqual(payroll_day_accrual_rub(profile, "н", 24), Decimal("24000.00"))
+        self.assertEqual(payroll_day_accrual_rub(profile, "д", 12), Decimal("6000.00"))
+
+
+class PayrollPayoutFormulaTests(SimpleTestCase):
+    def test_user_formula_guaranteed_slices_bonus(self):
+        base = Decimal("100000")
+        parts = payroll_payout_parts_from_base(
+            base,
+            quality_pct=Decimal("20"),
+            result_pct=Decimal("20"),
+            mode_pct=Decimal("10"),
+            bonus_percent=Decimal("5"),
+            bonus_rub=Decimal("1000"),
+            penalty_rub=Decimal("500"),
+        )
+        self.assertEqual(parts["guaranteed_rub"], Decimal("50000.00"))
+        self.assertEqual(parts["slices_rub"], Decimal("50000.00"))
+        self.assertEqual(parts["tab_payout"], Decimal("100000.00"))
+        self.assertEqual(parts["bonus_pct_amount"], Decimal("5000.00"))
+        self.assertEqual(parts["bonus_total"], Decimal("6000.00"))
+        self.assertEqual(parts["total"], Decimal("105500.00"))
 
 
 class PayrollRateTests(SimpleTestCase):

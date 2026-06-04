@@ -21,18 +21,88 @@
     return '';
   }
 
-  function rateForShiftKind(kind) {
-    return kind === 'н' ? nightRate : dayRate;
-  }
-
-  function dayAccrualRub(kind, tabH) {
+  function tabDayNightHours(kind, tabH) {
     var h = Number(tabH) || 0;
-    if (h <= 0) return 0;
+    if (h <= 0) return { day: 0, night: 0 };
     var sh = shiftHours;
     if (sh > 0 && h >= sh * 2 - 0.01) {
-      return round2(sh * dayRate + sh * nightRate);
+      var payH = sh * 2;
+      if (kind === 'н') return { day: 0, night: payH };
+      return { day: payH, night: 0 };
     }
-    return round2(h * rateForShiftKind(kind));
+    if (kind === 'н') return { day: 0, night: h };
+    return { day: h, night: 0 };
+  }
+
+  function baseFromHours(dayH, nightH) {
+    return round2(dayH * dayRate + nightH * nightRate);
+  }
+
+  function payoutPartsFromBase(base, opts) {
+    opts = opts || {};
+    var includeFixedRub = opts.includeFixedRub !== false;
+    var qMax = 20;
+    var rMax = 20;
+    var mMax = 10;
+    var pqRaw =
+      parseNum(
+        form.querySelector('[name="penalty_quality_pct"]') &&
+          form.querySelector('[name="penalty_quality_pct"]').value
+      ) || 0;
+    var prRaw =
+      parseNum(
+        form.querySelector('[name="penalty_result_pct"]') &&
+          form.querySelector('[name="penalty_result_pct"]').value
+      ) || 0;
+    var pmRaw =
+      parseNum(
+        form.querySelector('[name="penalty_mode_pct"]') &&
+          form.querySelector('[name="penalty_mode_pct"]').value
+      ) || 0;
+    var qEff = Math.min(qMax, Math.max(0, pqRaw));
+    var rEff = Math.min(rMax, Math.max(0, prRaw));
+    var mEff = Math.min(mMax, Math.max(0, pmRaw));
+    var guaranteed = round2(base / 2);
+    var slicesPay = round2((base * (qEff + rEff + mEff)) / 100);
+    var tabPayout = round2(guaranteed + slicesPay);
+    var bPct =
+      parseNum(
+        form.querySelector('[name="bonus_percent"]') &&
+          form.querySelector('[name="bonus_percent"]').value
+      ) || 0;
+    if (bPct < 0) bPct = 0;
+    var bonusPctAmt = round2((base * bPct) / 100);
+    var bRub =
+      parseNum(
+        form.querySelector('[name="bonus_rub"]') && form.querySelector('[name="bonus_rub"]').value
+      ) || 0;
+    if (bRub < 0) bRub = 0;
+    bRub = round2(bRub);
+    var penRub =
+      parseNum(
+        form.querySelector('[name="penalty_rub"]') && form.querySelector('[name="penalty_rub"]').value
+      ) || 0;
+    if (penRub < 0) penRub = 0;
+    penRub = round2(penRub);
+    if (!includeFixedRub) {
+      bRub = 0;
+      penRub = 0;
+    }
+    var bonusTotal = round2(bonusPctAmt + bRub);
+    var total = round2(tabPayout + bonusTotal - penRub);
+    if (total < 0) total = 0;
+    return {
+      guaranteed: guaranteed,
+      slices: slicesPay,
+      tab_payout: tabPayout,
+      bonus_pct_amount: bonusPctAmt,
+      bonus_rub: bRub,
+      bonus_total: bonusTotal,
+      penalty_rub: penRub,
+      penalties: round2(base - tabPayout),
+      total: total,
+      penalty_pct_sum: round2(qMax - qEff + (rMax - rEff) + (mMax - mEff)),
+    };
   }
 
   function defaultTabForRow(r) {
@@ -79,141 +149,56 @@
     var dayPred = options.dayPred;
     var includeFixedRub = options.includeFixedRub !== false;
     var byDate = tabHoursByDate();
-    var base = 0;
+    var dayH = 0;
+    var nightH = 0;
     var skudSum = 0;
     var tabSum = 0;
     rows.forEach(function (r) {
       if (dayPred && !dayPred(r)) return;
       var h = byDate[r.date_iso] || 0;
       var sk = Number(r.skud_h) || 0;
+      var split = tabDayNightHours(shiftKindForRow(r), h);
       tabSum += h;
       skudSum += sk;
-      base += dayAccrualRub(shiftKindForRow(r), h);
+      dayH += split.day;
+      nightH += split.night;
     });
-    base = round2(base);
+    var base = baseFromHours(dayH, nightH);
     skudSum = round2(skudSum);
     tabSum = round2(tabSum);
-
-    var qMax = 20;
-    var rMax = 20;
-    var mMax = 10;
-    var pqRaw =
-      parseNum(
-        form.querySelector('[name="penalty_quality_pct"]') &&
-          form.querySelector('[name="penalty_quality_pct"]').value
-      ) || 0;
-    var prRaw =
-      parseNum(
-        form.querySelector('[name="penalty_result_pct"]') &&
-          form.querySelector('[name="penalty_result_pct"]').value
-      ) || 0;
-    var pmRaw =
-      parseNum(
-        form.querySelector('[name="penalty_mode_pct"]') &&
-          form.querySelector('[name="penalty_mode_pct"]').value
-      ) || 0;
-    var qEff = Math.min(qMax, Math.max(0, pqRaw));
-    var rEff = Math.min(rMax, Math.max(0, prRaw));
-    var mEff = Math.min(mMax, Math.max(0, pmRaw));
-    var guaranteed = round2((base * 50) / 100);
-    var qualityPay = round2((base * qEff) / 100);
-    var resultPay = round2((base * rEff) / 100);
-    var modePay = round2((base * mEff) / 100);
-    var tabPayout = round2(guaranteed + qualityPay + resultPay + modePay);
-    var penalties = round2(base - tabPayout);
-    var pctSum = round2(qMax - qEff + (rMax - rEff) + (mMax - mEff));
-    var bPct =
-      parseNum(
-        form.querySelector('[name="bonus_percent"]') &&
-          form.querySelector('[name="bonus_percent"]').value
-      ) || 0;
-    if (bPct < 0) bPct = 0;
-    var bonusPctAmt = round2((base * bPct) / 100);
-    var bRub =
-      parseNum(
-        form.querySelector('[name="bonus_rub"]') && form.querySelector('[name="bonus_rub"]').value
-      ) || 0;
-    if (bRub < 0) bRub = 0;
-    bRub = round2(bRub);
-    var penRub =
-      parseNum(
-        form.querySelector('[name="penalty_rub"]') && form.querySelector('[name="penalty_rub"]').value
-      ) || 0;
-    if (penRub < 0) penRub = 0;
-    penRub = round2(penRub);
-    if (!includeFixedRub) {
-      bRub = 0;
-      penRub = 0;
-    }
-    var total = round2(tabPayout + bonusPctAmt + bRub - penRub);
-    if (total < 0) total = 0;
+    dayH = round2(dayH);
+    nightH = round2(nightH);
+    var parts = payoutPartsFromBase(base, { includeFixedRub: includeFixedRub });
     return {
       base_tab: base,
-      tab_payout: tabPayout,
+      tab_payout: parts.tab_payout,
+      guaranteed_rub: parts.guaranteed,
+      slices_rub: parts.slices,
       total_skud_hours: skudSum,
       total_tab_hours: tabSum,
-      penalties: penalties,
-      bonus_pct_amount: bonusPctAmt,
-      bonus_rub: bRub,
-      penalty_rub: penRub,
-      total: total,
-      penalty_pct_sum: pctSum,
+      total_day_hours: dayH,
+      total_night_hours: nightH,
+      penalties: parts.penalties,
+      bonus_pct_amount: parts.bonus_pct_amount,
+      bonus_rub: parts.bonus_rub,
+      bonus_total: parts.bonus_total,
+      penalty_rub: parts.penalty_rub,
+      total: parts.total,
+      penalty_pct_sum: parts.penalty_pct_sum,
     };
   }
 
   function computeTotalsSkud() {
-    var base = 0;
+    var dayH = 0;
+    var nightH = 0;
     rows.forEach(function (r) {
       var sk = Number(r.skud_h) || 0;
-      base += dayAccrualRub(shiftKindForRow(r), sk);
+      var split = tabDayNightHours(shiftKindForRow(r), sk);
+      dayH += split.day;
+      nightH += split.night;
     });
-    base = round2(base);
-    var qMax = 20;
-    var rMax = 20;
-    var mMax = 10;
-    var pqRaw =
-      parseNum(
-        form.querySelector('[name="penalty_quality_pct"]') &&
-          form.querySelector('[name="penalty_quality_pct"]').value
-      ) || 0;
-    var prRaw =
-      parseNum(
-        form.querySelector('[name="penalty_result_pct"]') &&
-          form.querySelector('[name="penalty_result_pct"]').value
-      ) || 0;
-    var pmRaw =
-      parseNum(
-        form.querySelector('[name="penalty_mode_pct"]') &&
-          form.querySelector('[name="penalty_mode_pct"]').value
-      ) || 0;
-    var qEff = Math.min(qMax, Math.max(0, pqRaw));
-    var rEff = Math.min(rMax, Math.max(0, prRaw));
-    var mEff = Math.min(mMax, Math.max(0, pmRaw));
-    var tabPayout = round2(
-      base * 0.5 + (base * qEff) / 100 + (base * rEff) / 100 + (base * mEff) / 100
-    );
-    var bPct =
-      parseNum(
-        form.querySelector('[name="bonus_percent"]') &&
-          form.querySelector('[name="bonus_percent"]').value
-      ) || 0;
-    if (bPct < 0) bPct = 0;
-    var bonusPctAmt = round2((base * bPct) / 100);
-    var bRub =
-      parseNum(
-        form.querySelector('[name="bonus_rub"]') && form.querySelector('[name="bonus_rub"]').value
-      ) || 0;
-    if (bRub < 0) bRub = 0;
-    bRub = round2(bRub);
-    var penRub =
-      parseNum(
-        form.querySelector('[name="penalty_rub"]') && form.querySelector('[name="penalty_rub"]').value
-      ) || 0;
-    if (penRub < 0) penRub = 0;
-    penRub = round2(penRub);
-    var total = round2(tabPayout + bonusPctAmt + bRub - penRub);
-    if (total < 0) total = 0;
-    return total;
+    var parts = payoutPartsFromBase(baseFromHours(dayH, nightH));
+    return parts.total;
   }
 
   function fmtRu(n) {
@@ -237,14 +222,24 @@
 
   function renderTotals(t) {
     var el;
+    el = document.getElementById('payroll-pl-day-h');
+    if (el) el.textContent = fmtRu(t.total_day_hours);
+    el = document.getElementById('payroll-pl-night-h');
+    if (el) el.textContent = fmtRu(t.total_night_hours);
     el = document.getElementById('payroll-pl-base');
     if (el) el.textContent = fmtRu(t.base_tab);
+    el = document.getElementById('payroll-pl-guaranteed');
+    if (el) el.textContent = fmtRu(t.guaranteed_rub);
+    el = document.getElementById('payroll-pl-slices');
+    if (el) el.textContent = fmtRu(t.slices_rub);
     el = document.getElementById('payroll-pl-tab-pay');
     if (el) el.textContent = fmtRu(t.tab_payout);
     el = document.getElementById('payroll-pl-tab-h');
     if (el) el.textContent = fmtRu(t.total_tab_hours);
     el = document.getElementById('payroll-pl-skud-h');
     if (el) el.textContent = fmtRu(t.total_skud_hours);
+    el = document.getElementById('payroll-pl-bonus-total');
+    if (el) el.textContent = fmtRu(t.bonus_total);
     el = document.getElementById('payroll-pl-bonus-pct');
     if (el) el.textContent = fmtRu(t.bonus_pct_amount);
     el = document.getElementById('payroll-pl-bonus-rub');
@@ -288,9 +283,37 @@
   }
 
   var scheduled = null;
+  function fmtHours(n) {
+    var x = Number(n) || 0;
+    if (Math.abs(x - Math.round(x)) < 0.001) return String(Math.round(x));
+    return x.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+  }
+
+  function updateCalendarSplitHours() {
+    var byDate = tabHoursByDate();
+    rows.forEach(function (r) {
+      var iso = r.date_iso;
+      var h = byDate[iso] || 0;
+      var split = tabDayNightHours(shiftKindForRow(r), h);
+      var cell = form.querySelector('.pr-cal__split[data-date-iso="' + iso + '"]');
+      if (!cell) return;
+      var elD = cell.querySelector('.js-pr-day-h');
+      var elN = cell.querySelector('.js-pr-night-h');
+      if (elD) elD.textContent = fmtHours(split.day);
+      if (elN) elN.textContent = fmtHours(split.night);
+    });
+  }
+
   function refresh() {
     var monthTotals = computeTotalsCore({});
     renderTotals(monthTotals);
+    updateCalendarSplitHours();
+    var elDay = document.getElementById('pr-cal-foot-day');
+    var elNight = document.getElementById('pr-cal-foot-night');
+    var elTab = document.getElementById('pr-cal-foot-tab');
+    if (elDay) elDay.textContent = fmtHours(monthTotals.total_day_hours);
+    if (elNight) elNight.textContent = fmtHours(monthTotals.total_night_hours);
+    if (elTab) elTab.textContent = fmtHours(monthTotals.total_tab_hours);
     renderGrossSlice(
       computeTotalsCore({
         dayPred: dayOkForAdvance,

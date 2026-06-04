@@ -454,7 +454,7 @@
 }
 
 .pr-cal__day {
-  min-height: 4.5rem;
+  min-height: 5.25rem;
   padding: 4px 5px 5px;
   border-radius: 6px;
   border: 1px solid var(--bio-surface-item-border);
@@ -496,6 +496,60 @@
   font-size: 10px;
   color: var(--bio-caption-soft);
   font-variant-numeric: tabular-nums;
+}
+
+.pr-cal__split {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.pr-cal__dn {
+  flex: 1;
+  padding: 1px 3px;
+  border-radius: 3px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.pr-cal__dn--d {
+  color: #e8d4a8;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pr-cal__dn--n {
+  color: #ffe566;
+  background: rgba(255, 229, 102, 0.12);
+}
+
+.pr-cal__dn .js-pr-day-h,
+.pr-cal__dn .js-pr-night-h {
+  font-weight: 700;
+}
+
+.pr-cal__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--bio-surface-item-border);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 11px;
+  color: var(--bio-caption-soft);
+}
+
+.pr-cal__foot-item strong {
+  color: var(--bio-body-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.pr-cal__foot-item--muted strong {
+  color: var(--bio-muted);
 }
 
 .pr-cal__tab {

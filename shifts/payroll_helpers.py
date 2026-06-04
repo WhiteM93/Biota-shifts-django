@@ -159,20 +159,103 @@ def _profile_shift_hours_int(profile, default: int = 8) -> int:
     return default
 
 
-def payroll_day_accrual_rub(profile, shift_kind: str, tab_h) -> Decimal:
-    """Начисление за день: часы × ставка; при 2× смене (24 ч) — 12 ч день + 12 ч ночь."""
+def payroll_tab_day_night_hours(profile, shift_kind: str, tab_h) -> tuple[Decimal, Decimal]:
+    """Разбивка часов табеля: (дневные, ночные) для суммы дн×ставка + ноч×ставка.
+
+    Если в табеле ≥ 2× длины смены (напр. 24 при смене 12 ч) — праздничная двойная оплата:
+    одна смена по коду графика (д/н), часы для расчёта = 2× shift_hours по соответствующей ставке,
+    а не «день + ночь» в одни сутки.
+    """
     D = Decimal
     h = D(str(tab_h or 0))
     if h <= 0:
-        return D("0")
-    sh_int = _profile_shift_hours_int(profile)
-    sh = D(str(sh_int))
+        return D("0"), D("0")
+    sh = D(str(_profile_shift_hours_int(profile)))
+    if sh > 0 and h >= sh * D("2") - D("0.01"):
+        pay_h = sh * D("2")
+        if shift_kind == "н":
+            return D("0"), pay_h
+        return pay_h, D("0")
+    if shift_kind == "н":
+        return D("0"), h
+    return h, D("0")
+
+
+def payroll_day_accrual_rub(profile, shift_kind: str, tab_h) -> Decimal:
+    """Сумма за день: дневные_ч × дн.ставка + ночные_ч × ноч.ставка."""
+    D = Decimal
+    day_h, night_h = payroll_tab_day_night_hours(profile, shift_kind, tab_h)
     day_r = profile.hourly_rate_day if profile.hourly_rate_day is not None else D("0")
     night_r = profile.hourly_rate_night if profile.hourly_rate_night is not None else D("0")
-    if sh > 0 and h >= sh * D("2") - D("0.01"):
-        return (sh * day_r + sh * night_r).quantize(D("0.01"))
-    rate = night_r if shift_kind == "н" else day_r
-    return (h * rate).quantize(D("0.01"))
+    return (day_h * day_r + night_h * night_r).quantize(D("0.01"))
+
+
+def payroll_base_from_hours(profile, day_hours: Decimal, night_hours: Decimal) -> Decimal:
+    """Начисление (сумма) = дневные ч × дн.ставка + ночные ч × ноч.ставка."""
+    D = Decimal
+    day_r = profile.hourly_rate_day if profile.hourly_rate_day is not None else D("0")
+    night_r = profile.hourly_rate_night if profile.hourly_rate_night is not None else D("0")
+    return (day_hours * day_r + night_hours * night_r).quantize(D("0.01"))
+
+
+def payroll_payout_parts_from_base(
+    base: Decimal,
+    *,
+    quality_pct: Decimal,
+    result_pct: Decimal,
+    mode_pct: Decimal,
+    bonus_percent: Decimal,
+    bonus_rub: Decimal,
+    penalty_rub: Decimal,
+    include_fixed_rub: bool = True,
+) -> dict[str, Decimal]:
+    """Итог: 50% гарантия + доли % от суммы (20+20+10) + премия % и ₽ − штраф ₽."""
+    D = Decimal
+    b = D(str(base or 0)).quantize(D("0.01"))
+    q = min(max(D(str(quality_pct or 0)), D("0")), TAB_SLICE_QUALITY_PCT)
+    r = min(max(D(str(result_pct or 0)), D("0")), TAB_SLICE_RESULT_PCT)
+    m = min(max(D(str(mode_pct or 0)), D("0")), TAB_SLICE_MODE_PCT)
+    b_pct = max(D("0"), D(str(bonus_percent or 0)))
+
+    guaranteed = (b / D("2")).quantize(D("0.01"))
+    quality_pay = (b * q / D("100")).quantize(D("0.01"))
+    result_pay = (b * r / D("100")).quantize(D("0.01"))
+    mode_pay = (b * m / D("100")).quantize(D("0.01"))
+    slices_pay = (quality_pay + result_pay + mode_pay).quantize(D("0.01"))
+    tab_payout = (guaranteed + slices_pay).quantize(D("0.01"))
+
+    bonus_pct_amt = (b * b_pct / D("100")).quantize(D("0.01"))
+    b_rub = D(str(bonus_rub or 0)).quantize(D("0.01"))
+    pen_rub = D(str(penalty_rub or 0)).quantize(D("0.01"))
+    if b_rub < 0:
+        b_rub = D("0")
+    if pen_rub < 0:
+        pen_rub = D("0")
+    if not include_fixed_rub:
+        b_rub = D("0")
+        pen_rub = D("0")
+    bonus_total = (bonus_pct_amt + b_rub).quantize(D("0.01"))
+    total_raw = tab_payout + bonus_total - pen_rub
+    total = total_raw.quantize(D("0.01"))
+    if total < 0:
+        total = D("0")
+    penalties = (b - tab_payout).quantize(D("0.01"))
+    penalty_pp_sum = (
+        (TAB_SLICE_QUALITY_PCT - q) + (TAB_SLICE_RESULT_PCT - r) + (TAB_SLICE_MODE_PCT - m)
+    ).quantize(D("0.01"))
+    return {
+        "guaranteed_rub": guaranteed,
+        "slices_rub": slices_pay,
+        "tab_payout": tab_payout,
+        "bonus_pct_amount": bonus_pct_amt,
+        "bonus_rub": b_rub,
+        "bonus_total": bonus_total,
+        "penalty_rub": pen_rub,
+        "penalties": penalties,
+        "total": total,
+        "penalty_pp_sum": penalty_pp_sum,
+        "penalty_pct_sum": penalty_pp_sum,
+    }
 
 
 def schedule_cell_display(cell) -> str:
@@ -238,6 +321,8 @@ def payroll_day_rows(
         sk = float(skud_by_day.get(dk, 0.0))
         default_tab = default_tab_hours_for_schedule_cell(raw_cell, shift_hours)
         tab = effective_tab_hours(tab_by_day.get(dk), default_tab)
+        _sh = type("_Sh", (), {"shift_hours": shift_hours})()
+        tab_d, tab_n = payroll_tab_day_night_hours(_sh, shift_kind, tab)
         out.append(
             {
                 "date": dd,
@@ -247,6 +332,8 @@ def payroll_day_rows(
                 "graph_shift": shift_kind,
                 "skud_h": round(sk, 2),
                 "tab_h": tab,
+                "tab_day_h": float(tab_d),
+                "tab_night_h": float(tab_n),
                 "default_tab_h": default_tab,
             }
         )
@@ -283,9 +370,10 @@ def distribute_month_tab_hours(
     return {dk: out_vals[i] for i, dk in enumerate(days)}
 
 
-# Начисление по табелю (base): 50% гарантированно + три доли от начисления — до 20%, 20%, 10%.
-# Поля penalty_* — выплачиваемый % от начисления по своей линии (0…макс). 20/20/10 = полная сумма;
-# например 18 по «результат» = 18% от base с этой строки (минус 2 п.п. от максимума → −2% от base).
+# Сумма = дневные_ч×дн.ставка + ночные_ч×ноч.ставка.
+# К выплате по табелю = 50% суммы (гарантия) + доли % от суммы (качество/результат/режим, макс. 20+20+10).
+# Итог = гарантия + доли + премия (% от суммы + ₽) − штраф ₽.
+# Поля penalty_* — выплачиваемый % от суммы по линии (0…макс.), не удержание.
 TAB_GUARANTEED_PCT = Decimal("50")
 TAB_SLICE_QUALITY_PCT = Decimal("20")
 TAB_SLICE_RESULT_PCT = Decimal("20")
@@ -301,7 +389,8 @@ def payroll_gross_tab_skud_through_day(
     D = Decimal
     tab_sum = D("0")
     skud_sum = D("0")
-    gross = D("0")
+    day_hours = D("0")
+    night_hours = D("0")
     for r in day_rows:
         dd = r.get("date")
         if not isinstance(dd, date):
@@ -315,11 +404,16 @@ def payroll_gross_tab_skud_through_day(
         sk = D(str(r.get("skud_h") or 0))
         tab_sum += h
         skud_sum += sk
-        gross += payroll_day_accrual_rub(profile, str(r.get("graph_shift") or ""), h)
+        dh, nh = payroll_tab_day_night_hours(profile, str(r.get("graph_shift") or ""), h)
+        day_hours += dh
+        night_hours += nh
+    gross = payroll_base_from_hours(profile, day_hours, night_hours)
     return {
         "total_tab_hours": tab_sum.quantize(D("0.01")),
         "total_skud_hours": skud_sum.quantize(D("0.01")),
-        "gross_accrual_rub": gross.quantize(D("0.01")),
+        "total_day_hours": day_hours.quantize(D("0.01")),
+        "total_night_hours": night_hours.quantize(D("0.01")),
+        "gross_accrual_rub": gross,
     }
 
 
@@ -441,15 +535,11 @@ def compute_payroll_totals(
     through_day: int | None = None,
     defect_adjust_sum_by_kind: dict[str, Decimal] | None = None,
 ) -> dict[str, Decimal]:
-    """Начисление по табелю (ставка д/н): 50% + доли % от base, премия % и +руб.
-
-    through_day: если задано (например 20), учитываются только дни месяца с 1 по это число
-    (для оценки аванса / табеля до 20-го).
-    defect_adjust_sum_by_kind: добавки из учёта брака (сумма по всем записям месяца) к полям премий/штрафов.
-    """
+    """Сумма по дн/ноч часам; итог = 50% + доли + премия − штраф ₽ (см. payroll_payout_parts_from_base)."""
     D = Decimal
     dadj = defect_adjust_sum_by_kind
-    base = D("0")
+    day_hours = D("0")
+    night_hours = D("0")
     skud_sum = D("0")
     tab_sum = D("0")
     for r in day_rows:
@@ -466,48 +556,39 @@ def compute_payroll_totals(
         sk = D(str(r.get("skud_h") or 0))
         tab_sum += h
         skud_sum += sk
-        base += payroll_day_accrual_rub(profile, str(r.get("graph_shift") or ""), h)
+        dh, nh = payroll_tab_day_night_hours(profile, str(r.get("graph_shift") or ""), h)
+        day_hours += dh
+        night_hours += nh
 
+    base = payroll_base_from_hours(profile, day_hours, night_hours)
     side = effective_side_payroll_fields(settlement, dadj)
-    q = side["penalty_quality_pct"]
-    r = side["penalty_result_pct"]
-    m = side["penalty_mode_pct"]
-    b_pct = side["bonus_percent"]
-
-    guaranteed = (base * TAB_GUARANTEED_PCT / D("100")).quantize(D("0.01"))
-    quality_pay = (base * q / D("100")).quantize(D("0.01"))
-    result_pay = (base * r / D("100")).quantize(D("0.01"))
-    mode_pay = (base * m / D("100")).quantize(D("0.01"))
-    tab_payout = (guaranteed + quality_pay + result_pay + mode_pay).quantize(D("0.01"))
-
-    penalties = (base - tab_payout).quantize(D("0.01"))
-    penalty_pp_sum = (
-        (TAB_SLICE_QUALITY_PCT - q) + (TAB_SLICE_RESULT_PCT - r) + (TAB_SLICE_MODE_PCT - m)
-    ).quantize(D("0.01"))
-
-    bonus_pct_amt = (base * b_pct / D("100")).quantize(D("0.01"))
-    b_rub = side["bonus_rub"]
-    pen_rub = side["penalty_rub"]
-    if through_day is not None:
-        # Фикс. премия и штраф ₽ задаются на месяц целиком — в срезе 1–N не смешиваем с авансом.
-        b_rub = D("0")
-        pen_rub = D("0")
-    total_raw = tab_payout + bonus_pct_amt + b_rub - pen_rub
-    total = total_raw.quantize(D("0.01"))
-    if total < 0:
-        total = D("0")
+    parts = payroll_payout_parts_from_base(
+        base,
+        quality_pct=side["penalty_quality_pct"],
+        result_pct=side["penalty_result_pct"],
+        mode_pct=side["penalty_mode_pct"],
+        bonus_percent=side["bonus_percent"],
+        bonus_rub=side["bonus_rub"],
+        penalty_rub=side["penalty_rub"],
+        include_fixed_rub=through_day is None,
+    )
     return {
-        "base_tab": base.quantize(D("0.01")),
-        "tab_payout": tab_payout,
+        "base_tab": base,
+        "tab_payout": parts["tab_payout"],
+        "guaranteed_rub": parts["guaranteed_rub"],
+        "slices_rub": parts["slices_rub"],
         "total_skud_hours": skud_sum.quantize(D("0.01")),
         "total_tab_hours": tab_sum.quantize(D("0.01")),
-        "penalties": penalties,
-        "bonus_pct_amount": bonus_pct_amt,
-        "bonus_rub": b_rub,
-        "penalty_rub": pen_rub,
-        "total": total,
-        "penalty_pp_sum": penalty_pp_sum,
-        "penalty_pct_sum": penalty_pp_sum,
+        "total_day_hours": day_hours.quantize(D("0.01")),
+        "total_night_hours": night_hours.quantize(D("0.01")),
+        "penalties": parts["penalties"],
+        "bonus_pct_amount": parts["bonus_pct_amount"],
+        "bonus_rub": parts["bonus_rub"],
+        "bonus_total": parts["bonus_total"],
+        "penalty_rub": parts["penalty_rub"],
+        "total": parts["total"],
+        "penalty_pp_sum": parts["penalty_pp_sum"],
+        "penalty_pct_sum": parts["penalty_pct_sum"],
     }
 
 
