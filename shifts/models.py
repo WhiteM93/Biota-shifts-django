@@ -867,6 +867,21 @@ class ToolMaterialExtra(models.Model):
         return self.value
 
 
+class PurchaseStore(models.Model):
+    """Справочник магазинов для заявок на закупку."""
+
+    name = models.CharField(max_length=120, unique=True, verbose_name="Магазин")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("name",)
+        verbose_name = "Магазин (закупки)"
+        verbose_name_plural = "Магазины (закупки)"
+
+    def __str__(self):
+        return self.name
+
+
 class StockMovement(models.Model):
     movement_type = models.CharField(
         max_length=16,
@@ -968,6 +983,7 @@ class SectionActionLog(models.Model):
 
 class PurchaseRequest(models.Model):
     requested_item = models.CharField(max_length=255, verbose_name="Что закупить")
+    store_name = models.CharField(max_length=120, blank=True, default="", verbose_name="Магазин")
     store_link = models.URLField(blank=True, verbose_name="Ссылка на магазин")
     article = models.CharField(max_length=120, blank=True, verbose_name="Артикул")
     quantity = models.PositiveIntegerField(verbose_name="Количество")

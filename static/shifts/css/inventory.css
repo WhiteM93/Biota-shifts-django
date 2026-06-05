@@ -1147,6 +1147,7 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
 
   .arrival-bulk-table td.short-col input,
   .arrival-bulk-table td.short-col select,
+  .arrival-bulk-table td.angle-col select,
   .arrival-bulk-table td.qty-col input,
   .arrival-bulk-table td.tap-step-col input,
   .arrival-bulk-table td.tap-tpi-col input,
@@ -1162,7 +1163,9 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
   .arrival-bulk-table select[data-k="tool_material"],
   .arrival-bulk-table select[data-k="thread_standard"],
   .arrival-bulk-table select[data-k="hole_type"],
-  .arrival-bulk-table select[data-k="tap_type"] {
+  .arrival-bulk-table select[data-k="tap_type"],
+  .arrival-bulk-table select[data-k="cd_angle_deg"],
+  .arrival-bulk-table select[data-k="cs_angle_deg"] {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
@@ -1177,7 +1180,9 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
   .arrival-bulk-table select[data-k="tool_material"]::-ms-expand,
   .arrival-bulk-table select[data-k="thread_standard"]::-ms-expand,
   .arrival-bulk-table select[data-k="hole_type"]::-ms-expand,
-  .arrival-bulk-table select[data-k="tap_type"]::-ms-expand {
+  .arrival-bulk-table select[data-k="tap_type"]::-ms-expand,
+  .arrival-bulk-table select[data-k="cd_angle_deg"]::-ms-expand,
+  .arrival-bulk-table select[data-k="cs_angle_deg"]::-ms-expand {
     display: none;
   }
   .arrival-bulk-table th.qty-col,
@@ -1221,6 +1226,27 @@ html[data-theme="dawn"] .inv-page--stock .btn-inv-delete--s5 {
     min-width: 5ch;
     max-width: 5.5ch;
     text-align: center;
+  }
+
+  /* Угол: шире short-col; :has — для строк, созданных до angle-col в JS */
+  .arrival-bulk-table th.angle-col,
+  .arrival-bulk-table td.angle-col,
+  .arrival-bulk-table td.short-col:has(select[data-k="cd_angle_deg"]),
+  .arrival-bulk-table td.short-col:has(select[data-k="cs_angle_deg"]) {
+    width: 10ch;
+    min-width: 10ch;
+    max-width: 11ch;
+    text-align: center;
+  }
+
+  .arrival-bulk-table select[data-k="cd_angle_deg"],
+  .arrival-bulk-table select[data-k="cs_angle_deg"] {
+    min-width: 0;
+    width: 100%;
+    max-width: 11ch;
+    padding-left: 2px;
+    padding-right: 2px;
+    font-size: 13px;
   }
 
   .arrival-bulk-table td.short-col input.arrival-diam-input,

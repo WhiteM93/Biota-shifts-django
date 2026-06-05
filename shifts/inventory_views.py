@@ -80,6 +80,7 @@ from .models import (
     ToolMaterialExtra,
     UserInventoryStockFilterPrefs,
     PurchaseRequest,
+    PurchaseStore,
     EmployeeDefectRecord,
     EmployeePayrollProfile,
     EmployeePayrollMonthStatus,
@@ -94,6 +95,7 @@ from .models import (
 )
 
 TOOL_MATERIAL_FILTER_OTHER = "__other__"
+PURCHASE_STORE_FILTER_OTHER = "__purchase_store_other__"
 _TOOL_MATERIAL_STD_KEYS = frozenset(k for k, _ in TOOL_MATERIAL_TYPES)
 _INVENTORY_CATEGORIES = frozenset({"end_mill", "tap", "center_drill", "countersink", "drill", "insert", "collet"})
 _HISTORY_MOVEMENT_TYPES = frozenset({"issue", "restock", "writeoff"})
@@ -173,6 +175,66 @@ def _register_tool_material_extra(value: str) -> str | None:
         return None
     ToolMaterialExtra.objects.get_or_create(value=v)
     return v
+
+
+def _register_purchase_store(name: str) -> str | None:
+    n = (name or "").strip()[:120]
+    if not n or n == PURCHASE_STORE_FILTER_OTHER:
+        return None
+    PurchaseStore.objects.get_or_create(name=n)
+    return n
+
+
+def _purchase_store_options(*, extra_candidate: str = "") -> list[str]:
+    from_vocab = set(PurchaseStore.objects.values_list("name", flat=True))
+    from_requests = {
+        v.strip()
+        for v in PurchaseRequest.objects.exclude(store_name="").values_list("store_name", flat=True).distinct()
+        if v and v.strip()
+    }
+    out = sorted(from_vocab | from_requests)
+    cand = (extra_candidate or "").strip()[:120]
+    if cand and cand not in out:
+        out = sorted(set(out) | {cand})
+    return out
+
+
+def _store_name_from_url(url: str) -> str:
+    from urllib.parse import urlparse
+
+    raw = (url or "").strip()
+    if not raw:
+        return ""
+    if not raw.startswith(("http://", "https://")):
+        raw = f"https://{raw}"
+    try:
+        host = (urlparse(raw).hostname or "").lower()
+    except ValueError:
+        return ""
+    if host.startswith("www."):
+        host = host[4:]
+    if not host:
+        return ""
+    parts = host.split(".")
+    if len(parts) < 2:
+        return host[:120]
+    multi_tlds = {"co.uk", "com.ru", "org.ru", "net.ru"}
+    if len(parts) >= 3 and ".".join(parts[-2:]) in multi_tlds:
+        return parts[-3][:120]
+    return parts[-2][:120]
+
+
+def _resolve_purchase_store_name(post) -> str:
+    sel = (post.get("store_name") or "").strip()
+    custom = (post.get("store_name_custom") or "").strip()
+    if sel == PURCHASE_STORE_FILTER_OTHER:
+        return custom[:120]
+    if sel:
+        return sel[:120]
+    store_link = (post.get("store_link") or "").strip()
+    if store_link:
+        return _store_name_from_url(store_link)
+    return ""
 
 
 def _tool_material_extra_options(*, tools_qs=None, extra_candidate: str = "") -> list[str]:
@@ -1169,6 +1231,12 @@ def inventory_view(request):
             return JsonResponse({"ok": False, "error": "Укажите непустой материал (не из стандартного списка)."}, status=400)
         return JsonResponse({"ok": True, "value": saved})
 
+    if action == "register_purchase_store":
+        saved = _register_purchase_store(request.POST.get("name") or "")
+        if not saved:
+            return JsonResponse({"ok": False, "error": "Укажите название магазина."}, status=400)
+        return JsonResponse({"ok": True, "name": saved})
+
     if action == "process_issue_outcome":
         issue_id = _to_int(request.POST.get("issue_id"), 0)
         returned_qty = _to_int(request.POST.get("returned_qty"), 0)
@@ -1681,6 +1749,7 @@ def inventory_view(request):
 
     if action == "create_purchase_request":
         requested_item = (request.POST.get("requested_item") or "").strip()
+        store_name = _resolve_purchase_store_name(request.POST)
         store_link = (request.POST.get("store_link") or "").strip()
         article = (request.POST.get("article") or "").strip()
         quantity = _to_int(request.POST.get("quantity"), 0)
@@ -1695,8 +1764,13 @@ def inventory_view(request):
         if not store_link and not article:
             messages.error(request, "Добавьте ссылку на магазин или артикул.")
             return redirect(f"{request.path}?panel=purchases")
+        if not store_name and store_link:
+            store_name = _store_name_from_url(store_link)
+        if store_name:
+            _register_purchase_store(store_name)
         PurchaseRequest.objects.create(
             requested_item=requested_item,
+            store_name=store_name,
             store_link=store_link,
             article=article,
             quantity=quantity,
@@ -2590,6 +2664,8 @@ def inventory_view(request):
         ).filter(is_deleted=False).order_by("category", "name"),
         "issue_candidates": issue_candidates,
         "purchase_requests": purchase_qs[:300],
+        "purchase_store_options": _purchase_store_options(),
+        "purchase_store_filter_other": PURCHASE_STORE_FILTER_OTHER,
         "purchase_statuses": PURCHASE_STATUSES,
         "purchase_filters": {
             "status": purchase_status,

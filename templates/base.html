@@ -5,10 +5,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>MetaBase</title>
-  <link rel="shortcut icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
-  <link rel="icon" href="{% static 'favicon.ico' %}" sizes="any">
-  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}">
-  <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
+  <link rel="manifest" href="{% static 'site.webmanifest' %}">
+  <link rel="icon" href="{% static 'favicon.ico' %}?v={{ static_asset_version }}" sizes="any">
+  <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon-16x16.png' %}?v={{ static_asset_version }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}?v={{ static_asset_version }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}?v={{ static_asset_version }}">
   <script>
     (function(){try{var k='biotaSiteTheme',l=localStorage.getItem('adminTestLabTheme');if(l&&!localStorage.getItem(k))localStorage.setItem(k,l);var v=localStorage.getItem(k);document.documentElement.setAttribute('data-theme',v==='dawn'?'dawn':'night');}catch(e){document.documentElement.setAttribute('data-theme','night');}})();
   </script>

@@ -91,6 +91,157 @@ var INV = (function () {
 })();
 
 (function () {
+  var form = document.getElementById("purchase-request-form");
+  if (!form) return;
+  var sel = form.querySelector(".js-purchase-store-name");
+  var inp = form.querySelector(".js-purchase-store-name-custom");
+  var linkInp = form.querySelector(".js-purchase-store-link");
+  if (!sel || !inp) return;
+  var otherVal = INV.purchase_store_filter_other || "__purchase_store_other__";
+  var csrfEl = form.querySelector('input[name="csrfmiddlewaretoken"]');
+  var csrfToken = csrfEl ? csrfEl.value : "";
+  var storeManual = false;
+  var storeAutoFilled = false;
+  var linkTimer = null;
+
+  function syncStoreField(fromUserChange) {
+    var isOther = sel.value === otherVal;
+    inp.style.display = isOther ? "block" : "none";
+    if (!isOther && fromUserChange) inp.value = "";
+  }
+
+  function ensureStoreOption(name) {
+    var v = (name || "").trim();
+    if (!v || v === otherVal) return;
+    var found = Array.prototype.some.call(sel.options, function (o) { return o.value === v; });
+    if (found) return;
+    var otherOpt = Array.prototype.find.call(sel.options, function (o) { return o.value === otherVal; });
+    var o = document.createElement("option");
+    o.value = v;
+    o.textContent = v;
+    if (otherOpt) sel.insertBefore(o, otherOpt);
+    else sel.appendChild(o);
+  }
+
+  function findStoreOption(name) {
+    var needle = (name || "").trim().toLowerCase();
+    if (!needle) return "";
+    var hit = "";
+    Array.prototype.forEach.call(sel.options, function (o) {
+      if (o.value && o.value.toLowerCase() === needle) hit = o.value;
+    });
+    return hit;
+  }
+
+  function storeNameFromUrl(url) {
+    var s = (url || "").trim();
+    if (!s) return "";
+    try {
+      if (!/^https?:\/\//i.test(s)) s = "https://" + s;
+      var host = new URL(s).hostname.toLowerCase();
+      if (host.indexOf("www.") === 0) host = host.slice(4);
+      var parts = host.split(".");
+      if (parts.length < 2) return host;
+      var multiTlds = { "co.uk": 1, "com.ru": 1, "org.ru": 1, "net.ru": 1 };
+      var last2 = parts[parts.length - 2] + "." + parts[parts.length - 1];
+      if (parts.length >= 3 && multiTlds[last2]) return parts[parts.length - 3];
+      return parts[parts.length - 2];
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function registerPurchaseStore(name) {
+    var v = (name || "").trim();
+    if (!v) return Promise.resolve(null);
+    var body = new URLSearchParams();
+    body.set("action", "register_purchase_store");
+    body.set("name", v);
+    if (csrfToken) body.set("csrfmiddlewaretoken", csrfToken);
+    return fetch(form.getAttribute("action") || window.location.pathname, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: body.toString(),
+      credentials: "same-origin",
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.ok && data.name) return data.name;
+        return null;
+      })
+      .catch(function () { return null; });
+  }
+
+  function setStoreFromName(name, register) {
+    var raw = (name || "").trim();
+    if (!raw) return;
+    var existing = findStoreOption(raw);
+    var use = existing || raw;
+    ensureStoreOption(use);
+    sel.value = use;
+    inp.value = "";
+    syncStoreField(false);
+    storeAutoFilled = true;
+    if (register && !existing) registerPurchaseStore(use);
+  }
+
+  function applyStoreFromLink() {
+    if (!linkInp || storeManual) return;
+    var parsed = storeNameFromUrl(linkInp.value);
+    if (!parsed) return;
+    if (!sel.value || storeAutoFilled) setStoreFromName(parsed, true);
+  }
+
+  function applyCustomStore() {
+    var v = (inp.value || "").trim();
+    if (!v || sel.value !== otherVal) return;
+    registerPurchaseStore(v).then(function (saved) {
+      var use = saved || v;
+      ensureStoreOption(use);
+      sel.value = use;
+      inp.value = "";
+      inp.style.display = "none";
+      storeManual = true;
+      storeAutoFilled = false;
+    });
+  }
+
+  sel.addEventListener("change", function () {
+    storeManual = true;
+    storeAutoFilled = false;
+    syncStoreField(true);
+  });
+  inp.addEventListener("blur", applyCustomStore);
+  inp.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      inp.blur();
+    }
+  });
+  function scheduleStoreFromLink(immediate) {
+    if (linkTimer) clearTimeout(linkTimer);
+    if (immediate) {
+      applyStoreFromLink();
+      return;
+    }
+    linkTimer = setTimeout(applyStoreFromLink, 150);
+  }
+
+  if (linkInp) {
+    linkInp.addEventListener("input", function () { scheduleStoreFromLink(false); });
+    linkInp.addEventListener("paste", function () {
+      setTimeout(function () { scheduleStoreFromLink(true); }, 0);
+    });
+    linkInp.addEventListener("change", function () { scheduleStoreFromLink(true); });
+    linkInp.addEventListener("blur", function () { scheduleStoreFromLink(true); });
+  }
+  syncStoreField(false);
+})();
+
+(function () {
   var inputs = document.querySelectorAll(".defect-cell-input");
   var rowToggles = document.querySelectorAll(".defects-row-edit-toggle");
   if (!rowToggles.length) return;
@@ -1436,8 +1587,8 @@ var INV = (function () {
   var arrivalGroupHeadHtml = {
     end_mill: '<tr><th>Тип фрезы</th><th class="short-col">D</th><th class="short-col">R</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     tap: '<tr><th class="tap-size-col">Размер</th><th class="tap-std-col">Стандарт</th><th class="tap-step-col">Шаг</th><th class="tap-tpi-col">TPI</th><th class="tap-l-col">L</th><th class="tap-lc-col">Lc</th><th class="tap-hole-col">Тип</th><th>Тип инструмента</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    center_drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    countersink: '<tr><th>Тип</th><th class="short-col">D</th><th class="short-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    center_drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="angle-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    countersink: '<tr><th>Тип</th><th class="short-col">D</th><th class="angle-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     insert:
       "<tr>" +
@@ -1557,7 +1708,7 @@ var INV = (function () {
     } else if (cat === "center_drill") {
       cells.push(arrivalRequiredDiamCell("cd_diameter_mm"));
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cd_overall_length_mm"></td>');
-      cells.push('<td class="short-col"><select data-k="cd_angle_deg">' + buildOptionsHtml(INV.center_drill_angles || []) + '</select></td>');
+      cells.push('<td class="angle-col"><select data-k="cd_angle_deg">' + buildOptionsHtml(INV.center_drill_angles || []) + '</select></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
@@ -1566,7 +1717,7 @@ var INV = (function () {
     } else if (cat === "countersink") {
       cells.push('<td><select data-k="cs_type">' + buildOptionsHtml(INV.countersink_types || []) + '</select></td>');
       cells.push(arrivalRequiredDiamCell("cs_diameter_mm"));
-      cells.push('<td class="short-col"><select data-k="cs_angle_deg">' + buildOptionsHtml(INV.countersink_angles || []) + '</select></td>');
+      cells.push('<td class="angle-col"><select data-k="cs_angle_deg">' + buildOptionsHtml(INV.countersink_angles || []) + '</select></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cs_overall_length_mm"></td>');
       cells.push('<td class="short-col"><input type="number" data-k="cs_flutes_count"></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
