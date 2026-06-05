@@ -7,18 +7,10 @@
 
 {% block content %}
 <div class="auth-shell">
-  <header class="auth-header">
-    <div class="auth-header-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-        <polyline points="10 17 15 12 10 7"/>
-        <line x1="15" y1="12" x2="3" y2="12"/>
-      </svg>
-    </div>
-    <div>
-      <h1 class="auth-title">Вход</h1>
-      <p class="auth-subtitle">Введите логин и пароль от вашей учётной записи.</p>
-    </div>
+  <header class="auth-header auth-header--centered">
+    <button type="button" class="auth-logo-btn" id="biota-theme-toggle" aria-pressed="false" title="Сменить тему">
+      {% include "shifts/includes/m_logo_svg.html" %}
+    </button>
   </header>
 
   <section class="auth-glass-card">
@@ -58,10 +50,6 @@
       Нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться</a><br>
       <a href="{% url 'resend_verification' %}">Не пришло письмо с подтверждением?</a>
     </p>
-
-    <div class="auth-theme-row">
-      <button type="button" class="nav-theme-btn" id="biota-theme-toggle" aria-pressed="false" title="Тема «Рассвет» (светлая)">☾</button>
-    </div>
   </section>
 </div>
 {% endblock %}

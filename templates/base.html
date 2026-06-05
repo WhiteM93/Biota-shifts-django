@@ -45,7 +45,6 @@
         var btn = document.getElementById("biota-theme-toggle");
         if (btn) {
           btn.setAttribute("aria-pressed", v === "dawn" ? "true" : "false");
-          btn.textContent = v === "dawn" ? "☀" : "☾";
           btn.title = v === "dawn" ? "Переключить на ночную тему" : "Тема «Рассвет» (светлая)";
         }
         try {
@@ -57,7 +56,6 @@
       if (btnInit) {
         var cur = document.documentElement.getAttribute("data-theme") || "night";
         btnInit.setAttribute("aria-pressed", cur === "dawn" ? "true" : "false");
-        btnInit.textContent = cur === "dawn" ? "☀" : "☾";
         btnInit.title =
           cur === "dawn"
             ? "Переключить на ночную тему"

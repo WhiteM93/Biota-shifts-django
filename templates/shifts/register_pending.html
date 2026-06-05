@@ -9,10 +9,7 @@
 <div class="auth-shell">
   <header class="auth-header">
     <div class="auth-header-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-        <polyline points="22,6 12,13 2,6"/>
-      </svg>
+      {% include "shifts/includes/m_logo_svg.html" %}
     </div>
     <div>
       <h1 class="auth-title">Проверьте почту</h1>
@@ -50,7 +47,7 @@
     </p>
 
     <div class="auth-theme-row">
-      <button type="button" class="nav-theme-btn" id="biota-theme-toggle" aria-pressed="false" title="Тема «Рассвет» (светлая)">☾</button>
+      <button type="button" class="nav-theme-btn" id="biota-theme-toggle" aria-pressed="false" title="Тема «Рассвет» (светлая)">{% include "shifts/includes/m_logo_svg.html" %}</button>
     </div>
   </section>
 </div>

@@ -69,6 +69,57 @@ html[data-theme="dawn"] .auth-shell {
   margin-bottom: 18px;
 }
 
+.auth-header--centered {
+  justify-content: center;
+  margin-top: 24px;
+  margin-bottom: -20px;
+}
+
+.auth-logo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.auth-logo-btn:hover {
+  transform: translateY(-2px) scale(1.06);
+}
+
+.auth-logo-btn:active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 0.12s;
+}
+
+.auth-logo-btn:focus-visible {
+  outline: 2px solid var(--au, #6f7ef2);
+  outline-offset: 3px;
+}
+
+.auth-logo-btn .m-logo {
+  width: 176px;
+  height: 176px;
+  color: var(--au, var(--bio-mlogo-color, currentColor));
+}
+
+.auth-logo-btn .m-logo__mark,
+.auth-logo-btn .m-logo__eye {
+  fill: url(#m-logo-grad);
+}
+
+.auth-logo-btn .m-logo__stop1 {
+  stop-color: var(--au, #8f9cff);
+}
+
+.auth-logo-btn .m-logo__stop2 {
+  stop-color: var(--au2, #6f7ef2);
+}
+
 .auth-header-icon {
   width: 48px;
   height: 48px;
@@ -85,6 +136,12 @@ html[data-theme="dawn"] .auth-shell {
   width: 26px;
   height: 26px;
   stroke: #fff;
+}
+
+.auth-header-icon .m-logo {
+  width: 34px;
+  height: 34px;
+  color: #fff;
 }
 
 .auth-title {
