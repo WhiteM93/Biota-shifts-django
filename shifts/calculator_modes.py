@@ -17,6 +17,9 @@ SETUP_THREAD_TOOL_TYPES = ("Метчик", "Раскатник", "Резьбоф
 
 CUTTING_MODE_THREAD = "thread"
 CUTTING_MODE_END_MILL = "end_mill"
+CUTTING_MODE_DRILL = "drill"
+
+SETUP_DRILL_TOOL_TYPES = ("Сверло",)
 
 END_MILL_TYPE_LABELS: dict[str, str] = dict(END_MILL_TYPES)
 
@@ -76,6 +79,56 @@ def warehouse_end_mill_tool_types() -> list[str]:
     return [lbl for lbl in order if lbl in found]
 
 
+def _drill_tool_label(diameter_mm: Decimal | None, angle_deg: Decimal | None) -> str:
+    d = _fmt_decimal(diameter_mm) if diameter_mm is not None else "—"
+    a = _fmt_decimal(angle_deg) if angle_deg is not None else "—"
+    return f"Ø{d} / {a}°"
+
+
+def warehouse_drill_tool_types() -> list[str]:
+    """Типы сверл со склада (по диаметру и углу)."""
+    found: list[str] = []
+    seen: set[str] = set()
+    qs = ToolItem.objects.filter(category="drill", is_deleted=False).select_related("drill_spec")
+    for tool in qs:
+        dr = getattr(tool, "drill_spec", None)
+        if dr is None:
+            label = SETUP_DRILL_TOOL_TYPES[0]
+        else:
+            label = _drill_tool_label(dr.diameter_mm, dr.angle_deg)
+        if label in seen:
+            continue
+        seen.add(label)
+        found.append(label)
+    if not found:
+        return list(SETUP_DRILL_TOOL_TYPES)
+    return sorted(found, key=lambda s: (s == SETUP_DRILL_TOOL_TYPES[0], s))
+
+
+def warehouse_drill_presets() -> dict[str, list[dict[str, str]]]:
+    """Подсказки D и угла по сверлу со склада."""
+    presets: dict[str, list[dict[str, str]]] = {}
+    qs = ToolItem.objects.filter(category="drill", is_deleted=False).select_related("drill_spec")
+    for tool in qs:
+        dr = getattr(tool, "drill_spec", None)
+        if dr is None:
+            continue
+        label = _drill_tool_label(dr.diameter_mm, dr.angle_deg)
+        entry: dict[str, str] = {}
+        if dr.diameter_mm is not None:
+            entry["d"] = _fmt_decimal(dr.diameter_mm)
+        if dr.angle_deg is not None:
+            entry["angle"] = _fmt_decimal(dr.angle_deg)
+        if dr.cutting_length_mm is not None:
+            entry["cut_len"] = _fmt_decimal(dr.cutting_length_mm)
+        if not entry:
+            continue
+        bucket = presets.setdefault(label, [])
+        if entry not in bucket:
+            bucket.append(entry)
+    return presets
+
+
 def warehouse_end_mill_presets() -> dict[str, list[dict[str, str]]]:
     """Подсказки D и Z по типу фрезы с склада (для автозаполнения строки)."""
     presets: dict[str, list[dict[str, str]]] = {}
@@ -102,6 +155,7 @@ def cutting_modes_payload() -> dict:
     """Конфигурация режимов резания для шаблона калькулятора."""
     thread_types = warehouse_thread_tool_types() or list(SETUP_THREAD_TOOL_TYPES)
     mill_types = warehouse_end_mill_tool_types()
+    drill_types = warehouse_drill_tool_types()
 
     modes: list[dict] = [
         {
@@ -119,6 +173,14 @@ def cutting_modes_payload() -> dict:
             "tool_types": mill_types,
             "operation_types": [{"id": oid, "label": lbl} for oid, lbl in MILL_OPERATION_TYPES],
             "tool_presets": warehouse_end_mill_presets(),
+        },
+        {
+            "id": CUTTING_MODE_DRILL,
+            "label": "Сверла",
+            "hint": "Типы со склада: " + ", ".join(drill_types) + ". Колонка «Инструмент».",
+            "form": CUTTING_MODE_DRILL,
+            "tool_types": drill_types,
+            "tool_presets": warehouse_drill_presets(),
         },
     ]
     return {

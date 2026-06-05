@@ -16,7 +16,6 @@
     <h1>Главная</h1>
     {% if month_name and not dashboard_error %}
     <p class="home-hero__period">{{ month_name }} {{ dash_year }}</p>
-    <p class="home-hero__lead">Сводка по опозданиям и раннему уходу по данным СКУД и графика смен.</p>
     {% else %}
     <p class="home-hero__lead">Сводка по сотрудникам и складу. Выберите период, когда данные доступны.</p>
     {% endif %}
@@ -88,7 +87,6 @@
     <section class="home-panel home-panel--accent home-panel--by-area">
       <div class="home-panel__head">
         <h2>По отделам</h2>
-        <p class="home-panel__hint">Сумма минут опозданий и раннего ухода за выбранный месяц.</p>
       </div>
       <div class="home-panel__body">
         {% if by_area_rows %}

@@ -869,12 +869,12 @@ select,
 textarea {
   width: 100%;
   box-sizing: border-box;
-  background: var(--bio-input-bg);
+  background-color: var(--bio-input-bg);
   color: var(--bio-input-fg);
   border: 1px solid var(--bio-input-border);
   border-radius: 4px;
   padding: 8px 10px;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, color 0.2s ease;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease, color 0.2s ease;
   font: inherit;
 }
 
@@ -895,7 +895,7 @@ textarea:focus {
   outline: none;
   border-color: var(--bio-input-focus-border);
   box-shadow: 0 0 0 3px var(--bio-input-focus-ring);
-  background: var(--bio-input-focus-bg);
+  background-color: var(--bio-input-focus-bg);
 }
 
 .btn {

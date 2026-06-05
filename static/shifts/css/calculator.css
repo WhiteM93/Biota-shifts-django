@@ -15,6 +15,9 @@
 
   --glass-bg:     rgba(255,255,255,.04);
   --glass-border: rgba(255,255,255,.09);
+
+  --calc-sel-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239bb0d8' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
+  --calc-mc-arrow:  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%239bb0d8' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
 }
 
 /* Светлая тема «Рассвет» */
@@ -32,6 +35,9 @@ html[data-theme="dawn"] .calc-page {
 
   --glass-bg:     rgba(0,0,0,.030);
   --glass-border: rgba(0,0,0,.075);
+
+  --calc-sel-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6258' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
+  --calc-mc-arrow:  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6258' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
 }
 
 /* ── Страница ── */
@@ -444,10 +450,43 @@ html[data-theme="dawn"] .calc-page {
   border: 1px solid var(--bio-input-border);
   border-radius: 8px;
 }
+/* Стрелка — на обёртке, не на select (иначе ломается при :focus/:open) */
+.calc-sel-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.calc-sel-wrap::after,
+.calc-modes-table td.mc-sel-cell::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+.calc-sel-wrap::after {
+  right: 12px;
+  width: 12px;
+  height: 12px;
+  background-image: var(--calc-sel-arrow);
+}
+.calc-modes-table td.mc-sel-cell {
+  position: relative;
+}
+.calc-modes-table td.mc-sel-cell::after {
+  right: 20px;
+  width: 10px;
+  height: 10px;
+  background-image: var(--calc-mc-arrow);
+}
 .calc-sel {
   width: 100%;
   min-height: 39px;
   background-color: var(--bio-input-bg);
+  background-image: none;
   border: 1.5px solid var(--bio-input-border);
   border-radius: 8px;
   color: var(--bio-input-fg);
@@ -457,19 +496,14 @@ html[data-theme="dawn"] .calc-page {
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239bb0d8' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
   transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
-}
-html[data-theme="dawn"] .calc-sel {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6258' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
 }
 .calc-sel:hover {
   border-color: var(--bio-input-hover-border);
   background-color: var(--bio-input-focus-bg);
 }
-.calc-sel:focus {
+.calc-sel:focus,
+.calc-sel:open {
   outline: none;
   border-color: var(--bio-input-focus-border);
   box-shadow: 0 0 0 3px var(--bio-input-focus-ring);
@@ -512,6 +546,9 @@ html[data-theme="dawn"] .calc-sel {
 .calc-modes-table--mill {
   min-width: 1080px;
 }
+.calc-modes-table--drill {
+  min-width: 980px;
+}
 .calc-modes-table thead th {
   font-size: 11px; font-weight: 600;
   text-transform: uppercase; letter-spacing: .06em;
@@ -546,7 +583,12 @@ html[data-theme="dawn"] .calc-sel {
 .mc-mill-ae   { width: 80px; }
 .mc-mill-ap   { width: 80px; }
 .mc-mill-op   { min-width: 108px; }
-.mc-del   { width: 40px; }
+.mc-drill-d     { width: 72px; }
+.mc-drill-angle { width: 72px; }
+.mc-drill-depth { width: 96px; }
+.mc-drill-pass  { width: 96px; }
+.mc-drill-feed  { width: 96px; }
+.mc-actions { width: 112px; }
 
 .mc-inp {
   width: 100%; box-sizing: border-box;
@@ -563,12 +605,13 @@ select.mc-inp {
   padding-right: 28px;
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%239bb0d8' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
+  background-image: none;
 }
-html[data-theme="dawn"] select.mc-inp {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6258' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
+select.mc-inp:hover,
+select.mc-inp:focus,
+select.mc-inp:open {
+  background-color: var(--bio-input-bg);
+  background-image: none;
 }
 select.mc-inp option {
   background: var(--bio-input-bg);
@@ -586,9 +629,11 @@ input.mc-inp[type="number"] {
 .mc-inp::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .mc-inp:focus {
   outline: none;
-  background: var(--bio-input-bg);
   border-color: var(--ca);
   box-shadow: 0 0 0 3px var(--ca-glow);
+}
+input.mc-inp:focus {
+  background: var(--bio-input-bg);
 }
 .mc-inp:hover:not(:focus) {
   border-color: var(--bio-input-hover-border);
@@ -610,14 +655,76 @@ input.mc-inp:hover:not(:focus) {
   color: var(--bio-text-muted);
   font-weight: 400; font-size: 13px;
 }
-.mc-del-btn {
-  width: 28px; height: 28px;
-  display: flex; align-items: center; justify-content: center;
-  background: none; border: none; border-radius: 6px;
-  color: var(--bio-text-muted); cursor: pointer; font-size: 18px; line-height: 1;
+.mc-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.mc-act-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--bio-text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+.mc-act-btn svg { width: 15px; height: 15px; }
+.mc-act-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--bio-input-focus-border) 12%, transparent); color: var(--bio-text); }
+.mc-act-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.mc-lock-btn.is-active {
+  color: var(--ca);
+  background: color-mix(in srgb, var(--ca) 14%, transparent);
+}
+.mc-del-btn:hover:not(:disabled) { background: rgba(248,113,113,.12); color: #f87171; }
+.mc-confirm-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--bio-text-muted);
   transition: background 0.15s, color 0.15s;
 }
-.mc-del-btn:hover { background: rgba(248,113,113,.12); color: #f87171; }
+.mc-confirm-wrap:hover { background: color-mix(in srgb, var(--bio-input-focus-border) 12%, transparent); color: var(--bio-text); }
+.mc-confirm-cb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.mc-confirm-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.mc-confirm-ico svg { width: 15px; height: 15px; }
+tr.is-row-confirmed .mc-confirm-wrap {
+  color: var(--ca3);
+  background: color-mix(in srgb, var(--ca3) 16%, transparent);
+}
+tr.is-row-locked .mc-inp:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+tr.is-row-locked {
+  background: color-mix(in srgb, var(--bio-input-focus-border) 6%, transparent);
+}
 
 /* ── Пустой экран ── */
 .calc-modes-empty {

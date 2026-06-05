@@ -5,7 +5,7 @@
 <script type="application/json" id="calc-products-json">{{ products_json|safe }}</script>
 <script type="application/json" id="calc-cutting-modes-json">{{ cutting_modes_json|safe }}</script>
 
-<div class="calc-page">
+<div class="calc-page" data-calc-username="{{ biota_username|default:''|escape }}">
 
   <!-- ── Шапка ── -->
   <div class="calc-header">
@@ -246,13 +246,21 @@
           Обороты, подача и глубины (ae / ap) задаются в строке. Типы фрез — со склада.
         </div>
       </div>
+      <div id="m-formula-drill" hidden>
+        <div class="calc-formula-label">Режимы сверления</div>
+        <div class="calc-formula-desc">
+          Диаметр, угол, общая глубина и глубина прохода задаются в строке. Обороты и подача — вручную. Типы сверл — со склада.
+        </div>
+      </div>
     </div>
 
     <!-- Шапка таблицы -->
     <div class="calc-modes-toolbar">
       <div class="calc-field-inline calc-modes-mode-field" id="m-mode-field" hidden>
         <label class="calc-label" for="m-tool-type">Режим расчёта</label>
-        <select id="m-tool-type" class="calc-sel calc-sel--toolbar" aria-label="Режим расчёта"></select>
+        <div class="calc-sel-wrap">
+          <select id="m-tool-type" class="calc-sel calc-sel--toolbar" aria-label="Режим расчёта"></select>
+        </div>
       </div>
       <p class="calc-modes-mode-hint" id="m-mode-hint"></p>
       <button type="button" class="calc-add-btn" id="m-add-row">
@@ -290,7 +298,7 @@
 </div><!-- /.calc-page -->
 
 <!-- ══════════════ СТИЛИ ══════════════ -->
-<link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}">
+<link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}?v={{ static_asset_version }}">
 
 
 <script>
@@ -457,6 +465,11 @@
             { id: "finish", label: "Чистовой" }
           ],
           tool_presets: {}
+        },
+        {
+          id: "drill", label: "Сверла", form: "drill",
+          tool_types: ["Сверло"],
+          tool_presets: {}
         }
       ],
       materials: [
@@ -485,7 +498,10 @@
   var mModeSel = document.getElementById("m-tool-type");
   var mFormulaThread = document.getElementById("m-formula-thread");
   var mFormulaMill = document.getElementById("m-formula-mill");
+  var mFormulaDrill = document.getElementById("m-formula-drill");
   var currentModeId = (CUTTING_MODES.modes[0] && CUTTING_MODES.modes[0].id) || "thread";
+  var calcPageEl = document.querySelector(".calc-page");
+  var CALC_USERNAME = (calcPageEl && calcPageEl.dataset.calcUsername) || "";
 
   function lsKey() { return "calc_modes_" + currentModeId + "_v4"; }
 
@@ -505,6 +521,11 @@
   function isMillForm() {
     var m = currentMode();
     return m && m.form === "end_mill";
+  }
+
+  function isDrillForm() {
+    var m = currentMode();
+    return m && m.form === "drill";
   }
 
   var mModeField = document.getElementById("m-mode-field");
@@ -548,6 +569,7 @@
   function syncFormulaCard() {
     if (mFormulaThread) mFormulaThread.hidden = !isThreadForm();
     if (mFormulaMill) mFormulaMill.hidden = !isMillForm();
+    if (mFormulaDrill) mFormulaDrill.hidden = !isDrillForm();
   }
 
   function buildThead() {
@@ -562,7 +584,19 @@
         { label: "Шаг p, мм", cls: "mc-pitch" },
         { label: "n, об/мин", cls: "mc-n" },
         { label: "F, мм/мин", cls: "mc-f" },
-        { label: "", cls: "mc-del" }
+        { label: "", cls: "mc-actions" }
+      ];
+    } else if (isDrillForm()) {
+      cols = [
+        { label: "Инструмент", cls: "mc-type" },
+        { label: "D, мм", cls: "mc-drill-d" },
+        { label: "Угол, °", cls: "mc-drill-angle" },
+        { label: "Материал", cls: "mc-mat" },
+        { label: "Глубина, мм", cls: "mc-drill-depth" },
+        { label: "Проход, мм", cls: "mc-drill-pass" },
+        { label: "n, об/мин", cls: "mc-n" },
+        { label: "F, мм/мин", cls: "mc-drill-feed" },
+        { label: "", cls: "mc-actions" }
       ];
     } else {
       cols = [
@@ -575,7 +609,7 @@
         { label: "ae, мм", cls: "mc-mill-ae" },
         { label: "ap, мм", cls: "mc-mill-ap" },
         { label: "Обработка", cls: "mc-mill-op" },
-        { label: "", cls: "mc-del" }
+        { label: "", cls: "mc-actions" }
       ];
     }
     cols.forEach(function (c) {
@@ -592,6 +626,7 @@
     if (!mTable) return;
     mTable.classList.toggle("calc-modes-table--thread", isThreadForm());
     mTable.classList.toggle("calc-modes-table--mill", isMillForm());
+    mTable.classList.toggle("calc-modes-table--drill", isDrillForm());
   }
 
   function syncEmpty() { mEmpty.hidden = mTbody.rows.length > 0; }
@@ -643,27 +678,130 @@
     setTimeout(function () { tr.remove(); syncEmpty(); saveTable(); }, 180);
   }
 
-  function appendDelCell(tr) {
-    var delBtn = mk("button", "mc-del-btn");
+  function formatConfirmTitle(by, at) {
+    if (!by) return "Подтвердить режим";
+    var t = "Подтвердил: " + by;
+    if (at) {
+      try {
+        var d = new Date(at);
+        if (!isNaN(d.getTime())) t += ", " + d.toLocaleString("ru-RU");
+      } catch (e) {}
+    }
+    return t;
+  }
+
+  function applyRowLock(tr, locked) {
+    tr.classList.toggle("is-row-locked", locked);
+    tr.querySelectorAll(".mc-inp").forEach(function (el) {
+      el.disabled = locked;
+    });
+    var lockBtn = tr.querySelector(".mc-lock-btn");
+    if (lockBtn) {
+      lockBtn.classList.toggle("is-active", locked);
+      lockBtn.title = locked ? "Разблокировать строку" : "Заблокировать строку";
+      lockBtn.setAttribute("aria-pressed", locked ? "true" : "false");
+    }
+    var delBtn = tr.querySelector(".mc-del-btn");
+    if (delBtn) delBtn.disabled = locked;
+  }
+
+  function applyRowConfirm(tr, confirmed, by, at) {
+    var cb = tr.querySelector(".mc-confirm-cb");
+    var wrap = tr.querySelector(".mc-confirm-wrap");
+    if (!cb || !wrap) return;
+    cb.checked = confirmed;
+    wrap.title = formatConfirmTitle(confirmed ? by : "", confirmed ? at : "");
+    tr.classList.toggle("is-row-confirmed", confirmed);
+    if (confirmed) {
+      tr.dataset.confirmedBy = by || "";
+      tr.dataset.confirmedAt = at || "";
+    } else {
+      delete tr.dataset.confirmedBy;
+      delete tr.dataset.confirmedAt;
+    }
+  }
+
+  function rowMetaFromTr(tr) {
+    var cb = tr.querySelector(".mc-confirm-cb");
+    return {
+      locked: tr.classList.contains("is-row-locked"),
+      confirmed: !!(cb && cb.checked),
+      confirmed_by: tr.dataset.confirmedBy || "",
+      confirmed_at: tr.dataset.confirmedAt || ""
+    };
+  }
+
+  function appendActionCell(tr, data) {
+    var td = mk("td", "mc-actions");
+    var bar = mk("div", "mc-actions-bar");
+
+    var lockBtn = mk("button", "mc-act-btn mc-lock-btn");
+    lockBtn.type = "button";
+    lockBtn.title = "Заблокировать строку";
+    lockBtn.setAttribute("aria-label", "Заблокировать строку");
+    lockBtn.setAttribute("aria-pressed", "false");
+    lockBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 116 0v3"/></svg>';
+    lockBtn.addEventListener("click", function () {
+      applyRowLock(tr, !tr.classList.contains("is-row-locked"));
+      saveTable();
+    });
+
+    var confirmWrap = mk("label", "mc-confirm-wrap");
+    confirmWrap.title = "Подтвердить режим";
+    var confirmCb = mk("input", "mc-confirm-cb");
+    confirmCb.type = "checkbox";
+    confirmCb.setAttribute("aria-label", "Подтвердить режим");
+    confirmWrap.appendChild(confirmCb);
+    var confirmIco = mk("span", "mc-confirm-ico");
+    confirmIco.setAttribute("aria-hidden", "true");
+    confirmIco.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10l3.5 3.5L15 6"/></svg>';
+    confirmWrap.appendChild(confirmIco);
+    confirmCb.addEventListener("change", function () {
+      if (confirmCb.checked) {
+        applyRowConfirm(tr, true, CALC_USERNAME || "Неизвестный", new Date().toISOString());
+      } else {
+        applyRowConfirm(tr, false, "", "");
+      }
+      saveTable();
+    });
+
+    var delBtn = mk("button", "mc-act-btn mc-del-btn");
     delBtn.type = "button";
     delBtn.textContent = "×";
     delBtn.title = "Удалить строку";
+    delBtn.setAttribute("aria-label", "Удалить строку");
     delBtn.addEventListener("click", function () { removeRow(tr); });
-    var td = mk("td");
-    td.appendChild(delBtn);
+
+    bar.appendChild(lockBtn);
+    bar.appendChild(confirmWrap);
+    bar.appendChild(delBtn);
+    td.appendChild(bar);
     tr.appendChild(td);
+
+    applyRowLock(tr, !!(data && data.locked));
+    if (data && data.confirmed) {
+      applyRowConfirm(tr, true, data.confirmed_by || "", data.confirmed_at || "");
+    }
   }
 
-  function applyMillPreset(tr, typeVal) {
+  function applyToolPreset(tr, typeVal, mapping) {
     var mode = currentMode();
     if (!mode || !mode.tool_presets) return;
     var list = mode.tool_presets[typeVal];
     if (!list || !list.length) return;
     var preset = list[0];
-    var dInp = tr.querySelector(".m-inp-d");
-    var zInp = tr.querySelector(".m-inp-flutes");
-    if (dInp && !dInp.value && preset.d) dInp.value = preset.d;
-    if (zInp && !zInp.value && preset.flutes) zInp.value = preset.flutes;
+    Object.keys(mapping).forEach(function (presetKey) {
+      var inp = tr.querySelector("." + mapping[presetKey]);
+      if (inp && !inp.value && preset[presetKey]) inp.value = preset[presetKey];
+    });
+  }
+
+  function applyMillPreset(tr, typeVal) {
+    applyToolPreset(tr, typeVal, { d: "m-inp-d", flutes: "m-inp-flutes" });
+  }
+
+  function applyDrillPreset(tr, typeVal) {
+    applyToolPreset(tr, typeVal, { d: "m-inp-d", angle: "m-inp-angle" });
   }
 
   function calcThreadRow(tr) {
@@ -688,20 +826,29 @@
         var e = tr.querySelector("." + cls);
         return e ? e.value : "";
       };
+      var meta = rowMetaFromTr(tr);
+      var row;
       if (isThreadForm()) {
-        rows.push({ type: g("m-inp-type"), m: g("m-inp-m"), mat: g("m-inp-mat"), pitch: g("m-inp-p"), n: g("m-inp-n") });
+        row = { type: g("m-inp-type"), m: g("m-inp-m"), mat: g("m-inp-mat"), pitch: g("m-inp-p"), n: g("m-inp-n") };
+      } else if (isDrillForm()) {
+        row = {
+          type: g("m-inp-type"), d: g("m-inp-d"), angle: g("m-inp-angle"), mat: g("m-inp-mat"),
+          depth: g("m-inp-depth"), pass: g("m-inp-pass"), n: g("m-inp-n"), feed: g("m-inp-feed")
+        };
       } else {
-        rows.push({
+        row = {
           type: g("m-inp-type"), d: g("m-inp-d"), mat: g("m-inp-mat"), flutes: g("m-inp-flutes"),
           n: g("m-inp-n"), feed: g("m-inp-feed"), ae: g("m-inp-ae"), ap: g("m-inp-ap"), op: g("m-inp-op")
-        });
+        };
       }
+      rows.push(Object.assign(row, meta));
     });
     try { localStorage.setItem(lsKey(), JSON.stringify(rows)); } catch (e) {}
   }
 
   function appendTd(tr, el) {
     var td = mk("td");
+    if (el && el.tagName === "SELECT") td.className = "mc-sel-cell";
     td.appendChild(el);
     tr.appendChild(td);
     return el;
@@ -732,7 +879,7 @@
     fTd.textContent = "—";
     tr.appendChild(fTd);
 
-    appendDelCell(tr);
+    appendActionCell(tr, data);
     bindRowInputs(tr, [sel, mInp, matSel, pInp, nInp], function () {
       calcThreadRow(tr);
       saveTable();
@@ -742,6 +889,45 @@
     syncEmpty();
     calcThreadRow(tr);
     if (!data) pInp.focus();
+  }
+
+  function addDrillRow(data) {
+    var tr = mk("tr");
+    var sel = mkTypeSelect(data);
+    sel.addEventListener("change", function () {
+      applyDrillPreset(tr, sel.value);
+      saveTable();
+    });
+    appendTd(tr, sel);
+
+    var dInp = mkNumInp("m-inp-d", "мм", data && data.d);
+    appendTd(tr, dInp);
+
+    var angleInp = mkNumInp("m-inp-angle", "°", data && data.angle);
+    appendTd(tr, angleInp);
+
+    var matSel = mkMatSelect(data);
+    appendTd(tr, matSel);
+
+    var depthInp = mkNumInp("m-inp-depth", "глуб", data && data.depth);
+    appendTd(tr, depthInp);
+
+    var passInp = mkNumInp("m-inp-pass", "прох", data && data.pass);
+    appendTd(tr, passInp);
+
+    var nInp = mkNumInp("m-inp-n", "об/мин", data && data.n);
+    appendTd(tr, nInp);
+
+    var feedInp = mkNumInp("m-inp-feed", "мм/мин", data && data.feed);
+    appendTd(tr, feedInp);
+
+    appendActionCell(tr, data);
+    bindRowInputs(tr, [sel, dInp, angleInp, matSel, depthInp, passInp, nInp, feedInp], saveTable);
+
+    mTbody.appendChild(tr);
+    if (!data && sel.value) applyDrillPreset(tr, sel.value);
+    syncEmpty();
+    if (!data) dInp.focus();
   }
 
   function addMillRow(data) {
@@ -786,7 +972,7 @@
     });
     appendTd(tr, opSel);
 
-    appendDelCell(tr);
+    appendActionCell(tr, data);
     bindRowInputs(tr, [sel, dInp, matSel, zInp, nInp, feedInp, aeInp, apInp, opSel], saveTable);
 
     mTbody.appendChild(tr);
@@ -797,6 +983,7 @@
 
   function addRow(data) {
     if (isMillForm()) addMillRow(data);
+    else if (isDrillForm()) addDrillRow(data);
     else addThreadRow(data);
   }
 
