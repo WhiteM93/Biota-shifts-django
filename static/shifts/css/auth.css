@@ -8,6 +8,8 @@
   flex-direction: column;
   justify-content: center;
   overflow-x: hidden;
+  background: #0f1115;
+  background-image: none;
   padding:
     max(12px, env(safe-area-inset-top, 0px))
     max(12px, env(safe-area-inset-right, 0px))
@@ -37,6 +39,11 @@
   width: 100%;
   max-width: 100%;
   animation: authFadeIn 0.24s ease;
+}
+
+html[data-theme="dawn"] .auth-page {
+  background: #f6efe6;
+  background-image: none;
 }
 
 html[data-theme="dawn"] .auth-shell {
