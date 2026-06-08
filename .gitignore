@@ -9,6 +9,7 @@ db.sqlite3-shm
 media/
 .env
 .env.secrets
+secrets/
 .biota_users.json
 # Локальное демо графика (manage.py create_graph_demo_local)
 local/

@@ -10,6 +10,7 @@ from django.views.decorators.http import require_http_methods
 
 from biota_shifts import schedule as biota_schedule
 from biota_shifts.constants import MONTH_NAMES_RU
+from biota_shifts.schedule_google import GoogleScheduleError
 from biota_shifts.schedule import (
     PREV_MONTH_KEYS,
     is_schedule_day_column,
@@ -19,6 +20,7 @@ from biota_shifts.schedule import (
 
 from .auth_utils import biota_login_required, nav_permission_required
 from .department_order import apply_department_order, load_department_order
+from .graph_schedule_source import get_graph_schedule_source
 from .graph_views import (
     _dept_rank_map,
     _employees_for_user,
@@ -103,7 +105,15 @@ def _short_employee_name(full_name: str) -> str:
 
 def _load_schedule_for_user(request, year: int, month: int) -> pd.DataFrame:
     employees_df = _employees_for_user(request)
-    schedule_df = biota_schedule.load_schedule_table(employees_df, year, month)
+    source = get_graph_schedule_source(request)
+    try:
+        schedule_df = biota_schedule.load_schedule_table(
+            employees_df, year, month, source=source
+        )
+    except GoogleScheduleError:
+        schedule_df = biota_schedule.load_schedule_table(
+            employees_df, year, month, source="local"
+        )
     schedule_df = _schedule_with_department(schedule_df, employees_df)
     all_deps = apply_department_order(
         sorted(schedule_df["Отдел"].unique().tolist()),

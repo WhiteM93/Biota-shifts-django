@@ -220,8 +220,32 @@ def build_schedule_template_bytes(employees_df: pd.DataFrame, year: int, month: 
     return out.getvalue()
 
 
-def _read_schedule_dataframe(employees_df: pd.DataFrame, year: int, month: int) -> pd.DataFrame:
+def _read_schedule_dataframe(
+    employees_df: pd.DataFrame,
+    year: int,
+    month: int,
+    *,
+    source: str = "local",
+) -> pd.DataFrame:
     """Чтение и нормализация графика за месяц без подстановки хвоста из прошлого месяца."""
+    if source == "google":
+        from biota_shifts.schedule_google import (
+            GoogleScheduleError,
+            fetch_schedule_dataframe,
+            google_schedule_configured,
+        )
+
+        if google_schedule_configured():
+            try:
+                xl = fetch_schedule_dataframe(year, month)
+                if xl.empty:
+                    return empty_schedule_from_db(employees_df, year, month)
+                return normalize_schedule_excel(xl, employees_df, year, month)
+            except GoogleScheduleError:
+                raise
+            except Exception as exc:
+                raise GoogleScheduleError(str(exc)) from exc
+
     file_path = schedule_path(year, month)
     if file_path.exists():
         try:
@@ -233,13 +257,18 @@ def _read_schedule_dataframe(employees_df: pd.DataFrame, year: int, month: int) 
 
 
 def apply_prev_month_tail_from_previous_schedule(
-    df: pd.DataFrame, employees_df: pd.DataFrame, year: int, month: int
+    df: pd.DataFrame,
+    employees_df: pd.DataFrame,
+    year: int,
+    month: int,
+    *,
+    source: str = "local",
 ) -> pd.DataFrame:
     """Заполняет колонки p1–p3 значениями из соответствующих календарных дней предыдущего месяца."""
     out = df.copy()
     d0, d1, d2 = prev_month_tail_dates(year, month)
     yp, mp = d0.year, d0.month
-    prev_df = _read_schedule_dataframe(employees_df, yp, mp)
+    prev_df = _read_schedule_dataframe(employees_df, yp, mp, source=source)
     day_src = [str(d0.day), str(d1.day), str(d2.day)]
     for pk, src_col in zip(PREV_MONTH_KEYS, day_src):
         if pk not in out.columns:
@@ -258,9 +287,17 @@ def apply_prev_month_tail_from_previous_schedule(
     return out
 
 
-def load_schedule_table(employees_df: pd.DataFrame, year: int, month: int) -> pd.DataFrame:
-    df = _read_schedule_dataframe(employees_df, year, month)
-    return apply_prev_month_tail_from_previous_schedule(df, employees_df, year, month)
+def load_schedule_table(
+    employees_df: pd.DataFrame,
+    year: int,
+    month: int,
+    *,
+    source: str = "local",
+) -> pd.DataFrame:
+    df = _read_schedule_dataframe(employees_df, year, month, source=source)
+    return apply_prev_month_tail_from_previous_schedule(
+        df, employees_df, year, month, source=source
+    )
 
 
 def _rotate_schedule_backups(year: int, month: int, keep: int = 20) -> None:
@@ -284,10 +321,31 @@ def _rotate_schedule_backups(year: int, month: int, keep: int = 20) -> None:
             pass
 
 
-def save_schedule_table(df: pd.DataFrame, year: int, month: int) -> Path:
+def save_schedule_table(
+    df: pd.DataFrame,
+    year: int,
+    month: int,
+    *,
+    source: str = "local",
+) -> Path:
     file_path = schedule_path(year, month)
     file_path.parent.mkdir(parents=True, exist_ok=True)
     _rotate_schedule_backups(year, month)
     with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="График")
+    if source == "google":
+        from biota_shifts.schedule_google import (
+            GoogleScheduleError,
+            google_schedule_configured,
+            google_schedule_read_only,
+            save_schedule_dataframe_to_google,
+        )
+
+        if google_schedule_configured() and not google_schedule_read_only():
+            try:
+                save_schedule_dataframe_to_google(df, year, month)
+            except GoogleScheduleError:
+                raise
+            except Exception as exc:
+                raise GoogleScheduleError(str(exc)) from exc
     return file_path

@@ -22,8 +22,15 @@ from biota_shifts.schedule import (
     sort_schedule_day_columns,
 )
 
+from biota_shifts.schedule_google import GoogleScheduleError, google_schedule_configured
+
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
 from .department_order import apply_department_order, load_department_order
+from .graph_schedule_source import (
+    SCHEDULE_SOURCE_GOOGLE,
+    append_schedule_source,
+    get_graph_schedule_source,
+)
 from .position_order import apply_position_order, load_position_order
 from .ru_work_calendar import is_ru_non_working_day
 from .section_action_log import (
@@ -52,6 +59,30 @@ def _employees_for_user(request):
     cfg = biota_db.db_config()
     employees_df = biota_db.load_employees(cfg)
     return employees_df_for_nav(biota_user(request), "graph", employees_df)
+
+
+def _graph_redirect(request, year: int, month: int):
+    src = get_graph_schedule_source(request)
+    return redirect(append_schedule_source(f"/graph/?year={year}&month={month}", src))
+
+
+def _load_schedule_for_graph(request, employees_df, year: int, month: int) -> pd.DataFrame:
+    source = get_graph_schedule_source(request)
+    try:
+        return biota_schedule.load_schedule_table(
+            employees_df, year, month, source=source
+        )
+    except GoogleScheduleError as exc:
+        messages.error(request, str(exc))
+        if source == SCHEDULE_SOURCE_GOOGLE:
+            messages.warning(
+                request,
+                "Показан локальный график (Excel). Проверьте настройки Google или переключите источник.",
+            )
+            return biota_schedule.load_schedule_table(
+                employees_df, year, month, source="local"
+            )
+        raise
 
 
 def _parse_year_month(request, *, default_year: int, default_month: int) -> tuple[int, int]:
@@ -278,13 +309,21 @@ def graph_view(request):
                 request,
                 "Редактирование и загрузка доступны только при фильтрах «Все» (отделы и должности).",
             )
-            return redirect(f"/graph/?year={y}&month={m}")
+            return _graph_redirect(request, y, m)
+
+        schedule_source = get_graph_schedule_source(request)
 
         if action == "upload":
+            if schedule_source == SCHEDULE_SOURCE_GOOGLE:
+                messages.error(
+                    request,
+                    "Загрузка Excel доступна только в режиме «Базовый». Переключите источник данных.",
+                )
+                return _graph_redirect(request, y, m)
             upl = request.FILES.get("schedule_file")
             if not upl:
                 messages.error(request, "Выберите файл .xlsx")
-                return redirect(f"/graph/?year={y}&month={m}")
+                return _graph_redirect(request, y, m)
             try:
                 raw = upl.read()
                 xl_imp = biota_schedule.read_schedule_sheet_from_bytes(raw)
@@ -305,21 +344,39 @@ def graph_view(request):
                 messages.error(request, str(err))
             except Exception as exc:
                 messages.error(request, f"Не удалось прочитать файл: {exc}")
-            return redirect(f"/graph/?year={y}&month={m}")
+            return _graph_redirect(request, y, m)
 
         # save — ячейки привязаны к коду сотрудника (cell_<Код>_<день>), не к индексу строки
-        full_schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
+        try:
+            full_schedule_df = _load_schedule_for_graph(request, employees_df, y, m)
+        except GoogleScheduleError:
+            return _graph_redirect(request, y, m)
         full_schedule_df = apply_schedule_cells_from_post(
             full_schedule_df, request, year=y, month=m
         )
         full_schedule_df = biota_schedule.apply_prev_month_tail_from_previous_schedule(
-            full_schedule_df, employees_df, y, m
+            full_schedule_df, employees_df, y, m, source=schedule_source
         )
         full_schedule_df = full_schedule_df.sort_values(["Порядок", "Код"]).reset_index(drop=True)
-        saved_path = biota_schedule.save_schedule_table(full_schedule_df, y, m)
+        try:
+            saved_path = biota_schedule.save_schedule_table(
+                full_schedule_df, y, m, source=schedule_source
+            )
+        except GoogleScheduleError as exc:
+            messages.error(request, str(exc))
+            return _graph_redirect(request, y, m)
         stats = log_graph_save(
             request, full_schedule_df, year=y, month=m, saved_name=saved_path.name
         )
+        if schedule_source == SCHEDULE_SOURCE_GOOGLE:
+            from biota_shifts.schedule_google import google_schedule_read_only
+
+            if google_schedule_read_only():
+                save_msg = f"Сохранено локально ({saved_path.name}); Google — только чтение"
+            else:
+                save_msg = f"Сохранено в Google и локально ({saved_path.name})"
+        else:
+            save_msg = f"Сохранено: {saved_path.name}"
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return JsonResponse(
                 {
@@ -328,14 +385,16 @@ def graph_view(request):
                     "applied_cells": stats.get("applied_cells", 0),
                     "post_cell_fields": stats.get("post_cell_fields", 0),
                     "reload": (request.POST.get("_save_reload") or "").strip() == "1",
+                    "schedule_source": schedule_source,
                 }
             )
-        messages.success(request, f"Сохранено: {saved_path.name}")
-        return redirect(f"/graph/?year={y}&month={m}")
+        messages.success(request, save_msg)
+        return _graph_redirect(request, y, m)
 
     # GET
     y, m = _parse_year_month(request, default_year=default_y, default_month=default_m)
-    schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
+    schedule_source = get_graph_schedule_source(request)
+    schedule_df = _load_schedule_for_graph(request, employees_df, y, m)
     schedule_df = _schedule_with_department(schedule_df, employees_df)
     all_deps = apply_department_order(
         sorted(schedule_df["Отдел"].unique().tolist()),
@@ -452,6 +511,9 @@ def graph_view(request):
             "day_headers": day_headers,
             "non_working_days": non_working_days,
             "table_rows": table_rows,
+            "schedule_source": schedule_source,
+            "schedule_source_google": SCHEDULE_SOURCE_GOOGLE,
+            "google_schedule_available": google_schedule_configured(),
         },
     )
 
@@ -467,7 +529,13 @@ def graph_download(request):
         return HttpResponse(str(exc), status=500)
     if employees_df.empty:
         return HttpResponse("Нет сотрудников", status=400)
-    schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
+    source = get_graph_schedule_source(request)
+    try:
+        schedule_df = biota_schedule.load_schedule_table(
+            employees_df, y, m, source=source
+        )
+    except GoogleScheduleError:
+        schedule_df = biota_schedule.load_schedule_table(employees_df, y, m, source="local")
     data = biota_export.build_schedule_excel(
         schedule_df, sheet_name="График", year=y, month=m
     )
