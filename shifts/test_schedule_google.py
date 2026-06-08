@@ -108,24 +108,21 @@ class GraphScheduleSourceSessionTests(TestCase):
         return req
 
     @patch("shifts.graph_schedule_source.google_schedule_configured", return_value=True)
-    def test_get_sets_session_google(self, _cfg):
-        req = self._request(schedule_source="google")
+    def test_defaults_to_google_when_configured(self, _cfg):
+        req = self._request()
         self.assertEqual(get_graph_schedule_source(req), SCHEDULE_SOURCE_GOOGLE)
         self.assertEqual(req.session[SESSION_KEY], SCHEDULE_SOURCE_GOOGLE)
 
+    @patch("shifts.graph_schedule_source.google_schedule_configured", return_value=True)
+    def test_local_param_ignored_when_google_configured(self, _cfg):
+        req = self._request(schedule_source="local")
+        self.assertEqual(get_graph_schedule_source(req), SCHEDULE_SOURCE_GOOGLE)
+
     @patch("shifts.graph_schedule_source.google_schedule_configured", return_value=False)
-    def test_google_without_config_falls_back_local(self, _cfg):
+    def test_without_config_uses_local(self, _cfg):
         req = self._request(schedule_source="google")
         self.assertEqual(get_graph_schedule_source(req), SCHEDULE_SOURCE_LOCAL)
-
-    @patch("shifts.graph_schedule_source.google_schedule_configured", return_value=True)
-    def test_session_persists(self, _cfg):
-        req = self._request(schedule_source="google")
-        get_graph_schedule_source(req)
-        session = req.session
-        req2 = self._request()
-        req2.session = session
-        self.assertEqual(get_graph_schedule_source(req2), SCHEDULE_SOURCE_GOOGLE)
+        self.assertEqual(req.session[SESSION_KEY], SCHEDULE_SOURCE_LOCAL)
 
 
 class AppendScheduleSourceTests(SimpleTestCase):

@@ -54,24 +54,8 @@
             {% endfor %}
           </select>
         </label>
-        <span class="fp-filter-sep"></span>
-        <div class="graph-source-wrap" id="graph-source-wrap">
-          <span class="fp-mode-label">Источник</span>
-          <div class="fp-toggle-track" id="graph-source-toggle" role="group" aria-label="Источник графика">
-            <span class="fp-toggle-thumb" id="graph-source-thumb" aria-hidden="true"></span>
-            <label class="fp-toggle-opt{% if schedule_source != schedule_source_google %} is-on{% endif %}">
-              <input type="radio" name="schedule_source" value="local"{% if schedule_source != schedule_source_google %} checked{% endif %}>
-              Базовый
-            </label>
-            <label class="fp-toggle-opt{% if schedule_source == schedule_source_google %} is-on{% endif %}{% if not google_schedule_available %} is-disabled{% endif %}"{% if not google_schedule_available %} title="Задайте BIOTA_GOOGLE_SCHEDULE_SPREADSHEET_ID и BIOTA_GOOGLE_SCHEDULE_CREDENTIALS"{% endif %}>
-              <input type="radio" name="schedule_source" value="google"{% if schedule_source == schedule_source_google %} checked{% endif %}{% if not google_schedule_available %} disabled{% endif %}>
-              Google
-            </label>
-          </div>
-        </div>
-        {% if not google_schedule_available %}
-        <span class="graph-source-hint" title="См. .env.example">Google не настроен</span>
-        {% elif schedule_source == schedule_source_google %}
+        {% if google_schedule_available %}
+        <input type="hidden" name="schedule_source" value="google">
         <span class="graph-google-meta">
           {% if google_cache_updated_at %}
           <span class="graph-cache-updated" title="Локальный снимок; автообновление в 21:00 МСК">кэш: {{ google_cache_updated_at }}</span>
@@ -88,6 +72,8 @@
             </span>
           </button>
         </span>
+        {% else %}
+        <span class="graph-source-hint" title="См. .env.example">Google не настроен — локальный Excel</span>
         {% endif %}
         <span class="fp-filter-sep"></span>
         <div class="fp-dd" id="fp-dd-dep">
@@ -126,7 +112,7 @@
         </div>
       </div>
     </form>
-    {% if google_schedule_available and schedule_source == schedule_source_google %}
+    {% if google_schedule_available %}
     <form method="post" action="" id="graph-google-refresh-form" class="graph-google-refresh-form biota-exempt-global-readonly-form">
       {% csrf_token %}
       <input type="hidden" name="action" value="refresh_google">
@@ -329,8 +315,8 @@
       if (hiddenDepMode) hiddenDepMode.value = filterDepModeInput.value;
       if (hiddenPosMode) hiddenPosMode.value = filterPosModeInput.value;
       var hiddenScheduleSource = form.querySelector('input[name="schedule_source"]');
-      var srcRadio = filterForm && filterForm.querySelector('input[name="schedule_source"]:checked');
-      if (hiddenScheduleSource && srcRadio) hiddenScheduleSource.value = srcRadio.value;
+      var filterSrc = filterForm && filterForm.querySelector('input[name="schedule_source"]');
+      if (hiddenScheduleSource && filterSrc) hiddenScheduleSource.value = filterSrc.value;
       if (!graphEditAllowed && editing) {
         exitEditWithSave();
       } else {
@@ -1000,32 +986,6 @@
 
       initDropdown("fp-dd-dep", "fp-dep-mode-val", "fp-dep-txt");
       initDropdown("fp-dd-pos", "fp-pos-mode-val", "fp-pos-txt");
-      (function initSourceToggle() {
-        var track = document.getElementById("graph-source-toggle");
-        var thumb = document.getElementById("graph-source-thumb");
-        if (!track || !thumb) return;
-        function layoutThumb() {
-          var on = track.querySelector(".fp-toggle-opt.is-on");
-          if (!on) {
-            thumb.style.opacity = "0";
-            return;
-          }
-          thumb.style.opacity = "1";
-          thumb.style.left = on.offsetLeft + "px";
-          thumb.style.width = on.offsetWidth + "px";
-        }
-        track.querySelectorAll('input[name="schedule_source"]').forEach(function (inp) {
-          inp.addEventListener("change", function () {
-            track.querySelectorAll(".fp-toggle-opt").forEach(function (lbl) {
-              var radio = lbl.querySelector("input");
-              lbl.classList.toggle("is-on", radio && radio.checked);
-            });
-            layoutThumb();
-          });
-        });
-        layoutThumb();
-        window.addEventListener("resize", layoutThumb);
-      })();
       syncSaveFormFilterMeta();
       if (filterForm) {
         filterForm.addEventListener("change", syncSaveFormFilterMeta);

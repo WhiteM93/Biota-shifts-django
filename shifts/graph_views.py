@@ -339,7 +339,7 @@ def graph_view(request):
         if action == "save" and schedule_source == SCHEDULE_SOURCE_GOOGLE:
             messages.error(
                 request,
-                "В режиме Google график только для просмотра. Редактируйте в Google Таблице или переключите «Базовый».",
+                "График только для просмотра. Редактируйте в Google Таблице.",
             )
             return _graph_redirect(request, y, m)
 
@@ -347,7 +347,7 @@ def graph_view(request):
             if schedule_source == SCHEDULE_SOURCE_GOOGLE:
                 messages.error(
                     request,
-                    "Загрузка Excel доступна только в режиме «Базовый». Переключите источник данных.",
+                    "Загрузка Excel недоступна: график ведётся в Google Таблице.",
                 )
                 return _graph_redirect(request, y, m)
             upl = request.FILES.get("schedule_file")
