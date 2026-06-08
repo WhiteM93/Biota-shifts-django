@@ -72,11 +72,22 @@
         {% if not google_schedule_available %}
         <span class="graph-source-hint" title="См. .env.example">Google не настроен</span>
         {% elif schedule_source == schedule_source_google %}
-        <span class="graph-source-badge" title="Листы «Июль 2026» и т.д., A — таб. №, B — ФИО">Google Таблицы</span>
-        {% if google_cache_updated_at %}
-        <span class="graph-cache-updated" title="Локальный снимок; автообновление в 21:00 МСК">кэш: {{ google_cache_updated_at }}</span>
-        {% endif %}
-        <button type="submit" form="graph-google-refresh-form" class="fp-action-btn graph-refresh-btn" title="Обновить из Google сейчас" aria-label="Обновить из Google">⟳</button>
+        <span class="graph-google-meta">
+          {% if google_cache_updated_at %}
+          <span class="graph-cache-updated" title="Локальный снимок; автообновление в 21:00 МСК">кэш: {{ google_cache_updated_at }}</span>
+          {% endif %}
+          <button type="submit" form="graph-google-refresh-form" class="fp-action-btn graph-refresh-btn" id="graph-google-refresh-btn" title="Обновить из Google сейчас" aria-label="Обновить из Google">
+            <span class="graph-refresh-btn__glow" aria-hidden="true"></span>
+            <span class="graph-refresh-btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 2v6h-6"/>
+                <path d="M3 12a9 9 0 0 1 15.55-6.36L21 8"/>
+                <path d="M3 22v-6h6"/>
+                <path d="M21 12a9 9 0 0 1-15.55 6.36L3 16"/>
+              </svg>
+            </span>
+          </button>
+        </span>
         {% endif %}
         <span class="fp-filter-sep"></span>
         <div class="fp-dd" id="fp-dd-dep">
@@ -1038,6 +1049,16 @@
         }
       });
     }
+
+    (function initGoogleRefreshBtn() {
+      var refreshBtn = document.getElementById("graph-google-refresh-btn");
+      var refreshForm = document.getElementById("graph-google-refresh-form");
+      if (!refreshBtn || !refreshForm) return;
+      refreshForm.addEventListener("submit", function () {
+        refreshBtn.classList.add("is-loading");
+        refreshBtn.setAttribute("aria-busy", "true");
+      });
+    })();
 
     var printBtn = document.getElementById("graph-print-btn");
     if (printBtn) {

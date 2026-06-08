@@ -187,3 +187,17 @@ class ScheduleGoogleIntegrationTests(TestCase):
             )
         self.assertFalse(df.empty)
         fetch_mock.assert_called()
+
+
+class HoursScheduleSourceTests(SimpleTestCase):
+    @patch("shifts.hours_views.load_schedule_table_resolved")
+    @patch("shifts.hours_views.get_skud_schedule_source", return_value=SCHEDULE_SOURCE_GOOGLE)
+    def test_hours_loads_google_schedule_when_configured(self, _src_mock, load_mock):
+        from biota_shifts.db import _demo_employees
+        from shifts.hours_views import _load_schedule_for_hours
+
+        load_mock.return_value = pd.DataFrame({"Код": ["1001"]})
+        df = _load_schedule_for_hours(_demo_employees(), 2026, 5)
+        load_mock.assert_called_once()
+        self.assertEqual(load_mock.call_args.kwargs["source"], SCHEDULE_SOURCE_GOOGLE)
+        self.assertFalse(df.empty)

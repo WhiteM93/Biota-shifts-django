@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<p class="muted">{{ month_name|capfirst }} {{ year }} — в ячейках факт часов из Biota; <strong>{{ no_punch }}</strong> — нет отметок; звёздочка <strong>{{ suffix_out }}</strong> — часы вне графика.</p>
+<p class="muted">{{ month_name|capfirst }} {{ year }} — в ячейках факт часов из Biota; <strong>{{ no_punch }}</strong> — нет отметок; звёздочка <strong>{{ suffix_out }}</strong> — часы вне графика.{% if schedule_from_google %} График смен — из <strong>Google Таблиц</strong> (как в СКУД).{% endif %}</p>
 
 <form method="get" action="" class="filter-panel hours-filters auto-submit-form">
   <div class="filter-grid">

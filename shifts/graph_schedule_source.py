@@ -45,7 +45,7 @@ def append_schedule_source(url: str, source: str) -> str:
 
 
 def get_skud_schedule_source() -> str:
-    """СКУД сверяет отметки с Google-графиком, если интеграция настроена."""
+    """Google-график для модулей без переключателя (СКУД, Часы), если интеграция настроена."""
     if google_schedule_configured():
         return SCHEDULE_SOURCE_GOOGLE
     return SCHEDULE_SOURCE_LOCAL

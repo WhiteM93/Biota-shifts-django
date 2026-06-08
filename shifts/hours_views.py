@@ -13,8 +13,17 @@ from biota_shifts.auth import employees_df_for_nav
 from biota_shifts.constants import HOURS_GRID_NO_PUNCH, HOURS_GRID_SUFFIX_OUTSIDE_GRAPH, MONTH_NAMES_RU
 from biota_shifts import schedule as biota_schedule
 
+from biota_shifts.schedule_google import google_schedule_configured
+
 from .auth_utils import biota_login_required, biota_user, nav_permission_required
+from .graph_schedule_source import get_skud_schedule_source, load_schedule_table_resolved
 from .ru_work_calendar import is_ru_non_working_day
+
+
+def _load_schedule_for_hours(employees_df, year: int, month: int) -> pd.DataFrame:
+    return load_schedule_table_resolved(
+        employees_df, year, month, source=get_skud_schedule_source()
+    )
 
 
 def _employees_for_user(request):
@@ -89,7 +98,7 @@ def hours_view(request):
     y, m = _parse_year_month(request, default_y, now.month)
     filtered, sel_deps, sel_pos, all_deps, all_pos, dep_mode, pos_mode = _filter_lists(request, employees_df)
 
-    schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
+    schedule_df = _load_schedule_for_hours(employees_df, y, m)
     err_msg = None
     grid_view = None
     day_headers = []
@@ -195,6 +204,7 @@ def hours_view(request):
         "no_punch": HOURS_GRID_NO_PUNCH,
         "suffix_out": HOURS_GRID_SUFFIX_OUTSIDE_GRAPH,
         "query_string": query_string,
+        "schedule_from_google": google_schedule_configured(),
     }
     return render(request, "shifts/hours.html", ctx)
 
@@ -209,7 +219,7 @@ def _hours_grid_for_download(request):
     default_y = now.year if now.year in year_options else (year_options[0] if year_options else now.year)
     y, m = _parse_year_month(request, default_y, now.month)
     filtered, _, _, _, _, _, _ = _filter_lists(request, employees_df)
-    schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
+    schedule_df = _load_schedule_for_hours(employees_df, y, m)
     if schedule_df.empty or filtered.empty:
         return None, "Нет данных"
     allow_hc = frozenset(filtered["emp_code"].astype(str))
