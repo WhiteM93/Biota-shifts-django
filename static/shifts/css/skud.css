@@ -1,18 +1,359 @@
-.skud-form h3 { margin-top: 18px; font-size: 1rem; color: var(--bio-muted); }
-.skud-period-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
-.err-banner { color: var(--bio-error-soft); padding: 10px 0; }
-.skud-tabs { display: flex; gap: 8px; margin: 16px 0; }
-.skud-tabs .tab { padding: 8px 14px; border-radius: 3px; background: var(--bio-table-th-bg); color: var(--bio-input-focus-border); text-decoration: none; font-weight: 600; }
-.skud-tabs .tab.active { background: var(--bio-input-focus-border); color: #fff; }
-.table-wrap { overflow-x: auto; border: 1px solid var(--bio-table-cell-border); border-radius: 4px; padding: 8px; margin-top: 10px; }
-.data-grid { min-width: max-content; font-size: 12px; }
-.data-grid th, .data-grid td { border: 1px solid var(--bio-table-cell-border); padding: 4px 6px; text-align: center; }
-.dl-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-.dl-row .btn { text-decoration: none; display: inline-block; }
+/* ── СКУД (стили в духе калькулятора / часов по дням) ── */
+
+.skud-page {
+  max-width: 100%;
+}
+
+/* ── Фильтры ── */
+.skud-filters-card {
+  margin-bottom: 18px;
+}
+
+.skud-search-field {
+  margin-bottom: 16px;
+}
+
+.skud-search-inp {
+  padding-right: 12px !important;
+}
+
+.skud-fields-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 2fr) 120px 160px;
+  gap: 14px;
+  align-items: end;
+}
+
+.skud-filter-hint {
+  margin: 14px 0 0;
+}
+
+/* ── Ошибка ── */
+.skud-alert {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(248, 113, 113, .35);
+  background: rgba(248, 113, 113, .10);
+  color: #fca5a5;
+  font-size: 14px;
+}
+
+html[data-theme="dawn"] .skud-alert {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+/* ── Сводка и вкладки ── */
+.skud-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 20px;
+  margin-bottom: 18px;
+  padding: 16px 20px;
+}
+
+.skud-summary-main {
+  min-width: 0;
+  flex: 1 1 240px;
+}
+
+.skud-summary-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--bio-text);
+  margin-bottom: 8px;
+  line-height: 1.25;
+}
+
+.skud-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.skud-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(var(--ca-rgb), .12);
+  border: 1px solid rgba(var(--ca-rgb), .25);
+  color: var(--bio-text-muted);
+}
+
+.skud-badge--period {
+  font-variant-numeric: tabular-nums;
+}
+
+.skud-badge--count {
+  background: rgba(52, 211, 153, .12);
+  border-color: rgba(52, 211, 153, .30);
+  color: #6ee7b7;
+}
+
+html[data-theme="dawn"] .skud-badge--count {
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.skud-tab-bar {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  flex-shrink: 0;
+}
+
+.skud-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--bio-text-muted);
+  text-decoration: none;
+  transition: color .18s, background .18s, box-shadow .18s;
+  white-space: nowrap;
+}
+
+.skud-tab svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.skud-tab:hover {
+  color: var(--bio-text);
+}
+
+.skud-tab.is-active {
+  background: var(--bio-bg-card);
+  color: var(--bio-text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .14);
+  border: 1px solid var(--glass-border);
+}
+
+/* ── Контент ── */
+.skud-content-card {
+  padding-bottom: 14px;
+}
+
+.skud-content-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.skud-content-title {
+  margin-bottom: 0;
+}
+
+.skud-export-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.skud-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--ca), var(--ca2));
+  color: #fff;
+  box-shadow: 0 4px 14px var(--ca-glow);
+  transition: transform .18s, box-shadow .18s;
+  white-space: nowrap;
+}
+
+.skud-export-btn svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.skud-export-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px var(--ca-glow);
+  color: #fff;
+}
+
+.skud-export-btn--ghost {
+  background: var(--glass-bg);
+  color: var(--bio-text);
+  border: 1px solid var(--glass-border);
+  box-shadow: none;
+}
+
+.skud-export-btn--ghost:hover {
+  border-color: rgba(var(--ca-rgb), .35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .08);
+  color: var(--bio-text);
+}
+
+.skud-empty {
+  margin: 8px 0 4px;
+  padding: 20px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--bio-text-muted);
+  border: 1px dashed var(--glass-border);
+  border-radius: 10px;
+  background: var(--glass-bg);
+}
+
+/* ── Таблица ── */
+.skud-table-wrap {
+  overflow: auto;
+  max-width: 100%;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, .12);
+}
+
+html[data-theme="dawn"] .skud-table-wrap {
+  background: rgba(0, 0, 0, .02);
+}
+
+.skud-table {
+  min-width: max-content;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+
+.skud-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 9px 10px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--bio-text-muted);
+  background: var(--bio-bg-card);
+  border-bottom: 1px solid var(--glass-border);
+  border-right: 1px solid var(--glass-border);
+  white-space: nowrap;
+  box-shadow: 0 1px 0 var(--glass-border);
+}
+
+.skud-table thead th:first-child {
+  text-align: left;
+}
+
+.skud-table tbody td {
+  padding: 7px 10px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, .05);
+  border-right: 1px solid rgba(255, 255, 255, .05);
+  font-variant-numeric: tabular-nums;
+  color: var(--bio-text);
+}
+
+.skud-table tbody td:first-child {
+  text-align: left;
+  font-weight: 500;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bio-bg-card);
+  border-right: 1px solid var(--glass-border) !important;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, .06);
+  min-width: 100px;
+}
+
+html[data-theme="dawn"] .skud-table tbody td {
+  border-bottom-color: rgba(0, 0, 0, .06);
+  border-right-color: rgba(0, 0, 0, .06);
+}
+
+.skud-table tbody tr:hover td {
+  background: rgba(var(--ca-rgb), .06);
+}
+
+.skud-table tbody tr:hover td:first-child {
+  background: color-mix(in srgb, var(--bio-bg-card) 90%, rgba(var(--ca-rgb), .12));
+}
+
+/* Подсветка колонок с опозданием / ранним уходом */
+.skud-table tbody td:empty {
+  color: var(--bio-text-muted);
+}
+
+/* ── Адаптив ── */
+@media (max-width: 860px) {
+  .skud-fields-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .skud-emp-field {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 720px) {
-  .skud-period-grid { grid-template-columns: 1fr; }
-  .mode-row { gap: 6px; }
-  .inline { padding: 4px 8px; font-size: 11px; }
-  .skud-tabs .tab { padding: 7px 10px; font-size: 12px; }
-  .data-grid th, .data-grid td { font-size: 11px; padding: 4px; }
+  .skud-summary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .skud-tab-bar {
+    width: 100%;
+  }
+
+  .skud-tab {
+    flex: 1;
+    justify-content: center;
+    padding: 9px 12px;
+    font-size: 13px;
+  }
+
+  .skud-fields-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .skud-content-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .skud-export-btns {
+    justify-content: stretch;
+  }
+
+  .skud-export-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .skud-table {
+    font-size: 11px;
+  }
+
+  .skud-table thead th,
+  .skud-table tbody td {
+    padding: 6px 7px;
+  }
 }

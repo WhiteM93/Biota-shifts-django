@@ -2,90 +2,190 @@
 {% load static %}
 
 {% block content %}
-<p class="muted">{{ month_name|capfirst }} {{ year }} — в ячейках факт часов из Biota; <strong>{{ no_punch }}</strong> — нет отметок; звёздочка <strong>{{ suffix_out }}</strong> — часы вне графика.{% if schedule_from_google %} График смен — из <strong>Google Таблиц</strong> (как в СКУД).{% endif %}</p>
+<link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}">
+<link rel="stylesheet" href="{% static 'shifts/css/hours.css' %}">
 
-<form method="get" action="" class="filter-panel hours-filters auto-submit-form">
-  <div class="filter-grid">
-    <label class="field"><span>Год</span>
-      <select name="year">
-        {% for yy in year_options %}
-        <option value="{{ yy }}" {% if yy == year %}selected{% endif %}>{{ yy }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span>Месяц</span>
-      <select name="month">
-        {% for mm, mlab in month_choices %}
-        <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <div class="filter-actions">
-      <button type="submit" class="btn">Показать</button>
+<div class="calc-page hours-page">
+
+  <div class="calc-header">
+    <div class="calc-header-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/>
+        <polyline points="12,7 12,12 15,14"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="calc-title">Часы по дням</h1>
+      <p class="calc-subtitle">
+        {{ month_name|capfirst }} {{ year }}
+        {% if table_rows %}· {{ table_rows|length }} чел.{% endif %}
+        {% if schedule_from_google %}· график из Google Таблиц{% endif %}
+      </p>
     </div>
   </div>
-  <div class="mode-row">
-    <span class="label">Отдел:</span>
-    <label class="inline"><input type="radio" name="dep_mode" value="all" {% if not dep_mode_pick %}checked{% endif %}> Все</label>
-    <label class="inline"><input type="radio" name="dep_mode" value="pick" {% if dep_mode_pick %}checked{% endif %}> По списку</label>
-  </div>
-  <div class="check-row mode-target {% if not dep_mode_pick %}is-hidden{% endif %}" data-mode-target="dep">
-    <span class="label">Отдел:</span>
-    {% for d in all_deps %}
-    <label class="chk"><input type="checkbox" name="dep" value="{{ d }}" {% if d in sel_deps %}checked{% endif %}> {{ d }}</label>
-    {% endfor %}
-  </div>
-  <div class="mode-row">
-    <span class="label">Должность:</span>
-    <label class="inline"><input type="radio" name="pos_mode" value="all" {% if not pos_mode_pick %}checked{% endif %}> Все</label>
-    <label class="inline"><input type="radio" name="pos_mode" value="pick" {% if pos_mode_pick %}checked{% endif %}> По списку</label>
-  </div>
-  <div class="check-row mode-target {% if not pos_mode_pick %}is-hidden{% endif %}" data-mode-target="pos">
-    <span class="label">Должность:</span>
-    {% for p in all_pos %}
-    <label class="chk"><input type="checkbox" name="pos" value="{{ p }}" {% if p in sel_pos %}checked{% endif %}> {{ p }}</label>
-    {% endfor %}
-  </div>
-  <p class="muted" style="margin:8px 0 0 0;">Фильтры применяются автоматически при изменении.</p>
-</form>
 
-{% if error_message %}
-<p style="color:var(--bio-error-soft);">{{ error_message }}</p>
-{% endif %}
+  <div class="hours-legend calc-formula-card">
+    <div class="calc-formula-label">Как читать таблицу</div>
+    <div class="hours-legend-grid">
+      <div class="hours-legend-item">
+        <span class="hours-sample hours-sample--hours">8:30</span>
+        <span class="hours-legend-text">факт часов по отметкам Biota</span>
+      </div>
+      <div class="hours-legend-item">
+        <span class="hours-sample hours-sample--nopunch">{{ no_punch }}</span>
+        <span class="hours-legend-text">смена д/н в графике, но нет пары отметок</span>
+      </div>
+      <div class="hours-legend-item">
+        <span class="hours-sample hours-sample--outside">8:30{{ suffix_out }}</span>
+        <span class="hours-legend-text">часы вне графика (отметки есть, смены д/н нет)</span>
+      </div>
+      <div class="hours-legend-item">
+        <span class="hours-sample hours-sample--empty">—</span>
+        <span class="hours-legend-text">в графике нет смены д/н (от, б, п…)</span>
+      </div>
+    </div>
+  </div>
 
-{% if table_rows %}
-<p style="margin:12px 0;">
-  <a class="btn" href="{% url 'hours_excel' %}?{{ query_string }}">Скачать Excel</a>
-  <a class="btn" href="{% url 'hours_pdf' %}?{{ query_string }}" style="margin-left:8px;">Скачать PDF</a>
-</p>
+  <div class="calc-glass-card hours-filters-card">
+    <div class="calc-card-header">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M3 5h14M6 10h8M9 15h2"/>
+      </svg>
+      <span>Период и фильтры</span>
+    </div>
 
-<div class="schedule-wrap hours-wrap">
-  <table class="schedule-table hours-table">
-    <thead>
-      <tr>
-        <th>Сотрудник</th>
-        {% for d, lab, is_non_working in day_headers %}
-        <th title="день {{ d }}" class="{% if is_non_working %}non-work-col{% endif %}">{{ lab }}</th>
-        {% endfor %}
-        <th class="total-col">Итого</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in table_rows %}
-      <tr>
-        <td class="emp-cell">{{ row.name }}</td>
-        {% for cell in row.cells %}
-        <td class="hours-cell {% if cell.is_non_working %}non-work-col {% endif %}{% if cell.value == no_punch %}cell-nopunch{% elif suffix_out in cell.value %}cell-outside{% endif %}">{{ cell.value }}</td>
-        {% endfor %}
-        <td class="hours-cell total-col">{{ row.total }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    <form method="get" action="" class="hours-filters auto-submit-form">
+      <div class="hours-period-row">
+        <label class="calc-field">
+          <span class="calc-label">Год</span>
+          <span class="calc-sel-wrap">
+            <select name="year" class="calc-sel">
+              {% for yy in year_options %}
+              <option value="{{ yy }}" {% if yy == year %}selected{% endif %}>{{ yy }}</option>
+              {% endfor %}
+            </select>
+          </span>
+        </label>
+        <label class="calc-field">
+          <span class="calc-label">Месяц</span>
+          <span class="calc-sel-wrap">
+            <select name="month" class="calc-sel">
+              {% for mm, mlab in month_choices %}
+              <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
+              {% endfor %}
+            </select>
+          </span>
+        </label>
+      </div>
+
+      <div class="hours-filter-block">
+        <div class="hours-filter-head">
+          <span class="hours-filter-label">Отдел</span>
+          <div class="hours-segment" role="group" aria-label="Режим фильтра отдела">
+            <label class="hours-segment-opt">
+              <input type="radio" name="dep_mode" value="all" {% if not dep_mode_pick %}checked{% endif %}>
+              <span>Все</span>
+            </label>
+            <label class="hours-segment-opt">
+              <input type="radio" name="dep_mode" value="pick" {% if dep_mode_pick %}checked{% endif %}>
+              <span>Выбрать</span>
+            </label>
+          </div>
+        </div>
+        <div class="hours-chip-grid mode-target {% if not dep_mode_pick %}is-hidden{% endif %}" data-mode-target="dep">
+          {% for d in all_deps %}
+          <label class="hours-chip">
+            <input type="checkbox" name="dep" value="{{ d }}" {% if d in sel_deps %}checked{% endif %}>
+            <span>{{ d }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="hours-filter-block">
+        <div class="hours-filter-head">
+          <span class="hours-filter-label">Должность</span>
+          <div class="hours-segment" role="group" aria-label="Режим фильтра должности">
+            <label class="hours-segment-opt">
+              <input type="radio" name="pos_mode" value="all" {% if not pos_mode_pick %}checked{% endif %}>
+              <span>Все</span>
+            </label>
+            <label class="hours-segment-opt">
+              <input type="radio" name="pos_mode" value="pick" {% if pos_mode_pick %}checked{% endif %}>
+              <span>Выбрать</span>
+            </label>
+          </div>
+        </div>
+        <div class="hours-chip-grid mode-target {% if not pos_mode_pick %}is-hidden{% endif %}" data-mode-target="pos">
+          {% for p in all_pos %}
+          <label class="hours-chip">
+            <input type="checkbox" name="pos" value="{{ p }}" {% if p in sel_pos %}checked{% endif %}>
+            <span>{{ p }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <p class="calc-hint hours-filter-hint">Фильтры применяются автоматически при изменении.</p>
+    </form>
+  </div>
+
+  {% if error_message %}
+  <div class="hours-alert" role="alert">{{ error_message }}</div>
+  {% endif %}
+
+  {% if table_rows %}
+  <div class="calc-glass-card hours-table-card">
+    <div class="hours-table-toolbar">
+      <div class="calc-card-header hours-table-title">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <rect x="3" y="3" width="14" height="14" rx="2"/>
+          <line x1="3" y1="8" x2="17" y2="8"/>
+          <line x1="8" y1="3" x2="8" y2="17"/>
+        </svg>
+        <span>Сводка за {{ month_name }} {{ year }}</span>
+      </div>
+      <div class="hours-export-btns">
+        <a class="hours-export-btn" href="{% url 'hours_excel' %}?{{ query_string }}">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg>
+          Excel
+        </a>
+        <a class="hours-export-btn hours-export-btn--ghost" href="{% url 'hours_pdf' %}?{{ query_string }}">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M10 2v3h3"/></svg>
+          PDF
+        </a>
+      </div>
+    </div>
+
+    <div class="hours-table-wrap">
+      <table class="hours-table">
+        <thead>
+          <tr>
+            <th class="hours-th-emp">Сотрудник</th>
+            {% for d, lab, is_non_working in day_headers %}
+            <th title="день {{ d }}" class="{% if is_non_working %}non-work-col{% endif %}">{{ lab }}</th>
+            {% endfor %}
+            <th class="hours-th-total">Итого</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in table_rows %}
+          <tr>
+            <td class="hours-td-emp">{{ row.name }}</td>
+            {% for cell in row.cells %}
+            <td class="hours-td-val {% if cell.is_non_working %}non-work-col{% endif %}{% if cell.value == no_punch %} cell-nopunch{% elif suffix_out in cell.value %} cell-outside{% elif cell.value %} cell-hours{% endif %}">{{ cell.value }}</td>
+            {% endfor %}
+            <td class="hours-td-total">{{ row.total }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
 </div>
-{% endif %}
 
-<link rel="stylesheet" href="{% static "shifts/css/hours.css" %}">
 <script>
   (function () {
     var form = document.querySelector("form.hours-filters");
