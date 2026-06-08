@@ -62,6 +62,49 @@ def split_telegram_text(text: str, limit: int = TELEGRAM_TEXT_LIMIT) -> list[str
     return chunks
 
 
+def explain_telegram_error(message: str) -> str:
+    m = (message or "").strip()
+    low = m.lower()
+    if "can't initiate conversation" in low or "bot was blocked" in low:
+        return m + " — откройте бота в Telegram и нажмите /start (или разблокируйте)."
+    if "chat not found" in low:
+        return m + " — проверьте chat_id (для лички нужно число, не @username)."
+    if "unauthorized" in low:
+        return m + " — неверный токен бота."
+    if "not enough rights" in low or "need administrator" in low:
+        return m + " — для канала добавьте бота администратором с правом публикации."
+    return m
+
+
+def telegram_api_get(token: str, method: str, timeout: float = 15) -> dict:
+    if not token:
+        raise ValueError("Не задан токен Telegram-бота")
+    url = f"https://api.telegram.org/bot{token}/{method}"
+    req = urllib.request.Request(url, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            out = json.loads(resp.read().decode("utf-8"))
+            if not out.get("ok"):
+                raise RuntimeError(explain_telegram_error(out.get("description") or "Telegram API error"))
+            return out
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        try:
+            msg = json.loads(detail).get("description") or detail
+        except json.JSONDecodeError:
+            msg = detail or str(exc)
+        raise RuntimeError(explain_telegram_error(msg)) from exc
+
+
+def fetch_telegram_bot_username(token: str) -> str:
+    try:
+        data = telegram_api_get(token, "getMe")
+        result = data.get("result") or {}
+        return str(result.get("username") or "").strip()
+    except Exception:
+        return ""
+
+
 def send_telegram_message(
     token: str,
     chat_id: str,
@@ -87,7 +130,7 @@ def send_telegram_message(
             raw = resp.read().decode("utf-8")
             out = json.loads(raw)
             if not out.get("ok"):
-                raise RuntimeError(out.get("description") or "Telegram API error")
+                raise RuntimeError(explain_telegram_error(out.get("description") or "Telegram API error"))
             return out
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
@@ -96,7 +139,7 @@ def send_telegram_message(
             msg = parsed.get("description") or detail
         except json.JSONDecodeError:
             msg = detail or str(exc)
-        raise RuntimeError(msg) from exc
+        raise RuntimeError(explain_telegram_error(msg)) from exc
 
 
 def send_telegram_broadcast(

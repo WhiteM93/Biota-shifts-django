@@ -692,7 +692,12 @@ def notifications_settings_view(request):
         telegram_token_configured,
     )
     from biota_shifts.schedule import employee_label_row
-    from biota_shifts.telegram_notify import send_telegram_test, telegram_notify_configured
+    from biota_shifts.telegram_notify import (
+        fetch_telegram_bot_username,
+        resolve_telegram_bot_token,
+        send_telegram_test,
+        telegram_notify_configured,
+    )
 
     settings = load_notification_settings()
     preview_text = None
@@ -767,12 +772,14 @@ def notifications_settings_view(request):
         employee_rows.sort(key=lambda r: (r["department_name"].lower(), r["label"].lower()))
 
     chat_ids = settings.get("telegram_chat_ids") or []
+    tg_token = resolve_telegram_bot_token(settings)
     ctx = {
         "settings": settings,
         "employee_rows": employee_rows,
         "telegram_chat_ids_text": "\n".join(chat_ids),
         "telegram_configured": telegram_notify_configured(settings),
         "telegram_token_configured": telegram_token_configured(settings),
+        "telegram_bot_username": fetch_telegram_bot_username(tg_token) if tg_token else "",
         "preview_text": preview_text,
         "cron_morning": "20 8 * * * cd $PROJECT && .venv/bin/python manage.py send_attendance_summaries --slot=morning",
         "cron_evening": "20 20 * * * cd $PROJECT && .venv/bin/python manage.py send_attendance_summaries --slot=evening",
