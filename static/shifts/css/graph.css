@@ -415,11 +415,14 @@ html[data-theme="dawn"] #graph-page-root .schedule-table td.today-col {
   box-shadow: inset 0 0 0 2px rgba(13, 148, 136, 0.75);
 }
 html[data-theme="dawn"] #graph-page-root .schedule-table th.non-work-col,
-html[data-theme="dawn"] #graph-page-root .schedule-table td.non-work-col {
+html[data-theme="dawn"] #graph-page-root .schedule-table td.non-work-col,
+html[data-theme="dawn"] #hours-page-root .schedule-table th.non-work-col,
+html[data-theme="dawn"] #hours-page-root .schedule-table td.non-work-col {
   background: var(--bio-schedule-alt-col2);
   color: var(--bio-body-fg);
 }
-html[data-theme="dawn"] #graph-page-root .emp-cell {
+html[data-theme="dawn"] #graph-page-root .emp-cell,
+html[data-theme="dawn"] #hours-page-root .emp-cell {
   color: var(--bio-body-fg);
 }
 @media (max-width: 900px) {
@@ -607,7 +610,8 @@ html[data-theme="dawn"] #graph-page-root .emp-cell {
 }
 
 /* ── Filter Panel — glass card redesign ── */
-#graph-page-root > .filter-panel {
+#graph-page-root > .filter-panel,
+#hours-page-root > .filter-panel {
   padding: 0;
   background: rgba(255,255,255,.038);
   border-color: rgba(255,255,255,.09);
@@ -618,7 +622,8 @@ html[data-theme="dawn"] #graph-page-root .emp-cell {
   z-index: 10;
   margin-bottom: 12px;
 }
-#graph-page-root > .filter-panel::before {
+#graph-page-root > .filter-panel::before,
+#hours-page-root > .filter-panel::before {
   content: "";
   position: absolute;
   top: 0; left: 0; right: 0; height: 2px;
@@ -726,10 +731,12 @@ html[data-theme="dawn"] .fp-action-btn:hover { background: rgba(0,0,0,.08); bord
   grid-template-rows: 1fr;
   transition: grid-template-rows .18s ease;
 }
-#graph-filter-panel.fp-collapsed .fp-body-shell {
+#graph-filter-panel.fp-collapsed .fp-body-shell,
+#hours-filter-panel.fp-collapsed .fp-body-shell {
   grid-template-rows: 0fr;
 }
-#graph-filter-panel.fp-collapsed .fp-head {
+#graph-filter-panel.fp-collapsed .fp-head,
+#hours-filter-panel.fp-collapsed .fp-head {
   border-bottom-color: transparent;
 }
 .fp-body {
@@ -737,7 +744,8 @@ html[data-theme="dawn"] .fp-action-btn:hover { background: rgba(0,0,0,.08); bord
   min-height: 0;
   padding: 8px 14px 10px;
 }
-#graph-filter-panel:not(.fp-collapsed) .fp-body {
+#graph-filter-panel:not(.fp-collapsed) .fp-body,
+#hours-filter-panel:not(.fp-collapsed) .fp-body {
   overflow: visible;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -967,7 +975,8 @@ html[data-theme="dawn"] .fp-filter-sep { background: rgba(0,0,0,.1); }
 .fp-toggle-opt.is-on { color: #c0cbff; font-weight: 600; }
 
 /* Check-row smooth slide */
-#graph-page-root .check-row.mode-target {
+#graph-page-root .check-row.mode-target,
+#hours-page-root .check-row.mode-target {
   display: flex !important;
   overflow: hidden;
   max-height: 300px;
@@ -976,7 +985,8 @@ html[data-theme="dawn"] .fp-filter-sep { background: rgba(0,0,0,.1); }
               margin-top .28s cubic-bezier(.4,0,.2,1), padding-top .28s cubic-bezier(.4,0,.2,1),
               border-top-color .22s ease;
 }
-#graph-page-root .check-row.mode-target.is-hidden {
+#graph-page-root .check-row.mode-target.is-hidden,
+#hours-page-root .check-row.mode-target.is-hidden {
   max-height: 0;
   opacity: 0;
   margin-top: 0;
@@ -986,7 +996,9 @@ html[data-theme="dawn"] .fp-filter-sep { background: rgba(0,0,0,.1); }
 
 /* Select focus glow */
 #graph-page-root > .filter-panel select:focus,
-#graph-page-root > .filter-panel input[type="text"]:focus {
+#graph-page-root > .filter-panel input[type="text"]:focus,
+#hours-page-root > .filter-panel select:focus,
+#hours-page-root > .filter-panel input[type="text"]:focus {
   outline: none;
   border-color: #8f9cff;
   box-shadow: 0 0 0 3px rgba(124,140,255,.20);
@@ -1011,7 +1023,8 @@ html[data-theme="dawn"] .fp-filter-sep { background: rgba(0,0,0,.1); }
 }
 .fp-dd-btn:hover { background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.16); }
 /* override global grid — compact flex row for graph filter */
-#graph-page-root > .filter-panel .filter-grid {
+#graph-page-root > .filter-panel .filter-grid,
+#hours-page-root > .filter-panel .filter-grid {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1122,12 +1135,14 @@ html[data-theme="dawn"] .fp-dd-actions button:hover { background: rgba(0,0,0,.09
 .fp-dd-item span { flex: 1; }
 
 /* Dawn theme overrides */
-html[data-theme="dawn"] #graph-page-root > .filter-panel {
+html[data-theme="dawn"] #graph-page-root > .filter-panel,
+html[data-theme="dawn"] #hours-page-root > .filter-panel {
   background: rgba(0,0,0,.028);
   border-color: rgba(0,0,0,.08);
   box-shadow: 0 4px 24px rgba(0,0,0,.07);
 }
-html[data-theme="dawn"] #graph-page-root > .filter-panel::before {
+html[data-theme="dawn"] #graph-page-root > .filter-panel::before,
+html[data-theme="dawn"] #hours-page-root > .filter-panel::before {
   background: linear-gradient(90deg, #14b8a6 0%, #0d9488 50%, #f59e0b 100%);
 }
 html[data-theme="dawn"] .fp-collapse-btn {
@@ -1143,7 +1158,8 @@ html[data-theme="dawn"] .fp-toggle-thumb {
   box-shadow: 0 0 10px rgba(13,148,136,.15);
 }
 html[data-theme="dawn"] .fp-toggle-opt.is-on { color: #0d7a70; }
-html[data-theme="dawn"] #graph-page-root > .filter-panel select:focus {
+html[data-theme="dawn"] #graph-page-root > .filter-panel select:focus,
+html[data-theme="dawn"] #hours-page-root > .filter-panel select:focus {
   border-color: #0d9488;
   box-shadow: 0 0 0 3px rgba(13,148,136,.20);
 }
@@ -1173,5 +1189,6 @@ html[data-theme="dawn"] .fp-dd-item:hover { background: rgba(0,0,0,.05); }
 
 /* Print: hide filter panel */
 @media print {
-  #graph-page-root > .filter-panel { display: none !important; }
+  #graph-page-root > .filter-panel,
+  #hours-page-root > .filter-panel { display: none !important; }
 }

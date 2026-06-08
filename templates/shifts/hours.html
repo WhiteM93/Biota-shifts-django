@@ -2,218 +2,256 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}?v={{ static_asset_version }}">
-<link rel="stylesheet" href="{% static 'shifts/css/hours.css' %}?v={{ static_asset_version }}">
+<div class="graph-page hours-page" id="hours-page-root">
 
-<div class="calc-page hours-page">
+<div class="graph-top-strip hours-legend-strip">
+  <span class="hours-legend-title">Как читать</span>
+  <span class="hours-legend-item"><span class="hours-legend-sample hours-legend-sample--hours">8:30</span> факт часов</span>
+  <span class="hours-legend-item"><span class="hours-legend-sample hours-legend-sample--nopunch">{{ no_punch }}</span> нет отметок</span>
+  <span class="hours-legend-item"><span class="hours-legend-sample hours-legend-sample--outside">8:30{{ suffix_out }}</span> вне графика</span>
+  <span class="hours-legend-item"><span class="hours-legend-sample hours-legend-sample--empty">—</span> нет смены д/н</span>
+  {% if schedule_from_google %}
+  <span class="hours-legend-meta">График — Google Таблицы</span>
+  {% endif %}
+</div>
 
-  <div class="calc-header">
-    <div class="calc-header-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="9"/>
-        <polyline points="12,7 12,12 15,14"/>
-      </svg>
-    </div>
-    <div>
-      <h1 class="calc-title">Часы по дням</h1>
-      <p class="calc-subtitle">
-        {{ month_name|capfirst }} {{ year }}
-        {% if table_rows %}· {{ table_rows|length }} чел.{% endif %}
-        {% if schedule_from_google %}· график из Google Таблиц{% endif %}
-      </p>
-    </div>
-  </div>
-
-  <div class="hours-legend calc-formula-card">
-    <div class="calc-formula-label">Как читать таблицу</div>
-    <div class="hours-legend-grid">
-      <div class="hours-legend-item">
-        <span class="hours-sample hours-sample--hours">8:30</span>
-        <span class="hours-legend-text">факт часов по отметкам Biota</span>
-      </div>
-      <div class="hours-legend-item">
-        <span class="hours-sample hours-sample--nopunch">{{ no_punch }}</span>
-        <span class="hours-legend-text">смена д/н в графике, но нет пары отметок</span>
-      </div>
-      <div class="hours-legend-item">
-        <span class="hours-sample hours-sample--outside">8:30{{ suffix_out }}</span>
-        <span class="hours-legend-text">часы вне графика (отметки есть, смены д/н нет)</span>
-      </div>
-      <div class="hours-legend-item">
-        <span class="hours-sample hours-sample--empty">—</span>
-        <span class="hours-legend-text">в графике нет смены д/н (от, б, п…)</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="calc-glass-card hours-filters-card">
-    <div class="calc-card-header">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+<div class="filter-panel" id="hours-filter-panel">
+  <div class="fp-head">
+    <span class="fp-head-label">
+      <svg class="fp-head-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 5h14M6 10h8M9 15h2"/>
       </svg>
-      <span>Период и фильтры</span>
+      Период и фильтры
+      {% if table_rows %}<span class="hours-fp-meta">{{ month_name }} {{ year }} · {{ table_rows|length }} чел.</span>{% endif %}
+    </span>
+    <div class="fp-head-actions">
+      {% if table_rows %}
+      <div class="fp-actions-group">
+        <a class="fp-action-btn" href="{% url 'hours_excel' %}?{{ query_string }}">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg>
+          <span class="fp-btn-label">Excel</span>
+        </a>
+        <a class="fp-action-btn" href="{% url 'hours_pdf' %}?{{ query_string }}">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M10 2v3h3"/></svg>
+          <span class="fp-btn-label">PDF</span>
+        </a>
+      </div>
+      {% endif %}
     </div>
-
-    <form method="get" action="" class="hours-filters auto-submit-form">
-      <div class="hours-period-row">
-        <label class="calc-field">
-          <span class="calc-label">Год</span>
-          <span class="calc-sel-wrap">
-            <select name="year" class="calc-sel">
-              {% for yy in year_options %}
-              <option value="{{ yy }}" {% if yy == year %}selected{% endif %}>{{ yy }}</option>
-              {% endfor %}
-            </select>
-          </span>
+    <button type="button" class="fp-collapse-btn" id="hours-fp-collapse-btn" aria-label="Свернуть/развернуть фильтр" aria-expanded="true" aria-controls="hours-fp-body">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="5 8 10 13 15 8"/>
+      </svg>
+    </button>
+  </div>
+  <div class="fp-body-shell">
+  <div class="fp-body" id="hours-fp-body">
+    <form method="get" action="" class="auto-submit-form" id="hours-filter-form">
+      <input type="hidden" name="dep_mode" id="hours-dep-mode-val" value="{% if dep_mode_pick %}pick{% else %}all{% endif %}">
+      <input type="hidden" name="pos_mode" id="hours-pos-mode-val" value="{% if pos_mode_pick %}pick{% else %}all{% endif %}">
+      <div class="filter-grid fp-filter-row">
+        <label class="fp-dd-btn fp-sel-wrap">
+          <span class="fp-dd-lbl">Год</span>
+          <span class="fp-dd-sep"></span>
+          <select name="year" class="fp-sel">
+            {% for yy in year_options %}
+            <option value="{{ yy }}" {% if yy == year %}selected{% endif %}>{{ yy }}</option>
+            {% endfor %}
+          </select>
         </label>
-        <label class="calc-field">
-          <span class="calc-label">Месяц</span>
-          <span class="calc-sel-wrap">
-            <select name="month" class="calc-sel">
-              {% for mm, mlab in month_choices %}
-              <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
-              {% endfor %}
-            </select>
-          </span>
+        <label class="fp-dd-btn fp-sel-wrap">
+          <span class="fp-dd-lbl">Месяц</span>
+          <span class="fp-dd-sep"></span>
+          <select name="month" class="fp-sel">
+            {% for mm, mlab in month_choices %}
+            <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
+            {% endfor %}
+          </select>
         </label>
-      </div>
-
-      <div class="hours-filter-block">
-        <div class="hours-filter-head">
-          <span class="hours-filter-label">Отдел</span>
-          <div class="hours-segment" role="group" aria-label="Режим фильтра отдела">
-            <label class="hours-segment-opt">
-              <input type="radio" name="dep_mode" value="all" {% if not dep_mode_pick %}checked{% endif %}>
-              <span>Все</span>
-            </label>
-            <label class="hours-segment-opt">
-              <input type="radio" name="dep_mode" value="pick" {% if dep_mode_pick %}checked{% endif %}>
-              <span>Выбрать</span>
-            </label>
+        <span class="fp-filter-sep"></span>
+        <div class="fp-dd" id="hours-fp-dd-dep">
+          <button type="button" class="fp-dd-btn">
+            <span class="fp-dd-lbl">Отделы</span>
+            <span class="fp-dd-sep"></span>
+            <span class="fp-dd-txt" id="hours-dep-txt"></span>
+            <svg class="fp-dd-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
+          </button>
+          <div class="fp-dd-panel" id="hours-dep-panel" hidden>
+            <div class="fp-dd-actions">
+              <button type="button" class="fp-dd-all">Все</button>
+              <button type="button" class="fp-dd-none">Снять</button>
+            </div>
+            {% for d in all_deps %}
+            <label class="fp-dd-item"><input type="checkbox" name="dep" value="{{ d }}" {% if d in sel_deps %}checked{% endif %}><span>{{ d }}</span></label>
+            {% endfor %}
           </div>
         </div>
-        <div class="hours-chip-grid mode-target {% if not dep_mode_pick %}is-hidden{% endif %}" data-mode-target="dep">
-          {% for d in all_deps %}
-          <label class="hours-chip">
-            <input type="checkbox" name="dep" value="{{ d }}" {% if d in sel_deps %}checked{% endif %}>
-            <span>{{ d }}</span>
-          </label>
-          {% endfor %}
-        </div>
-      </div>
-
-      <div class="hours-filter-block">
-        <div class="hours-filter-head">
-          <span class="hours-filter-label">Должность</span>
-          <div class="hours-segment" role="group" aria-label="Режим фильтра должности">
-            <label class="hours-segment-opt">
-              <input type="radio" name="pos_mode" value="all" {% if not pos_mode_pick %}checked{% endif %}>
-              <span>Все</span>
-            </label>
-            <label class="hours-segment-opt">
-              <input type="radio" name="pos_mode" value="pick" {% if pos_mode_pick %}checked{% endif %}>
-              <span>Выбрать</span>
-            </label>
+        <div class="fp-dd" id="hours-fp-dd-pos">
+          <button type="button" class="fp-dd-btn">
+            <span class="fp-dd-lbl">Должности</span>
+            <span class="fp-dd-sep"></span>
+            <span class="fp-dd-txt" id="hours-pos-txt"></span>
+            <svg class="fp-dd-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
+          </button>
+          <div class="fp-dd-panel" id="hours-pos-panel" hidden>
+            <div class="fp-dd-actions">
+              <button type="button" class="fp-dd-all">Все</button>
+              <button type="button" class="fp-dd-none">Снять</button>
+            </div>
+            {% for p in all_pos %}
+            <label class="fp-dd-item"><input type="checkbox" name="pos" value="{{ p }}" {% if p in sel_pos %}checked{% endif %}><span>{{ p }}</span></label>
+            {% endfor %}
           </div>
         </div>
-        <div class="hours-chip-grid mode-target {% if not pos_mode_pick %}is-hidden{% endif %}" data-mode-target="pos">
-          {% for p in all_pos %}
-          <label class="hours-chip">
-            <input type="checkbox" name="pos" value="{{ p }}" {% if p in sel_pos %}checked{% endif %}>
-            <span>{{ p }}</span>
-          </label>
-          {% endfor %}
-        </div>
       </div>
-
-      <p class="calc-hint hours-filter-hint">Фильтры применяются автоматически при изменении.</p>
     </form>
   </div>
-
-  {% if error_message %}
-  <div class="hours-alert" role="alert">{{ error_message }}</div>
-  {% endif %}
-
-  {% if table_rows %}
-  <div class="calc-glass-card hours-table-card">
-    <div class="hours-table-toolbar">
-      <div class="calc-card-header hours-table-title">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-          <rect x="3" y="3" width="14" height="14" rx="2"/>
-          <line x1="3" y1="8" x2="17" y2="8"/>
-          <line x1="8" y1="3" x2="8" y2="17"/>
-        </svg>
-        <span>Сводка за {{ month_name }} {{ year }}</span>
-      </div>
-      <div class="hours-export-btns">
-        <a class="hours-export-btn" href="{% url 'hours_excel' %}?{{ query_string }}">
-          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v8M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg>
-          Excel
-        </a>
-        <a class="hours-export-btn hours-export-btn--ghost" href="{% url 'hours_pdf' %}?{{ query_string }}">
-          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M10 2v3h3"/></svg>
-          PDF
-        </a>
-      </div>
-    </div>
-
-    <div class="hours-table-wrap">
-      <table class="hours-table">
-        <thead>
-          <tr>
-            <th class="hours-th-emp">Сотрудник</th>
-            {% for d, lab, is_non_working in day_headers %}
-            <th title="день {{ d }}" class="{% if is_non_working %}non-work-col{% endif %}">{{ lab }}</th>
-            {% endfor %}
-            <th class="hours-th-total">Итого</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in table_rows %}
-          <tr>
-            <td class="hours-td-emp">{{ row.name }}</td>
-            {% for cell in row.cells %}
-            <td class="hours-td-val {% if cell.is_non_working %}non-work-col{% endif %}{% if cell.value == no_punch %} cell-nopunch{% elif suffix_out in cell.value %} cell-outside{% elif cell.value %} cell-hours{% endif %}">{{ cell.value }}</td>
-            {% endfor %}
-            <td class="hours-td-total">{{ row.total }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
   </div>
-  {% endif %}
+</div>
+
+{% if error_message %}
+<p class="muted hours-error">{{ error_message }}</p>
+{% endif %}
+
+<div class="graph-body">
+<div class="graph-main-column">
+{% if table_rows %}
+<div class="schedule-wrap hours-schedule-wrap">
+  <table class="schedule-table hours-schedule-table">
+    <thead>
+      <tr>
+        <th class="emp-header-th">Сотрудник</th>
+        {% for d, lab, is_non_working in day_headers %}
+        <th title="день {{ d }}" class="day-num-th {% if is_non_working %}non-work-col{% endif %}">{{ lab }}</th>
+        {% endfor %}
+        <th class="hours-total-th">Итого</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in table_rows %}
+      <tr>
+        <td class="emp-cell"><span class="emp-name">{{ row.name }}</span></td>
+        {% for cell in row.cells %}
+        <td class="hours-val-cell {% if cell.is_non_working %}non-work-col{% endif %}{% if cell.value == no_punch %} cell-nopunch{% elif suffix_out in cell.value %} cell-outside{% elif cell.value %} cell-hours{% endif %}">{{ cell.value }}</td>
+        {% endfor %}
+        <td class="hours-total-cell">{{ row.total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+</div>
+</div>
 
 </div>
 
+<link rel="stylesheet" href="{% static 'shifts/css/graph.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% static 'shifts/css/hours.css' %}?v={{ static_asset_version }}">
 <script>
   (function () {
-    var form = document.querySelector("form.hours-filters");
-    if (!form) return;
-    function modeVal(name) {
-      var checked = form.querySelector('input[name="' + name + '"]:checked');
-      return checked ? checked.value : "all";
-    }
-    function syncVisibility() {
-      var depBlock = form.querySelector('[data-mode-target="dep"]');
-      var posBlock = form.querySelector('[data-mode-target="pos"]');
-      if (depBlock) depBlock.classList.toggle("is-hidden", modeVal("dep_mode") === "all");
-      if (posBlock) posBlock.classList.toggle("is-hidden", modeVal("pos_mode") === "all");
-    }
-    form.addEventListener("change", function (event) {
-      var t = event.target;
-      if (t && t.name === "dep_mode" && t.value === "pick" && t.checked) {
-        var depBlock = form.querySelector('[data-mode-target="dep"]');
-        if (depBlock) depBlock.querySelectorAll('input[name="dep"]').forEach(function (cb) { cb.checked = false; });
+    var filterForm = document.getElementById("hours-filter-form");
+    if (!filterForm) return;
+
+    function initDropdown(ddId, modeInputId, txtId) {
+      var dd = document.getElementById(ddId);
+      var modeInput = document.getElementById(modeInputId);
+      var txtEl = document.getElementById(txtId);
+      if (!dd || !modeInput || !txtEl) return;
+      var panel = dd.querySelector(".fp-dd-panel");
+      var cbs = panel ? Array.prototype.slice.call(panel.querySelectorAll("input[type='checkbox']")) : [];
+      var isOpen = false;
+      var submitTimer = null;
+      var changed = false;
+
+      function updateLabel() {
+        var checked = cbs.filter(function (cb) { return cb.checked; });
+        var total = cbs.length;
+        var allChecked = total > 0 && checked.length === total;
+        if (allChecked) {
+          txtEl.textContent = "Все";
+          modeInput.value = "all";
+        } else if (checked.length === 0) {
+          txtEl.textContent = "Не выбрано";
+          modeInput.value = "pick";
+        } else if (checked.length <= 2) {
+          txtEl.textContent = checked.map(function (cb) { return cb.value; }).join(", ");
+          modeInput.value = "pick";
+        } else {
+          txtEl.textContent = "Выбрано: " + checked.length;
+          modeInput.value = "pick";
+        }
       }
-      if (t && t.name === "pos_mode" && t.value === "pick" && t.checked) {
-        var posBlock = form.querySelector('[data-mode-target="pos"]');
-        if (posBlock) posBlock.querySelectorAll('input[name="pos"]').forEach(function (cb) { cb.checked = false; });
+
+      var justOpened = false;
+      function openPanel() {
+        isOpen = true; changed = false; justOpened = true;
+        setTimeout(function () { justOpened = false; }, 150);
+        if (panel) { panel.hidden = false; requestAnimationFrame(function () { panel.classList.add("is-open"); }); }
+        dd.classList.add("is-open");
       }
-      if (!t || (t.name !== "dep_mode" && t.name !== "pos_mode")) return;
-      syncVisibility();
-    });
-    syncVisibility();
+
+      function closePanel(submit) {
+        if (justOpened) return;
+        isOpen = false;
+        if (panel) { panel.classList.remove("is-open"); setTimeout(function () { if (!isOpen) panel.hidden = true; }, 220); }
+        dd.classList.remove("is-open");
+        if (submit && changed) {
+          if (submitTimer) clearTimeout(submitTimer);
+          submitTimer = setTimeout(function () {
+            if (filterForm.dataset.submitting !== "1") { filterForm.dataset.submitting = "1"; filterForm.submit(); }
+          }, 60);
+        }
+      }
+
+      var btn = dd.querySelector(".fp-dd-btn");
+      if (btn) btn.addEventListener("click", function () { if (isOpen) closePanel(true); else openPanel(); });
+      if (panel) {
+        panel.addEventListener("change", function (e) { e.stopPropagation(); changed = true; updateLabel(); });
+        var allBtn = panel.querySelector(".fp-dd-all");
+        var noneBtn = panel.querySelector(".fp-dd-none");
+        if (allBtn) allBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          cbs.forEach(function (cb) { cb.checked = true; });
+          changed = true;
+          updateLabel();
+        });
+        if (noneBtn) noneBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          cbs.forEach(function (cb) { cb.checked = false; });
+          changed = true;
+          updateLabel();
+        });
+      }
+      document.addEventListener("click", function (e) {
+        if (isOpen && !dd.contains(e.target)) closePanel(true);
+      });
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape" && isOpen) closePanel(true); });
+      if (modeInput.value === "all" && cbs.length) {
+        cbs.forEach(function (cb) { cb.checked = true; });
+      }
+      updateLabel();
+    }
+
+    initDropdown("hours-fp-dd-dep", "hours-dep-mode-val", "hours-dep-txt");
+    initDropdown("hours-fp-dd-pos", "hours-pos-mode-val", "hours-pos-txt");
+
+    var collapseBtn = document.getElementById("hours-fp-collapse-btn");
+    var panel = document.getElementById("hours-filter-panel");
+    if (collapseBtn && panel) {
+      function setCollapsed(collapsed) {
+        panel.classList.toggle("fp-collapsed", collapsed);
+        collapseBtn.classList.toggle("is-collapsed", collapsed);
+        collapseBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        try { localStorage.setItem("hours-fp-collapsed", collapsed ? "1" : "0"); } catch (e) {}
+      }
+      var saved = false;
+      try { saved = localStorage.getItem("hours-fp-collapsed") === "1"; } catch (e) {}
+      if (saved) setCollapsed(true);
+      collapseBtn.addEventListener("click", function () {
+        setCollapsed(!panel.classList.contains("fp-collapsed"));
+      });
+    }
   })();
 </script>
 {% endblock %}

@@ -1,513 +1,150 @@
-/* ── Часы по дням (стили в духе калькулятора) ── */
+/* Часы по дням — дополнения к graph.css */
 
-.hours-page {
-  max-width: 100%;
+#hours-page-root .hours-legend-strip {
+  gap: 12px 16px;
+  margin-bottom: 12px;
 }
 
-/* ── Легенда ── */
-.hours-legend {
-  margin-bottom: 18px;
+#hours-page-root .hours-legend-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--bio-field-label);
+  opacity: .75;
+  flex-shrink: 0;
 }
 
-.hours-legend-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px 16px;
-}
-
-.hours-legend-item {
-  display: flex;
+#hours-page-root .hours-legend-item {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--bio-body-fg);
+  white-space: nowrap;
 }
 
-.hours-legend-text {
-  font-size: 13px;
-  color: var(--bio-text-muted);
-  line-height: 1.35;
+#hours-page-root .hours-legend-meta {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--bio-caption-soft);
+  white-space: nowrap;
 }
 
-.hours-sample {
+#hours-page-root .hours-legend-sample {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  padding: 3px 8px;
-  border-radius: 7px;
-  font-size: 13px;
-  font-weight: 600;
+  min-width: 34px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
   border: 1px solid transparent;
 }
 
-.hours-sample--hours {
-  background: rgba(var(--ca-rgb), .14);
-  border-color: rgba(var(--ca-rgb), .28);
-  color: var(--bio-text);
+#hours-page-root .hours-legend-sample--hours {
+  background: #f6e899;
+  color: var(--bio-text-on-shift);
+  border-color: rgba(26, 31, 47, .12);
 }
 
-.hours-sample--nopunch {
-  background: rgba(107, 122, 153, .18);
-  border-color: rgba(107, 122, 153, .35);
-  color: #9bb0d8;
-}
-
-.hours-sample--outside {
-  background: rgba(245, 158, 11, .14);
-  border-color: rgba(245, 158, 11, .35);
-  color: #fbbf24;
-}
-
-.hours-sample--empty {
-  background: rgba(255, 255, 255, .04);
-  border-color: var(--glass-border);
-  color: var(--bio-text-muted);
-}
-
-html[data-theme="dawn"] .hours-sample--nopunch {
-  color: #78716c;
-  background: #f5f5f4;
-  border-color: #d6d3d1;
-}
-
-html[data-theme="dawn"] .hours-sample--outside {
-  color: #b45309;
-  background: #fff7ed;
-  border-color: #fdba74;
-}
-
-html[data-theme="dawn"] .hours-sample--hours {
-  color: #134e4a;
-  background: #ecfdf5;
-  border-color: #99f6e4;
-}
-
-/* ── Фильтры ── */
-.hours-filters-card {
-  margin-bottom: 18px;
-}
-
-.hours-period-row {
-  display: grid;
-  grid-template-columns: 140px 180px;
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-.hours-filter-block + .hours-filter-block {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--glass-border);
-}
-
-.hours-filter-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 14px;
-  margin-bottom: 10px;
-}
-
-.hours-filter-label {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: var(--bio-text-muted);
-  min-width: 72px;
-}
-
-.hours-segment {
-  display: inline-flex;
-  gap: 3px;
-  padding: 3px;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 9px;
-}
-
-.hours-segment-opt {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  cursor: pointer;
-  user-select: none;
-}
-
-.hours-page .hours-segment-opt input[type="radio"] {
-  position: static !important;
-  opacity: 1;
-  width: auto !important;
-  min-width: 0 !important;
-  height: auto !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  flex-shrink: 0;
-  accent-color: var(--ca);
-}
-
-.hours-segment-opt span {
-  display: block;
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--bio-text-muted);
-  transition: color .18s, background .18s, box-shadow .18s;
-  white-space: nowrap;
-}
-
-.hours-segment-opt input:checked + span {
-  background: var(--bio-bg-card);
-  color: var(--bio-text);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, .14);
-  border: 1px solid var(--glass-border);
-}
-
-.hours-segment-opt:hover span {
-  color: var(--bio-text);
-}
-
-.hours-chip-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.hours-chip-grid.is-hidden {
-  display: none;
-}
-
-.hours-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  padding: 5px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--bio-chk-border);
+#hours-page-root .hours-legend-sample--nopunch {
   background: var(--bio-chk-bg);
-  font-size: 12px;
-  color: var(--bio-text-muted);
-  cursor: pointer;
-  transition: border-color .18s, background .18s, color .18s;
-  white-space: nowrap;
+  color: var(--bio-caption-soft);
+  border-color: var(--bio-chk-border);
 }
 
-.hours-page .hours-chip input[type="checkbox"] {
-  width: auto !important;
-  min-width: 0 !important;
-  height: auto !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  flex-shrink: 0;
-  accent-color: var(--ca);
+#hours-page-root .hours-legend-sample--outside {
+  background: #fde68a;
+  color: #92400e;
+  border-color: rgba(146, 64, 14, .25);
 }
 
-.hours-chip:has(input:checked) {
-  border-color: rgba(var(--ca-rgb), .45);
-  background: rgba(var(--ca-rgb), .12);
-  color: var(--bio-text);
+#hours-page-root .hours-legend-sample--empty {
+  background: var(--bio-surface-panel);
+  color: var(--bio-caption-soft);
+  border-color: var(--bio-filter-border);
 }
 
-.hours-filter-hint {
-  margin: 14px 0 0;
-}
-
-/* ── Ошибка ── */
-.hours-alert {
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  border-radius: 10px;
-  border: 1px solid rgba(248, 113, 113, .35);
-  background: rgba(248, 113, 113, .10);
-  color: #fca5a5;
-  font-size: 14px;
-}
-
-html[data-theme="dawn"] .hours-alert {
-  color: #b91c1c;
-  background: #fef2f2;
-  border-color: #fecaca;
-}
-
-/* ── Таблица ── */
-.hours-table-card {
-  padding-bottom: 14px;
-}
-
-.hours-table-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.hours-table-title {
-  margin-bottom: 0;
-}
-
-.hours-export-btns {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.hours-export-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  border: none;
-  cursor: pointer;
-  background: linear-gradient(135deg, var(--ca), var(--ca2));
-  color: #fff;
-  box-shadow: 0 4px 14px var(--ca-glow);
-  transition: transform .18s, box-shadow .18s;
-  white-space: nowrap;
-}
-
-.hours-page svg {
-  max-width: 100%;
-  flex-shrink: 0;
-}
-
-.hours-export-btn svg,
-.hours-table-title svg,
-.calc-card-header svg {
-  width: 16px;
-  height: 16px;
-}
-
-.hours-export-btn svg {
-  width: 15px;
-  height: 15px;
-}
-
-.hours-export-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px var(--ca-glow);
-  color: #fff;
-}
-
-.hours-export-btn--ghost {
-  background: var(--glass-bg);
-  color: var(--bio-text);
-  border: 1px solid var(--glass-border);
-  box-shadow: none;
-}
-
-.hours-export-btn--ghost:hover {
-  border-color: rgba(var(--ca-rgb), .35);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .08);
-  color: var(--bio-text);
-}
-
-.hours-table-wrap {
-  overflow: auto;
-  max-width: 100%;
-  max-height: min(70vh, 720px);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  background: rgba(0, 0, 0, .12);
-  -webkit-overflow-scrolling: touch;
-}
-
-html[data-theme="dawn"] .hours-table-wrap {
-  background: rgba(0, 0, 0, .02);
-}
-
-.hours-page .hours-table {
-  min-width: max-content;
-  width: max-content;
-  max-width: none;
-  border-collapse: separate !important;
-  border-spacing: 0;
-  font-size: 12px;
-  table-layout: auto;
-  background: transparent;
-}
-
-.hours-page .hours-table th,
-.hours-page .hours-table td {
-  padding: 5px 4px;
-  font-size: 12px;
-  vertical-align: middle;
-}
-
-.hours-page .hours-table thead th:not(.hours-th-emp):not(.hours-th-total) {
-  min-width: 34px;
-  width: 34px;
-  max-width: 40px;
-}
-
-.hours-page .hours-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  text-align: center;
-  font-weight: 600;
+#hours-page-root .hours-fp-meta {
+  margin-left: 8px;
   font-size: 11px;
-  color: var(--bio-text-muted);
-  background: var(--bio-bg-card);
-  border-bottom: 1px solid var(--glass-border);
-  border-right: 1px solid var(--glass-border);
-  box-shadow: 0 1px 0 var(--glass-border);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: .65;
 }
 
-.hours-page .hours-table tbody td {
-  text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, .05);
-  border-right: 1px solid rgba(255, 255, 255, .05);
+#hours-page-root .hours-error {
+  color: var(--bio-error-soft);
+  margin: 0 0 10px;
+}
+
+#hours-page-root .hours-schedule-wrap {
+  margin-top: 0;
+}
+
+#hours-page-root .hours-schedule-table th,
+#hours-page-root .hours-schedule-table td {
+  padding: 3px 4px;
+}
+
+#hours-page-root .hours-val-cell {
+  min-width: 38px;
   font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bio-body-fg);
 }
 
-html[data-theme="dawn"] .hours-table tbody td {
-  border-bottom-color: rgba(0, 0, 0, .06);
-  border-right-color: rgba(0, 0, 0, .06);
-}
-
-.hours-table tbody tr:hover td {
-  background: rgba(var(--ca-rgb), .06);
-}
-
-.hours-th-emp,
-.hours-td-emp {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  text-align: left !important;
-  padding-left: 12px !important;
-  padding-right: 10px !important;
-  min-width: 160px;
-  max-width: 240px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  background: var(--bio-bg-card);
-  border-right: 1px solid var(--glass-border) !important;
-  box-shadow: 2px 0 6px rgba(0, 0, 0, .08);
-}
-
-.hours-table thead .hours-th-emp {
-  z-index: 4;
-}
-
-.hours-td-emp {
-  font-weight: 500;
-  color: var(--bio-text);
-}
-
-.hours-th-total,
-.hours-td-total {
+#hours-page-root .hours-val-cell.cell-hours {
   font-weight: 700;
-  min-width: 58px;
-  width: 58px;
-  max-width: 72px;
-  background: rgba(var(--ca-rgb), .08) !important;
-  color: var(--ca);
-  border-left: 1px solid rgba(var(--ca-rgb), .18);
 }
 
-.hours-table th.non-work-col,
-.hours-table td.non-work-col {
-  background: var(--bio-schedule-alt-col);
-}
-
-.hours-table tbody tr:hover td.non-work-col {
-  background: color-mix(in srgb, var(--bio-schedule-alt-col) 85%, rgba(var(--ca-rgb), .15));
-}
-
-.hours-td-val {
-  max-width: 56px;
-  color: var(--bio-text-muted);
-}
-
-.hours-td-val.cell-hours {
-  color: var(--bio-text);
-  font-weight: 500;
-}
-
-.hours-td-val.cell-nopunch {
-  color: #6b7a99;
-  font-size: 15px;
+#hours-page-root .hours-val-cell.cell-nopunch {
+  color: var(--bio-caption-soft);
+  font-size: 14px;
+  font-weight: 700;
   line-height: 1;
 }
 
-.hours-td-val.cell-outside {
-  color: #fbbf24;
-  font-weight: 600;
-}
-
-html[data-theme="dawn"] .hours-td-val.cell-outside {
+#hours-page-root .hours-val-cell.cell-outside {
   color: #b45309;
+  font-weight: 800;
 }
 
-html[data-theme="dawn"] .hours-td-val.cell-nopunch {
-  color: #78716c;
+html[data-theme="dawn"] #hours-page-root .hours-val-cell.cell-outside {
+  color: #c2410c;
 }
 
-html[data-theme="dawn"] .hours-th-total,
-html[data-theme="dawn"] .hours-td-total {
-  background: #e7efe9 !important;
+#hours-page-root .hours-total-th,
+#hours-page-root .hours-total-cell {
+  min-width: 54px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  background: rgba(143, 156, 255, .12);
+  color: var(--bio-body-fg);
+}
+
+html[data-theme="dawn"] #hours-page-root .hours-total-th,
+html[data-theme="dawn"] #hours-page-root .hours-total-cell {
+  background: rgba(13, 148, 136, .12);
   color: #134e4a;
 }
 
-html[data-theme="dawn"] .hours-table thead th {
-  color: #6b6258;
-}
-
-/* ── Адаптив ── */
 @media (max-width: 720px) {
-  .hours-period-row {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .hours-legend-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .hours-table-toolbar {
+  #hours-page-root .hours-legend-strip {
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
   }
 
-  .hours-export-btns {
-    justify-content: stretch;
+  #hours-page-root .hours-legend-meta {
+    margin-left: 0;
   }
 
-  .hours-export-btn {
-    flex: 1;
-    justify-content: center;
-  }
-
-  .hours-th-emp,
-  .hours-td-emp {
-    min-width: 120px;
-    max-width: 140px;
-    font-size: 11px;
-  }
-
-  .hours-table {
-    font-size: 11px;
-  }
-
-  .hours-td-val {
-    max-width: 44px;
+  #hours-page-root .hours-fp-meta {
+    display: none;
   }
 }
