@@ -54,10 +54,17 @@ class Command(BaseCommand):
             return
 
         if not telegram_notify_configured(settings) and not options["dry_run"]:
-            self.stderr.write(
-                "Telegram не настроен: нужен токен бота (BIOTA_TELEGRAM_BOT_TOKEN или в кабинете) "
-                "и хотя бы один chat_id."
-            )
+            from biota_shifts.telegram_notify import resolve_telegram_bot_token
+
+            token_ok = bool(resolve_telegram_bot_token(settings))
+            chats = settings.get("telegram_chat_ids") or []
+            parts = []
+            if not token_ok:
+                parts.append("токен (BIOTA_TELEGRAM_BOT_TOKEN в .env.secrets)")
+            if not chats:
+                parts.append("chat_id (кабинет или BIOTA_TELEGRAM_CHAT_IDS в .env.secrets)")
+            self.stderr.write("Telegram не настроен: нет " + " и ".join(parts) + ".")
+            self.stderr.write("Диагностика: python manage.py check_telegram_notify")
             return
 
         summary = load_attendance_summary_from_db(slot)

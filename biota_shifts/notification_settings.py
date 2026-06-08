@@ -5,7 +5,7 @@ import json
 import re
 from pathlib import Path
 
-from biota_shifts.config import APP_DIR
+from biota_shifts.config import APP_DIR, _config_str
 from biota_shifts.emp_codes import normalize_emp_code, normalize_emp_codes_list
 
 NOTIFICATION_SETTINGS_PATH = Path(APP_DIR) / ".biota_notification_settings.json"
@@ -57,6 +57,13 @@ def parse_chat_ids_text(text: str) -> list[str]:
     return _normalize_chat_ids(parts)
 
 
+def _chat_ids_from_env() -> list[str]:
+    raw = (_config_str("BIOTA_TELEGRAM_CHAT_IDS", "") or "").strip()
+    if not raw:
+        return []
+    return parse_chat_ids_text(raw.replace(";", ","))
+
+
 def load_notification_settings() -> dict:
     if not NOTIFICATION_SETTINGS_PATH.exists():
         return dict(DEFAULT_SETTINGS)
@@ -76,6 +83,9 @@ def load_notification_settings() -> dict:
     out["telegram_bot_token"] = str(raw.get("telegram_bot_token") or "").strip()
     out["telegram_chat_ids"] = _normalize_chat_ids(raw.get("telegram_chat_ids") or [])
     out["blacklist_emp_codes"] = normalize_emp_codes_list(raw.get("blacklist_emp_codes") or [])
+    env_chats = _chat_ids_from_env()
+    if env_chats:
+        out["telegram_chat_ids"] = _normalize_chat_ids(list(out["telegram_chat_ids"]) + env_chats)
     return out
 
 
