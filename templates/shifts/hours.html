@@ -2,8 +2,8 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}">
-<link rel="stylesheet" href="{% static 'shifts/css/hours.css' %}">
+<link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% static 'shifts/css/hours.css' %}?v={{ static_asset_version }}">
 
 <div class="calc-page hours-page">
 
@@ -147,11 +147,11 @@
       </div>
       <div class="hours-export-btns">
         <a class="hours-export-btn" href="{% url 'hours_excel' %}?{{ query_string }}">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v8M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg>
           Excel
         </a>
         <a class="hours-export-btn hours-export-btn--ghost" href="{% url 'hours_pdf' %}?{{ query_string }}">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M10 2v3h3"/></svg>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M10 2v3h3"/></svg>
           PDF
         </a>
       </div>
