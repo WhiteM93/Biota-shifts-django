@@ -97,6 +97,7 @@
           {% if telegram_configured %}<strong style="color:var(--bio-inv-ok);">токен и chat_id указаны</strong>{% else %}не хватает токена или chat_id{% endif %}
           {% if telegram_bot_username %}<br>Бот: <a href="https://t.me/{{ telegram_bot_username }}" target="_blank" rel="noopener noreferrer">@{{ telegram_bot_username }}</a> — для лички обязательно нажмите <code>/start</code> в этом чате.{% endif %}
           <br>Зелёный статус ≠ доставка. Нажмите <strong>«Тест Telegram»</strong> ниже.
+          <br>Ошибка <code>No route to host</code> — с сервера нет доступа к Telegram; нужен прокси <code>BIOTA_TELEGRAM_PROXY</code> в <code>.env.secrets</code>.
         </p>
       </div>
     </section>

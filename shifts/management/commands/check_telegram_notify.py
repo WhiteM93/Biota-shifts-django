@@ -5,6 +5,7 @@ from biota_shifts.notification_settings import NOTIFICATION_SETTINGS_PATH, load_
 from biota_shifts.telegram_notify import (
     fetch_telegram_bot_username,
     resolve_telegram_bot_token,
+    resolve_telegram_proxy,
     send_telegram_test,
     telegram_notify_configured,
 )
@@ -26,6 +27,12 @@ class Command(BaseCommand):
         chats = settings.get("telegram_chat_ids") or []
 
         self.stdout.write(f"Файл настроек: {NOTIFICATION_SETTINGS_PATH} ({'есть' if NOTIFICATION_SETTINGS_PATH.exists() else 'нет'})")
+        proxy = resolve_telegram_proxy()
+        if proxy:
+            self.stdout.write(f"Прокси: {proxy[:40]}{'…' if len(proxy) > 40 else ''}")
+        else:
+            self.stdout.write("Прокси: не задан (прямое подключение к api.telegram.org)")
+
         if token:
             self.stdout.write(f"Токен: задан ({token[:8]}…{token[-4:]}, длина {len(token)})")
             username = fetch_telegram_bot_username(token)

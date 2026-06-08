@@ -1,10 +1,14 @@
 """Отправка сообщений через Telegram Bot API."""
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
+import os
+import socket
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
 
 from biota_shifts.config import _config_str
 from biota_shifts.notification_settings import load_notification_settings
@@ -12,6 +16,7 @@ from biota_shifts.notification_settings import load_notification_settings
 logger = logging.getLogger(__name__)
 
 TELEGRAM_TEXT_LIMIT = 4096
+TELEGRAM_API_HOST = "api.telegram.org"
 
 
 def resolve_telegram_bot_token(settings: dict | None = None) -> str:
@@ -62,9 +67,103 @@ def split_telegram_text(text: str, limit: int = TELEGRAM_TEXT_LIMIT) -> list[str
     return chunks
 
 
+def resolve_telegram_proxy() -> str:
+    return (
+        _config_str("BIOTA_TELEGRAM_PROXY", "")
+        or _config_str("HTTPS_PROXY", "")
+        or _config_str("https_proxy", "")
+        or (os.getenv("HTTPS_PROXY") or "")
+        or (os.getenv("https_proxy") or "")
+        or ""
+    ).strip()
+
+
+def _is_socks_proxy(proxy_url: str) -> bool:
+    scheme = (urlparse(proxy_url).scheme or "").lower()
+    return scheme.startswith("socks")
+
+
+@contextlib.contextmanager
+def _socks_socket_context(proxy_url: str):
+    try:
+        import socks
+    except ImportError as exc:
+        raise RuntimeError(
+            "Для SOCKS-прокси (socks5://…) установите на сервере: pip install PySocks"
+        ) from exc
+    p = urlparse(proxy_url)
+    scheme = (p.scheme or "socks5").lower()
+    proxy_type = socks.SOCKS5 if "5" in scheme else socks.SOCKS4
+    rdns = scheme.endswith("h")
+    port = p.port or 1080
+    host = p.hostname or ""
+    if not host:
+        raise RuntimeError("Некорректный BIOTA_TELEGRAM_PROXY: не указан host")
+    orig_socket = socket.socket
+    socks.set_default_proxy(
+        proxy_type,
+        host,
+        port,
+        rdns=rdns,
+        username=p.username,
+        password=p.password,
+    )
+    socket.socket = socks.socksocket
+    try:
+        yield
+    finally:
+        socket.socket = orig_socket
+
+
+def _wrap_network_error(exc: BaseException) -> RuntimeError:
+    errno = getattr(exc, "errno", None)
+    reason = str(exc)
+    if errno in (101, 113) or "no route to host" in reason.lower() or "network is unreachable" in reason.lower():
+        proxy = resolve_telegram_proxy()
+        hint = (
+            f"Сервер не достучится до {TELEGRAM_API_HOST} (блокировка или фаервол). "
+            "Проверка: curl -I --max-time 10 https://api.telegram.org . "
+        )
+        if proxy:
+            hint += f"Задан прокси {proxy[:24]}… — проверьте, что он доступен с сервера."
+        else:
+            hint += (
+                "Если curl не работает — у хостера откройте исходящий HTTPS или задайте в .env.secrets "
+                "BIOTA_TELEGRAM_PROXY=http://user:pass@host:port (или socks5://… + pip install PySocks)."
+            )
+        return RuntimeError(f"{reason} — {hint}")
+    if errno in (110, 111) or "timed out" in reason.lower():
+        return RuntimeError(f"{reason} — таймаут при подключении к {TELEGRAM_API_HOST}.")
+    return RuntimeError(reason)
+
+
+def _telegram_urlopen(req: urllib.request.Request, timeout: float):
+    proxy = resolve_telegram_proxy()
+    try:
+        if proxy and _is_socks_proxy(proxy):
+            with _socks_socket_context(proxy):
+                return urllib.request.urlopen(req, timeout=timeout)
+        if proxy:
+            opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({"http": proxy, "https": proxy})
+            )
+            return opener.open(req, timeout=timeout)
+        return urllib.request.urlopen(req, timeout=timeout)
+    except urllib.error.HTTPError:
+        raise
+    except urllib.error.URLError as exc:
+        if isinstance(exc.reason, OSError):
+            raise _wrap_network_error(exc.reason) from exc
+        raise RuntimeError(str(exc.reason or exc)) from exc
+    except OSError as exc:
+        raise _wrap_network_error(exc) from exc
+
+
 def explain_telegram_error(message: str) -> str:
     m = (message or "").strip()
     low = m.lower()
+    if "no route to host" in low or "network is unreachable" in low:
+        return m
     if "can't initiate conversation" in low or "bot was blocked" in low:
         return m + " — откройте бота в Telegram и нажмите /start (или разблокируйте)."
     if "chat not found" in low:
@@ -82,7 +181,7 @@ def telegram_api_get(token: str, method: str, timeout: float = 15) -> dict:
     url = f"https://api.telegram.org/bot{token}/{method}"
     req = urllib.request.Request(url, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _telegram_urlopen(req, timeout) as resp:
             out = json.loads(resp.read().decode("utf-8"))
             if not out.get("ok"):
                 raise RuntimeError(explain_telegram_error(out.get("description") or "Telegram API error"))
@@ -94,6 +193,8 @@ def telegram_api_get(token: str, method: str, timeout: float = 15) -> dict:
         except json.JSONDecodeError:
             msg = detail or str(exc)
         raise RuntimeError(explain_telegram_error(msg)) from exc
+    except OSError as exc:
+        raise _wrap_network_error(exc) from exc
 
 
 def fetch_telegram_bot_username(token: str) -> str:
@@ -126,7 +227,7 @@ def send_telegram_message(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _telegram_urlopen(req, timeout) as resp:
             raw = resp.read().decode("utf-8")
             out = json.loads(raw)
             if not out.get("ok"):
@@ -140,6 +241,8 @@ def send_telegram_message(
         except json.JSONDecodeError:
             msg = detail or str(exc)
         raise RuntimeError(explain_telegram_error(msg)) from exc
+    except OSError as exc:
+        raise _wrap_network_error(exc) from exc
 
 
 def send_telegram_broadcast(
