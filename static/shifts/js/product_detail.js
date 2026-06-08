@@ -6,61 +6,46 @@ var PD = (function () {
   } catch (e) { return {}; }
 })();
 
-var PHASED_DELETE_STEPS = 3;
+var BDB = window.BiotaDeleteBtn || {};
 
 function phasedDeleteReset(btn) {
-  if (!btn) return;
-  var base = btn.getAttribute("data-phased-delete-base") || btn.className;
-  btn.setAttribute("data-phased-delete-step", "0");
-  btn.className = base + " btn-phased-delete--s0";
-  btn.setAttribute("aria-label", "Удалить: нажмите " + PHASED_DELETE_STEPS + " раз");
-  btn.title = "Удалить: нажмите " + PHASED_DELETE_STEPS + " раз";
-}
-
-function phasedDeleteSetStep(btn, step) {
-  var base = btn.getAttribute("data-phased-delete-base") || "";
-  btn.setAttribute("data-phased-delete-step", String(step));
-  btn.className = base + " btn-phased-delete--s" + step;
-  btn.setAttribute("aria-label", "Удалить: " + step + " из " + PHASED_DELETE_STEPS);
-  btn.title =
-    step < PHASED_DELETE_STEPS
-      ? "Удалить: ещё " + (PHASED_DELETE_STEPS - step) + " наж."
-      : "Подтвердить удаление";
+  if (BDB.reset) BDB.reset(btn);
 }
 
 function phasedDeleteInit(btn) {
-  if (!btn || btn.getAttribute("data-phased-delete-base")) return;
-  btn.setAttribute("data-phased-delete-base", btn.className);
-  phasedDeleteReset(btn);
+  if (BDB.init) BDB.init(btn);
 }
 
 function phasedDeleteInitAll(scope) {
-  var root = scope || document;
-  root.querySelectorAll(".js-phased-delete").forEach(phasedDeleteInit);
+  if (BDB.initAll) BDB.initAll(scope, ".js-phased-delete");
 }
 
 function phasedDeleteResetAll(scope) {
-  var root = scope || document;
-  root.querySelectorAll(".js-phased-delete").forEach(function (btn) {
-    if (btn.getAttribute("data-phased-delete-base")) phasedDeleteReset(btn);
-  });
+  if (BDB.resetAll) BDB.resetAll(scope, ".js-phased-delete");
 }
 
 function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
-  phasedDeleteInit(btn);
-  var step = parseInt(btn.getAttribute("data-phased-delete-step") || "0", 10) + 1;
-  if (step < PHASED_DELETE_STEPS) {
-    phasedDeleteSetStep(btn, step);
-    return false;
+  if (BDB.handleClick) return BDB.handleClick(btn, confirmMsg, onFinal);
+  return false;
+}
+
+function productDetailDeleteBtnHtml(extraClass, attrs) {
+  var cls = "btn btn-inv-delete btn-inv-delete--s0 js-phased-delete" + (extraClass ? " " + extraClass : "");
+  var attrStr = "";
+  if (attrs) {
+    Object.keys(attrs).forEach(function (k) {
+      attrStr += " " + k + '="' + String(attrs[k]).replace(/"/g, "&quot;") + '"';
+    });
   }
-  phasedDeleteSetStep(btn, PHASED_DELETE_STEPS);
-  if (confirmMsg && !window.confirm(confirmMsg)) {
-    phasedDeleteReset(btn);
-    return false;
-  }
-  phasedDeleteReset(btn);
-  if (onFinal) onFinal();
-  return true;
+  return (
+    '<button type="button" class="' +
+    cls +
+    '" data-step="0"' +
+    attrStr +
+    ">" +
+    (BDB.TRASH_SVG || "") +
+    "</button>"
+  );
 }
 
   (function () {
@@ -968,13 +953,11 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
       innerActions.className = "setup-tools-row-actions-cell-inner";
       var btnRm = document.createElement("button");
       btnRm.type = "button";
-      btnRm.className = "btn btn-ghost setup-tools-remove-row-btn js-setup-tools-remove-row js-phased-delete";
+      btnRm.className = "btn btn-inv-delete btn-inv-delete--s0 setup-tools-remove-row-btn js-setup-tools-remove-row js-phased-delete";
+      btnRm.setAttribute("data-step", "0");
       btnRm.title = "Удалить строку";
       btnRm.setAttribute("aria-label", "Удалить строку инструмента");
-      var icRm = document.createElement("i");
-      icRm.className = "fi fi-br-cross ui-icon";
-      icRm.setAttribute("aria-hidden", "true");
-      btnRm.appendChild(icRm);
+      btnRm.innerHTML = BDB.TRASH_SVG || "";
       phasedDeleteInit(btnRm);
       innerActions.appendChild(btnRm);
       tdActions.appendChild(innerActions);
@@ -1474,8 +1457,7 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
       clone.classList.remove("setup-spec-box-extra");
       clone.classList.add("setup-spec-box-extra");
       clone.querySelectorAll(".js-phased-delete").forEach(function (b) {
-        b.removeAttribute("data-phased-delete-base");
-        b.removeAttribute("data-phased-delete-step");
+        b.removeAttribute("data-delete-base");
         phasedDeleteInit(b);
       });
       clone.removeAttribute("data-extra-block-index");
@@ -2854,7 +2836,7 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
           '<figcaption class="muted"><input type="text" class="js-new-photo-caption" placeholder="Описание" style="width:100%;"/></figcaption>' +
           '<div class="setup-photo-inline-controls">' +
             '<button type="button" class="btn btn-ghost js-save-new-photo">Сохранить</button>' +
-            '<button type="button" class="btn btn-ghost js-setup-photo-delete js-phased-delete">×</button>' +
+            productDetailDeleteBtnHtml("js-setup-photo-delete", { title: "Удалить блок", "aria-label": "Удалить блок" }) +
           '</div>';
         photosWrap.appendChild(draft);
         var delDraftBtn = draft.querySelector(".js-setup-photo-delete");
@@ -2956,7 +2938,7 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
           '<figcaption class="muted setup-photo-caption is-inline-edit" data-caption-editable="1" contenteditable="true" spellcheck="true" title="Двойной щелчок — открыть фото">' + (ph.caption || "") + '</figcaption>' +
           '<div class="setup-photo-inline-controls" hidden>' +
             '<button type="button" class="btn btn-ghost js-setup-photo-save-caption" title="Сохранить подпись">Сохранить</button>' +
-            '<button type="button" class="btn btn-ghost js-setup-photo-delete js-phased-delete" title="Удалить блок">×</button>' +
+            productDetailDeleteBtnHtml("js-setup-photo-delete", { title: "Удалить блок", "aria-label": "Удалить блок" }) +
           '</div>';
         if (inlineEditMode) {
           draftFig.setAttribute("draggable", "true");
@@ -3233,11 +3215,12 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
         if (editMode) {
           var del = document.createElement("button");
           del.type = "button";
-          del.className = "btn btn-ghost product-drawing-delete-btn js-product-drawing-file-delete js-phased-delete";
+          del.className = "btn btn-inv-delete btn-inv-delete--s0 product-drawing-delete-btn js-product-drawing-file-delete js-phased-delete";
+          del.setAttribute("data-step", "0");
           del.setAttribute("data-drawing-file-id", String(f.id));
           del.title = "Удалить чертёж";
           del.setAttribute("aria-label", "Удалить чертёж");
-          del.innerHTML = '<i class="fi fi-br-cross ui-icon" aria-hidden="true"></i>';
+          del.innerHTML = BDB.TRASH_SVG || "";
           phasedDeleteInit(del);
           actions.appendChild(del);
         }
@@ -3297,12 +3280,13 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
             if (editMode) {
               var del = document.createElement("button");
               del.type = "button";
-              del.className = "btn btn-ghost setup-program-file-delete js-setup-program-file-delete js-phased-delete";
+              del.className = "btn btn-inv-delete btn-inv-delete--s0 setup-program-file-delete js-setup-program-file-delete js-phased-delete";
+              del.setAttribute("data-step", "0");
               del.setAttribute("data-program-file-id", String(f.id));
               del.setAttribute("data-setup-id", String(setupId));
               del.title = "Удалить файл";
               del.setAttribute("aria-label", "Удалить файл программы");
-              del.innerHTML = '<i class="fi fi-br-cross ui-icon" aria-hidden="true"></i>';
+              del.innerHTML = BDB.TRASH_SVG || "";
               phasedDeleteInit(del);
               li.appendChild(del);
             }
@@ -3851,6 +3835,100 @@ function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
         true
       );
     })();
+
+    function applySetupInWorkToggleUi(toggles, inWork) {
+      toggles.forEach(function (b) {
+        b.classList.toggle("is-on", !!inWork);
+        b.setAttribute("aria-pressed", inWork ? "true" : "false");
+        b.title = inWork
+          ? "В работе — нажмите, чтобы снять"
+          : "Не в работе — нажмите, чтобы включить";
+      });
+    }
+
+    function reorderSetupSelectInWork(setupOrder) {
+      var select = document.getElementById("setup-tab-select");
+      if (!select || !setupOrder || !setupOrder.length) return;
+
+      var nextIds = setupOrder.map(function (s) { return String(s.pk); }).join(",");
+      var tabsRoot = document.getElementById("product-tabs");
+      if (tabsRoot) tabsRoot.setAttribute("data-inline-setup-ids", nextIds);
+
+      var orderChanged = nextIds !== (select.getAttribute("data-setup-order-ids") || "");
+      setupOrder.forEach(function (item) {
+        var opt = select.querySelector('option[value="' + item.tab_slug + '"]');
+        if (!opt) return;
+        opt.textContent = (item.in_work ? "● " : "") + item.name;
+        opt.setAttribute("data-setup-in-work", item.in_work ? "1" : "0");
+        if (orderChanged) select.appendChild(opt);
+      });
+      if (orderChanged) select.setAttribute("data-setup-order-ids", nextIds);
+    }
+
+    document.addEventListener("click", function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest(".product-setup-inwork-toggle") : null;
+      if (!btn || btn.disabled || btn.classList.contains("is-busy")) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      var setupId = btn.getAttribute("data-setup-id");
+      if (!setupId) return;
+      var nextOn = !btn.classList.contains("is-on");
+      var toggles = document.querySelectorAll('.product-setup-inwork-toggle[data-setup-id="' + setupId + '"]');
+      var prevOn = btn.classList.contains("is-on");
+
+      applySetupInWorkToggleUi(toggles, nextOn);
+      toggles.forEach(function (b) {
+        b.classList.add("is-busy");
+        b.disabled = true;
+      });
+
+      var fd = new FormData();
+      fd.append("action", "inline_toggle_setup_in_work");
+      fd.append("setup_id", setupId);
+      fd.append("in_work", nextOn ? "1" : "0");
+      var csrf = getCookie("csrftoken");
+      if (csrf) fd.append("csrfmiddlewaretoken", csrf);
+
+      fetch(window.location.href, {
+        method: "POST",
+        body: fd,
+        headers: { "X-CSRFToken": csrf, "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin",
+      })
+        .then(function (res) {
+          return res.text().then(function (text) {
+            var data = null;
+            try {
+              data = JSON.parse(text);
+            } catch (parseErr) {
+              throw new Error(
+                res.ok
+                  ? "Некорректный ответ сервера."
+                  : "Ошибка сервера (" + res.status + "). Обновите страницу."
+              );
+            }
+            if (!res.ok || !data.ok) {
+              throw new Error((data && data.error) || "Не удалось изменить статус.");
+            }
+            return data;
+          });
+        })
+        .then(function (data) {
+          applySetupInWorkToggleUi(toggles, !!data.in_work);
+          if (data.setup_order) reorderSetupSelectInWork(data.setup_order);
+        })
+        .catch(function (err) {
+          applySetupInWorkToggleUi(toggles, prevOn);
+          alert(err && err.message ? err.message : "Ошибка сети при смене статуса.");
+        })
+        .finally(function () {
+          toggles.forEach(function (b) {
+            b.classList.remove("is-busy");
+            b.disabled = false;
+          });
+        });
+    });
   })();
   (function () {
     var MAX_GCODE_HIGHLIGHT_CHARS = 120000;

@@ -69,6 +69,30 @@ class ProductInlineSaveTests(TestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.name, "Наладка после переименования")
 
+    def test_toggle_setup_in_work_reorders_list(self):
+        second = ProductSetup.objects.create(
+            product=self.product,
+            name="Установка 2",
+            sort_order=1,
+        )
+        res = self.client.post(
+            f"/products/{self.product.pk}/",
+            {
+                "action": "inline_toggle_setup_in_work",
+                "setup_id": str(second.pk),
+                "in_work": "1",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(res.status_code, 200, res.content[:500])
+        body = res.json()
+        self.assertTrue(body.get("ok"), body)
+        self.assertTrue(body.get("in_work"))
+        order = [row["pk"] for row in body.get("setup_order") or []]
+        self.assertEqual(order[0], second.pk)
+        second.refresh_from_db()
+        self.assertTrue(second.in_work)
+
     def test_empty_product_type_returns_clear_error(self):
         res = self.client.post(
             f"/products/{self.product.pk}/",

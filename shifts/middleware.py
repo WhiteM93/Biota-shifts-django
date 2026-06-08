@@ -19,7 +19,8 @@ class ExecutorReadOnlyMiddleware:
 
         username = (request.session.get("biota_username") or "").strip()
         if username and user_is_executor(username):
-            if (request.POST.get("action") or "").strip() == "refresh_google":
+            action = (request.POST.get("action") or "").strip()
+            if action in {"refresh_google", "inline_toggle_setup_in_work"}:
                 return self.get_response(request)
             is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
             if is_ajax:

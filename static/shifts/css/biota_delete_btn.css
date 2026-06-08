@@ -1,0 +1,124 @@
+.btn-inv-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
+  margin: 0;
+  border-radius: 5px;
+  border: 1px solid var(--bio-btn-ghost-border);
+  background: var(--bio-btn-ghost-bg);
+  color: var(--bio-muted);
+  box-shadow: var(--bio-btn-sm-shadow);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+.btn-inv-delete__icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+.btn-inv-delete:active {
+  transform: scale(0.94);
+}
+
+.btn-inv-delete--s0 {
+  background: var(--bio-btn-ghost-bg);
+  border-color: var(--bio-btn-ghost-border);
+  color: var(--bio-muted);
+}
+
+.btn-inv-delete--s1 {
+  background: color-mix(in srgb, #c9a227 28%, var(--bio-btn-ghost-bg));
+  border-color: #a88620;
+  color: #e8c547;
+}
+
+.btn-inv-delete--s2 {
+  background: color-mix(in srgb, #d97b2a 35%, var(--bio-btn-ghost-bg));
+  border-color: #b8651f;
+  color: #f0a04d;
+}
+
+.btn-inv-delete--s3 {
+  background: color-mix(in srgb, #d9563a 40%, var(--bio-btn-ghost-bg));
+  border-color: #b8432c;
+  color: #f0806a;
+}
+
+.btn-inv-delete--s4 {
+  background: color-mix(in srgb, #c93d3d 48%, var(--bio-btn-ghost-bg));
+  border-color: #a82f2f;
+  color: #f28a8a;
+}
+
+.btn-inv-delete--s5 {
+  background: linear-gradient(180deg, #b82e2e, #8f2222);
+  border-color: #7a1c1c;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(255, 120, 120, 0.35);
+}
+
+html[data-theme="dawn"] .btn-inv-delete--s1 {
+  background: #f5e6b8;
+  border-color: #c9a227;
+  color: #7a5c10;
+}
+
+html[data-theme="dawn"] .btn-inv-delete--s2 {
+  background: #fde0c4;
+  border-color: #d97b2a;
+  color: #8a4510;
+}
+
+html[data-theme="dawn"] .btn-inv-delete--s3 {
+  background: #fcd4cc;
+  border-color: #d9563a;
+  color: #8f2e1f;
+}
+
+html[data-theme="dawn"] .btn-inv-delete--s4 {
+  background: #f8c4c4;
+  border-color: #c93d3d;
+  color: #7a1818;
+}
+
+html[data-theme="dawn"] .btn-inv-delete--s5 {
+  background: linear-gradient(180deg, #c93d3d, #a82f2f);
+  border-color: #8f2222;
+  color: #fff;
+}
+
+.setup-spec-box-controls .btn-inv-delete,
+.setup-tools-row-actions-cell-inner .btn-inv-delete,
+.setup-photo-inline-controls .btn-inv-delete,
+.product-drawing-file-actions .btn-inv-delete,
+.setup-program-file-item-side .btn-inv-delete {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+}
+
+.setup-spec-box-controls .btn-inv-delete__icon,
+.setup-tools-row-actions-cell-inner .btn-inv-delete__icon,
+.setup-photo-inline-controls .btn-inv-delete__icon,
+.product-drawing-file-actions .btn-inv-delete__icon,
+.setup-program-file-item-side .btn-inv-delete__icon {
+  width: 12px;
+  height: 12px;
+}
+
+.product-drawing-notes__delete.btn-inv-delete {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+}
+
+.product-tabs-nav > .product-setup-inline-delete-btn.btn-inv-delete {
+  width: var(--product-nav-control-h, 32px);
+  height: var(--product-nav-control-h, 32px);
+  min-width: var(--product-nav-control-h, 32px);
+}

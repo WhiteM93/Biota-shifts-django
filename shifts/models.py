@@ -1554,11 +1554,12 @@ class ProductSetup(models.Model):
         validators=[FileExtensionValidator(["stl"])],
     )
     sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    in_work = models.BooleanField(default=False, verbose_name="В работе")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
 
     class Meta:
-        ordering = ("sort_order", "id")
+        ordering = ("-in_work", "sort_order", "id")
         verbose_name = "Установка изделия"
         verbose_name_plural = "Установки изделий"
 

@@ -82,7 +82,7 @@
               <i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>
             </a>
             {% if biota_can_edit %}
-            <button type="button" class="btn btn-ghost product-drawing-delete-btn js-product-drawing-file-delete js-phased-delete" data-drawing-file-id="{{ df.pk }}" title="Удалить чертёж" aria-label="Удалить чертёж"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-drawing-delete-btn js-product-drawing-file-delete js-phased-delete" data-step="0" data-drawing-file-id="{{ df.pk }}" title="Удалить чертёж" aria-label="Удалить чертёж">{% include "shifts/includes/biota_delete_icon.html" %}</button>
             {% endif %}
           </div>
         </li>
@@ -108,7 +108,7 @@
         <li class="setup-program-file-item setup-program-file-item-side" data-program-file-id="{{ pf.pk }}">
           <a href="{{ pf.file.url }}" download class="btn product-btn-program setup-side-program-download">{{ pf.display_name }}</a>
           {% if biota_can_edit %}
-            <button type="button" class="btn btn-ghost setup-program-file-delete js-setup-program-file-delete js-phased-delete" data-program-file-id="{{ pf.pk }}" data-setup-id="{{ setup.pk }}" title="Удалить файл" aria-label="Удалить файл программы"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 setup-program-file-delete js-setup-program-file-delete js-phased-delete" data-step="0" data-program-file-id="{{ pf.pk }}" data-setup-id="{{ setup.pk }}" title="Удалить файл" aria-label="Удалить файл программы">{% include "shifts/includes/biota_delete_icon.html" %}</button>
           {% endif %}
         </li>
         {% endfor %}

@@ -13,7 +13,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Count, Max, Q
 from django.http import JsonResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -42,6 +42,12 @@ from .product_plan_sync import (
     plan_inline_state_payload,
     validate_product_plan_post,
 )
+
+SETUP_LIST_ORDER = ("-in_work", "sort_order", "id")
+
+
+def _product_setups_qs(product: Product):
+    return product.setups.order_by(*SETUP_LIST_ORDER)
 
 # Ограничение вывода ПП в карточке (страница)
 MAX_PROGRAM_DISPLAY_BYTES = 800_000
@@ -334,7 +340,7 @@ def get_all_product_files(product_id: int) -> dict:
 
     # Файлы по наладкам
     setups_with_files = []
-    for setup in product.setups.order_by("sort_order", "id"):
+    for setup in _product_setups_qs(product):
         setup_files = list(ProductFile.objects.filter(setup_id=setup.id).order_by("sort_order", "id"))
         setups_with_files.append({
             "setup": setup,
@@ -977,7 +983,12 @@ def _build_display_tool_rows(existing_rows: list[ProductSetupToolRow] | None = N
 @require_http_methods(["GET", "HEAD"])
 def products_list_view(request):
     q = (request.GET.get("q") or "").strip()
-    qs = Product.objects.all().order_by("-updated_at", "-id")
+    qs = (
+        Product.objects.annotate(
+            in_work_count=Count("setups", filter=Q(setups__in_work=True)),
+        )
+        .order_by("-updated_at", "-id")
+    )
     if q:
         qs = qs.filter(Q(name__icontains=q) | Q(description__icontains=q))
     paginator = Paginator(qs, 24)
@@ -1670,11 +1681,41 @@ def product_detail_view(request, pk: int):
                     {"ok": False, "error": f"Ошибка сохранения: {save_exc}"},
                     status=500,
                 )
+
+        if action == "inline_toggle_setup_in_work":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            if "in_work" in request.POST:
+                setup.in_work = _post_bool(request.POST.get("in_work"))
+            else:
+                setup.in_work = not setup.in_work
+            setup.save(update_fields=["in_work", "updated_at"])
+            setups = list(_product_setups_qs(product))
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "setup_id": setup.pk,
+                    "in_work": setup.in_work,
+                    "setup_order": [
+                        {
+                            "pk": s.pk,
+                            "tab_slug": f"setup-{s.pk}",
+                            "name": (s.name or "").strip() or "без названия",
+                            "in_work": s.in_work,
+                        }
+                        for s in setups
+                    ],
+                }
+            )
+
         return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
     setup_photos = list(product.setup_photos.filter(setup__isnull=True))
     product.drawing_file_list = list(_product_drawing_files_qs(product))
     product.has_any_drawing = bool(product.drawing_file_list)
-    setups = list(product.setups.prefetch_related("tools", "program_files"))
+    setups = list(_product_setups_qs(product).prefetch_related("tools", "program_files"))
     for setup in setups:
         setup.tab_slug = f"setup-{setup.pk}"
         setup.side_notes = list(

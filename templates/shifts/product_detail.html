@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=30">
+<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=35">
 <div class="product-detail-grid{% if tab_default == 'drawing' %} has-meta-column{% endif %}"{% if setups %} data-product-has-setups="1"{% endif %}>
   <div class="product-detail-main">
 
@@ -21,13 +21,13 @@
         <select id="setup-tab-select">
           <option value="drawing" {% if tab_default == 'drawing' %}selected{% endif %}>Изделие</option>
           {% for setup in setups %}
-          <option value="{{ setup.tab_slug }}" data-setup-option-for="{{ setup.tab_slug }}" {% if tab_default == setup.tab_slug %}selected{% endif %}>{% if setup.name %}{{ setup.name }}{% else %}без названия{% endif %}</option>
+          <option value="{{ setup.tab_slug }}" data-setup-option-for="{{ setup.tab_slug }}" data-setup-in-work="{% if setup.in_work %}1{% else %}0{% endif %}" {% if tab_default == setup.tab_slug %}selected{% endif %}>{% if setup.in_work %}● {% endif %}{% if setup.name %}{{ setup.name }}{% else %}без названия{% endif %}</option>
           {% endfor %}
         </select>
       </label>
       </div>
       {% if biota_can_edit %}
-      <button type="button" class="btn btn-ghost product-setup-inline-delete-btn js-phased-delete" id="setup-inline-delete-setup-btn" hidden title="Удалить выбранную установку" aria-label="Удалить выбранную установку">Удалить установку</button>
+      <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-setup-inline-delete-btn js-phased-delete" id="setup-inline-delete-setup-btn" data-step="0" hidden title="Удалить выбранную установку" aria-label="Удалить выбранную установку">{% include "shifts/includes/biota_delete_icon.html" %}</button>
       {% endif %}
       {% elif biota_can_edit %}
       <form method="post" action="{% url 'product_detail' product.pk %}" style="display:inline;">
@@ -55,6 +55,19 @@
             <div class="product-setup-panel-title">
               <span class="muted">Название установки:</span>
               <span class="product-setup-name" data-field-text="name">{{ setup.name }}</span>
+              <button
+                type="button"
+                class="product-setup-inwork-toggle{% if setup.in_work %} is-on{% endif %}"
+                data-setup-id="{{ setup.pk }}"
+                data-tab-slug="{{ setup.tab_slug }}"
+                aria-pressed="{% if setup.in_work %}true{% else %}false{% endif %}"
+                title="{% if setup.in_work %}В работе — нажмите, чтобы снять{% else %}Не в работе — нажмите, чтобы включить{% endif %}"
+              >
+                <span class="product-setup-inwork-toggle__track" aria-hidden="true">
+                  <span class="product-setup-inwork-toggle__thumb"></span>
+                </span>
+                <span class="product-setup-inwork-toggle__label">В работе</span>
+              </button>
             </div>
             <div class="product-setup-spec-group">
               <h5>Привязки</h5>
@@ -69,7 +82,7 @@
                 <div class="setup-spec-box">
                 <div class="setup-spec-box-controls" hidden>
                   <button type="button" class="btn btn-ghost js-setup-spec-copy setup-spec-copy-btn" title="Копировать блок" aria-label="Копировать блок"><i class="fi fi-rr-copy ui-icon" aria-hidden="true"></i></button>
-                  <button type="button" class="btn btn-ghost js-setup-spec-remove setup-spec-remove-btn js-phased-delete" title="Удалить блок" aria-label="Удалить блок"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
+                  <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 js-setup-spec-remove setup-spec-remove-btn js-phased-delete" data-step="0" title="Удалить блок" aria-label="Удалить блок">{% include "shifts/includes/biota_delete_icon.html" %}</button>
                 </div>
                 <div class="setup-spec-col setup-spec-col-bindings">
                   <div class="setup-row-photo setup-row-photo-binding">
@@ -146,7 +159,7 @@
                 <div class="setup-spec-box setup-spec-box-extra" data-extra-block-index="{{ forloop.counter0 }}">
                 <div class="setup-spec-box-controls" hidden>
                   <button type="button" class="btn btn-ghost js-setup-spec-copy setup-spec-copy-btn" title="Копировать блок" aria-label="Копировать блок"><i class="fi fi-rr-copy ui-icon" aria-hidden="true"></i></button>
-                  <button type="button" class="btn btn-ghost js-setup-spec-remove setup-spec-remove-btn js-phased-delete" title="Удалить блок" aria-label="Удалить блок"><i class="fi fi-br-cross ui-icon" aria-hidden="true"></i></button>
+                  <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 js-setup-spec-remove setup-spec-remove-btn js-phased-delete" data-step="0" title="Удалить блок" aria-label="Удалить блок">{% include "shifts/includes/biota_delete_icon.html" %}</button>
                 </div>
                 <div class="setup-spec-col setup-spec-col-bindings">
                   <div class="setup-row-photo setup-row-photo-binding">
@@ -302,11 +315,12 @@
                       <div class="setup-tools-row-actions-cell-inner">
                         <button
                           type="button"
-                          class="btn btn-ghost setup-tools-remove-row-btn js-setup-tools-remove-row js-phased-delete"
+                          class="btn btn-inv-delete btn-inv-delete--s0 setup-tools-remove-row-btn js-setup-tools-remove-row js-phased-delete"
+                          data-step="0"
                           title="Удалить строку"
                           aria-label="Удалить строку инструмента"
                         >
-                          <i class="fi fi-br-cross ui-icon" aria-hidden="true"></i>
+                          {% include "shifts/includes/biota_delete_icon.html" %}
                         </button>
                       </div>
                     </td>
@@ -346,7 +360,7 @@
             {% if biota_can_edit %}
             <div class="setup-photo-inline-controls" hidden>
               <button type="button" class="btn btn-ghost js-setup-photo-save-caption" title="Сохранить подпись">Сохранить</button>
-              <button type="button" class="btn btn-ghost js-setup-photo-delete js-phased-delete" title="Удалить блок">×</button>
+              <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 js-setup-photo-delete js-phased-delete" data-step="0" title="Удалить блок" aria-label="Удалить блок">{% include "shifts/includes/biota_delete_icon.html" %}</button>
             </div>
             {% endif %}
           </figure>
@@ -454,7 +468,7 @@
   "tool_type_choices": [{% for v, lbl in tool_type_choices %}{"value":"{{ v|escapejs }}","label":"{{ lbl|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
 }</script>
 <script src="{% static 'shifts/js/plan-cascade-form.js' %}" defer></script>
-<script src="{% static 'shifts/js/product_detail.js' %}?v=29" defer></script>
+<script src="{% static 'shifts/js/product_detail.js' %}?v=34" defer></script>
 
 {% if cad_inline_preview or has_setup_preview_stl %}
 <script type="importmap">

@@ -16,6 +16,19 @@
     gap: 10px;
     min-width: 0;
     height: 360px;
+    position: relative;
+  }
+  .product-tile--has-in-work {
+    border-color: rgba(72, 196, 130, 0.55);
+    box-shadow:
+      0 8px 20px var(--bio-shadow-card),
+      inset 3px 0 0 #3ecf7a;
+  }
+  html[data-theme="dawn"] .product-tile--has-in-work {
+    border-color: rgba(13, 140, 84, 0.45);
+    box-shadow:
+      0 8px 20px var(--bio-shadow-card),
+      inset 3px 0 0 #1faa66;
   }
   .product-tile-title {
     color: var(--bio-body-fg);
@@ -30,6 +43,77 @@
     min-height: 2.7em;
   }
   .product-tile-title:hover { color: var(--bio-heading-accent); }
+  .product-tile-in-work {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    max-width: 100%;
+    min-height: 0;
+    margin-top: -4px;
+    padding: 3px 10px 3px 7px;
+    border-radius: 99px;
+    background: linear-gradient(
+      135deg,
+      rgba(46, 168, 108, 0.22) 0%,
+      rgba(46, 168, 108, 0.1) 100%
+    );
+    border: 1px solid rgba(72, 196, 130, 0.45);
+    box-shadow: 0 1px 6px rgba(46, 168, 108, 0.12);
+  }
+  .product-tile-in-work-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4fd68e;
+    box-shadow: 0 0 6px rgba(79, 214, 142, 0.7);
+    flex-shrink: 0;
+  }
+  .product-tile-in-work-text {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #8ef0bf;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .product-tile-in-work-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    color: #e8fff3;
+    background: rgba(46, 168, 108, 0.45);
+    border: 1px solid rgba(110, 220, 160, 0.35);
+  }
+  html[data-theme="dawn"] .product-tile-in-work {
+    background: linear-gradient(
+      135deg,
+      rgba(13, 140, 84, 0.14) 0%,
+      rgba(13, 140, 84, 0.06) 100%
+    );
+    border-color: rgba(13, 140, 84, 0.35);
+    box-shadow: 0 1px 4px rgba(13, 140, 84, 0.1);
+  }
+  html[data-theme="dawn"] .product-tile-in-work-text {
+    color: #0a7a4d;
+  }
+  html[data-theme="dawn"] .product-tile-in-work-dot {
+    background: #1faa66;
+    box-shadow: 0 0 5px rgba(31, 170, 102, 0.5);
+  }
+  html[data-theme="dawn"] .product-tile-in-work-count {
+    color: #fff;
+    background: rgba(13, 140, 84, 0.72);
+    border-color: rgba(13, 140, 84, 0.4);
+  }
   .product-tile-3d {
     flex: 0 0 230px;
     height: 230px;
@@ -68,6 +152,11 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+  }
+  .product-tile-date {
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: nowrap;
   }
   .product-tile-delete-slot {
     flex: 0 0 auto;

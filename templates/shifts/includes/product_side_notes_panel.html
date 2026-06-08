@@ -12,14 +12,13 @@
         {% if username and biota_is_admin or note.author_username == username %}
         <button
           type="button"
-          class="btn product-drawing-notes__delete js-product-note-delete js-phased-delete"
+          class="btn btn-inv-delete btn-inv-delete--s0 product-drawing-notes__delete js-product-note-delete js-phased-delete"
+          data-step="0"
           data-note-id="{{ note.pk }}"
           title="Удалить заметку"
           aria-label="Удалить заметку"
         >
-          <span class="product-drawing-notes__delete-inner" aria-hidden="true">
-            <i class="fi fi-br-cross ui-icon" aria-hidden="true"></i>
-          </span>
+          {% include "shifts/includes/biota_delete_icon.html" %}
         </button>
         {% endif %}
       </div>
