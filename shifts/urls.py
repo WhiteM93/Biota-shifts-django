@@ -52,6 +52,7 @@ urlpatterns = [
     path("debug-log/ingest/", debug_log_views.debug_log_ingest, name="debug_log_ingest"),
     path("debug-log/list/", debug_log_views.debug_log_list, name="debug_log_list"),
     path("cabinet/", cabinet_views.cabinet_view, name="cabinet"),
+    path("cabinet/notifications/", cabinet_views.notifications_settings_view, name="cabinet_notifications"),
     path("cabinet/backups/", cabinet_views.schedule_backups_view, name="schedule_backups"),
     path("cabinet/backups/download/<str:filename>/", cabinet_views.schedule_backup_download, name="schedule_backup_download"),
     path("cabinet/inventory-backups/", cabinet_views.inventory_backups_view, name="inventory_backups"),

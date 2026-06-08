@@ -826,3 +826,120 @@ label.btn-upload input[type="file"] {
     width: 100%;
   }
 }
+
+/* Уведомления */
+.cabinet-quick-card--notifications {
+  border-color: color-mix(in srgb, var(--bio-nav-refresh-bg2) 35%, var(--bio-surface-item-border));
+}
+
+.cabinet-notify-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cabinet-notify-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.cabinet-notify-slot {
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--bio-filter-border);
+  background: var(--bio-surface-item);
+}
+
+.cabinet-notify-time {
+  margin-top: 8px;
+}
+
+.cabinet-notify-hint {
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+
+.cabinet-notify-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cabinet-notify-steps li + li {
+  margin-top: 6px;
+}
+
+.cabinet-notify-blacklist-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cabinet-notify-blacklist-search {
+  width: 100%;
+  max-width: 420px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--bio-filter-border);
+  background: var(--bio-input-bg);
+  color: var(--bio-body-fg);
+}
+
+.cabinet-notify-blacklist {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--bio-filter-border);
+  border-radius: 8px;
+  padding: 6px;
+  background: var(--bio-surface-item);
+}
+
+.cabinet-notify-blacklist-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 6px 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.cabinet-notify-blacklist-item:hover {
+  background: color-mix(in srgb, var(--bio-filter-border) 25%, transparent);
+}
+
+.cabinet-notify-blacklist-label {
+  font-weight: 500;
+}
+
+.cabinet-notify-blacklist-meta {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.cabinet-notify-test-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cabinet-notify-preview,
+.cabinet-notify-cron {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--bio-filter-border);
+  background: var(--bio-emp-code-bg);
+  color: var(--bio-body-fg);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}

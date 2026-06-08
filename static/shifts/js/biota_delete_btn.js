@@ -89,8 +89,10 @@
   function initForms(formSelector, confirmMsg, options) {
     var opts = options || {};
     document.querySelectorAll(formSelector || ".biota-delete-form").forEach(function (form) {
+      if (form.getAttribute("data-delete-initialized") === "1") return;
       var btn = form.querySelector(".btn-inv-delete");
       if (!btn) return;
+      form.setAttribute("data-delete-initialized", "1");
       init(btn);
       btn.addEventListener("click", function (e) {
         if (opts.stopPropagation) e.stopPropagation();
@@ -111,6 +113,11 @@
     });
   }
 
+  function bootDefaultForms() {
+    initForms(".inv-stock-delete-form", "Удалить эту позицию склада?");
+    initForms(".product-tile-delete-form", "Удалить эту наладку?", { stopPropagation: true });
+  }
+
   global.BiotaDeleteBtn = {
     DELETE_STEPS: DELETE_STEPS,
     TRASH_SVG: TRASH_SVG,
@@ -122,5 +129,14 @@
     initAll: initAll,
     resetAll: resetAll,
     initForms: initForms,
+    bootDefaultForms: bootDefaultForms,
   };
+
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", bootDefaultForms);
+    } else {
+      bootDefaultForms();
+    }
+  }
 })(typeof window !== "undefined" ? window : this);

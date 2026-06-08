@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
+{% block content %}
+<div class="cabinet-subpage">
+  <a class="cabinet-subpage__back" href="{% url 'cabinet' %}">← Кабинет администратора</a>
+
+  <header class="cabinet-hero">
+    <p class="cabinet-hero__eyebrow">Администрирование</p>
+    <h1>Уведомления</h1>
+    <p class="cabinet-section__lead" style="margin:0;color:var(--bio-muted);">
+      Ежедневные сводки в Telegram: кто по графику ещё не отметился в СКУД. Утро — дневная смена (д), вечер — ночная (н).
+    </p>
+  </header>
+
+  <form method="post" class="cabinet-notify-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save">
+
+    <section class="cabinet-section">
+      <div class="cabinet-section__head">
+        <h2>Расписание</h2>
+      </div>
+      <div class="cabinet-section__body">
+        <label class="cabinet-notify-toggle">
+          <input type="checkbox" name="enabled" value="1"{% if settings.enabled %} checked{% endif %}>
+          <span>Включить автоматические уведомления (cron на сервере)</span>
+        </label>
+
+        <div class="cabinet-notify-slots">
+          <div class="cabinet-notify-slot">
+            <label class="cabinet-notify-toggle">
+              <input type="checkbox" name="morning_enabled" value="1"{% if settings.morning_enabled %} checked{% endif %}>
+              <span>Утренняя сводка</span>
+            </label>
+            <label class="field cabinet-notify-time">
+              <span>Время (МСК)</span>
+              <input type="time" name="morning_time" value="{{ settings.morning_time }}" required>
+            </label>
+            <p class="muted cabinet-notify-hint">Сотрудники с <code>д</code> в графике на сегодня без отметки к этому времени.</p>
+          </div>
+          <div class="cabinet-notify-slot">
+            <label class="cabinet-notify-toggle">
+              <input type="checkbox" name="evening_enabled" value="1"{% if settings.evening_enabled %} checked{% endif %}>
+              <span>Вечерняя сводка</span>
+            </label>
+            <label class="field cabinet-notify-time">
+              <span>Время (МСК)</span>
+              <input type="time" name="evening_time" value="{{ settings.evening_time }}" required>
+            </label>
+            <p class="muted cabinet-notify-hint">Сотрудники с <code>н</code> в графике на сегодня без отметки к этому времени.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cabinet-section">
+      <div class="cabinet-section__head">
+        <h2>Telegram-бот</h2>
+        <p class="cabinet-section__lead">Сводка уходит в личные сообщения или в канал/группу, куда добавлен бот.</p>
+      </div>
+      <div class="cabinet-section__body">
+        <ol class="cabinet-notify-steps muted">
+          <li>Создайте бота в <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">@BotFather</a> и скопируйте токен.</li>
+          <li><strong>Личные сообщения:</strong> напишите боту <code>/start</code>, узнайте свой chat_id (например через <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer">@userinfobot</a>).</li>
+          <li><strong>Канал:</strong> добавьте бота администратором канала, укажите <code>@имя_канала</code> или числовой id <code>-100…</code>.</li>
+        </ol>
+
+        <label class="field" style="margin-top:12px;">
+          <span>Токен бота</span>
+          <input
+            type="password"
+            name="telegram_bot_token"
+            value=""
+            placeholder="{% if telegram_token_configured %}Токен сохранён — введите новый, чтобы заменить{% else %}123456789:AA…{% endif %}"
+            autocomplete="off"
+            style="width:100%;max-width:520px;"
+          >
+        </label>
+        <p class="muted cabinet-notify-hint">Токен в <code>.env.secrets</code>: <code>BIOTA_TELEGRAM_BOT_TOKEN</code> (или <code>BOT_TOKEN</code> как в TgBot) — поле в форме не обязательно.</p>
+
+        <label class="field" style="margin-top:12px;">
+          <span>Chat ID (по одному на строку)</span>
+          <textarea
+            name="telegram_chat_ids"
+            rows="4"
+            placeholder="123456789&#10;@my_channel"
+            style="width:100%;max-width:520px;font-family:ui-monospace,monospace;font-size:13px;"
+          >{{ telegram_chat_ids_text }}</textarea>
+        </label>
+        <p class="muted cabinet-notify-hint">
+          Статус:
+          {% if telegram_configured %}<strong style="color:var(--bio-inv-ok);">бот настроен</strong>{% else %}не настроен{% endif %}
+        </p>
+      </div>
+    </section>
+
+    <section class="cabinet-section">
+      <div class="cabinet-section__head">
+        <h2>Чёрный список</h2>
+        <p class="cabinet-section__lead">Сотрудники, которых не включать в сводку.</p>
+      </div>
+      <div class="cabinet-section__body">
+        <div class="cabinet-notify-blacklist-wrap">
+          <input type="search" class="cabinet-notify-blacklist-search" placeholder="Поиск по ФИО, табельному, отделу…" aria-label="Поиск в списке сотрудников">
+          <div class="cabinet-notify-blacklist" role="group" aria-label="Чёрный список сотрудников">
+            {% for emp in employee_rows %}
+            <label class="cabinet-notify-blacklist-item" data-search="{{ emp.department_name|lower }} {{ emp.label|lower }} {{ emp.emp_code }}">
+              <input type="checkbox" name="blacklist_emp_codes" value="{{ emp.emp_code }}"{% if emp.blacklisted %} checked{% endif %}>
+              <span class="cabinet-notify-blacklist-label">{{ emp.label }}</span>
+              <span class="muted cabinet-notify-blacklist-meta">{{ emp.department_name }} · {{ emp.emp_code }}</span>
+            </label>
+            {% empty %}
+            <p class="muted">Сотрудники не загружены из БД.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="cabinet-form-row" style="margin-bottom:24px;">
+      <button type="submit" class="btn">Сохранить настройки</button>
+    </div>
+  </form>
+
+  <section class="cabinet-section">
+    <div class="cabinet-section__head">
+      <h2>Проверка и отправка</h2>
+    </div>
+    <div class="cabinet-section__body cabinet-notify-test-actions">
+      <form method="post" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="test_telegram">
+        <button type="submit" class="btn">Тест Telegram</button>
+      </form>
+      <form method="post" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="preview_morning">
+        <button type="submit" class="btn btn-ghost">Показать утреннюю сводку</button>
+      </form>
+      <form method="post" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="preview_evening">
+        <button type="submit" class="btn btn-ghost">Показать вечернюю сводку</button>
+      </form>
+      <form method="post" style="display:inline;" onsubmit="return confirm('Отправить утреннюю сводку в Telegram?');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="send_morning">
+        <button type="submit" class="btn">Отправить утреннюю</button>
+      </form>
+      <form method="post" style="display:inline;" onsubmit="return confirm('Отправить вечернюю сводку в Telegram?');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="send_evening">
+        <button type="submit" class="btn">Отправить вечернюю</button>
+      </form>
+    </div>
+    {% if preview_text %}
+    <div class="cabinet-section__body">
+      <pre class="cabinet-notify-preview">{{ preview_text }}</pre>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="cabinet-section">
+    <div class="cabinet-section__head">
+      <h2>Cron на сервере</h2>
+      <p class="cabinet-section__lead">Подставьте путь к проекту вместо <code>$PROJECT</code>. Время — по часам сервера (МСК).</p>
+    </div>
+    <div class="cabinet-section__body">
+      <pre class="cabinet-notify-cron">{{ cron_morning }}
+{{ cron_evening }}</pre>
+      <p class="muted" style="font-size:12px;margin:8px 0 0;">Тест: <code>python manage.py send_attendance_summaries --slot=morning --dry-run --force</code></p>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var input = document.querySelector(".cabinet-notify-blacklist-search");
+  var box = document.querySelector(".cabinet-notify-blacklist");
+  if (!input || !box) return;
+  input.addEventListener("input", function () {
+    var q = (input.value || "").trim().toLowerCase();
+    box.querySelectorAll(".cabinet-notify-blacklist-item").forEach(function (row) {
+      var hay = row.getAttribute("data-search") || "";
+      row.hidden = q && hay.indexOf(q) === -1;
+    });
+  });
+})();
+</script>
+{% endblock %}

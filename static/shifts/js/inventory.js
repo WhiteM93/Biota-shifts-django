@@ -6,11 +6,6 @@ var INV = (function () {
   } catch (e) { return {}; }
 })();
 
-(function () {
-  if (window.BiotaDeleteBtn && BiotaDeleteBtn.initForms) {
-    BiotaDeleteBtn.initForms(".inv-stock-delete-form", "Удалить эту позицию склада?");
-  }
-})();
 
 (function () {
   var exportBtn = document.getElementById("inv-stock-export-csv");

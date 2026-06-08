@@ -11,6 +11,7 @@ media/
 .env.secrets
 secrets/
 .biota_users.json
+.biota_notification_settings.json
 # Локальное демо графика (manage.py create_graph_demo_local)
 local/
 FETCH_HEAD

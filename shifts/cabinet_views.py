@@ -660,3 +660,121 @@ def regulations_backup_download(request, filename: str):
         response = HttpResponse(f.read(), content_type="application/json; charset=utf-8")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
+
+
+@biota_login_required
+@require_http_methods(["GET", "POST"])
+def notifications_settings_view(request):
+    """Уведомления: сводки СКУД по расписанию и чёрный список сотрудников."""
+    user = biota_user(request)
+    if not user or not _is_admin(user):
+        messages.error(request, "Доступ запрещен")
+        return redirect("cabinet")
+
+    cfg = biota_db.db_config()
+    try:
+        employees_full = biota_db.load_employees(cfg)
+    except Exception as exc:
+        return render(request, "shifts/error.html", {"title": "Ошибка БД", "message": str(exc)})
+
+    from biota_shifts.attendance_summary import (
+        SLOT_EVENING,
+        SLOT_MORNING,
+        format_summary_text,
+        load_attendance_summary_from_db,
+        send_summary_telegram,
+    )
+    from biota_shifts.emp_codes import normalize_emp_code
+    from biota_shifts.notification_settings import (
+        load_notification_settings,
+        parse_chat_ids_text,
+        save_notification_settings,
+        telegram_token_configured,
+    )
+    from biota_shifts.schedule import employee_label_row
+    from biota_shifts.telegram_notify import send_telegram_test, telegram_notify_configured
+
+    settings = load_notification_settings()
+    preview_text = None
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "save":
+            blacklist = request.POST.getlist("blacklist_emp_codes")
+            save_payload = {
+                "enabled": request.POST.get("enabled") == "1",
+                "morning_enabled": request.POST.get("morning_enabled") == "1",
+                "evening_enabled": request.POST.get("evening_enabled") == "1",
+                "morning_time": request.POST.get("morning_time") or "08:20",
+                "evening_time": request.POST.get("evening_time") or "20:20",
+                "telegram_chat_ids": parse_chat_ids_text(request.POST.get("telegram_chat_ids") or ""),
+                "blacklist_emp_codes": blacklist,
+            }
+            token_in = (request.POST.get("telegram_bot_token") or "").strip()
+            if token_in:
+                save_payload["telegram_bot_token"] = token_in
+            settings = save_notification_settings(save_payload)
+            messages.success(request, "Настройки уведомлений сохранены.")
+            return redirect("cabinet_notifications")
+
+        if action == "test_telegram":
+            if not telegram_notify_configured(settings):
+                messages.error(request, "Укажите токен бота и хотя бы один chat_id.")
+            else:
+                try:
+                    n = send_telegram_test(settings)
+                    messages.success(request, f"Тестовое сообщение отправлено в {n} чат(ов) Telegram.")
+                except Exception as exc:
+                    messages.error(request, f"Ошибка Telegram: {exc}")
+            return redirect("cabinet_notifications")
+
+        if action in ("preview_morning", "preview_evening", "send_morning", "send_evening"):
+            slot = SLOT_MORNING if "morning" in action else SLOT_EVENING
+            try:
+                summary = load_attendance_summary_from_db(slot, settings=settings)
+                preview_text = format_summary_text(summary)
+            except Exception as exc:
+                messages.error(request, f"Не удалось сформировать сводку: {exc}")
+                return redirect("cabinet_notifications")
+
+            if action.startswith("send_"):
+                if not telegram_notify_configured(settings):
+                    messages.error(request, "Настройте Telegram: токен бота и chat_id.")
+                else:
+                    try:
+                        n = send_summary_telegram(summary, settings)
+                        messages.success(request, f"Сводка отправлена в {n} чат(ов) Telegram.")
+                    except Exception as exc:
+                        messages.error(request, f"Ошибка Telegram: {exc}")
+                return redirect("cabinet_notifications")
+
+    blacklist_codes = set(settings.get("blacklist_emp_codes") or [])
+    employee_rows = []
+    if not employees_full.empty:
+        for _, row in employees_full.iterrows():
+            code = normalize_emp_code(row.get("emp_code"))
+            if not code:
+                continue
+            employee_rows.append(
+                {
+                    "emp_code": code,
+                    "label": employee_label_row(row),
+                    "department_name": str(row.get("department_name") or "").strip() or "—",
+                    "blacklisted": code in blacklist_codes,
+                }
+            )
+        employee_rows.sort(key=lambda r: (r["department_name"].lower(), r["label"].lower()))
+
+    chat_ids = settings.get("telegram_chat_ids") or []
+    ctx = {
+        "settings": settings,
+        "employee_rows": employee_rows,
+        "telegram_chat_ids_text": "\n".join(chat_ids),
+        "telegram_configured": telegram_notify_configured(settings),
+        "telegram_token_configured": telegram_token_configured(settings),
+        "preview_text": preview_text,
+        "cron_morning": "20 8 * * * cd $PROJECT && .venv/bin/python manage.py send_attendance_summaries --slot=morning",
+        "cron_evening": "20 20 * * * cd $PROJECT && .venv/bin/python manage.py send_attendance_summaries --slot=evening",
+    }
+    return render(request, "shifts/cabinet_notifications.html", ctx)
