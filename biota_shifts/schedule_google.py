@@ -301,8 +301,8 @@ def _col_index_to_a1(col_idx: int) -> str:
     return letters
 
 
-def fetch_schedule_dataframe(year: int, month: int) -> pd.DataFrame:
-    """График с листа Google в формате для normalize_schedule_excel."""
+def _fetch_schedule_dataframe_from_api(year: int, month: int) -> tuple[pd.DataFrame, str]:
+    """Прямое чтение листа Google (без кэша)."""
     client = _get_gspread_client()
     spreadsheet = _open_spreadsheet(client)
     worksheet = _resolve_worksheet(spreadsheet, year, month)
@@ -310,7 +310,19 @@ def fetch_schedule_dataframe(year: int, month: int) -> pd.DataFrame:
         values = worksheet.get_all_values()
     except Exception as exc:
         raise GoogleScheduleError(f"Не удалось прочитать лист «{worksheet.title}»: {exc}") from exc
-    return google_mv_values_to_schedule_df(values, year, month)
+    return google_mv_values_to_schedule_df(values, year, month), worksheet.title
+
+
+def fetch_schedule_dataframe(
+    year: int,
+    month: int,
+    *,
+    force_refresh: bool = False,
+) -> pd.DataFrame:
+    """График с листа Google в формате для normalize_schedule_excel (через локальный кэш)."""
+    from biota_shifts.schedule_google_cache import load_google_schedule_cached
+
+    return load_google_schedule_cached(year, month, force_refresh=force_refresh)
 
 
 def save_schedule_dataframe_to_google(df: pd.DataFrame, year: int, month: int) -> str:

@@ -313,6 +313,36 @@ def graph_view(request):
 
         schedule_source = get_graph_schedule_source(request)
 
+        if action == "refresh_google":
+            if not google_schedule_configured():
+                messages.error(request, "Google не настроен.")
+                return _graph_redirect(request, y, m)
+            if schedule_source != SCHEDULE_SOURCE_GOOGLE:
+                messages.error(request, "Обновление из Google доступно только в режиме Google.")
+                return _graph_redirect(request, y, m)
+            try:
+                from biota_shifts.schedule_google_cache import (
+                    format_cache_fetched_at,
+                    prev_month,
+                    refresh_google_schedule_cache,
+                )
+
+                refresh_google_schedule_cache(y, m, force=True)
+                py, pm = prev_month(y, m)
+                refresh_google_schedule_cache(py, pm, force=True)
+                label = format_cache_fetched_at(y, m)
+                messages.success(request, f"График обновлён из Google ({label}).")
+            except GoogleScheduleError as exc:
+                messages.error(request, str(exc))
+            return _graph_redirect(request, y, m)
+
+        if action == "save" and schedule_source == SCHEDULE_SOURCE_GOOGLE:
+            messages.error(
+                request,
+                "В режиме Google график только для просмотра. Редактируйте в Google Таблице или переключите «Базовый».",
+            )
+            return _graph_redirect(request, y, m)
+
         if action == "upload":
             if schedule_source == SCHEDULE_SOURCE_GOOGLE:
                 messages.error(
@@ -492,6 +522,11 @@ def graph_view(request):
         )
 
     month_choices = [(mm, MONTH_NAMES_RU[mm]) for mm in range(1, 13)]
+    google_cache_updated_at = ""
+    if schedule_source == SCHEDULE_SOURCE_GOOGLE and google_schedule_configured():
+        from biota_shifts.schedule_google_cache import format_cache_fetched_at
+
+        google_cache_updated_at = format_cache_fetched_at(y, m)
     return render(
         request,
         "shifts/graph.html",
@@ -507,13 +542,18 @@ def graph_view(request):
             "all_positions": all_positions,
             "sel_positions": selected_positions,
             "pos_mode_pick": pos_mode != "all",
-            "graph_edit_allowed": dep_mode == "all" and pos_mode == "all",
+            "graph_edit_allowed": (
+                dep_mode == "all"
+                and pos_mode == "all"
+                and schedule_source != SCHEDULE_SOURCE_GOOGLE
+            ),
             "day_headers": day_headers,
             "non_working_days": non_working_days,
             "table_rows": table_rows,
             "schedule_source": schedule_source,
             "schedule_source_google": SCHEDULE_SOURCE_GOOGLE,
             "google_schedule_available": google_schedule_configured(),
+            "google_cache_updated_at": google_cache_updated_at,
         },
     )
 

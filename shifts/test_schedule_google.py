@@ -7,6 +7,9 @@ import pandas as pd
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.test import RequestFactory, SimpleTestCase, TestCase
 
+from datetime import datetime
+
+from biota_shifts.constants import MSK
 from biota_shifts.schedule_google import (
     SCHEDULE_SOURCE_GOOGLE,
     SCHEDULE_SOURCE_LOCAL,
@@ -16,6 +19,7 @@ from biota_shifts.schedule_google import (
     parse_schedule_source,
     worksheet_name_candidates,
 )
+from biota_shifts.schedule_google_cache import needs_scheduled_refresh
 from shifts.graph_schedule_source import (
     SESSION_KEY,
     append_schedule_source,
@@ -48,6 +52,23 @@ class WorksheetNameCandidatesTests(SimpleTestCase):
     def test_template_month_title(self, _tpl):
         names = worksheet_name_candidates(2026, 5)
         self.assertEqual(names[0], "Май 2026")
+
+
+class GoogleCacheRefreshTests(SimpleTestCase):
+    def test_no_refresh_before_21_msk(self):
+        fetched = datetime(2026, 6, 8, 20, 0, tzinfo=MSK)
+        now = datetime(2026, 6, 8, 20, 30, tzinfo=MSK)
+        self.assertFalse(needs_scheduled_refresh(fetched, now=now))
+
+    def test_refresh_after_21_if_cache_older(self):
+        fetched = datetime(2026, 6, 8, 18, 0, tzinfo=MSK)
+        now = datetime(2026, 6, 8, 21, 5, tzinfo=MSK)
+        self.assertTrue(needs_scheduled_refresh(fetched, now=now))
+
+    def test_no_refresh_after_21_if_already_updated(self):
+        fetched = datetime(2026, 6, 8, 21, 10, tzinfo=MSK)
+        now = datetime(2026, 6, 8, 22, 0, tzinfo=MSK)
+        self.assertFalse(needs_scheduled_refresh(fetched, now=now))
 
 
 class GoogleMvParseTests(SimpleTestCase):
@@ -129,14 +150,18 @@ class ScheduleGoogleIntegrationTests(TestCase):
                     return_value=True,
                 ):
                     with patch(
-                        "biota_shifts.schedule_google.save_schedule_dataframe_to_google"
-                    ) as save_google_mock:
-                        employees = _demo_employees()
-                        df = biota_schedule.empty_schedule_from_db(employees, 2026, 5)
-                        biota_schedule.save_schedule_table(df, 2026, 5, source="google")
-                        save_google_mock.assert_called_once()
+                        "biota_shifts.schedule_google.google_schedule_read_only",
+                        return_value=False,
+                    ):
+                        with patch(
+                            "biota_shifts.schedule_google.save_schedule_dataframe_to_google"
+                        ) as save_google_mock:
+                            employees = _demo_employees()
+                            df = biota_schedule.empty_schedule_from_db(employees, 2026, 5)
+                            biota_schedule.save_schedule_table(df, 2026, 5, source="google")
+                            save_google_mock.assert_called_once()
 
-    @patch("biota_shifts.schedule_google.fetch_schedule_dataframe")
+    @patch("biota_shifts.schedule_google_cache.load_google_schedule_cached")
     def test_load_from_google(self, fetch_mock):
         from biota_shifts import schedule as biota_schedule
         from biota_shifts.db import _demo_employees

@@ -200,7 +200,7 @@ def write_permission_required(view_func):
             rm = getattr(request, "resolver_match", None)
             if rm and rm.url_name == "inventory" and inventory_stock_manage_for_user(u):
                 return view_func(request, *args, **kwargs)
-            if action in {"add_product_note", "delete_product_note"}:
+            if action in {"add_product_note", "delete_product_note", "refresh_google"}:
                 return view_func(request, *args, **kwargs)
             if (request.headers.get("X-Requested-With") or "").strip() == "XMLHttpRequest":
                 return JsonResponse(

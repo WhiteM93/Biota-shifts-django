@@ -73,6 +73,19 @@
         <span class="graph-source-hint" title="См. .env.example">Google не настроен</span>
         {% elif schedule_source == schedule_source_google %}
         <span class="graph-source-badge" title="Листы «Июль 2026» и т.д., A — таб. №, B — ФИО">Google Таблицы</span>
+        {% if google_cache_updated_at %}
+        <span class="graph-cache-updated" title="Локальный снимок; автообновление в 21:00 МСК">кэш: {{ google_cache_updated_at }}</span>
+        {% endif %}
+        <form method="post" action="" class="graph-google-refresh-form biota-exempt-global-readonly-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="refresh_google">
+          <input type="hidden" name="year" value="{{ year }}">
+          <input type="hidden" name="month" value="{{ month }}">
+          <input type="hidden" name="schedule_source" value="google">
+          <input type="hidden" name="dep_mode" value="{% if dep_mode_pick %}pick{% else %}all{% endif %}">
+          <input type="hidden" name="pos_mode" value="{% if pos_mode_pick %}pick{% else %}all{% endif %}">
+          <button type="submit" class="fp-action-btn graph-refresh-btn" title="Обновить из Google сейчас" aria-label="Обновить из Google">⟳</button>
+        </form>
         {% endif %}
         <span class="fp-filter-sep"></span>
         <div class="fp-dd" id="fp-dd-dep">
@@ -194,14 +207,14 @@
     </tbody>
   </table>
 </form>
-<p id="graph-save-status" class="muted graph-save-status">{% if not biota_can_edit %}Режим исполнителя: только просмотр и скачивание.{% elif not graph_edit_allowed %}Редактирование доступно только при фильтрах «Все» (отделы и должности).{% else %}График только для просмотра.{% endif %}</p>
+<p id="graph-save-status" class="muted graph-save-status">{% if schedule_source == schedule_source_google %}График Google: только просмотр. Редактирование — в Google Таблице.{% elif not biota_can_edit %}Режим исполнителя: только просмотр и скачивание.{% elif not graph_edit_allowed %}Редактирование доступно только при фильтрах «Все» (отделы и должности).{% else %}График только для просмотра.{% endif %}</p>
 </div>
 </div>
 </div>
 
 </div>
 
-<link rel="stylesheet" href="{% static "shifts/css/graph.css" %}?v=3">
+<link rel="stylesheet" href="{% static "shifts/css/graph.css" %}?v=4">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
   (function () {

@@ -42,3 +42,31 @@ def append_schedule_source(url: str, source: str) -> str:
         return url
     sep = "&" if "?" in url else "?"
     return f"{url}{sep}{qp}"
+
+
+def get_skud_schedule_source() -> str:
+    """СКУД сверяет отметки с Google-графиком, если интеграция настроена."""
+    if google_schedule_configured():
+        return SCHEDULE_SOURCE_GOOGLE
+    return SCHEDULE_SOURCE_LOCAL
+
+
+def load_schedule_table_resolved(
+    employees_df,
+    year: int,
+    month: int,
+    *,
+    source: str,
+):
+    """Загрузка графика с fallback на локальный Excel при ошибке Google."""
+    from biota_shifts import schedule as biota_schedule
+    from biota_shifts.schedule_google import GoogleScheduleError
+
+    try:
+        return biota_schedule.load_schedule_table(
+            employees_df, year, month, source=source
+        )
+    except GoogleScheduleError:
+        return biota_schedule.load_schedule_table(
+            employees_df, year, month, source=SCHEDULE_SOURCE_LOCAL
+        )

@@ -15,6 +15,7 @@ from biota_shifts import schedule as biota_schedule
 from biota_shifts.schedule import employee_label_row
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required
+from .graph_schedule_source import get_skud_schedule_source, load_schedule_table_resolved
 
 
 def _fmt_minutes_human(v) -> str:
@@ -99,7 +100,9 @@ def _skud_load_bundle(request, employees_df: pd.DataFrame, filtered: pd.DataFram
     cfg = biota_db.db_config()
 
     try:
-        schedule_df = biota_schedule.load_schedule_table(employees_df, y, m)
+        schedule_df = load_schedule_table_resolved(
+            employees_df, y, m, source=get_skud_schedule_source()
+        )
         df = biota_db.load_shifts(cfg, selected_emp, start_date, end_date)
         punches_df = biota_db.load_iclock_punches(cfg, selected_emp, punch_day_from, punch_day_to)
         stats_df = biota_logic.build_employee_stats_month(df, schedule_df, selected_emp, punches_df)
@@ -262,7 +265,9 @@ def skud_stats_excel(request):
         return HttpResponse(err, status=400)
     cfg = biota_db.db_config()
     start_date, end_date = bundle["start_date"], bundle["end_date"]
-    schedule_df = biota_schedule.load_schedule_table(employees_df, bundle["year"], bundle["month"])
+    schedule_df = load_schedule_table_resolved(
+        employees_df, bundle["year"], bundle["month"], source=get_skud_schedule_source()
+    )
     df = biota_db.load_shifts(cfg, bundle["selected_emp"], start_date, end_date)
     punches_df = biota_db.load_iclock_punches(
         cfg,
@@ -294,7 +299,9 @@ def skud_stats_csv(request):
         return HttpResponse(err, status=400)
     cfg = biota_db.db_config()
     start_date, end_date = bundle["start_date"], bundle["end_date"]
-    schedule_df = biota_schedule.load_schedule_table(employees_df, bundle["year"], bundle["month"])
+    schedule_df = load_schedule_table_resolved(
+        employees_df, bundle["year"], bundle["month"], source=get_skud_schedule_source()
+    )
     df = biota_db.load_shifts(cfg, bundle["selected_emp"], start_date, end_date)
     punches_df = biota_db.load_iclock_punches(
         cfg,
@@ -323,7 +330,9 @@ def skud_stats_pdf(request):
         return HttpResponse(err, status=400)
     cfg = biota_db.db_config()
     start_date, end_date = bundle["start_date"], bundle["end_date"]
-    schedule_df = biota_schedule.load_schedule_table(employees_df, bundle["year"], bundle["month"])
+    schedule_df = load_schedule_table_resolved(
+        employees_df, bundle["year"], bundle["month"], source=get_skud_schedule_source()
+    )
     df = biota_db.load_shifts(cfg, bundle["selected_emp"], start_date, end_date)
     punches_df = biota_db.load_iclock_punches(
         cfg,
