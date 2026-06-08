@@ -624,6 +624,14 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
     var inlineEditMode = false;
     var saveNoticeTimers = [];
 
+    function setEditToggleBtnState(enabled) {
+      if (!editToggleBtn) return;
+      editToggleBtn.setAttribute("aria-pressed", enabled ? "true" : "false");
+      var hint = enabled ? "Сохранить изменения" : "Быстрое редактирование";
+      editToggleBtn.setAttribute("aria-label", hint);
+      editToggleBtn.setAttribute("title", hint);
+    }
+
     function escapeHtmlText(s) {
       return String(s || "")
         .replace(/&/g, "&amp;")
@@ -1684,9 +1692,7 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
       var metaRoot = productDetailMetaEl();
       if (metaRoot) refreshInlineFieldTitles(metaRoot, inlineEditMode);
       syncMetaDrawingInlineEdit(inlineEditMode);
-      if (editToggleBtn) {
-        editToggleBtn.textContent = inlineEditMode ? "Сохранить изменения" : "Быстрое редактирование";
-      }
+      setEditToggleBtnState(inlineEditMode);
       syncDrawingPanelQuickEdit(inlineEditMode);
       syncInlineDeleteSetupBtn();
       if (inlineEditMode) phasedDeleteInitAll(document);
@@ -1697,9 +1703,7 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
     function forceDisableInlineEdit() {
       inlineEditMode = false;
       document.body.classList.remove("setup-inline-edit-enabled");
-      if (editToggleBtn) {
-        editToggleBtn.textContent = "Быстрое редактирование";
-      }
+      setEditToggleBtnState(false);
       root.querySelectorAll(".setup-inline-toolbar-block").forEach(function (toolbar) {
         toolbar.setAttribute("hidden", "hidden");
       });

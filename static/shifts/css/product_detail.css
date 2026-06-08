@@ -373,6 +373,119 @@ html[data-theme="dawn"] {
   #setup-export-photos-btn[hidden] {
     display: none !important;
   }
+  .product-pdf-export-btn--icon-only {
+    gap: 0;
+    width: var(--product-nav-control-h);
+    min-width: var(--product-nav-control-h);
+    max-width: var(--product-nav-control-h);
+    height: var(--product-nav-control-h);
+    padding: 0 !important;
+    flex: 0 0 var(--product-nav-control-h);
+  }
+  .product-pdf-export-btn__icon {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pdf-export-icon-glow {
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(143, 156, 255, 0.35) 0%, transparent 70%);
+    opacity: 0;
+    transform: scale(0.8);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    pointer-events: none;
+  }
+  .pdf-export-icon {
+    position: relative;
+    z-index: 1;
+    width: 18px;
+    height: 18px;
+    display: block;
+    transition: transform 0.26s cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+  .pdf-export-icon__lines path {
+    transform-origin: 12px 15px;
+    animation: pdf-specs-line-breathe 2.6s ease-in-out infinite;
+  }
+  .pdf-export-icon__lines path:nth-child(2) {
+    animation-delay: 0.35s;
+  }
+  .pdf-export-icon__lines path:nth-child(3) {
+    animation-delay: 0.7s;
+  }
+  .pdf-export-icon__badge {
+    opacity: 0.88;
+    animation: pdf-badge-pulse 2.4s ease-in-out infinite;
+  }
+  .pdf-export-icon__grid rect {
+    transform-origin: center;
+    animation: pdf-photo-cell-pulse 2.8s ease-in-out infinite;
+  }
+  .pdf-export-icon__grid rect:nth-child(2) { animation-delay: 0.12s; }
+  .pdf-export-icon__grid rect:nth-child(3) { animation-delay: 0.24s; }
+  .pdf-export-icon__grid rect:nth-child(4) { animation-delay: 0.36s; }
+  .pdf-export-icon__grid rect:nth-child(5) { animation-delay: 0.48s; }
+  .pdf-export-icon__grid rect:nth-child(6) { animation-delay: 0.6s; }
+  .pdf-export-icon__grid rect:nth-child(7) { animation-delay: 0.72s; }
+  .pdf-export-icon__grid rect:nth-child(8) { animation-delay: 0.84s; }
+  .pdf-export-icon__grid rect:nth-child(9) { animation-delay: 0.96s; }
+  .pdf-export-icon__lens {
+    animation: pdf-lens-blink 3.2s ease-in-out infinite;
+  }
+  .product-pdf-export-btn--icon-only:hover .pdf-export-icon-glow,
+  .product-pdf-export-btn--icon-only:focus .pdf-export-icon-glow {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  .product-pdf-export-btn--icon-only:hover .pdf-export-icon,
+  .product-pdf-export-btn--icon-only:focus .pdf-export-icon {
+    transform: scale(1.08) translateY(-1px);
+  }
+  .product-pdf-export-btn--icon-only:hover .pdf-export-icon__lines path,
+  .product-pdf-export-btn--icon-only:focus .pdf-export-icon__lines path {
+    animation-duration: 1.2s;
+  }
+  .product-pdf-export-btn--icon-only:hover .pdf-export-icon__grid rect,
+  .product-pdf-export-btn--icon-only:focus .pdf-export-icon__grid rect {
+    animation-duration: 1.4s;
+  }
+  @keyframes pdf-specs-line-breathe {
+    0%, 100% { opacity: 0.55; transform: scaleX(0.92); }
+    50% { opacity: 1; transform: scaleX(1); }
+  }
+  @keyframes pdf-badge-pulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+  }
+  @keyframes pdf-photo-cell-pulse {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 1; }
+  }
+  @keyframes pdf-lens-blink {
+    0%, 88%, 100% { opacity: 1; transform: scale(1); }
+    92% { opacity: 0.35; transform: scale(0.75); }
+  }
+  html[data-theme="dawn"] .pdf-export-icon-glow {
+    background: radial-gradient(circle, rgba(13, 122, 112, 0.28) 0%, transparent 70%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pdf-export-icon__lines path,
+    .pdf-export-icon__badge,
+    .pdf-export-icon__grid rect,
+    .pdf-export-icon__lens {
+      animation: none !important;
+    }
+    .pdf-export-icon__lines path,
+    .pdf-export-icon__grid rect {
+      opacity: 1;
+      transform: none;
+    }
+  }
   .product-tab {
     background: var(--bio-tab-pill-bg);
     border: 1px solid var(--bio-filter-border);
@@ -1371,15 +1484,24 @@ html[data-theme="dawn"] {
     line-height: 0;
     margin: 0;
     flex: 0 0 26px !important;
-    background: rgba(0, 0, 0, 0.35) !important;
     border: 0 !important;
     box-shadow: none !important;
     color: #fff;
     white-space: nowrap;
     overflow: hidden;
   }
+  .product-drawing-preview-btn.btn.btn-ghost {
+    background: transparent !important;
+  }
+  .product-drawing-delete-btn.btn.btn-ghost {
+    background: rgba(0, 0, 0, 0.35) !important;
+  }
   .product-drawing-preview-btn.btn.btn-ghost:hover,
-  .product-drawing-preview-btn.btn.btn-ghost:focus,
+  .product-drawing-preview-btn.btn.btn-ghost:focus {
+    background: transparent !important;
+    color: #fff;
+    filter: brightness(1.2);
+  }
   .product-drawing-delete-btn.btn.btn-ghost:hover,
   .product-drawing-delete-btn.btn.btn-ghost:focus {
     background: rgba(0, 0, 0, 0.5) !important;
@@ -3176,8 +3298,9 @@ html[data-theme="dawn"] {
       width: 100%;
       max-width: 100%;
     }
-    .product-tabs-nav .product-btn-edit-mode,
-    .product-tabs-nav > a.btn:not(.product-add-setup-inline),
+    .product-tabs-nav .product-btn-edit-mode:not(.product-btn-edit-mode--icon-only),
+    .product-tabs-nav .product-pdf-export-btn:not(.product-pdf-export-btn--icon-only),
+    .product-tabs-nav > a.btn:not(.product-add-setup-inline):not(.product-pdf-export-btn--icon-only),
     .product-tabs-nav > .btn:not(.product-add-setup-inline):not(.product-setup-inline-delete-btn) {
       flex: 1 1 10rem;
       min-width: 0;
@@ -3189,6 +3312,13 @@ html[data-theme="dawn"] {
       min-height: var(--product-nav-control-h);
       padding-top: 6px;
       padding-bottom: 6px;
+    }
+    .product-tabs-nav .product-btn-edit-mode--icon-only {
+      flex: 0 0 var(--product-nav-control-h);
+      width: var(--product-nav-control-h);
+      min-width: var(--product-nav-control-h);
+      height: var(--product-nav-control-h);
+      padding: 0;
     }
     .product-tabs-nav .product-add-setup-inline {
       flex: 0 0 var(--product-nav-control-h);

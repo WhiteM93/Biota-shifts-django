@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=35">
+<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=39">
 <div class="product-detail-grid{% if tab_default == 'drawing' %} has-meta-column{% endif %}"{% if setups %} data-product-has-setups="1"{% endif %}>
   <div class="product-detail-main">
 
@@ -41,9 +41,15 @@
       {% endfor %}
       {% if biota_can_edit and setups %}
       <span class="nav-spacer" style="flex:1 1 auto;"></span>
-      <a href="#" class="btn btn-ghost" id="setup-export-specs-btn" target="_blank" rel="noopener" hidden>PDF параметры</a>
-      <a href="#" class="btn btn-ghost" id="setup-export-photos-btn" target="_blank" rel="noopener" hidden>PDF фото 3x5</a>
-      <button type="button" class="btn product-btn-edit-mode" id="setup-inline-edit-btn">Быстрое редактирование</button>
+      <a href="#" class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only" id="setup-export-specs-btn" target="_blank" rel="noopener" hidden aria-label="PDF параметры" title="PDF параметры">
+        {% include "shifts/includes/pdf_export_specs_icon.html" %}
+      </a>
+      <a href="#" class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only" id="setup-export-photos-btn" target="_blank" rel="noopener" hidden aria-label="PDF фото 3×5" title="PDF фото 3×5">
+        {% include "shifts/includes/pdf_export_photos_icon.html" %}
+      </a>
+      <button type="button" class="btn product-btn-edit-mode product-btn-edit-mode--icon-only" id="setup-inline-edit-btn" aria-pressed="false" aria-label="Быстрое редактирование" title="Быстрое редактирование">
+        {% include "shifts/includes/quick_edit_btn_icon.html" %}
+      </button>
       {% endif %}
     </div>
     <div class="product-tab-panels">
@@ -468,7 +474,7 @@
   "tool_type_choices": [{% for v, lbl in tool_type_choices %}{"value":"{{ v|escapejs }}","label":"{{ lbl|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
 }</script>
 <script src="{% static 'shifts/js/plan-cascade-form.js' %}" defer></script>
-<script src="{% static 'shifts/js/product_detail.js' %}?v=34" defer></script>
+<script src="{% static 'shifts/js/product_detail.js' %}?v=36" defer></script>
 
 {% if cad_inline_preview or has_setup_preview_stl %}
 <script type="importmap">
