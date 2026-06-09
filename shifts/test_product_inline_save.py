@@ -93,6 +93,35 @@ class ProductInlineSaveTests(TestCase):
         second.refresh_from_db()
         self.assertTrue(second.in_work)
 
+    def test_product_detail_renders_in_work_setups_first(self):
+        second = ProductSetup.objects.create(
+            product=self.product,
+            name="Установка 2",
+            sort_order=1,
+            in_work=True,
+        )
+        res = self.client.get(f"/products/{self.product.pk}/")
+        self.assertEqual(res.status_code, 200, res.content[:500])
+        html = res.content.decode()
+        first_setup_opt = html.split('option value="setup-')[1].split('"')[0]
+        self.assertEqual(first_setup_opt, str(second.pk))
+
+    def test_products_list_puts_in_work_products_first(self):
+        other = create_product_with_defaults()
+        ProductSetup.objects.filter(product=other).update(in_work=True)
+        self.product.name = "ZZZ без работы"
+        self.product.save(update_fields=["name"])
+        other.name = "AAA в работе"
+        other.save(update_fields=["name"])
+        res = self.client.get("/products/")
+        self.assertEqual(res.status_code, 200, res.content[:500])
+        html = res.content.decode()
+        pos_other = html.find("AAA в работе")
+        pos_self = html.find("ZZZ без работы")
+        self.assertNotEqual(pos_other, -1)
+        self.assertNotEqual(pos_self, -1)
+        self.assertLess(pos_other, pos_self)
+
     def test_empty_product_type_returns_clear_error(self):
         res = self.client.post(
             f"/products/{self.product.pk}/",

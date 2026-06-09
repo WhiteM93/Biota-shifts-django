@@ -987,7 +987,7 @@ def products_list_view(request):
         Product.objects.annotate(
             in_work_count=Count("setups", filter=Q(setups__in_work=True)),
         )
-        .order_by("-updated_at", "-id")
+        .order_by("-in_work_count", "-updated_at", "-id")
     )
     if q:
         qs = qs.filter(Q(name__icontains=q) | Q(description__icontains=q))

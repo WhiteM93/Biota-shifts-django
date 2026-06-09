@@ -18,7 +18,7 @@
       {% endif %}
       <div class="product-setup-select-inline">
       <label class="field product-setup-select-wrap">
-        <select id="setup-tab-select">
+        <select id="setup-tab-select" data-setup-order-ids="{% for setup in setups %}{{ setup.pk }}{% if not forloop.last %},{% endif %}{% endfor %}">
           <option value="drawing" {% if tab_default == 'drawing' %}selected{% endif %}>Изделие</option>
           {% for setup in setups %}
           <option value="{{ setup.tab_slug }}" data-setup-option-for="{{ setup.tab_slug }}" data-setup-in-work="{% if setup.in_work %}1{% else %}0{% endif %}" {% if tab_default == setup.tab_slug %}selected{% endif %}>{% if setup.in_work %}● {% endif %}{% if setup.name %}{{ setup.name }}{% else %}без названия{% endif %}</option>
@@ -474,7 +474,7 @@
   "tool_type_choices": [{% for v, lbl in tool_type_choices %}{"value":"{{ v|escapejs }}","label":"{{ lbl|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
 }</script>
 <script src="{% static 'shifts/js/plan-cascade-form.js' %}" defer></script>
-<script src="{% static 'shifts/js/product_detail.js' %}?v=37" defer></script>
+<script src="{% static 'shifts/js/product_detail.js' %}?v=38" defer></script>
 
 {% if cad_inline_preview or has_setup_preview_stl %}
 <script type="importmap">

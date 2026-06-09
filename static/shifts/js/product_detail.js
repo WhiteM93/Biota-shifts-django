@@ -3972,16 +3972,44 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
       var tabsRoot = document.getElementById("product-tabs");
       if (tabsRoot) tabsRoot.setAttribute("data-inline-setup-ids", nextIds);
 
-      var orderChanged = nextIds !== (select.getAttribute("data-setup-order-ids") || "");
       setupOrder.forEach(function (item) {
         var opt = select.querySelector('option[value="' + item.tab_slug + '"]');
         if (!opt) return;
         opt.textContent = (item.in_work ? "● " : "") + item.name;
         opt.setAttribute("data-setup-in-work", item.in_work ? "1" : "0");
-        if (orderChanged) select.appendChild(opt);
+        select.appendChild(opt);
       });
-      if (orderChanged) select.setAttribute("data-setup-order-ids", nextIds);
+      select.setAttribute("data-setup-order-ids", nextIds);
     }
+
+    function initSetupSelectInWorkOrder() {
+      var select = document.getElementById("setup-tab-select");
+      if (!select) return;
+      var setupOpts = Array.prototype.slice.call(
+        select.querySelectorAll('option[value^="setup-"]')
+      );
+      if (!setupOpts.length) return;
+      setupOpts.sort(function (a, b) {
+        var ai = a.getAttribute("data-setup-in-work") === "1" ? 1 : 0;
+        var bi = b.getAttribute("data-setup-in-work") === "1" ? 1 : 0;
+        if (ai !== bi) return bi - ai;
+        return 0;
+      });
+      setupOpts.forEach(function (opt) {
+        select.appendChild(opt);
+      });
+      select.setAttribute(
+        "data-setup-order-ids",
+        setupOpts
+          .map(function (o) {
+            var m = /^setup-(\d+)$/.exec(o.value || "");
+            return m ? m[1] : "";
+          })
+          .filter(Boolean)
+          .join(",")
+      );
+    }
+    initSetupSelectInWorkOrder();
 
     document.addEventListener("click", function (e) {
       var btn = e.target && e.target.closest ? e.target.closest(".product-setup-inwork-toggle") : null;
