@@ -1091,8 +1091,8 @@ html[data-theme="dawn"] .nav-machines-icon-glow {
 }
 
 .nav .nav-ctl .m-logo {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
 }
 
 .nav a[class*="--icon-only"] [class$="__icon"],
@@ -2017,8 +2017,8 @@ html[data-theme="dawn"] .chk {
   .nav a[class*="--icon-only"] svg,
   .nav-dropdown > summary[class*="--icon-only"] svg,
   .nav .nav-ctl .m-logo {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
   }
 
   .nav a[class*="--icon-only"] [class$="__icon"],

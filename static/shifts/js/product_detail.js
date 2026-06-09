@@ -234,6 +234,120 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
       window.addEventListener("resize", syncPreviewOnScroll);
     }
 
+    var notePop = document.getElementById("setup-tool-note-pop");
+    if (notePop) {
+      var noteHideTimer = null;
+      var noteActiveCell = null;
+
+      function hideNotePop() {
+        if (noteHideTimer) {
+          clearTimeout(noteHideTimer);
+          noteHideTimer = null;
+        }
+        notePop.hidden = true;
+        notePop.setAttribute("aria-hidden", "true");
+        notePop.textContent = "";
+        noteActiveCell = null;
+      }
+
+      function scheduleHideNotePop() {
+        if (noteHideTimer) clearTimeout(noteHideTimer);
+        noteHideTimer = window.setTimeout(hideNotePop, 200);
+      }
+
+      function noteCellFromTarget(t) {
+        if (!t || !t.closest) return null;
+        return t.closest('table.setup-tools-view td[data-tool-col="note"]:not(.is-inline-edit)');
+      }
+
+      function noteCellText(cell) {
+        return (cell.textContent || "").replace(/\s+/g, " ").trim();
+      }
+
+      function noteCellTruncated(cell) {
+        return cell.scrollWidth > cell.clientWidth + 1;
+      }
+
+      function positionNotePop(cell) {
+        var r = cell.getBoundingClientRect();
+        var gap = 8;
+        notePop.style.left = "0";
+        notePop.style.top = "0";
+        notePop.removeAttribute("hidden");
+        notePop.setAttribute("aria-hidden", "false");
+        var pw = notePop.offsetWidth;
+        var ph = notePop.offsetHeight;
+        var left = r.left + r.width / 2 - pw / 2;
+        var top = r.bottom + gap;
+        var maxL = window.innerWidth - pw - 8;
+        left = Math.max(8, Math.min(left, maxL));
+        if (top + ph > window.innerHeight - 8) {
+          top = r.top - ph - gap;
+        }
+        if (top < 8) {
+          top = Math.max(8, Math.min(r.bottom + gap, window.innerHeight - ph - 8));
+        }
+        notePop.style.left = left + "px";
+        notePop.style.top = top + "px";
+      }
+
+      function showNotePop(cell) {
+        if (!fineHoverMq.matches) return;
+        var text = noteCellText(cell);
+        if (!text || !noteCellTruncated(cell)) return;
+        if (noteHideTimer) {
+          clearTimeout(noteHideTimer);
+          noteHideTimer = null;
+        }
+        noteActiveCell = cell;
+        notePop.textContent = text;
+        positionNotePop(cell);
+      }
+
+      document.addEventListener(
+        "mouseover",
+        function (e) {
+          var cell = noteCellFromTarget(e.target);
+          if (!cell) return;
+          showNotePop(cell);
+        },
+        true
+      );
+      document.addEventListener(
+        "mouseout",
+        function (e) {
+          if (!noteActiveCell) return;
+          var rel = e.relatedTarget;
+          if (rel) {
+            var stillInside =
+              noteActiveCell.contains(rel) ||
+              noteActiveCell === rel ||
+              notePop.contains(rel) ||
+              notePop === rel;
+            if (stillInside) return;
+          }
+          var from = e.target;
+          var fromZone =
+            noteActiveCell.contains(from) ||
+            noteActiveCell === from ||
+            notePop.contains(from) ||
+            notePop === from;
+          if (fromZone) scheduleHideNotePop();
+        },
+        true
+      );
+      function syncNotePopOnScroll() {
+        if (notePop.hidden || !noteActiveCell) return;
+        if (!document.body.contains(noteActiveCell)) {
+          hideNotePop();
+          return;
+        }
+        positionNotePop(noteActiveCell);
+      }
+      window.addEventListener("scroll", syncNotePopOnScroll, true);
+      window.addEventListener("resize", syncNotePopOnScroll);
+    }
+
     function closeModal() {
       modal.hidden = true;
       modalImg.src = "";

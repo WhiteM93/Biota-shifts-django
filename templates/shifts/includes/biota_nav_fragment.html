@@ -10,42 +10,30 @@
   </a>
 {% endif %}
 {% if biota_nav.graph and biota_nav.regulations %}
-<details class="nav-dropdown nav-dropdown--icon-only">
-  <summary class="nav-calendar-summary nav-calendar-summary--icon-only {% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' or request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}" title="График и регламенты" aria-label="График и регламенты">
-    {% include "shifts/includes/nav_calendar_icon.html" %}
-  </summary>
+<details class="nav-dropdown">
+  <summary class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' or request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">График и регламенты</summary>
   <div class="nav-dropdown-menu">
     <a href="{% url 'graph' %}" class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' %}active{% endif %}">График</a>
     <a href="{% url 'regulations_page' %}" class="{% if request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">Регламенты</a>
   </div>
 </details>
 {% elif biota_nav.graph %}
-<a href="{% url 'graph' %}" class="nav-calendar-link nav-calendar-link--icon-only {% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' %}active{% endif %}" title="График" aria-label="График">
-  {% include "shifts/includes/nav_calendar_icon.html" %}
-</a>
+<a href="{% url 'graph' %}" class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' %}active{% endif %}">График</a>
 {% elif biota_nav.regulations %}
-<a href="{% url 'regulations_page' %}" class="nav-calendar-link nav-calendar-link--icon-only {% if request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}" title="Регламенты" aria-label="Регламенты">
-  {% include "shifts/includes/nav_calendar_icon.html" %}
-</a>
+<a href="{% url 'regulations_page' %}" class="{% if request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">Регламенты</a>
 {% endif %}
 {% if biota_nav.hours and biota_nav.skud %}
-<details class="nav-dropdown nav-dropdown--icon-only">
-  <summary class="nav-hours-skud-summary nav-hours-skud-summary--icon-only {% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' or request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}" title="Часы и СКУД" aria-label="Часы и СКУД">
-    {% include "shifts/includes/nav_hours_skud_icon.html" %}
-  </summary>
+<details class="nav-dropdown">
+  <summary class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' or request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">Часы и СКУД</summary>
   <div class="nav-dropdown-menu">
     <a href="{% url 'hours' %}" class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' %}active{% endif %}">Часы по дням</a>
     <a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
   </div>
 </details>
 {% elif biota_nav.hours %}
-<a href="{% url 'hours' %}" class="nav-hours-skud-link nav-hours-skud-link--icon-only {% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' %}active{% endif %}" title="Часы по дням" aria-label="Часы по дням">
-  {% include "shifts/includes/nav_hours_skud_icon.html" %}
-</a>
+<a href="{% url 'hours' %}" class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' %}active{% endif %}">Часы по дням</a>
 {% elif biota_nav.skud %}
-<a href="{% url 'skud' %}" class="nav-hours-skud-link nav-hours-skud-link--icon-only {% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}" title="СКУД" aria-label="СКУД">
-  {% include "shifts/includes/nav_hours_skud_icon.html" %}
-</a>
+<a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
 {% endif %}
 {% if biota_nav.inventory %}
 <a href="{% url 'inventory' %}" class="nav-inventory-link nav-inventory-link--icon-only {% if request.resolver_match.url_name == 'inventory' and request.GET.panel != 'defects' and request.GET.panel != 'payroll' and request.GET.panel != 'employees' %}active{% endif %}" title="Склад" aria-label="Склад">
@@ -53,10 +41,8 @@
 </a>
 {% endif %}
 {% if biota_nav.defects or biota_nav.payroll or biota_nav.employees %}
-<details class="nav-dropdown nav-dropdown--icon-only">
-  <summary class="nav-hr-summary nav-hr-summary--icon-only {% if request.resolver_match.url_name == 'inventory' and request.GET.panel == 'defects' or request.resolver_match.url_name == 'payroll_settlement' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'payroll' or request.resolver_match.url_name == 'employee_payroll_detail' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'employees' %}active{% endif %}" title="Кадры и ЗП" aria-label="Кадры и ЗП">
-    {% include "shifts/includes/nav_hr_payroll_icon.html" %}
-  </summary>
+<details class="nav-dropdown">
+  <summary class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel == 'defects' or request.resolver_match.url_name == 'payroll_settlement' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'payroll' or request.resolver_match.url_name == 'employee_payroll_detail' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'employees' %}active{% endif %}">Кадры и ЗП</summary>
   <div class="nav-dropdown-menu">
     {% if biota_nav.defects %}
     <a href="{% url 'inventory' %}?panel=defects" class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel == 'defects' %}active{% endif %}">Учёт брака</a>
@@ -71,14 +57,10 @@
 </details>
 {% endif %}
 {% if biota_nav.products %}
-<a href="{% url 'products_list' %}" class="nav-setups-link nav-setups-link--icon-only {% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_setup_edit' %}active{% endif %}" title="Наладки" aria-label="Наладки">
-  {% include "shifts/includes/nav_setups_icon.html" %}
-</a>
+<a href="{% url 'products_list' %}" class="{% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_setup_edit' %}active{% endif %}">Наладки</a>
 {% endif %}
 {% if biota_nav.machines %}
-<a href="{% url 'machines' %}" class="nav-machines-link nav-machines-link--icon-only {% if request.resolver_match.url_name == 'machines' %}active{% endif %}" title="Станки" aria-label="Станки">
-  {% include "shifts/includes/nav_machines_icon.html" %}
-</a>
+<a href="{% url 'machines' %}" class="{% if request.resolver_match.url_name == 'machines' %}active{% endif %}">Станки</a>
 {% endif %}
 <span class="nav-spacer"></span>
 {% if biota_username %}
