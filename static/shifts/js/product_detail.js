@@ -48,6 +48,136 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
   );
 }
 
+var SETUP_TOOL_NOTE_EYE_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">' +
+  '<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8a3 3 0 100 6 3 3 0 000-6z"/>' +
+  "</svg>";
+
+var setupToolNoteEditState = { cell: null };
+
+function getSetupToolNoteWrap(cell) {
+  return cell && cell.querySelector ? cell.querySelector(".setup-tool-note-wrap") : null;
+}
+
+function getSetupToolNoteValue(cell) {
+  if (!cell) return "";
+  var wrap = getSetupToolNoteWrap(cell);
+  if (wrap) return (wrap.getAttribute("data-note-value") || "").trim();
+  return (cell.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function syncSetupToolNoteDisplay(cell) {
+  if (!cell) return;
+  var wrap = getSetupToolNoteWrap(cell);
+  if (!wrap) return;
+  var val = (wrap.getAttribute("data-note-value") || "").trim();
+  var preview = wrap.querySelector(".setup-tool-note-preview");
+  var btn = wrap.querySelector(".setup-tool-note-eye");
+  if (preview) {
+    if (!val) {
+      preview.textContent = "";
+      preview.hidden = true;
+    } else {
+      var flat = val.replace(/\s+/g, " ");
+      preview.textContent = flat.length > 24 ? flat.slice(0, 24) + "…" : flat;
+      preview.hidden = false;
+    }
+  }
+  if (btn) {
+    btn.classList.toggle("has-note", !!val);
+    btn.setAttribute(
+      "aria-label",
+      val ? "Примечание: " + val.replace(/\s+/g, " ").slice(0, 80) : "Примечание"
+    );
+  }
+  cell.classList.toggle("is-note-empty", !val);
+}
+
+function setSetupToolNoteValue(cell, text) {
+  if (!cell) return;
+  var val = String(text || "").trim();
+  var wrap = getSetupToolNoteWrap(cell);
+  if (!wrap) {
+    cell.textContent = val;
+    return;
+  }
+  wrap.setAttribute("data-note-value", val);
+  syncSetupToolNoteDisplay(cell);
+}
+
+function buildSetupToolNoteWrap(noteText) {
+  var wrap = document.createElement("div");
+  wrap.className = "setup-tool-note-wrap";
+  wrap.setAttribute("data-note-value", String(noteText || "").trim());
+  var btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "setup-tool-note-eye js-setup-tool-note-eye";
+  btn.title = "Примечание";
+  btn.innerHTML = SETUP_TOOL_NOTE_EYE_SVG;
+  var preview = document.createElement("span");
+  preview.className = "setup-tool-note-preview";
+  preview.setAttribute("aria-hidden", "true");
+  wrap.appendChild(btn);
+  wrap.appendChild(preview);
+  return wrap;
+}
+
+function ensureSetupToolNoteCellStructure(cell) {
+  if (!cell || cell.getAttribute("data-tool-col") !== "note") return;
+  if (getSetupToolNoteWrap(cell)) {
+    syncSetupToolNoteDisplay(cell);
+    return;
+  }
+  var text = (cell.textContent || "").trim();
+  cell.textContent = "";
+  cell.classList.add("setup-tool-note-cell");
+  cell.appendChild(buildSetupToolNoteWrap(text));
+  syncSetupToolNoteDisplay(cell);
+}
+
+function initAllSetupToolNoteCells(scope) {
+  var root = scope && scope.querySelectorAll ? scope : document;
+  root.querySelectorAll('td[data-tool-col="note"]').forEach(ensureSetupToolNoteCellStructure);
+}
+
+function openSetupToolNoteEditor(cell) {
+  var modal = document.getElementById("setup-tool-note-edit-modal");
+  var input = modal && modal.querySelector(".js-setup-tool-note-edit-input");
+  if (!modal || !input || !cell) return;
+  setupToolNoteEditState.cell = cell;
+  input.value = getSetupToolNoteValue(cell);
+  modal.hidden = false;
+  modal.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+  window.setTimeout(function () {
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }, 0);
+}
+
+function closeSetupToolNoteEditor() {
+  var modal = document.getElementById("setup-tool-note-edit-modal");
+  if (!modal) return;
+  modal.hidden = true;
+  modal.setAttribute("aria-hidden", "true");
+  setupToolNoteEditState.cell = null;
+  if (!document.getElementById("setup-photo-modal") || document.getElementById("setup-photo-modal").hidden) {
+    document.body.style.overflow = "";
+  }
+}
+
+function saveSetupToolNoteEditor() {
+  var modal = document.getElementById("setup-tool-note-edit-modal");
+  var input = modal && modal.querySelector(".js-setup-tool-note-edit-input");
+  var cell = setupToolNoteEditState.cell;
+  if (!input || !cell) {
+    closeSetupToolNoteEditor();
+    return;
+  }
+  setSetupToolNoteValue(cell, input.value);
+  closeSetupToolNoteEditor();
+}
+
   (function () {
     document.querySelectorAll(".js-print-setup-html").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -236,6 +366,7 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
 
     var notePop = document.getElementById("setup-tool-note-pop");
     if (notePop) {
+      initAllSetupToolNoteCells(document);
       var noteHideTimer = null;
       var noteActiveCell = null;
 
@@ -257,19 +388,24 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
 
       function noteCellFromTarget(t) {
         if (!t || !t.closest) return null;
-        return t.closest('table.setup-tools-view td[data-tool-col="note"]:not(.is-inline-edit)');
+        if (document.body.classList.contains("setup-inline-edit-enabled")) return null;
+        var eye = t.closest(".js-setup-tool-note-eye");
+        if (eye) {
+          if (!eye.classList.contains("has-note")) return null;
+          return eye.closest('td[data-tool-col="note"]');
+        }
+        var cell = t.closest('td[data-tool-col="note"].setup-tool-note-cell');
+        if (cell && cell.classList.contains("is-note-empty")) return null;
+        return cell;
       }
 
       function noteCellText(cell) {
-        return (cell.textContent || "").replace(/\s+/g, " ").trim();
-      }
-
-      function noteCellTruncated(cell) {
-        return cell.scrollWidth > cell.clientWidth + 1;
+        return getSetupToolNoteValue(cell);
       }
 
       function positionNotePop(cell) {
-        var r = cell.getBoundingClientRect();
+        var anchor = cell.querySelector(".setup-tool-note-eye") || cell;
+        var r = anchor.getBoundingClientRect();
         var gap = 8;
         notePop.style.left = "0";
         notePop.style.top = "0";
@@ -294,7 +430,7 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
       function showNotePop(cell) {
         if (!fineHoverMq.matches) return;
         var text = noteCellText(cell);
-        if (!text || !noteCellTruncated(cell)) return;
+        if (!text) return;
         if (noteHideTimer) {
           clearTimeout(noteHideTimer);
           noteHideTimer = null;
@@ -382,12 +518,16 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
         closeModal();
       } else if (e.key === "Escape" && previewPop && !previewPop.hidden) {
         hideBindingPreview();
+      } else if (e.key === "Escape") {
+        var noteModal = document.getElementById("setup-tool-note-edit-modal");
+        if (noteModal && !noteModal.hidden) closeSetupToolNoteEditor();
       }
     });
   })();
   (function () {
     var root = document.getElementById("product-tabs");
     if (!root) return;
+    initAllSetupToolNoteCells(root);
     var tabButtons = root.querySelectorAll(".product-tab");
     var panels = root.querySelectorAll(".product-tab-panel");
     var programDownloadBtn = document.getElementById("product-program-download");
@@ -1106,11 +1246,16 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
       tdType.setAttribute("data-tool-col", "tool_type");
       tdType.setAttribute("data-tool-type-value", "");
       tr.appendChild(tdType);
-      ["diameter", "overhang", "note"].forEach(function (col) {
+      ["diameter", "overhang"].forEach(function (col) {
         var td = document.createElement("td");
         td.setAttribute("data-tool-col", col);
         tr.appendChild(td);
       });
+      var tdNote = document.createElement("td");
+      tdNote.setAttribute("data-tool-col", "note");
+      tdNote.className = "setup-tool-note-cell";
+      tdNote.appendChild(buildSetupToolNoteWrap(""));
+      tr.appendChild(tdNote);
       tbody.appendChild(tr);
       sortSetupToolsTbodyByToolNumber(tbody);
       syncRowOrderDisplay(panel);
@@ -1284,6 +1429,13 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
             }
             return;
           }
+          if (col === "note") {
+            ensureSetupToolNoteCellStructure(cell);
+            cell.classList.toggle("is-inline-edit", enabled);
+            cell.removeAttribute("contenteditable");
+            syncSetupToolNoteDisplay(cell);
+            return;
+          }
           if (enabled) {
             cell.textContent = cell.textContent || "";
             cell.classList.add("is-inline-edit");
@@ -1352,6 +1504,9 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
           if (colName === "tool_number") {
             var tRaw = (cell.textContent || "").trim().toUpperCase();
             return normalizeToolNumber(tRaw) || tRaw;
+          }
+          if (colName === "note") {
+            return getSetupToolNoteValue(cell);
           }
           return (cell.textContent || "").trim();
         };
@@ -2424,6 +2579,44 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
         );
       });
     }
+
+    var noteEditModal = document.getElementById("setup-tool-note-edit-modal");
+    if (noteEditModal) {
+      noteEditModal.addEventListener("click", function (e) {
+        var t = e.target;
+        if (t && t.getAttribute("data-close-setup-tool-note") === "1") {
+          closeSetupToolNoteEditor();
+        }
+      });
+      var noteEditSave = noteEditModal.querySelector(".js-setup-tool-note-edit-save");
+      if (noteEditSave) {
+        noteEditSave.addEventListener("click", function () {
+          saveSetupToolNoteEditor();
+        });
+      }
+      var noteEditInput = noteEditModal.querySelector(".js-setup-tool-note-edit-input");
+      if (noteEditInput) {
+        noteEditInput.addEventListener("keydown", function (e) {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            closeSetupToolNoteEditor();
+          } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            saveSetupToolNoteEditor();
+          }
+        });
+      }
+    }
+
+    document.addEventListener("click", function (e) {
+      var eye = e.target && e.target.closest && e.target.closest(".js-setup-tool-note-eye");
+      if (!eye) return;
+      if (!document.body.classList.contains("setup-inline-edit-enabled")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var cell = eye.closest('td[data-tool-col="note"]');
+      if (cell) openSetupToolNoteEditor(cell);
+    });
 
     if (editToggleBtn) {
     editToggleBtn.addEventListener(

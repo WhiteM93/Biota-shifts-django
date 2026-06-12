@@ -310,7 +310,7 @@
                     <th class="setup-tools-th-rot">Тип</th>
                     <th class="setup-tools-th-rot setup-tools-th-diameter">⌀</th>
                     <th class="setup-tools-th-rot">Вылет</th>
-                    <th class="setup-tools-th-rot setup-tools-th-note" data-tool-col-header="note">Примечание</th>
+                    <th class="setup-tools-th-rot setup-tools-th-note" data-tool-col-header="note" title="Примечание">Прим.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -340,7 +340,14 @@
                     <td data-tool-col="tool_type" data-tool-type-value="{{ row.tool_type|default:'' }}">{{ row.tool_type }}</td>
                     <td data-tool-col="diameter">{{ row.diameter }}</td>
                     <td data-tool-col="overhang">{{ row.overhang }}</td>
-                    <td data-tool-col="note">{{ row.note }}</td>
+                    <td data-tool-col="note" class="setup-tool-note-cell">
+                      <div class="setup-tool-note-wrap" data-note-value="{{ row.note|default:''|escape }}">
+                        <button type="button" class="setup-tool-note-eye js-setup-tool-note-eye" title="Примечание" aria-label="Примечание">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8a3 3 0 100 6 3 3 0 000-6z"/></svg>
+                        </button>
+                        <span class="setup-tool-note-preview" aria-hidden="true"{% if not row.note %} hidden{% endif %}>{% if row.note %}{{ row.note|truncatechars:24 }}{% endif %}</span>
+                      </div>
+                    </td>
                   </tr>
                   {% endfor %}
                 </tbody>

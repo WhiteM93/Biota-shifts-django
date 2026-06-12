@@ -10,3 +10,14 @@
   <img src="" alt="" decoding="async" />
 </div>
 <div id="setup-tool-note-pop" class="setup-tool-note-pop" hidden aria-hidden="true" role="tooltip"></div>
+<div id="setup-tool-note-edit-modal" class="setup-tool-note-edit-modal" hidden aria-hidden="true">
+  <div class="setup-tool-note-edit-modal-backdrop" data-close-setup-tool-note="1"></div>
+  <div class="setup-tool-note-edit-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="setup-tool-note-edit-title">
+    <h2 id="setup-tool-note-edit-title" class="setup-tool-note-edit-modal-title">Примечание к инструменту</h2>
+    <textarea class="setup-tool-note-edit-modal-input js-setup-tool-note-edit-input" rows="5" maxlength="300" placeholder="Текст примечания"></textarea>
+    <div class="setup-tool-note-edit-modal-actions">
+      <button type="button" class="btn btn-ghost" data-close-setup-tool-note="1">Отмена</button>
+      <button type="button" class="btn btn-primary js-setup-tool-note-edit-save">Сохранить</button>
+    </div>
+  </div>
+</div>
