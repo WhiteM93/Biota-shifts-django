@@ -540,6 +540,10 @@ html[data-theme="dawn"] .forms-control {
   color: #000;
   font: inherit;
   padding: 2px 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.35;
 }
 
 .forms-el-text:focus {
@@ -991,23 +995,56 @@ body.forms-table-resizing--row * {
   }
 }
 
+.forms-print-static-text {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  border: none !important;
+  background: transparent !important;
+  color: #000 !important;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  overflow: visible !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
+.forms-print-body {
+  position: static;
+  overflow: visible;
+  height: auto;
+  box-sizing: border-box;
+}
+
 /* ── Print ── */
 @media print {
-  body * {
-    visibility: hidden !important;
+  body .nav,
+  body .messages,
+  .forms-topbar,
+  .forms-layout,
+  .forms-dialog {
+    display: none !important;
   }
 
-  .forms-print-root,
-  .forms-print-root * {
-    visibility: visible !important;
+  body,
+  .container,
+  .forms-page {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .container {
+    width: auto !important;
+    max-width: none !important;
   }
 
   .forms-print-root {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
     display: block !important;
+    position: static !important;
+    width: 100%;
   }
 
   .forms-print-sheet {
@@ -1017,35 +1054,49 @@ body.forms-table-resizing--row * {
     box-sizing: border-box;
     page-break-after: always;
     position: relative;
+    transform: none !important;
+    overflow: visible !important;
   }
 
   .forms-print-sheet[data-orientation="portrait"] {
     width: 210mm;
-    height: 297mm;
-    min-height: 0;
+    min-height: 297mm;
+    height: auto;
   }
 
   .forms-print-sheet[data-orientation="landscape"] {
     width: 297mm;
-    height: 210mm;
-    min-height: 0;
+    min-height: 210mm;
+    height: auto;
   }
 
   .forms-print-frame {
-    position: absolute;
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
     box-sizing: border-box;
+    overflow: visible !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
   .forms-print-inner {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    overflow: visible;
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    overflow: visible !important;
     box-sizing: border-box;
+    height: auto !important;
+  }
+
+  .forms-print-body {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
   }
 
   .forms-el-toolbar,
@@ -1053,6 +1104,7 @@ body.forms-table-resizing--row * {
     display: none !important;
   }
 
+  .forms-print-static-text,
   .forms-el-heading,
   .forms-el-text,
   .forms-el-table textarea,
@@ -1062,15 +1114,50 @@ body.forms-table-resizing--row * {
   .forms-el-field-label,
   .forms-el-field-value {
     border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
   }
 
   .forms-el-field-value {
-    border-bottom: 1px solid #000 !important;
+    border-bottom: 1pt solid #000 !important;
   }
 
-  .forms-el-table td {
-    border: 1px solid #000 !important;
+  .forms-print-inner .forms-el-table,
+  .forms-print-root .forms-el-table {
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+    width: 100%;
+    border: 1pt solid #000 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .forms-print-inner .forms-el-table td,
+  .forms-print-root .forms-el-table td {
+    border: none !important;
+    box-shadow: inset 0 0 0 1pt #000 !important;
+    overflow: visible !important;
+    outline: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .forms-print-inner .forms-el-table td.forms-td-fixed-h,
+  .forms-print-root .forms-el-table td.forms-td-fixed-h {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  .forms-print-inner .forms-el-table td.is-selected,
+  .forms-print-root .forms-el-table td.is-selected {
+    outline: none !important;
+  }
+
+  .forms-print-inner .forms-el-table .forms-print-static-text {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
   }
 }

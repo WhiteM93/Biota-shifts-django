@@ -62,6 +62,40 @@
     border_color: "#000000",
   };
 
+  function formsPrintCss(pageSize) {
+    return (
+      "@page { size: " + pageSize + "; margin: 0; }" +
+      "*, *::before, *::after { box-sizing: border-box; }" +
+      "html, body { margin: 0; padding: 0; background: #fff; color: #000; width: 100%; height: 100%; overflow: hidden; }" +
+      ".forms-print-sheet { margin: 0 auto; background: #fff; color: #000; position: relative; overflow: hidden; page-break-after: auto; page-break-inside: avoid; }" +
+      ".forms-print-sheet[data-orientation=\"portrait\"] { width: 210mm; height: 297mm; }" +
+      ".forms-print-sheet[data-orientation=\"landscape\"] { width: 297mm; height: 210mm; }" +
+      ".forms-print-frame { position: absolute; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
+      ".forms-print-inner { position: absolute; top: 0; left: 0; right: 0; bottom: 0; box-sizing: border-box; overflow: visible; }" +
+      ".forms-print-body { position: static; overflow: visible; height: auto; }" +
+      ".forms-el { position: relative; margin-bottom: 8px; overflow: visible; }" +
+      ".forms-print-heading { display: block; width: 100%; font-weight: 700; line-height: 1.2; margin: 0; padding: 2px 0; overflow: visible; }" +
+      ".forms-print-text { display: block; width: 100%; min-height: 48px; line-height: 1.35; margin: 0; padding: 2px 0; overflow: visible; }" +
+      ".forms-print-static-text { overflow: visible !important; height: auto !important; min-height: 0 !important; max-height: none !important; color: #000; background: transparent; padding: 0; margin: 0; }" +
+      ".forms-el-checkbox { display: grid !important; grid-template-columns: 14px 1fr; gap: 8px; width: 100%; align-items: start; overflow: visible; }" +
+      ".forms-el-checkbox-box { width: 14px; height: 14px; border: 1.5px solid #000; margin-top: 2px; display: block; font-size: 11px; line-height: 14px; text-align: center; }" +
+      ".forms-el-checkbox-box.is-checked::after { content: \"\\2713\"; }" +
+      ".forms-print-checkbox-text { display: block !important; width: 100% !important; white-space: pre-wrap !important; line-height: 1.35; overflow: visible !important; height: auto !important; min-height: 0 !important; max-height: none !important; word-wrap: break-word; overflow-wrap: break-word; }" +
+      ".forms-el-list { margin: 0; padding-left: 1.2em; color: #000; }" +
+      ".forms-el-list-input { width: 100%; border: none; background: transparent; color: #000; font: inherit; padding: 0; }" +
+      ".forms-el-field { display: flex; align-items: flex-end; gap: 8px; width: 100%; }" +
+      ".forms-el-field-num { flex: 0 0 auto; width: 2.2em; border: none; border-bottom: 1px solid transparent; background: transparent; color: #000; font: inherit; font-size: 14px; padding: 0 0 3px; text-align: right; }" +
+      ".forms-el-field-label { flex: 0 0 auto; max-width: 38%; border: none; background: transparent; color: #000; font: inherit; font-size: 14px; padding: 0 0 3px; }" +
+      ".forms-el-field--item .forms-el-field-label { flex: 1 1 auto; min-width: 0; max-width: none; }" +
+      ".forms-el-field-value { flex: 1 1 auto; min-width: 0; border: none; border-bottom: 1px solid #000; background: transparent; color: #000; font: inherit; font-size: 14px; padding: 0 0 3px; text-align: left; }" +
+      ".forms-el-line { border: none; border-top: 1px solid #000; margin: 6px 0; }" +
+      ".forms-el-table-wrap { overflow: visible; }" +
+      ".forms-el-table { width: 100%; border-collapse: collapse; border-spacing: 0; table-layout: fixed; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
+      ".forms-el-table td { padding: 4px; vertical-align: top; background: #fff; color: #000; overflow: visible !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
+      ".forms-print-table-cell { display: block; width: 100%; overflow: visible !important; height: auto !important; max-height: none !important; padding: 0; margin: 0; background: transparent; color: #000; font-size: 12pt; line-height: 1.35; word-wrap: break-word; overflow-wrap: break-word; }"
+    );
+  }
+
   if (!canEdit) root.classList.add("is-readonly");
 
   function normalizePageSettings(raw) {
@@ -218,6 +252,45 @@
   function ensureFormPageSettings(form) {
     form.page_settings = normalizePageSettings(form.page_settings);
     return form.page_settings;
+  }
+
+  function applyPrintPageLayout(form, sheet, frame, inner) {
+    if (!form || !sheet || !frame || !inner) return;
+    var ps = ensureFormPageSettings(form);
+    sheet.setAttribute("data-orientation", normOrientation(form.orientation));
+    var size = sheetPageSizeMm(form.orientation);
+    sheet.style.width = size.w + "mm";
+    sheet.style.height = size.h + "mm";
+    sheet.style.minHeight = size.h + "mm";
+    sheet.style.maxHeight = size.h + "mm";
+    sheet.style.position = "relative";
+    sheet.style.overflow = "hidden";
+    sheet.style.margin = "0 auto";
+
+    frame.style.position = "absolute";
+    frame.style.margin = "0";
+    if (form.show_border) {
+      frame.style.top = ps.border_inset_mm + "mm";
+      frame.style.left = ps.border_inset_mm + "mm";
+      frame.style.right = ps.border_inset_mm + "mm";
+      frame.style.bottom = ps.border_inset_mm + "mm";
+      frame.style.border = ps.border_width_mm + "mm " + ps.border_style + " #000000";
+    } else {
+      frame.style.top = "0";
+      frame.style.left = "0";
+      frame.style.right = "0";
+      frame.style.bottom = "0";
+      frame.style.border = "none";
+    }
+
+    inner.style.position = "absolute";
+    inner.style.top = "0";
+    inner.style.left = "0";
+    inner.style.right = "0";
+    inner.style.bottom = "0";
+    inner.style.height = "auto";
+    inner.style.padding = ps.margin_mm + "mm";
+    inner.style.overflow = "visible";
   }
 
   function applyPageLayout(form, sheet, frame, inner) {
@@ -1519,6 +1592,221 @@
     ta.style.height = Math.max(minH, ta.scrollHeight) + "px";
   }
 
+  function copyTextControlStyles(fromEl, toEl, opts) {
+    opts = opts || {};
+    var inlineProps = [
+      "textAlign", "fontSize", "fontWeight", "fontStyle", "textDecoration",
+      "lineHeight", "fontFamily", "padding", "boxSizing",
+    ];
+    if (!opts.skipSize) {
+      inlineProps.push("width", "height", "minHeight", "maxHeight", "display");
+    }
+    inlineProps.forEach(function (prop) {
+      if (fromEl.style[prop]) toEl.style[prop] = fromEl.style[prop];
+    });
+    var cs = window.getComputedStyle(fromEl);
+    if (!toEl.style.fontSize) toEl.style.fontSize = cs.fontSize;
+    if (!toEl.style.fontWeight) toEl.style.fontWeight = cs.fontWeight;
+    if (!toEl.style.fontStyle) toEl.style.fontStyle = cs.fontStyle;
+    if (!toEl.style.textDecoration) toEl.style.textDecoration = cs.textDecoration;
+    if (!toEl.style.textAlign) toEl.style.textAlign = cs.textAlign;
+    if (!toEl.style.lineHeight) toEl.style.lineHeight = cs.lineHeight;
+    if (!toEl.style.fontFamily) toEl.style.fontFamily = cs.fontFamily;
+  }
+
+  function elementDataByWrap(wrap, form) {
+    if (!wrap || !form) return null;
+    var id = wrap.getAttribute("data-el-id") || "";
+    var els = form.elements || [];
+    for (var i = 0; i < els.length; i++) {
+      if (els[i].id === id) return els[i];
+    }
+    return null;
+  }
+
+  function liveTextareaValue(ta, liveRoot) {
+    var wrap = ta.closest(".forms-el");
+    if (!wrap || !liveRoot) return ta.value;
+    var id = wrap.getAttribute("data-el-id") || "";
+    var liveWrap = liveRoot.querySelector('.forms-el[data-el-id="' + id + '"]');
+    if (!liveWrap) return ta.value;
+    if (ta.classList.contains("forms-el-checkbox-label")) {
+      var liveLbl = liveWrap.querySelector(".forms-el-checkbox-label");
+      return liveLbl ? liveLbl.value : ta.value;
+    }
+    if (ta.classList.contains("forms-el-heading")) {
+      var liveH = liveWrap.querySelector(".forms-el-heading");
+      return liveH ? liveH.value : ta.value;
+    }
+    if (ta.classList.contains("forms-el-text")) {
+      var liveT = liveWrap.querySelector(".forms-el-text");
+      return liveT ? liveT.value : ta.value;
+    }
+    if (ta.classList.contains("forms-el-table-cell")) {
+      var td = ta.closest("td");
+      if (!td) return ta.value;
+      var row = td.getAttribute("data-row");
+      var col = td.getAttribute("data-col");
+      var liveTd = liveWrap.querySelector('td[data-row="' + row + '"][data-col="' + col + '"]');
+      var liveCell = liveTd && liveTd.querySelector("textarea");
+      return liveCell ? liveCell.value : ta.value;
+    }
+    return ta.value;
+  }
+
+  function printTextForTextarea(ta, form, liveRoot) {
+    var wrap = ta.closest(".forms-el");
+    var elData = elementDataByWrap(wrap, form);
+    if (elData) {
+      if (elData.type === "checkbox" && ta.classList.contains("forms-el-checkbox-label")) {
+        return elData.label || "";
+      }
+      if (elData.type === "heading" && ta.classList.contains("forms-el-heading")) {
+        return elData.text || "";
+      }
+      if (elData.type === "text" && ta.classList.contains("forms-el-text")) {
+        return elData.text || "";
+      }
+      if (elData.type === "table" && ta.classList.contains("forms-el-table-cell")) {
+        var td = ta.closest("td");
+        if (td) {
+          var r = parseInt(td.getAttribute("data-row") || "", 10);
+          var c = parseInt(td.getAttribute("data-col") || "", 10);
+          if (!isNaN(r) && !isNaN(c) && elData.cells && elData.cells[r] && elData.cells[r][c]) {
+            return elData.cells[r][c].text || "";
+          }
+        }
+      }
+    }
+    return liveTextareaValue(ta, liveRoot);
+  }
+
+  function setPrintTextContent(el, text) {
+    el.textContent = String(text || "");
+    el.style.whiteSpace = "pre-wrap";
+    el.style.wordWrap = "break-word";
+    el.style.overflowWrap = "break-word";
+  }
+
+  function printTextareaClassName(className) {
+    var cls = String(className || "");
+    if (cls.indexOf("forms-el-checkbox-label") >= 0) return "forms-print-checkbox-text forms-print-static-text";
+    if (cls.indexOf("forms-el-table-cell") >= 0) return "forms-print-table-cell forms-print-static-text";
+    if (cls.indexOf("forms-el-heading") >= 0) return "forms-print-heading forms-print-static-text";
+    if (cls.indexOf("forms-el-text") >= 0) return "forms-print-text forms-print-static-text";
+    return "forms-print-static-text";
+  }
+
+  function syncCloneFieldValues(liveRoot, cloneRoot) {
+    var liveTextareas = liveRoot.querySelectorAll("textarea");
+    var cloneTextareas = cloneRoot.querySelectorAll("textarea");
+    for (var i = 0; i < liveTextareas.length; i++) {
+      if (cloneTextareas[i]) cloneTextareas[i].value = liveTextareas[i].value;
+    }
+    var liveInputs = liveRoot.querySelectorAll("input");
+    var cloneInputs = cloneRoot.querySelectorAll("input");
+    for (var j = 0; j < liveInputs.length; j++) {
+      if (cloneInputs[j]) cloneInputs[j].value = liveInputs[j].value;
+    }
+    var liveBoxes = liveRoot.querySelectorAll(".forms-el-checkbox-box");
+    var cloneBoxes = cloneRoot.querySelectorAll(".forms-el-checkbox-box");
+    for (var k = 0; k < liveBoxes.length; k++) {
+      if (!cloneBoxes[k]) continue;
+      cloneBoxes[k].classList.toggle("is-checked", liveBoxes[k].classList.contains("is-checked"));
+    }
+  }
+
+  function applyPrintTableBorders(root) {
+    root.querySelectorAll(".forms-el-table").forEach(function (table) {
+      table.style.borderCollapse = "collapse";
+      table.style.borderSpacing = "0";
+      table.style.width = "100%";
+      table.style.tableLayout = "fixed";
+      table.style.border = "1px solid #000";
+    });
+    root.querySelectorAll(".forms-el-table td").forEach(function (td) {
+      td.style.border = "1px solid #000";
+      td.style.boxShadow = "none";
+      td.style.webkitPrintColorAdjust = "exact";
+      td.style.printColorAdjust = "exact";
+      td.style.overflow = "visible";
+      td.classList.remove("is-selected");
+      if (!td.classList.contains("forms-td-fixed-h")) {
+        td.style.height = "auto";
+        td.style.minHeight = "24px";
+        td.style.maxHeight = "none";
+      }
+    });
+  }
+
+  function buildPrintBody(form) {
+    var body = document.createElement("div");
+    body.className = "forms-print-body";
+    var liveEls = sheetInnerEl.querySelectorAll(".forms-el[data-el-id]");
+    for (var i = 0; i < liveEls.length; i++) {
+      body.appendChild(liveEls[i].cloneNode(true));
+    }
+    syncCloneFieldValues(sheetInnerEl, body);
+    materializePrintFields(body, sheetInnerEl, form);
+    applyPrintTableBorders(body);
+    return body;
+  }
+
+  function findLiveTextarea(ta, liveRoot) {
+    var wrap = ta.closest(".forms-el");
+    if (!wrap || !liveRoot) return ta;
+    var id = wrap.getAttribute("data-el-id") || "";
+    var liveWrap = liveRoot.querySelector('.forms-el[data-el-id="' + id + '"]');
+    if (!liveWrap) return ta;
+    if (ta.classList.contains("forms-el-table-cell")) {
+      var td = ta.closest("td");
+      if (!td) return ta;
+      var liveTd = liveWrap.querySelector(
+        'td[data-row="' + td.getAttribute("data-row") + '"][data-col="' + td.getAttribute("data-col") + '"]'
+      );
+      return (liveTd && liveTd.querySelector("textarea")) || ta;
+    }
+    var liveEl = liveWrap.querySelector("." + Array.prototype.join.call(ta.classList, "."));
+    return liveEl || ta;
+  }
+
+  function materializePrintFields(root, liveRoot, form) {
+    root.querySelectorAll(".forms-el-toolbar, .forms-table-toolbar").forEach(function (node) {
+      node.remove();
+    });
+    root.querySelectorAll("textarea").forEach(function (ta) {
+      var text = printTextForTextarea(ta, form, liveRoot);
+      var div = document.createElement("div");
+      div.className = printTextareaClassName(ta.className);
+      setPrintTextContent(div, text);
+      copyTextControlStyles(findLiveTextarea(ta, liveRoot), div, { skipSize: true });
+      div.style.overflow = "visible";
+      div.style.height = "auto";
+      div.style.minHeight = "0";
+      div.style.maxHeight = "none";
+      div.style.background = "transparent";
+      div.style.color = "#000";
+      if (div.classList.contains("forms-print-checkbox-text")) {
+        div.style.display = "block";
+        div.style.width = "100%";
+        div.style.whiteSpace = "pre-wrap";
+        div.style.lineHeight = "1.35";
+      }
+      ta.parentNode.replaceChild(div, ta);
+    });
+    root.querySelectorAll(".forms-el-checkbox").forEach(function (row) {
+      row.style.display = "grid";
+      row.style.gridTemplateColumns = "14px 1fr";
+      row.style.gap = "8px";
+      row.style.width = "100%";
+      row.style.overflow = "visible";
+      row.style.alignItems = "start";
+    });
+    root.querySelectorAll(".forms-el").forEach(function (el) {
+      el.style.overflow = "visible";
+    });
+  }
+
   function bindTextInput(input, elData, key) {
     function sync() {
       elData[key] = input.value;
@@ -1815,10 +2103,10 @@
 
   function printForm() {
     var form = currentForm();
-    if (!form) return;
+    if (!form || !sheetInnerEl) return;
     captureEditorState();
     form.orientation = normOrientation(form.orientation);
-    printRoot.innerHTML = "";
+
     var sheet = document.createElement("div");
     sheet.className = "forms-print-sheet";
     sheet.setAttribute("data-orientation", form.orientation);
@@ -1826,27 +2114,54 @@
     frame.className = "forms-print-frame";
     var inner = document.createElement("div");
     inner.className = "forms-print-inner";
-    (form.elements || []).forEach(function (el, i) {
-      inner.appendChild(renderElement(el, i));
-    });
+    inner.appendChild(buildPrintBody(form));
     frame.appendChild(inner);
     sheet.appendChild(frame);
-    applyPageLayout(form, sheet, frame, inner);
-    printRoot.appendChild(sheet);
-    printRoot.hidden = false;
+    applyPrintPageLayout(form, sheet, frame, inner);
 
-    var style = document.createElement("style");
-    style.textContent = "@page { size: A4 " + (form.orientation === "landscape" ? "landscape" : "portrait") + "; margin: 0; }";
-    document.head.appendChild(style);
+    var pageSize = form.orientation === "landscape" ? "A4 landscape" : "A4 portrait";
+    var sheetW = form.orientation === "landscape" ? "297mm" : "210mm";
+    var sheetH = form.orientation === "landscape" ? "210mm" : "297mm";
+    var iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText =
+      "position:fixed;left:-10000px;top:0;width:" + sheetW + ";height:" + sheetH +
+      ";border:0;visibility:hidden;overflow:hidden";
+    document.body.appendChild(iframe);
 
-    window.print();
+    var doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(
+      "<!DOCTYPE html><html lang=\"ru\"><head><meta charset=\"utf-8\"><style>" +
+      formsPrintCss(pageSize) +
+      "</style></head><body>" +
+      sheet.outerHTML +
+      "</body></html>"
+    );
+    doc.close();
 
-    setTimeout(function () {
-      document.head.removeChild(style);
-      printRoot.hidden = true;
-      printRoot.innerHTML = "";
-      renderCanvas();
-    }, 300);
+    var win = iframe.contentWindow;
+    var cleaned = false;
+    function cleanup() {
+      if (cleaned) return;
+      cleaned = true;
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }
+    function runPrint() {
+      try {
+        win.focus();
+        win.print();
+      } catch (e) {
+        console.error(e);
+      }
+      setTimeout(cleanup, 1000);
+    }
+    if (doc.readyState === "complete") {
+      setTimeout(runPrint, 50);
+    } else {
+      iframe.onload = function () { setTimeout(runPrint, 50); };
+      setTimeout(runPrint, 500);
+    }
   }
 
   function loadForms() {
