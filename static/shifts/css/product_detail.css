@@ -3249,11 +3249,14 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     vertical-align: middle;
   }
   .setup-tool-note-wrap {
-    display: flex;
-    align-items: flex-start;
-    gap: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
     min-width: 0;
-    width: 100%;
+    width: 22px;
+    max-width: 100%;
+    margin: 0 auto;
   }
   .setup-tool-note-eye {
     flex: 0 0 auto;
@@ -3326,24 +3329,6 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     border-color: rgba(37, 99, 235, 0.55);
     background: rgba(37, 99, 235, 0.12);
     opacity: 1;
-  }
-  .setup-tool-note-preview {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 11px;
-    line-height: 22px;
-    color: var(--bio-body-muted, #9ca3af);
-  }
-  .setup-tools-view td[data-tool-col="note"] .setup-tool-note-preview {
-    display: none;
-  }
-  .setup-tools-view td[data-tool-col="note"] .setup-tool-note-wrap {
-    display: inline-flex;
-    gap: 0;
-    width: auto;
   }
   .setup-tool-note-cell.is-inline-edit .setup-tool-note-eye {
     cursor: pointer;

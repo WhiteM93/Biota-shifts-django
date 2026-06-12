@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v=43">
+<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v={{ static_asset_version }}">
 <div class="product-detail-grid{% if tab_default == 'drawing' %} has-meta-column{% endif %}"{% if setups %} data-product-has-setups="1"{% endif %}>
   <div class="product-detail-main">
 
@@ -340,12 +340,11 @@
                     <td data-tool-col="tool_type" data-tool-type-value="{{ row.tool_type|default:'' }}">{{ row.tool_type }}</td>
                     <td data-tool-col="diameter">{{ row.diameter }}</td>
                     <td data-tool-col="overhang">{{ row.overhang }}</td>
-                    <td data-tool-col="note" class="setup-tool-note-cell">
+                    <td data-tool-col="note" class="setup-tool-note-cell{% if not row.note %} is-note-empty{% endif %}">
                       <div class="setup-tool-note-wrap" data-note-value="{{ row.note|default:''|escape }}">
-                        <button type="button" class="setup-tool-note-eye js-setup-tool-note-eye" title="Примечание" aria-label="Примечание">
+                        <button type="button" class="setup-tool-note-eye js-setup-tool-note-eye{% if row.note %} has-note{% endif %}" title="Примечание" aria-label="{% if row.note %}Примечание: {{ row.note|truncatechars:80 }}{% else %}Примечание{% endif %}">
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8a3 3 0 100 6 3 3 0 000-6z"/></svg>
                         </button>
-                        <span class="setup-tool-note-preview" aria-hidden="true"{% if not row.note %} hidden{% endif %}>{% if row.note %}{{ row.note|truncatechars:24 }}{% endif %}</span>
                       </div>
                     </td>
                   </tr>
@@ -481,7 +480,7 @@
   "tool_type_choices": [{% for v, lbl in tool_type_choices %}{"value":"{{ v|escapejs }}","label":"{{ lbl|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
 }</script>
 <script src="{% static 'shifts/js/plan-cascade-form.js' %}" defer></script>
-<script src="{% static 'shifts/js/product_detail.js' %}?v=38" defer></script>
+<script src="{% static 'shifts/js/product_detail.js' %}?v={{ static_asset_version }}" defer></script>
 
 {% if cad_inline_preview or has_setup_preview_stl %}
 <script type="importmap">

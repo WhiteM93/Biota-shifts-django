@@ -71,18 +71,7 @@ function syncSetupToolNoteDisplay(cell) {
   var wrap = getSetupToolNoteWrap(cell);
   if (!wrap) return;
   var val = (wrap.getAttribute("data-note-value") || "").trim();
-  var preview = wrap.querySelector(".setup-tool-note-preview");
   var btn = wrap.querySelector(".setup-tool-note-eye");
-  if (preview) {
-    if (!val) {
-      preview.textContent = "";
-      preview.hidden = true;
-    } else {
-      var flat = val.replace(/\s+/g, " ");
-      preview.textContent = flat.length > 24 ? flat.slice(0, 24) + "…" : flat;
-      preview.hidden = false;
-    }
-  }
   if (btn) {
     btn.classList.toggle("has-note", !!val);
     btn.setAttribute(
@@ -114,11 +103,7 @@ function buildSetupToolNoteWrap(noteText) {
   btn.className = "setup-tool-note-eye js-setup-tool-note-eye";
   btn.title = "Примечание";
   btn.innerHTML = SETUP_TOOL_NOTE_EYE_SVG;
-  var preview = document.createElement("span");
-  preview.className = "setup-tool-note-preview";
-  preview.setAttribute("aria-hidden", "true");
   wrap.appendChild(btn);
-  wrap.appendChild(preview);
   return wrap;
 }
 
