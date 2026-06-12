@@ -2108,3 +2108,36 @@ class MachinesBoardState(models.Model):
 
     def __str__(self) -> str:
         return "Станки (общая сводка)"
+
+
+class PrintForm(models.Model):
+    """Шаблон печатной формы A4 (конструктор «Формы»)."""
+
+    ORIENTATION_PORTRAIT = "portrait"
+    ORIENTATION_LANDSCAPE = "landscape"
+    ORIENTATION_CHOICES = (
+        (ORIENTATION_PORTRAIT, "Книжная"),
+        (ORIENTATION_LANDSCAPE, "Альбомная"),
+    )
+
+    name = models.CharField(max_length=200, verbose_name="Название")
+    orientation = models.CharField(
+        max_length=16,
+        choices=ORIENTATION_CHOICES,
+        default=ORIENTATION_PORTRAIT,
+        verbose_name="Ориентация",
+    )
+    show_border = models.BooleanField(default=True, verbose_name="Рамка листа")
+    page_settings = models.JSONField(default=dict, blank=True, verbose_name="Параметры листа и рамки")
+    elements = models.JSONField(default=list, blank=True, verbose_name="Элементы формы")
+    created_by = models.CharField(max_length=150, blank=True, default="", verbose_name="Автор")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("name", "id")
+        verbose_name = "Печатная форма"
+        verbose_name_plural = "Печатные формы"
+
+    def __str__(self) -> str:
+        return self.name

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/forms.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
+{% block content %}
+<div
+  class="forms-page"
+  data-api-list-url="{% url 'forms_api_list' %}"
+  data-api-detail-tpl="{% url 'forms_api_detail' 0 %}"
+  data-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}"
+>
+  <header class="forms-topbar">
+    <div class="forms-topbar-text">
+      <h1 class="forms-title">Формы</h1>
+      <p class="forms-subtitle">Конструктор печатных бланков A4</p>
+    </div>
+    <button type="button" class="forms-btn-print js-forms-print" disabled title="Печать">Печать</button>
+  </header>
+
+  <div class="forms-layout">
+    <aside class="forms-panel forms-panel--list" aria-label="Список бланков">
+      <div class="forms-panel-head">
+        <span class="forms-panel-title">Бланки</span>
+        <button type="button" class="forms-btn-icon js-forms-new" title="Новый бланк" aria-label="Новый бланк">+</button>
+      </div>
+      <ul class="forms-list js-forms-list" role="list"></ul>
+    </aside>
+
+    <main class="forms-panel forms-panel--canvas" aria-label="Превью листа">
+      <div class="forms-empty js-forms-empty">
+        <p>Выберите бланк слева или создайте новый.</p>
+      </div>
+
+      <div class="forms-editor js-forms-editor forms-is-hidden" hidden>
+        <div class="forms-canvas-stage js-forms-canvas-stage">
+          <div class="forms-sheet-scaler js-forms-sheet-scaler">
+            <div class="forms-sheet js-forms-sheet" data-orientation="portrait">
+              <div class="forms-sheet-frame js-forms-sheet-frame">
+                <div class="forms-sheet-inner js-forms-sheet-inner"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="forms-panel forms-panel--props js-forms-props forms-is-hidden" aria-label="Настройки" hidden>
+      <section class="forms-props-block">
+        <h2 class="forms-props-heading">Лист</h2>
+        <label class="forms-row">
+          <span class="forms-row-label">Название</span>
+          <input type="text" class="forms-control js-forms-name" maxlength="200" autocomplete="off">
+        </label>
+        <label class="forms-row">
+          <span class="forms-row-label">Ориентация</span>
+          <select class="forms-control js-forms-orientation">
+            <option value="portrait">Книжная</option>
+            <option value="landscape">Альбомная</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="forms-props-block forms-border-panel">
+        <div class="forms-props-block-head">
+          <h2 class="forms-props-heading">Рамка</h2>
+          <label class="forms-toggle">
+            <input type="checkbox" class="js-forms-border">
+            <span>Вкл</span>
+          </label>
+        </div>
+        <div class="forms-border-settings js-forms-border-settings">
+          <label class="forms-row">
+            <span class="forms-row-label">Отступ от края, мм</span>
+            <input type="number" class="forms-control forms-control--num js-forms-border-inset" min="0" max="40" step="1" value="8">
+          </label>
+          <label class="forms-row">
+            <span class="forms-row-label">Поля контента, мм</span>
+            <input type="number" class="forms-control forms-control--num js-forms-margin-mm" min="0" max="40" step="1" value="12">
+          </label>
+          <label class="forms-row">
+            <span class="forms-row-label">Толщина, мм</span>
+            <input type="number" class="forms-control forms-control--num js-forms-border-width" min="0.1" max="5" step="0.1" value="1">
+          </label>
+          <label class="forms-row">
+            <span class="forms-row-label">Стиль</span>
+            <select class="forms-control js-forms-border-style">
+              <option value="solid">Сплошная</option>
+              <option value="dashed">Штриховая</option>
+              <option value="dotted">Точечная</option>
+              <option value="double">Двойная</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="forms-props-block js-forms-table-props forms-is-hidden" hidden>
+        <h2 class="forms-props-heading">Таблица</h2>
+        <div class="js-forms-table-toolbar-host"></div>
+      </section>
+
+      <section class="forms-props-block js-forms-heading-props forms-is-hidden" hidden>
+        <h2 class="forms-props-heading">Заголовок</h2>
+        <div class="forms-row">
+          <span class="forms-row-label">Выравнивание</span>
+          <div class="forms-align-group" role="group" aria-label="Выравнивание заголовка">
+            <button type="button" class="forms-align-btn js-forms-heading-align" data-align="left" title="Слева">Слева</button>
+            <button type="button" class="forms-align-btn js-forms-heading-align" data-align="center" title="По центру">Центр</button>
+            <button type="button" class="forms-align-btn js-forms-heading-align" data-align="right" title="Справа">Справа</button>
+          </div>
+        </div>
+        <label class="forms-row">
+          <span class="forms-row-label">Размер, pt</span>
+          <input type="number" class="forms-control forms-control--num js-forms-heading-size" min="8" max="48" step="1" value="16">
+        </label>
+      </section>
+
+      <section class="forms-props-block">
+        <h2 class="forms-props-heading">Элементы</h2>
+        <div class="forms-add-grid" role="toolbar" aria-label="Добавить элемент">
+          <button type="button" class="forms-add-btn js-forms-add" data-type="heading">Заголовок</button>
+          <button type="button" class="forms-add-btn js-forms-add" data-type="text">Текст</button>
+          <button type="button" class="forms-add-btn js-forms-add" data-type="table">Таблица</button>
+          <button type="button" class="forms-add-btn js-forms-add" data-type="list">Список</button>
+          <button type="button" class="forms-add-btn js-forms-add" data-type="checkbox">Галочка</button>
+          <button type="button" class="forms-add-btn js-forms-add" data-type="date">Дата</button>
+          <button type="button" class="forms-add-btn js-forms-add" data-type="fio">ФИО</button>
+          <button type="button" class="forms-add-btn js-forms-add" data-type="item">Пункт</button>
+          <button type="button" class="forms-add-btn js-forms-add" data-type="line">Линия</button>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <dialog class="forms-dialog js-forms-dialog-new" aria-labelledby="forms-dialog-new-title">
+    <form class="forms-dialog-body js-forms-new-form">
+      <h2 id="forms-dialog-new-title" class="forms-dialog-title">Новый бланк</h2>
+      <label class="forms-row">
+        <span class="forms-row-label">Название</span>
+        <input type="text" class="forms-control js-forms-new-name" maxlength="200" required autocomplete="off">
+      </label>
+      <label class="forms-row">
+        <span class="forms-row-label">Ориентация</span>
+        <select class="forms-control js-forms-new-orientation">
+          <option value="portrait">Книжная</option>
+          <option value="landscape">Альбомная</option>
+        </select>
+      </label>
+      <label class="forms-toggle forms-toggle--dialog">
+        <input type="checkbox" class="js-forms-new-border" checked>
+        <span>Рамка листа</span>
+      </label>
+      <div class="forms-dialog-actions">
+        <button type="button" class="forms-btn-secondary js-forms-dialog-cancel">Отмена</button>
+        <button type="submit" class="forms-btn-primary">Создать</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="forms-dialog js-forms-dialog-prompt" aria-labelledby="forms-dialog-prompt-title">
+    <form class="forms-dialog-body js-forms-prompt-form">
+      <h2 id="forms-dialog-prompt-title" class="forms-dialog-title js-forms-prompt-title">Параметры</h2>
+      <div class="js-forms-prompt-fields"></div>
+      <div class="forms-dialog-actions">
+        <button type="button" class="forms-btn-secondary js-forms-prompt-cancel">Отмена</button>
+        <button type="submit" class="forms-btn-primary">Добавить</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="forms-print-root js-forms-print-root" hidden aria-hidden="true"></div>
+</div>
+
+<script src="{% static 'shifts/js/forms.js' %}?v={{ static_asset_version }}" defer></script>
+{% endblock %}

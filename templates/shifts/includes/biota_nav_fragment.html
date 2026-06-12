@@ -68,6 +68,11 @@
   {% include "shifts/includes/nav_user_icon.html" %}
 </a>
 {% endif %}
+{% if biota_nav.forms %}
+<a href="{% url 'forms' %}" class="nav-icon-btn nav-ctl {% if request.resolver_match.url_name == 'forms' %}active{% endif %}" title="Формы" aria-label="Формы">
+  {% include "shifts/includes/nav_forms_icon.html" %}
+</a>
+{% endif %}
 {% if biota_nav.calculator %}
 <a href="{% url 'calculator' %}" class="nav-icon-btn nav-ctl {% if request.resolver_match.url_name == 'calculator' %}active{% endif %}" title="Калькулятор" aria-label="Калькулятор">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">

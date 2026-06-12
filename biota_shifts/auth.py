@@ -517,6 +517,7 @@ NAV_KEYS = (
     "products",
     "machines",
     "calculator",
+    "forms",
 )
 USER_ROLE_MANAGER = "manager"
 USER_ROLE_EXECUTOR = "executor"
@@ -534,6 +535,7 @@ NAV_LABELS_RU = {
     "products": "Изделия",
     "machines": "Станки",
     "calculator": "Калькулятор",
+    "forms": "Формы",
 }
 NAV_LABELS_SHORT = {
     "home": "Главная",
@@ -548,6 +550,7 @@ NAV_LABELS_SHORT = {
     "products": "Наладки",
     "machines": "Станки",
     "calculator": "Калькулятор",
+    "forms": "Формы",
 }
 
 

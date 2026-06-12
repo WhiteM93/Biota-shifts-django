@@ -10,6 +10,7 @@ from . import inventory_views
 from . import payroll_views
 from . import product_views
 from . import skud_views
+from . import forms_views
 from . import machines_views
 from . import views
 
@@ -40,6 +41,9 @@ urlpatterns = [
     path("inventory/", inventory_views.inventory_view, name="inventory"),
     path("machines/", machines_views.machines_view, name="machines"),
     path("calculator/", views.calculator_view, name="calculator"),
+    path("forms/", forms_views.forms_view, name="forms"),
+    path("forms/api/", forms_views.forms_api_list, name="forms_api_list"),
+    path("forms/api/<int:pk>/", forms_views.forms_api_detail, name="forms_api_detail"),
     path("products/", product_views.products_list_view, name="products_list"),
     path("products/<int:pk>/delete/", product_views.product_delete_view, name="product_delete"),
     path("products/new/", product_views.product_create_view, name="product_create"),
