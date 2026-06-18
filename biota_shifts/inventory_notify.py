@@ -105,6 +105,40 @@ def format_inventory_event_message(event: InventoryStockEvent) -> str:
     return "\n".join(lines)
 
 
+def build_inventory_test_message(*, actor: str = "тест") -> str:
+    from datetime import datetime
+
+    date_str, time_str = _format_when(datetime.now(MSK))
+    lines = [
+        "Склад — Пополнение (тест)",
+        "Позиция: Тестовая позиция · сверло D10",
+        "Количество: 1 шт. · на складе: 10 шт.",
+        f"Дата операции: {date_str} · записано: {date_str} {time_str}",
+        f"Кто: {actor}",
+        "Комментарий: Проверка уведомлений склада из кабинета Biota",
+        "",
+        "— Biota / Склад",
+    ]
+    return "\n".join(lines)
+
+
+def send_inventory_notify_test(settings: dict | None = None, *, actor: str = "тест") -> None:
+    """Тестовое уведомление склада (из кабинета)."""
+    cfg = load_notification_settings() if settings is None else settings
+    if not notify_delivery_configured(cfg):
+        raise ValueError("Доставка не настроена: укажите relay URL или токен + chat_id")
+    text = build_inventory_test_message(actor=actor)
+    chat_ids = list(cfg.get("telegram_chat_ids") or [])
+    payload = {"kind": "inventory", "text": text, "chat_ids": chat_ids, "meta": {"test": True}}
+    if notify_relay_configured(cfg):
+        post_notify_relay(payload, cfg)
+        return
+    token = resolve_telegram_bot_token(cfg)
+    if not token or not chat_ids:
+        raise ValueError("Не задан токен или chat_id")
+    send_telegram_broadcast(token, chat_ids, text)
+
+
 def send_inventory_notification(text: str, *, meta: dict | None = None, settings: dict | None = None) -> None:
     cfg = load_notification_settings() if settings is None else settings
     if not inventory_notify_enabled(cfg) or not notify_delivery_configured(cfg):

@@ -664,6 +664,16 @@ def regulations_backup_download(request, filename: str):
 
 @biota_login_required
 @require_http_methods(["GET", "POST"])
+def _notify_cron_line(hm: str, slot: str) -> str:
+    parts = (hm or "08:20").strip().split(":")
+    h = int(parts[0]) if parts and parts[0].isdigit() else 8
+    mi = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 20
+    return (
+        f"{mi} {h} * * * cd $PROJECT && .venv/bin/python manage.py "
+        f"send_attendance_summaries --slot={slot}"
+    )
+
+
 def notifications_settings_view(request):
     """Уведомления: сводки СКУД по расписанию и чёрный список сотрудников."""
     user = biota_user(request)
@@ -699,6 +709,7 @@ def notifications_settings_view(request):
         resolve_notify_relay_url,
         send_notify_test,
     )
+    from biota_shifts.inventory_notify import inventory_notify_enabled, send_inventory_notify_test
     from biota_shifts.telegram_notify import (
         fetch_telegram_bot_username,
         resolve_telegram_bot_token,
@@ -707,6 +718,10 @@ def notifications_settings_view(request):
 
     settings = load_notification_settings()
     preview_text = None
+    preview_label = ""
+
+    def _delivery_error() -> str:
+        return "Настройте доставку: URL сервера бота и chat_id (или токен Telegram)."
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -734,41 +749,57 @@ def notifications_settings_view(request):
             messages.success(request, "Настройки уведомлений сохранены.")
             return redirect("cabinet_notifications")
 
-        if action == "test_telegram":
+        if action == "test_connection":
             if not notify_delivery_configured(settings):
-                messages.error(request, "Укажите URL сервера бота или токен + chat_id Telegram.")
+                messages.error(request, _delivery_error())
             else:
                 try:
                     n = send_notify_test(settings)
                     if notify_relay_configured(settings):
-                        messages.success(request, "Тест отправлен на сервер бота — проверьте Telegram.")
+                        messages.success(request, "Связь с ботом OK — проверьте тестовое сообщение в Telegram.")
                     else:
-                        messages.success(request, f"Тестовое сообщение отправлено в {n} чат(ов) Telegram.")
+                        messages.success(request, f"Сообщение отправлено в {n} чат(ов) Telegram.")
                 except Exception as exc:
-                    messages.error(request, f"Ошибка доставки: {exc}")
+                    messages.error(request, f"Ошибка связи: {exc}")
             return redirect("cabinet_notifications")
 
-        if action in ("preview_morning", "preview_evening", "send_morning", "send_evening"):
+        if action in ("test_attendance_morning", "test_attendance_evening"):
+            slot = SLOT_MORNING if action.endswith("morning") else SLOT_EVENING
+            slot_label = "утренняя" if slot == SLOT_MORNING else "вечерняя"
+            if not notify_delivery_configured(settings):
+                messages.error(request, _delivery_error())
+                return redirect("cabinet_notifications")
+            try:
+                summary = load_attendance_summary_from_db(slot, settings=settings)
+                send_summary_telegram(summary, settings)
+                messages.success(request, f"{slot_label.capitalize()} сводка СКУД отправлена в Telegram.")
+            except Exception as exc:
+                messages.error(request, f"Не удалось отправить сводку: {exc}")
+            return redirect("cabinet_notifications")
+
+        if action == "test_inventory":
+            if not notify_delivery_configured(settings):
+                messages.error(request, _delivery_error())
+                return redirect("cabinet_notifications")
+            if not inventory_notify_enabled(settings):
+                messages.error(request, "Уведомления склада выключены — включите галочку в настройках.")
+                return redirect("cabinet_notifications")
+            try:
+                actor = (biota_user(request) or {}).get("username") or "admin"
+                send_inventory_notify_test(settings, actor=actor)
+                messages.success(request, "Тестовое уведомление склада отправлено в Telegram.")
+            except Exception as exc:
+                messages.error(request, f"Не удалось отправить: {exc}")
+            return redirect("cabinet_notifications")
+
+        if action in ("preview_morning", "preview_evening"):
             slot = SLOT_MORNING if "morning" in action else SLOT_EVENING
             try:
                 summary = load_attendance_summary_from_db(slot, settings=settings)
                 preview_text = format_summary_text(summary)
+                preview_label = "Утренняя сводка СКУД" if slot == SLOT_MORNING else "Вечерняя сводка СКУД"
             except Exception as exc:
                 messages.error(request, f"Не удалось сформировать сводку: {exc}")
-                return redirect("cabinet_notifications")
-
-            if action.startswith("send_"):
-                if not notify_delivery_configured(settings):
-                    messages.error(request, "Настройте доставку: URL сервера бота или Telegram.")
-                else:
-                    try:
-                        n = send_summary_telegram(summary, settings)
-                        if notify_relay_configured(settings):
-                            messages.success(request, "Сводка отправлена на сервер бота.")
-                        else:
-                            messages.success(request, f"Сводка отправлена в {n} чат(ов) Telegram.")
-                    except Exception as exc:
-                        messages.error(request, f"Ошибка доставки: {exc}")
                 return redirect("cabinet_notifications")
 
     blacklist_codes = set(settings.get("blacklist_emp_codes") or [])
@@ -802,8 +833,10 @@ def notifications_settings_view(request):
         "telegram_configured": telegram_notify_configured(settings),
         "telegram_token_configured": telegram_token_configured(settings),
         "telegram_bot_username": fetch_telegram_bot_username(tg_token) if tg_token and not relay_url else "",
+        "inventory_notify_on": inventory_notify_enabled(settings),
         "preview_text": preview_text,
-        "cron_morning": "20 8 * * * cd $PROJECT && .venv/bin/python manage.py send_attendance_summaries --slot=morning",
-        "cron_evening": "20 20 * * * cd $PROJECT && .venv/bin/python manage.py send_attendance_summaries --slot=evening",
+        "preview_label": preview_label,
+        "cron_morning": _notify_cron_line(settings.get("morning_time"), "morning"),
+        "cron_evening": _notify_cron_line(settings.get("evening_time"), "evening"),
     }
     return render(request, "shifts/cabinet_notifications.html", ctx)

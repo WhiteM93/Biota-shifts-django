@@ -92,3 +92,15 @@ class InventoryNotifyFormatTests(SimpleTestCase):
     def test_inventory_notify_env_disable(self):
         with patch("biota_shifts.inventory_notify._config_str", return_value="0"):
             self.assertFalse(inventory_notify_enabled())
+
+    @patch("biota_shifts.inventory_notify.send_telegram_broadcast")
+    @patch("biota_shifts.inventory_notify.notify_relay_configured", return_value=True)
+    @patch("biota_shifts.inventory_notify.post_notify_relay")
+    @patch("biota_shifts.inventory_notify.notify_delivery_configured", return_value=True)
+    def test_send_inventory_notify_test(self, _del, mock_post, _relay, _tg):
+        from biota_shifts.inventory_notify import send_inventory_notify_test
+
+        send_inventory_notify_test({"telegram_chat_ids": ["1"]}, actor="admin")
+        mock_post.assert_called_once()
+        self.assertEqual(mock_post.call_args[0][0]["kind"], "inventory")
+        self.assertIn("тест", mock_post.call_args[0][0]["text"].lower())
