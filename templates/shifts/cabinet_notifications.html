@@ -60,8 +60,45 @@
 
     <section class="cabinet-section">
       <div class="cabinet-section__head">
-        <h2>Telegram-бот</h2>
-        <p class="cabinet-section__lead">Сводка уходит в личные сообщения или в канал/группу, куда добавлен бот.</p>
+        <h2>Сервер бота (relay)</h2>
+        <p class="cabinet-section__lead">Biota отправляет сводку HTTP POST на ваш сервер; бот там сам шлёт в Telegram. Приоритетнее прямой отправки.</p>
+      </div>
+      <div class="cabinet-section__body">
+        <label class="field">
+          <span>URL endpoint</span>
+          <input
+            type="url"
+            name="relay_url"
+            value="{{ relay_url }}"
+            placeholder="https://bot.example.com/api/biota/notify"
+            style="width:100%;max-width:520px;"
+          >
+        </label>
+        <p class="muted cabinet-notify-hint">В <code>.env.secrets</code>: <code>BIOTA_NOTIFY_RELAY_URL</code> — перекрывает поле формы.</p>
+
+        <label class="field" style="margin-top:12px;">
+          <span>Секрет (Bearer)</span>
+          <input
+            type="password"
+            name="relay_secret"
+            value=""
+            placeholder="{% if relay_secret_configured %}Секрет сохранён — введите новый, чтобы заменить{% else %}опционально{% endif %}"
+            autocomplete="off"
+            style="width:100%;max-width:520px;"
+          >
+        </label>
+        <p class="muted cabinet-notify-hint"><code>BIOTA_NOTIFY_RELAY_SECRET</code> в <code>.env.secrets</code> — заголовок <code>Authorization: Bearer …</code></p>
+
+        {% if notify_relay_configured %}
+        <p class="muted" style="margin-top:8px;"><strong style="color:var(--bio-inv-ok);">Relay настроен</strong> — токен Telegram на стороне Biota не нужен.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="cabinet-section">
+      <div class="cabinet-section__head">
+        <h2>Telegram напрямую</h2>
+        <p class="cabinet-section__lead">Если relay не задан: Biota сам вызывает api.telegram.org.</p>
       </div>
       <div class="cabinet-section__body">
         <ol class="cabinet-notify-steps muted">
@@ -93,11 +130,12 @@
           >{{ telegram_chat_ids_text }}</textarea>
         </label>
         <p class="muted cabinet-notify-hint">
-          Статус полей:
-          {% if telegram_configured %}<strong style="color:var(--bio-inv-ok);">токен и chat_id указаны</strong>{% else %}не хватает токена или chat_id{% endif %}
-          {% if telegram_bot_username %}<br>Бот: <a href="https://t.me/{{ telegram_bot_username }}" target="_blank" rel="noopener noreferrer">@{{ telegram_bot_username }}</a> — для лички обязательно нажмите <code>/start</code> в этом чате.{% endif %}
-          <br>Зелёный статус ≠ доставка. Нажмите <strong>«Тест Telegram»</strong> ниже.
-          <br>Ошибка <code>No route to host</code> — с сервера нет доступа к Telegram; нужен прокси <code>BIOTA_TELEGRAM_PROXY</code> в <code>.env.secrets</code>.
+          Статус:
+          {% if notify_delivery_configured %}
+            {% if notify_relay_configured %}<strong style="color:var(--bio-inv-ok);">через сервер бота</strong>{% elif telegram_configured %}<strong style="color:var(--bio-inv-ok);">напрямую в Telegram</strong>{% endif %}
+          {% else %}не настроено{% endif %}
+          {% if telegram_bot_username %}<br>Бот: <a href="https://t.me/{{ telegram_bot_username }}" target="_blank" rel="noopener noreferrer">@{{ telegram_bot_username }}</a>{% endif %}
+          <br>Нажмите <strong>«Тест доставки»</strong> ниже.
         </p>
       </div>
     </section>
@@ -138,7 +176,7 @@
       <form method="post" style="display:inline;">
         {% csrf_token %}
         <input type="hidden" name="action" value="test_telegram">
-        <button type="submit" class="btn">Тест Telegram</button>
+        <button type="submit" class="btn">Тест доставки</button>
       </form>
       <form method="post" style="display:inline;">
         {% csrf_token %}

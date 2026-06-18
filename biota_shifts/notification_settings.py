@@ -18,6 +18,8 @@ DEFAULT_SETTINGS: dict = {
     "morning_time": "08:20",
     "evening_enabled": True,
     "evening_time": "20:20",
+    "relay_url": "",
+    "relay_secret": "",
     "telegram_bot_token": "",
     "telegram_chat_ids": [],
     "blacklist_emp_codes": [],
@@ -80,6 +82,8 @@ def load_notification_settings() -> dict:
     out["evening_enabled"] = bool(raw.get("evening_enabled", out["evening_enabled"]))
     out["morning_time"] = _normalize_time(str(raw.get("morning_time") or ""), out["morning_time"])
     out["evening_time"] = _normalize_time(str(raw.get("evening_time") or ""), out["evening_time"])
+    out["relay_url"] = str(raw.get("relay_url") or "").strip()
+    out["relay_secret"] = str(raw.get("relay_secret") or "").strip()
     out["telegram_bot_token"] = str(raw.get("telegram_bot_token") or "").strip()
     out["telegram_chat_ids"] = _normalize_chat_ids(raw.get("telegram_chat_ids") or [])
     out["blacklist_emp_codes"] = normalize_emp_codes_list(raw.get("blacklist_emp_codes") or [])
@@ -96,6 +100,12 @@ def save_notification_settings(data: dict) -> dict:
     current["evening_enabled"] = bool(data.get("evening_enabled", current["evening_enabled"]))
     current["morning_time"] = _normalize_time(str(data.get("morning_time") or ""), current["morning_time"])
     current["evening_time"] = _normalize_time(str(data.get("evening_time") or ""), current["evening_time"])
+    if "relay_url" in data:
+        current["relay_url"] = str(data.get("relay_url") or "").strip()
+    if "relay_secret" in data:
+        secret = str(data.get("relay_secret") or "").strip()
+        if secret:
+            current["relay_secret"] = secret
     if "telegram_bot_token" in data:
         token = str(data.get("telegram_bot_token") or "").strip()
         if token:

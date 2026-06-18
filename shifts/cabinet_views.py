@@ -692,10 +692,16 @@ def notifications_settings_view(request):
         telegram_token_configured,
     )
     from biota_shifts.schedule import employee_label_row
+    from biota_shifts.notify_relay import (
+        notify_delivery_configured,
+        notify_relay_configured,
+        resolve_notify_relay_secret,
+        resolve_notify_relay_url,
+        send_notify_test,
+    )
     from biota_shifts.telegram_notify import (
         fetch_telegram_bot_username,
         resolve_telegram_bot_token,
-        send_telegram_test,
         telegram_notify_configured,
     )
 
@@ -713,9 +719,13 @@ def notifications_settings_view(request):
                 "evening_enabled": request.POST.get("evening_enabled") == "1",
                 "morning_time": request.POST.get("morning_time") or "08:20",
                 "evening_time": request.POST.get("evening_time") or "20:20",
+                "relay_url": (request.POST.get("relay_url") or "").strip(),
                 "telegram_chat_ids": parse_chat_ids_text(request.POST.get("telegram_chat_ids") or ""),
                 "blacklist_emp_codes": blacklist,
             }
+            relay_secret_in = (request.POST.get("relay_secret") or "").strip()
+            if relay_secret_in:
+                save_payload["relay_secret"] = relay_secret_in
             token_in = (request.POST.get("telegram_bot_token") or "").strip()
             if token_in:
                 save_payload["telegram_bot_token"] = token_in
@@ -724,14 +734,17 @@ def notifications_settings_view(request):
             return redirect("cabinet_notifications")
 
         if action == "test_telegram":
-            if not telegram_notify_configured(settings):
-                messages.error(request, "Укажите токен бота и хотя бы один chat_id.")
+            if not notify_delivery_configured(settings):
+                messages.error(request, "Укажите URL сервера бота или токен + chat_id Telegram.")
             else:
                 try:
-                    n = send_telegram_test(settings)
-                    messages.success(request, f"Тестовое сообщение отправлено в {n} чат(ов) Telegram.")
+                    n = send_notify_test(settings)
+                    if notify_relay_configured(settings):
+                        messages.success(request, "Тест отправлен на сервер бота — проверьте Telegram.")
+                    else:
+                        messages.success(request, f"Тестовое сообщение отправлено в {n} чат(ов) Telegram.")
                 except Exception as exc:
-                    messages.error(request, f"Ошибка Telegram: {exc}")
+                    messages.error(request, f"Ошибка доставки: {exc}")
             return redirect("cabinet_notifications")
 
         if action in ("preview_morning", "preview_evening", "send_morning", "send_evening"):
@@ -744,14 +757,17 @@ def notifications_settings_view(request):
                 return redirect("cabinet_notifications")
 
             if action.startswith("send_"):
-                if not telegram_notify_configured(settings):
-                    messages.error(request, "Настройте Telegram: токен бота и chat_id.")
+                if not notify_delivery_configured(settings):
+                    messages.error(request, "Настройте доставку: URL сервера бота или Telegram.")
                 else:
                     try:
                         n = send_summary_telegram(summary, settings)
-                        messages.success(request, f"Сводка отправлена в {n} чат(ов) Telegram.")
+                        if notify_relay_configured(settings):
+                            messages.success(request, "Сводка отправлена на сервер бота.")
+                        else:
+                            messages.success(request, f"Сводка отправлена в {n} чат(ов) Telegram.")
                     except Exception as exc:
-                        messages.error(request, f"Ошибка Telegram: {exc}")
+                        messages.error(request, f"Ошибка доставки: {exc}")
                 return redirect("cabinet_notifications")
 
     blacklist_codes = set(settings.get("blacklist_emp_codes") or [])
@@ -773,13 +789,18 @@ def notifications_settings_view(request):
 
     chat_ids = settings.get("telegram_chat_ids") or []
     tg_token = resolve_telegram_bot_token(settings)
+    relay_url = resolve_notify_relay_url(settings)
     ctx = {
         "settings": settings,
         "employee_rows": employee_rows,
         "telegram_chat_ids_text": "\n".join(chat_ids),
+        "relay_url": relay_url,
+        "relay_secret_configured": bool(settings.get("relay_secret") or resolve_notify_relay_secret(settings)),
+        "notify_delivery_configured": notify_delivery_configured(settings),
+        "notify_relay_configured": notify_relay_configured(settings),
         "telegram_configured": telegram_notify_configured(settings),
         "telegram_token_configured": telegram_token_configured(settings),
-        "telegram_bot_username": fetch_telegram_bot_username(tg_token) if tg_token else "",
+        "telegram_bot_username": fetch_telegram_bot_username(tg_token) if tg_token and not relay_url else "",
         "preview_text": preview_text,
         "cron_morning": "20 8 * * * cd $PROJECT && .venv/bin/python manage.py send_attendance_summaries --slot=morning",
         "cron_evening": "20 20 * * * cd $PROJECT && .venv/bin/python manage.py send_attendance_summaries --slot=evening",

@@ -14,7 +14,7 @@ from biota_shifts.attendance_summary import (
     send_summary_telegram,
 )
 from biota_shifts.notification_settings import load_notification_settings, telegram_token_configured
-from biota_shifts.telegram_notify import telegram_notify_configured
+from biota_shifts.notify_relay import notify_delivery_configured, notify_relay_configured
 
 
 class Command(BaseCommand):
@@ -53,17 +53,21 @@ class Command(BaseCommand):
             self.stdout.write("Вечерняя сводка выключена.")
             return
 
-        if not telegram_notify_configured(settings) and not options["dry_run"]:
+        if not notify_delivery_configured(settings) and not options["dry_run"]:
+            from biota_shifts.notify_relay import resolve_notify_relay_url
             from biota_shifts.telegram_notify import resolve_telegram_bot_token
 
-            token_ok = bool(resolve_telegram_bot_token(settings))
-            chats = settings.get("telegram_chat_ids") or []
             parts = []
-            if not token_ok:
-                parts.append("токен (BIOTA_TELEGRAM_BOT_TOKEN в .env.secrets)")
-            if not chats:
-                parts.append("chat_id (кабинет или BIOTA_TELEGRAM_CHAT_IDS в .env.secrets)")
-            self.stderr.write("Telegram не настроен: нет " + " и ".join(parts) + ".")
+            if not resolve_notify_relay_url(settings):
+                parts.append("URL сервера бота (BIOTA_NOTIFY_RELAY_URL)")
+            if not resolve_telegram_bot_token(settings):
+                parts.append("токен Telegram (если без relay)")
+            chats = settings.get("telegram_chat_ids") or []
+            if not chats and not resolve_notify_relay_url(settings):
+                parts.append("chat_id")
+            self.stderr.write("Доставка не настроена. Нужен хотя бы relay URL или пара токен + chat_id.")
+            if parts:
+                self.stderr.write("Не хватает: " + ", ".join(parts) + ".")
             self.stderr.write("Диагностика: python manage.py check_telegram_notify")
             return
 
@@ -72,7 +76,12 @@ class Command(BaseCommand):
         self.stdout.write(text)
 
         if options["dry_run"]:
-            self.stdout.write(self.style.WARNING("dry-run: Telegram не отправлен"))
+            self.stdout.write(self.style.WARNING("dry-run: уведомление не отправлено"))
+            return
+
+        if notify_relay_configured(settings):
+            n = send_summary_telegram(summary, settings)
+            self.stdout.write(self.style.SUCCESS(f"Сводка отправлена на сервер бота"))
             return
 
         if not telegram_token_configured(settings):

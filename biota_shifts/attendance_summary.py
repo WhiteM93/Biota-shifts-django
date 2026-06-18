@@ -229,14 +229,25 @@ def format_summary_html(summary: AttendanceSummary) -> str:
     ) + "</pre>"
 
 
-def send_summary_telegram(summary: AttendanceSummary, settings: dict | None = None) -> int:
+def send_summary_telegram(
+    summary: AttendanceSummary,
+    settings: dict | None = None,
+    *,
+    chat_ids: list[str] | None = None,
+) -> int:
+    from biota_shifts.notify_relay import notify_relay_configured, send_summary_relay
     from biota_shifts.notification_settings import load_notification_settings
     from biota_shifts.telegram_notify import resolve_telegram_bot_token, send_telegram_broadcast
 
     cfg = load_notification_settings() if settings is None else settings
+    target_chats = list(chat_ids) if chat_ids is not None else list(cfg.get("telegram_chat_ids") or [])
+    if notify_relay_configured(cfg):
+        if not target_chats:
+            raise ValueError("Не задан chat_id для отправки сводки")
+        return send_summary_relay(summary, cfg, chat_ids=target_chats)
+
     token = resolve_telegram_bot_token(cfg)
-    chat_ids = cfg.get("telegram_chat_ids") or []
-    if not token or not chat_ids:
+    if not token or not target_chats:
         return 0
     body = format_summary_text(summary)
-    return send_telegram_broadcast(token, chat_ids, body)
+    return send_telegram_broadcast(token, target_chats, body)

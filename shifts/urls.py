@@ -1,5 +1,6 @@
 from django.urls import path
 
+from . import notify_api_views
 from . import cabinet_views
 from . import debug_log_views
 from . import graph_mobile_views
@@ -55,6 +56,7 @@ urlpatterns = [
     path("products/<int:pk>/", product_views.product_detail_view, name="product_detail"),
     path("debug-log/ingest/", debug_log_views.debug_log_ingest, name="debug_log_ingest"),
     path("debug-log/list/", debug_log_views.debug_log_list, name="debug_log_list"),
+    path("api/notify/attendance/", notify_api_views.notify_attendance_trigger, name="notify_attendance_trigger"),
     path("cabinet/", cabinet_views.cabinet_view, name="cabinet"),
     path("cabinet/notifications/", cabinet_views.notifications_settings_view, name="cabinet_notifications"),
     path("cabinet/backups/", cabinet_views.schedule_backups_view, name="schedule_backups"),
