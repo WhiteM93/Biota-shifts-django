@@ -92,6 +92,12 @@
         {% if notify_relay_configured %}
         <p class="muted" style="margin-top:8px;"><strong style="color:var(--bio-inv-ok);">Relay настроен</strong> — токен Telegram на стороне Biota не нужен.</p>
         {% endif %}
+
+        <label class="cabinet-notify-toggle" style="margin-top:14px;">
+          <input type="checkbox" name="inventory_notify_enabled" value="1"{% if settings.inventory_notify_enabled %} checked{% endif %}>
+          <span>Уведомлять в Telegram о складе (приход, выдача, списание, возврат, откат)</span>
+        </label>
+        <p class="muted cabinet-notify-hint">Отключить глобально: <code>BIOTA_INVENTORY_NOTIFY=0</code> в <code>.env.secrets</code>.</p>
       </div>
     </section>
 

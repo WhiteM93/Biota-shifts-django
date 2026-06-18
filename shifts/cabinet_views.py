@@ -720,6 +720,7 @@ def notifications_settings_view(request):
                 "morning_time": request.POST.get("morning_time") or "08:20",
                 "evening_time": request.POST.get("evening_time") or "20:20",
                 "relay_url": (request.POST.get("relay_url") or "").strip(),
+                "inventory_notify_enabled": request.POST.get("inventory_notify_enabled") == "1",
                 "telegram_chat_ids": parse_chat_ids_text(request.POST.get("telegram_chat_ids") or ""),
                 "blacklist_emp_codes": blacklist,
             }
