@@ -662,8 +662,6 @@ def regulations_backup_download(request, filename: str):
         return response
 
 
-@biota_login_required
-@require_http_methods(["GET", "POST"])
 def _notify_cron_line(hm: str, slot: str) -> str:
     parts = (hm or "08:20").strip().split(":")
     h = int(parts[0]) if parts and parts[0].isdigit() else 8
@@ -674,6 +672,8 @@ def _notify_cron_line(hm: str, slot: str) -> str:
     )
 
 
+@biota_login_required
+@require_http_methods(["GET", "POST"])
 def notifications_settings_view(request):
     """Уведомления: сводки СКУД по расписанию и чёрный список сотрудников."""
     user = biota_user(request)
@@ -785,7 +785,7 @@ def notifications_settings_view(request):
                 messages.error(request, "Уведомления склада выключены — включите галочку в настройках.")
                 return redirect("cabinet_notifications")
             try:
-                actor = (biota_user(request) or {}).get("username") or "admin"
+                actor = user or "admin"
                 send_inventory_notify_test(settings, actor=actor)
                 messages.success(request, "Тестовое уведомление склада отправлено в Telegram.")
             except Exception as exc:
