@@ -87,12 +87,27 @@ const PD = (function () {
     }
   }
 
-  function fitCameraToObject(camera, controls, root) {
+  function fitCameraToObject(camera, controls, root, margin) {
+    const pad = margin == null ? 1.32 : margin;
     const box = new THREE.Box3().setFromObject(root);
+    if (box.isEmpty()) return;
     const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z, 1e-6);
-    camera.position.set(center.x + maxDim * 1.2, center.y + maxDim * 0.85, center.z + maxDim * 1.35);
+    const sphere = box.getBoundingSphere(new THREE.Sphere());
+    const radius = Math.max(sphere.radius, 1e-6);
+
+    const vFov = (camera.fov * Math.PI) / 180;
+    const aspect = Math.max(camera.aspect, 1e-6);
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+    const distV = radius / Math.sin(vFov / 2);
+    const distH = radius / Math.sin(hFov / 2);
+    const distance = pad * Math.max(distV, distH);
+
+    const dir = new THREE.Vector3(0.62, 0.42, 0.72).normalize();
+    camera.position.copy(center).add(dir.multiplyScalar(distance));
+    camera.near = Math.max(distance / 300, 0.001);
+    camera.far = Math.max(distance * 300, 1000);
+    camera.updateProjectionMatrix();
+
     if (controls.target) controls.target.copy(center);
     camera.lookAt(center);
     controls.update();
@@ -145,10 +160,10 @@ const PD = (function () {
     });
   }
 
-  function triggerCadResize() {
+  function triggerCadResize(refit) {
     if (cadViewerState && typeof cadViewerState.onResize === "function") {
       requestAnimationFrame(function () {
-        if (cadViewerState && cadViewerState.onResize) cadViewerState.onResize();
+        if (cadViewerState && cadViewerState.onResize) cadViewerState.onResize(refit);
       });
     }
   }
@@ -181,7 +196,7 @@ const PD = (function () {
       block.classList.remove("is-cad-fullscreen-fallback");
       document.body.classList.remove("product-cad-fullscreen-active");
       setFullscreenUi(false);
-      triggerCadResize();
+      triggerCadResize(true);
     }
 
     function enterCadFullscreen() {
@@ -191,13 +206,13 @@ const PD = (function () {
           block.classList.add("is-cad-fullscreen-fallback");
           document.body.classList.add("product-cad-fullscreen-active");
           setFullscreenUi(true);
-          triggerCadResize();
+          triggerCadResize(true);
         });
       }
       block.classList.add("is-cad-fullscreen-fallback");
       document.body.classList.add("product-cad-fullscreen-active");
       setFullscreenUi(true);
-      triggerCadResize();
+      triggerCadResize(true);
       return Promise.resolve();
     }
 
@@ -214,7 +229,7 @@ const PD = (function () {
         document.body.classList.remove("product-cad-fullscreen-active");
       }
       setFullscreenUi(active || block.classList.contains("is-cad-fullscreen-fallback"));
-      triggerCadResize();
+      triggerCadResize(true);
     });
     document.addEventListener("webkitfullscreenchange", function () {
       document.dispatchEvent(new Event("fullscreenchange"));
@@ -367,15 +382,19 @@ const PD = (function () {
       return cadViewerState && cadViewerState.root ? cadViewerState.root : null;
     });
 
-    function onResize() {
+    function onResize(refit) {
       const w = host.clientWidth;
       const h = host.clientHeight || 260;
+      if (w < 1 || h < 1) return;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cadPixelRatioCap));
       renderer.setSize(w, h);
+      if (refit && cadViewerState && cadViewerState.root) {
+        fitCameraToObject(camera, controls, cadViewerState.root);
+      }
     }
-    window.addEventListener("resize", onResize);
+    window.addEventListener("resize", function () { onResize(false); });
 
     function tick() {
       const rafId = requestAnimationFrame(tick);
@@ -422,7 +441,12 @@ const PD = (function () {
         if (cadViewerState && cadViewerState.loadToken === myToken) {
           cadViewerState.root = root;
         }
+        onResize(true);
         fitCameraToObject(camera, controls, root);
+        requestAnimationFrame(function () {
+          onResize(true);
+          fitCameraToObject(camera, controls, root);
+        });
       },
       undefined,
       function () {

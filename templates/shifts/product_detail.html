@@ -446,7 +446,6 @@
       data-cad-ext="{{ cad_ext }}">
       {% if cad_inline_preview %}
       <p class="muted product-cad-loading">Загрузка предпросмотра…</p>
-      <p class="product-cad-fullscreen-hint" aria-hidden="true">Колёсико — масштаб · двойной щелчок — сброс · Esc — выход</p>
       {% elif product.cad_model and cad_is_step %}
       <p class="muted" style="padding:12px;">В браузере показывается только STL. {% if biota_can_edit %}Загрузите <strong>STL для предпросмотра</strong> кнопкой с иконкой загрузки справа в блоке «Файлы»{% else %}Нужен файл STL для предпросмотра{% endif %} (экспорт из CAD из вашего STEP) или скачайте STEP ниже.</p>
       {% elif product.cad_model %}
@@ -462,6 +461,7 @@
         <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>
       </svg>
     </button>
+    <p class="product-cad-fullscreen-hint" aria-hidden="true">Колёсико — масштаб · двойной щелчок — сброс · Esc — выход</p>
     {% endif %}
     {% if cad_inline_preview and biota_can_edit %}
     <div id="product-save-preview-block" class="product-cad-preview-actions">
@@ -500,6 +500,6 @@
   }
 }
 </script>
-<script type="module" src="{% static 'shifts/js/product_detail_module.js' %}?v=7"></script>
+<script type="module" src="{% static 'shifts/js/product_detail_module.js' %}?v={{ static_asset_version }}"></script>
 {% endif %}
 {% endblock %}

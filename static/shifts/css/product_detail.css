@@ -2785,8 +2785,8 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   }
   .product-cad-viewport canvas {
     display: block;
-    width: 100%;
-    height: 100%;
+    width: 100% !important;
+    height: 100% !important;
     background: transparent;
     touch-action: none;
   }
@@ -2862,10 +2862,11 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     display: none;
   }
   .product-cad-fullscreen-hint {
+    display: none;
     position: absolute;
     left: 12px;
     bottom: 10px;
-    z-index: 6;
+    z-index: 8;
     margin: 0;
     padding: 4px 8px;
     border-radius: 4px;
@@ -2873,12 +2874,10 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     color: var(--bio-muted);
     background: color-mix(in srgb, var(--bio-table-bg) 80%, transparent);
     pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s ease;
   }
   #product-cad-block:fullscreen .product-cad-fullscreen-hint,
   #product-cad-block.is-cad-fullscreen-fallback .product-cad-fullscreen-hint {
-    opacity: 1;
+    display: block;
   }
   .cad-setup-stl-btn {
     position: absolute;
