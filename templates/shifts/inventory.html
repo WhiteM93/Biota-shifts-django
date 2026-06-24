@@ -1503,7 +1503,6 @@
       <col class="col-user">
       <col class="col-item">
       <col class="col-store">
-      <col class="col-link">
       <col class="col-article">
       <col class="col-qty">
       <col class="col-price">
@@ -1519,7 +1518,6 @@
         <th class="col-user" scope="col">Кто</th>
         <th class="col-item" scope="col">Позиция</th>
         <th class="col-store" scope="col">Магазин</th>
-        <th class="col-link" scope="col">Ссылка</th>
         <th class="col-article" scope="col">Арт.</th>
         <th class="col-qty" scope="col">Кол.</th>
         <th class="col-price" scope="col">Цена</th>
@@ -1537,12 +1535,13 @@
         <td class="col-user"><span class="inv-purchases-user">{{ pr.requested_by }}</span></td>
         <td class="col-item"><span class="inv-purchases-item">{{ pr.requested_item }}</span></td>
         <td class="col-store">
-          {% if pr.store_name %}
-          <span class="inv-purchases-store-tag" title="{{ pr.store_name }}">{{ pr.store_name }}</span>
-          {% else %}<span class="inv-purchases-empty">—</span>{% endif %}
-        </td>
-        <td class="col-link">
-          {% if pr.store_link %}<a href="{{ pr.store_link }}" class="inv-purchases-link-chip" target="_blank" rel="noopener" title="{{ pr.store_link }}">URL</a>{% else %}<span class="inv-purchases-empty">—</span>{% endif %}
+          {% if pr.store_link %}
+          <a href="{{ pr.store_link }}" class="inv-purchases-store-tag" target="_blank" rel="noopener" title="{{ pr.store_link }}">{{ pr.store_name|default:"Открыть" }}</a>
+          {% elif pr.store_name %}
+          <span class="inv-purchases-store-tag inv-purchases-store-tag--plain" title="{{ pr.store_name }}">{{ pr.store_name }}</span>
+          {% else %}
+          <span class="inv-purchases-empty">—</span>
+          {% endif %}
         </td>
         <td class="col-article">
           {% if pr.article %}<code class="inv-purchases-article" title="{{ pr.article }}">{{ pr.article }}</code>{% else %}<span class="inv-purchases-empty">—</span>{% endif %}
@@ -1611,7 +1610,7 @@
         </td>
       </tr>
       {% empty %}
-      <tr><td colspan="13" class="inv-purchases-table-empty">Заявок пока нет.</td></tr>
+      <tr><td colspan="12" class="inv-purchases-table-empty">Заявок пока нет.</td></tr>
       {% endfor %}
     </tbody>
   </table>

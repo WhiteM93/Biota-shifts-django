@@ -165,7 +165,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # Увеличивайте после правок CSS/JS, чтобы браузер и nginx не отдавали старые файлы.
-STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "42").strip() or "42"
+STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "43").strip() or "43"
 
 # Загрузки изделий (чертежи, CAD). При DEBUG файлы отдаёт Django; в проде настройте раздачу /media/ через nginx.
 MEDIA_URL = "/media/"

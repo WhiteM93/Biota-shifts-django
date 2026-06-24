@@ -214,28 +214,22 @@ html[data-theme="dawn"] .inv-purchases-grid.data-grid tbody tr:nth-child(even) t
   overflow: hidden;
   text-overflow: ellipsis;
   vertical-align: middle;
+  text-decoration: none;
 }
 
-.inv-purchases-link-chip {
-  display: inline-block;
-  box-sizing: border-box;
-  max-width: 100%;
-  padding: 1px 4px;
-  border-radius: 5px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1.35;
-  text-transform: uppercase;
-  color: var(--ca) !important;
-  background: rgba(var(--ca-rgb), 0.12);
-  border: 1px solid rgba(var(--ca-rgb), 0.22);
-  text-decoration: none !important;
-  white-space: nowrap;
+a.inv-purchases-store-tag {
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.inv-purchases-link-chip:hover {
-  background: rgba(var(--ca-rgb), 0.2);
+a.inv-purchases-store-tag:hover {
+  background: rgba(var(--ca-rgb), 0.18);
+  border-color: rgba(var(--ca-rgb), 0.35);
+  text-decoration: none;
+}
+
+.inv-purchases-store-tag--plain {
+  cursor: default;
 }
 
 .inv-purchases-article {
@@ -336,19 +330,17 @@ html[data-theme="dawn"] .inv-purchases-comment-tooltip {
 .inv-purchases-grid col.col-date { width: 6%; }
 .inv-purchases-grid col.col-user { width: 5%; }
 .inv-purchases-grid col.col-item { width: 14%; }
-.inv-purchases-grid col.col-store { width: 7%; }
-.inv-purchases-grid col.col-link { width: 4%; }
-.inv-purchases-grid col.col-article { width: 8%; }
+.inv-purchases-grid col.col-store { width: 10%; }
+.inv-purchases-grid col.col-article { width: 10%; }
 .inv-purchases-grid col.col-qty { width: 4%; }
 .inv-purchases-grid col.col-price { width: 7%; }
 .inv-purchases-grid col.col-total { width: 7%; }
 .inv-purchases-grid col.col-status { width: 8%; }
-.inv-purchases-grid col.col-comment { width: 19%; }
+.inv-purchases-grid col.col-comment { width: 18%; }
 .inv-purchases-grid col.col-updated { width: 7%; }
 .inv-purchases-grid col.col-actions { width: 4%; }
 
-.inv-purchases-grid td.col-store,
-.inv-purchases-grid td.col-link {
+.inv-purchases-grid td.col-store {
   overflow: hidden;
   min-width: 0;
   word-break: normal;
@@ -365,10 +357,6 @@ html[data-theme="dawn"] .inv-purchases-comment-tooltip {
 
 .inv-purchases-grid thead th.col-article {
   text-align: left;
-}
-
-.inv-purchases-grid td.col-link {
-  text-align: center;
 }
 
 .inv-purchases-grid .col-actions,
@@ -431,13 +419,8 @@ html[data-theme="dawn"] .inv-purchases-comment-tooltip {
   background: transparent !important;
 }
 
-.inv-purchases-grid.data-grid a:not(.inv-purchases-link-chip) {
+.inv-purchases-grid.data-grid a.inv-purchases-store-tag {
   color: var(--ca);
-  text-decoration: none;
-}
-
-.inv-purchases-grid.data-grid a:not(.inv-purchases-link-chip):hover {
-  text-decoration: underline;
 }
 
 .inv-purchases-form {
