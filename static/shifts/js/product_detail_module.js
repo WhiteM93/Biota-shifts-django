@@ -145,6 +145,96 @@ const PD = (function () {
     });
   }
 
+  function triggerCadResize() {
+    if (cadViewerState && typeof cadViewerState.onResize === "function") {
+      requestAnimationFrame(function () {
+        if (cadViewerState && cadViewerState.onResize) cadViewerState.onResize();
+      });
+    }
+  }
+
+  function getCadFullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+
+  function bindCadFullscreen() {
+    const btn = document.getElementById("product-cad-fullscreen-btn");
+    const block = document.getElementById("product-cad-block");
+    if (!btn || !block || !host) return;
+
+    function isCadFullscreen() {
+      return getCadFullscreenElement() === block || block.classList.contains("is-cad-fullscreen-fallback");
+    }
+
+    function setFullscreenUi(active) {
+      btn.classList.toggle("is-active", active);
+      btn.title = active ? "Выйти из полноэкранного режима (Esc)" : "На весь экран";
+      btn.setAttribute("aria-label", btn.title);
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+    }
+
+    function exitCadFullscreen() {
+      if (getCadFullscreenElement() === block) {
+        const exitFn = document.exitFullscreen || document.webkitExitFullscreen;
+        if (exitFn) exitFn.call(document);
+      }
+      block.classList.remove("is-cad-fullscreen-fallback");
+      document.body.classList.remove("product-cad-fullscreen-active");
+      setFullscreenUi(false);
+      triggerCadResize();
+    }
+
+    function enterCadFullscreen() {
+      const req = block.requestFullscreen || block.webkitRequestFullscreen;
+      if (req) {
+        return Promise.resolve(req.call(block)).catch(function () {
+          block.classList.add("is-cad-fullscreen-fallback");
+          document.body.classList.add("product-cad-fullscreen-active");
+          setFullscreenUi(true);
+          triggerCadResize();
+        });
+      }
+      block.classList.add("is-cad-fullscreen-fallback");
+      document.body.classList.add("product-cad-fullscreen-active");
+      setFullscreenUi(true);
+      triggerCadResize();
+      return Promise.resolve();
+    }
+
+    btn.addEventListener("click", function () {
+      if (isCadFullscreen()) exitCadFullscreen();
+      else enterCadFullscreen();
+    });
+
+    document.addEventListener("fullscreenchange", function () {
+      const active = getCadFullscreenElement() === block;
+      if (!active && block.classList.contains("is-cad-fullscreen-fallback")) return;
+      if (!active) {
+        block.classList.remove("is-cad-fullscreen-fallback");
+        document.body.classList.remove("product-cad-fullscreen-active");
+      }
+      setFullscreenUi(active || block.classList.contains("is-cad-fullscreen-fallback"));
+      triggerCadResize();
+    });
+    document.addEventListener("webkitfullscreenchange", function () {
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && block.classList.contains("is-cad-fullscreen-fallback")) {
+        exitCadFullscreen();
+      }
+    });
+
+    window.showProductCadFullscreenBtn = function () {
+      btn.hidden = false;
+    };
+  }
+
+  function showCadFullscreenBtn() {
+    if (typeof window.showProductCadFullscreenBtn === "function") window.showProductCadFullscreenBtn();
+  }
+
   /** Контур граней + flat shading на меше */
   function addProductStlEdges(mesh, geometry, angleDeg) {
     try {
@@ -258,6 +348,7 @@ const PD = (function () {
     }
     cadRenderer = renderer;
     host.appendChild(renderer.domElement);
+    showCadFullscreenBtn();
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.38));
     scene.add(new THREE.HemisphereLight(0xdde4ff, 0x1a1e28, 0.55));
@@ -438,6 +529,7 @@ const PD = (function () {
     if (miniUrl) mountMiniStlViewer(mini, miniUrl);
   });
   refreshSetupCadButton();
+  bindCadFullscreen();
 
   function getCookie(name) {
     const m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));

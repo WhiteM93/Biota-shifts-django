@@ -2793,6 +2793,93 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   #product-cad-block {
     position: relative;
   }
+  .product-cad-fullscreen-btn {
+    position: absolute;
+    top: 42px;
+    right: 8px;
+    z-index: 7;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 6px;
+    border: 1px solid var(--bio-filter-border);
+    background: color-mix(in srgb, var(--bio-table-bg) 88%, transparent);
+    color: var(--bio-body-fg);
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  }
+  .product-cad-fullscreen-btn:hover {
+    background: var(--bio-surface-item);
+    border-color: var(--bio-input-focus-border);
+    transform: translateY(-1px);
+  }
+  .product-cad-fullscreen-btn[hidden] {
+    display: none !important;
+  }
+  .product-cad-fullscreen-btn.is-active {
+    background: var(--bio-surface-item);
+    border-color: var(--bio-input-focus-border);
+  }
+  #product-cad-block:fullscreen,
+  #product-cad-block.is-cad-fullscreen-fallback {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    padding: 16px 20px 20px;
+    background: var(--bio-page-bg, var(--bio-input-bg));
+    z-index: 99999;
+  }
+  #product-cad-block.is-cad-fullscreen-fallback {
+    position: fixed;
+    inset: 0;
+  }
+  body.product-cad-fullscreen-active {
+    overflow: hidden;
+  }
+  #product-cad-block:fullscreen #product-cad-viewport,
+  #product-cad-block.is-cad-fullscreen-fallback #product-cad-viewport {
+    flex: 1 1 auto;
+    width: 100%;
+    height: auto;
+    min-height: 240px;
+    max-height: none;
+  }
+  #product-cad-block:fullscreen .product-cad-fullscreen-btn,
+  #product-cad-block.is-cad-fullscreen-fallback .product-cad-fullscreen-btn {
+    top: 16px;
+    right: 16px;
+  }
+  #product-cad-block:fullscreen #product-save-preview-block,
+  #product-cad-block.is-cad-fullscreen-fallback #product-save-preview-block {
+    display: none;
+  }
+  .product-cad-fullscreen-hint {
+    position: absolute;
+    left: 12px;
+    bottom: 10px;
+    z-index: 6;
+    margin: 0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--bio-muted);
+    background: color-mix(in srgb, var(--bio-table-bg) 80%, transparent);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  #product-cad-block:fullscreen .product-cad-fullscreen-hint,
+  #product-cad-block.is-cad-fullscreen-fallback .product-cad-fullscreen-hint {
+    opacity: 1;
+  }
   .cad-setup-stl-btn {
     position: absolute;
     top: 8px;
