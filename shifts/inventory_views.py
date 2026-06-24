@@ -2350,12 +2350,15 @@ def inventory_view(request):
         .order_by("-movement_date", "-id")[:200]
     )
     purchase_status = (request.GET.get("purchase_status") or "").strip()
+    purchase_store = (request.GET.get("purchase_store") or "").strip()
     purchase_date_from = (request.GET.get("purchase_date_from") or "").strip()
     purchase_date_to = (request.GET.get("purchase_date_to") or "").strip()
     purchase_employee = (request.GET.get("purchase_employee") or "").strip()
     purchase_qs = PurchaseRequest.objects.all()
     if purchase_status in {x[0] for x in PURCHASE_STATUSES}:
         purchase_qs = purchase_qs.filter(status=purchase_status)
+    if purchase_store:
+        purchase_qs = purchase_qs.filter(store_name__iexact=purchase_store)
     if purchase_date_from:
         purchase_qs = purchase_qs.filter(created_at__date__gte=purchase_date_from)
     if purchase_date_to:
@@ -2672,6 +2675,7 @@ def inventory_view(request):
         "purchase_statuses": PURCHASE_STATUSES,
         "purchase_filters": {
             "status": purchase_status,
+            "store": purchase_store,
             "date_from": purchase_date_from,
             "date_to": purchase_date_to,
             "employee": purchase_employee,

@@ -1464,6 +1464,17 @@
           </span>
         </label>
         <label class="calc-field field">
+          <span class="calc-label">Магазин</span>
+          <span class="calc-sel-wrap">
+            <select name="purchase_store" class="calc-sel">
+              <option value="">Все</option>
+              {% for name in purchase_store_options %}
+              <option value="{{ name }}" {% if purchase_filters.store == name %}selected{% endif %}>{{ name }}</option>
+              {% endfor %}
+            </select>
+          </span>
+        </label>
+        <label class="calc-field field">
           <span class="calc-label">Дата с</span>
           <input type="date" name="purchase_date_from" value="{{ purchase_filters.date_from }}" class="calc-inp calc-inp--plain">
         </label>
@@ -1480,79 +1491,125 @@
 
     <div class="calc-divider" style="margin: 0 20px;"></div>
 
+    <section class="inv-purchases-table-section" aria-label="Список заявок на закупку">
+      <div class="inv-purchases-table-section__head">
+        <span class="inv-purchases-table-section__title">Заявки</span>
+        <span class="inv-purchases-table-section__count">{{ purchase_requests|length }}</span>
+      </div>
     <div class="table-wrap inv-purchases-table-wrap">
   <table class="data-grid inv-purchases-grid">
+    <colgroup>
+      <col class="col-date">
+      <col class="col-user">
+      <col class="col-item">
+      <col class="col-store">
+      <col class="col-link">
+      <col class="col-qty">
+      <col class="col-price">
+      <col class="col-total">
+      <col class="col-status">
+      <col class="col-comment">
+      <col class="col-updated">
+      <col class="col-actions">
+    </colgroup>
     <thead>
       <tr>
-        <th class="col-date">Создано</th>
-        <th class="col-user">Кто</th>
-        <th class="col-item">Позиция</th>
-        <th class="col-store">Магазин</th>
-        <th class="col-link">Ссылка</th>
-        <th class="col-qty">Кол.</th>
-        <th class="col-price">Цена</th>
-        <th class="col-total">Итого</th>
-        <th class="col-status">Статус</th>
-        <th class="col-comment">Коммент.</th>
-        <th class="col-updated">Обновил</th>
-        <th class="col-actions">Действия</th>
+        <th class="col-date" scope="col">Создано</th>
+        <th class="col-user" scope="col">Кто</th>
+        <th class="col-item" scope="col">Позиция</th>
+        <th class="col-store" scope="col">Магазин</th>
+        <th class="col-link" scope="col">Ссылка</th>
+        <th class="col-qty" scope="col">Кол.</th>
+        <th class="col-price" scope="col">Цена</th>
+        <th class="col-total" scope="col">Итого</th>
+        <th class="col-status" scope="col">Статус</th>
+        <th class="col-comment" scope="col">Коммент.</th>
+        <th class="col-updated" scope="col">Обновил</th>
+        <th class="col-actions" scope="col" aria-label="Действия"><span aria-hidden="true">⋯</span></th>
       </tr>
     </thead>
     <tbody>
       {% for pr in purchase_requests %}
       <tr>
-        <td class="col-date">{{ pr.created_at|date:"d.m.Y H:i" }}</td>
-        <td class="col-user">{{ pr.requested_by }}</td>
-        <td class="col-item">{{ pr.requested_item }}</td>
-        <td class="col-store">{{ pr.store_name|default:"—" }}</td>
+        <td class="col-date"><time datetime="{{ pr.created_at|date:'c' }}">{{ pr.created_at|date:"d.m.Y" }}<span class="inv-purchases-date-time">{{ pr.created_at|date:"H:i" }}</span></time></td>
+        <td class="col-user"><span class="inv-purchases-user">{{ pr.requested_by }}</span></td>
+        <td class="col-item"><span class="inv-purchases-item">{{ pr.requested_item }}</span></td>
+        <td class="col-store">
+          {% if pr.store_name %}
+          <span class="inv-purchases-store-tag" title="{{ pr.store_name }}">{{ pr.store_name }}</span>
+          {% else %}<span class="inv-purchases-empty">—</span>{% endif %}
+        </td>
         <td class="col-link">
-          {% if pr.store_link %}<a href="{{ pr.store_link }}" target="_blank" rel="noopener" title="{{ pr.store_link }}">URL</a>{% endif %}
+          {% if pr.store_link %}<a href="{{ pr.store_link }}" class="inv-purchases-link-chip" target="_blank" rel="noopener" title="{{ pr.store_link }}">URL</a>{% endif %}
           {% if pr.store_link and pr.article %}<br>{% endif %}
-          {% if pr.article %}<span class="muted">{{ pr.article }}</span>{% elif not pr.store_link %}—{% endif %}
+          {% if pr.article %}<span class="inv-purchases-article">{{ pr.article }}</span>{% elif not pr.store_link %}<span class="inv-purchases-empty">—</span>{% endif %}
         </td>
-        <td class="col-qty">{{ pr.quantity }}</td>
-        <td class="col-price">{{ pr.unit_price|floatformat:2 }}</td>
-        <td class="col-total"><strong>{{ pr.total_price|floatformat:2 }}</strong></td>
-        <td class="col-status"><span class="inv-purchases-status">{{ pr.get_status_display }}</span></td>
+        <td class="col-qty"><span class="inv-purchases-num">{{ pr.quantity }}</span></td>
+        <td class="col-price" title="{{ pr.unit_price|floatformat:2 }}"><span class="inv-purchases-num">{{ pr.unit_price|floatformat:2 }}</span></td>
+        <td class="col-total" title="{{ pr.total_price|floatformat:2 }}"><span class="inv-purchases-num inv-purchases-num--total">{{ pr.total_price|floatformat:2 }}</span></td>
+        <td class="col-status"><span class="inv-purchases-status inv-purchases-status--{{ pr.status }}">{{ pr.get_status_display }}</span></td>
         <td class="col-comment">
-          {% if pr.request_comment %}{{ pr.request_comment }}{% endif %}
-          {% if pr.status_comment %}<br><span class="muted">{{ pr.status_comment }}</span>{% endif %}
-          {% if not pr.request_comment and not pr.status_comment %}—{% endif %}
+          {% if pr.request_comment or pr.status_comment %}
+          <span class="inv-purchases-comment-wrap">
+            <span class="inv-purchases-comment-preview">
+              {% if pr.request_comment %}{{ pr.request_comment }}{% endif %}
+              {% if pr.status_comment %}<br><span class="muted">{{ pr.status_comment }}</span>{% endif %}
+            </span>
+            <span class="inv-purchases-comment-tooltip" role="tooltip" hidden>
+              {% if pr.request_comment %}{{ pr.request_comment }}{% endif %}
+              {% if pr.request_comment and pr.status_comment %}<br>{% endif %}
+              {% if pr.status_comment %}<span class="muted">{{ pr.status_comment }}</span>{% endif %}
+            </span>
+          </span>
+          {% else %}
+          <span class="inv-purchases-empty">—</span>
+          {% endif %}
         </td>
-        <td class="col-updated">{{ pr.status_updated_by|default:"—" }}<br><span class="muted">{{ pr.updated_at|date:"d.m H:i" }}</span></td>
+        <td class="col-updated">
+          <span class="inv-purchases-updated-by">{{ pr.status_updated_by|default:"—" }}</span>
+          <span class="inv-purchases-updated-at">{{ pr.updated_at|date:"d.m H:i" }}</span>
+        </td>
         <td class="col-actions">
           {% if biota_can_edit %}
-          <form method="post" class="inv-purchases-status-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="update_purchase_status">
-            <input type="hidden" name="request_id" value="{{ pr.id }}">
-            <select name="status">
-              {% for key, label in purchase_statuses %}
-              <option value="{{ key }}" {% if pr.status == key %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-            <input type="text" name="status_comment" value="{{ pr.status_comment }}" placeholder="Коммент.">
-            <button type="submit" class="btn btn-sm">Сохранить</button>
-          </form>
-          {% if is_admin_user %}
-          <form method="post" class="inv-purchases-delete-form" onsubmit="return confirm('Удалить заявку?');">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_purchase_request">
-            <input type="hidden" name="request_id" value="{{ pr.id }}">
-            <button type="submit" class="btn btn-sm">Удалить</button>
-          </form>
-          {% endif %}
+          <div class="inv-purchases-actions-menu">
+            <button type="button" class="inv-purchases-actions-btn" aria-label="Действия с заявкой" aria-expanded="false" aria-haspopup="true">⋯</button>
+            <div class="inv-purchases-actions-panel" hidden>
+              <form method="post" class="inv-purchases-status-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_purchase_status">
+                <input type="hidden" name="request_id" value="{{ pr.id }}">
+                <label class="inv-purchases-actions-label">Статус</label>
+                <select name="status">
+                  {% for key, label in purchase_statuses %}
+                  <option value="{{ key }}" {% if pr.status == key %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                <label class="inv-purchases-actions-label">Коммент.</label>
+                <input type="text" name="status_comment" value="{{ pr.status_comment }}" placeholder="Коммент.">
+                <button type="submit" class="btn btn-sm">Сохранить</button>
+              </form>
+              {% if is_admin_user %}
+              <form method="post" class="inv-purchases-delete-form" onsubmit="return confirm('Удалить заявку?');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_purchase_request">
+                <input type="hidden" name="request_id" value="{{ pr.id }}">
+                <button type="submit" class="btn btn-sm inv-purchases-delete-btn">Удалить</button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
           {% else %}
-          <span class="muted">Просмотр</span>
+          <span class="muted">—</span>
           {% endif %}
         </td>
       </tr>
       {% empty %}
-      <tr><td colspan="12" class="muted">Заявок пока нет.</td></tr>
+      <tr><td colspan="12" class="inv-purchases-table-empty">Заявок пока нет.</td></tr>
       {% endfor %}
     </tbody>
   </table>
     </div>
+    </section>
   </div>
 
   {% if biota_can_edit %}

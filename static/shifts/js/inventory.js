@@ -2220,3 +2220,222 @@ var INV = (function () {
     });
   });
 })();
+
+(function () {
+  var menus = document.querySelectorAll(".inv-purchases-actions-menu");
+  var wraps = document.querySelectorAll(".inv-purchases-comment-wrap");
+  if (!menus.length && !wraps.length) return;
+
+  var ui = { hideCommentTips: function () {}, hideActionMenus: function () {} };
+
+  function panelEl(menu) {
+    return menu._floatingPanel || menu.querySelector(".inv-purchases-actions-panel");
+  }
+
+  function closeMenu(menu) {
+    if (!menu) return;
+    menu.classList.remove("is-open");
+    var btn = menu.querySelector(".inv-purchases-actions-btn");
+    var panel = panelEl(menu);
+    if (panel) {
+      panel.hidden = true;
+      panel.style.position = "";
+      panel.style.left = "";
+      panel.style.top = "";
+      panel.style.right = "";
+      panel.style.zIndex = "";
+      if (panel.parentNode === document.body) {
+        menu.appendChild(panel);
+      }
+    }
+    menu._floatingPanel = null;
+    if (btn) btn.setAttribute("aria-expanded", "false");
+    if (!document.querySelector(".inv-purchases-actions-menu.is-open")) {
+      document.body.classList.remove("inv-purchases-panel-open");
+    }
+  }
+
+  function closeAllMenus(except) {
+    Array.prototype.forEach.call(menus, function (menu) {
+      if (menu !== except) closeMenu(menu);
+    });
+  }
+
+  function positionPanel(menu) {
+    var btn = menu.querySelector(".inv-purchases-actions-btn");
+    var panel = panelEl(menu);
+    if (!btn || !panel) return;
+    panel.style.position = "fixed";
+    panel.style.zIndex = "10100";
+    panel.style.visibility = "hidden";
+    panel.style.left = "0";
+    panel.style.top = "0";
+    var rect = btn.getBoundingClientRect();
+    var panelW = panel.offsetWidth || 196;
+    var panelH = panel.offsetHeight || 160;
+    var gap = 4;
+    var left = rect.right - panelW;
+    if (left < 8) left = 8;
+    if (left + panelW > window.innerWidth - 8) left = window.innerWidth - panelW - 8;
+    var top = rect.top - panelH - gap;
+    if (top < 8) top = rect.bottom + gap;
+    if (top + panelH > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - panelH - 8);
+    }
+    panel.style.left = left + "px";
+    panel.style.top = top + "px";
+    panel.style.visibility = "";
+  }
+
+  function openMenu(menu) {
+    ui.hideCommentTips();
+    closeAllMenus(menu);
+    var btn = menu.querySelector(".inv-purchases-actions-btn");
+    var panel = menu.querySelector(".inv-purchases-actions-panel");
+    if (!btn || !panel) return;
+    document.body.appendChild(panel);
+    document.body.classList.add("inv-purchases-panel-open");
+    menu._floatingPanel = panel;
+    menu.classList.add("is-open");
+    panel.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+    positionPanel(menu);
+  }
+
+  ui.hideActionMenus = function () { closeAllMenus(null); };
+
+  Array.prototype.forEach.call(menus, function (menu) {
+    var btn = menu.querySelector(".inv-purchases-actions-btn");
+    if (!btn || btn.getAttribute("data-bound") === "1") return;
+    btn.setAttribute("data-bound", "1");
+    btn.addEventListener("mouseenter", ui.hideCommentTips);
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (menu.classList.contains("is-open")) {
+        closeMenu(menu);
+        return;
+      }
+      window.setTimeout(function () {
+        openMenu(menu);
+      }, 0);
+    });
+  });
+
+  document.addEventListener("click", function (e) {
+    var inMenu = e.target.closest(".inv-purchases-actions-menu");
+    var inPanel = e.target.closest(".inv-purchases-actions-panel");
+    if (inMenu || inPanel) return;
+    closeAllMenus(null);
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    closeAllMenus(null);
+    ui.hideCommentTips();
+  });
+
+  window.addEventListener("resize", function () {
+    Array.prototype.forEach.call(menus, function (menu) {
+      if (menu.classList.contains("is-open")) positionPanel(menu);
+    });
+  });
+
+  window.addEventListener("scroll", function () {
+    Array.prototype.forEach.call(menus, function (menu) {
+      if (menu.classList.contains("is-open")) positionPanel(menu);
+    });
+  }, true);
+
+  function tipEl(wrap) {
+    return wrap._floatingTip || wrap.querySelector(".inv-purchases-comment-tooltip");
+  }
+
+  function hideTip(wrap) {
+    if (!wrap) return;
+    wrap.classList.remove("is-tip-visible");
+    if (wrap._tipTimer) {
+      window.clearTimeout(wrap._tipTimer);
+      wrap._tipTimer = null;
+    }
+    var tip = tipEl(wrap);
+    if (!tip) return;
+    tip.hidden = true;
+    tip.style.visibility = "";
+    tip.style.position = "";
+    tip.style.left = "";
+    tip.style.top = "";
+    tip.style.zIndex = "";
+    if (tip.parentNode === document.body) {
+      wrap.appendChild(tip);
+    }
+    wrap._floatingTip = null;
+  }
+
+  function hideAllCommentTips() {
+    Array.prototype.forEach.call(wraps, function (wrap) {
+      hideTip(wrap);
+    });
+  }
+
+  ui.hideCommentTips = hideAllCommentTips;
+
+  function positionTip(wrap) {
+    var preview = wrap.querySelector(".inv-purchases-comment-preview");
+    var tip = tipEl(wrap);
+    if (!preview || !tip) return;
+
+    tip.style.visibility = "hidden";
+    tip.style.position = "fixed";
+    tip.style.zIndex = "10050";
+    var rect = preview.getBoundingClientRect();
+    var gap = 6;
+    var left = rect.left;
+    var tipW = tip.offsetWidth;
+    var tipH = tip.offsetHeight;
+    if (left + tipW > window.innerWidth - 12) left = window.innerWidth - tipW - 12;
+    if (left < 12) left = 12;
+    var top = rect.bottom + gap;
+    if (top + tipH > window.innerHeight - 12 && rect.top - tipH - gap > 12) {
+      top = rect.top - tipH - gap;
+    }
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+    tip.style.visibility = "";
+  }
+
+  function showTip(wrap) {
+    if (document.body.classList.contains("inv-purchases-panel-open")) return;
+    ui.hideActionMenus();
+    hideAllCommentTips();
+    var tip = wrap.querySelector(".inv-purchases-comment-tooltip");
+    if (!tip) return;
+    document.body.appendChild(tip);
+    wrap._floatingTip = tip;
+    wrap.classList.add("is-tip-visible");
+    tip.hidden = false;
+    positionTip(wrap);
+  }
+
+  Array.prototype.forEach.call(wraps, function (wrap) {
+    wrap.addEventListener("mouseenter", function () {
+      if (document.body.classList.contains("inv-purchases-panel-open")) return;
+      if (wrap._tipTimer) window.clearTimeout(wrap._tipTimer);
+      wrap._tipTimer = window.setTimeout(function () {
+        wrap._tipTimer = null;
+        showTip(wrap);
+      }, 280);
+    });
+    wrap.addEventListener("mouseleave", function () {
+      hideTip(wrap);
+    });
+  });
+
+  window.addEventListener(
+    "scroll",
+    function () {
+      hideAllCommentTips();
+    },
+    true
+  );
+})();
