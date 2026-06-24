@@ -240,13 +240,22 @@ html[data-theme="dawn"] .inv-purchases-grid.data-grid tbody tr:nth-child(even) t
 
 .inv-purchases-article {
   display: block;
-  margin-top: 3px;
-  max-width: 100%;
-  font-size: 9px;
-  color: var(--bio-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 2px 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--bio-text);
+  background: rgba(var(--ca-rgb), 0.07);
+  border: 1px dashed rgba(var(--ca-rgb), 0.2);
+  border-radius: 4px;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  user-select: all;
+  cursor: text;
 }
 
 .inv-purchases-num {
@@ -324,16 +333,17 @@ html[data-theme="dawn"] .inv-purchases-comment-tooltip {
   display: none !important;
 }
 
-.inv-purchases-grid col.col-date { width: 7%; }
+.inv-purchases-grid col.col-date { width: 6%; }
 .inv-purchases-grid col.col-user { width: 5%; }
-.inv-purchases-grid col.col-item { width: 15%; }
-.inv-purchases-grid col.col-store { width: 8%; }
-.inv-purchases-grid col.col-link { width: 6%; }
+.inv-purchases-grid col.col-item { width: 14%; }
+.inv-purchases-grid col.col-store { width: 7%; }
+.inv-purchases-grid col.col-link { width: 4%; }
+.inv-purchases-grid col.col-article { width: 8%; }
 .inv-purchases-grid col.col-qty { width: 4%; }
 .inv-purchases-grid col.col-price { width: 7%; }
 .inv-purchases-grid col.col-total { width: 7%; }
-.inv-purchases-grid col.col-status { width: 9%; }
-.inv-purchases-grid col.col-comment { width: 20%; }
+.inv-purchases-grid col.col-status { width: 8%; }
+.inv-purchases-grid col.col-comment { width: 19%; }
 .inv-purchases-grid col.col-updated { width: 7%; }
 .inv-purchases-grid col.col-actions { width: 4%; }
 
@@ -344,6 +354,17 @@ html[data-theme="dawn"] .inv-purchases-comment-tooltip {
   word-break: normal;
   padding-left: 6px;
   padding-right: 6px;
+}
+
+.inv-purchases-grid td.col-article {
+  overflow: visible;
+  min-width: 0;
+  vertical-align: middle;
+  padding: 6px 5px;
+}
+
+.inv-purchases-grid thead th.col-article {
+  text-align: left;
 }
 
 .inv-purchases-grid td.col-link {
@@ -667,15 +688,20 @@ html[data-theme="dawn"] .inv-purchases-actions-panel {
 .inv-purchases-status {
   display: inline-block;
   max-width: 100%;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 9px;
   font-weight: 600;
   line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  text-align: center;
   vertical-align: middle;
+}
+
+.inv-purchases-grid td.col-status {
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 .inv-purchases-status--processing {

@@ -1504,6 +1504,7 @@
       <col class="col-item">
       <col class="col-store">
       <col class="col-link">
+      <col class="col-article">
       <col class="col-qty">
       <col class="col-price">
       <col class="col-total">
@@ -1519,6 +1520,7 @@
         <th class="col-item" scope="col">Позиция</th>
         <th class="col-store" scope="col">Магазин</th>
         <th class="col-link" scope="col">Ссылка</th>
+        <th class="col-article" scope="col">Арт.</th>
         <th class="col-qty" scope="col">Кол.</th>
         <th class="col-price" scope="col">Цена</th>
         <th class="col-total" scope="col">Итого</th>
@@ -1540,14 +1542,19 @@
           {% else %}<span class="inv-purchases-empty">—</span>{% endif %}
         </td>
         <td class="col-link">
-          {% if pr.store_link %}<a href="{{ pr.store_link }}" class="inv-purchases-link-chip" target="_blank" rel="noopener" title="{{ pr.store_link }}">URL</a>{% endif %}
-          {% if pr.store_link and pr.article %}<br>{% endif %}
-          {% if pr.article %}<span class="inv-purchases-article">{{ pr.article }}</span>{% elif not pr.store_link %}<span class="inv-purchases-empty">—</span>{% endif %}
+          {% if pr.store_link %}<a href="{{ pr.store_link }}" class="inv-purchases-link-chip" target="_blank" rel="noopener" title="{{ pr.store_link }}">URL</a>{% else %}<span class="inv-purchases-empty">—</span>{% endif %}
+        </td>
+        <td class="col-article">
+          {% if pr.article %}<code class="inv-purchases-article" title="{{ pr.article }}">{{ pr.article }}</code>{% else %}<span class="inv-purchases-empty">—</span>{% endif %}
         </td>
         <td class="col-qty"><span class="inv-purchases-num">{{ pr.quantity }}</span></td>
         <td class="col-price" title="{{ pr.unit_price|floatformat:2 }}"><span class="inv-purchases-num">{{ pr.unit_price|floatformat:2 }}</span></td>
         <td class="col-total" title="{{ pr.total_price|floatformat:2 }}"><span class="inv-purchases-num inv-purchases-num--total">{{ pr.total_price|floatformat:2 }}</span></td>
-        <td class="col-status"><span class="inv-purchases-status inv-purchases-status--{{ pr.status }}">{{ pr.get_status_display }}</span></td>
+        <td class="col-status">
+          <span class="inv-purchases-status inv-purchases-status--{{ pr.status }}" title="{{ pr.get_status_display }}">
+            {% if pr.status == 'stocked' %}На складе{% else %}{{ pr.get_status_display }}{% endif %}
+          </span>
+        </td>
         <td class="col-comment">
           {% if pr.request_comment or pr.status_comment %}
           <span class="inv-purchases-comment-wrap">
@@ -1604,7 +1611,7 @@
         </td>
       </tr>
       {% empty %}
-      <tr><td colspan="12" class="inv-purchases-table-empty">Заявок пока нет.</td></tr>
+      <tr><td colspan="13" class="inv-purchases-table-empty">Заявок пока нет.</td></tr>
       {% endfor %}
     </tbody>
   </table>
