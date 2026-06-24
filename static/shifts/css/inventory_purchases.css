@@ -559,7 +559,8 @@ html[data-theme="dawn"] .inv-purchases-comment-tooltip {
   /* Панель в document.body — переменные calc-page сюда не доходят */
   --bio-text: #eaf0ff;
   --bio-text-muted: #9bb0d8;
-  --bio-input-bg: rgba(255, 255, 255, 0.07);
+  --bio-input-bg: #1a2234;
+  --bio-input-focus-bg: #222c42;
   --bio-input-border: rgba(255, 255, 255, 0.16);
   --bio-input-fg: #eaf0ff;
   --glass-border: rgba(255, 255, 255, 0.12);
@@ -567,10 +568,12 @@ html[data-theme="dawn"] .inv-purchases-comment-tooltip {
   --ca: #8f9cff;
   --ca2: #6f7ef2;
   --ca3: #34d399;
+  --inv-purchases-sel-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239bb0d8' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
 
   position: fixed;
   z-index: 10100;
   isolation: isolate;
+  color-scheme: dark;
   min-width: 196px;
   max-width: min(240px, calc(100vw - 16px));
   padding: 12px;
@@ -602,7 +605,8 @@ html[data-theme="dawn"] .inv-purchases-comment-tooltip {
 html[data-theme="dawn"] .inv-purchases-actions-panel {
   --bio-text: #3c362f;
   --bio-text-muted: #6b6258;
-  --bio-input-bg: rgba(255, 255, 255, 0.92);
+  --bio-input-bg: #fffefb;
+  --bio-input-focus-bg: #f8f4ec;
   --bio-input-border: rgba(0, 0, 0, 0.12);
   --bio-input-fg: #3c362f;
   --glass-border: rgba(0, 0, 0, 0.08);
@@ -610,6 +614,9 @@ html[data-theme="dawn"] .inv-purchases-actions-panel {
   --ca: #14b8a6;
   --ca2: #0d9488;
   --ca3: #f59e0b;
+  --inv-purchases-sel-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6258' d='M3 4.5L6 8l3-3.5'/%3E%3C/svg%3E");
+
+  color-scheme: light;
 
   border-color: rgba(var(--ca-rgb), 0.28);
   background:
@@ -637,9 +644,49 @@ html[data-theme="dawn"] .inv-purchases-actions-panel {
   padding: 4px 8px;
   border-radius: 6px;
   border: 1.5px solid var(--bio-input-border);
-  background: var(--bio-input-bg);
+  background-color: var(--bio-input-bg);
   color: var(--bio-input-fg);
   box-sizing: border-box;
+}
+
+.inv-purchases-actions-panel .inv-purchases-status-form select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px;
+  background-image: var(--inv-purchases-sel-arrow);
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  cursor: pointer;
+}
+
+.inv-purchases-actions-panel .inv-purchases-status-form select:hover,
+.inv-purchases-actions-panel .inv-purchases-status-form select:focus {
+  background-color: var(--bio-input-focus-bg);
+  outline: none;
+  border-color: rgba(var(--ca-rgb), 0.45);
+}
+
+.inv-purchases-actions-panel .inv-purchases-status-form select option {
+  background-color: var(--bio-input-bg);
+  color: var(--bio-input-fg);
+}
+
+.inv-purchases-actions-panel .inv-purchases-status-form input[type="text"]::placeholder {
+  color: var(--bio-text-muted);
+  opacity: 0.85;
+}
+
+.inv-purchases-actions-panel .inv-purchases-status-form .btn.btn-sm {
+  background: linear-gradient(180deg, #5a6aff 0%, #4656e8 100%);
+  border: 1px solid #3a48d4;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(70, 86, 232, 0.35);
+}
+
+html[data-theme="dawn"] .inv-purchases-actions-panel .inv-purchases-status-form .btn.btn-sm {
+  background: linear-gradient(180deg, #14b8a6 0%, #0d9488 100%);
+  border: 1px solid #0f766e;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.28);
 }
 
 .inv-purchases-status-form .btn {
