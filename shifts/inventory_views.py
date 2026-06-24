@@ -1764,6 +1764,9 @@ def inventory_view(request):
         if not store_link and not article:
             messages.error(request, "Добавьте ссылку на магазин или артикул.")
             return redirect(f"{request.path}?panel=purchases")
+        if store_link and len(store_link) > 2048:
+            messages.error(request, "Ссылка на магазин слишком длинная (максимум 2048 символов).")
+            return redirect(f"{request.path}?panel=purchases")
         if not store_name and store_link:
             store_name = _store_name_from_url(store_link)
         if store_name:

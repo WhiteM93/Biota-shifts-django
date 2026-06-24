@@ -984,7 +984,7 @@ class SectionActionLog(models.Model):
 class PurchaseRequest(models.Model):
     requested_item = models.CharField(max_length=255, verbose_name="Что закупить")
     store_name = models.CharField(max_length=120, blank=True, default="", verbose_name="Магазин")
-    store_link = models.URLField(blank=True, verbose_name="Ссылка на магазин")
+    store_link = models.URLField(max_length=2048, blank=True, verbose_name="Ссылка на магазин")
     article = models.CharField(max_length=120, blank=True, verbose_name="Артикул")
     quantity = models.PositiveIntegerField(verbose_name="Количество")
     unit_price = models.DecimalField(
