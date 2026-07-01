@@ -34,8 +34,8 @@ class PayrollTabDefaultTests(SimpleTestCase):
         self.assertEqual(default_tab_hours_for_schedule_cell("н", 12), 12.0)
         self.assertEqual(default_tab_hours_for_schedule_cell("от", 8), 0.0)
 
-    def test_stored_zero_yields_schedule_default(self):
-        self.assertEqual(effective_tab_hours(0, 12.0), 12.0)
+    def test_explicit_zero_honored_on_shift_day(self):
+        self.assertEqual(effective_tab_hours(0, 12.0), 0.0)
         self.assertEqual(effective_tab_hours(None, 12.0), 12.0)
         self.assertEqual(effective_tab_hours(8, 12.0), 8.0)
         self.assertEqual(effective_tab_hours(0, 0.0), 0.0)

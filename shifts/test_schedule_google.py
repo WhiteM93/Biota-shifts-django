@@ -198,3 +198,17 @@ class HoursScheduleSourceTests(SimpleTestCase):
         load_mock.assert_called_once()
         self.assertEqual(load_mock.call_args.kwargs["source"], SCHEDULE_SOURCE_GOOGLE)
         self.assertFalse(df.empty)
+
+
+class PayrollScheduleSourceTests(SimpleTestCase):
+    @patch("shifts.payroll_helpers.load_schedule_table_resolved")
+    @patch("shifts.payroll_helpers.get_skud_schedule_source", return_value=SCHEDULE_SOURCE_GOOGLE)
+    def test_payroll_loads_google_schedule_when_configured(self, _src_mock, load_mock):
+        from biota_shifts.db import _demo_employees
+        from shifts.payroll_helpers import _load_schedule_for_payroll
+
+        load_mock.return_value = pd.DataFrame({"Код": ["1001"], "1": ["д"]})
+        df = _load_schedule_for_payroll(_demo_employees(), 2026, 7)
+        load_mock.assert_called_once()
+        self.assertEqual(load_mock.call_args.kwargs["source"], SCHEDULE_SOURCE_GOOGLE)
+        self.assertFalse(df.empty)

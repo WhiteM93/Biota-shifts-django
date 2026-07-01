@@ -26,9 +26,11 @@ from .models import (
     EmployeePayrollProfile,
     EmployeePayrollSettlement,
 )
-from biota_shifts.schedule import load_schedule_table, schedule_path
+from biota_shifts.schedule import schedule_path
+from biota_shifts.schedule_google import google_schedule_configured
 
 from .payroll_helpers import (
+    _load_schedule_for_payroll,
     compute_payroll_totals,
     distribute_month_tab_hours,
     effective_side_payroll_fields,
@@ -125,10 +127,10 @@ def payroll_settlement_view(request, emp_code: str):
     schedule_emp_df = full if full is not None and not getattr(full, "empty", True) else pay_df
     if schedule_emp_df is not None and not getattr(schedule_emp_df, "empty", True):
         try:
-            schedule_df = load_schedule_table(schedule_emp_df, year, month)
+            schedule_df = _load_schedule_for_payroll(schedule_emp_df, year, month)
         except Exception:
             schedule_df = pd.DataFrame()
-    schedule_file_exists = schedule_path(year, month).exists()
+    schedule_file_exists = schedule_path(year, month).exists() or google_schedule_configured()
 
     profile, _ = EmployeePayrollProfile.objects.get_or_create(emp_code=ec, defaults={"shift_hours": 8})
     settlement, _ = EmployeePayrollSettlement.objects.get_or_create(

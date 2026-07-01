@@ -16,6 +16,15 @@ from biota_shifts.emp_codes import normalize_emp_code
 from biota_shifts import schedule as biota_schedule
 from biota_shifts.schedule import employee_label_row
 
+from .graph_schedule_source import get_skud_schedule_source, load_schedule_table_resolved
+
+
+def _load_schedule_for_payroll(employees_df, year: int, month: int) -> pd.DataFrame:
+    """График для расчёта ЗП: тот же источник, что у «График» / «СКУД» / «Часы»."""
+    return load_schedule_table_resolved(
+        employees_df, year, month, source=get_skud_schedule_source()
+    )
+
 
 def parse_payroll_year_month(request) -> tuple[int, int]:
     """Год и месяц из GET для панели «Расчёт ЗП»."""
@@ -46,7 +55,7 @@ def skud_hours_for_payroll_month(
     cfg = biota_db.db_config()
     start_date, end_date = biota_schedule.month_bounds(date(year, month, 1))
     try:
-        schedule_full = biota_schedule.load_schedule_table(employees_df, year, month)
+        schedule_full = _load_schedule_for_payroll(employees_df, year, month)
     except Exception:
         return totals, by_day
     if schedule_full.empty or "Код" not in schedule_full.columns:
@@ -101,15 +110,14 @@ def schedule_cell_for_day(row, day: int):
 def effective_tab_hours(raw_tab, default_tab: float) -> float:
     """Часы табеля: сохранённое значение или авто из графика.
 
-    Сохранённый 0 не блокирует подстановку, если по графику должна быть смена (default_tab > 0).
+    None / пусто — подставляется default_tab из графика.
+    Явный 0 сохраняется (например, смена есть, но в табеле 0 ч).
     """
     if raw_tab is None:
         return default_tab
     try:
         tab = float(raw_tab)
     except (TypeError, ValueError):
-        return default_tab
-    if tab == 0 and default_tab > 0:
         return default_tab
     return tab
 
