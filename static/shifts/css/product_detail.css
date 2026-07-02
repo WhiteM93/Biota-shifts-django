@@ -1971,6 +1971,69 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   html[data-theme="dawn"] .setup-tools-view td[data-tool-col="tool_number"] {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
   }
+  .setup-tool-number-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.1em;
+    padding: 0 12px 0 2px;
+    box-sizing: border-box;
+  }
+  .setup-tool-number-text {
+    display: block;
+    min-width: 0;
+    text-align: center;
+    line-height: 1.15;
+  }
+  .setup-tool-photo-pin {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 11px;
+    height: 11px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 2px;
+    background: transparent;
+    color: var(--bio-body-muted, #9ca3af);
+    cursor: pointer;
+    line-height: 0;
+    opacity: 0.35;
+    pointer-events: auto;
+  }
+  .setup-tool-photo-pin:hover,
+  .setup-tool-photo-pin:focus-visible {
+    color: var(--bio-accent, #60a5fa);
+    opacity: 1;
+    outline: none;
+  }
+  .setup-tool-photo-pin.has-photo {
+    color: var(--bio-accent, #60a5fa);
+    opacity: 1;
+  }
+  .setup-tool-number-cell:not(.is-inline-edit) .setup-tool-photo-pin:not(.has-photo) {
+    display: none;
+  }
+  .setup-tool-number-cell.is-inline-edit .setup-tool-photo-pin {
+    display: inline-flex;
+  }
+  .setup-tool-number-cell.is-inline-edit .setup-tool-photo-pin:not(.has-photo) {
+    opacity: 0.45;
+  }
+  .setup-tool-number-cell.is-inline-edit .setup-tool-photo-pin.has-photo {
+    opacity: 1;
+  }
+  .setup-tools-view td[data-tool-col="tool_number"] .setup-tool-number-text.is-inline-edit {
+    outline: none;
+    min-width: 2.5ch;
+  }
   .setup-tools-view th.setup-tools-th-rot {
     height: auto;
     min-width: 0;

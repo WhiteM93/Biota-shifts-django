@@ -315,7 +315,7 @@
                 </thead>
                 <tbody>
                   {% for row in setup.tool_display_rows %}
-                  <tr data-tool-row-index="{{ forloop.counter0 }}">
+                  <tr data-tool-row-index="{{ forloop.counter0 }}"{% if row.id %} data-tool-row-id="{{ row.id }}"{% endif %}>
                     {% if biota_can_edit %}
                     <td class="setup-tools-row-actions-cell">
                       <div class="setup-tools-row-actions-cell-inner">
@@ -331,7 +331,21 @@
                       </div>
                     </td>
                     {% endif %}
-                    <td data-tool-col="tool_number">{{ row.tool_number }}</td>
+                    <td data-tool-col="tool_number" class="setup-tool-number-cell{% if row.photo_url %} has-tool-photo{% endif %}"{% if row.id %} data-tool-row-id="{{ row.id }}"{% endif %}>
+                      <div class="setup-tool-number-wrap" data-photo-url="{{ row.photo_url|default:''|escape }}">
+                        <span class="setup-tool-number-text">{{ row.tool_number }}</span>
+                        {% if biota_can_edit %}
+                        <button type="button" class="setup-tool-photo-pin js-setup-tool-photo-pin{% if row.photo_url %} has-photo{% endif %}" title="{% if row.photo_url %}Фото инструмента{% else %}Прикрепить фото{% endif %}" aria-label="{% if row.photo_url %}Фото инструмента {{ row.tool_number }}{% else %}Прикрепить фото к {{ row.tool_number }}{% endif %}" hidden>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 3a2 2 0 00-2 2v1H5a2 2 0 00-2 2v11a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a2 2 0 00-2-2H9zm0 2h6v1H9V5zm-2 4h10v9H7V9zm5 1.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/></svg>
+                        </button>
+                        <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="setup-tool-photo-input" hidden />
+                        {% elif row.photo_url %}
+                        <button type="button" class="setup-tool-photo-pin js-setup-tool-photo-pin has-photo" title="Фото инструмента" aria-label="Фото инструмента {{ row.tool_number }}">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 3a2 2 0 00-2 2v1H5a2 2 0 00-2 2v11a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a2 2 0 00-2-2H9zm0 2h6v1H9V5zm-2 4h10v9H7V9zm5 1.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/></svg>
+                        </button>
+                        {% endif %}
+                      </div>
+                    </td>
                     <td data-tool-col="correction_enabled" class="setup-tool-correction-cell" data-correction-enabled="{{ row.correction_enabled|yesno:'1,0' }}">
                       <span class="setup-tool-correction-box{% if row.correction_enabled %} is-checked{% endif %}" aria-hidden="true"></span>
                     </td>

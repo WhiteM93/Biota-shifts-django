@@ -935,6 +935,7 @@ def _display_dict_from_tool_row(row: ProductSetupToolRow) -> dict:
     kor_n_show = "" if (exp_h_up and cur_h_up == exp_h_up) else cur_h
     kor_d_show = "" if (exp_d_up and cur_d_up == exp_d_up) else cur_d
     return {
+        "id": row.pk,
         "tool_number": display_tn,
         "correction_enabled": bool(row.correction_enabled),
         "kor_n": kor_n_show,
@@ -944,6 +945,7 @@ def _display_dict_from_tool_row(row: ProductSetupToolRow) -> dict:
         "diameter": _format_tool_diameter_display(row.diameter or "", tt),
         "overhang": _format_tool_overhang_display(row.overhang or ""),
         "note": row.name or "",
+        "photo_url": row.photo.url if row.photo else "",
         "kor_n_override": kor_n_override,
         "kor_d_override": kor_d_override,
     }
@@ -956,6 +958,7 @@ def _build_display_tool_rows(existing_rows: list[ProductSetupToolRow] | None = N
         out: list[dict] = []
         for tool_no in _default_tool_number_list():
             default_row = {
+                "id": None,
                 "tool_number": tool_no,
                 "correction_enabled": False,
                 "kor_n": "",
@@ -965,6 +968,7 @@ def _build_display_tool_rows(existing_rows: list[ProductSetupToolRow] | None = N
                 "diameter": "",
                 "overhang": "",
                 "note": "",
+                "photo_url": "",
                 "kor_n_override": False,
                 "kor_d_override": False,
             }
@@ -1247,6 +1251,7 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
         product.save(update_fields=product_update_fields + ["updated_at"])
     if product_meta_changed:
         ensure_plan_piece_for_naladki_product(product.pk)
+    out_tool_rows = False
     rows_json = (request.POST.get("rows_json") or "").strip()
     if rows_json:
         try:
@@ -1269,11 +1274,16 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
             )
             row_overhang = _normalize_tool_overhang_for_storage(str((row.get("overhang") or "")).strip())
             row_note = str((row.get("note") or "")).strip()
+            row_id_raw = row.get("id")
+            row_id: int | None = None
+            if row_id_raw is not None and str(row_id_raw).strip().isdigit():
+                row_id = int(str(row_id_raw).strip())
             row_vals = (row_tool_number, row_kor_n, row_kor_d, row_tool_type, row_diameter, row_overhang, row_note)
             if all(v == "" for v in row_vals) and not row_correction_enabled:
                 continue
             parsed_rows.append(
                 {
+                    "id": row_id,
                     "tool_number": row_tool_number,
                     "correction_enabled": row_correction_enabled,
                     "kor_n": row_kor_n,
@@ -1286,21 +1296,39 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
             )
         indexed = list(enumerate(parsed_rows))
         indexed.sort(key=lambda p: (_tool_row_dict_sort_tuple(p[1]), p[0]))
-        ProductSetupToolRow.objects.filter(setup=setup).delete()
+        existing_by_id = {r.pk: r for r in setup.tools.all()}
+        kept_ids: list[int] = []
         for idx, (_, pr) in enumerate(indexed):
-            ProductSetupToolRow.objects.create(
-                setup=setup,
-                sort_order=idx,
-                tool_number=pr["tool_number"],
-                correction_enabled=pr["correction_enabled"],
-                kor_n=pr["kor_n"],
-                kor_d=pr["kor_d"],
-                tool_type=pr["tool_type"],
-                diameter=pr["diameter"],
-                overhang=pr["overhang"],
-                tap_hole_type="",
-                name=pr["note"],
-            )
+            row_id = pr.get("id")
+            fields = {
+                "sort_order": idx,
+                "tool_number": pr["tool_number"],
+                "correction_enabled": pr["correction_enabled"],
+                "kor_n": pr["kor_n"],
+                "kor_d": pr["kor_d"],
+                "tool_type": pr["tool_type"],
+                "diameter": pr["diameter"],
+                "overhang": pr["overhang"],
+                "tap_hole_type": "",
+                "name": pr["note"],
+            }
+            if row_id and row_id in existing_by_id:
+                obj = existing_by_id[row_id]
+                for k, v in fields.items():
+                    setattr(obj, k, v)
+                obj.save()
+                kept_ids.append(obj.pk)
+            else:
+                obj = ProductSetupToolRow.objects.create(setup=setup, **fields)
+                kept_ids.append(obj.pk)
+        for orphan in setup.tools.exclude(pk__in=kept_ids):
+            if orphan.photo:
+                try:
+                    orphan.photo.delete(save=False)
+                except Exception:
+                    pass
+            orphan.delete()
+        out_tool_rows = True
     out: dict = {
         "ok": True,
         "setup": {
@@ -1327,6 +1355,8 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
             "description": (product.description or "").strip(),
         },
     }
+    if out_tool_rows:
+        out["tool_rows"] = _build_display_tool_rows(list(setup.tools.all()))
     if (request.POST.get("sync_plan_from_inline") or "").strip() == "1":
         plan_err = validate_product_plan_post(request.POST)
         if plan_err:
@@ -1543,6 +1573,51 @@ def product_detail_view(request, pk: int):
                     photo.sort_order = idx
                     photo.save(update_fields=["sort_order"])
             return JsonResponse({"ok": True})
+
+        if action == "inline_replace_tool_row_photo":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            tool_row_id_raw = (request.POST.get("tool_row_id") or "").strip()
+            tool_row_id = int(tool_row_id_raw) if tool_row_id_raw.isdigit() else 0
+            tool_row = ProductSetupToolRow.objects.filter(pk=tool_row_id, setup=setup).first()
+            if not tool_row:
+                return JsonResponse({"ok": False, "error": "Строка инструмента не найдена."}, status=404)
+            image_file = request.FILES.get("image")
+            if not image_file:
+                return JsonResponse({"ok": False, "error": "Выберите фото."}, status=400)
+            if tool_row.photo:
+                try:
+                    tool_row.photo.delete(save=False)
+                except Exception:
+                    pass
+            tool_row.photo = image_file
+            tool_row.save(update_fields=["photo"])
+            return JsonResponse(
+                {"ok": True, "url": tool_row.photo.url if tool_row.photo else "", "tool_row_id": tool_row.pk}
+            )
+
+        if action == "inline_delete_tool_row_photo":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            tool_row_id_raw = (request.POST.get("tool_row_id") or "").strip()
+            tool_row_id = int(tool_row_id_raw) if tool_row_id_raw.isdigit() else 0
+            tool_row = ProductSetupToolRow.objects.filter(pk=tool_row_id, setup=setup).first()
+            if not tool_row:
+                return JsonResponse({"ok": False, "error": "Строка инструмента не найдена."}, status=404)
+            if tool_row.photo:
+                try:
+                    tool_row.photo.delete(save=False)
+                except Exception:
+                    pass
+                tool_row.photo = ""
+                tool_row.save(update_fields=["photo"])
+            return JsonResponse({"ok": True, "tool_row_id": tool_row.pk})
 
         if action == "inline_replace_binding_photo":
             setup_id_raw = (request.POST.get("setup_id") or "").strip()

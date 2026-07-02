@@ -53,6 +53,11 @@ var SETUP_TOOL_NOTE_EYE_SVG =
   '<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8a3 3 0 100 6 3 3 0 000-6z"/>' +
   "</svg>";
 
+var SETUP_TOOL_PHOTO_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true" focusable="false">' +
+  '<path fill="currentColor" d="M9 3a2 2 0 00-2 2v1H5a2 2 0 00-2 2v11a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a2 2 0 00-2-2H9zm0 2h6v1H9V5zm-2 4h10v9H7V9zm5 1.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/>' +
+  "</svg>";
+
 var setupToolNoteEditState = { cell: null };
 
 function getSetupToolNoteWrap(cell) {
@@ -123,6 +128,108 @@ function ensureSetupToolNoteCellStructure(cell) {
 function initAllSetupToolNoteCells(scope) {
   var root = scope && scope.querySelectorAll ? scope : document;
   root.querySelectorAll('td[data-tool-col="note"]').forEach(ensureSetupToolNoteCellStructure);
+}
+
+function getSetupToolNumberWrap(cell) {
+  return cell && cell.querySelector ? cell.querySelector(".setup-tool-number-wrap") : null;
+}
+
+function getSetupToolNumberValue(cell) {
+  if (!cell) return "";
+  var wrap = getSetupToolNumberWrap(cell);
+  if (wrap) {
+    var span = wrap.querySelector(".setup-tool-number-text");
+    return (span ? span.textContent : wrap.textContent || "").replace(/\s+/g, " ").trim();
+  }
+  return (cell.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function getSetupToolNumberPhotoUrl(cell) {
+  if (!cell) return "";
+  var wrap = getSetupToolNumberWrap(cell);
+  return wrap ? (wrap.getAttribute("data-photo-url") || "").trim() : "";
+}
+
+function syncSetupToolNumberDisplay(cell) {
+  if (!cell) return;
+  var wrap = getSetupToolNumberWrap(cell);
+  if (!wrap) return;
+  var url = (wrap.getAttribute("data-photo-url") || "").trim();
+  var pin = wrap.querySelector(".js-setup-tool-photo-pin");
+  var editMode = document.body.classList.contains("setup-inline-edit-enabled");
+  var toolNo = getSetupToolNumberValue(cell);
+  cell.classList.toggle("has-tool-photo", !!url);
+  if (pin) {
+    pin.classList.toggle("has-photo", !!url);
+    pin.hidden = !editMode && !url;
+    pin.title = url
+      ? editMode
+        ? "Фото инструмента (Alt+щелчок — заменить)"
+        : "Фото инструмента"
+      : "Прикрепить фото";
+    pin.setAttribute(
+      "aria-label",
+      url ? "Фото инструмента " + toolNo : "Прикрепить фото к " + (toolNo || "инструменту")
+    );
+  }
+}
+
+function setSetupToolNumberPhotoUrl(cell, url) {
+  if (!cell) return;
+  var wrap = getSetupToolNumberWrap(cell);
+  if (wrap) wrap.setAttribute("data-photo-url", String(url || "").trim());
+  syncSetupToolNumberDisplay(cell);
+}
+
+function buildSetupToolNumberWrap(toolNo, photoUrl, withUpload) {
+  var wrap = document.createElement("div");
+  wrap.className = "setup-tool-number-wrap";
+  wrap.setAttribute("data-photo-url", String(photoUrl || "").trim());
+  var span = document.createElement("span");
+  span.className = "setup-tool-number-text";
+  span.textContent = String(toolNo || "").trim();
+  wrap.appendChild(span);
+  if (withUpload) {
+    var pin = document.createElement("button");
+    pin.type = "button";
+    pin.className = "setup-tool-photo-pin js-setup-tool-photo-pin";
+    pin.innerHTML = SETUP_TOOL_PHOTO_SVG;
+    wrap.appendChild(pin);
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*,.jpg,.jpeg,.png,.webp,.gif";
+    input.className = "setup-tool-photo-input";
+    input.hidden = true;
+    wrap.appendChild(input);
+  } else if (photoUrl) {
+    var pinView = document.createElement("button");
+    pinView.type = "button";
+    pinView.className = "setup-tool-photo-pin js-setup-tool-photo-pin has-photo";
+    pinView.innerHTML = SETUP_TOOL_PHOTO_SVG;
+    wrap.appendChild(pinView);
+  }
+  return wrap;
+}
+
+function ensureSetupToolNumberCellStructure(cell) {
+  if (!cell || cell.getAttribute("data-tool-col") !== "tool_number") return;
+  cell.classList.add("setup-tool-number-cell");
+  if (getSetupToolNumberWrap(cell)) {
+    syncSetupToolNumberDisplay(cell);
+    return;
+  }
+  var text = (cell.textContent || "").trim();
+  var photoUrl = (cell.getAttribute("data-photo-url") || "").trim();
+  var table = cell.closest("table.setup-tools-view");
+  var withUpload = !!(table && table.classList.contains("has-tool-row-move"));
+  cell.textContent = "";
+  cell.appendChild(buildSetupToolNumberWrap(text, photoUrl, withUpload));
+  syncSetupToolNumberDisplay(cell);
+}
+
+function initAllSetupToolNumberCells(scope) {
+  var root = scope && scope.querySelectorAll ? scope : document;
+  root.querySelectorAll('td[data-tool-col="tool_number"]').forEach(ensureSetupToolNumberCellStructure);
 }
 
 function openSetupToolNoteEditor(cell) {
@@ -352,6 +459,7 @@ function saveSetupToolNoteEditor() {
     var notePop = document.getElementById("setup-tool-note-pop");
     if (notePop) {
       initAllSetupToolNoteCells(document);
+      initAllSetupToolNumberCells(document);
       var noteHideTimer = null;
       var noteActiveCell = null;
 
@@ -485,6 +593,22 @@ function saveSetupToolNoteEditor() {
     }
 
     document.addEventListener("click", function (e) {
+      var photoPin = e.target && e.target.closest && e.target.closest(".js-setup-tool-photo-pin");
+      if (photoPin) {
+        var photoCell = photoPin.closest('td[data-tool-col="tool_number"]');
+        if (!photoCell) return;
+        var photoUrl = typeof getSetupToolNumberPhotoUrl === "function" ? getSetupToolNumberPhotoUrl(photoCell) : "";
+        var altReplace =
+          e.altKey && photoUrl && document.body.classList.contains("setup-inline-edit-enabled");
+        if (photoUrl && !altReplace) {
+          e.preventDefault();
+          e.stopPropagation();
+          var toolNo =
+            typeof getSetupToolNumberValue === "function" ? getSetupToolNumberValue(photoCell) : "";
+          openModal(photoUrl, (toolNo || "Инструмент") + " — фото инструмента");
+        }
+        return;
+      }
       var a = e.target && e.target.closest ? e.target.closest(".setup-photo-open") : null;
       if (!a) return;
       e.preventDefault();
@@ -513,6 +637,7 @@ function saveSetupToolNoteEditor() {
     var root = document.getElementById("product-tabs");
     if (!root) return;
     initAllSetupToolNoteCells(root);
+    initAllSetupToolNumberCells(root);
     var tabButtons = root.querySelectorAll(".product-tab");
     var panels = root.querySelectorAll(".product-tab-panel");
     var programDownloadBtn = document.getElementById("product-program-download");
@@ -1143,8 +1268,8 @@ function saveSetupToolNoteEditor() {
       rows.sort(function (a, b) {
         var ta = a.querySelector('td[data-tool-col="tool_number"]');
         var tb = b.querySelector('td[data-tool-col="tool_number"]');
-        var ka = toolNumberSortKey(ta ? ta.textContent : "");
-        var kb = toolNumberSortKey(tb ? tb.textContent : "");
+        var ka = toolNumberSortKey(ta ? getSetupToolNumberValue(ta) : "");
+        var kb = toolNumberSortKey(tb ? getSetupToolNumberValue(tb) : "");
         if (ka[0] !== kb[0]) return ka[0] - kb[0];
         if (ka[0] === 0) return (ka[1] || 0) - (kb[1] || 0);
         var sa = String(ka[1] || "");
@@ -1173,7 +1298,7 @@ function saveSetupToolNoteEditor() {
     function maxToolNumericInPanel(panel) {
       var max = 0;
       panel.querySelectorAll('.setup-tools-view td[data-tool-col="tool_number"]').forEach(function (td) {
-        var nStr = normalizeToolNumber(td.textContent || "");
+        var nStr = normalizeToolNumber(getSetupToolNumberValue(td));
         if (!nStr || nStr.charAt(0) !== "T") return;
         var num = parseInt(nStr.slice(1), 10);
         if (!isNaN(num) && num > max) max = num;
@@ -1211,7 +1336,8 @@ function saveSetupToolNoteEditor() {
       tr.appendChild(tdActions);
       var tdNo = document.createElement("td");
       tdNo.setAttribute("data-tool-col", "tool_number");
-      tdNo.textContent = toolNo;
+      tdNo.className = "setup-tool-number-cell";
+      tdNo.appendChild(buildSetupToolNumberWrap(toolNo, "", true));
       tr.appendChild(tdNo);
       var tdCor = document.createElement("td");
       tdCor.setAttribute("data-tool-col", "correction_enabled");
@@ -1350,7 +1476,7 @@ function saveSetupToolNoteEditor() {
         var hCell = row.querySelector('td[data-tool-col="kor_n"]');
         var dCell = row.querySelector('td[data-tool-col="kor_d"]');
         if (!toolCell || !hCell || !dCell) return;
-        var exp = expectedCorrectors(toolCell.textContent || "");
+        var exp = expectedCorrectors(getSetupToolNumberValue(toolCell) || "");
         var curH = (hCell.textContent || "").trim().toUpperCase();
         var curD = (dCell.textContent || "").trim().toUpperCase();
         var hOverride = !!(exp.h && curH && curH !== exp.h);
@@ -1369,18 +1495,31 @@ function saveSetupToolNoteEditor() {
         row.querySelectorAll("td[data-tool-col]").forEach(function (cell) {
           var col = cell.getAttribute("data-tool-col") || "";
           if (col === "tool_number") {
+            ensureSetupToolNumberCellStructure(cell);
+            var numSpan = cell.querySelector(".setup-tool-number-text");
             if (enabled) {
-              cell.textContent = (cell.textContent || "").trim();
+              if (numSpan) {
+                numSpan.textContent = getSetupToolNumberValue(cell);
+                numSpan.classList.add("is-inline-edit");
+                numSpan.setAttribute("contenteditable", "true");
+                numSpan.setAttribute("spellcheck", "false");
+              }
               cell.classList.add("is-inline-edit");
-              cell.setAttribute("contenteditable", "true");
-              cell.setAttribute("spellcheck", "false");
             } else {
-              var rawTn = (cell.textContent || "").trim().toUpperCase();
+              var rawTn = getSetupToolNumberValue(cell).trim().toUpperCase();
               var normTn = normalizeToolNumber(rawTn);
-              cell.textContent = normTn || rawTn || "";
+              if (numSpan) {
+                numSpan.textContent = normTn || rawTn || "";
+                numSpan.classList.remove("is-inline-edit");
+                numSpan.removeAttribute("contenteditable");
+                numSpan.removeAttribute("spellcheck");
+              } else {
+                cell.textContent = normTn || rawTn || "";
+              }
               cell.classList.remove("is-inline-edit");
               cell.removeAttribute("contenteditable");
             }
+            syncSetupToolNumberDisplay(cell);
             return;
           }
           if (col === "correction_enabled") {
@@ -1479,7 +1618,7 @@ function saveSetupToolNoteEditor() {
               return (colName === "kor_n" ? "H" : "D") + digits;
             }
             var tnCell = row.querySelector('td[data-tool-col="tool_number"]');
-            var tnRaw = (tnCell && tnCell.textContent ? tnCell.textContent : "").trim().toUpperCase();
+            var tnRaw = getSetupToolNumberValue(tnCell).trim().toUpperCase();
             var tnNorm = normalizeToolNumber(tnRaw) || tnRaw;
             var exp = expectedCorrectors(tnNorm);
             if (colName === "kor_n" && exp.h) return exp.h;
@@ -1487,7 +1626,7 @@ function saveSetupToolNoteEditor() {
             return "";
           }
           if (colName === "tool_number") {
-            var tRaw = (cell.textContent || "").trim().toUpperCase();
+            var tRaw = getSetupToolNumberValue(cell).trim().toUpperCase();
             return normalizeToolNumber(tRaw) || tRaw;
           }
           if (colName === "note") {
@@ -1496,6 +1635,14 @@ function saveSetupToolNoteEditor() {
           return (cell.textContent || "").trim();
         };
         rows.push({
+          id: (function () {
+            var rid = (row.getAttribute("data-tool-row-id") || "").trim();
+            if (!rid && row.querySelector) {
+              var tnCellId = row.querySelector('td[data-tool-col="tool_number"]');
+              rid = tnCellId ? (tnCellId.getAttribute("data-tool-row-id") || "").trim() : "";
+            }
+            return rid && /^\d+$/.test(rid) ? parseInt(rid, 10) : null;
+          })(),
           tool_number: getCellValue("tool_number"),
           correction_enabled: getCellValue("correction_enabled"),
           kor_n: getCellValue("kor_n"),
@@ -2045,7 +2192,15 @@ function saveSetupToolNoteEditor() {
           e.target.textContent = (textG || "").replace(/[^0-9]/g, "").slice(0, 2);
           return;
         }
-        var td = e.target && e.target.closest ? e.target.closest("table.setup-tools-view td.is-inline-edit[data-tool-col]") : null;
+        var td = e.target && e.target.closest
+          ? e.target.closest(
+              "table.setup-tools-view td.is-inline-edit[data-tool-col], table.setup-tools-view .setup-tool-number-text.is-inline-edit"
+            )
+          : null;
+        if (!td) return;
+        if (td.classList && td.classList.contains("setup-tool-number-text")) {
+          td = td.closest('td[data-tool-col="tool_number"]');
+        }
         if (!td) return;
         var col = td.getAttribute("data-tool-col") || "";
         if (col === "tool_type") return;
@@ -2118,7 +2273,15 @@ function saveSetupToolNoteEditor() {
       "focusout",
       function (e) {
         if (!inlineEditMode) return;
-        var tdTn = e.target && e.target.closest && e.target.closest('td[data-tool-col="tool_number"].is-inline-edit');
+        var tnEl =
+          e.target &&
+          e.target.closest &&
+          e.target.closest(".setup-tool-number-text.is-inline-edit, td[data-tool-col='tool_number'].is-inline-edit");
+        var tdTn = tnEl
+          ? tnEl.matches && tnEl.matches("td")
+            ? tnEl
+            : tnEl.closest('td[data-tool-col="tool_number"]')
+          : null;
         if (!tdTn) return;
         var trFo = tdTn.closest("tr");
         var tbodyFo = trFo && trFo.parentNode;
@@ -2127,6 +2290,8 @@ function saveSetupToolNoteEditor() {
         window.setTimeout(function () {
           if (!inlineEditMode) return;
           if (tdTn.contains(document.activeElement)) return;
+          var activeSpan = tdTn.querySelector(".setup-tool-number-text.is-inline-edit");
+          if (activeSpan && activeSpan === document.activeElement) return;
           sortSetupToolsTbodyByToolNumber(tbodyFo);
           syncRowOrderDisplay(panelFo);
           syncToolOverrideClasses(panelFo);
@@ -2343,6 +2508,29 @@ function saveSetupToolNoteEditor() {
       }
     }
 
+    function applyToolRowsResponseToDom(panel, toolRows) {
+      if (!panel || !toolRows || !toolRows.length) return;
+      var trs = panel.querySelectorAll(".setup-tools-view tbody tr");
+      toolRows.forEach(function (rowData, i) {
+        var tr = trs[i];
+        if (!tr || !rowData) return;
+        if (rowData.id) {
+          tr.setAttribute("data-tool-row-id", String(rowData.id));
+        } else {
+          tr.removeAttribute("data-tool-row-id");
+        }
+        var cell = tr.querySelector('td[data-tool-col="tool_number"]');
+        if (!cell) return;
+        if (rowData.id) cell.setAttribute("data-tool-row-id", String(rowData.id));
+        else cell.removeAttribute("data-tool-row-id");
+        ensureSetupToolNumberCellStructure(cell);
+        var span = cell.querySelector(".setup-tool-number-text");
+        if (span && rowData.tool_number) span.textContent = rowData.tool_number;
+        setSetupToolNumberPhotoUrl(cell, rowData.photo_url || "");
+      });
+      syncToolOverrideClasses(panel);
+    }
+
     function applyInlineUpdateResponseToDom(setupId, data) {
       if (!data || !data.setup) return;
       if (data.product) applyProductMetaToDom(data.product);
@@ -2378,6 +2566,7 @@ function saveSetupToolNoteEditor() {
         });
         refreshInlineFieldTitles(panel, false);
         rebuildBindingExtraBoxesFromResponse(panel, data.setup);
+        if (data.tool_rows) applyToolRowsResponseToDom(panel, data.tool_rows);
       });
     }
 
@@ -2594,6 +2783,37 @@ function saveSetupToolNoteEditor() {
     }
 
     document.addEventListener("click", function (e) {
+      var photoPin = e.target && e.target.closest && e.target.closest(".js-setup-tool-photo-pin");
+      if (photoPin) {
+        var photoCell = photoPin.closest('td[data-tool-col="tool_number"]');
+        if (!photoCell) return;
+        var photoUrl = getSetupToolNumberPhotoUrl(photoCell);
+        var photoEditMode = document.body.classList.contains("setup-inline-edit-enabled");
+        if (e.altKey && photoUrl && photoEditMode) {
+          e.preventDefault();
+          e.stopPropagation();
+          var replaceInput = photoCell.querySelector(".setup-tool-photo-input");
+          if (replaceInput) replaceInput.click();
+          return;
+        }
+        if (photoUrl) return;
+        if (!photoEditMode) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var pickInput = photoCell.querySelector(".setup-tool-photo-input");
+        if (!pickInput) return;
+        var photoTr = photoCell.closest("tr");
+        var photoRowId =
+          (photoTr && photoTr.getAttribute("data-tool-row-id")) ||
+          photoCell.getAttribute("data-tool-row-id") ||
+          "";
+        if (!photoRowId) {
+          alert("Сначала сохраните таблицу инструмента, затем прикрепите фото.");
+          return;
+        }
+        pickInput.click();
+        return;
+      }
       var eye = e.target && e.target.closest && e.target.closest(".js-setup-tool-note-eye");
       if (!eye) return;
       if (!document.body.classList.contains("setup-inline-edit-enabled")) return;
@@ -3441,6 +3661,48 @@ function saveSetupToolNoteEditor() {
       draggedPhotoFigure = null;
     });
 
+    async function handleToolPhotoInputChange(input) {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      var cell = input.closest('td[data-tool-col="tool_number"]');
+      if (!cell) return;
+      var tr = cell.closest("tr");
+      var rowId = (tr && tr.getAttribute("data-tool-row-id")) || cell.getAttribute("data-tool-row-id") || "";
+      var table = cell.closest("table.setup-tools-view");
+      var setupId = "";
+      if (table && table.id && table.id.indexOf("setup-tools-table-") === 0) {
+        setupId = table.id.slice("setup-tools-table-".length);
+      }
+      if (!setupId || !rowId) {
+        alert("Сначала сохраните таблицу инструмента, затем прикрепите фото.");
+        input.value = "";
+        return;
+      }
+      var fd = new FormData();
+      fd.append("action", "inline_replace_tool_row_photo");
+      fd.append("setup_id", setupId);
+      fd.append("tool_row_id", rowId);
+      fd.append("image", file);
+      var res = await fetch(window.location.href, {
+        method: "POST",
+        headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+        body: fd,
+        credentials: "same-origin",
+      });
+      var data = await res.json();
+      if (!res.ok || !data.ok) {
+        alert(data.error || "Не удалось прикрепить фото.");
+        input.value = "";
+        return;
+      }
+      if (data.tool_row_id) {
+        if (tr) tr.setAttribute("data-tool-row-id", String(data.tool_row_id));
+        cell.setAttribute("data-tool-row-id", String(data.tool_row_id));
+      }
+      setSetupToolNumberPhotoUrl(cell, data.url || "");
+      input.value = "";
+    }
+
     async function handleBindingPhotoInputChange(input) {
         var file = input.files && input.files[0];
         if (!file) return;
@@ -3644,6 +3906,10 @@ function saveSetupToolNoteEditor() {
       if (!input || !input.classList) return;
       if (input.classList.contains("setup-binding-photo-input")) {
         handleBindingPhotoInputChange(input);
+        return;
+      }
+      if (input.classList.contains("setup-tool-photo-input")) {
+        handleToolPhotoInputChange(input);
         return;
       }
       if (input.classList.contains("js-inline-gcode-system")) {

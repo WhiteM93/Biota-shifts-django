@@ -1760,6 +1760,12 @@ class ProductSetupToolRow(models.Model):
 
     diameter = models.CharField(max_length=40, blank=True, default="", verbose_name="Диаметр")
     overhang = models.CharField(max_length=40, blank=True, default="", verbose_name="Вылет")
+    photo = models.FileField(
+        upload_to="products/setup_tool_photos/",
+        blank=True,
+        verbose_name="Фото инструмента",
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png", "webp", "gif"])],
+    )
 
     class Meta:
         ordering = ("sort_order", "id")
