@@ -175,64 +175,6 @@
   max-width: none;
 }
 
-.home-panel__head--stack {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 14px;
-}
-
-.home-panel__head-top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px 16px;
-}
-
-.home-low-stock-filter {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 10px 14px;
-  padding: 12px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--bio-filter-border);
-  background: var(--bio-surface-item);
-}
-
-.home-low-stock-filter .field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-}
-
-.home-low-stock-filter .field span {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--bio-field-label);
-}
-
-.home-low-stock-filter select,
-.home-low-stock-filter input[type="number"] {
-  min-width: 140px;
-}
-
-.home-low-stock-filter input[type="number"] {
-  width: 100px;
-  max-width: 120px;
-}
-
-.home-low-stock-filter .filter-actions,
-.home-low-stock-actions {
-  display: flex;
-  align-items: center;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: none;
-}
-
 .home-panel__hint strong {
   color: var(--bio-body-fg);
   font-weight: 700;
@@ -305,70 +247,6 @@
 
 .home-panel--accent {
   border-left: 3px solid var(--bio-tab-pill-active-bg);
-}
-
-.home-panel--warn {
-  border-left: 3px solid #e8b84a;
-}
-
-.home-low-stock-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.home-low-stock-item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
-  padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--bio-surface-item-border);
-  background: var(--bio-surface-item);
-}
-
-.home-low-stock-item__name {
-  flex: 1 1 200px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--bio-body-fg);
-  line-height: 1.35;
-}
-
-.home-low-stock-qty {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.5rem;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #1a1f2f;
-  background: linear-gradient(180deg, #f5d66a 0%, #e8b84a 100%);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.home-low-stock-qty--critical {
-  color: #fff;
-  background: linear-gradient(180deg, #ff8a8a 0%, #e85555 100%);
-  border-color: rgba(0, 0, 0, 0.15);
-}
-
-.home-panel__footer {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--bio-surface-item-border);
-}
-
-.home-panel__footer a {
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .home-no-access {

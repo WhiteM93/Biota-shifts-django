@@ -32,7 +32,6 @@ from .email_verification import (
     send_verification_email,
     verify_email_token,
 )
-from .home_low_stock import apply_home_low_stock_context
 
 
 def _df_columns_rows(df: pd.DataFrame):
@@ -285,18 +284,9 @@ def home_view(request):
         "dash_month": datetime.now().month,
         "year_options": [],
         "month_choices": [(mm, MONTH_NAMES_RU[mm]) for mm in range(1, 13)],
-        "low_stock_items": [],
     }
 
-    can_inventory = nav_permissions_for_user(user or "").get("inventory", True)
-
     def _render_home():
-        apply_home_low_stock_context(
-            ctx,
-            username=user,
-            query=request.GET,
-            can_inventory=can_inventory,
-        )
         return render(request, "shifts/home.html", ctx)
 
     if employees_df.empty:
