@@ -38,7 +38,7 @@
   <a class="inv-tab {% if panel == 'analysis' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=analysis">Анализ</a>
 </nav>
 {% endif %}
-{% if panel != "defects" and panel != "payroll" and panel != "employees" and panel != "stock" and panel != "arrival" and panel != "issue_outcome" and panel != "purchases" and panel != "history" %}
+{% if panel != "defects" and panel != "payroll" and panel != "employees" and panel != "stock" and panel != "arrival" and panel != "issue_outcome" and panel != "purchases" and panel != "history" and panel != "analysis" %}
 <h2 style="margin-top:0;">Склад инструмента</h2>
 <p class="muted">Отображается один тип инструмента за раз (по умолчанию: фрезы), только с остатком больше 0.</p>
 {% endif %}

@@ -73,19 +73,35 @@
 }
 
 .inv-analysis-alert__qty {
-  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   white-space: nowrap;
 }
 
 .inv-analysis-alert__need {
   font-size: 11px;
   color: var(--bio-text-muted);
-  margin-left: 4px;
+}
+
+.inv-analysis-link {
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--ca);
+  white-space: nowrap;
 }
 
 .inv-analysis-layout {
   gap: 16px;
   align-items: start;
+}
+
+.inv-analysis-sidebar {
+  padding: 16px 16px 18px;
+  align-self: start;
+  height: auto;
 }
 
 .inv-analysis-main {
@@ -118,12 +134,35 @@
 }
 
 .inv-analysis-zero {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-  color: var(--bio-text-muted);
   min-height: 36px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--bio-surface-item);
+  font-size: 12px;
+  color: var(--bio-text);
+  cursor: pointer;
+}
+
+.inv-analysis-zero input {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.inv-analysis-zero span {
+  line-height: 1.3;
+}
+
+.inv-analysis-check .calc-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bio-field-label);
+  margin-bottom: 6px;
+  display: block;
 }
 
 .inv-analysis-table-section {
@@ -232,15 +271,17 @@
   border-color: #962d26;
 }
 
+.inv-analysis-mini-btn--save {
+  color: #fff;
+  background: #2d8a5c;
+  border-color: #1f6b45;
+}
+
 .inv-analysis-inline-form {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   margin-left: 4px;
-}
-
-.inv-analysis-sidebar {
-  padding: 16px 16px 18px;
 }
 
 .inv-analysis-watch-form {
@@ -278,16 +319,29 @@
   background: var(--bio-surface-item);
 }
 
-.inv-analysis-watch-card--warn {
-  border-left: 3px solid #e8b84a;
+.inv-analysis-watch-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.inv-analysis-watch-card--critical {
-  border-left: 3px solid #e85555;
+.inv-analysis-watch-card__head {
+  min-width: 0;
+  flex: 1;
 }
 
-.inv-analysis-watch-card--ok {
-  border-left: 3px solid #34d399;
+.inv-analysis-watch-card__stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.inv-analysis-watch-card__norm {
+  font-size: 11px;
+  color: var(--bio-text-muted);
 }
 
 .inv-analysis-watch-card__head strong {
@@ -302,13 +356,6 @@
   margin-top: 2px;
 }
 
-.inv-analysis-watch-card__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-}
-
 .inv-analysis-watch-card__notes {
   margin: 6px 0 0;
   font-size: 10px;
@@ -318,23 +365,55 @@
 .inv-analysis-watch-card__actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 8px;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--glass-border);
 }
 
-.inv-analysis-min-label {
+.inv-analysis-watch-edit-form,
+.inv-analysis-watch-delete-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.inv-analysis-norm-label {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 10px;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
   color: var(--bio-text-muted);
 }
 
+.inv-analysis-norm-label span {
+  white-space: nowrap;
+}
+
 .inv-analysis-min-input {
-  width: 52px;
-  min-height: 26px;
+  width: 56px;
+  min-height: 28px;
   font-size: 11px;
-  padding: 2px 4px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--glass-border);
+  background: var(--bio-input-bg, var(--bio-surface-item));
+  color: var(--bio-body-fg);
+}
+
+.inv-analysis-watch-card--warn {
+  border-left: 3px solid #e8b84a;
+}
+
+.inv-analysis-watch-card--critical {
+  border-left: 3px solid #e85555;
+}
+
+.inv-analysis-watch-card--ok {
+  border-left: 3px solid #34d399;
 }
 
 .inv-analysis-watch-empty {

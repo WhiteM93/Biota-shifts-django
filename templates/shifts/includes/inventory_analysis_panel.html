@@ -22,8 +22,8 @@
       <span class="inv-analysis-alert__meta">{{ row.category_label }} · {{ row.group_label }} {{ row.template.group_value }}</span>
     </div>
     <div class="inv-analysis-alert__qty">
-      <span class="inv-analysis-qty inv-analysis-qty--{{ row.status }}">{{ row.total_qty }}</span>
-      <span class="inv-analysis-alert__need">/ {{ row.template.min_qty }} мин.</span>
+      <span class="inv-analysis-qty inv-analysis-qty--{{ row.status }}">{{ row.total_qty }} шт.</span>
+      <span class="inv-analysis-alert__need">из {{ row.template.min_qty }} шт.</span>
     </div>
     <a class="inv-analysis-link" href="{{ row.stock_url }}">На склад →</a>
   </article>
@@ -64,10 +64,13 @@
           <span class="calc-label">Поиск</span>
           <input type="search" name="analysis_search" value="{{ analysis_search }}" placeholder="Значение…" class="calc-inp calc-inp--plain">
         </label>
-        <label class="calc-field field inv-analysis-check">
-          <span class="calc-label">&nbsp;</span>
-          <label class="inv-analysis-zero"><input type="checkbox" name="show_zero" value="1" {% if analysis_include_zero %}checked{% endif %}> С нулевым остатком</label>
-        </label>
+        <div class="field inv-analysis-check">
+          <span class="calc-label">Остаток</span>
+          <label class="inv-analysis-zero">
+            <input type="checkbox" name="show_zero" value="1" {% if analysis_include_zero %}checked{% endif %}>
+            <span>Показывать с нулевым остатком</span>
+          </label>
+        </div>
       </div>
     </form>
 
@@ -165,32 +168,37 @@
     <div class="inv-analysis-watch-list">
       {% for row in analysis_watch_rows %}
       <article class="inv-analysis-watch-card inv-analysis-watch-card--{{ row.status }}">
-        <div class="inv-analysis-watch-card__head">
-          <strong>{{ row.template.name }}</strong>
-          <span class="inv-analysis-watch-card__meta">{{ row.category_label }} · {{ row.group_label }} {{ row.template.group_value }}</span>
-        </div>
-        <div class="inv-analysis-watch-card__row">
-          <span class="inv-analysis-qty inv-analysis-qty--{{ row.status }}">{{ row.total_qty }}</span>
-          <span class="muted">/ {{ row.template.min_qty }} мин.</span>
+        <div class="inv-analysis-watch-card__top">
+          <div class="inv-analysis-watch-card__head">
+            <strong>{{ row.template.name }}</strong>
+            <span class="inv-analysis-watch-card__meta">{{ row.category_label }} · {{ row.group_label }} {{ row.template.group_value }}</span>
+          </div>
           <a class="inv-analysis-mini-link" href="{{ row.stock_url }}">Склад</a>
+        </div>
+        <div class="inv-analysis-watch-card__stats">
+          <span class="inv-analysis-qty inv-analysis-qty--{{ row.status }}">{{ row.total_qty }} шт.</span>
+          <span class="inv-analysis-watch-card__norm">норма {{ row.template.min_qty }} шт.</span>
         </div>
         {% if row.template.notes %}<p class="inv-analysis-watch-card__notes">{{ row.template.notes }}</p>{% endif %}
         {% if biota_can_edit %}
         <div class="inv-analysis-watch-card__actions">
-          <form method="post" class="inv-analysis-inline-form">
+          <form method="post" class="inv-analysis-watch-edit-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="update_watch_template">
             <input type="hidden" name="watch_id" value="{{ row.template.id }}">
             <input type="hidden" name="watch_name" value="{{ row.template.name }}">
             <input type="hidden" name="watch_notes" value="{{ row.template.notes }}">
-            <label class="inv-analysis-min-label">мин. <input type="number" name="watch_min_qty" value="{{ row.template.min_qty }}" min="1" max="9999" class="inv-analysis-min-input"></label>
-            <button type="submit" class="inv-analysis-mini-btn">OK</button>
+            <label class="inv-analysis-norm-label">
+              <span>Норма, шт.</span>
+              <input type="number" name="watch_min_qty" value="{{ row.template.min_qty }}" min="1" max="9999" class="inv-analysis-min-input">
+            </label>
+            <button type="submit" class="inv-analysis-mini-btn inv-analysis-mini-btn--save" title="Сохранить">✓</button>
           </form>
-          <form method="post" class="inv-analysis-inline-form" onsubmit="return confirm('Удалить строку контроля?');">
+          <form method="post" class="inv-analysis-watch-delete-form" onsubmit="return confirm('Удалить строку контроля?');">
             {% csrf_token %}
             <input type="hidden" name="action" value="delete_watch_template">
             <input type="hidden" name="watch_id" value="{{ row.template.id }}">
-            <button type="submit" class="inv-analysis-mini-btn inv-analysis-mini-btn--danger">×</button>
+            <button type="submit" class="inv-analysis-mini-btn inv-analysis-mini-btn--danger" title="Удалить">×</button>
           </form>
         </div>
         {% endif %}
