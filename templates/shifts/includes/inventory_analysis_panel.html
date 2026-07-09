@@ -78,8 +78,20 @@
     <section class="inv-analysis-table-section" aria-label="Сводка остатков">
       <div class="inv-analysis-table-section__head">
         <span class="inv-analysis-table-section__title">{{ analysis_category_label }} · {{ analysis_group_label }}</span>
-        <span class="inv-analysis-table-section__count">{{ analysis_rows|length }}</span>
-        <span class="inv-analysis-table-section__meta">{{ analysis_total_qty }} шт. · {{ analysis_total_skus }} поз.</span>
+        <div class="inv-analysis-table-section__stats">
+          <span class="inv-analysis-stat" title="Число различных значений в сводке">
+            <span class="inv-analysis-stat__val">{{ analysis_rows|length }}</span>
+            <span class="inv-analysis-stat__lbl">групп</span>
+          </span>
+          <span class="inv-analysis-stat" title="Суммарный остаток по всем группам">
+            <span class="inv-analysis-stat__val">{{ analysis_total_qty }}</span>
+            <span class="inv-analysis-stat__lbl">шт.</span>
+          </span>
+          <span class="inv-analysis-stat" title="Число карточек на складе">
+            <span class="inv-analysis-stat__val">{{ analysis_total_skus }}</span>
+            <span class="inv-analysis-stat__lbl">поз.</span>
+          </span>
+        </div>
       </div>
       <div class="table-wrap inv-analysis-table-wrap">
         <table class="data-grid inv-analysis-grid">
