@@ -39,6 +39,17 @@ def prefers_mobile_graph(request: HttpRequest) -> bool:
     return _truthy(request.GET.get("prefer_mobile"))
 
 
+def should_auto_redirect_mobile_graph(request: HttpRequest) -> bool:
+    """Авто-переход на /graph/mobile/ для телефонов (если включён BIOTA_PERF_MOBILE_GRAPH)."""
+    from django.conf import settings
+
+    if not getattr(settings, "BIOTA_PERF_MOBILE_GRAPH", False):
+        return False
+    if prefers_desktop_graph(request):
+        return False
+    return is_mobile_user_agent(request)
+
+
 def mobile_graph_url(request: HttpRequest) -> str:
     q = request.GET.copy()
     q.pop("desktop", None)

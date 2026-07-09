@@ -1,7 +1,7 @@
 """Тесты авто-перехода на мобильный график."""
 
 from django.http import HttpRequest, QueryDict
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from shifts.graph_device import (
     GRAPH_DESKTOP_COOKIE,
@@ -10,6 +10,7 @@ from shifts.graph_device import (
     mobile_graph_url,
     prefers_desktop_graph,
     redirect_to_mobile_graph,
+    should_auto_redirect_mobile_graph,
 )
 
 
@@ -69,3 +70,23 @@ class GraphDeviceTests(SimpleTestCase):
         self.assertIn("graph/mobile", mobile_graph_url(r))
         self.assertIn("year=2026", mobile_graph_url(r))
         self.assertNotIn("desktop", mobile_graph_url(r))
+
+    @override_settings(BIOTA_PERF_MOBILE_GRAPH=False)
+    def test_auto_redirect_off_by_default(self):
+        r = _req("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)")
+        self.assertFalse(should_auto_redirect_mobile_graph(r))
+
+    @override_settings(BIOTA_PERF_MOBILE_GRAPH=True)
+    def test_auto_redirect_iphone_when_enabled(self):
+        r = _req("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)")
+        self.assertTrue(should_auto_redirect_mobile_graph(r))
+
+    @override_settings(BIOTA_PERF_MOBILE_GRAPH=True)
+    def test_auto_redirect_respects_desktop_cookie(self):
+        r = _req("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", cookies={GRAPH_DESKTOP_COOKIE: "1"})
+        self.assertFalse(should_auto_redirect_mobile_graph(r))
+
+    @override_settings(BIOTA_PERF_MOBILE_GRAPH=True)
+    def test_auto_redirect_skips_desktop_windows(self):
+        r = _req("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
+        self.assertFalse(should_auto_redirect_mobile_graph(r))

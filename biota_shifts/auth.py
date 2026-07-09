@@ -1,10 +1,13 @@
 """Аутентификация, пользователи, права, личный кабинет."""
 import base64
+import copy
 import hashlib
 import hmac
 import json
 import os
 import re
+import threading
+import time
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -158,7 +161,30 @@ def _pbkdf2_verify(password: str, salt_hex: str, hash_hex: str) -> bool:
     return hmac.compare_digest(dk.hex(), hash_hex)
 
 
-def _load_users_store() -> dict[str, dict]:
+_users_store_cache_lock = threading.Lock()
+_users_store_cache_payload: dict[str, dict] | None = None
+_users_store_cache_mtime: float = 0.0
+_users_store_cache_ts: float = 0.0
+
+
+def _users_store_cache_seconds() -> int:
+    try:
+        from django.conf import settings
+
+        return max(0, int(getattr(settings, "BIOTA_PERF_USERS_STORE_CACHE_SEC", 0) or 0))
+    except Exception:
+        return 0
+
+
+def invalidate_users_store_cache() -> None:
+    global _users_store_cache_payload, _users_store_cache_mtime, _users_store_cache_ts
+    with _users_store_cache_lock:
+        _users_store_cache_payload = None
+        _users_store_cache_mtime = 0.0
+        _users_store_cache_ts = 0.0
+
+
+def _read_users_store_from_disk() -> dict[str, dict]:
     if not USERS_STORE_PATH.exists():
         return {}
     try:
@@ -167,6 +193,34 @@ def _load_users_store() -> dict[str, dict]:
         return dict(raw.get("users", {}))
     except (json.JSONDecodeError, OSError, TypeError):
         return {}
+
+
+def _load_users_store() -> dict[str, dict]:
+    cache_sec = _users_store_cache_seconds()
+    if cache_sec <= 0 or not USERS_STORE_PATH.exists():
+        return _read_users_store_from_disk()
+
+    try:
+        mtime = USERS_STORE_PATH.stat().st_mtime
+    except OSError:
+        return _read_users_store_from_disk()
+
+    now = time.monotonic()
+    global _users_store_cache_payload, _users_store_cache_mtime, _users_store_cache_ts
+    with _users_store_cache_lock:
+        if (
+            _users_store_cache_payload is not None
+            and _users_store_cache_mtime == mtime
+            and (now - _users_store_cache_ts) < cache_sec
+        ):
+            return copy.deepcopy(_users_store_cache_payload)
+
+    payload = _read_users_store_from_disk()
+    with _users_store_cache_lock:
+        _users_store_cache_payload = payload
+        _users_store_cache_mtime = mtime
+        _users_store_cache_ts = now
+    return copy.deepcopy(payload)
 
 
 def _resolve_registered_user(username: str):
@@ -189,6 +243,7 @@ def _save_users_store(users: dict[str, dict]) -> None:
         json.dumps({"users": users}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    invalidate_users_store_cache()
 
 
 def _credentials_match(user: str, password: str) -> bool:

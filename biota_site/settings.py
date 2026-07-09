@@ -15,6 +15,7 @@ from pathlib import Path
 
 from biota_shifts.config import biota_db_env
 from biota_shifts.env_manual import load_env_file
+from biota_site.perf_flags import load_perf_settings
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -166,6 +167,13 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # Увеличивайте после правок CSS/JS, чтобы браузер и nginx не отдавали старые файлы.
 STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "46").strip() or "46"
+
+# Оптимизации производительности (пакет A): по умолчанию выключены. См. PERFORMANCE_NOTES.md и .env.example.
+_perf = load_perf_settings()
+BIOTA_PERF_PACKAGE_A = _perf["BIOTA_PERF_PACKAGE_A"]
+BIOTA_PERF_MOBILE_GRAPH = _perf["BIOTA_PERF_MOBILE_GRAPH"]
+BIOTA_PERF_DEFER_SCRIPTS = _perf["BIOTA_PERF_DEFER_SCRIPTS"]
+BIOTA_PERF_USERS_STORE_CACHE_SEC = _perf["BIOTA_PERF_USERS_STORE_CACHE_SEC"]
 
 # Загрузки изделий (чертежи, CAD). При DEBUG файлы отдаёт Django; в проде настройте раздачу /media/ через nginx.
 MEDIA_URL = "/media/"

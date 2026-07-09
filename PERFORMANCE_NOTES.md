@@ -117,10 +117,11 @@
 ### Быстрые wins
 
 1. ~~Убрать склад с главной~~ (сделано 2026-07-09)
-2. Auto-redirect телефонов `/graph/` → `/graph/mobile/`
-3. `defer` на `biota_delete_btn.js`
-4. Не грузить `inventory.js` + `#inv-options` на `panel=purchases`
-5. Кэш `_load_users_store()` 60 сек
+2. ~~Пакет A (feature flags)~~ — ветка `perf/package-a`, см. ниже
+3. Auto-redirect телефонов `/graph/` → `/graph/mobile/` — **BIOTA_PERF_MOBILE_GRAPH**
+4. `defer` на `biota_delete_btn.js` — **BIOTA_PERF_DEFER_SCRIPTS**
+5. Кэш `_load_users_store()` — **BIOTA_PERF_USERS_STORE_CACHE_SEC**
+6. Не грузить `inventory.js` + `#inv-options` на `panel=purchases`
 
 ### Средний эффект
 
@@ -156,3 +157,49 @@ python manage.py collectstatic --noinput
 sudo systemctl restart <django-сервис>
 # Ctrl+F5 в браузере
 ```
+
+---
+
+## Пакет A — включение и откат (ветка `perf/package-a`)
+
+**По умолчанию всё выключено** — поведение сайта не меняется, пока не задана переменная.
+
+### Включить на сервере для теста
+
+```bash
+git fetch origin
+git checkout perf/package-a   # или git pull origin perf/package-a
+# В .env:
+BIOTA_PERF_PACKAGE_A=1
+sudo systemctl restart <django-сервис>
+```
+
+Что делает `BIOTA_PERF_PACKAGE_A=1`:
+- телефоны с `/graph/` автоматически на `/graph/mobile/` (cookie `graph_prefer_desktop=1` — полная таблица);
+- `defer` на `biota_delete_btn.js`;
+- кэш JSON прав пользователей 60 сек (сброс при сохранении users store).
+
+### Откат без git (мгновенно)
+
+```bash
+# В .env:
+BIOTA_PERF_PACKAGE_A=0
+sudo systemctl restart <django-сервис>
+```
+
+### Откат по частям
+
+```env
+BIOTA_PERF_MOBILE_GRAPH=0
+BIOTA_PERF_DEFER_SCRIPTS=0
+BIOTA_PERF_USERS_STORE_CACHE_SEC=0
+```
+
+### Откат через git
+
+```bash
+git checkout master
+sudo systemctl restart <django-сервис>
+```
+
+После проверки — merge `perf/package-a` → `master`.

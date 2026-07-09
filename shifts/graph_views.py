@@ -258,6 +258,7 @@ def graph_view(request):
             apply_desktop_graph_query_redirect,
             prefers_mobile_graph,
             redirect_to_mobile_graph,
+            should_auto_redirect_mobile_graph,
         )
 
         if prefers_mobile_graph(request):
@@ -266,6 +267,9 @@ def graph_view(request):
         desk_redirect = apply_desktop_graph_query_redirect(request)
         if desk_redirect is not None:
             return desk_redirect
+
+        if should_auto_redirect_mobile_graph(request):
+            return redirect_to_mobile_graph(request)
 
     now = datetime.now()
     default_y, default_m = now.year, now.month

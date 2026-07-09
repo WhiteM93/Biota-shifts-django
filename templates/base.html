@@ -140,6 +140,6 @@
       });
     })();
   </script>
-  <script src="{% static 'shifts/js/biota_delete_btn.js' %}?v={{ static_asset_version }}"></script>
+  <script src="{% static 'shifts/js/biota_delete_btn.js' %}?v={{ static_asset_version }}"{% if perf_defer_scripts %} defer{% endif %}></script>
 </body>
 </html>
