@@ -203,3 +203,22 @@ sudo systemctl restart <django-сервис>
 ```
 
 После проверки — merge `perf/package-a` → `master`.
+
+---
+
+## Диагностика медленных загрузок
+
+**Включение:** `BIOTA_PERF_DIAGNOSTICS=1` + миграция `0100` + restart gunicorn.
+
+**Просмотр:** Кабинет (admin) → «Медленные загрузки» (`/cabinet/perf-diagnostics/`).
+
+**Что собирается при превышении порога:**
+- TTFB, DOM, полная загрузка (браузер)
+- тип сети (4g/3g), saveData, viewport
+- медленные CSS/JS (>1 сек)
+- время ответа сервера (middleware)
+- авто-подсказка: «сервер / сеть / файлы»
+
+**Пороги в .env:** `BIOTA_PERF_DIAG_TTFB_MS`, `BIOTA_PERF_DIAG_LOAD_MS`, `BIOTA_PERF_DIAG_SERVER_MS`.
+
+**Откат:** `BIOTA_PERF_DIAGNOSTICS=0` + restart.

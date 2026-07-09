@@ -14,9 +14,15 @@ def biota_session(request):
 
         static_asset_version = getattr(settings, "STATIC_ASSET_VERSION", "1")
         perf_defer_scripts = getattr(settings, "BIOTA_PERF_DEFER_SCRIPTS", False)
+        perf_diagnostics = getattr(settings, "BIOTA_PERF_DIAGNOSTICS", False)
+        perf_diag_ttfb_ms = getattr(settings, "BIOTA_PERF_DIAG_TTFB_MS", 2500)
+        perf_diag_load_ms = getattr(settings, "BIOTA_PERF_DIAG_LOAD_MS", 5000)
     except Exception:
         static_asset_version = "1"
         perf_defer_scripts = False
+        perf_diagnostics = False
+        perf_diag_ttfb_ms = 2500
+        perf_diag_load_ms = 5000
     u = (request.session.get("biota_username") or "").strip()
     if not u:
         return {
@@ -28,6 +34,9 @@ def biota_session(request):
             "biota_machines_quick_edit": False,
             "static_asset_version": static_asset_version,
             "perf_defer_scripts": perf_defer_scripts,
+            "perf_diagnostics": perf_diagnostics,
+            "perf_diag_ttfb_ms": perf_diag_ttfb_ms,
+            "perf_diag_load_ms": perf_diag_load_ms,
         }
     nav = nav_permissions_for_user(u)
     adn = (request.session.get("admin_display_name") or "").strip()
@@ -42,6 +51,9 @@ def biota_session(request):
     }
     payload["static_asset_version"] = static_asset_version
     payload["perf_defer_scripts"] = perf_defer_scripts
+    payload["perf_diagnostics"] = perf_diagnostics
+    payload["perf_diag_ttfb_ms"] = perf_diag_ttfb_ms
+    payload["perf_diag_load_ms"] = perf_diag_load_ms
     if is_admin and adn:
         return {"biota_username": adn, **payload}
     return {"biota_username": u, **payload}

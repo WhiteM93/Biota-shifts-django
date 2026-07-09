@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+<style>
+.perf-diag-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.perf-diag-table th, .perf-diag-table td { padding: 8px 10px; border-bottom: 1px solid var(--bio-surface-item-border); vertical-align: top; text-align: left; }
+.perf-diag-table tbody tr:hover { background: var(--bio-surface-item); }
+.perf-diag-hint { color: var(--bio-body-fg); font-weight: 600; max-width: 280px; }
+.perf-diag-meta { color: var(--bio-muted); font-size: 11px; }
+.perf-diag-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.perf-diag-filters a { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--bio-filter-border); text-decoration: none; font-size: 12px; }
+.perf-diag-filters a.active { background: var(--bio-tab-pill-active-bg); color: #fff; border-color: transparent; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cabinet-page">
+  <header class="cabinet-hero">
+    <p class="cabinet-hero__eyebrow">Администрирование</p>
+    <h1>Медленные загрузки</h1>
+    <p class="cabinet-hero__meta muted">Журнал срабатывает, когда страница грузится дольше порога. Помогает понять: сервер, интернет или тяжёлые файлы.</p>
+  </header>
+
+  {% if not enabled %}
+  <p class="home-alert home-alert--error" role="alert">
+    Сбор выключен. Добавьте в <code>.env</code>: <code>BIOTA_PERF_DIAGNOSTICS=1</code> и перезапустите gunicorn.
+  </p>
+  {% else %}
+  <p class="muted" style="font-size:12px;margin:0 0 12px;">
+    Пороги: TTFB ≥ {{ thresholds.ttfb_ms }} мс, полная загрузка ≥ {{ thresholds.load_ms }} мс, сервер ≥ {{ thresholds.server_ms }} мс.
+  </p>
+  <nav class="perf-diag-filters" aria-label="Фильтр">
+    <a href="{% url 'perf_diagnostics' %}" class="{% if not source_filter %}active{% endif %}">Все</a>
+    <a href="{% url 'perf_diagnostics' %}?source=client" class="{% if source_filter == 'client' %}active{% endif %}">Браузер</a>
+    <a href="{% url 'perf_diagnostics' %}?source=server" class="{% if source_filter == 'server' %}active{% endif %}">Сервер</a>
+  </nav>
+
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="perf-diag-table">
+      <thead>
+        <tr>
+          <th>Когда</th>
+          <th>Источник</th>
+          <th>Страница</th>
+          <th>Кто</th>
+          <th>мс</th>
+          <th>Подсказка</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>{{ row.created_at|date:"d.m.Y H:i:s" }}</td>
+          <td>{{ row.get_source_display }}{% if row.is_mobile %}<br><span class="perf-diag-meta">📱</span>{% endif %}{% if row.connection_type %}<br><span class="perf-diag-meta">{{ row.connection_type }}</span>{% endif %}</td>
+          <td><code>{{ row.page_path|truncatechars:48 }}</code></td>
+          <td>{{ row.actor_username|default:"—" }}</td>
+          <td class="perf-diag-meta">
+            {% if row.ttfb_ms %}TTFB {{ row.ttfb_ms }}<br>{% endif %}
+            {% if row.load_ms %}Load {{ row.load_ms }}<br>{% endif %}
+            {% if row.server_ms %}Srv {{ row.server_ms }}{% endif %}
+          </td>
+          <td class="perf-diag-hint">{{ row.diagnosis }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Пока записей нет — зайдите на медленную страницу с телефона или дождитесь реального торможения.</p>
+  {% endif %}
+  {% endif %}
+
+  <p style="margin-top:20px;"><a href="{% url 'cabinet' %}">← Личный кабинет</a></p>
+</div>
+{% endblock %}

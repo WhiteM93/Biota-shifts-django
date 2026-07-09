@@ -35,3 +35,34 @@ class ExecutorReadOnlyMiddleware:
             return HttpResponseForbidden("Роль «исполнитель»: доступны только просмотр и скачивание.")
 
         return self.get_response(request)
+
+
+class PerfDiagnosticMiddleware:
+    """Заголовок X-Biota-Response-Ms и запись медленных HTML-ответов (если BIOTA_PERF_DIAGNOSTICS)."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from django.conf import settings
+
+        if not getattr(settings, "BIOTA_PERF_DIAGNOSTICS", False):
+            return self.get_response(request)
+
+        import time
+
+        from shifts.perf_diagnostic import record_server_diagnostic
+
+        start = time.perf_counter()
+        response = self.get_response(request)
+        server_ms = int((time.perf_counter() - start) * 1000)
+        response["X-Biota-Response-Ms"] = str(server_ms)
+
+        if request.method == "GET":
+            content_type = (response.get("Content-Type") or "").lower()
+            if "text/html" in content_type and getattr(response, "status_code", 200) < 400:
+                try:
+                    record_server_diagnostic(request, server_ms)
+                except Exception:
+                    pass
+        return response

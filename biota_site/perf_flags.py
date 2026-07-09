@@ -26,6 +26,16 @@ def _users_store_cache_seconds(package_a: bool) -> int:
     return 60 if package_a else 0
 
 
+def _int_env(name: str, default: int) -> int:
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return default
+
+
 def load_perf_settings() -> dict:
     package_a = _truthy(os.getenv("BIOTA_PERF_PACKAGE_A"))
     return {
@@ -33,4 +43,9 @@ def load_perf_settings() -> dict:
         "BIOTA_PERF_MOBILE_GRAPH": _env_or_package("BIOTA_PERF_MOBILE_GRAPH", package_a),
         "BIOTA_PERF_DEFER_SCRIPTS": _env_or_package("BIOTA_PERF_DEFER_SCRIPTS", package_a),
         "BIOTA_PERF_USERS_STORE_CACHE_SEC": _users_store_cache_seconds(package_a),
+        "BIOTA_PERF_DIAGNOSTICS": _truthy(os.getenv("BIOTA_PERF_DIAGNOSTICS")),
+        "BIOTA_PERF_DIAG_TTFB_MS": _int_env("BIOTA_PERF_DIAG_TTFB_MS", 2500),
+        "BIOTA_PERF_DIAG_LOAD_MS": _int_env("BIOTA_PERF_DIAG_LOAD_MS", 5000),
+        "BIOTA_PERF_DIAG_SERVER_MS": _int_env("BIOTA_PERF_DIAG_SERVER_MS", 2000),
+        "BIOTA_PERF_DIAG_KEEP": _int_env("BIOTA_PERF_DIAG_KEEP", 1000),
     }

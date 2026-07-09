@@ -75,6 +75,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "shifts.middleware.ExecutorReadOnlyMiddleware",
+    "shifts.middleware.PerfDiagnosticMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -166,7 +167,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # Увеличивайте после правок CSS/JS, чтобы браузер и nginx не отдавали старые файлы.
-STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "46").strip() or "46"
+STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "47").strip() or "47"
 
 # Оптимизации производительности (пакет A): по умолчанию выключены. См. PERFORMANCE_NOTES.md и .env.example.
 _perf = load_perf_settings()
@@ -174,6 +175,11 @@ BIOTA_PERF_PACKAGE_A = _perf["BIOTA_PERF_PACKAGE_A"]
 BIOTA_PERF_MOBILE_GRAPH = _perf["BIOTA_PERF_MOBILE_GRAPH"]
 BIOTA_PERF_DEFER_SCRIPTS = _perf["BIOTA_PERF_DEFER_SCRIPTS"]
 BIOTA_PERF_USERS_STORE_CACHE_SEC = _perf["BIOTA_PERF_USERS_STORE_CACHE_SEC"]
+BIOTA_PERF_DIAGNOSTICS = _perf["BIOTA_PERF_DIAGNOSTICS"]
+BIOTA_PERF_DIAG_TTFB_MS = _perf["BIOTA_PERF_DIAG_TTFB_MS"]
+BIOTA_PERF_DIAG_LOAD_MS = _perf["BIOTA_PERF_DIAG_LOAD_MS"]
+BIOTA_PERF_DIAG_SERVER_MS = _perf["BIOTA_PERF_DIAG_SERVER_MS"]
+BIOTA_PERF_DIAG_KEEP = _perf["BIOTA_PERF_DIAG_KEEP"]
 
 # Загрузки изделий (чертежи, CAD). При DEBUG файлы отдаёт Django; в проде настройте раздачу /media/ через nginx.
 MEDIA_URL = "/media/"

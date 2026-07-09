@@ -981,6 +981,39 @@ class SectionActionLog(models.Model):
         return f"{self.section} · {self.summary[:80]}"
 
 
+class PageLoadDiagnostic(models.Model):
+    """Медленные загрузки страниц — для разбора «сеть / сервер / браузер»."""
+
+    SOURCE_CLIENT = "client"
+    SOURCE_SERVER = "server"
+    SOURCE_CHOICES = [
+        (SOURCE_CLIENT, "Браузер"),
+        (SOURCE_SERVER, "Сервер"),
+    ]
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Когда")
+    source = models.CharField(max_length=8, choices=SOURCE_CHOICES, db_index=True, verbose_name="Источник")
+    actor_username = models.CharField(max_length=120, blank=True, default="", verbose_name="Пользователь")
+    page_path = models.CharField(max_length=500, db_index=True, verbose_name="Страница")
+    server_ms = models.PositiveIntegerField(null=True, blank=True, verbose_name="Сервер, мс")
+    ttfb_ms = models.PositiveIntegerField(null=True, blank=True, verbose_name="TTFB, мс")
+    dom_ms = models.PositiveIntegerField(null=True, blank=True, verbose_name="DOM, мс")
+    load_ms = models.PositiveIntegerField(null=True, blank=True, verbose_name="Load, мс")
+    is_mobile = models.BooleanField(default=False, verbose_name="Мобильный")
+    user_agent = models.CharField(max_length=300, blank=True, default="", verbose_name="User-Agent")
+    connection_type = models.CharField(max_length=16, blank=True, default="", verbose_name="Сеть")
+    diagnosis = models.CharField(max_length=500, verbose_name="Подсказка")
+    details = models.JSONField(default=dict, blank=True, verbose_name="Детали")
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = "Диагностика загрузки"
+        verbose_name_plural = "Диагностика загрузок"
+
+    def __str__(self):
+        return f"{self.source} · {self.page_path} · {self.diagnosis[:60]}"
+
+
 class PurchaseRequest(models.Model):
     requested_item = models.CharField(max_length=255, verbose_name="Что закупить")
     store_name = models.CharField(max_length=120, blank=True, default="", verbose_name="Магазин")
