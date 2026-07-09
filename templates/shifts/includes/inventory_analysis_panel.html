@@ -1,0 +1,203 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'shifts/css/inventory_analysis.css' %}?v={{ static_asset_version }}">
+
+<div class="inv-analysis-hero calc-header">
+  <div class="calc-header-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15v-3"/><path d="M12 15V8"/><path d="M16 15v-5"/>
+    </svg>
+  </div>
+  <div>
+    <h1 class="calc-title">Анализ склада</h1>
+    <p class="calc-subtitle">Сводка по ключевому параметру и контроль ходового инструмента</p>
+  </div>
+</div>
+
+{% if analysis_watch_alerts %}
+<section class="inv-analysis-alerts" aria-label="Требует внимания">
+  {% for row in analysis_watch_alerts %}
+  <article class="inv-analysis-alert inv-analysis-alert--{{ row.status }}">
+    <div class="inv-analysis-alert__main">
+      <strong>{{ row.template.name }}</strong>
+      <span class="inv-analysis-alert__meta">{{ row.category_label }} · {{ row.group_label }} {{ row.template.group_value }}</span>
+    </div>
+    <div class="inv-analysis-alert__qty">
+      <span class="inv-analysis-qty inv-analysis-qty--{{ row.status }}">{{ row.total_qty }}</span>
+      <span class="inv-analysis-alert__need">/ {{ row.template.min_qty }} мин.</span>
+    </div>
+    <a class="inv-analysis-link" href="{{ row.stock_url }}">На склад →</a>
+  </article>
+  {% endfor %}
+</section>
+{% endif %}
+
+<div class="inv-stock-layout inv-analysis-layout">
+  <div class="inv-stock-main calc-glass-card inv-analysis-main">
+    <form method="get" class="inv-analysis-filter auto-submit-form">
+      <input type="hidden" name="panel" value="analysis">
+      <div class="calc-card-header">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 5h14M5 9h10M7 13h6"/></svg>
+        <span>Сводка</span>
+      </div>
+      <div class="inv-analysis-filter__grid">
+        <label class="calc-field field">
+          <span class="calc-label">Тип инструмента</span>
+          <span class="calc-sel-wrap">
+            <select name="analysis_category" class="calc-sel">
+              {% for key, label in analysis_categories %}
+              <option value="{{ key }}" {% if key == analysis_category %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </span>
+        </label>
+        <label class="calc-field field">
+          <span class="calc-label">Группировать по</span>
+          <span class="calc-sel-wrap">
+            <select name="group_by" class="calc-sel">
+              {% for key, label in analysis_group_fields %}
+              <option value="{{ key }}" {% if key == analysis_group_field %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </span>
+        </label>
+        <label class="calc-field field">
+          <span class="calc-label">Поиск</span>
+          <input type="search" name="analysis_search" value="{{ analysis_search }}" placeholder="Значение…" class="calc-inp calc-inp--plain">
+        </label>
+        <label class="calc-field field inv-analysis-check">
+          <span class="calc-label">&nbsp;</span>
+          <label class="inv-analysis-zero"><input type="checkbox" name="show_zero" value="1" {% if analysis_include_zero %}checked{% endif %}> С нулевым остатком</label>
+        </label>
+      </div>
+    </form>
+
+    <div class="calc-divider" style="margin: 0 20px;"></div>
+
+    <section class="inv-analysis-table-section" aria-label="Сводка остатков">
+      <div class="inv-analysis-table-section__head">
+        <span class="inv-analysis-table-section__title">{{ analysis_category_label }} · {{ analysis_group_label }}</span>
+        <span class="inv-analysis-table-section__count">{{ analysis_rows|length }}</span>
+        <span class="inv-analysis-table-section__meta">{{ analysis_total_qty }} шт. · {{ analysis_total_skus }} поз.</span>
+      </div>
+      <div class="table-wrap inv-analysis-table-wrap">
+        <table class="data-grid inv-analysis-grid">
+          <thead>
+            <tr>
+              <th>{{ analysis_group_label }}</th>
+              <th class="col-num">Позиций</th>
+              <th class="col-num">Всего, шт.</th>
+              <th class="col-actions" aria-label="Действия"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in analysis_rows %}
+            <tr>
+              <td><strong>{{ row.group_value }}</strong></td>
+              <td class="col-num">{{ row.sku_count }}</td>
+              <td class="col-num"><span class="inv-analysis-qty {% if row.total_qty == 0 %}inv-analysis-qty--critical{% endif %}">{{ row.total_qty }}</span></td>
+              <td class="col-actions">
+                <a class="inv-analysis-mini-link" href="{{ row.stock_url }}">Склад</a>
+                {% if biota_can_edit %}
+                <form method="post" class="inv-analysis-inline-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="save_watch_template">
+                  <input type="hidden" name="watch_name" value="{{ analysis_category_label }} {{ row.group_value }}">
+                  <input type="hidden" name="watch_category" value="{{ analysis_category }}">
+                  <input type="hidden" name="watch_group_field" value="{{ analysis_group_field }}">
+                  <input type="hidden" name="watch_group_value" value="{{ row.group_value }}">
+                  <input type="hidden" name="watch_min_qty" value="5">
+                  <button type="submit" class="inv-analysis-mini-btn" title="Добавить в контроль">+ контроль</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="muted" style="padding:18px;text-align:center;">Нет данных для выбранных параметров.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <aside class="inv-stock-sidebar calc-glass-card inv-analysis-sidebar">
+    <div class="calc-card-header">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 2l2 4 4 .5-3 3 .8 4.5L10 12l-3.8 2 1-4.5-3-3 4-.5z"/></svg>
+      <span>Контроль ходового</span>
+    </div>
+
+    {% if biota_can_edit %}
+    <form method="post" class="inv-analysis-watch-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_watch_template">
+      <input type="hidden" name="analysis_category" value="{{ analysis_category }}">
+      <input type="hidden" name="group_by" value="{{ analysis_group_field }}">
+      <label class="field"><span>Название</span>
+        <input type="text" name="watch_name" maxlength="120" placeholder="Фрезы Ø2" required>
+      </label>
+      <label class="field"><span>Тип</span>
+        <select name="watch_category">
+          {% for key, label in analysis_categories %}
+          <option value="{{ key }}" {% if key == analysis_category %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field"><span>Группировать по</span>
+        <select name="watch_group_field" id="inv-analysis-watch-group-field">
+          {% for key, label in analysis_group_fields %}
+          <option value="{{ key }}" {% if key == analysis_group_field %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field"><span>Значение</span>
+        <input type="text" name="watch_group_value" maxlength="80" placeholder="2" required>
+      </label>
+      <label class="field"><span>Минимум, шт.</span>
+        <input type="number" name="watch_min_qty" value="5" min="1" max="9999" step="1">
+      </label>
+      <label class="field"><span>Заметка</span>
+        <input type="text" name="watch_notes" maxlength="255" placeholder="Необязательно">
+      </label>
+      <button type="submit" class="btn btn-sm" style="width:100%;">Добавить в контроль</button>
+    </form>
+    {% endif %}
+
+    <div class="inv-analysis-watch-list">
+      {% for row in analysis_watch_rows %}
+      <article class="inv-analysis-watch-card inv-analysis-watch-card--{{ row.status }}">
+        <div class="inv-analysis-watch-card__head">
+          <strong>{{ row.template.name }}</strong>
+          <span class="inv-analysis-watch-card__meta">{{ row.category_label }} · {{ row.group_label }} {{ row.template.group_value }}</span>
+        </div>
+        <div class="inv-analysis-watch-card__row">
+          <span class="inv-analysis-qty inv-analysis-qty--{{ row.status }}">{{ row.total_qty }}</span>
+          <span class="muted">/ {{ row.template.min_qty }} мин.</span>
+          <a class="inv-analysis-mini-link" href="{{ row.stock_url }}">Склад</a>
+        </div>
+        {% if row.template.notes %}<p class="inv-analysis-watch-card__notes">{{ row.template.notes }}</p>{% endif %}
+        {% if biota_can_edit %}
+        <div class="inv-analysis-watch-card__actions">
+          <form method="post" class="inv-analysis-inline-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_watch_template">
+            <input type="hidden" name="watch_id" value="{{ row.template.id }}">
+            <input type="hidden" name="watch_name" value="{{ row.template.name }}">
+            <input type="hidden" name="watch_notes" value="{{ row.template.notes }}">
+            <label class="inv-analysis-min-label">мин. <input type="number" name="watch_min_qty" value="{{ row.template.min_qty }}" min="1" max="9999" class="inv-analysis-min-input"></label>
+            <button type="submit" class="inv-analysis-mini-btn">OK</button>
+          </form>
+          <form method="post" class="inv-analysis-inline-form" onsubmit="return confirm('Удалить строку контроля?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_watch_template">
+            <input type="hidden" name="watch_id" value="{{ row.template.id }}">
+            <button type="submit" class="inv-analysis-mini-btn inv-analysis-mini-btn--danger">×</button>
+          </form>
+        </div>
+        {% endif %}
+      </article>
+      {% empty %}
+      <p class="muted inv-analysis-watch-empty">Добавьте строки контроля — система покажет, чего не хватает. Можно добавить из таблицы слева кнопкой «+ контроль».</p>
+      {% endfor %}
+    </div>
+  </aside>
+</div>

@@ -17,10 +17,14 @@
 <link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}?v={{ static_asset_version }}">
 <link rel="stylesheet" href="{% static 'shifts/css/inventory_purchases.css' %}?v={{ static_asset_version }}">
 {% endif %}
+{% if panel == "analysis" %}
+<link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% static 'shifts/css/inventory_analysis.css' %}?v={{ static_asset_version }}">
+{% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="inv-page{% if panel == 'stock' %} inv-page--stock{% endif %}{% if panel == 'arrival' %} inv-page--arrival{% endif %}{% if panel == 'issue_outcome' %} inv-page--issue-outcome{% endif %}{% if panel == 'payroll' %} inv-page--payroll{% endif %}{% if panel == 'purchases' %} inv-page--purchases calc-page{% endif %}">
+<div class="inv-page{% if panel == 'stock' %} inv-page--stock{% endif %}{% if panel == 'arrival' %} inv-page--arrival{% endif %}{% if panel == 'issue_outcome' %} inv-page--issue-outcome{% endif %}{% if panel == 'payroll' %} inv-page--payroll{% endif %}{% if panel == 'purchases' %} inv-page--purchases calc-page{% endif %}{% if panel == 'analysis' %} inv-page--analysis calc-page{% endif %}">
 {% if panel != "defects" and panel != "payroll" and panel != "employees" %}
 <nav class="inv-tabs" aria-label="Разделы склада">
   <a class="inv-tab {% if panel == 'stock' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=stock">Склад</a>
@@ -31,6 +35,7 @@
   <a class="inv-tab {% if panel == 'arrival' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=arrival">Приход</a>
   {% endif %}
   <a class="inv-tab {% if panel == 'purchases' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=purchases">Закупки</a>
+  <a class="inv-tab {% if panel == 'analysis' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=analysis">Анализ</a>
 </nav>
 {% endif %}
 {% if panel != "defects" and panel != "payroll" and panel != "employees" and panel != "stock" and panel != "arrival" and panel != "issue_outcome" and panel != "purchases" and panel != "history" %}
@@ -1423,6 +1428,10 @@
 {% else %}
 <p class="muted">Режим исполнителя: только просмотр и скачивание.</p>
 {% endif %}
+{% endif %}
+
+{% if panel == "analysis" %}
+{% include "shifts/includes/inventory_analysis_panel.html" %}
 {% endif %}
 
 {% if panel == "purchases" %}

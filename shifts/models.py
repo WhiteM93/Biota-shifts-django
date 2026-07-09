@@ -1273,6 +1273,34 @@ class UserHomeLowStockPrefs(models.Model):
         return f"{self.username} · {cat} · <{self.max_qty}"
 
 
+class InventoryWatchTemplate(models.Model):
+    """Строка контроля ходового инструмента (вкладка «Анализ»)."""
+
+    username = models.CharField(max_length=200, db_index=True, verbose_name="Аккаунт")
+    name = models.CharField(max_length=120, verbose_name="Название")
+    category = models.CharField(
+        max_length=20,
+        verbose_name="Тип инструмента",
+        choices=ToolItem._meta.get_field("category").choices,
+    )
+    group_field = models.CharField(max_length=40, verbose_name="Поле группировки")
+    group_value = models.CharField(max_length=80, verbose_name="Значение")
+    min_qty = models.PositiveSmallIntegerField(default=5, verbose_name="Минимум, шт.")
+    sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+    is_active = models.BooleanField(default=True, verbose_name="Активно")
+    notes = models.CharField(max_length=255, blank=True, default="", verbose_name="Заметка")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("sort_order", "name", "id")
+        verbose_name = "Контроль остатков (шаблон)"
+        verbose_name_plural = "Контроль остатков (шаблоны)"
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.group_value})"
+
+
 DEFECT_PAYROLL_ADJUST_KIND_CHOICES = [
     ("bonus_percent", "Премия, % от начисления по табелю"),
     ("bonus_rub", "Премия, ₽ (фикс)"),

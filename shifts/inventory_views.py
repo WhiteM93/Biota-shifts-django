@@ -44,6 +44,7 @@ from .collet_constants import (
     normalize_er_clamp_range,
     normalize_er_collet_size,
 )
+from .inventory_analysis import analysis_context, normalize_group_field
 from .insert_constants import (
     INSERT_EDGE_LENGTH_CODES,
     INSERT_NOSE_RADIUS_CODES,
@@ -74,6 +75,7 @@ from .models import (
     ColletSpec,
     InsertSpec,
     InventoryStockEvent,
+    InventoryWatchTemplate,
     StockMovement,
     TapSpec,
     ToolItem,
@@ -99,6 +101,23 @@ PURCHASE_STORE_FILTER_OTHER = "__purchase_store_other__"
 _TOOL_MATERIAL_STD_KEYS = frozenset(k for k, _ in TOOL_MATERIAL_TYPES)
 _INVENTORY_CATEGORIES = frozenset({"end_mill", "tap", "center_drill", "countersink", "drill", "insert", "collet"})
 _HISTORY_MOVEMENT_TYPES = frozenset({"issue", "restock", "writeoff"})
+
+
+def _analysis_panel_redirect(request, **extra: str) -> redirect:
+    params: dict[str, str] = {"panel": "analysis"}
+    cat = (extra.get("analysis_category") or request.POST.get("analysis_category") or request.GET.get("analysis_category") or "end_mill").strip()
+    if cat in _INVENTORY_CATEGORIES:
+        params["analysis_category"] = cat
+    group_by = (extra.get("group_by") or request.POST.get("group_by") or request.GET.get("group_by") or "").strip()
+    if group_by:
+        params["group_by"] = group_by
+    show_zero = (extra.get("show_zero") or request.POST.get("show_zero") or request.GET.get("show_zero") or "").strip()
+    if show_zero == "1":
+        params["show_zero"] = "1"
+    search = (extra.get("analysis_search") or request.POST.get("analysis_search") or request.GET.get("analysis_search") or "").strip()
+    if search:
+        params["analysis_search"] = search
+    return redirect(f"{request.path}?{urlencode(params)}")
 
 
 def _history_panel_redirect(request):
@@ -822,7 +841,7 @@ def _create_collet_tool(quantity, spec_fields: dict) -> ToolItem:
 def inventory_view(request):
     action = request.POST.get("action") if request.method == "POST" else ""
     panel = (request.GET.get("panel") or "stock").strip()
-    if panel not in {"stock", "history", "issue", "arrival", "issue_outcome", "purchases", "defects", "payroll", "employees"}:
+    if panel not in {"stock", "history", "issue", "arrival", "issue_outcome", "purchases", "analysis", "defects", "payroll", "employees"}:
         panel = "stock"
 
     username = biota_user(request) or "Неизвестный пользователь"
@@ -843,6 +862,58 @@ def inventory_view(request):
     if panel == "employees" and not can_employees:
         messages.warning(request, "У вас нет доступа к разделу «Сотрудники».")
         return redirect(reverse("inventory"))
+
+    if panel == "employees" and not can_employees:
+        messages.warning(request, "У вас нет доступа к разделу «Сотрудники».")
+        return redirect(reverse("inventory"))
+
+    if action == "save_watch_template":
+        name = (request.POST.get("watch_name") or "").strip()[:120]
+        category = (request.POST.get("watch_category") or "").strip()
+        group_field = normalize_group_field(category, (request.POST.get("watch_group_field") or "").strip())
+        group_value = (request.POST.get("watch_group_value") or "").strip()[:80]
+        min_qty = max(1, min(9999, _to_int(request.POST.get("watch_min_qty"), 5)))
+        notes = (request.POST.get("watch_notes") or "").strip()[:255]
+        if not name or category not in _INVENTORY_CATEGORIES or not group_value:
+            messages.error(request, "Укажите название, тип инструмента и значение для контроля.")
+            return _analysis_panel_redirect(request)
+        sort_order = (
+            InventoryWatchTemplate.objects.filter(username=username, is_active=True).count() + 1
+        )
+        InventoryWatchTemplate.objects.create(
+            username=username,
+            name=name,
+            category=category,
+            group_field=group_field,
+            group_value=group_value,
+            min_qty=min_qty,
+            sort_order=sort_order,
+            notes=notes,
+        )
+        messages.success(request, f"Добавлено в контроль: {name}")
+        return _analysis_panel_redirect(request, analysis_category=category)
+
+    if action == "update_watch_template":
+        tpl_id = _to_int(request.POST.get("watch_id"), 0)
+        tpl = InventoryWatchTemplate.objects.filter(id=tpl_id, username=username, is_active=True).first()
+        if not tpl:
+            messages.error(request, "Строка контроля не найдена.")
+            return _analysis_panel_redirect(request)
+        tpl.min_qty = max(1, min(9999, _to_int(request.POST.get("watch_min_qty"), tpl.min_qty)))
+        tpl.name = (request.POST.get("watch_name") or tpl.name).strip()[:120]
+        tpl.notes = (request.POST.get("watch_notes") or tpl.notes).strip()[:255]
+        tpl.save(update_fields=["min_qty", "name", "notes", "updated_at"])
+        messages.success(request, "Контроль обновлён.")
+        return _analysis_panel_redirect(request, analysis_category=tpl.category)
+
+    if action == "delete_watch_template":
+        tpl_id = _to_int(request.POST.get("watch_id"), 0)
+        deleted, _ = InventoryWatchTemplate.objects.filter(id=tpl_id, username=username).delete()
+        if deleted:
+            messages.success(request, "Строка контроля удалена.")
+        else:
+            messages.error(request, "Строка контроля не найдена.")
+        return _analysis_panel_redirect(request)
 
     if action == "rollback_stock_movement":
         if not is_admin_user:
@@ -2703,4 +2774,6 @@ def inventory_view(request):
         "payroll_year_options": payroll_year_options,
         "month_choices_payroll": [(mm, MONTH_NAMES_RU[mm]) for mm in range(1, 13)],
     }
+    if panel == "analysis":
+        ctx.update(analysis_context(request, username))
     return render(request, "shifts/inventory.html", ctx)
