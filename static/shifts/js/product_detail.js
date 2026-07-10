@@ -8,28 +8,38 @@ var PD = (function () {
 
 var BDB = window.BiotaDeleteBtn || {};
 
+function getBdb() {
+  return window.BiotaDeleteBtn || BDB;
+}
+
 function phasedDeleteReset(btn) {
-  if (BDB.reset) BDB.reset(btn);
+  var bdb = getBdb();
+  if (bdb.reset) bdb.reset(btn);
 }
 
 function phasedDeleteInit(btn) {
-  if (BDB.init) BDB.init(btn);
+  var bdb = getBdb();
+  if (bdb.init) bdb.init(btn);
 }
 
 function phasedDeleteInitAll(scope) {
-  if (BDB.initAll) BDB.initAll(scope, ".js-phased-delete");
+  var bdb = getBdb();
+  if (bdb.initAll) bdb.initAll(scope, ".js-phased-delete");
 }
 
 function phasedDeleteResetAll(scope) {
-  if (BDB.resetAll) BDB.resetAll(scope, ".js-phased-delete");
+  var bdb = getBdb();
+  if (bdb.resetAll) bdb.resetAll(scope, ".js-phased-delete");
 }
 
 function phasedDeleteHandleClick(btn, confirmMsg, onFinal) {
-  if (BDB.handleClick) return BDB.handleClick(btn, confirmMsg, onFinal);
+  var bdb = getBdb();
+  if (bdb.handleClick) return bdb.handleClick(btn, confirmMsg, onFinal);
   return false;
 }
 
 function productDetailDeleteBtnHtml(extraClass, attrs) {
+  var bdb = getBdb();
   var cls = "btn btn-inv-delete btn-inv-delete--s0 js-phased-delete" + (extraClass ? " " + extraClass : "");
   var attrStr = "";
   if (attrs) {
@@ -43,7 +53,7 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
     '" data-step="0"' +
     attrStr +
     ">" +
-    (BDB.TRASH_SVG || "") +
+    (BDB.TRASH_SVG || bdb.TRASH_SVG || "") +
     "</button>"
   );
 }

@@ -15,6 +15,7 @@
   </script>
   <link rel="stylesheet" href="{% static 'css/biota_global.css' %}?v={{ static_asset_version }}">
   <link rel="stylesheet" href="{% static 'shifts/css/biota_delete_btn.css' %}?v={{ static_asset_version }}">
+  <script src="{% static 'shifts/js/biota_delete_btn.js' %}?v={{ static_asset_version }}"></script>
   {% block extra_styles %}{% endblock %}
 </head>
 <body class="{% if auth_page %}auth-page{% endif %}" data-biota-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}">
@@ -151,6 +152,5 @@
   </script>
   <script src="{% static 'shifts/js/perf-diagnostic.js' %}?v={{ static_asset_version }}" defer></script>
   {% endif %}
-  <script src="{% static 'shifts/js/biota_delete_btn.js' %}?v={{ static_asset_version }}"{% if perf_defer_scripts %} defer{% endif %}></script>
 </body>
 </html>

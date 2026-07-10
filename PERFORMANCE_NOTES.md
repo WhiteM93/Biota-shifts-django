@@ -119,7 +119,7 @@
 1. ~~Убрать склад с главной~~ (сделано 2026-07-09)
 2. ~~Пакет A (feature flags)~~ — ветка `perf/package-a`, см. ниже
 3. Auto-redirect телефонов `/graph/` → `/graph/mobile/` — **BIOTA_PERF_MOBILE_GRAPH**
-4. `defer` на `biota_delete_btn.js` — **BIOTA_PERF_DEFER_SCRIPTS**
+4. `biota_delete_btn.js` — **без defer**, подключается в `<head>` (критичен для удаления; defer ломал порядок с `product_detail.js`).
 5. Кэш `_load_users_store()` — **BIOTA_PERF_USERS_STORE_CACHE_SEC**
 6. Не грузить `inventory.js` + `#inv-options` на `panel=purchases`
 
