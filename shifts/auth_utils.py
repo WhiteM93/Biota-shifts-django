@@ -17,6 +17,16 @@ from biota_shifts.auth import (
     user_is_executor,
 )
 
+# POST-действия, разрешённые роли «исполнитель» (остальное — только просмотр/скачивание).
+EXECUTOR_ALLOWED_POST_ACTIONS = frozenset(
+    {
+        "add_product_note",
+        "delete_product_note",
+        "refresh_google",
+        "inline_toggle_setup_in_work",
+    }
+)
+
 
 def biota_user(request):
     return (request.session.get("biota_username") or "").strip() or None
@@ -206,12 +216,7 @@ def write_permission_required(view_func):
             rm = getattr(request, "resolver_match", None)
             if rm and rm.url_name == "inventory" and inventory_stock_manage_for_user(u):
                 return view_func(request, *args, **kwargs)
-            if action in {
-                "add_product_note",
-                "delete_product_note",
-                "refresh_google",
-                "inline_toggle_setup_in_work",
-            }:
+            if action in EXECUTOR_ALLOWED_POST_ACTIONS:
                 return view_func(request, *args, **kwargs)
             if (request.headers.get("X-Requested-With") or "").strip() == "XMLHttpRequest":
                 return JsonResponse(

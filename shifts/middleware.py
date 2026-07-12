@@ -3,6 +3,8 @@ from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 
 from biota_shifts.auth import user_is_executor
 
+from shifts.auth_utils import EXECUTOR_ALLOWED_POST_ACTIONS
+
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 REGISTER_PATH_PREFIX = "/accounts/register"
@@ -79,7 +81,7 @@ class ExecutorReadOnlyMiddleware:
         username = (request.session.get("biota_username") or "").strip()
         if username and user_is_executor(username):
             action = (request.POST.get("action") or "").strip()
-            if action in {"refresh_google", "inline_toggle_setup_in_work"}:
+            if action in EXECUTOR_ALLOWED_POST_ACTIONS:
                 return self.get_response(request)
             is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
             if is_ajax:
