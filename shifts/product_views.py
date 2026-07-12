@@ -71,6 +71,25 @@ def _product_list_url_name(product: Product) -> str:
     return "products_list"
 
 
+def _resolve_product_setup_from_post(product: Product, post) -> ProductSetup | None:
+    setup_id_raw = (post.get("setup_id") or "").strip()
+    if not setup_id_raw.isdigit():
+        return None
+    return ProductSetup.objects.filter(pk=int(setup_id_raw), product=product).first()
+
+
+def _inspection_setup_or_400(product: Product, post):
+    setup_id_raw = (post.get("setup_id") or "").strip()
+    if not setup_id_raw:
+        return None, None
+    if not setup_id_raw.isdigit():
+        return None, JsonResponse({"ok": False, "error": "Некорректная установка."}, status=400)
+    setup = ProductSetup.objects.filter(pk=int(setup_id_raw), product=product).first()
+    if not setup:
+        return None, JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+    return setup, None
+
+
 def _product_setups_qs(product: Product):
     return product.setups.order_by(*SETUP_LIST_ORDER)
 
@@ -1977,6 +1996,7 @@ def product_detail_view(request, pk: int):
             if setup.tab_slug == tab_default:
                 active_setup = setup
                 break
+    inspection_ctx = None
     return render(
         request,
         "shifts/product_detail.html",
@@ -2012,6 +2032,7 @@ def product_detail_view(request, pk: int):
                 if not product.is_osnastka
                 else []
             ),
+            "show_inspection_link": not product.is_osnastka and bool(setups),
         },
     )
 

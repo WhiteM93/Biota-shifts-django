@@ -1,5 +1,6 @@
 from django.urls import path
 
+from . import inspection_views
 from . import notify_api_views
 from . import cabinet_views
 from . import debug_log_views
@@ -54,6 +55,11 @@ urlpatterns = [
     path("products/<int:pk>/setups/<int:setup_pk>/edit/", product_views.product_setup_edit_view, name="product_setup_edit"),
     path("products/<int:pk>/setups/<int:setup_pk>/pdf/<str:mode>/", product_views.product_setup_pdf_export_view, name="product_setup_pdf_export"),
     path("products/<int:pk>/save-list-preview/", product_views.product_save_list_preview_view, name="product_save_list_preview"),
+    path(
+        "products/<int:pk>/setups/<int:setup_pk>/inspection/",
+        inspection_views.product_setup_inspection_view,
+        name="product_setup_inspection",
+    ),
     path("products/<int:pk>/", product_views.product_detail_view, name="product_detail"),
     path("osnastki/", product_views.osnastka_list_view, name="osnastka_list"),
     path("osnastki/new/", product_views.osnastka_create_view, name="osnastka_create"),

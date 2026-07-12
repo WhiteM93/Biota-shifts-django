@@ -543,6 +543,11 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     font-weight: 600;
     min-width: 0;
   }
+  .product-setup-inspection-btn {
+    flex-shrink: 0;
+    font-size: 13px;
+    padding: 4px 10px;
+  }
   .product-setup-inwork-toggle {
     display: inline-flex;
     align-items: center;
@@ -4604,4 +4609,223 @@ html[data-theme="dawn"] .pd-save-notice {
   outline: 2px solid rgba(248, 113, 113, 0.65);
   outline-offset: 4px;
   border-radius: 10px;
+}
+
+/* --- Контроль размеров --- */
+.product-detail-meta-inspection {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+.product-inspection-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.product-inspection-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.product-inspection-tab {
+  border: 1px solid var(--bio-input-border);
+  background: var(--bio-input-bg);
+  color: var(--bio-body-fg);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.product-inspection-tab.is-active {
+  border-color: var(--bio-accent, #3b82f6);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bio-accent, #3b82f6) 35%, transparent);
+}
+.product-inspection-body {
+  display: grid;
+  grid-template-columns: minmax(180px, 38%) 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.product-inspection-pdf-wrap {
+  position: relative;
+  min-height: 220px;
+  border: 1px solid var(--bio-input-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bio-input-bg);
+}
+.product-inspection-pdf-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--bio-input-border);
+  font-size: 12px;
+}
+.product-inspection-pdf-frame {
+  width: 100%;
+  height: 320px;
+  border: 0;
+  background: #fff;
+}
+.product-inspection-pane {
+  min-width: 0;
+}
+.product-inspection-pane[hidden] {
+  display: none !important;
+}
+.product-inspection-hint,
+.product-inspection-empty {
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+.product-inspection-plan-toolbar,
+.product-inspection-form-actions,
+.product-inspection-measure-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.product-inspection-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--bio-input-border);
+  border-radius: 8px;
+}
+.product-inspection-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.product-inspection-table th,
+.product-inspection-table td {
+  border-bottom: 1px solid var(--bio-input-border);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+.product-inspection-table th {
+  background: color-mix(in srgb, var(--bio-input-bg) 70%, transparent);
+  font-weight: 600;
+}
+.product-inspection-inp {
+  width: 100%;
+  min-width: 64px;
+  box-sizing: border-box;
+  border: 1px solid var(--bio-input-border);
+  border-radius: 6px;
+  background: var(--bio-input-bg);
+  color: var(--bio-input-fg);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+.product-inspection-inp--n {
+  max-width: 64px;
+}
+.product-inspection-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.product-inspection-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.product-inspection-field--check {
+  flex-direction: row;
+  align-items: center;
+  font-size: 12px;
+}
+.product-inspection-emp-combo {
+  position: relative;
+}
+.product-inspection-emp-search {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--bio-input-border);
+  border-radius: 6px;
+  background: var(--bio-input-bg);
+  color: var(--bio-input-fg);
+  padding: 6px 8px;
+  font-size: 13px;
+}
+.product-inspection-emp-suggest {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  border: 1px solid var(--bio-input-border);
+  border-radius: 8px;
+  background: var(--bio-filter-bg2, var(--bio-input-bg));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.product-inspection-emp-item {
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.product-inspection-emp-item.is-active,
+.product-inspection-emp-item:hover {
+  background: color-mix(in srgb, var(--bio-accent, #3b82f6) 16%, transparent);
+}
+.product-inspection-journal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.product-inspection-session {
+  border: 1px solid var(--bio-input-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--bio-input-bg);
+}
+.product-inspection-session-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.product-inspection-session-meta {
+  font-size: 12px;
+  margin: 0 0 6px;
+}
+.product-inspection-result {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--bio-input-border);
+}
+.product-inspection-result--ok {
+  border-color: rgba(52, 211, 153, 0.5);
+}
+.product-inspection-result--nok {
+  border-color: rgba(248, 113, 113, 0.55);
+}
+.product-inspection-result--partial {
+  border-color: rgba(251, 191, 36, 0.55);
+}
+.product-inspection-ok-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+@media (max-width: 980px) {
+  .product-inspection-body {
+    grid-template-columns: 1fr;
+  }
+  .product-inspection-form-grid {
+    grid-template-columns: 1fr;
+  }
 }

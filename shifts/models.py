@@ -1563,6 +1563,186 @@ class ProductOsnastkaUsage(models.Model):
         return f"наладка {self.product_id} → оснастка {self.osnastka_id}"
 
 
+class ProductInspectionDimension(models.Model):
+    """Контролируемый размер в карте контроля наладки."""
+
+    CRITICALITY_CRITICAL = "critical"
+    CRITICALITY_STANDARD = "standard"
+    CRITICALITY_REFERENCE = "reference"
+    CRITICALITY_CHOICES = (
+        (CRITICALITY_CRITICAL, "Критичный — каждая деталь"),
+        (CRITICALITY_STANDARD, "Обычный — выборочно"),
+        (CRITICALITY_REFERENCE, "Справочный — первая / после переналадки"),
+    )
+
+    FREQUENCY_ALWAYS = "always"
+    FREQUENCY_EVERY_N = "every_n"
+    FREQUENCY_FIRST = "first_only"
+    FREQUENCY_CHOICES = (
+        (FREQUENCY_ALWAYS, "Каждая деталь"),
+        (FREQUENCY_EVERY_N, "Каждая N-я деталь"),
+        (FREQUENCY_FIRST, "Только первая / после переналадки"),
+    )
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="inspection_dimensions",
+        verbose_name="Изделие",
+    )
+    setup = models.ForeignKey(
+        "ProductSetup",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="inspection_dimensions",
+        verbose_name="Установка",
+        help_text="Пусто — контроль на уровне изделия (вкладка «Изделие»).",
+    )
+    label = models.CharField(max_length=120, verbose_name="Размер")
+    nominal = models.CharField(max_length=80, blank=True, verbose_name="Номинал")
+    tolerance_plus = models.CharField(max_length=40, blank=True, verbose_name="Допуск +")
+    tolerance_minus = models.CharField(max_length=40, blank=True, verbose_name="Допуск −")
+    tolerance_display = models.CharField(
+        max_length=80,
+        blank=True,
+        verbose_name="Допуск (отображение)",
+        help_text="Например ±0.05 или +0.1/-0.05",
+    )
+    criticality = models.CharField(
+        max_length=20,
+        choices=CRITICALITY_CHOICES,
+        default=CRITICALITY_STANDARD,
+        verbose_name="Критичность",
+    )
+    frequency = models.CharField(
+        max_length=20,
+        choices=FREQUENCY_CHOICES,
+        default=FREQUENCY_ALWAYS,
+        verbose_name="Частота контроля",
+    )
+    frequency_n = models.PositiveSmallIntegerField(default=5, verbose_name="N для выборочного")
+    pdf_page = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Страница PDF")
+    mark_x = models.FloatField(null=True, blank=True, verbose_name="Метка X, %")
+    mark_y = models.FloatField(null=True, blank=True, verbose_name="Метка Y, %")
+    sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Контролируемый размер"
+        verbose_name_plural = "Контролируемые размеры"
+
+    def __str__(self) -> str:
+        return f"{self.label} ({self.product_id})"
+
+    @property
+    def tolerance_text(self) -> str:
+        td = (self.tolerance_display or "").strip()
+        if td:
+            return td
+        plus = (self.tolerance_plus or "").strip()
+        minus = (self.tolerance_minus or "").strip()
+        if plus and minus and plus == minus:
+            return f"±{plus}"
+        if plus or minus:
+            return f"+{plus or '0'}/-{minus or '0'}"
+        return ""
+
+
+class ProductInspectionSession(models.Model):
+    """Акт контрольных замеров (документ)."""
+
+    RESULT_OK = "ok"
+    RESULT_NOK = "nok"
+    RESULT_PARTIAL = "partial"
+    RESULT_CHOICES = (
+        (RESULT_OK, "Годна"),
+        (RESULT_PARTIAL, "Частично"),
+        (RESULT_NOK, "Брак"),
+    )
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="inspection_sessions",
+        verbose_name="Изделие",
+    )
+    setup = models.ForeignKey(
+        "ProductSetup",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="inspection_sessions",
+        verbose_name="Установка",
+    )
+    session_no = models.PositiveIntegerField(default=1, verbose_name="№ акта")
+    inspector_emp_code = models.CharField(max_length=32, blank=True, verbose_name="Таб. №")
+    inspector_label = models.CharField(max_length=240, verbose_name="Контролёр")
+    part_label = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Деталь / партия",
+        help_text="Номер детали, партии или серии.",
+    )
+    author_username = models.CharField(max_length=150, verbose_name="Автор записи")
+    result = models.CharField(
+        max_length=20,
+        choices=RESULT_CHOICES,
+        default=RESULT_OK,
+        verbose_name="Итог",
+    )
+    notes = models.TextField(max_length=2000, blank=True, verbose_name="Примечание")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата и время")
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = "Акт контрольных замеров"
+        verbose_name_plural = "Акты контрольных замеров"
+
+    def __str__(self) -> str:
+        return f"Акт #{self.session_no} {self.product_id} @ {self.created_at}"
+
+
+class ProductInspectionValue(models.Model):
+    """Строка замера в акте (фиксируется снимок номинала/допуска)."""
+
+    session = models.ForeignKey(
+        ProductInspectionSession,
+        on_delete=models.CASCADE,
+        related_name="values",
+        verbose_name="Акт",
+    )
+    dimension = models.ForeignKey(
+        ProductInspectionDimension,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="session_values",
+        verbose_name="Размер (карта)",
+    )
+    dimension_label = models.CharField(max_length=120, verbose_name="Размер")
+    nominal = models.CharField(max_length=80, blank=True, verbose_name="Номинал")
+    tolerance_display = models.CharField(max_length=80, blank=True, verbose_name="Допуск")
+    criticality = models.CharField(max_length=20, blank=True, verbose_name="Критичность")
+    actual_value = models.CharField(max_length=80, blank=True, verbose_name="Факт")
+    is_ok = models.BooleanField(null=True, verbose_name="В допуске")
+    pdf_page = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Страница PDF")
+    mark_x = models.FloatField(null=True, blank=True, verbose_name="Метка X, %")
+    mark_y = models.FloatField(null=True, blank=True, verbose_name="Метка Y, %")
+    sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Замер в акте"
+        verbose_name_plural = "Замеры в акте"
+
+    def __str__(self) -> str:
+        return f"{self.dimension_label}: {self.actual_value}"
+
+
 _PRODUCT_SETUP_GCODE_STD = frozenset({"G54", "G55", "G56", "G57", "G58", "G59"})
 _PRODUCT_SETUP_GCODE_EXT_RE = re.compile(r"^G54\.1\s*P\s*(\d{1,2})\s*$", re.IGNORECASE)
 

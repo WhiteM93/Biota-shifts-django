@@ -61,6 +61,7 @@
             <div class="product-setup-panel-title">
               <span class="muted">Название установки:</span>
               <span class="product-setup-name" data-field-text="name">{{ setup.name }}</span>
+              <a href="{% url 'product_setup_inspection' product.pk setup.pk %}" class="btn btn-ghost product-setup-inspection-btn" title="Контроль размеров этой установки">Замер</a>
               <button
                 type="button"
                 class="product-setup-inwork-toggle{% if setup.in_work %} is-on{% endif %}"

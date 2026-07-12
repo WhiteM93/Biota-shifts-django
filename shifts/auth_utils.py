@@ -24,6 +24,8 @@ EXECUTOR_ALLOWED_POST_ACTIONS = frozenset(
         "delete_product_note",
         "refresh_google",
         "inline_toggle_setup_in_work",
+        "create_inspection_session",
+        "get_inspection_applicable",
     }
 )
 

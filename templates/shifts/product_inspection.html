@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/product_inspection.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
+{% block content %}
+<div class="insp-page" id="insp-page">
+  <header class="insp-header">
+    <a href="{{ product_url }}" class="insp-back" title="К наладке">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <polyline points="12,4 6,10 12,16"/>
+      </svg>
+      <span>К наладке</span>
+    </a>
+    <div class="insp-header-main">
+      <div class="insp-header-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 20V4"/>
+          <path d="M4 20h16"/>
+          <path d="M8 16V8"/>
+          <path d="M12 16V6"/>
+          <path d="M16 16v-4"/>
+        </svg>
+      </div>
+      <div class="insp-header-text">
+        <h1 class="insp-title">Замер</h1>
+        <p class="insp-subtitle">{{ product.name }} · <strong>{{ setup_label }}</strong></p>
+      </div>
+    </div>
+  </header>
+
+  <div class="insp-tabs-wrap">
+    <div class="insp-tabs" role="tablist">
+      <button type="button" class="insp-tab is-active" data-insp-tab="act" role="tab" aria-selected="true">
+        <svg class="insp-tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M4 4h12v12H4z"/><line x1="7" y1="8" x2="13" y2="8"/><line x1="7" y1="11" x2="11" y2="11"/>
+        </svg>
+        Новый акт
+      </button>
+      <button type="button" class="insp-tab" data-insp-tab="journal" role="tab" aria-selected="false">
+        <svg class="insp-tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M5 3h10a1 1 0 0 1 1 1v13l-3-2-3 2-3-2-3 2V4a1 1 0 0 1 1-1z"/>
+        </svg>
+        Журнал
+      </button>
+      {% if biota_can_edit %}
+      <button type="button" class="insp-tab" data-insp-tab="plan" role="tab" aria-selected="false">
+        <svg class="insp-tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2"/>
+        </svg>
+        Карта
+      </button>
+      {% endif %}
+      <div class="insp-tab-slider" id="insp-tab-slider"></div>
+    </div>
+    <p class="insp-hint-bar">Клик по чертежу добавляет пункт в акт</p>
+  </div>
+
+  <div class="insp-layout" id="insp-layout">
+    <section class="insp-card insp-drawing" aria-label="Чертёж">
+      <button type="button" class="insp-side-toggle" id="insp-side-toggle" aria-expanded="true" aria-controls="insp-side" title="Свернуть панель акта">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <polyline points="12,5 7,10 12,15"/>
+        </svg>
+      </button>
+      <div class="insp-card-head">
+        <span class="insp-card-label">Чертёж</span>
+        <div class="insp-drawing-toolbar">
+          <select id="insp-drawing-select" class="insp-select" aria-label="Файл чертежа"></select>
+          <div class="insp-page-nav">
+            <button type="button" class="insp-icon-btn" id="insp-page-prev" title="Пред. страница" aria-label="Пред. страница">‹</button>
+            <span class="insp-page-label" id="insp-page-label">—</span>
+            <button type="button" class="insp-icon-btn" id="insp-page-next" title="След. страница" aria-label="След. страница">›</button>
+          </div>
+          <label class="insp-toggle">
+            <input type="checkbox" id="insp-pick-mode" checked />
+            <span class="insp-toggle-track"><span class="insp-toggle-thumb"></span></span>
+            <span class="insp-toggle-text">Выбор</span>
+          </label>
+          <a href="#" class="insp-icon-btn insp-pdf-link" id="insp-pdf-open" target="_blank" rel="noopener" title="Открыть PDF">PDF</a>
+        </div>
+      </div>
+      <div class="insp-canvas-wrap" id="insp-canvas-wrap">
+        <div class="insp-canvas-loading" id="insp-canvas-loading" hidden>
+          <span class="insp-spinner" aria-hidden="true"></span>
+          <span>Загрузка…</span>
+        </div>
+        <div class="insp-canvas-empty" id="insp-canvas-empty" hidden>
+          <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <rect x="6" y="8" width="36" height="32" rx="3"/>
+            <path d="M14 20h20M14 28h14"/>
+          </svg>
+          <p>Чертёж не загружен. Добавьте PDF в карточке наладки.</p>
+        </div>
+        <div class="insp-canvas-stage" id="insp-canvas-stage">
+          <canvas id="insp-pdf-canvas" hidden></canvas>
+          <div class="insp-markers" id="insp-markers"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="insp-card insp-side" id="insp-side" aria-label="Акт и журнал">
+      <div class="insp-pane is-active" data-insp-pane="act">
+        <form class="insp-form biota-exempt-global-readonly-form" id="insp-act-form">
+          <div class="insp-form-grid">
+            <label class="insp-field">
+              <span class="insp-label">Контролёр</span>
+              <div class="insp-emp-combo" id="insp-emp-combo">
+                <select id="insp-emp-select" tabindex="-1" aria-hidden="true" hidden>
+                  <option value="">— выберите —</option>
+                  {% for emp in inspection_ctx.employee_options %}
+                  <option value="{{ emp.emp_code|escape }}" data-label="{{ emp.label|escape }}">{{ emp.label }}</option>
+                  {% endfor %}
+                </select>
+                <input type="text" class="insp-inp" id="insp-emp-search" placeholder="Поиск сотрудника…" autocomplete="off" spellcheck="false" required />
+                <ul class="insp-emp-suggest" id="insp-emp-suggest" role="listbox" hidden></ul>
+              </div>
+            </label>
+            <label class="insp-field">
+              <span class="insp-label">Деталь / партия</span>
+              <input type="text" class="insp-inp insp-inp--plain" id="insp-part-label" maxlength="120" placeholder="Необязательно" />
+            </label>
+            <label class="insp-field insp-check-field">
+              <input type="checkbox" id="insp-first-piece" />
+              <span>Первая деталь / после переналадки</span>
+            </label>
+          </div>
+
+          <div class="insp-section-head">
+            <span class="insp-section-title">Пункты акта</span>
+            <div class="insp-section-actions">
+              <button type="button" class="insp-btn insp-btn--ghost" id="insp-load-from-plan">Из карты</button>
+              <button type="button" class="insp-btn insp-btn--ghost" id="insp-clear-draft">Очистить</button>
+            </div>
+          </div>
+
+          <div class="insp-table-wrap">
+            <table class="insp-table" id="insp-draft-table">
+              <colgroup>
+                <col class="insp-col-num" />
+                <col class="insp-col-label" />
+                <col class="insp-col-nominal" />
+                <col class="insp-col-tol" />
+                <col class="insp-col-actual" />
+                <col class="insp-col-act" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th class="insp-draft-num-col" aria-label="№">#</th>
+                  <th class="insp-th-tip">
+                    Размер
+                    <span class="insp-tip-text" role="tooltip">Обозначение или название контролируемого размера на чертеже (например, Ø50, 120, R5).</span>
+                  </th>
+                  <th class="insp-th-tip">
+                    Номинал
+                    <span class="insp-tip-text" role="tooltip">Эталонное значение размера — к которому нужно стремиться при обработке и контроле.</span>
+                  </th>
+                  <th class="insp-th-tip">
+                    Допуск
+                    <span class="insp-tip-text" role="tooltip">Допустимое отклонение от номинала (например, ±0.05 или +0.1/−0.05).</span>
+                  </th>
+                  <th class="insp-th-tip">
+                    Факт
+                    <span class="insp-tip-text" role="tooltip">Измеренное значение. По нему определяется, годна деталь или нет.</span>
+                  </th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="insp-draft-tbody"></tbody>
+            </table>
+            <p class="insp-empty" id="insp-draft-empty">Кликните по чертежу, чтобы добавить пункт замера.</p>
+          </div>
+
+          <label class="insp-field">
+            <span class="insp-label">Примечание</span>
+            <textarea class="insp-inp insp-inp--plain insp-textarea" id="insp-notes" rows="2" maxlength="2000"></textarea>
+          </label>
+
+          <div class="insp-form-actions">
+            <button type="submit" class="insp-btn insp-btn--primary">Сохранить акт</button>
+            <span class="insp-form-msg" id="insp-form-msg" aria-live="polite"></span>
+          </div>
+        </form>
+      </div>
+
+      <div class="insp-pane" data-insp-pane="journal" hidden>
+        <div class="insp-journal" id="insp-journal"></div>
+        <p class="insp-empty" id="insp-journal-empty" hidden>Актов пока нет.</p>
+      </div>
+
+      {% if biota_can_edit %}
+      <div class="insp-pane" data-insp-pane="plan" hidden>
+        <p class="insp-pane-hint">Постоянная карта контроля. Точки с карты видны на чертеже.</p>
+        <div class="insp-section-head">
+          <span class="insp-section-title">Размеры</span>
+          <div class="insp-section-actions">
+            <button type="button" class="insp-btn insp-btn--ghost" id="insp-plan-add-row">+ Размер</button>
+            <button type="button" class="insp-btn insp-btn--primary insp-btn--sm" id="insp-plan-save">Сохранить</button>
+          </div>
+        </div>
+        <span class="insp-form-msg" id="insp-plan-msg" aria-live="polite"></span>
+        <div class="insp-table-wrap">
+          <table class="insp-table">
+            <thead>
+              <tr>
+                <th>Размер</th>
+                <th>Номинал</th>
+                <th>Допуск</th>
+                <th>Крит.</th>
+                <th>Частота</th>
+                <th>N</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="insp-plan-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+
+<script type="application/json" id="insp-bootstrap">{{ inspection_bootstrap_json|safe }}</script>
+<script type="importmap">
+{
+  "imports": {
+    "pdfjs-dist": "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs"
+  }
+}
+</script>
+<script type="module" src="{% static 'shifts/js/product_inspection_page.js' %}?v={{ static_asset_version }}"></script>
+{% endblock %}
