@@ -1969,33 +1969,17 @@
   }
   .defects-table .col-date { width: 132px; }
   .defects-table .col-employee { width: 240px; }
-  .defects-table .col-qty { width: 92px; }
-  .defects-table .col-good { width: 92px; }
-  .defects-table .col-bad { width: 96px; }
-  .defects-table .col-potential { width: 100px; }
-  .defects-table .col-product { width: 210px; }
   .defects-table .col-actions { width: 96px; }
   .defects-table th.defect-col-reason,
   .defects-table td.defect-col-reason {
     width: auto;
     min-width: 320px;
   }
-  .defects-table td.defect-col-good,
-  .defects-table td.defect-col-qty,
-  .defects-table td.defect-col-bad,
-  .defects-table td.defect-col-potential,
-  .defects-table th.defect-col-good,
-  .defects-table th.defect-col-qty,
-  .defects-table th.defect-col-bad,
-  .defects-table th.defect-col-potential {
-    text-align: center;
-  }
   .defects-table td.defect-col-date,
   .defects-table td.defect-col-employee,
   .defects-table td.defect-col-product {
     white-space: nowrap;
   }
-  .defect-num-input { min-width: 78px; }
   @media (max-width: 720px) {
     .inventory-top-actions {
       flex-wrap: nowrap;
@@ -2030,30 +2014,133 @@
     padding: 4px 6px;
     font-size: 12px;
   }
-  /* ── Defect date filter ──────────────────── */
-  .defect-date-filter { display: flex; flex-direction: column; gap: 6px; }
-  .defect-date-mode-btns { display: flex; gap: 4px; }
-  .defect-date-mode-btn {
-    padding: 3px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    border-radius: 99px;
-    border: 1px solid rgba(255,255,255,.1);
-    background: transparent;
-    color: var(--bio-text-muted, #888);
+  /* ── Defect date filter (calendar) ───────── */
+  .defect-date-filter { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .defect-add-date-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .defect-add-date-field .defect-cal-wrap,
+  .defect-date-filter .defect-cal-wrap { position: relative; width: 100%; min-width: 0; }
+  .defect-cal-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    font-size: 13px;
+    text-align: left;
+    border-radius: 4px;
+    border: 1px solid var(--bio-input-border);
+    background: var(--bio-input-bg);
+    color: var(--bio-body-fg);
     cursor: pointer;
-    transition: background .15s, color .15s, border-color .15s;
+    transition: border-color .15s ease;
   }
-  .defect-date-mode-btn.is-active {
-    background: rgba(143,156,255,.15);
-    border-color: rgba(143,156,255,.4);
-    color: #c0cbff;
+  .defect-cal-trigger:hover,
+  .defect-cal-trigger:focus-visible {
+    border-color: var(--bio-input-hover-border);
+    outline: none;
   }
-  .defect-date-inputs { display: flex; align-items: center; gap: 6px; }
-  .defect-date-inputs input[type="date"] { flex: 1; min-width: 0; }
-  .defect-date-range { display: flex; align-items: center; gap: 6px; flex: 1; }
-  .defect-date-sep { opacity: .5; font-size: 14px; flex-shrink: 0; }
-  .defect-date-single { width: 100%; }
+  .defect-cal-trigger-icon { opacity: .75; flex-shrink: 0; }
+  .defect-cal-popup {
+    position: absolute;
+    z-index: 120;
+    top: calc(100% + 4px);
+    left: 0;
+    width: min(100%, 280px);
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid var(--bio-filter-border);
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow);
+    box-sizing: border-box;
+  }
+  .defect-cal-popup[hidden] { display: none !important; }
+  .defect-cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .defect-cal-title {
+    flex: 1 1 auto;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--bio-body-fg);
+  }
+  .defect-cal-nav {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid var(--bio-input-border);
+    background: var(--bio-input-bg);
+    color: var(--bio-body-fg);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .defect-cal-nav:hover { border-color: var(--bio-input-hover-border); }
+  .defect-cal-dow,
+  .defect-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  .defect-cal-dow {
+    margin-bottom: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: lowercase;
+    color: var(--bio-field-label);
+    text-align: center;
+  }
+  .defect-cal-dow--we { color: rgba(239, 68, 68, .75); }
+  .defect-cal-day {
+    aspect-ratio: 1;
+    min-height: 30px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--bio-body-fg);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .12s ease, color .12s ease;
+  }
+  .defect-cal-day--pad { visibility: hidden; pointer-events: none; }
+  .defect-cal-day--we:not(.defect-cal-day--in-range):not(.defect-cal-day--pending) { color: rgba(239, 68, 68, .85); }
+  .defect-cal-day:hover { background: rgba(143, 156, 255, .12); }
+  .defect-cal-day--today { box-shadow: inset 0 0 0 1px rgba(143, 156, 255, .45); }
+  .defect-cal-day--pending,
+  .defect-cal-day--range-start,
+  .defect-cal-day--range-end {
+    background: rgba(143, 156, 255, .28);
+    color: #fff;
+    font-weight: 700;
+  }
+  .defect-cal-day--in-range { background: rgba(143, 156, 255, .14); }
+  .defect-cal-foot {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--bio-input-border);
+  }
+  .defect-cal-hint {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.35;
+    text-align: center;
+  }
+  .defect-cal-clear {
+    align-self: center;
+    padding: 4px 10px;
+    font-size: 12px;
+  }
 
   /* ── Defect type toggle ───────────────────── */
   .defect-type-toggle {

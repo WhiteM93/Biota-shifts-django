@@ -398,7 +398,9 @@ def calculator_view(request):
     from .models import Product, ProductSetup, ProductSetupToolRow
     import json as _json
 
-    products_qs = Product.objects.prefetch_related(
+    products_qs = Product.objects.filter(
+        catalog_section=Product.CATALOG_NALADKI,
+    ).prefetch_related(
         "setups__tools"
     ).order_by("name")
 

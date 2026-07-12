@@ -2439,3 +2439,298 @@ var INV = (function () {
     true
   );
 })();
+
+(function initDefectCalendars() {
+  var MONTHS_GEN = [
+    "января", "февраля", "марта", "апреля", "мая", "июня",
+    "июля", "августа", "сентября", "октября", "ноября", "декабря",
+  ];
+  var MONTHS_NOM = [
+    "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+  ];
+
+  function parseIso(iso) {
+    var p = (iso || "").split("-");
+    if (p.length !== 3) return null;
+    var y = parseInt(p[0], 10);
+    var m = parseInt(p[1], 10) - 1;
+    var d = parseInt(p[2], 10);
+    if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+    return { y: y, m: m, d: d };
+  }
+
+  function isoFromParts(y, m, d) {
+    return y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+  }
+
+  function isoFromDate(dt) {
+    return isoFromParts(dt.getFullYear(), dt.getMonth(), dt.getDate());
+  }
+
+  function compareIso(a, b) {
+    if (a === b) return 0;
+    return a < b ? -1 : 1;
+  }
+
+  function setupDefectCalendar(cfg) {
+    var wrap = document.getElementById(cfg.wrapId);
+    if (!wrap) return;
+    var isRange = cfg.selectionMode === "range";
+    var trigger = document.getElementById(cfg.triggerId);
+    var triggerText = document.getElementById(cfg.triggerTextId);
+    var popup = document.getElementById(cfg.popupId);
+    var grid = document.getElementById(cfg.gridId);
+    var titleEl = document.getElementById(cfg.titleId);
+    var clearBtn = cfg.clearBtnId ? document.getElementById(cfg.clearBtnId) : null;
+    var modeVal = cfg.modeInputId ? document.getElementById(cfg.modeInputId) : null;
+    var fromVal = document.getElementById(cfg.fromInputId);
+    var toVal = cfg.toInputId ? document.getElementById(cfg.toInputId) : null;
+    if (!trigger || !popup || !grid || !fromVal) return;
+    if (isRange && (!toVal || !modeVal)) return;
+
+    var selectedFrom = (fromVal.value || "").trim();
+    var selectedTo = isRange ? (toVal.value || "").trim() : selectedFrom;
+    var pendingStart = null;
+    var viewYear;
+    var viewMonth;
+    var todayIso = isoFromDate(new Date());
+
+    function initViewMonth() {
+      var base = parseIso(selectedFrom || selectedTo);
+      if (base) {
+        viewYear = base.y;
+        viewMonth = base.m;
+        return;
+      }
+      var now = new Date();
+      viewYear = now.getFullYear();
+      viewMonth = now.getMonth();
+    }
+
+    function formatTriggerLabel() {
+      if (isRange && !selectedFrom && !selectedTo) return cfg.emptyLabel || "Все даты";
+      var from = selectedFrom || selectedTo;
+      var to = isRange ? (selectedTo || selectedFrom) : selectedFrom;
+      if (from === to) {
+        var one = parseIso(from);
+        if (!one) return from;
+        return one.d + " " + MONTHS_GEN[one.m] + " " + one.y;
+      }
+      var a = parseIso(from);
+      var b = parseIso(to);
+      if (!a || !b) return from + " — " + to;
+      if (a.y === b.y && a.m === b.m) {
+        return a.d + " — " + b.d + " " + MONTHS_GEN[a.m] + " " + a.y;
+      }
+      if (a.y === b.y) {
+        return a.d + " " + MONTHS_GEN[a.m] + " — " + b.d + " " + MONTHS_GEN[b.m] + " " + a.y;
+      }
+      return a.d + " " + MONTHS_GEN[a.m] + " " + a.y + " — " + b.d + " " + MONTHS_GEN[b.m] + " " + b.y;
+    }
+
+    function syncTriggerText() {
+      if (triggerText) triggerText.textContent = formatTriggerLabel();
+      if (clearBtn) clearBtn.hidden = !selectedFrom && !selectedTo;
+    }
+
+    function notifyChange() {
+      if (typeof cfg.onChange === "function") cfg.onChange(fromVal, toVal, modeVal);
+    }
+
+    function applySelection(from, to) {
+      selectedFrom = from || "";
+      selectedTo = isRange ? (to || "") : selectedFrom;
+      fromVal.value = selectedFrom;
+      if (isRange && toVal) toVal.value = selectedTo;
+      if (isRange && modeVal) {
+        modeVal.value = selectedFrom && selectedTo && selectedFrom !== selectedTo ? "range" : "day";
+      }
+      pendingStart = null;
+      syncTriggerText();
+      renderGrid();
+      closePopup();
+      notifyChange();
+    }
+
+    function clearSelection() {
+      selectedFrom = selectedTo = "";
+      fromVal.value = "";
+      if (toVal) toVal.value = "";
+      if (modeVal) modeVal.value = "day";
+      pendingStart = null;
+      syncTriggerText();
+      renderGrid();
+      closePopup();
+      notifyChange();
+    }
+
+    function dayClasses(iso, dowIndex) {
+      var cls = ["defect-cal-day"];
+      if (dowIndex >= 5) cls.push("defect-cal-day--we");
+      if (iso === todayIso) cls.push("defect-cal-day--today");
+      if (pendingStart === iso) cls.push("defect-cal-day--pending");
+      var from = selectedFrom || "";
+      var to = isRange ? (selectedTo || "") : selectedFrom;
+      if (from && to && !pendingStart) {
+        var lo = compareIso(from, to) <= 0 ? from : to;
+        var hi = compareIso(from, to) <= 0 ? to : from;
+        if (compareIso(iso, lo) >= 0 && compareIso(iso, hi) <= 0) {
+          cls.push("defect-cal-day--in-range");
+          if (iso === lo) cls.push("defect-cal-day--range-start");
+          if (iso === hi) cls.push("defect-cal-day--range-end");
+        }
+      }
+      return cls.join(" ");
+    }
+
+    function renderGrid() {
+      if (titleEl) titleEl.textContent = MONTHS_NOM[viewMonth] + " " + viewYear;
+      grid.textContent = "";
+      var first = new Date(viewYear, viewMonth, 1);
+      var pad = (first.getDay() + 6) % 7;
+      var daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+      var i;
+      for (i = 0; i < pad; i += 1) {
+        var padEl = document.createElement("span");
+        padEl.className = "defect-cal-day defect-cal-day--pad";
+        padEl.setAttribute("aria-hidden", "true");
+        grid.appendChild(padEl);
+      }
+      for (i = 1; i <= daysInMonth; i += 1) {
+        var iso = isoFromParts(viewYear, viewMonth, i);
+        var dowIndex = (pad + i - 1) % 7;
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = dayClasses(iso, dowIndex);
+        btn.textContent = String(i);
+        btn.setAttribute("data-iso", iso);
+        btn.setAttribute("role", "gridcell");
+        btn.setAttribute("aria-label", iso);
+        grid.appendChild(btn);
+      }
+    }
+
+    function openPopup() {
+      pendingStart = null;
+      initViewMonth();
+      renderGrid();
+      popup.hidden = false;
+      trigger.setAttribute("aria-expanded", "true");
+    }
+
+    function closePopup() {
+      popup.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+      pendingStart = null;
+      renderGrid();
+    }
+
+    function handleDayPick(iso) {
+      if (!isRange) {
+        applySelection(iso, iso);
+        return;
+      }
+      if (!pendingStart) {
+        pendingStart = iso;
+        renderGrid();
+        return;
+      }
+      if (iso === pendingStart) {
+        applySelection(iso, iso);
+        return;
+      }
+      var lo = compareIso(pendingStart, iso) <= 0 ? pendingStart : iso;
+      var hi = compareIso(pendingStart, iso) <= 0 ? iso : pendingStart;
+      applySelection(lo, hi);
+    }
+
+    trigger.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (popup.hidden) openPopup();
+      else closePopup();
+    });
+
+    grid.addEventListener("click", function (e) {
+      var btn = e.target.closest(".defect-cal-day[data-iso]");
+      if (!btn) return;
+      e.preventDefault();
+      handleDayPick(btn.getAttribute("data-iso") || "");
+    });
+
+    grid.addEventListener("dblclick", function (e) {
+      var btn = e.target.closest(".defect-cal-day[data-iso]");
+      if (!btn) return;
+      e.preventDefault();
+      applySelection(btn.getAttribute("data-iso") || "", btn.getAttribute("data-iso") || "");
+    });
+
+    wrap.querySelectorAll(".defect-cal-nav").forEach(function (navBtn) {
+      navBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var dir = parseInt(navBtn.getAttribute("data-dir"), 10) || 0;
+        viewMonth += dir;
+        if (viewMonth < 0) {
+          viewMonth = 11;
+          viewYear -= 1;
+        } else if (viewMonth > 11) {
+          viewMonth = 0;
+          viewYear += 1;
+        }
+        renderGrid();
+      });
+    });
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        clearSelection();
+      });
+    }
+
+    document.addEventListener("mousedown", function (e) {
+      if (popup.hidden) return;
+      if (wrap.contains(e.target)) return;
+      closePopup();
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !popup.hidden) closePopup();
+    });
+
+    initViewMonth();
+    syncTriggerText();
+    renderGrid();
+  }
+
+  setupDefectCalendar({
+    wrapId: "defect-date-filter",
+    selectionMode: "range",
+    triggerId: "defect-cal-trigger",
+    triggerTextId: "defect-cal-trigger-text",
+    popupId: "defect-cal-popup",
+    gridId: "defect-cal-grid",
+    titleId: "defect-cal-title",
+    clearBtnId: "defect-cal-clear",
+    fromInputId: "defect-date-from-val",
+    toInputId: "defect-date-to-val",
+    modeInputId: "defect-date-mode-val",
+    emptyLabel: "Все даты",
+    onChange: function (fromVal) {
+      fromVal.dispatchEvent(new Event("change", { bubbles: true }));
+    },
+  });
+
+  setupDefectCalendar({
+    wrapId: "defect-add-date-wrap",
+    selectionMode: "single",
+    triggerId: "defect-add-cal-trigger",
+    triggerTextId: "defect-add-cal-trigger-text",
+    popupId: "defect-add-cal-popup",
+    gridId: "defect-add-cal-grid",
+    titleId: "defect-add-cal-title",
+    fromInputId: "defect-add-date-val",
+  });
+})();

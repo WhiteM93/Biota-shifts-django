@@ -481,6 +481,7 @@ function saveSetupToolNoteEditor() {
         notePop.hidden = true;
         notePop.setAttribute("aria-hidden", "true");
         notePop.textContent = "";
+        notePop.classList.remove("is-tap-open");
         noteActiveCell = null;
       }
 
@@ -530,8 +531,8 @@ function saveSetupToolNoteEditor() {
         notePop.style.top = top + "px";
       }
 
-      function showNotePop(cell) {
-        if (!fineHoverMq.matches) return;
+      function showNotePop(cell, force) {
+        if (!force && !fineHoverMq.matches) return;
         var text = noteCellText(cell);
         if (!text) return;
         if (noteHideTimer) {
@@ -540,6 +541,7 @@ function saveSetupToolNoteEditor() {
         }
         noteActiveCell = cell;
         notePop.textContent = text;
+        notePop.classList.toggle("is-tap-open", !!force);
         positionNotePop(cell);
       }
 
@@ -548,14 +550,14 @@ function saveSetupToolNoteEditor() {
         function (e) {
           var cell = noteCellFromTarget(e.target);
           if (!cell) return;
-          showNotePop(cell);
+          showNotePop(cell, false);
         },
         true
       );
       document.addEventListener(
         "mouseout",
         function (e) {
-          if (!noteActiveCell) return;
+          if (!noteActiveCell || notePop.classList.contains("is-tap-open")) return;
           var rel = e.relatedTarget;
           if (rel) {
             var stillInside =
@@ -585,6 +587,38 @@ function saveSetupToolNoteEditor() {
       }
       window.addEventListener("scroll", syncNotePopOnScroll, true);
       window.addEventListener("resize", syncNotePopOnScroll);
+
+      document.addEventListener(
+        "click",
+        function (e) {
+          if (document.body.classList.contains("setup-inline-edit-enabled")) return;
+          var eye = e.target && e.target.closest && e.target.closest(".js-setup-tool-note-eye");
+          if (eye) {
+            if (!eye.classList.contains("has-note")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            var cellTap = eye.closest('td[data-tool-col="note"]');
+            if (!cellTap) return;
+            if (noteActiveCell === cellTap && !notePop.hidden && notePop.classList.contains("is-tap-open")) {
+              hideNotePop();
+            } else {
+              showNotePop(cellTap, true);
+            }
+            return;
+          }
+          if (!notePop.hidden && notePop.classList.contains("is-tap-open")) {
+            var inside = notePop.contains(e.target) || (noteActiveCell && noteActiveCell.contains(e.target));
+            if (!inside) hideNotePop();
+          }
+        },
+        true
+      );
+
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && !notePop.hidden && notePop.classList.contains("is-tap-open")) {
+          hideNotePop();
+        }
+      });
     }
 
     function closeModal() {
@@ -1136,6 +1170,178 @@ function saveSetupToolNoteEditor() {
           }
         }
       });
+    }
+
+    function syncProductOsnastkaInlineEdit(enabled) {
+      var block = document.getElementById("product-osnastka-block");
+      if (!block) return;
+      block.querySelectorAll(".js-product-osnastka-remove").forEach(function (btn) {
+        if (enabled) btn.removeAttribute("hidden");
+        else btn.setAttribute("hidden", "hidden");
+      });
+      var addRow = block.querySelector("#product-osnastka-add");
+      if (addRow) {
+        if (enabled) addRow.removeAttribute("hidden");
+        else addRow.setAttribute("hidden", "hidden");
+      }
+      if (!enabled) hideProductOsnastkaSuggest(document.getElementById("product-osnastka-combo"));
+    }
+
+    var osnastkaComboActiveIdx = -1;
+
+    function normalizeOsnastkaSearchText(value) {
+      return (value || "").trim().toLowerCase();
+    }
+
+    function hideProductOsnastkaSuggest(combo) {
+      if (!combo) return;
+      var list = combo.querySelector(".js-product-osnastka-suggest");
+      var input = combo.querySelector(".js-product-osnastka-search");
+      if (list) list.hidden = true;
+      if (input) input.setAttribute("aria-expanded", "false");
+      combo.classList.remove("is-open");
+      osnastkaComboActiveIdx = -1;
+    }
+
+    function showProductOsnastkaSuggest(combo) {
+      if (!combo) return;
+      var list = combo.querySelector(".js-product-osnastka-suggest");
+      var input = combo.querySelector(".js-product-osnastka-search");
+      if (!list) return;
+      list.hidden = false;
+      if (input) input.setAttribute("aria-expanded", "true");
+      combo.classList.add("is-open");
+    }
+
+    function setProductOsnastkaSuggestActive(items, idx) {
+      items.forEach(function (item, i) {
+        item.classList.toggle("is-active", i === idx);
+      });
+      if (items[idx]) items[idx].scrollIntoView({ block: "nearest" });
+    }
+
+    function pickProductOsnastkaOption(combo, id, label) {
+      if (!combo) return;
+      var sel = combo.querySelector("#product-osnastka-select");
+      var input = combo.querySelector(".js-product-osnastka-search");
+      if (sel) sel.value = id ? String(id) : "";
+      if (input) input.value = label || "";
+      hideProductOsnastkaSuggest(combo);
+    }
+
+    function refreshProductOsnastkaSuggest(combo, query) {
+      if (!combo) combo = document.getElementById("product-osnastka-combo");
+      if (!combo) return;
+      var sel = combo.querySelector("#product-osnastka-select");
+      var list = combo.querySelector(".js-product-osnastka-suggest");
+      var input = combo.querySelector(".js-product-osnastka-search");
+      if (!sel || !list) return;
+      var q = normalizeOsnastkaSearchText(query != null ? query : (input ? input.value : ""));
+      list.textContent = "";
+      var visibleCount = 0;
+      Array.prototype.forEach.call(sel.options, function (opt, idx) {
+        if (idx === 0 || !opt.value) return;
+        var text = (opt.textContent || "").trim();
+        if (q && normalizeOsnastkaSearchText(text).indexOf(q) === -1) return;
+        var li = document.createElement("li");
+        li.className = "product-osnastka-suggest-item";
+        li.setAttribute("role", "option");
+        li.setAttribute("data-osnastka-id", opt.value);
+        li.textContent = text;
+        list.appendChild(li);
+        visibleCount += 1;
+      });
+      if (!visibleCount) {
+        var empty = document.createElement("li");
+        empty.className = "product-osnastka-suggest-empty muted";
+        empty.setAttribute("role", "presentation");
+        empty.textContent = q ? "Ничего не найдено" : "Нет доступной оснастки";
+        list.appendChild(empty);
+      }
+      osnastkaComboActiveIdx = -1;
+    }
+
+    function resetProductOsnastkaComboSelection() {
+      var combo = document.getElementById("product-osnastka-combo");
+      if (!combo) return;
+      pickProductOsnastkaOption(combo, "", "");
+      refreshProductOsnastkaSuggest(combo, "");
+    }
+
+    function initProductOsnastkaCombo() {
+      var combo = document.getElementById("product-osnastka-combo");
+      if (!combo || combo.getAttribute("data-bound") === "1") return;
+      combo.setAttribute("data-bound", "1");
+      var input = combo.querySelector(".js-product-osnastka-search");
+      var list = combo.querySelector(".js-product-osnastka-suggest");
+      var sel = combo.querySelector("#product-osnastka-select");
+      if (!input || !list || !sel) return;
+
+      input.addEventListener("input", function () {
+        if (sel.value) {
+          var opt = sel.options[sel.selectedIndex];
+          var label = opt ? (opt.textContent || "").trim() : "";
+          if (normalizeOsnastkaSearchText(input.value) !== normalizeOsnastkaSearchText(label)) {
+            sel.value = "";
+          }
+        }
+        refreshProductOsnastkaSuggest(combo, input.value);
+        showProductOsnastkaSuggest(combo);
+      });
+
+      input.addEventListener("focus", function () {
+        refreshProductOsnastkaSuggest(combo, input.value);
+        showProductOsnastkaSuggest(combo);
+      });
+
+      input.addEventListener("keydown", function (e) {
+        if (list.hidden) {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            refreshProductOsnastkaSuggest(combo, input.value);
+            showProductOsnastkaSuggest(combo);
+          } else {
+            return;
+          }
+        }
+        var items = Array.prototype.slice.call(list.querySelectorAll(".product-osnastka-suggest-item"));
+        if (!items.length) {
+          if (e.key === "Escape") hideProductOsnastkaSuggest(combo);
+          return;
+        }
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          osnastkaComboActiveIdx = Math.min(osnastkaComboActiveIdx + 1, items.length - 1);
+          setProductOsnastkaSuggestActive(items, osnastkaComboActiveIdx);
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          osnastkaComboActiveIdx = Math.max(osnastkaComboActiveIdx - 1, 0);
+          setProductOsnastkaSuggestActive(items, osnastkaComboActiveIdx);
+        } else if (e.key === "Enter") {
+          if (osnastkaComboActiveIdx >= 0 && items[osnastkaComboActiveIdx]) {
+            e.preventDefault();
+            var pick = items[osnastkaComboActiveIdx];
+            pickProductOsnastkaOption(combo, pick.getAttribute("data-osnastka-id"), pick.textContent);
+          }
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          hideProductOsnastkaSuggest(combo);
+        }
+      });
+
+      list.addEventListener("mousedown", function (e) {
+        var item = e.target.closest(".product-osnastka-suggest-item");
+        if (!item) return;
+        e.preventDefault();
+        pickProductOsnastkaOption(combo, item.getAttribute("data-osnastka-id"), item.textContent);
+      });
+
+      document.addEventListener("mousedown", function (e) {
+        if (!combo.classList.contains("is-open")) return;
+        if (combo.contains(e.target)) return;
+        hideProductOsnastkaSuggest(combo);
+      });
+
+      refreshProductOsnastkaSuggest(combo, "");
     }
     var notesSelection = null;
     var TOOL_TYPE_OPTIONS = (PD.tool_type_choices || []);
@@ -2103,6 +2309,7 @@ function saveSetupToolNoteEditor() {
       var metaRoot = productDetailMetaEl();
       if (metaRoot) refreshInlineFieldTitles(metaRoot, inlineEditMode);
       syncMetaDrawingInlineEdit(inlineEditMode);
+      syncProductOsnastkaInlineEdit(inlineEditMode);
       setEditToggleBtnState(inlineEditMode);
       syncDrawingPanelQuickEdit(inlineEditMode);
       syncInlineDeleteSetupBtn();
@@ -2123,6 +2330,7 @@ function saveSetupToolNoteEditor() {
         node.removeAttribute("contenteditable");
       });
       syncMetaDrawingInlineEdit(false);
+      syncProductOsnastkaInlineEdit(false);
       syncDrawingPanelQuickEdit(false);
       root.querySelectorAll(".setup-photo-inline-controls").forEach(function (row) {
         row.setAttribute("hidden", "hidden");
@@ -2327,19 +2535,33 @@ function saveSetupToolNoteEditor() {
       return formContainer._cascadeFormManager;
     }
 
+    function flushCascadeFormInput(container) {
+      if (!container) return;
+      var active = document.activeElement;
+      if (!active || !container.contains(active)) return;
+      var tag = (active.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "select" || tag === "textarea") {
+        active.blur();
+      }
+    }
+
     function collectPlanCascadeFormData(planWrap) {
       if (!planWrap) return null;
       var container = planWrap.querySelector("[data-plan-cascade-form]");
       if (!container) return null;
 
+      flushCascadeFormInput(container);
+
       var mgr = ensurePlanCascadeManager(container);
       if (mgr) {
-        mgr.syncStateFromDOM();
+        mgr.prepareForSubmit();
         return mgr.getFormPayload();
       }
 
       function fieldVal(name) {
-        var el = container.querySelector('[data-field="' + name + '"]');
+        var el = container.querySelector(
+          'input[data-field="' + name + '"], select[data-field="' + name + '"]'
+        );
         return el && el.value != null ? String(el.value).trim() : "";
       }
       return {
@@ -2379,13 +2601,19 @@ function saveSetupToolNoteEditor() {
 
     async function saveProductPlanCascadeOnly() {
       var planWrap = productDetailPlanWrap();
-      var formData = collectPlanCascadeFormData(planWrap);
-      if (!formData || !formData.product_type) {
+      var container = planWrap && planWrap.querySelector("[data-plan-cascade-form]");
+      if (!container) {
         return { ok: true, skipped: true };
       }
-      var container = planWrap && planWrap.querySelector("[data-plan-cascade-form]");
-      var mgr = container ? ensurePlanCascadeManager(container) : null;
+
+      flushCascadeFormInput(container);
+      var mgr = ensurePlanCascadeManager(container);
+      var formData = null;
       if (mgr) {
+        mgr.prepareForSubmit();
+        if (!mgr.state.product_type) {
+          return { ok: true, skipped: true };
+        }
         var check = mgr.validateForm();
         if (!check.valid) {
           var clientErr =
@@ -2399,6 +2627,12 @@ function saveSetupToolNoteEditor() {
             focusPlan: true,
           });
           return { ok: false, skipped: false, error: clientErr };
+        }
+        formData = mgr.getFormPayload();
+      } else {
+        formData = collectPlanCascadeFormData(planWrap);
+        if (!formData || !formData.product_type) {
+          return { ok: true, skipped: true };
         }
       }
       var fd = new FormData();
@@ -3270,6 +3504,58 @@ function saveSetupToolNoteEditor() {
         return;
       }
 
+      var btnOsnastkaAdd = e.target.closest(".js-product-osnastka-add");
+      if (btnOsnastkaAdd) {
+        e.preventDefault();
+        var blockAdd = document.getElementById("product-osnastka-block");
+        var selAdd = blockAdd ? blockAdd.querySelector("#product-osnastka-select") : null;
+        var osnId = selAdd ? (selAdd.value || "").trim() : "";
+        if (!osnId) {
+          alert("Найдите и выберите оснастку из списка.");
+          return;
+        }
+        var fdOsnAdd = new FormData();
+        fdOsnAdd.append("action", "product_add_osnastka");
+        fdOsnAdd.append("osnastka_id", osnId);
+        var resOsnAdd = await fetch(window.location.href, {
+          method: "POST",
+          headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+          body: fdOsnAdd,
+          credentials: "same-origin",
+        });
+        var dataOsnAdd = await resOsnAdd.json();
+        if (!resOsnAdd.ok || !dataOsnAdd.ok) {
+          alert(dataOsnAdd.error || "Не удалось добавить оснастку.");
+          return;
+        }
+        renderProductOsnastkaBlock(dataOsnAdd);
+        return;
+      }
+
+      var btnOsnastkaRemove = e.target.closest(".js-product-osnastka-remove");
+      if (btnOsnastkaRemove) {
+        e.preventDefault();
+        var linkId = btnOsnastkaRemove.getAttribute("data-link-id") || "";
+        if (!linkId) return;
+        if (!window.confirm("Убрать эту оснастку из карточки?")) return;
+        var fdOsnRem = new FormData();
+        fdOsnRem.append("action", "product_remove_osnastka");
+        fdOsnRem.append("link_id", linkId);
+        var resOsnRem = await fetch(window.location.href, {
+          method: "POST",
+          headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+          body: fdOsnRem,
+          credentials: "same-origin",
+        });
+        var dataOsnRem = await resOsnRem.json();
+        if (!resOsnRem.ok || !dataOsnRem.ok) {
+          alert(dataOsnRem.error || "Не удалось убрать оснастку.");
+          return;
+        }
+        renderProductOsnastkaBlock(dataOsnRem);
+        return;
+      }
+
       var btnProgFileDel = e.target.closest(".js-setup-program-file-delete");
       if (btnProgFileDel) {
         e.preventDefault();
@@ -3797,6 +4083,60 @@ function saveSetupToolNoteEditor() {
       });
       var emptyMsg = wrap.querySelector(".product-drawing-tab-empty-msg");
       if (emptyMsg) emptyMsg.hidden = files.length > 0;
+    }
+
+    function renderProductOsnastkaBlock(data) {
+      if (!data) return;
+      var block = document.getElementById("product-osnastka-block");
+      if (!block) return;
+      var editMode = document.body.classList.contains("setup-inline-edit-enabled");
+      var links = data.osnastka_links || [];
+      var ul = block.querySelector("#product-osnastka-list");
+      if (ul) {
+        ul.textContent = "";
+        links.forEach(function (link) {
+          var li = document.createElement("li");
+          li.className = "product-osnastka-item";
+          li.setAttribute("data-link-id", String(link.id));
+          li.setAttribute("data-osnastka-id", String(link.osnastka_id));
+          var a = document.createElement("a");
+          a.href = link.url || "#";
+          a.className = "btn product-btn-secondary product-osnastka-link";
+          a.textContent = link.name || "";
+          li.appendChild(a);
+          if (editMode) {
+            var del = document.createElement("button");
+            del.type = "button";
+            del.className = "btn btn-inv-delete btn-inv-delete--s0 product-osnastka-remove js-product-osnastka-remove";
+            del.setAttribute("data-link-id", String(link.id));
+            del.title = "Убрать оснастку";
+            del.setAttribute("aria-label", "Убрать оснастку");
+            del.innerHTML = BDB.TRASH_SVG || "";
+            li.appendChild(del);
+          }
+          ul.appendChild(li);
+        });
+      }
+      var emptyMsg = block.querySelector("#product-osnastka-empty-msg");
+      if (emptyMsg) emptyMsg.hidden = links.length > 0;
+      var sel = block.querySelector("#product-osnastka-select");
+      if (sel) {
+        var prev = sel.value;
+        sel.textContent = "";
+        var blank = document.createElement("option");
+        blank.value = "";
+        blank.textContent = "— выберите —";
+        sel.appendChild(blank);
+        (data.osnastka_options || []).forEach(function (opt) {
+          var o = document.createElement("option");
+          o.value = String(opt.id);
+          o.textContent = opt.name || "";
+          sel.appendChild(o);
+        });
+        if (prev && sel.querySelector('option[value="' + prev + '"]')) sel.value = prev;
+        else sel.value = "";
+      }
+      resetProductOsnastkaComboSelection();
     }
 
     async function uploadProductDrawingFile(file) {
@@ -4529,6 +4869,8 @@ function saveSetupToolNoteEditor() {
           });
         });
     });
+
+    initProductOsnastkaCombo();
   })();
   (function () {
     var MAX_GCODE_HIGHLIGHT_CHARS = 120000;

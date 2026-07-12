@@ -49,9 +49,10 @@
     <!-- Формула -->
     <div class="calc-formula-card">
       <div class="calc-formula-label">Формула расчёта</div>
-      <div class="calc-formula-body">
+      <div class="calc-formula-body" id="calc-formula-body">
         <span class="cf-result" id="cf-tsht">Т<sub>шт</sub></span>
         <span class="cf-eq">=</span>
+        <span class="cf-paren" id="cf-cycle-open" hidden>(</span>
         <span class="cf-term" id="cf-tauto">Т<sub>автом</sub></span>
         <span class="cf-op">×</span>
         <span class="cf-paren">(</span>
@@ -63,6 +64,14 @@
         <span class="cf-term" id="cf-tust">Т<sub>уст</sub></span>
         <span class="cf-op">+</span>
         <span class="cf-term" id="cf-tizm">Т<sub>изм</sub></span>
+        <span class="cf-op" id="cf-mul-k" hidden>×</span>
+        <span class="cf-term" id="cf-k" hidden><i>k</i></span>
+        <span class="cf-paren" id="cf-cycle-close" hidden>)</span>
+        <span class="cf-op" id="cf-div-k" hidden> / </span>
+        <span class="cf-term" id="cf-k2" hidden><i>k</i></span>
+      </div>
+      <div class="calc-formula-desc" id="calc-formula-desc">
+        Т<sub>шт</sub> — норма на одну деталь. Если за один проход программы делается несколько шт (k &gt; 1), время цикла делится на k.
       </div>
     </div>
 
@@ -89,10 +98,20 @@
                 <polyline points="10,6 10,10 13,12"/>
               </svg>
               <input id="t-tauto" type="number" min="0" step="0.001"
-                     placeholder="из программы ЧПУ" class="calc-inp" data-tcalc>
+                     placeholder="43" class="calc-inp" data-tcalc>
               <span class="calc-fi-unit">мин</span>
             </div>
-            <span class="calc-hint">Время отработки управляющей программы на станке</span>
+            <span class="calc-hint" id="hint-tauto">Время одного прохода программы (на все детали в зажиме, если k &gt; 1)</span>
+          </div>
+
+          <div class="calc-field" data-linked="cf-k">
+            <label class="calc-label" for="t-k">Деталей за цикл <i>k</i></label>
+            <div class="calc-fi">
+              <input id="t-k" type="number" min="1" step="1" value="1"
+                     class="calc-inp calc-inp--plain" data-tcalc placeholder="1">
+              <span class="calc-fi-unit">шт</span>
+            </div>
+            <span class="calc-hint">Сколько деталей получается за одну установку и один проход программы</span>
           </div>
 
           <div class="calc-field" data-linked="cf-a">
@@ -126,11 +145,11 @@
                 <path d="M14.5 3.5a3 3 0 0 1 0 4.24L6 16.25 3.75 14l8.51-8.5A3 3 0 0 1 14.5 3.5z"/>
                 <line x1="3" y1="17" x2="5" y2="15"/>
               </svg>
-              <input id="t-tust-m" type="number" min="0" step="1" value="1"
+              <input id="t-tust-m" type="number" min="0" step="1" value="5"
                      class="calc-inp" data-tcalc placeholder="0">
               <span class="calc-fi-unit">мин</span>
             </div>
-            <span class="calc-hint">Закрепление, раскрепление, базирование</span>
+            <span class="calc-hint" id="hint-tust">На один цикл: поставить и снять все k деталей (если k = 1 — одну)</span>
           </div>
 
           <div class="calc-field" data-linked="cf-tizm">
@@ -142,11 +161,80 @@
                 <line x1="9" y1="13" x2="11" y2="13"/>
                 <line x1="13" y1="13" x2="15" y2="13"/>
               </svg>
-              <input id="t-tizm-m" type="number" min="0" step="1" value="1"
+              <input id="t-tizm-m" type="number" min="0" step="1" value="10"
                      class="calc-inp" data-tcalc placeholder="0">
               <span class="calc-fi-unit">мин</span>
             </div>
-            <span class="calc-hint">Промер инструментом / калибром</span>
+            <span class="calc-hint" id="hint-tizm">Замер одной детали; при k &gt; 1 обычно замеряют каждую из k после цикла</span>
+          </div>
+
+          <div class="calc-field-sep" aria-hidden="true"></div>
+          <div class="calc-subsection-label">Заказ / партия</div>
+
+          <div class="calc-field">
+            <label class="calc-label" for="t-qty">Количество в заказе <i>N</i></label>
+            <div class="calc-fi">
+              <input id="t-qty" type="number" min="1" step="1" value="1000"
+                     class="calc-inp calc-inp--plain" data-tcalc placeholder="1000">
+              <span class="calc-fi-unit">шт</span>
+            </div>
+          </div>
+
+          <div class="calc-field">
+            <label class="calc-label" for="t-tpz">Наладка на партию Т<sub>пз</sub></label>
+            <div class="calc-fi">
+              <svg class="calc-fi-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <path d="M14.5 3.5a3 3 0 0 1 0 4.24L6 16.25 3.75 14l8.51-8.5A3 3 0 0 1 14.5 3.5z"/>
+              </svg>
+              <input id="t-tpz" type="number" min="0" step="1" value="120"
+                     class="calc-inp" data-tcalc placeholder="0">
+              <span class="calc-fi-unit">мин</span>
+            </div>
+            <span class="calc-hint">Один раз на партию: привязка программы, первую деталь, настройка инструмента. В Т<sub>шт</sub> не входит</span>
+          </div>
+
+          <div class="calc-field-sep" aria-hidden="true"></div>
+          <div class="calc-subsection-label">Планирование смены</div>
+
+          <div class="calc-field">
+            <label class="calc-label" for="t-shift-h">Длительность смены</label>
+            <div class="calc-fi calc-fi--select">
+              <select id="t-shift-h" class="calc-inp calc-select" data-tcalc>
+                <option value="8" selected>8 часов (480 мин)</option>
+                <option value="10">10 часов (600 мин)</option>
+                <option value="12">12 часов (720 мин)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="calc-field">
+            <label class="calc-label" for="t-tvsp">Вспомогательное время Т<sub>всп</sub></label>
+            <div class="calc-fi">
+              <svg class="calc-fi-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <path d="M4 10h12M10 4v12"/>
+                <circle cx="10" cy="10" r="7.5"/>
+              </svg>
+              <input id="t-tvsp" type="number" min="0" step="1" value="30"
+                     class="calc-inp" data-tcalc placeholder="0">
+              <span class="calc-fi-unit">мин</span>
+            </div>
+            <span class="calc-hint">На каждую смену: сдача/приём, уборка, мелкие операции без детали</span>
+          </div>
+
+          <div class="calc-field">
+            <label class="calc-label" for="t-tidle">Простои Т<sub>пр</sub></label>
+            <div class="calc-fi">
+              <svg class="calc-fi-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <circle cx="10" cy="10" r="7.5"/>
+                <line x1="10" y1="6" x2="10" y2="10"/>
+                <line x1="10" y1="10" x2="13" y2="12"/>
+                <line x1="4" y1="4" x2="16" y2="16"/>
+              </svg>
+              <input id="t-tidle" type="number" min="0" step="1" value="60"
+                     class="calc-inp" data-tcalc placeholder="0">
+              <span class="calc-fi-unit">мин</span>
+            </div>
+            <span class="calc-hint">Ожидаемые простои: ожидание заготовок, ремонт, перерывы сверх нормы</span>
           </div>
 
         </div>
@@ -164,12 +252,12 @@
 
         <!-- Главный результат -->
         <div class="calc-main-result">
-          <div class="calc-main-result-label">Штучное время Т<sub>шт</sub></div>
+          <div class="calc-main-result-label">Штучное время Т<sub>шт</sub> (норма)</div>
           <div class="calc-main-result-value">
             <span class="calc-main-num" id="r-tsht">—</span>
-            <span class="calc-main-unit">мин</span>
           </div>
-          <div class="calc-main-sec">= <span id="r-tsht-s">—</span> с</div>
+          <div class="calc-main-sec">= <span id="r-tsht-min">—</span> мин/шт · 1.0 = 60 мин</div>
+          <div class="calc-main-sec calc-main-sec--cycle" id="r-cycle-wrap" hidden>1 цикл (<span id="r-k-val">1</span> шт) = <span id="r-tcycle-min">—</span> мин</div>
         </div>
 
         <div class="calc-divider"></div>
@@ -207,13 +295,67 @@
         <div class="calc-stat-row">
           <div class="calc-stat">
             <div class="calc-stat-val" id="r-prod">—</div>
-            <div class="calc-stat-label">дет / час</div>
+            <div class="calc-stat-label">дет / час (по норме)</div>
           </div>
           <div class="calc-stat-sep"></div>
           <div class="calc-stat">
             <div class="calc-stat-val" id="r-shift">—</div>
-            <div class="calc-stat-label">дет / смена</div>
+            <div class="calc-stat-label">дет / смена (план)</div>
           </div>
+        </div>
+
+        <div class="calc-shift-plan">
+          <div class="calc-shift-plan__title">Баланс смены</div>
+          <div class="calc-shift-plan__bar" aria-hidden="true">
+            <span class="calc-shift-plan__seg calc-shift-plan__seg--work" id="bar-shift-work"></span>
+            <span class="calc-shift-plan__seg calc-shift-plan__seg--aux" id="bar-shift-aux"></span>
+            <span class="calc-shift-plan__seg calc-shift-plan__seg--idle" id="bar-shift-idle"></span>
+            <span class="calc-shift-plan__seg calc-shift-plan__seg--free" id="bar-shift-free"></span>
+          </div>
+          <div class="calc-shift-plan__legend">
+            <span><i class="calc-shift-plan__dot calc-shift-plan__dot--work"></i> детали <strong id="r-shift-work">—</strong> мин</span>
+            <span><i class="calc-shift-plan__dot calc-shift-plan__dot--aux"></i> Т<sub>всп</sub> <strong id="r-shift-aux">—</strong> мин</span>
+            <span><i class="calc-shift-plan__dot calc-shift-plan__dot--idle"></i> Т<sub>пр</sub> <strong id="r-shift-idle">—</strong> мин</span>
+            <span><i class="calc-shift-plan__dot calc-shift-plan__dot--free"></i> резерв <strong id="r-shift-free">—</strong> мин</span>
+          </div>
+          <div class="calc-shift-plan__meta">
+            <span>Полезный фонд: <strong id="r-shift-avail">—</strong> мин</span>
+            <span>Загрузка: <strong id="r-shift-load">—</strong></span>
+            <span>Выработка: <strong id="r-prod-plan">—</strong> дет/ч</span>
+          </div>
+        </div>
+
+        <div class="calc-order-plan" id="calc-order-plan">
+          <div class="calc-shift-plan__title">План заказа</div>
+          <div class="calc-order-plan__grid">
+            <div class="calc-order-plan__item">
+              <span class="calc-order-plan__label">Удельная норма</span>
+              <span class="calc-order-plan__val"><strong id="r-order-unit">—</strong> мин/шт</span>
+            </div>
+            <div class="calc-order-plan__item">
+              <span class="calc-order-plan__label">Т<sub>пз</sub> на шт</span>
+              <span class="calc-order-plan__val"><strong id="r-order-tpz-unit">—</strong> мин</span>
+            </div>
+            <div class="calc-order-plan__item">
+              <span class="calc-order-plan__label">Всего на заказ</span>
+              <span class="calc-order-plan__val"><strong id="r-order-total">—</strong> мин</span>
+            </div>
+            <div class="calc-order-plan__item">
+              <span class="calc-order-plan__label">Смен на заказ</span>
+              <span class="calc-order-plan__val"><strong id="r-order-shifts">—</strong></span>
+            </div>
+            <div class="calc-order-plan__item">
+              <span class="calc-order-plan__label">Циклов на заказ</span>
+              <span class="calc-order-plan__val"><strong id="r-order-cycles">—</strong></span>
+            </div>
+          </div>
+          <p class="calc-order-plan__note" id="r-order-note">—</p>
+        </div>
+
+        <div class="calc-method-note">
+          <strong>Как считать статистику.</strong>
+          Выработку по станку сравнивают с Т<sub>шт</sub> на одну деталь (цикл из k шт делится на k).
+          Т<sub>пз</sub>, Т<sub>всп</sub> и Т<sub>пр</sub> — отдельно от нормы серии.
         </div>
 
       </div>
@@ -368,6 +510,7 @@
   /* Подсветка слагаемых в формуле */
   var fieldLinks = {
     "t-tauto":  "cf-tauto",
+    "t-k":      "cf-k",
     "t-a":      "cf-a",
     "t-a-range":"cf-a",
     "t-tust-m": "cf-tust",
@@ -406,41 +549,167 @@
     if (el) el.style.width = (Math.min(frac, 1) * 100).toFixed(1) + "%";
   }
 
+  function updateShiftBars(workMin, auxMin, idleMin, availMin, shiftMin) {
+    var total = shiftMin > 0 ? shiftMin : 1;
+    var freeMin = Math.max(0, availMin - workMin);
+    updateBar("bar-shift-work", workMin / total);
+    updateBar("bar-shift-aux", auxMin / total);
+    updateBar("bar-shift-idle", idleMin / total);
+    updateBar("bar-shift-free", freeMin / total);
+  }
+
+  function updateFormulaCycle(k) {
+    var multi = k > 1;
+    ["cf-cycle-open", "cf-mul-k", "cf-k", "cf-cycle-close", "cf-div-k", "cf-k2"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.hidden = !multi;
+    });
+    var wrap = document.getElementById("r-cycle-wrap");
+    if (wrap) wrap.hidden = !multi;
+  }
+
+  function planOrderShifts(qty, tshtMin, tcycleMin, k, tpz, tavail) {
+    if (qty <= 0 || tavail <= 0) return { shifts: 0, note: "" };
+    var byCycle = k > 1 && tcycleMin > 0;
+    var unitMin = byCycle ? tcycleMin : tshtMin;
+    if (unitMin <= 0) return { shifts: 0, note: "" };
+
+    var unitsNeeded = byCycle ? Math.ceil(qty / k) : qty;
+    var firstAvail = Math.max(0, tavail - tpz);
+    var perShiftUnits = Math.floor(tavail / unitMin);
+    var firstShiftUnits = Math.floor(firstAvail / unitMin);
+
+    if (firstShiftUnits <= 0 && tpz >= tavail) {
+      return {
+        shifts: 0,
+        note: "Наладка Тпз не помещается в полезный фонд одной смены — увеличьте смену или уменьшите Тпз.",
+      };
+    }
+    if (unitsNeeded <= firstShiftUnits) {
+      return {
+        shifts: 1,
+        note: byCycle
+          ? "Наладка в первой смене, " + firstShiftUnits + " цикл(ов) × " + k + " шт."
+          : "Наладка в первой смене, серийный выпуск в той же смене.",
+      };
+    }
+    var leftUnits = unitsNeeded - firstShiftUnits;
+    var otherShifts = perShiftUnits > 0 ? Math.ceil(leftUnits / perShiftUnits) : 0;
+    var shifts = 1 + otherShifts;
+    var perShiftQty = byCycle ? perShiftUnits * k : perShiftUnits;
+    return {
+      shifts: shifts,
+      note: byCycle
+        ? "1-я смена: Тпз + " + (firstShiftUnits * k) + " шт (" + firstShiftUnits + " цикл.), далее до " + perShiftQty + " шт/смена."
+        : "1-я смена: Тпз + " + (firstShiftUnits) + " шт, далее до " + perShiftUnits + " шт/смена.",
+    };
+  }
+
   function calcTime() {
     var Tauto = parseFloat(document.getElementById("t-tauto").value);
+    var k     = Math.max(1, parseInt(document.getElementById("t-k").value, 10) || 1);
     var a     = parseFloat(document.getElementById("t-a").value) || 0;
     var Tust  = parseFloat(document.getElementById("t-tust-m").value) || 0;
     var Tizm  = parseFloat(document.getElementById("t-tizm-m").value) || 0;
+    document.getElementById("t-k").value = k;
+    updateFormulaCycle(k);
 
     if (isNaN(Tauto) || Tauto < 0) {
       var mainNum = document.getElementById("r-tsht");
       mainNum.textContent = "—"; mainNum.removeAttribute("data-val");
-      document.getElementById("r-tsht-s").textContent = "—";
+      document.getElementById("r-tsht-min").textContent = "—";
+      document.getElementById("r-tcycle-min").textContent = "—";
       document.getElementById("r-prod").textContent = "—";
       document.getElementById("r-shift").textContent = "—";
-      ["r-tauto-k","r-tust-v","r-tizm-v"].forEach(function(id){ document.getElementById(id).textContent="—"; });
+      document.getElementById("r-prod-plan").textContent = "—";
+      ["r-tauto-k","r-tust-v","r-tizm-v","r-shift-work","r-shift-aux","r-shift-idle","r-shift-free","r-shift-avail","r-shift-load",
+       "r-order-unit","r-order-tpz-unit","r-order-total","r-order-shifts","r-order-cycles","r-order-note"].forEach(function(id){
+        var el = document.getElementById(id);
+        if (el) el.textContent = "—";
+      });
       updateBar("bar-tauto",0); updateBar("bar-tust",0); updateBar("bar-tizm",0);
+      updateShiftBars(0, 0, 0, 0, 1);
       return;
     }
 
-    var tautoK = Tauto * (1 + a / 100);
-    var Tsht   = tautoK + Tust + Tizm;
-    var prod   = Tsht > 0 ? 60 / Tsht : 0;
-    var shift  = Tsht > 0 ? Math.floor(480 / Tsht) : 0; /* 8-часовая смена */
+    var shiftHours = parseFloat(document.getElementById("t-shift-h").value) || 8;
+    var Tvsp = parseFloat(document.getElementById("t-tvsp").value) || 0;
+    var Tidle = parseFloat(document.getElementById("t-tidle").value) || 0;
+    var Tpz = parseFloat(document.getElementById("t-tpz").value) || 0;
+    var qty = parseInt(document.getElementById("t-qty").value, 10);
+    var shiftMin = shiftHours * 60;
 
-    animateNum(document.getElementById("r-tsht"), Tsht, 3);
-    document.getElementById("r-tsht-s").textContent = Math.round(Tsht * 60) + " с";
-    document.getElementById("r-tauto-k").textContent = tautoK.toFixed(3);
-    document.getElementById("r-tust-v").textContent  = Tust.toFixed(1);
+    var tautoK = Tauto * (1 + a / 100);
+    var TcycleMin = tautoK + Tust + Tizm * k;
+    var TshtMin = TcycleMin / k;
+    var TshtNorm = TshtMin / 60; /* норма: 1.0 = 60 мин */
+    var prod   = TshtMin > 0 ? 60 / TshtMin : 0;
+
+    var Tavail = Math.max(0, shiftMin - Tvsp - Tidle);
+    var shiftCycles, shiftPieces, shiftWork;
+    if (k > 1) {
+      shiftCycles = TcycleMin > 0 ? Math.floor(Tavail / TcycleMin) : 0;
+      shiftPieces = shiftCycles * k;
+      shiftWork = shiftCycles * TcycleMin;
+    } else {
+      shiftPieces = TshtMin > 0 ? Math.floor(Tavail / TshtMin) : 0;
+      shiftWork = shiftPieces * TshtMin;
+      shiftCycles = shiftPieces;
+    }
+    var loadPct = shiftMin > 0 ? (shiftWork / shiftMin * 100) : 0;
+    var prodPlan = shiftMin > 0 ? (shiftPieces * 60 / shiftMin) : 0;
+
+    animateNum(document.getElementById("r-tsht"), TshtNorm, 3);
+    document.getElementById("r-tsht-min").textContent = TshtMin.toFixed(1);
+    document.getElementById("r-k-val").textContent = k;
+    document.getElementById("r-tcycle-min").textContent = TcycleMin.toFixed(1);
+    document.getElementById("r-tauto-k").textContent = (tautoK / k).toFixed(1);
+    document.getElementById("r-tust-v").textContent  = (Tust / k).toFixed(1);
     document.getElementById("r-tizm-v").textContent  = Tizm.toFixed(1);
     document.getElementById("r-prod").textContent    = prod > 0 ? prod.toFixed(1) : "—";
-    document.getElementById("r-shift").textContent   = shift > 0 ? shift : "—";
+    document.getElementById("r-shift").textContent   = shiftPieces > 0 ? shiftPieces : "—";
+    document.getElementById("r-prod-plan").textContent = prodPlan > 0 ? prodPlan.toFixed(1) : "—";
+    document.getElementById("r-shift-work").textContent = shiftWork.toFixed(0);
+    document.getElementById("r-shift-aux").textContent = Tvsp.toFixed(0);
+    document.getElementById("r-shift-idle").textContent = Tidle.toFixed(0);
+    document.getElementById("r-shift-free").textContent = Math.max(0, Tavail - shiftWork).toFixed(0);
+    document.getElementById("r-shift-avail").textContent = Tavail.toFixed(0);
+    document.getElementById("r-shift-load").textContent = loadPct > 0 ? loadPct.toFixed(0) + " %" : "—";
 
-    /* полоски */
-    if (Tsht > 0) {
-      updateBar("bar-tauto", tautoK / Tsht);
-      updateBar("bar-tust",  Tust   / Tsht);
-      updateBar("bar-tizm",  Tizm   / Tsht);
+    updateShiftBars(shiftWork, Tvsp, Tidle, Tavail, shiftMin);
+
+    if (qty > 0) {
+      var orderPlan = planOrderShifts(qty, TshtMin, TcycleMin, k, Tpz, Tavail);
+      var tpzUnit = Tpz / qty;
+      var unitPlan = TshtMin + tpzUnit;
+      var orderPieceMin = qty * TshtMin;
+      var orderTotal = orderPieceMin + Tpz + orderPlan.shifts * (Tvsp + Tidle);
+      var orderCycles = Math.ceil(qty / k);
+
+      document.getElementById("r-order-unit").textContent = unitPlan.toFixed(2);
+      document.getElementById("r-order-tpz-unit").textContent = tpzUnit.toFixed(2);
+      document.getElementById("r-order-total").textContent = orderTotal.toFixed(0);
+      document.getElementById("r-order-shifts").textContent = orderPlan.shifts > 0 ? orderPlan.shifts : "—";
+      document.getElementById("r-order-cycles").textContent = orderCycles;
+      var orderNote = orderPlan.note || "";
+      if (k > 1) {
+        orderNote += (orderNote ? " " : "") + "≈ " + orderCycles + " циклов по " + k + " шт.";
+      }
+      document.getElementById("r-order-note").textContent = orderNote || "—";
+    } else {
+      document.getElementById("r-order-unit").textContent = "—";
+      document.getElementById("r-order-tpz-unit").textContent = "—";
+      document.getElementById("r-order-total").textContent = "—";
+      document.getElementById("r-order-shifts").textContent = "—";
+      document.getElementById("r-order-cycles").textContent = "—";
+      document.getElementById("r-order-note").textContent = "Укажите количество в заказе.";
+    }
+
+    /* полоски — доли на одну деталь */
+    if (TshtMin > 0) {
+      updateBar("bar-tauto", (tautoK / k) / TshtMin);
+      updateBar("bar-tust",  (Tust / k) / TshtMin);
+      updateBar("bar-tizm",  Tizm / TshtMin);
     }
   }
 

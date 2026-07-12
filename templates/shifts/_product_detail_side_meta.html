@@ -98,6 +98,38 @@
     </div>
   </div>
 </div>
+{% if not product.is_osnastka %}
+<div class="product-side-osnastka" id="product-osnastka-block" aria-label="Используемая оснастка">
+  <ul class="product-osnastka-list" id="product-osnastka-list">
+    {% for link in product_osnastka_links %}
+    <li class="product-osnastka-item" data-link-id="{{ link.pk }}" data-osnastka-id="{{ link.osnastka_id }}">
+      <a href="{% url 'osnastka_detail' link.osnastka_id %}" class="btn product-btn-secondary product-osnastka-link">{{ link.osnastka.name }}</a>
+      {% if biota_can_edit %}
+      <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-osnastka-remove js-product-osnastka-remove" data-link-id="{{ link.pk }}" title="Убрать оснастку" aria-label="Убрать оснастку" hidden>{% include "shifts/includes/biota_delete_icon.html" %}</button>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="muted product-osnastka-empty-msg" id="product-osnastka-empty-msg"{% if product_osnastka_links %} hidden{% endif %}>Оснастка не указана</p>
+  {% if biota_can_edit %}
+  <div class="product-osnastka-add" id="product-osnastka-add" hidden>
+    <div class="product-osnastka-combo js-product-osnastka-combo" id="product-osnastka-combo">
+      <select class="product-osnastka-select" id="product-osnastka-select" tabindex="-1" aria-hidden="true" hidden>
+        <option value="">— выберите —</option>
+        {% for opt in osnastka_catalog_options %}
+        <option value="{{ opt.id }}">{{ opt.name }}</option>
+        {% endfor %}
+      </select>
+      <input type="text" class="product-osnastka-search js-product-osnastka-search" id="product-osnastka-search" placeholder="Поиск оснастки…" autocomplete="off" spellcheck="false" aria-label="Поиск оснастки" aria-autocomplete="list" aria-controls="product-osnastka-suggest" aria-expanded="false" role="combobox" />
+      <ul class="product-osnastka-suggest js-product-osnastka-suggest" id="product-osnastka-suggest" role="listbox" hidden></ul>
+    </div>
+    <button type="button" class="btn btn-ghost product-osnastka-add-btn js-product-osnastka-add" title="Добавить оснастку" aria-label="Добавить оснастку">
+      <i class="fi fi-rr-add ui-icon" aria-hidden="true"></i>
+    </button>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
 {% if setups %}
 <div class="product-side-programs" id="product-side-programs" aria-label="Программы установок">
   {% for setup in setups %}

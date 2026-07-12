@@ -438,7 +438,11 @@ def _machines_post_save(request):
 @write_permission_required
 @require_http_methods(["GET", "HEAD", "POST"])
 def machines_view(request):
-    plist = list(Product.objects.order_by("name").only("id", "name", "list_preview_image"))
+    plist = list(
+        Product.objects.filter(catalog_section=Product.CATALOG_NALADKI)
+        .order_by("name")
+        .only("id", "name", "list_preview_image")
+    )
     product_by_id = {p.id: (p.name or "") for p in plist}
     valid_pids = set(product_by_id.keys())
     product_options = [{"id": p.id, "name": p.name or ""} for p in plist]

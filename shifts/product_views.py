@@ -12,9 +12,9 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Max, Q
-from django.http import JsonResponse, QueryDict
+from django.http import Http404, JsonResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -26,6 +26,7 @@ from .models import (
     Product,
     ProductFile,
     ProductNote,
+    ProductOsnastkaUsage,
     ProductSetup,
     ProductSetupPhoto,
     ProductDrawingFile,
@@ -44,6 +45,30 @@ from .product_plan_sync import (
 )
 
 SETUP_LIST_ORDER = ("-in_work", "sort_order", "id")
+
+
+def _products_qs_for_catalog(catalog_section: str):
+    return (
+        Product.objects.filter(catalog_section=catalog_section)
+        .annotate(in_work_count=Count("setups", filter=Q(setups__in_work=True)))
+        .order_by("-in_work_count", "-updated_at", "-id")
+    )
+
+
+def _product_detail_url_name(product: Product) -> str:
+    if product.is_osnastka:
+        return "osnastka_detail"
+    return "product_detail"
+
+
+def _product_detail_url(product: Product) -> str:
+    return reverse(_product_detail_url_name(product), kwargs={"pk": product.pk})
+
+
+def _product_list_url_name(product: Product) -> str:
+    if product.is_osnastka:
+        return "osnastka_list"
+    return "products_list"
 
 
 def _product_setups_qs(product: Product):
@@ -301,6 +326,51 @@ def _drawing_files_payload(product: Product) -> dict:
             }
         )
     return {"drawing_files": files_out}
+
+
+def _product_osnastka_links_qs(product: Product):
+    return ProductOsnastkaUsage.objects.filter(product=product).select_related("osnastka").order_by(
+        "sort_order", "id"
+    )
+
+
+def _product_osnastka_links_payload(product: Product) -> list[dict]:
+    out = []
+    for link in _product_osnastka_links_qs(product):
+        name = (link.osnastka.name or "").strip() or f"#{link.osnastka_id}"
+        out.append(
+            {
+                "id": link.pk,
+                "osnastka_id": link.osnastka_id,
+                "name": name,
+                "url": reverse("osnastka_detail", kwargs={"pk": link.osnastka_id}),
+            }
+        )
+    return out
+
+
+def _osnastka_catalog_options(*, linked_ids: set[int]) -> list[dict]:
+    qs = Product.objects.filter(catalog_section=Product.CATALOG_OSNASTKA).order_by("name", "id")
+    if linked_ids:
+        qs = qs.exclude(pk__in=linked_ids)
+    return [
+        {"id": row.pk, "name": (row.name or "").strip() or f"#{row.pk}"}
+        for row in qs
+    ]
+
+
+def _product_osnastka_payload(product: Product) -> dict:
+    linked_ids = set(_product_osnastka_links_qs(product).values_list("osnastka_id", flat=True))
+    return {
+        "osnastka_links": _product_osnastka_links_payload(product),
+        "osnastka_options": _osnastka_catalog_options(linked_ids=linked_ids),
+    }
+
+
+def _product_osnastka_usage_json(product: Product) -> dict:
+    out = _product_osnastka_payload(product)
+    out["ok"] = True
+    return out
 
 
 def _setup_program_files_qs(setup: ProductSetup):
@@ -987,12 +1057,7 @@ def _build_display_tool_rows(existing_rows: list[ProductSetupToolRow] | None = N
 @require_http_methods(["GET", "HEAD"])
 def products_list_view(request):
     q = (request.GET.get("q") or "").strip()
-    qs = (
-        Product.objects.annotate(
-            in_work_count=Count("setups", filter=Q(setups__in_work=True)),
-        )
-        .order_by("-in_work_count", "-updated_at", "-id")
-    )
+    qs = _products_qs_for_catalog(Product.CATALOG_NALADKI)
     if q:
         qs = qs.filter(Q(name__icontains=q) | Q(description__icontains=q))
     paginator = Paginator(qs, 24)
@@ -1000,6 +1065,27 @@ def products_list_view(request):
     return render(
         request,
         "shifts/products_list.html",
+        {
+            "products_page": page,
+            "search_q": q,
+            "username": biota_user(request),
+        },
+    )
+
+
+@biota_login_required
+@nav_permission_required("products")
+@require_http_methods(["GET", "HEAD"])
+def osnastka_list_view(request):
+    q = (request.GET.get("q") or "").strip()
+    qs = _products_qs_for_catalog(Product.CATALOG_OSNASTKA)
+    if q:
+        qs = qs.filter(Q(name__icontains=q) | Q(description__icontains=q))
+    paginator = Paginator(qs, 24)
+    page = paginator.get_page(request.GET.get("page") or 1)
+    return render(
+        request,
+        "shifts/osnastka_list.html",
         {
             "products_page": page,
             "search_q": q,
@@ -1019,12 +1105,13 @@ def product_delete_view(request, pk: int):
         return redirect("products_list")
     product = get_object_or_404(Product, pk=pk)
     nm = (product.name or "").strip() or f"#{pk}"
+    list_url = _product_list_url_name(product)
     product.delete()
     messages.success(request, f"Наладка «{nm}» удалена.")
     nxt = (request.POST.get("next") or "").strip()
     if nxt.startswith("/") and not nxt.startswith("//"):
         return redirect(nxt)
-    return redirect("products_list")
+    return redirect(list_url)
 
 
 @biota_login_required
@@ -1079,6 +1166,7 @@ def product_setup_pdf_export_view(request, pk: int, setup_pk: int, mode: str):
 
 
 NEW_PRODUCT_NAME_BASE = "Новая наладка"
+NEW_OSNASTKA_NAME_BASE = "Новая оснастка"
 NEW_PRODUCT_DEFAULT_WORKPIECE = "preparatory"
 
 
@@ -1091,16 +1179,19 @@ def _allocate_new_product_name(base: str = NEW_PRODUCT_NAME_BASE) -> str:
     return name
 
 
-def create_product_with_defaults() -> Product:
-    """Новая карточка наладки: изделие, первая установка, план с дефолтами."""
+def create_product_with_defaults(*, catalog_section: str | None = None) -> Product:
+    """Новая карточка: изделие в «Наладках» или «Оснастках», первая установка."""
+    section = catalog_section or Product.CATALOG_NALADKI
+    name_base = NEW_OSNASTKA_NAME_BASE if section == Product.CATALOG_OSNASTKA else NEW_PRODUCT_NAME_BASE
     with transaction.atomic():
         product = Product.objects.create(
-            name=_allocate_new_product_name(),
+            name=_allocate_new_product_name(name_base),
             description="",
             drawing_blank_size="",
             drawing_blank_type="",
             card_product_type="made",
             card_workpiece_type=NEW_PRODUCT_DEFAULT_WORKPIECE,
+            catalog_section=section,
         )
         ProductSetup.objects.create(
             product=product,
@@ -1117,7 +1208,18 @@ def create_product_with_defaults() -> Product:
 def product_create_view(request):
     product = create_product_with_defaults()
     messages.success(request, "Создана новая наладка — заполните карточку изделия.")
-    base = reverse("product_detail", kwargs={"pk": product.pk})
+    base = _product_detail_url(product)
+    return redirect(f"{base}?{urlencode({'tab': 'drawing', 'quick_edit': '1'})}")
+
+
+@biota_login_required
+@nav_permission_required("products")
+@write_permission_required
+@require_http_methods(["GET", "POST"])
+def osnastka_create_view(request):
+    product = create_product_with_defaults(catalog_section=Product.CATALOG_OSNASTKA)
+    messages.success(request, "Создана новая оснастка — заполните карточку.")
+    base = _product_detail_url(product)
     return redirect(f"{base}?{urlencode({'tab': 'drawing', 'quick_edit': '1'})}")
 
 
@@ -1140,7 +1242,7 @@ def product_name_suggestions_view(request):
     if len(q) < 2:
         return JsonResponse({"ok": True, "items": []})
 
-    qs = Product.objects.all()
+    qs = Product.objects.filter(catalog_section=Product.CATALOG_NALADKI)
     if exclude_id is not None:
         qs = qs.exclude(pk=exclude_id)
     q_tokens_all = _name_tokens(q)
@@ -1379,6 +1481,13 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
 @require_http_methods(["GET", "POST"])
 def product_detail_view(request, pk: int):
     product = get_object_or_404(Product.objects.prefetch_related("drawing_files"), pk=pk)
+    osnastka_route = getattr(request, "_osnastka_catalog_route", False)
+    if osnastka_route and not product.is_osnastka:
+        raise Http404("Карточка не найдена.")
+    if product.is_osnastka and not osnastka_route:
+        q = request.GET.urlencode()
+        dest = reverse("osnastka_detail", kwargs={"pk": pk})
+        return redirect(f"{dest}?{q}" if q else dest)
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
         if action == "create_setup":
@@ -1392,8 +1501,7 @@ def product_detail_view(request, pk: int):
             )
             messages.success(request, "Добавлена установка — заполните данные во вкладке.")
             tab_slug = f"setup-{setup.pk}"
-            base = reverse("product_detail", kwargs={"pk": pk})
-            return redirect(f"{base}?{urlencode({'tab': tab_slug})}")
+            return redirect(f"{_product_detail_url(product)}?{urlencode({'tab': tab_slug})}")
 
         if action == "add_product_note":
             body = (request.POST.get("body") or "").strip()
@@ -1731,6 +1839,47 @@ def product_detail_view(request, pk: int):
             out["ok"] = True
             return JsonResponse(out)
 
+        if action == "product_add_osnastka":
+            if product.is_osnastka:
+                return JsonResponse({"ok": False, "error": "Недоступно для карточки оснастки."}, status=400)
+            osn_raw = (request.POST.get("osnastka_id") or "").strip()
+            osn_id = int(osn_raw) if osn_raw.isdigit() else 0
+            if osn_id <= 0:
+                return JsonResponse({"ok": False, "error": "Выберите оснастку."}, status=400)
+            if osn_id == product.pk:
+                return JsonResponse({"ok": False, "error": "Нельзя указать эту же карточку."}, status=400)
+            osnastka = Product.objects.filter(pk=osn_id, catalog_section=Product.CATALOG_OSNASTKA).first()
+            if not osnastka:
+                return JsonResponse({"ok": False, "error": "Оснастка не найдена."}, status=404)
+            if ProductOsnastkaUsage.objects.filter(product=product, osnastka=osnastka).exists():
+                return JsonResponse({"ok": False, "error": "Эта оснастка уже указана."}, status=400)
+            last = _product_osnastka_links_qs(product).aggregate(m=Max("sort_order"))["m"]
+            next_order = (last + 1) if last is not None else 0
+            try:
+                ProductOsnastkaUsage.objects.create(
+                    product=product,
+                    osnastka=osnastka,
+                    sort_order=next_order,
+                )
+            except IntegrityError:
+                return JsonResponse({"ok": False, "error": "Эта оснастка уже указана."}, status=400)
+            product.save(update_fields=["updated_at"])
+            return JsonResponse(_product_osnastka_usage_json(product))
+
+        if action == "product_remove_osnastka":
+            if product.is_osnastka:
+                return JsonResponse({"ok": False, "error": "Недоступно для карточки оснастки."}, status=400)
+            link_id_raw = (request.POST.get("link_id") or "").strip()
+            link_id = int(link_id_raw) if link_id_raw.isdigit() else 0
+            if link_id <= 0:
+                return JsonResponse({"ok": False, "error": "Не указана связь."}, status=400)
+            row = ProductOsnastkaUsage.objects.filter(pk=link_id, product=product).first()
+            if not row:
+                return JsonResponse({"ok": False, "error": "Связь не найдена."}, status=404)
+            row.delete()
+            product.save(update_fields=["updated_at"])
+            return JsonResponse(_product_osnastka_usage_json(product))
+
         if action == "inline_delete_setup_program_file":
             setup_id_raw = (request.POST.get("setup_id") or "").strip()
             setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
@@ -1833,6 +1982,7 @@ def product_detail_view(request, pk: int):
         "shifts/product_detail.html",
         {
             "product": product,
+            "product_self_url": _product_detail_url(product),
             **plan_form_context(product),
             "setup_photos": setup_photos,
             "setups": setups,
@@ -1852,8 +2002,27 @@ def product_detail_view(request, pk: int):
             "product_notes": list(
                 product.notes.filter(setup__isnull=True).order_by("created_at", "id")
             ),
+            "product_osnastka_links": _product_osnastka_links_qs(product) if not product.is_osnastka else [],
+            "osnastka_catalog_options": (
+                _osnastka_catalog_options(
+                    linked_ids=set(
+                        _product_osnastka_links_qs(product).values_list("osnastka_id", flat=True)
+                    )
+                )
+                if not product.is_osnastka
+                else []
+            ),
         },
     )
+
+
+@biota_login_required
+@nav_permission_required("products")
+@write_permission_required
+@require_http_methods(["GET", "POST"])
+def osnastka_detail_view(request, pk: int):
+    request._osnastka_catalog_route = True
+    return product_detail_view(request, pk)
 
 
 @biota_login_required

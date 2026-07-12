@@ -3,9 +3,7 @@
   Отбор по сотруднику «{{ employee.label }}» (как в списке ЗП).
 </p>
 <p class="muted" style="margin:0 0 14px 0;font-size:12px;line-height:1.45;">
-  Итого за {{ month_name }}: записей <strong>{{ defect_month.count }}</strong>;
-  кол-во брака <strong>{{ defect_month.defect_quantity }}</strong>;
-  неисправно <strong>{{ defect_month.bad_quantity }}</strong>.
+  Итого за {{ month_name }}: записей <strong>{{ defect_month.count }}</strong>.
 </p>
 {% for rec in defect_records %}
 <div class="payroll-defect-entry">
@@ -19,10 +17,6 @@
     <dd>{{ rec.responsible_name|default:"—" }}</dd>
     <dt>Сотрудник</dt>
     <dd>{{ rec.employee_name }}</dd>
-    <dt>Кол-во брака</dt>
-    <dd>{{ rec.defect_quantity }}</dd>
-    <dt>Неисправно</dt>
-    <dd>{{ rec.bad_quantity }}</dd>
     <dt>Причина брака</dt>
     <dd>{{ rec.defect_reason }}</dd>
     <dt>Создано в системе</dt>

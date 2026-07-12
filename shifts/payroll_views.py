@@ -16,7 +16,7 @@ from biota_shifts.constants import MONTH_NAMES_RU
 from biota_shifts.emp_codes import normalize_emp_code
 
 from .auth_utils import biota_login_required, biota_user, write_permission_required
-from django.db.models import Count, Prefetch, Sum
+from django.db.models import Count, Prefetch
 
 from .models import (
     DEFECT_PAYROLL_ADJUST_KIND_CHOICES,
@@ -348,10 +348,6 @@ def payroll_settlement_view(request, emp_code: str):
             employee_name=label,
         ).aggregate(
             cnt=Count("id"),
-            defect_qty=Sum("defect_quantity"),
-            good_qty=Sum("good_quantity"),
-            bad_qty=Sum("bad_quantity"),
-            potential_qty=Sum("potential_defect_quantity"),
         )
     else:
         defect_records = []
@@ -359,10 +355,6 @@ def payroll_settlement_view(request, emp_code: str):
         defect_adj_sums = {}
         defect_agg = {
             "cnt": 0,
-            "defect_qty": None,
-            "good_qty": None,
-            "bad_qty": None,
-            "potential_qty": None,
         }
     totals = compute_payroll_totals(
         profile, settlement, day_rows, defect_adjust_sum_by_kind=defect_adj_sums or None
@@ -387,10 +379,6 @@ def payroll_settlement_view(request, emp_code: str):
     tab_month_sum = sum(float(r.get("tab_h") or 0) for r in day_rows)
     defect_month = {
         "count": int(defect_agg.get("cnt") or 0),
-        "defect_quantity": int(defect_agg.get("defect_qty") or 0),
-        "good_quantity": int(defect_agg.get("good_qty") or 0),
-        "bad_quantity": int(defect_agg.get("bad_qty") or 0),
-        "potential_defect_quantity": int(defect_agg.get("potential_qty") or 0),
     }
     preview_data = {
         "day_rate": str(

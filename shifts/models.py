@@ -1089,7 +1089,7 @@ class EmployeeDefectRecord(models.Model):
         verbose_name_plural = "Учёт брака сотрудников"
 
     def __str__(self):
-        return f"{self.defect_date} / {self.employee_name} / брак: {self.defect_quantity}"
+        return f"{self.defect_date} / {self.employee_name} / {(self.defect_reason or '')[:60]}"
 
 
 EMPLOYEE_PAYROLL_SHIFT_HOURS = (
@@ -1351,7 +1351,21 @@ class EmployeeDefectPayrollAdjustment(models.Model):
 class Product(models.Model):
     """Карточка изделия: чертёж, 3D, наладка, программа."""
 
+    CATALOG_NALADKI = "naladki"
+    CATALOG_OSNASTKA = "osnastka"
+    CATALOG_SECTION_CHOICES = [
+        (CATALOG_NALADKI, "Наладки"),
+        (CATALOG_OSNASTKA, "Оснастки"),
+    ]
+
     name = models.CharField(max_length=300, verbose_name="Название")
+    catalog_section = models.CharField(
+        max_length=20,
+        choices=CATALOG_SECTION_CHOICES,
+        default=CATALOG_NALADKI,
+        verbose_name="Раздел каталога",
+        db_index=True,
+    )
     description = models.TextField(blank=True, default="", verbose_name="Описание")
     drawing_pdf = models.FileField(
         upload_to="products/drawings/",
@@ -1480,6 +1494,10 @@ class Product(models.Model):
             return "из основного"
         return "—"
 
+    @property
+    def is_osnastka(self) -> bool:
+        return self.catalog_section == self.CATALOG_OSNASTKA
+
 
 class ProductNote(models.Model):
     """Заметки: вкладка «Изделие» (setup пустой) или отдельная история по каждой установке."""
@@ -1510,6 +1528,39 @@ class ProductNote(models.Model):
 
     def __str__(self) -> str:
         return f"{self.product_id} s={self.setup_id} {self.author_username} @ {self.created_at}"
+
+
+class ProductOsnastkaUsage(models.Model):
+    """Связь наладки с карточкой из каталога «Оснастки»."""
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="osnastka_usages",
+        verbose_name="Наладка",
+    )
+    osnastka = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="used_in_naladki",
+        verbose_name="Оснастка",
+    )
+    sort_order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("product", "osnastka"),
+                name="unique_product_osnastka_usage",
+            ),
+        ]
+        verbose_name = "Используемая оснастка"
+        verbose_name_plural = "Используемая оснастка"
+
+    def __str__(self) -> str:
+        return f"наладка {self.product_id} → оснастка {self.osnastka_id}"
 
 
 _PRODUCT_SETUP_GCODE_STD = frozenset({"G54", "G55", "G56", "G57", "G58", "G59"})

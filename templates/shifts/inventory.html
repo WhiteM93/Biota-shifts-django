@@ -94,10 +94,10 @@
           <td class="col-hours" data-label="СКУД, ч">{{ row.skud_hours }}</td>
           <td class="col-st" data-label="Аванс">{% if row.payroll_advance_ok %}<span class="inv-payroll-ok" title="Аванс учтён">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
           <td class="col-st" data-label="ЗП">{% if row.payroll_month_ok %}<span class="inv-payroll-ok" title="Расчёт закрыт">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-          <td class="col-action" data-label=""><a class="btn btn-sm" href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">Расчёт</a></td>
+          <td class="col-action" data-label="Расчёт"><a class="btn btn-sm" href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">Расчёт</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="muted" style="padding:16px;text-align:center;">Нет сотрудников для расчёта (права по отделам или недоступна БД Biota).</td></tr>
+        <tr><td colspan="7" class="inv-payroll-table__empty muted">Нет сотрудников для расчёта (права по отделам или недоступна БД Biota).</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -1702,7 +1702,30 @@
     <input type="hidden" name="panel" value="defects">
     <input type="hidden" name="action" value="create_defect_record">
     <input type="hidden" name="record_type" id="defect-record-type-input" value="scold">
-    <label class="field"><span>Дата</span><input type="date" name="defect_date" value="{{ today }}" required></label>
+    <div class="field defect-add-date-field">
+      <span>Дата</span>
+      <div class="defect-cal-wrap" id="defect-add-date-wrap">
+        <input type="hidden" name="defect_date" id="defect-add-date-val" value="{{ today }}">
+        <button type="button" class="defect-cal-trigger" id="defect-add-cal-trigger" aria-expanded="false" aria-controls="defect-add-cal-popup" aria-haspopup="dialog">
+          <i class="fi fi-rr-calendar ui-icon defect-cal-trigger-icon" aria-hidden="true"></i>
+          <span id="defect-add-cal-trigger-text">{{ today }}</span>
+        </button>
+        <div class="defect-cal-popup" id="defect-add-cal-popup" hidden role="dialog" aria-label="Выбор даты записи">
+          <div class="defect-cal-header">
+            <button type="button" class="defect-cal-nav" data-dir="-1" aria-label="Предыдущий месяц">‹</button>
+            <span class="defect-cal-title" id="defect-add-cal-title"></span>
+            <button type="button" class="defect-cal-nav" data-dir="1" aria-label="Следующий месяц">›</button>
+          </div>
+          <div class="defect-cal-dow" aria-hidden="true">
+            <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span class="defect-cal-dow--we">сб</span><span class="defect-cal-dow--we">вс</span>
+          </div>
+          <div class="defect-cal-grid" id="defect-add-cal-grid" role="grid"></div>
+          <div class="defect-cal-foot">
+            <p class="defect-cal-hint muted">Нажмите на день</p>
+          </div>
+        </div>
+      </div>
+    </div>
     <label class="field" style="position:relative;">
       <span>Сотрудник</span>
       <input type="hidden" name="employee_name" id="defect-employee-value" required>
@@ -1713,8 +1736,6 @@
         {% endfor %}
       </div>
     </label>
-    <label class="field defect-scold-only"><span>Кол-во брака</span><input type="number" name="defect_quantity" min="0" value="0"></label>
-    <label class="field defect-scold-only"><span>Неисправно</span><input type="number" name="bad_quantity" min="0" value="0"></label>
     <label class="field"><span id="defect-reason-label">Причина брака</span><input type="text" name="defect_reason" id="defect-reason-input" required placeholder="Опишите причину"></label>
     <div class="filter-actions"><button type="submit" class="btn" id="defect-add-submit-btn">Добавить запись</button></div>
   </form>
@@ -1727,7 +1748,6 @@
   var reasonInput = document.getElementById("defect-reason-input");
   var submitBtn = document.getElementById("defect-add-submit-btn");
   var panel = document.getElementById("defect-add-panel");
-  var scoldFields = panel ? Array.prototype.slice.call(panel.querySelectorAll(".defect-scold-only")) : [];
 
   function setType(type) {
     typeInput.value = type;
@@ -1735,7 +1755,6 @@
     toggle.querySelectorAll(".defect-type-btn").forEach(function(btn){
       btn.classList.toggle("is-active", btn.dataset.type === type);
     });
-    scoldFields.forEach(function(el){ el.style.display = isScold ? "" : "none"; });
     reasonLabel.textContent = isScold ? "Причина брака" : "За что хвалим";
     reasonInput.placeholder = isScold ? "Опишите причину" : "Опишите достижение";
     submitBtn.textContent = isScold ? "Добавить запись" : "Похвалить";
@@ -1820,17 +1839,27 @@
   <h3>Фильтр записей</h3>
   <div class="filter-grid">
     <div class="field defect-date-filter" id="defect-date-filter">
-      <div class="defect-date-mode-btns">
-        <button type="button" class="defect-date-mode-btn{% if defect_filters.date_mode != 'range' %} is-active{% endif %}" data-mode="day">День</button>
-        <button type="button" class="defect-date-mode-btn{% if defect_filters.date_mode == 'range' %} is-active{% endif %}" data-mode="range">Период</button>
-      </div>
-      <div class="defect-date-inputs">
-        <input type="date" id="defect-date-single" class="defect-date-single" value="{{ defect_filters.date_from }}"{% if defect_filters.date_mode == 'range' %} style="display:none"{% endif %}>
-        <span class="defect-date-range" id="defect-date-range"{% if defect_filters.date_mode != 'range' %} style="display:none"{% endif %}>
-          <input type="date" id="defect-date-from-inp" value="{{ defect_filters.date_from }}">
-          <span class="defect-date-sep">—</span>
-          <input type="date" id="defect-date-to-inp" value="{{ defect_filters.date_to }}">
-        </span>
+      <span>Дата</span>
+      <div class="defect-cal-wrap">
+        <button type="button" class="defect-cal-trigger" id="defect-cal-trigger" aria-expanded="false" aria-controls="defect-cal-popup" aria-haspopup="dialog">
+          <i class="fi fi-rr-calendar ui-icon defect-cal-trigger-icon" aria-hidden="true"></i>
+          <span id="defect-cal-trigger-text">{% if defect_filters.date_from %}{% if defect_filters.date_from == defect_filters.date_to %}{{ defect_filters.date_from }}{% else %}{{ defect_filters.date_from }} — {{ defect_filters.date_to }}{% endif %}{% else %}Все даты{% endif %}</span>
+        </button>
+        <div class="defect-cal-popup" id="defect-cal-popup" hidden role="dialog" aria-label="Выбор даты">
+          <div class="defect-cal-header">
+            <button type="button" class="defect-cal-nav" data-dir="-1" aria-label="Предыдущий месяц">‹</button>
+            <span class="defect-cal-title" id="defect-cal-title"></span>
+            <button type="button" class="defect-cal-nav" data-dir="1" aria-label="Следующий месяц">›</button>
+          </div>
+          <div class="defect-cal-dow" aria-hidden="true">
+            <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span class="defect-cal-dow--we">сб</span><span class="defect-cal-dow--we">вс</span>
+          </div>
+          <div class="defect-cal-grid" id="defect-cal-grid" role="grid"></div>
+          <div class="defect-cal-foot">
+            <p class="defect-cal-hint muted">Два клика по одному дню — один день; по разным — период</p>
+            <button type="button" class="btn btn-ghost defect-cal-clear" id="defect-cal-clear">Сбросить</button>
+          </div>
+        </div>
         <input type="hidden" name="defect_date_mode" id="defect-date-mode-val" value="{{ defect_filters.date_mode|default:'day' }}">
         <input type="hidden" name="defect_date_from" id="defect-date-from-val" value="{{ defect_filters.date_from }}">
         <input type="hidden" name="defect_date_to" id="defect-date-to-val" value="{{ defect_filters.date_to }}">
@@ -1846,74 +1875,12 @@
     </label>
   </div>
 </form>
-<script>
-(function(){
-  var wrap = document.getElementById("defect-date-filter");
-  if (!wrap) return;
-  var modeBtns = wrap.querySelectorAll(".defect-date-mode-btn");
-  var singleInp = document.getElementById("defect-date-single");
-  var rangeWrap = document.getElementById("defect-date-range");
-  var fromInp = document.getElementById("defect-date-from-inp");
-  var toInp = document.getElementById("defect-date-to-inp");
-  var fromVal = document.getElementById("defect-date-from-val");
-  var toVal = document.getElementById("defect-date-to-val");
-  var modeVal = document.getElementById("defect-date-mode-val");
-  var form = wrap.closest("form");
-  var mode = (modeVal && modeVal.value === "range") ? "range" : "day";
-
-  function syncHidden() {
-    if (mode === "day") {
-      fromVal.value = singleInp.value;
-      toVal.value = singleInp.value;
-    } else {
-      fromVal.value = fromInp.value;
-      toVal.value = toInp.value;
-    }
-  }
-
-  function setMode(m, opts) {
-    opts = opts || {};
-    mode = m;
-    if (modeVal) modeVal.value = m;
-    modeBtns.forEach(function(b){ b.classList.toggle("is-active", b.dataset.mode === m); });
-    singleInp.style.display = m === "day" ? "" : "none";
-    rangeWrap.style.display = m === "range" ? "flex" : "none";
-    if (m === "range" && opts.primeRange && singleInp.value) {
-      if (!fromInp.value) fromInp.value = singleInp.value;
-      if (!toInp.value) toInp.value = singleInp.value;
-    }
-    if (m === "day" && opts.primeDay) {
-      if (fromInp.value) singleInp.value = fromInp.value;
-      else if (toInp.value) singleInp.value = toInp.value;
-    }
-    syncHidden();
-  }
-
-  modeBtns.forEach(function(btn){
-    btn.addEventListener("click", function(){
-      var next = btn.dataset.mode;
-      setMode(next, { primeRange: next === "range", primeDay: next === "day" });
-      if (modeVal) {
-        modeVal.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-    });
-  });
-
-  singleInp.addEventListener("change", function(){ syncHidden(); });
-  fromInp.addEventListener("change", function(){ syncHidden(); });
-  toInp.addEventListener("change", function(){ syncHidden(); });
-
-  setMode(mode);
-})();
-</script>
 
 <div class="table-wrap">
   <table class="data-grid defects-table">
     <colgroup>
       <col class="col-date">
       <col class="col-employee">
-      <col class="col-qty">
-      <col class="col-bad">
       <col class="col-reason">
       {% if is_admin_user %}<col class="col-actions">{% endif %}
     </colgroup>
@@ -1921,8 +1888,6 @@
       <tr>
         <th class="defect-col-date">Дата</th>
         <th class="defect-col-employee">Сотрудник</th>
-        <th class="defect-col-qty">Кол-во брака</th>
-        <th class="defect-col-bad">Неисправно</th>
         <th class="defect-col-reason">Причина брака</th>
         {% if is_admin_user %}<th class="defect-col-actions">Действия</th>{% endif %}
       </tr>
@@ -1949,20 +1914,6 @@
           </select>
           {% else %}
           {{ rec.employee_name }}
-          {% endif %}
-        </td>
-        <td class="defect-col-qty">
-          {% if biota_can_edit or is_admin_user %}
-          <input class="defect-cell-input defect-num-input" type="number" name="defect_quantity" min="0" value="{{ rec.defect_quantity }}" form="defect-edit-form-{{ rec.id }}" readonly required>
-          {% else %}
-          <strong>{{ rec.defect_quantity }}</strong>
-          {% endif %}
-        </td>
-        <td class="defect-col-bad">
-          {% if biota_can_edit or is_admin_user %}
-          <input class="defect-cell-input defect-num-input" type="number" name="bad_quantity" min="0" value="{{ rec.bad_quantity }}" form="defect-edit-form-{{ rec.id }}" readonly>
-          {% else %}
-          {{ rec.bad_quantity }}
           {% endif %}
         </td>
         <td class="defect-col-reason">
@@ -2001,7 +1952,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if is_admin_user %}9{% else %}8{% endif %}" class="muted">Записей по браку пока нет.</td></tr>
+      <tr><td colspan="{% if is_admin_user %}4{% else %}3{% endif %}" class="muted">Записей по браку пока нет.</td></tr>
       {% endfor %}
     </tbody>
   </table>

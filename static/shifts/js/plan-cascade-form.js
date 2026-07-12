@@ -144,6 +144,20 @@ class PlanCascadeFormManager {
   }
 
   /**
+   * Сбросить фокус с активного поля формы и синхронизировать state (перед отправкой).
+   */
+  prepareForSubmit() {
+    const active = document.activeElement;
+    if (active && this.container.contains(active)) {
+      const tag = (active.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'select' || tag === 'textarea') {
+        active.blur();
+      }
+    }
+    this.syncStateFromDOM();
+  }
+
+  /**
    * Обновить состояние и пересчитать видимость полей
    * @param {string} key - имя поля
    * @param {string} value - новое значение
@@ -253,7 +267,7 @@ class PlanCascadeFormManager {
    * @returns {Object} - {valid: boolean, errors: string[]}
    */
   validateForm() {
-    this.syncStateFromDOM();
+    this.prepareForSubmit();
     const errors = [];
     const visible = new Set(this.getVisibleFieldsForState());
     const { product_type, workpiece_type, laser_thickness, material, workpiece_size, workpiece_type_enum } =

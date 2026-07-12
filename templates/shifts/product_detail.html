@@ -10,7 +10,7 @@
     <div class="product-tabs-nav" role="tablist" aria-label="Документация и наладка">
       {% if setups %}
       {% if biota_can_edit %}
-      <form method="post" action="{% url 'product_detail' product.pk %}" class="product-add-setup-inline" style="display:inline;">
+      <form method="post" action="{{ product_self_url }}" class="product-add-setup-inline" style="display:inline;">
         {% csrf_token %}
         <input type="hidden" name="action" value="create_setup" />
         <button type="submit" class="btn btn-ghost" title="Новая установка">+</button>
@@ -30,7 +30,7 @@
       <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-setup-inline-delete-btn js-phased-delete" id="setup-inline-delete-setup-btn" data-step="0" hidden title="Удалить выбранную установку" aria-label="Удалить выбранную установку">{% include "shifts/includes/biota_delete_icon.html" %}</button>
       {% endif %}
       {% elif biota_can_edit %}
-      <form method="post" action="{% url 'product_detail' product.pk %}" style="display:inline;">
+      <form method="post" action="{{ product_self_url }}" style="display:inline;">
         {% csrf_token %}
         <input type="hidden" name="action" value="create_setup" />
         <button type="submit" class="btn btn-ghost" title="Добавить первую установку">+ Установка</button>
@@ -413,12 +413,13 @@
         </div>
       </div>
       <div class="product-detail-meta-split">
-        <div class="product-detail-meta-plan">
+        <section class="product-detail-meta-plan" aria-label="Параметры изделия">
+          <h3 class="product-detail-meta-section-title">Параметры</h3>
           {% include "shifts/includes/plan_card_specs_unified.html" with plan_specs_variant="product" %}
-        </div>
-        <div class="product-detail-description-block">
+        </section>
+        <section class="product-detail-description-block" aria-label="Описание изделия">
+          <h3 class="product-detail-meta-section-title">Описание</h3>
           <div class="form-field form-field--always-visible product-description-toolbar-field">
-            <label class="form-label muted product-description-toolbar-label" aria-hidden="true">&#8203;</label>
             <div class="description-toolbar" hidden>
             <button type="button" class="desc-format-btn" data-cmd="bold" title="Жирный (Ctrl+B)"><strong>Ж</strong></button>
             <button type="button" class="desc-format-btn" data-cmd="italic" title="Курсив (Ctrl+I)"><em>К</em></button>
@@ -445,7 +446,7 @@
             </div>
           </div>
           <div class="product-drawing-description" data-field-text="product_description" data-empty-label="Добавьте описание изделия..." spellcheck="true">{% if product.description %}{{ product.description|safe }}{% endif %}</div>
-        </div>
+        </section>
       </div>
     </div>
   </aside>

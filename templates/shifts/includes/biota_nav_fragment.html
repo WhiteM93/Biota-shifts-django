@@ -58,6 +58,7 @@
 {% endif %}
 {% if biota_nav.products %}
 <a href="{% url 'products_list' %}" class="{% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_setup_edit' %}active{% endif %}">Наладки</a>
+<a href="{% url 'osnastka_list' %}" class="{% if request.resolver_match.url_name == 'osnastka_list' or request.resolver_match.url_name == 'osnastka_create' or request.resolver_match.url_name == 'osnastka_detail' %}active{% endif %}">Оснастки</a>
 {% endif %}
 {% if biota_nav.machines %}
 <a href="{% url 'machines' %}" class="{% if request.resolver_match.url_name == 'machines' %}active{% endif %}">Станки</a>
