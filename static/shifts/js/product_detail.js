@@ -2526,13 +2526,26 @@ function saveSetupToolNoteEditor() {
 
     function ensurePlanCascadeManager(formContainer) {
       if (!formContainer) return null;
-      if (formContainer._cascadeFormManager) return formContainer._cascadeFormManager;
+      var existing = formContainer._cascadeFormManager;
+      if (existing && typeof existing.prepareForSubmit === "function") return existing;
       var Ctor = typeof PlanCascadeFormManager !== "undefined"
         ? PlanCascadeFormManager
         : (typeof window !== "undefined" ? window.PlanCascadeFormManager : null);
-      if (!Ctor) return null;
+      if (!Ctor) return existing || null;
       formContainer._cascadeFormManager = new Ctor(formContainer);
       return formContainer._cascadeFormManager;
+    }
+
+    function cascadePrepareForSubmit(mgr, container) {
+      if (!mgr) return;
+      if (typeof mgr.prepareForSubmit === "function") {
+        mgr.prepareForSubmit();
+        return;
+      }
+      flushCascadeFormInput(container);
+      if (typeof mgr.syncStateFromDOM === "function") {
+        mgr.syncStateFromDOM();
+      }
     }
 
     function flushCascadeFormInput(container) {
@@ -2554,7 +2567,7 @@ function saveSetupToolNoteEditor() {
 
       var mgr = ensurePlanCascadeManager(container);
       if (mgr) {
-        mgr.prepareForSubmit();
+        cascadePrepareForSubmit(mgr, container);
         return mgr.getFormPayload();
       }
 
@@ -2610,7 +2623,7 @@ function saveSetupToolNoteEditor() {
       var mgr = ensurePlanCascadeManager(container);
       var formData = null;
       if (mgr) {
-        mgr.prepareForSubmit();
+        cascadePrepareForSubmit(mgr, container);
         if (!mgr.state.product_type) {
           return { ok: true, skipped: true };
         }

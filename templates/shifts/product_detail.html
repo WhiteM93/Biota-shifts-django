@@ -503,7 +503,7 @@
   "save_list_preview_url": "{% url 'product_save_list_preview' product.pk %}",
   "tool_type_choices": [{% for v, lbl in tool_type_choices %}{"value":"{{ v|escapejs }}","label":"{{ lbl|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
 }</script>
-<script src="{% static 'shifts/js/plan-cascade-form.js' %}" defer></script>
+<script src="{% static 'shifts/js/plan-cascade-form.js' %}?v={{ static_asset_version }}" defer></script>
 <script src="{% static 'shifts/js/product_detail.js' %}?v={{ static_asset_version }}" defer></script>
 
 {% if cad_inline_preview or has_setup_preview_stl %}
