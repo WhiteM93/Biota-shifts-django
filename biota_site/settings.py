@@ -69,6 +69,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "shifts.middleware.RegistrationRateLimitMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -98,6 +99,25 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "biota_site.wsgi.application"
+
+_rl_disabled = (os.getenv("BIOTA_REGISTER_RATELIMIT") or "1").strip().lower() in ("0", "false", "no")
+BIOTA_REGISTER_RATELIMIT_ENABLED = not _rl_disabled
+BIOTA_REGISTER_RATELIMIT_BURST = int(os.getenv("BIOTA_REGISTER_RATELIMIT_BURST", "30") or "30")
+BIOTA_REGISTER_RATELIMIT_BURST_WINDOW = int(os.getenv("BIOTA_REGISTER_RATELIMIT_BURST_WINDOW", "300") or "300")
+BIOTA_REGISTER_RATELIMIT_POST = int(os.getenv("BIOTA_REGISTER_RATELIMIT_POST", "5") or "5")
+BIOTA_REGISTER_RATELIMIT_POST_WINDOW = int(os.getenv("BIOTA_REGISTER_RATELIMIT_POST_WINDOW", "3600") or "3600")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "biota-default",
+    },
+    "ratelimit": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": BASE_DIR / ".cache" / "ratelimit",
+        "OPTIONS": {"MAX_ENTRIES": 10000},
+    },
+}
 
 
 # Database

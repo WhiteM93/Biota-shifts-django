@@ -31,7 +31,7 @@
     {% else %}
     <p class="auth-alert" role="alert">
       Не удалось отправить письмо{% if email_error %}: {{ email_error }}{% endif %}.
-      Запросите повторную отправку на <a href="{% url 'resend_verification' %}">отдельной странице</a> или у администратора.
+      Обратитесь к администратору.
     </p>
     {% endif %}
 
@@ -43,7 +43,6 @@
 
     <p class="auth-footer">
       <a href="{% url 'login' %}">К странице входа</a>
-      · <a href="{% url 'resend_verification' %}">Отправить письмо снова</a>
     </p>
 
     <div class="auth-theme-row">

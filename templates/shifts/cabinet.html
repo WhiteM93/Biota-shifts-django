@@ -377,7 +377,7 @@
             <label>Email
               <input type="email" name="email" value="{{ profile_email }}" maxlength="200">
               {% if profile_email and not profile_email_verified %}
-              <span class="muted">Email не подтверждён — проверьте почту или <a href="{% url 'resend_verification' %}">запросите письмо снова</a>.</span>
+              <span class="muted">Email не подтверждён — проверьте почту (включая «Спам»).</span>
               {% endif %}
             </label>
           </div>

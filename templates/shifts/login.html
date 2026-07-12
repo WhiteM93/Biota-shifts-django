@@ -14,12 +14,6 @@
   </header>
 
   <section class="auth-glass-card">
-    {% if resend_ok %}
-    <p class="auth-hint" role="status">Если учётная запись существует и email не подтверждён, письмо отправлено повторно.</p>
-    {% endif %}
-    {% if resend_err %}
-    <p class="auth-alert" role="alert">{{ resend_err }}</p>
-    {% endif %}
     {% if error %}
     <p class="auth-alert" role="alert">{{ error }}</p>
     {% endif %}
@@ -47,8 +41,7 @@
     </form>
 
     <p class="auth-footer">
-      Нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться</a><br>
-      <a href="{% url 'resend_verification' %}">Не пришло письмо с подтверждением?</a>
+      Нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться</a>
     </p>
   </section>
 </div>

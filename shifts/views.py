@@ -1,10 +1,8 @@
 from datetime import date, datetime
-from urllib.parse import quote
 
 import pandas as pd
 from django.conf import settings
 from django.contrib import messages
-from django.urls import reverse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -28,7 +26,6 @@ from .auth_utils import biota_login_required, biota_user, post_login_redirect, w
 from .email_verification import (
     email_uses_console_backend,
     login_block_reason,
-    send_verification_by_email_address,
     send_verification_email,
     verify_email_token,
 )
@@ -99,8 +96,6 @@ def login_view(request):
                 return redirect(post_login_redirect(ADMIN_USERNAME, next_url))
         if not err:
             err = "Неверный логин или пароль"
-    resend_ok = request.GET.get("resend") == "ok"
-    resend_err = request.GET.get("resend_err", "")
     return render(
         request,
         "shifts/login.html",
@@ -110,8 +105,6 @@ def login_view(request):
             "remember_me": remember_me,
             "hide_nav": True,
             "auth_page": True,
-            "resend_ok": resend_ok,
-            "resend_err": resend_err,
         },
     )
 
@@ -194,29 +187,6 @@ def verify_email_view(request, token: str):
             "verified_ok": ok,
             "message": msg if not ok else "Email подтверждён. После одобрения администратором можно войти в систему.",
         },
-    )
-
-
-@require_http_methods(["GET", "HEAD", "POST"])
-def resend_verification_view(request):
-    err = ""
-    ok = False
-    if request.method == "POST":
-        email = (request.POST.get("email") or "").strip()
-        username = (request.POST.get("username") or "").strip()
-        if username:
-            ok, err = send_verification_email(username, request=request)[:2]
-        elif email:
-            ok, err = send_verification_by_email_address(email, request=request)
-        else:
-            err = "Укажите логин или email."
-        if ok:
-            return redirect(f"{reverse('login')}?resend=ok")
-        return redirect(f"{reverse('login')}?resend_err={quote(err)}")
-    return render(
-        request,
-        "shifts/resend_verification.html",
-        {"hide_nav": True, "auth_page": True, "error": err, "success": ok},
     )
 
 

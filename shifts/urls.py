@@ -85,6 +85,5 @@ urlpatterns = [
     path("accounts/register/pending/", views.register_pending_view, name="register_pending"),
     path("accounts/register/legacy/", views.register_legacy_view, name="register_legacy"),
     path("accounts/verify-email/<str:token>/", views.verify_email_view, name="verify_email"),
-    path("accounts/resend-verification/", views.resend_verification_view, name="resend_verification"),
     path("accounts/logout/", views.logout_view, name="logout"),
 ]

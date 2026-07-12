@@ -1,9 +1,11 @@
-from django.http import HttpResponseForbidden, JsonResponse
+from django.conf import settings
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 
 from biota_shifts.auth import user_is_executor
 
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+REGISTER_PATH_PREFIX = "/accounts/register"
 
 
 class ExecutorReadOnlyMiddleware:
@@ -33,6 +35,42 @@ class ExecutorReadOnlyMiddleware:
                     status=403,
                 )
             return HttpResponseForbidden("Роль «исполнитель»: доступны только просмотр и скачивание.")
+
+        return self.get_response(request)
+
+
+class RegistrationRateLimitMiddleware:
+    """Ограничивает частоту запросов к /accounts/register/* по IP (защита от ботов-сканеров)."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if not getattr(settings, "BIOTA_REGISTER_RATELIMIT_ENABLED", True):
+            return self.get_response(request)
+
+        path = request.path or ""
+        if not path.startswith(REGISTER_PATH_PREFIX):
+            return self.get_response(request)
+
+        from shifts.rate_limit import get_client_ip, registration_rate_limits
+
+        client_id = get_client_ip(request)
+        result = registration_rate_limits(
+            client_id=client_id,
+            method=request.method or "GET",
+            burst_max=getattr(settings, "BIOTA_REGISTER_RATELIMIT_BURST", 30),
+            burst_window=getattr(settings, "BIOTA_REGISTER_RATELIMIT_BURST_WINDOW", 300),
+            post_max=getattr(settings, "BIOTA_REGISTER_RATELIMIT_POST", 5),
+            post_window=getattr(settings, "BIOTA_REGISTER_RATELIMIT_POST_WINDOW", 3600),
+        )
+        if result.exceeded:
+            return HttpResponse(
+                "Слишком много запросов к странице регистрации. Попробуйте позже.",
+                status=429,
+                content_type="text/plain; charset=utf-8",
+                headers={"Retry-After": str(result.retry_after)},
+            )
 
         return self.get_response(request)
 
