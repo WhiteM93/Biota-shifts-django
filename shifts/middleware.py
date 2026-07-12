@@ -8,6 +8,63 @@ SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 REGISTER_PATH_PREFIX = "/accounts/register"
 
 
+def _rate_limit_response(message: str, retry_after: int) -> HttpResponse:
+    return HttpResponse(
+        message,
+        status=429,
+        content_type="text/plain; charset=utf-8",
+        headers={"Retry-After": str(retry_after)},
+    )
+
+
+class AuthRateLimitMiddleware:
+    """Rate limit по IP для /accounts/register/* и POST на вход (/accounts/login/, /)."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from shifts.rate_limit import get_client_ip, is_login_post_request, login_rate_limits, registration_rate_limits
+
+        client_id = get_client_ip(request)
+        path = request.path or ""
+
+        if getattr(settings, "BIOTA_REGISTER_RATELIMIT_ENABLED", True) and path.startswith(REGISTER_PATH_PREFIX):
+            result = registration_rate_limits(
+                client_id=client_id,
+                method=request.method or "GET",
+                burst_max=getattr(settings, "BIOTA_REGISTER_RATELIMIT_BURST", 30),
+                burst_window=getattr(settings, "BIOTA_REGISTER_RATELIMIT_BURST_WINDOW", 300),
+                post_max=getattr(settings, "BIOTA_REGISTER_RATELIMIT_POST", 5),
+                post_window=getattr(settings, "BIOTA_REGISTER_RATELIMIT_POST_WINDOW", 3600),
+            )
+            if result.exceeded:
+                return _rate_limit_response(
+                    "Слишком много запросов к странице регистрации. Попробуйте позже.",
+                    result.retry_after,
+                )
+
+        if getattr(settings, "BIOTA_LOGIN_RATELIMIT_ENABLED", True) and is_login_post_request(request):
+            result = login_rate_limits(
+                client_id=client_id,
+                post_max=getattr(settings, "BIOTA_LOGIN_RATELIMIT_MAX", 10),
+                post_window=getattr(settings, "BIOTA_LOGIN_RATELIMIT_WINDOW", 900),
+            )
+            if result.exceeded:
+                return _rate_limit_response(
+                    "Слишком много попыток входа. Попробуйте позже.",
+                    result.retry_after,
+                )
+
+        return self.get_response(request)
+
+
+class RegistrationRateLimitMiddleware(AuthRateLimitMiddleware):
+    """Обратная совместимость (алиас AuthRateLimitMiddleware)."""
+
+    pass
+
+
 class ExecutorReadOnlyMiddleware:
     """For executor role allow only read/download requests."""
 
@@ -35,42 +92,6 @@ class ExecutorReadOnlyMiddleware:
                     status=403,
                 )
             return HttpResponseForbidden("Роль «исполнитель»: доступны только просмотр и скачивание.")
-
-        return self.get_response(request)
-
-
-class RegistrationRateLimitMiddleware:
-    """Ограничивает частоту запросов к /accounts/register/* по IP (защита от ботов-сканеров)."""
-
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        if not getattr(settings, "BIOTA_REGISTER_RATELIMIT_ENABLED", True):
-            return self.get_response(request)
-
-        path = request.path or ""
-        if not path.startswith(REGISTER_PATH_PREFIX):
-            return self.get_response(request)
-
-        from shifts.rate_limit import get_client_ip, registration_rate_limits
-
-        client_id = get_client_ip(request)
-        result = registration_rate_limits(
-            client_id=client_id,
-            method=request.method or "GET",
-            burst_max=getattr(settings, "BIOTA_REGISTER_RATELIMIT_BURST", 30),
-            burst_window=getattr(settings, "BIOTA_REGISTER_RATELIMIT_BURST_WINDOW", 300),
-            post_max=getattr(settings, "BIOTA_REGISTER_RATELIMIT_POST", 5),
-            post_window=getattr(settings, "BIOTA_REGISTER_RATELIMIT_POST_WINDOW", 3600),
-        )
-        if result.exceeded:
-            return HttpResponse(
-                "Слишком много запросов к странице регистрации. Попробуйте позже.",
-                status=429,
-                content_type="text/plain; charset=utf-8",
-                headers={"Retry-After": str(result.retry_after)},
-            )
 
         return self.get_response(request)
 

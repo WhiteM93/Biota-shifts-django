@@ -89,3 +89,27 @@ def registration_rate_limits(
             return post
 
     return RateLimitResult(False, 0, "")
+
+
+def login_rate_limits(
+    *,
+    client_id: str,
+    post_max: int,
+    post_window: int,
+) -> RateLimitResult:
+    """Лимит POST на /accounts/login/ и / (форма входа)."""
+    if post_max <= 0 or post_window <= 0:
+        return RateLimitResult(False, 0, "")
+    return check_rate_limit(
+        scope="login_post",
+        client_id=client_id,
+        max_requests=post_max,
+        window_seconds=post_window,
+    )
+
+
+def is_login_post_request(request) -> bool:
+    if (request.method or "").upper() != "POST":
+        return False
+    path = (request.path or "/").rstrip("/") or "/"
+    return path in ("/", "/accounts/login")

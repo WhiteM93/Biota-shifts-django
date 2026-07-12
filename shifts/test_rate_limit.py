@@ -3,8 +3,8 @@
 from django.core.cache import caches
 from django.test import RequestFactory, SimpleTestCase, override_settings
 
-from shifts.middleware import RegistrationRateLimitMiddleware
-from shifts.rate_limit import check_rate_limit, get_client_ip, registration_rate_limits
+from shifts.middleware import AuthRateLimitMiddleware, RegistrationRateLimitMiddleware
+from shifts.rate_limit import check_rate_limit, get_client_ip, is_login_post_request, login_rate_limits, registration_rate_limits
 
 
 @override_settings(
@@ -79,6 +79,22 @@ class RateLimitTests(SimpleTestCase):
         self.assertTrue(blocked.exceeded)
         self.assertEqual(blocked.limit_key, "register_post")
 
+    def test_login_post_limit(self):
+        for _ in range(3):
+            result = login_rate_limits(client_id="5.5.5.5", post_max=3, post_window=900)
+            self.assertFalse(result.exceeded)
+        blocked = login_rate_limits(client_id="5.5.5.5", post_max=3, post_window=900)
+        self.assertTrue(blocked.exceeded)
+        self.assertEqual(blocked.limit_key, "login_post")
+
+    def test_is_login_post_request(self):
+        login_post = RequestFactory().post("/accounts/login/")
+        self.assertTrue(is_login_post_request(login_post))
+        root_post = RequestFactory().post("/")
+        self.assertTrue(is_login_post_request(root_post))
+        login_get = RequestFactory().get("/accounts/login/")
+        self.assertFalse(is_login_post_request(login_get))
+
 
 @override_settings(
     BIOTA_REGISTER_RATELIMIT_ENABLED=True,
@@ -101,7 +117,7 @@ class RegistrationRateLimitMiddlewareTests(SimpleTestCase):
     def setUp(self):
         caches["ratelimit"].clear()
         self.factory = RequestFactory()
-        self.middleware = RegistrationRateLimitMiddleware(lambda request: self._ok_response(request))
+        self.middleware = AuthRateLimitMiddleware(lambda request: self._ok_response(request))
 
     @staticmethod
     def _ok_response(request):
@@ -128,5 +144,50 @@ class RegistrationRateLimitMiddlewareTests(SimpleTestCase):
         request = self.factory.get("/accounts/login/")
         request.META["REMOTE_ADDR"] = "10.0.0.4"
         for _ in range(10):
+            response = self.middleware(request)
+        self.assertEqual(response.status_code, 200)
+
+
+@override_settings(
+    BIOTA_LOGIN_RATELIMIT_ENABLED=True,
+    BIOTA_LOGIN_RATELIMIT_MAX=2,
+    BIOTA_LOGIN_RATELIMIT_WINDOW=900,
+    BIOTA_REGISTER_RATELIMIT_ENABLED=False,
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "test-default-login-mw",
+        },
+        "ratelimit": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "test-ratelimit-login-mw",
+        },
+    },
+)
+class LoginRateLimitMiddlewareTests(SimpleTestCase):
+    def setUp(self):
+        caches["ratelimit"].clear()
+        self.factory = RequestFactory()
+        self.middleware = AuthRateLimitMiddleware(lambda request: self._ok_response(request))
+
+    @staticmethod
+    def _ok_response(request):
+        from django.http import HttpResponse
+
+        return HttpResponse("ok")
+
+    def test_blocks_login_post_flood(self):
+        request = self.factory.post("/accounts/login/")
+        request.META["REMOTE_ADDR"] = "10.0.0.5"
+        self.middleware(request)
+        self.middleware(request)
+        blocked = self.middleware(request)
+        self.assertEqual(blocked.status_code, 429)
+        self.assertIn("Retry-After", blocked)
+
+    def test_login_get_not_limited(self):
+        request = self.factory.get("/accounts/login/")
+        request.META["REMOTE_ADDR"] = "10.0.0.6"
+        for _ in range(20):
             response = self.middleware(request)
         self.assertEqual(response.status_code, 200)

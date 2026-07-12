@@ -69,7 +69,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "shifts.middleware.RegistrationRateLimitMiddleware",
+    "shifts.middleware.AuthRateLimitMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -106,6 +106,11 @@ BIOTA_REGISTER_RATELIMIT_BURST = int(os.getenv("BIOTA_REGISTER_RATELIMIT_BURST",
 BIOTA_REGISTER_RATELIMIT_BURST_WINDOW = int(os.getenv("BIOTA_REGISTER_RATELIMIT_BURST_WINDOW", "300") or "300")
 BIOTA_REGISTER_RATELIMIT_POST = int(os.getenv("BIOTA_REGISTER_RATELIMIT_POST", "5") or "5")
 BIOTA_REGISTER_RATELIMIT_POST_WINDOW = int(os.getenv("BIOTA_REGISTER_RATELIMIT_POST_WINDOW", "3600") or "3600")
+
+_login_rl_disabled = (os.getenv("BIOTA_LOGIN_RATELIMIT") or "1").strip().lower() in ("0", "false", "no")
+BIOTA_LOGIN_RATELIMIT_ENABLED = not _login_rl_disabled
+BIOTA_LOGIN_RATELIMIT_MAX = int(os.getenv("BIOTA_LOGIN_RATELIMIT_MAX", "10") or "10")
+BIOTA_LOGIN_RATELIMIT_WINDOW = int(os.getenv("BIOTA_LOGIN_RATELIMIT_WINDOW", "900") or "900")
 
 CACHES = {
     "default": {
