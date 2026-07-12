@@ -109,13 +109,12 @@ def login_view(request):
     )
 
 
-def _register_form_context(*, err: str, legacy: bool, form_values: dict | None = None) -> dict:
+def _register_form_context(*, err: str, form_values: dict | None = None) -> dict:
     vals = form_values or {}
     return {
         "error": err,
         "hide_nav": True,
         "auth_page": True,
-        "legacy_form": legacy,
         "form_username": vals.get("username", ""),
         "form_email": vals.get("email", ""),
     }
@@ -146,7 +145,7 @@ def register_view(request):
     return render(
         request,
         "shifts/register.html",
-        _register_form_context(err=err, legacy=False, form_values=form_values),
+        _register_form_context(err=err, form_values=form_values),
     )
 
 
@@ -187,33 +186,6 @@ def verify_email_view(request, token: str):
             "verified_ok": ok,
             "message": msg if not ok else "Email подтверждён. После одобрения администратором можно войти в систему.",
         },
-    )
-
-
-def register_legacy_view(request):
-    """Прежняя форма: только логин и пароль (без обязательного email)."""
-    err = ""
-    form_values: dict[str, str] = {}
-    if request.method == "POST":
-        username = (request.POST.get("username") or "").strip()
-        p1 = request.POST.get("password") or ""
-        p2 = request.POST.get("password2") or ""
-        form_values = {"username": username}
-        if p1 != p2:
-            err = "Пароли не совпадают"
-        else:
-            ok, msg = _register_user(username, p1, require_email=False)
-            if ok:
-                messages.success(
-                    request,
-                    "Регистрация принята. Вход будет возможен после подтверждения администратором в личном кабинете.",
-                )
-                return redirect("login")
-            err = msg
-    return render(
-        request,
-        "shifts/register.html",
-        _register_form_context(err=err, legacy=True, form_values=form_values),
     )
 
 
