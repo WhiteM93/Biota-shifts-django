@@ -3,7 +3,9 @@ from datetime import date, datetime
 import pandas as pd
 from django.conf import settings
 from django.contrib import messages
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from biota_shifts import db as biota_db
@@ -336,9 +338,86 @@ def refresh_db_cache(request):
 
 
 @biota_login_required
+@require_http_methods(["GET", "POST"])
 def calculator_view(request):
-    from .models import Product, ProductSetup, ProductSetupToolRow
+    from decimal import Decimal, InvalidOperation
+
+    from .models import Product, ProductSetup, ProductSetupPieceNorm
     import json as _json
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action != "save_piece_norm":
+            return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
+        u = biota_user(request)
+        from biota_shifts.auth import user_is_executor
+
+        if u and not _is_admin(u) and user_is_executor(u):
+            return JsonResponse(
+                {"ok": False, "error": "У вас роль «исполнитель»: сохранение нормы недоступно."},
+                status=403,
+            )
+        setup_id_raw = (request.POST.get("setup_id") or "").strip()
+        setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+        setup = (
+            ProductSetup.objects.select_related("product")
+            .filter(pk=setup_id, product__catalog_section=Product.CATALOG_NALADKI)
+            .first()
+        )
+        if not setup:
+            return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+
+        def _dec(name, default=None):
+            raw = (request.POST.get(name) or "").strip().replace(",", ".")
+            if raw == "":
+                return default
+            try:
+                return Decimal(raw)
+            except (InvalidOperation, ValueError):
+                return None
+
+        tsht_norm = _dec("tsht_norm")
+        tsht_min = _dec("tsht_min")
+        if tsht_norm is None or tsht_min is None or tsht_norm < 0 or tsht_min < 0:
+            return JsonResponse({"ok": False, "error": "Сначала рассчитайте Тшт."}, status=400)
+        comment = (request.POST.get("comment") or "").strip()[:500]
+        if not comment:
+            return JsonResponse(
+                {"ok": False, "error": "Укажите комментарий — зачем изменилась норма."},
+                status=400,
+            )
+        k_raw = (request.POST.get("k_parts") or "1").strip()
+        k_parts = int(k_raw) if k_raw.isdigit() and int(k_raw) >= 1 else 1
+        prev = setup.piece_norms.order_by("-created_at", "-id").first()
+        entry = ProductSetupPieceNorm.objects.create(
+            setup=setup,
+            tsht_norm=tsht_norm,
+            tsht_min=tsht_min,
+            previous_tsht_norm=prev.tsht_norm if prev else None,
+            comment=comment,
+            author=(u or "").strip() or "?",
+            t_auto=_dec("t_auto"),
+            k_parts=k_parts,
+            a_pct=_dec("a_pct"),
+            t_ust=_dec("t_ust"),
+            t_izm=_dec("t_izm"),
+        )
+        product_url = reverse("product_detail", kwargs={"pk": setup.product_id})
+        return JsonResponse(
+            {
+                "ok": True,
+                "id": entry.pk,
+                "setup_id": setup.pk,
+                "product_id": setup.product_id,
+                "product_url": f"{product_url}?tab=setup-{setup.pk}",
+                "tsht_norm": str(entry.tsht_norm),
+                "tsht_min": str(entry.tsht_min),
+                "comment": entry.comment,
+                "author": entry.author,
+                "created_at": entry.created_at.strftime("%d.%m.%Y %H:%M"),
+                "previous_tsht_norm": str(entry.previous_tsht_norm) if entry.previous_tsht_norm is not None else None,
+            }
+        )
 
     products_qs = Product.objects.filter(
         catalog_section=Product.CATALOG_NALADKI,
@@ -370,6 +449,24 @@ def calculator_view(request):
             "name": product.name,
             "setups": setups_data,
         })
+
+    # Attach latest norms without N+1: one query
+    setup_ids = [s["id"] for p in products_data for s in p["setups"]]
+    latest_by_setup: dict[int, dict] = {}
+    if setup_ids:
+        for n in ProductSetupPieceNorm.objects.filter(setup_id__in=setup_ids).order_by(
+            "setup_id", "-created_at", "-id"
+        ):
+            if n.setup_id in latest_by_setup:
+                continue
+            latest_by_setup[n.setup_id] = {
+                "tsht_norm": str(n.tsht_norm),
+                "tsht_min": str(n.tsht_min),
+                "comment": n.comment or "",
+            }
+        for p in products_data:
+            for s in p["setups"]:
+                s["latest_norm"] = latest_by_setup.get(s["id"])
 
     from .calculator_modes import cutting_modes_payload
 

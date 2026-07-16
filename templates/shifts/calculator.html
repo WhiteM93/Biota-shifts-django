@@ -25,12 +25,20 @@
 
   <!-- ── Вкладки ── -->
   <div class="calc-tabs" role="tablist">
-    <button class="calc-tab active" role="tab" aria-selected="true" data-tab="time">
+    <button class="calc-tab active" role="tab" aria-selected="true" data-tab="piece">
       <svg class="calc-tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
         <circle cx="10" cy="10" r="8"/>
         <polyline points="10,6 10,10 13,12"/>
       </svg>
-      Нормы времени
+      Нормы на изделие
+    </button>
+    <button class="calc-tab" role="tab" aria-selected="false" data-tab="batch">
+      <svg class="calc-tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <rect x="3" y="4" width="14" height="12" rx="2"/>
+        <line x1="7" y1="8" x2="13" y2="8"/>
+        <line x1="7" y1="12" x2="11" y2="12"/>
+      </svg>
+      Нормы на партию
     </button>
     <button class="calc-tab" role="tab" aria-selected="false" data-tab="modes">
       <svg class="calc-tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -42,9 +50,9 @@
   </div>
 
   <!-- ══════════════════════════════════════
-       ВКЛАДКА 1 — Расчёт норм времени
+       ВКЛАДКА 1 — Нормы на изделие (Тшт)
   ══════════════════════════════════════ -->
-  <div class="calc-panel" id="calc-panel-time">
+  <div class="calc-panel" id="calc-panel-piece">
 
     <!-- Формула -->
     <div class="calc-formula-card">
@@ -72,6 +80,30 @@
       </div>
       <div class="calc-formula-desc" id="calc-formula-desc">
         Т<sub>шт</sub> — норма на одну деталь. Если за один проход программы делается несколько шт (k &gt; 1), время цикла делится на k.
+      </div>
+    </div>
+
+    <div class="calc-piece-save-bar">
+      <div class="calc-piece-save-bar__row">
+        <label class="calc-label" for="t-product">Наладка</label>
+        <select id="t-product" class="calc-inp calc-select" aria-label="Наладка">
+          <option value="">— выберите наладку —</option>
+        </select>
+      </div>
+      <div class="calc-piece-save-bar__row">
+        <label class="calc-label" for="t-setup">Установка</label>
+        <select id="t-setup" class="calc-inp calc-select" aria-label="Установка" disabled>
+          <option value="">— сначала наладка —</option>
+        </select>
+      </div>
+      <div class="calc-piece-save-bar__row calc-piece-save-bar__row--grow">
+        <label class="calc-label" for="t-norm-comment">Комментарий к сохранению</label>
+        <input id="t-norm-comment" type="text" maxlength="500" class="calc-inp calc-inp--plain"
+               placeholder="Почему изменилась норма (обязательно)">
+      </div>
+      <div class="calc-piece-save-bar__actions">
+        <button type="button" class="calc-add-btn" id="t-save-norm" disabled>Сохранить норму</button>
+        <span class="calc-piece-save-msg" id="t-save-norm-msg" hidden></span>
       </div>
     </div>
 
@@ -168,7 +200,108 @@
             <span class="calc-hint" id="hint-tizm">Замер одной детали; при k &gt; 1 обычно замеряют каждую из k после цикла</span>
           </div>
 
-          <div class="calc-field-sep" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <!-- Результат (изделие) -->
+      <div class="calc-glass-card calc-result-card">
+        <div class="calc-card-header">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M10 3v14M3 10h14"/>
+            <circle cx="10" cy="10" r="7"/>
+          </svg>
+          <span>Результат</span>
+        </div>
+
+        <!-- Главный результат -->
+        <div class="calc-main-result">
+          <div class="calc-main-result-label">Штучное время Т<sub>шт</sub> (норма)</div>
+          <div class="calc-main-result-value">
+            <span class="calc-main-num" id="r-tsht">—</span>
+          </div>
+          <div class="calc-main-sec">= <span id="r-tsht-min">—</span> мин/шт · 1.0 = 60 мин</div>
+          <div class="calc-main-sec calc-main-sec--cycle" id="r-cycle-wrap" hidden>1 цикл (<span id="r-k-val">1</span> шт) = <span id="r-tcycle-min">—</span> мин</div>
+        </div>
+
+        <div class="calc-divider"></div>
+
+        <!-- Разбивка -->
+        <div class="calc-breakdown">
+          <div class="calc-breakdown-row">
+            <span class="calc-breakdown-label">Т<sub>автом</sub> × (1 + <i>а</i>/100)</span>
+            <span class="calc-breakdown-bar-wrap">
+              <span class="calc-breakdown-bar" id="bar-tauto"></span>
+            </span>
+            <span class="calc-breakdown-val" id="r-tauto-k">—</span>
+            <span class="calc-breakdown-unit">мин</span>
+          </div>
+          <div class="calc-breakdown-row">
+            <span class="calc-breakdown-label">Т<sub>уст</sub></span>
+            <span class="calc-breakdown-bar-wrap">
+              <span class="calc-breakdown-bar calc-breakdown-bar--b" id="bar-tust"></span>
+            </span>
+            <span class="calc-breakdown-val" id="r-tust-v">—</span>
+            <span class="calc-breakdown-unit">мин</span>
+          </div>
+          <div class="calc-breakdown-row">
+            <span class="calc-breakdown-label">Т<sub>изм</sub></span>
+            <span class="calc-breakdown-bar-wrap">
+              <span class="calc-breakdown-bar calc-breakdown-bar--c" id="bar-tizm"></span>
+            </span>
+            <span class="calc-breakdown-val" id="r-tizm-v">—</span>
+            <span class="calc-breakdown-unit">мин</span>
+          </div>
+        </div>
+
+        <div class="calc-divider"></div>
+
+        <div class="calc-stat-row">
+          <div class="calc-stat">
+            <div class="calc-stat-val" id="r-prod">—</div>
+            <div class="calc-stat-label">дет / час (по норме)</div>
+          </div>
+        </div>
+
+        <div class="calc-method-note">
+          <strong>Норма на изделие.</strong>
+          Выработку по станку сравнивают с Т<sub>шт</sub> на одну деталь (цикл из k шт делится на k).
+          План партии и смены — во вкладке «Нормы на партию».
+        </div>
+
+      </div>
+    </div>
+  </div><!-- /#calc-panel-piece -->
+
+
+  <!-- ══════════════════════════════════════
+       ВКЛАДКА 2 — Нормы на партию
+  ══════════════════════════════════════ -->
+  <div class="calc-panel" id="calc-panel-batch" hidden>
+
+    <div class="calc-batch-tsht-summary" id="calc-batch-tsht-summary">
+      <div class="calc-batch-tsht-summary__label">Норма на изделие Т<sub>шт</sub></div>
+      <div class="calc-batch-tsht-summary__value">
+        <strong id="r-batch-tsht">—</strong>
+        <span class="calc-batch-tsht-summary__sec">= <span id="r-batch-tsht-min">—</span> мин/шт</span>
+      </div>
+      <p class="calc-batch-tsht-summary__hint" id="r-batch-tsht-hint">Заполните вкладку «Нормы на изделие», чтобы построить план партии.</p>
+    </div>
+
+    <div class="calc-grid-time">
+
+      <!-- Исходные данные партии -->
+      <div class="calc-glass-card">
+        <div class="calc-card-header">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <rect x="3" y="3" width="14" height="14" rx="2"/>
+            <line x1="7" y1="8" x2="13" y2="8"/>
+            <line x1="7" y1="11" x2="11" y2="11"/>
+          </svg>
+          <span>Исходные данные</span>
+        </div>
+
+        <div class="calc-field-group">
+
           <div class="calc-subsection-label">Заказ / партия</div>
 
           <div class="calc-field">
@@ -240,7 +373,7 @@
         </div>
       </div>
 
-      <!-- Результат -->
+      <!-- Результат партии -->
       <div class="calc-glass-card calc-result-card">
         <div class="calc-card-header">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
@@ -250,57 +383,15 @@
           <span>Результат</span>
         </div>
 
-        <!-- Главный результат -->
-        <div class="calc-main-result">
-          <div class="calc-main-result-label">Штучное время Т<sub>шт</sub> (норма)</div>
-          <div class="calc-main-result-value">
-            <span class="calc-main-num" id="r-tsht">—</span>
-          </div>
-          <div class="calc-main-sec">= <span id="r-tsht-min">—</span> мин/шт · 1.0 = 60 мин</div>
-          <div class="calc-main-sec calc-main-sec--cycle" id="r-cycle-wrap" hidden>1 цикл (<span id="r-k-val">1</span> шт) = <span id="r-tcycle-min">—</span> мин</div>
-        </div>
-
-        <div class="calc-divider"></div>
-
-        <!-- Разбивка -->
-        <div class="calc-breakdown">
-          <div class="calc-breakdown-row">
-            <span class="calc-breakdown-label">Т<sub>автом</sub> × (1 + <i>а</i>/100)</span>
-            <span class="calc-breakdown-bar-wrap">
-              <span class="calc-breakdown-bar" id="bar-tauto"></span>
-            </span>
-            <span class="calc-breakdown-val" id="r-tauto-k">—</span>
-            <span class="calc-breakdown-unit">мин</span>
-          </div>
-          <div class="calc-breakdown-row">
-            <span class="calc-breakdown-label">Т<sub>уст</sub></span>
-            <span class="calc-breakdown-bar-wrap">
-              <span class="calc-breakdown-bar calc-breakdown-bar--b" id="bar-tust"></span>
-            </span>
-            <span class="calc-breakdown-val" id="r-tust-v">—</span>
-            <span class="calc-breakdown-unit">мин</span>
-          </div>
-          <div class="calc-breakdown-row">
-            <span class="calc-breakdown-label">Т<sub>изм</sub></span>
-            <span class="calc-breakdown-bar-wrap">
-              <span class="calc-breakdown-bar calc-breakdown-bar--c" id="bar-tizm"></span>
-            </span>
-            <span class="calc-breakdown-val" id="r-tizm-v">—</span>
-            <span class="calc-breakdown-unit">мин</span>
-          </div>
-        </div>
-
-        <div class="calc-divider"></div>
-
         <div class="calc-stat-row">
-          <div class="calc-stat">
-            <div class="calc-stat-val" id="r-prod">—</div>
-            <div class="calc-stat-label">дет / час (по норме)</div>
-          </div>
-          <div class="calc-stat-sep"></div>
           <div class="calc-stat">
             <div class="calc-stat-val" id="r-shift">—</div>
             <div class="calc-stat-label">дет / смена (план)</div>
+          </div>
+          <div class="calc-stat-sep"></div>
+          <div class="calc-stat">
+            <div class="calc-stat-val" id="r-prod-plan">—</div>
+            <div class="calc-stat-label">дет / ч (план смены)</div>
           </div>
         </div>
 
@@ -321,7 +412,6 @@
           <div class="calc-shift-plan__meta">
             <span>Полезный фонд: <strong id="r-shift-avail">—</strong> мин</span>
             <span>Загрузка: <strong id="r-shift-load">—</strong></span>
-            <span>Выработка: <strong id="r-prod-plan">—</strong> дет/ч</span>
           </div>
         </div>
 
@@ -354,17 +444,17 @@
 
         <div class="calc-method-note">
           <strong>Как считать статистику.</strong>
-          Выработку по станку сравнивают с Т<sub>шт</sub> на одну деталь (цикл из k шт делится на k).
+          План партии строится от Т<sub>шт</sub> (вкладка «Нормы на изделие»).
           Т<sub>пз</sub>, Т<sub>всп</sub> и Т<sub>пр</sub> — отдельно от нормы серии.
         </div>
 
       </div>
     </div>
-  </div><!-- /#calc-panel-time -->
+  </div><!-- /#calc-panel-batch -->
 
 
   <!-- ══════════════════════════════════════
-       ВКЛАДКА 2 — Режимы резания
+       ВКЛАДКА 3 — Режимы резания
   ══════════════════════════════════════ -->
   <div class="calc-panel" id="calc-panel-modes" hidden>
 
@@ -471,6 +561,10 @@
       var panel = document.getElementById("calc-panel-" + btn.dataset.tab);
       if (panel) panel.hidden = false;
       moveSlider(btn);
+      if (btn.dataset.tab === "batch" || btn.dataset.tab === "piece") {
+        if (typeof calcTime === "function") calcTime();
+      }
+      requestAnimationFrame(function () { moveSlider(btn); });
     });
   });
 
@@ -482,7 +576,7 @@
   }
 
   /* ════════════════════════════════
-     ВКЛАДКА 1 — НОРМЫ ВРЕМЕНИ
+     НОРМЫ НА ИЗДЕЛИЕ / НА ПАРТИЮ
   ════════════════════════════════ */
 
   /* Связь слайдера % с числом + градиент дорожки */
@@ -605,6 +699,20 @@
     };
   }
 
+  function setBatchTshtSummary(tshtNorm, tshtMin, ready) {
+    var sum = document.getElementById("calc-batch-tsht-summary");
+    var rNorm = document.getElementById("r-batch-tsht");
+    var rMin = document.getElementById("r-batch-tsht-min");
+    var hint = document.getElementById("r-batch-tsht-hint");
+    if (rNorm) rNorm.textContent = ready ? Number(tshtNorm).toFixed(3) : "—";
+    if (rMin) rMin.textContent = ready ? Number(tshtMin).toFixed(1) : "—";
+    if (hint) {
+      hint.hidden = !!ready;
+      hint.textContent = "Заполните вкладку «Нормы на изделие», чтобы построить план партии.";
+    }
+    if (sum) sum.classList.toggle("is-ready", !!ready);
+  }
+
   function calcTime() {
     var Tauto = parseFloat(document.getElementById("t-tauto").value);
     var k     = Math.max(1, parseInt(document.getElementById("t-k").value, 10) || 1);
@@ -629,6 +737,7 @@
       });
       updateBar("bar-tauto",0); updateBar("bar-tust",0); updateBar("bar-tizm",0);
       updateShiftBars(0, 0, 0, 0, 1);
+      setBatchTshtSummary(0, 0, false);
       return;
     }
 
@@ -675,6 +784,7 @@
     document.getElementById("r-shift-free").textContent = Math.max(0, Tavail - shiftWork).toFixed(0);
     document.getElementById("r-shift-avail").textContent = Tavail.toFixed(0);
     document.getElementById("r-shift-load").textContent = loadPct > 0 ? loadPct.toFixed(0) + " %" : "—";
+    setBatchTshtSummary(TshtNorm, TshtMin, true);
 
     updateShiftBars(shiftWork, Tvsp, Tidle, Tavail, shiftMin);
 
@@ -717,6 +827,172 @@
     el.addEventListener("input", calcTime);
   });
   calcTime();
+
+  /* ── Сохранение Тшт в наладку ── */
+  (function initPieceNormSave() {
+    var productSel = document.getElementById("t-product");
+    var setupSel = document.getElementById("t-setup");
+    var commentInp = document.getElementById("t-norm-comment");
+    var saveBtn = document.getElementById("t-save-norm");
+    var msgEl = document.getElementById("t-save-norm-msg");
+    if (!productSel || !setupSel || !saveBtn) return;
+
+    function csrfToken() {
+      var m = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+      return m ? decodeURIComponent(m[1]) : "";
+    }
+
+    function fillProducts() {
+      productSel.innerHTML = '<option value="">— выберите наладку —</option>';
+      (PRODUCTS || []).forEach(function (p) {
+        var o = document.createElement("option");
+        o.value = String(p.id);
+        o.textContent = p.name || ("#" + p.id);
+        productSel.appendChild(o);
+      });
+    }
+
+    function fillSetups(productId) {
+      setupSel.innerHTML = "";
+      var product = null;
+      for (var i = 0; i < PRODUCTS.length; i++) {
+        if (String(PRODUCTS[i].id) === String(productId)) {
+          product = PRODUCTS[i];
+          break;
+        }
+      }
+      if (!product || !product.setups || !product.setups.length) {
+        setupSel.disabled = true;
+        var empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = productId ? "Нет установок" : "— сначала наладка —";
+        setupSel.appendChild(empty);
+        syncSaveEnabled();
+        return;
+      }
+      setupSel.disabled = false;
+      var ph = document.createElement("option");
+      ph.value = "";
+      ph.textContent = "— выберите установку —";
+      setupSel.appendChild(ph);
+      product.setups.forEach(function (s) {
+        var o = document.createElement("option");
+        o.value = String(s.id);
+        o.textContent = s.name || ("Уст. #" + s.id);
+        setupSel.appendChild(o);
+      });
+      syncSaveEnabled();
+    }
+
+    function currentTshtReady() {
+      var main = document.getElementById("r-tsht");
+      var minEl = document.getElementById("r-tsht-min");
+      if (!main || !minEl) return null;
+      var n = parseFloat(main.getAttribute("data-val") || main.textContent);
+      var m = parseFloat(minEl.textContent);
+      if (isNaN(n) || isNaN(m) || n < 0 || m < 0) return null;
+      return { norm: n, min: m };
+    }
+
+    function syncSaveEnabled() {
+      var ready = !!currentTshtReady();
+      var ok =
+        ready &&
+        !!(productSel.value || "").trim() &&
+        !!(setupSel.value || "").trim() &&
+        !!(commentInp && (commentInp.value || "").trim());
+      saveBtn.disabled = !ok;
+    }
+
+    function setMsg(text, kind) {
+      if (!msgEl) return;
+      if (!text) {
+        msgEl.hidden = true;
+        msgEl.textContent = "";
+        msgEl.classList.remove("is-ok", "is-err");
+        return;
+      }
+      msgEl.hidden = false;
+      msgEl.textContent = text;
+      msgEl.classList.toggle("is-ok", kind === "ok");
+      msgEl.classList.toggle("is-err", kind === "err");
+    }
+
+    fillProducts();
+    fillSetups("");
+    productSel.addEventListener("change", function () {
+      fillSetups(productSel.value);
+      setMsg("", "");
+    });
+    setupSel.addEventListener("change", function () {
+      syncSaveEnabled();
+      setMsg("", "");
+    });
+    if (commentInp) {
+      commentInp.addEventListener("input", syncSaveEnabled);
+    }
+    document.querySelectorAll("[data-tcalc]").forEach(function (el) {
+      el.addEventListener("input", syncSaveEnabled);
+    });
+
+    saveBtn.addEventListener("click", async function () {
+      var tsht = currentTshtReady();
+      if (!tsht) {
+        setMsg("Сначала рассчитайте Тшт.", "err");
+        return;
+      }
+      var setupId = (setupSel.value || "").trim();
+      var comment = commentInp ? (commentInp.value || "").trim() : "";
+      if (!setupId || !comment) {
+        setMsg("Выберите установку и укажите комментарий.", "err");
+        return;
+      }
+      saveBtn.disabled = true;
+      setMsg("Сохранение…", "");
+      var fd = new FormData();
+      fd.append("action", "save_piece_norm");
+      fd.append("setup_id", setupId);
+      fd.append("tsht_norm", String(tsht.norm));
+      fd.append("tsht_min", String(tsht.min));
+      fd.append("comment", comment);
+      fd.append("t_auto", document.getElementById("t-tauto").value || "");
+      fd.append("k_parts", document.getElementById("t-k").value || "1");
+      fd.append("a_pct", document.getElementById("t-a").value || "");
+      fd.append("t_ust", document.getElementById("t-tust-m").value || "");
+      fd.append("t_izm", document.getElementById("t-tizm-m").value || "");
+      try {
+        var res = await fetch(window.location.pathname, {
+          method: "POST",
+          headers: { "X-CSRFToken": csrfToken(), "X-Requested-With": "XMLHttpRequest" },
+          body: fd,
+          credentials: "same-origin",
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok || !data.ok) {
+          setMsg(data.error || "Не удалось сохранить.", "err");
+          syncSaveEnabled();
+          return;
+        }
+        setMsg("Сохранено. Открыть наладку →", "ok");
+        if (data.product_url && msgEl) {
+          msgEl.innerHTML = "";
+          var a = document.createElement("a");
+          a.href = data.product_url;
+          a.textContent = "Сохранено — открыть наладку";
+          a.style.color = "inherit";
+          msgEl.appendChild(a);
+          msgEl.hidden = false;
+          msgEl.classList.add("is-ok");
+          msgEl.classList.remove("is-err");
+        }
+        if (commentInp) commentInp.value = "";
+        syncSaveEnabled();
+      } catch (e) {
+        setMsg("Ошибка сети.", "err");
+        syncSaveEnabled();
+      }
+    });
+  })();
 
   /* ════════════════════════════════
      ВКЛАДКА 2 — РЕЖИМЫ РЕЗАНИЯ

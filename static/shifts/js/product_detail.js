@@ -735,7 +735,148 @@ function saveSetupToolNoteEditor() {
           if (exportPhotosBtn) exportPhotosBtn.href = photosPattern.replace("/0/pdf/photos/", "/" + setupId + "/pdf/photos/");
         }
       }
+      updateSetupNormBadge(tabName);
     }
+
+    var PIECE_NORMS = (function () {
+      try {
+        var el = document.getElementById("pd-piece-norms");
+        return el ? JSON.parse(el.textContent || "{}") : {};
+      } catch (e) {
+        return {};
+      }
+    })();
+
+    function updateSetupNormBadge(tabName) {
+      var badge = document.getElementById("setup-norm-badge");
+      var valEl = document.getElementById("setup-norm-value");
+      var minEl = document.getElementById("setup-norm-min");
+      var histBtn = document.getElementById("setup-norm-history-btn");
+      if (!badge || !valEl) return;
+      var m = (tabName || "").match(/^setup-(\d+)$/);
+      if (!m) {
+        badge.hidden = true;
+        if (histBtn) histBtn.hidden = true;
+        badge.removeAttribute("data-setup-id");
+        return;
+      }
+      var setupId = m[1];
+      var entry = PIECE_NORMS[setupId] || PIECE_NORMS[String(setupId)] || null;
+      badge.setAttribute("data-setup-id", setupId);
+      if (!entry) {
+        badge.hidden = false;
+        valEl.textContent = "—";
+        if (minEl) minEl.textContent = "";
+        badge.title = "Норма ещё не сохранена из калькулятора";
+        if (histBtn) histBtn.hidden = false;
+        return;
+      }
+      badge.hidden = false;
+      var norm = Number(entry.tsht_norm);
+      var mins = Number(entry.tsht_min);
+      valEl.textContent = isNaN(norm) ? "—" : norm.toFixed(3);
+      if (minEl) minEl.textContent = isNaN(mins) ? "" : "= " + mins.toFixed(1) + " мин";
+      badge.title = (entry.comment || "") + (entry.created_at ? " · " + entry.created_at : "");
+      if (histBtn) histBtn.hidden = false;
+    }
+
+    async function openPieceNormHistory(setupId) {
+      var modal = document.getElementById("setup-piece-norm-history-modal");
+      var list = document.getElementById("setup-piece-norm-hist-list");
+      if (!modal || !list || !setupId) return;
+      list.innerHTML = '<p class="setup-piece-norm-hist-empty">Загрузка…</p>';
+      modal.hidden = false;
+      modal.setAttribute("aria-hidden", "false");
+      var fd = new FormData();
+      fd.append("action", "list_piece_norms");
+      fd.append("setup_id", setupId);
+      try {
+        var res = await fetch(window.location.href, {
+          method: "POST",
+          headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+          body: fd,
+          credentials: "same-origin",
+        });
+        var data = await res.json().catch(function () { return {}; });
+        list.innerHTML = "";
+        if (!res.ok || !data.ok) {
+          list.innerHTML = '<p class="setup-piece-norm-hist-empty">' + (data.error || "Не удалось загрузить историю.") + "</p>";
+          return;
+        }
+        var entries = data.entries || [];
+        if (!entries.length) {
+          list.innerHTML = '<p class="setup-piece-norm-hist-empty">Пока нет сохранённых норм. Посчитайте Тшт в калькуляторе и нажмите «Сохранить норму».</p>';
+          return;
+        }
+        entries.forEach(function (e) {
+          var item = document.createElement("div");
+          item.className = "setup-piece-norm-hist-item";
+          var top = document.createElement("div");
+          top.className = "setup-piece-norm-hist-item__top";
+          var v = document.createElement("span");
+          v.className = "setup-piece-norm-hist-item__val";
+          v.textContent = "Тшт " + Number(e.tsht_norm).toFixed(3) + " (" + Number(e.tsht_min).toFixed(1) + " мин)";
+          top.appendChild(v);
+          if (e.delta != null && !isNaN(Number(e.delta)) && Number(e.delta) !== 0) {
+            var d = document.createElement("span");
+            d.className = "setup-piece-norm-hist-item__delta " + (Number(e.delta) > 0 ? "is-up" : "is-down");
+            d.textContent = (Number(e.delta) > 0 ? "↑ +" : "↓ ") + Number(e.delta).toFixed(3);
+            top.appendChild(d);
+          }
+          item.appendChild(top);
+          var meta = document.createElement("div");
+          meta.className = "setup-piece-norm-hist-item__meta";
+          meta.textContent = (e.created_at || "") + (e.author ? " · " + e.author : "");
+          item.appendChild(meta);
+          if (e.comment) {
+            var c = document.createElement("div");
+            c.className = "setup-piece-norm-hist-item__comment";
+            c.textContent = e.comment;
+            item.appendChild(c);
+          }
+          list.appendChild(item);
+        });
+      } catch (err) {
+        list.innerHTML = '<p class="setup-piece-norm-hist-empty">Ошибка сети.</p>';
+      }
+    }
+
+    function closePieceNormHistory() {
+      var modal = document.getElementById("setup-piece-norm-history-modal");
+      if (!modal) return;
+      modal.hidden = true;
+      modal.setAttribute("aria-hidden", "true");
+    }
+
+    document.addEventListener("click", function (e) {
+      var gotoSetup = e.target && e.target.closest && e.target.closest(".js-goto-setup-tab");
+      if (gotoSetup) {
+        e.preventDefault();
+        var tab = gotoSetup.getAttribute("data-tab") || "";
+        var setupSelect = document.getElementById("setup-tab-select");
+        if (tab && setupSelect) {
+          setupSelect.value = tab;
+          setupSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        return;
+      }
+      var histBtn = e.target && e.target.closest && e.target.closest("#setup-norm-history-btn");
+      if (histBtn) {
+        e.preventDefault();
+        var badge = document.getElementById("setup-norm-badge");
+        var sid = badge ? badge.getAttribute("data-setup-id") : "";
+        if (sid) openPieceNormHistory(sid);
+        return;
+      }
+      if (e.target && e.target.getAttribute && e.target.getAttribute("data-close-piece-norm-hist") === "1") {
+        closePieceNormHistory();
+      }
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      var modal = document.getElementById("setup-piece-norm-history-modal");
+      if (modal && !modal.hidden) closePieceNormHistory();
+    });
 
     function setSideBlocksByTab(tabName) {
       var isDrawing = tabName === "drawing";

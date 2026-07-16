@@ -80,6 +80,7 @@ html[data-theme="dawn"] .calc-page {
 .calc-tabs {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -87,11 +88,12 @@ html[data-theme="dawn"] .calc-page {
   padding: 5px;
   margin-bottom: 24px;
   width: fit-content;
+  max-width: 100%;
 }
 .calc-tab {
   position: relative;
   display: flex; align-items: center; gap: 7px;
-  padding: 9px 20px;
+  padding: 9px 16px;
   border-radius: 8px;
   border: none;
   background: transparent;
@@ -190,6 +192,93 @@ html[data-theme="dawn"] .calc-page {
   gap: 16px;
 }
 @media (max-width: 680px) { .calc-grid-time { grid-template-columns: 1fr; } }
+
+/* ── Сводка Тшт на вкладке партии ── */
+.calc-batch-tsht-summary {
+  margin-bottom: 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+}
+.calc-batch-tsht-summary.is-ready {
+  border-color: rgba(var(--ca-rgb), 0.35);
+}
+.calc-batch-tsht-summary__label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bio-text-muted);
+  margin-bottom: 6px;
+}
+.calc-batch-tsht-summary__value {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.calc-batch-tsht-summary__value strong {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--bio-text);
+  line-height: 1.1;
+}
+.calc-batch-tsht-summary__sec {
+  font-size: 13px;
+  color: var(--bio-text-muted);
+}
+.calc-batch-tsht-summary__hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--bio-text-muted);
+}
+.calc-batch-tsht-summary__hint[hidden] {
+  display: none;
+}
+
+/* ── Сохранение нормы на изделие ── */
+.calc-piece-save-bar {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.1fr) minmax(140px, 0.9fr) minmax(200px, 1.4fr) auto;
+  gap: 12px 14px;
+  align-items: end;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+}
+.calc-piece-save-bar__row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.calc-piece-save-bar__row--grow { min-width: 0; }
+.calc-piece-save-bar__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+.calc-piece-save-msg {
+  font-size: 12px;
+  color: var(--bio-text-muted);
+  max-width: 220px;
+}
+.calc-piece-save-msg.is-ok { color: var(--bio-inv-ok, #4ade80); }
+.calc-piece-save-msg.is-err { color: var(--bio-msg-error-fg, #f87171); }
+@media (max-width: 900px) {
+  .calc-piece-save-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .calc-piece-save-bar__row--grow,
+  .calc-piece-save-bar__actions {
+    grid-column: 1 / -1;
+  }
+}
 
 /* ── Стеклянная карточка ── */
 .calc-glass-card {

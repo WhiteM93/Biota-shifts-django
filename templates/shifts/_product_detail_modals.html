@@ -6,6 +6,16 @@
     <p id="setup-photo-modal-caption" class="muted" style="margin:8px 0 0 0;"></p>
   </div>
 </div>
+<div id="setup-piece-norm-history-modal" class="setup-piece-norm-history-modal" hidden aria-hidden="true">
+  <div class="setup-piece-norm-history-modal-backdrop" data-close-piece-norm-hist="1"></div>
+  <div class="setup-piece-norm-history-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="setup-piece-norm-hist-title">
+    <div class="setup-piece-norm-history-modal-head">
+      <h2 id="setup-piece-norm-hist-title" class="setup-piece-norm-history-modal-title">История норм Т<sub>шт</sub></h2>
+      <button type="button" class="btn btn-ghost" data-close-piece-norm-hist="1" aria-label="Закрыть">×</button>
+    </div>
+    <div class="setup-piece-norm-history-list" id="setup-piece-norm-hist-list"></div>
+  </div>
+</div>
 <div id="binding-photo-preview-pop" class="binding-photo-preview-pop" hidden aria-hidden="true">
   <img src="" alt="" decoding="async" />
 </div>

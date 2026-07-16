@@ -29,6 +29,7 @@ from .models import (
     ProductOsnastkaUsage,
     ProductSetup,
     ProductSetupPhoto,
+    ProductSetupPieceNorm,
     ProductDrawingFile,
     ProductSetupProgramFile,
     ProductSetupToolRow,
@@ -45,6 +46,43 @@ from .product_plan_sync import (
 )
 
 SETUP_LIST_ORDER = ("-in_work", "sort_order", "id")
+
+
+def _piece_norm_entry_dict(entry: ProductSetupPieceNorm) -> dict:
+    prev = entry.previous_tsht_norm
+    cur = entry.tsht_norm
+    delta = None
+    if prev is not None:
+        delta = float(cur - prev)
+    return {
+        "id": entry.pk,
+        "setup_id": entry.setup_id,
+        "tsht_norm": float(cur),
+        "tsht_min": float(entry.tsht_min),
+        "previous_tsht_norm": float(prev) if prev is not None else None,
+        "delta": delta,
+        "comment": entry.comment or "",
+        "author": entry.author or "",
+        "created_at": entry.created_at.strftime("%d.%m.%Y %H:%M"),
+        "t_auto": float(entry.t_auto) if entry.t_auto is not None else None,
+        "k_parts": entry.k_parts,
+        "a_pct": float(entry.a_pct) if entry.a_pct is not None else None,
+        "t_ust": float(entry.t_ust) if entry.t_ust is not None else None,
+        "t_izm": float(entry.t_izm) if entry.t_izm is not None else None,
+    }
+
+
+def _latest_piece_norms_by_setup(setup_ids: list[int]) -> dict[int, dict]:
+    out: dict[int, dict] = {}
+    if not setup_ids:
+        return out
+    for entry in ProductSetupPieceNorm.objects.filter(setup_id__in=setup_ids).order_by(
+        "setup_id", "-created_at", "-id"
+    ):
+        if entry.setup_id in out:
+            continue
+        out[entry.setup_id] = _piece_norm_entry_dict(entry)
+    return out
 
 
 def _products_qs_for_catalog(catalog_section: str):
@@ -1954,6 +1992,18 @@ def product_detail_view(request, pk: int):
                 }
             )
 
+        if action == "list_piece_norms":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            entries = [
+                _piece_norm_entry_dict(e)
+                for e in setup.piece_norms.order_by("-created_at", "-id")[:50]
+            ]
+            return JsonResponse({"ok": True, "setup_id": setup.pk, "entries": entries})
+
         return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
     setup_photos = list(product.setup_photos.filter(setup__isnull=True))
     product.drawing_file_list = list(_product_drawing_files_qs(product))
@@ -1973,6 +2023,9 @@ def product_detail_view(request, pk: int):
         setup.tool_rows = list(setup.tools.all())
         setup.tool_display_rows = _build_display_tool_rows(setup.tool_rows)
         setup.binding_extra_blocks_tpl = _binding_extra_blocks_template_rows(setup)
+    piece_norms_latest = _latest_piece_norms_by_setup([s.pk for s in setups])
+    for setup in setups:
+        setup.latest_piece_norm = piece_norms_latest.get(setup.pk)
     has_setup_preview_stl = any(bool(getattr(s, "preview_stl", None)) for s in setups)
     cad_name = (product.cad_model.name or "") if product.cad_model else ""
     cad_ext = _cad_ext(cad_name)
@@ -2017,6 +2070,10 @@ def product_detail_view(request, pk: int):
             "program_too_large": program_too_large,
             "tab_default": tab_default,
             "active_setup": active_setup,
+            "piece_norms_json": json.dumps(
+                {str(k): v for k, v in piece_norms_latest.items()},
+                ensure_ascii=False,
+            ),
             "tool_type_choices": SETUP_TOOL_TYPE_CHOICES,
             "username": biota_user(request),
             "product_notes": list(

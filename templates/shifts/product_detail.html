@@ -39,8 +39,18 @@
       {% for setup in setups %}
       <button type="button" class="product-tab{% if tab_default == setup.tab_slug %} is-active{% endif %}" role="tab" data-tab="{{ setup.tab_slug }}" data-setup-index="{{ forloop.counter }}" id="tab-setup-{{ setup.pk }}" aria-controls="panel-setup-{{ setup.pk }}" aria-selected="{% if tab_default == setup.tab_slug %}true{% else %}false{% endif %}" {% if setup.has_any_program %}data-program-url="{{ setup.primary_program_url }}" data-program-filename="{{ setup.primary_program_filename|escape }}"{% endif %} data-setup-name="{{ setup.name|escape }}" data-setup-edit-url="{% url 'product_setup_edit' product.pk setup.pk %}" hidden>Уст. {{ forloop.counter }}</button>
       {% endfor %}
-      {% if biota_can_edit and setups %}
+      <div class="product-setup-norm-badge" id="setup-norm-badge" hidden title="">
+        <span class="product-setup-norm-badge__label">Т<sub>шт</sub></span>
+        <strong class="product-setup-norm-badge__val" id="setup-norm-value">—</strong>
+        <span class="product-setup-norm-badge__min" id="setup-norm-min"></span>
+        <button type="button" class="product-setup-norm-hist-btn" id="setup-norm-history-btn" title="История норм" aria-label="История сохранённых норм" hidden>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M13 3a9 9 0 00-9 9H1l3.9 3.9L8.8 12H6a7 7 0 117 7 6.9 6.9 0 01-4.9-2l-1.4 1.5A9 9 0 1013 3zm-1 5v5l4.3 2.6.7-1.2-3.5-2.1V8H12z"/></svg>
+        </button>
+      </div>
+      {% if setups %}
       <span class="nav-spacer" style="flex:1 1 auto;"></span>
+      {% endif %}
+      {% if biota_can_edit and setups %}
       <a href="#" class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only" id="setup-export-specs-btn" target="_blank" rel="noopener" hidden aria-label="PDF параметры" title="PDF параметры">
         {% include "shifts/includes/pdf_export_specs_icon.html" %}
       </a>
@@ -449,6 +459,28 @@
           <div class="product-drawing-description" data-field-text="product_description" data-empty-label="Добавьте описание изделия..." spellcheck="true">{% if product.description %}{{ product.description|safe }}{% endif %}</div>
         </section>
       </div>
+      {% if setups %}
+      <section class="product-detail-meta-norms" aria-label="Нормы времени по установкам">
+        <h3 class="product-detail-meta-section-title">Нормы по установкам</h3>
+        <div class="product-setup-norms-list" id="product-setup-norms-list">
+          {% for setup in setups %}
+          <div class="product-setup-norms-row{% if not setup.latest_piece_norm %} is-empty{% endif %}" data-setup-id="{{ setup.pk }}">
+            <button type="button" class="product-setup-norms-row__name js-goto-setup-tab" data-tab="{{ setup.tab_slug }}" title="Открыть установку">
+              {% if setup.name %}{{ setup.name }}{% else %}Установка {{ forloop.counter }}{% endif %}
+            </button>
+            {% if setup.latest_piece_norm %}
+            <span class="product-setup-norms-row__norm" title="{{ setup.latest_piece_norm.comment|default:''|escape }}">Т<sub>шт</sub> {{ setup.latest_piece_norm.tsht_norm|floatformat:3 }}</span>
+            <span class="product-setup-norms-row__min">{{ setup.latest_piece_norm.tsht_min|floatformat:1 }} мин</span>
+            {% else %}
+            <span class="product-setup-norms-row__norm is-muted">—</span>
+            <span class="product-setup-norms-row__min is-muted">нет нормы</span>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <p class="product-setup-norms-hint muted">Нормы сохраняются из калькулятора («Нормы на изделие»).</p>
+      </section>
+      {% endif %}
     </div>
   </aside>
 
@@ -497,6 +529,7 @@
 {% include "shifts/_product_detail_modals.html" %}
 
 
+<script type="application/json" id="pd-piece-norms">{{ piece_norms_json|default:"{}"|safe }}</script>
 <script type="application/json" id="pd-options">{
   "pdf_url_specs": "{% url 'product_setup_pdf_export' product.pk 0 'specs' %}",
   "pdf_url_photos": "{% url 'product_setup_pdf_export' product.pk 0 'photos' %}",

@@ -280,6 +280,140 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     box-sizing: border-box;
   }
 
+  .product-setup-norm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--product-nav-control-h);
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid var(--bio-filter-border, #3a4666);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--bio-body-fg);
+    font-size: 13px;
+    white-space: nowrap;
+    max-width: min(360px, 42vw);
+  }
+  .product-setup-norm-badge[hidden] { display: none !important; }
+  .product-setup-norm-badge__label {
+    color: var(--bio-body-muted, #9ca3af);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .product-setup-norm-badge__val {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .product-setup-norm-badge__min {
+    color: var(--bio-body-muted, #9ca3af);
+    font-size: 12px;
+  }
+  .product-setup-norm-hist-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--bio-body-muted, #9ca3af);
+    cursor: pointer;
+  }
+  .product-setup-norm-hist-btn:hover,
+  .product-setup-norm-hist-btn:focus-visible {
+    color: var(--bio-accent, #60a5fa);
+    border-color: var(--bio-filter-border, #3a4666);
+    outline: none;
+  }
+  .product-setup-norm-hist-btn[hidden] { display: none !important; }
+
+  .setup-piece-norm-history-modal[hidden] { display: none !important; }
+  .setup-piece-norm-history-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .setup-piece-norm-history-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+  }
+  .setup-piece-norm-history-modal-dialog {
+    position: relative;
+    width: min(560px, 100%);
+    max-height: min(80vh, 640px);
+    overflow: auto;
+    border-radius: 12px;
+    border: 1px solid var(--bio-filter-border, #3a4666);
+    background: var(--bio-bg-card, #1a2033);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+    padding: 14px 16px 16px;
+  }
+  .setup-piece-norm-history-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .setup-piece-norm-history-modal-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 650;
+  }
+  .setup-piece-norm-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .setup-piece-norm-hist-item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--bio-filter-border, #3a4666);
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .setup-piece-norm-hist-item__top {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .setup-piece-norm-hist-item__val {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .setup-piece-norm-hist-item__delta {
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .setup-piece-norm-hist-item__delta.is-up { color: #f87171; }
+  .setup-piece-norm-hist-item__delta.is-down { color: #4ade80; }
+  .setup-piece-norm-hist-item__meta {
+    font-size: 12px;
+    color: var(--bio-body-muted, #9ca3af);
+  }
+  .setup-piece-norm-hist-item__comment {
+    margin-top: 6px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  .setup-piece-norm-hist-empty {
+    color: var(--bio-body-muted, #9ca3af);
+    font-size: 13px;
+    padding: 8px 0;
+  }
+
   .product-setup-select-inline {
     display: inline-flex;
     align-items: center;
@@ -2612,6 +2746,80 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   }
   .product-detail-meta-plan {
     align-self: stretch;
+  }
+  .product-detail-meta-norms {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 14px;
+    box-sizing: border-box;
+    border: 1px solid var(--bio-input-border);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--bio-input-bg) 88%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+  html[data-theme="dawn"] .product-detail-meta-norms {
+    background: rgba(255, 255, 255, 0.72);
+  }
+  .product-setup-norms-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .product-setup-norms-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 10px 14px;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--bio-input-border);
+    background: rgba(255, 255, 255, 0.03);
+  }
+  html[data-theme="dawn"] .product-setup-norms-row {
+    background: rgba(255, 255, 255, 0.55);
+  }
+  .product-setup-norms-row.is-empty {
+    opacity: 0.72;
+  }
+  .product-setup-norms-row__name {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--bio-body-fg);
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .product-setup-norms-row__name:hover,
+  .product-setup-norms-row__name:focus-visible {
+    color: var(--bio-accent, #60a5fa);
+    outline: none;
+  }
+  .product-setup-norms-row__norm {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .product-setup-norms-row__min {
+    font-size: 12px;
+    color: var(--bio-body-muted, #9ca3af);
+    white-space: nowrap;
+  }
+  .product-setup-norms-row__norm.is-muted,
+  .product-setup-norms-row__min.is-muted {
+    font-weight: 500;
+    color: var(--bio-body-muted, #9ca3af);
+  }
+  .product-setup-norms-hint {
+    margin: 10px 0 0;
+    font-size: 12px;
   }
   .product-detail-meta-plan .plan-unified-specs-card {
     margin: 0 !important;

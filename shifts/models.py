@@ -2068,6 +2068,50 @@ class ProductSetupToolRow(models.Model):
         return f"{self.tool_number or self.name}".strip() or f"#{self.pk}"
 
 
+class ProductSetupPieceNorm(models.Model):
+    """Сохранённая норма штучного времени Тшт для установки (история изменений)."""
+
+    setup = models.ForeignKey(
+        ProductSetup,
+        on_delete=models.CASCADE,
+        related_name="piece_norms",
+        verbose_name="Установка",
+    )
+    tsht_norm = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        verbose_name="Тшт (норма, 1.0 = 60 мин)",
+    )
+    tsht_min = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        verbose_name="Тшт, мин/шт",
+    )
+    previous_tsht_norm = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        verbose_name="Предыдущая Тшт",
+    )
+    comment = models.CharField(max_length=500, blank=True, default="", verbose_name="Комментарий")
+    author = models.CharField(max_length=120, blank=True, default="", verbose_name="Автор")
+    t_auto = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Тавтом, мин")
+    k_parts = models.PositiveIntegerField(default=1, verbose_name="k деталей за цикл")
+    a_pct = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, verbose_name="a, %")
+    t_ust = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Туст, мин")
+    t_izm = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Тизм, мин")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Сохранено")
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = "Норма Тшт установки"
+        verbose_name_plural = "Нормы Тшт установок"
+
+    def __str__(self) -> str:
+        return f"setup={self.setup_id} Тшт={self.tsht_norm}"
+
+
 class ProductSetupPhoto(models.Model):
     """Фото в блоке «Наладка»."""
 
