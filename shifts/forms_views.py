@@ -1,7 +1,10 @@
 """Раздел «Формы» — конструктор печатных бланков A4."""
 import json
+import os
 import re
+import uuid
 
+from django.core.files.storage import default_storage
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
@@ -10,19 +13,25 @@ from .auth_utils import biota_login_required, biota_user, nav_permission_require
 from .models import PrintForm
 
 MAX_FORMS = 200
-MAX_ELEMENTS = 120
+MAX_ELEMENTS = 200
+MAX_PAGES = 20
+MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024
 VALID_ORIENTATIONS = {PrintForm.ORIENTATION_PORTRAIT, PrintForm.ORIENTATION_LANDSCAPE}
-VALID_ELEMENT_TYPES = {"heading", "text", "table", "checkbox", "list", "line", "date", "fio", "item"}
+VALID_ELEMENT_TYPES = {"heading", "text", "table", "checkbox", "list", "line", "date", "fio", "item", "image"}
 _HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _BORDER_STYLES = {"solid", "dashed", "dotted", "double"}
 _HEADING_ALIGNS = {"left", "center", "right"}
+_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+_MEDIA_SRC_RE = re.compile(r"^/media/forms/[A-Za-z0-9._/-]+$")
 _DEFAULT_PAGE_SETTINGS = {
     "margin_mm": 12,
     "border_inset_mm": 8,
     "border_width_mm": 1,
     "border_style": "solid",
     "border_color": "#000000",
+    "page_count": 1,
 }
+_DEFAULT_IMAGE_FRAME_COLOR = "#1f4e79"
 
 
 def _norm_page_settings(raw) -> dict:
@@ -41,12 +50,18 @@ def _norm_page_settings(raw) -> dict:
             val = default
         return round(max(lo, min(hi, val)), 1)
 
+    try:
+        page_count = int(src.get("page_count") or 1)
+    except (TypeError, ValueError):
+        page_count = 1
+
     return {
         "margin_mm": _mm("margin_mm", 12, 0, 40),
         "border_inset_mm": _mm("border_inset_mm", 8, 0, 40),
         "border_width_mm": _mm("border_width_mm", 1, 0.1, 5),
         "border_style": style,
         "border_color": color,
+        "page_count": max(1, min(MAX_PAGES, page_count)),
     }
 
 
@@ -99,13 +114,15 @@ def _norm_cell(raw, *, default_hidden: bool = False) -> dict:
 
 
 def _form_to_dict(form: PrintForm) -> dict:
+    elements = _norm_elements(form.elements if isinstance(form.elements, list) else [])
+    page_settings = _sync_page_count(form.page_settings, elements)
     return {
         "id": form.pk,
         "name": form.name,
         "orientation": form.orientation,
         "show_border": form.show_border,
-        "page_settings": _norm_page_settings(form.page_settings),
-        "elements": form.elements if isinstance(form.elements, list) else [],
+        "page_settings": page_settings,
+        "elements": elements,
         "created_by": form.created_by,
         "updated_at": form.updated_at.isoformat(),
     }
@@ -135,6 +152,11 @@ def _norm_elements(raw) -> list[dict]:
             el["font_size"] = max(8, min(48, font_size))
         elif t == "text":
             el["text"] = str(item.get("text") or "")[:4000]
+            try:
+                height_px = int(item.get("height_px") or 0)
+            except (TypeError, ValueError):
+                height_px = 0
+            el["height_px"] = max(0, min(2000, height_px))
         elif t == "table":
             el["rows"] = max(1, min(50, int(item.get("rows") or 1)))
             el["cols"] = max(1, min(20, int(item.get("cols") or 1)))
@@ -207,10 +229,58 @@ def _norm_elements(raw) -> list[dict]:
             el["label"] = str(item.get("label") or "")[:200]
             el["value"] = str(item.get("value") or "")[:500]
             el["placeholder"] = str(item.get("placeholder") or "")[:80]
+        elif t == "image":
+            src = str(item.get("src") or "").strip()
+            if src and not _MEDIA_SRC_RE.match(src):
+                src = ""
+            el["src"] = src[:500]
+            frame_color = str(item.get("frame_color") or _DEFAULT_IMAGE_FRAME_COLOR).strip()
+            if not _HEX_COLOR_RE.match(frame_color):
+                frame_color = _DEFAULT_IMAGE_FRAME_COLOR
+            el["frame_color"] = frame_color
+            try:
+                frame_width = float(item.get("frame_width_mm", 1.5))
+            except (TypeError, ValueError):
+                frame_width = 1.5
+            el["frame_width_mm"] = round(max(0.3, min(5.0, frame_width)), 1)
+            try:
+                width_pct = float(item.get("width_pct", 60))
+            except (TypeError, ValueError):
+                width_pct = 60.0
+            el["width_pct"] = round(max(20.0, min(100.0, width_pct)), 1)
+            align = str(item.get("align") or "center").strip().lower()
+            if align not in _HEADING_ALIGNS:
+                align = "center"
+            el["align"] = align
+            el["alt"] = str(item.get("alt") or "")[:200]
+        try:
+            page = int(item.get("page") or 0)
+        except (TypeError, ValueError):
+            page = 0
+        el["page"] = max(0, min(MAX_PAGES - 1, page))
         if not el.get("id"):
             continue
         out.append(el)
     return out
+
+
+def _sync_page_count(page_settings, elements: list) -> dict:
+    ps = _norm_page_settings(page_settings)
+    max_page = 0
+    for el in elements:
+        if not isinstance(el, dict):
+            continue
+        try:
+            max_page = max(max_page, int(el.get("page") or 0))
+        except (TypeError, ValueError):
+            pass
+    ps["page_count"] = max(ps["page_count"], max_page + 1)
+    ps["page_count"] = max(1, min(MAX_PAGES, ps["page_count"]))
+    last = ps["page_count"] - 1
+    for el in elements:
+        if isinstance(el, dict) and int(el.get("page") or 0) > last:
+            el["page"] = last
+    return ps
 
 
 @biota_login_required
@@ -298,6 +368,53 @@ def forms_api_detail(request, pk: int):
         form.page_settings = _norm_page_settings(data.get("page_settings"))
     if "elements" in data:
         form.elements = _norm_elements(data.get("elements"))
+    # Согласовать page_count с элементами (и после частичного PATCH).
+    elements = form.elements if isinstance(form.elements, list) else []
+    form.page_settings = _sync_page_count(form.page_settings, elements)
+    form.elements = elements
 
     form.save()
     return JsonResponse({"ok": True, "form": _form_to_dict(form)})
+
+
+@biota_login_required
+@nav_permission_required("forms")
+@write_permission_required
+@require_http_methods(["POST"])
+def forms_api_upload(request):
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return JsonResponse({"ok": False, "error": "Ожидается AJAX."}, status=400)
+
+    uploaded = request.FILES.get("file")
+    if not uploaded:
+        return JsonResponse({"ok": False, "error": "Файл не передан."}, status=400)
+
+    raw_name = (getattr(uploaded, "name", "") or "").replace("\\", "/").rsplit("/", 1)[-1]
+    ext = os.path.splitext(raw_name)[1].lower()
+    if ext not in _IMAGE_EXTS:
+        return JsonResponse(
+            {"ok": False, "error": "Допустимы только изображения: JPG, PNG, GIF, WEBP."},
+            status=400,
+        )
+
+    size = getattr(uploaded, "size", None)
+    if size is not None and size > MAX_IMAGE_UPLOAD_BYTES:
+        return JsonResponse({"ok": False, "error": "Файл больше 5 МБ."}, status=400)
+
+    content_type = (getattr(uploaded, "content_type", "") or "").lower()
+    if content_type and not content_type.startswith("image/"):
+        return JsonResponse({"ok": False, "error": "Файл должен быть изображением."}, status=400)
+
+    storage_name = f"forms/{uuid.uuid4().hex}{ext}"
+    saved_path = default_storage.save(storage_name, uploaded)
+    url = default_storage.url(saved_path)
+    if "://" in url:
+        from urllib.parse import urlparse
+
+        url = urlparse(url).path or url
+    if not url.startswith("/"):
+        url = "/" + url.lstrip("/")
+    if not _MEDIA_SRC_RE.match(url):
+        url = "/media/" + saved_path.replace("\\", "/").lstrip("/")
+
+    return JsonResponse({"ok": True, "url": url})

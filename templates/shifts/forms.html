@@ -10,6 +10,7 @@
   class="forms-page"
   data-api-list-url="{% url 'forms_api_list' %}"
   data-api-detail-tpl="{% url 'forms_api_detail' 0 %}"
+  data-api-upload-url="{% url 'forms_api_upload' %}"
   data-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}"
 >
   <header class="forms-topbar">
@@ -35,6 +36,13 @@
       </div>
 
       <div class="forms-editor js-forms-editor forms-is-hidden" hidden>
+        <div class="forms-pages-bar js-forms-pages-bar">
+          <div class="forms-pages-tabs js-forms-pages-tabs" role="tablist" aria-label="Страницы бланка"></div>
+          <div class="forms-pages-actions">
+            <button type="button" class="forms-btn-secondary js-forms-page-add" title="Добавить страницу">+ Страница</button>
+            <button type="button" class="forms-btn-secondary js-forms-page-del" title="Удалить текущую страницу">Удалить</button>
+          </div>
+        </div>
         <div class="forms-canvas-stage js-forms-canvas-stage">
           <div class="forms-sheet-scaler js-forms-sheet-scaler">
             <div class="forms-sheet js-forms-sheet" data-orientation="portrait">
@@ -117,11 +125,37 @@
         </label>
       </section>
 
+      <section class="forms-props-block js-forms-image-props forms-is-hidden" hidden>
+        <h2 class="forms-props-heading">Картинка</h2>
+        <label class="forms-row">
+          <span class="forms-row-label">Цвет рамки</span>
+          <input type="color" class="forms-control forms-control--color js-forms-image-frame-color" value="#1f4e79">
+        </label>
+        <label class="forms-row">
+          <span class="forms-row-label">Толщина рамки, мм</span>
+          <input type="number" class="forms-control forms-control--num js-forms-image-frame-width" min="0.3" max="5" step="0.1" value="1.5">
+        </label>
+        <label class="forms-row">
+          <span class="forms-row-label">Ширина, %</span>
+          <input type="number" class="forms-control forms-control--num js-forms-image-width" min="20" max="100" step="1" value="60">
+        </label>
+        <div class="forms-row">
+          <span class="forms-row-label">Выравнивание</span>
+          <div class="forms-align-group" role="group" aria-label="Выравнивание картинки">
+            <button type="button" class="forms-align-btn js-forms-image-align" data-align="left" title="Слева">Слева</button>
+            <button type="button" class="forms-align-btn js-forms-image-align" data-align="center" title="По центру">Центр</button>
+            <button type="button" class="forms-align-btn js-forms-image-align" data-align="right" title="Справа">Справа</button>
+          </div>
+        </div>
+        <button type="button" class="forms-add-btn js-forms-image-replace" style="width:100%;margin-top:4px">Заменить файл</button>
+      </section>
+
       <section class="forms-props-block">
         <h2 class="forms-props-heading">Элементы</h2>
         <div class="forms-add-grid" role="toolbar" aria-label="Добавить элемент">
           <button type="button" class="forms-add-btn js-forms-add" data-type="heading">Заголовок</button>
           <button type="button" class="forms-add-btn js-forms-add" data-type="text">Текст</button>
+          <button type="button" class="forms-add-btn js-forms-add" data-type="image">Картинка</button>
           <button type="button" class="forms-add-btn js-forms-add" data-type="table">Таблица</button>
           <button type="button" class="forms-add-btn js-forms-add" data-type="list">Список</button>
           <button type="button" class="forms-add-btn js-forms-add" data-type="checkbox">Галочка</button>

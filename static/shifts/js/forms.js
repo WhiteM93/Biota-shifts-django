@@ -4,6 +4,7 @@
 
   var apiListUrl = root.getAttribute("data-api-list-url") || "";
   var apiDetailTpl = root.getAttribute("data-api-detail-tpl") || "";
+  var apiUploadUrl = root.getAttribute("data-api-upload-url") || "";
   var canEdit = (root.getAttribute("data-can-edit") || "") === "1";
 
   var emptyEl = root.querySelector(".js-forms-empty");
@@ -30,9 +31,18 @@
   var headingAlignBtns = root.querySelectorAll(".js-forms-heading-align");
   var headingSizeInput = root.querySelector(".js-forms-heading-size");
   var activeHeadingId = null;
+  var imagePropsBlock = root.querySelector(".js-forms-image-props");
+  var imageFrameColorInput = root.querySelector(".js-forms-image-frame-color");
+  var imageFrameWidthInput = root.querySelector(".js-forms-image-frame-width");
+  var imageWidthInput = root.querySelector(".js-forms-image-width");
+  var imageAlignBtns = root.querySelectorAll(".js-forms-image-align");
+  var imageReplaceBtn = root.querySelector(".js-forms-image-replace");
+  var activeImageId = null;
   var tablePropsBlock = root.querySelector(".js-forms-table-props");
   var tableToolbarHost = root.querySelector(".js-forms-table-toolbar-host");
   var activeTableId = null;
+  var DEFAULT_IMAGE_FRAME_COLOR = "#1f4e79";
+  var imageFileInput = null;
 
   var dialogNew = root.querySelector(".js-forms-dialog-new");
   var dialogNewForm = root.querySelector(".js-forms-new-form");
@@ -60,14 +70,22 @@
     border_width_mm: 1,
     border_style: "solid",
     border_color: "#000000",
+    page_count: 1,
   };
+  var MAX_PAGES = 20;
+  var currentPageIndex = 0;
+  var pagesTabsEl = root.querySelector(".js-forms-pages-tabs");
+  var pageAddBtn = root.querySelector(".js-forms-page-add");
+  var pageDelBtn = root.querySelector(".js-forms-page-del");
+  var suppressCapture = false;
 
   function formsPrintCss(pageSize) {
     return (
       "@page { size: " + pageSize + "; margin: 0; }" +
       "*, *::before, *::after { box-sizing: border-box; }" +
       "html, body { margin: 0; padding: 0; background: #fff; color: #000; width: 100%; height: 100%; overflow: hidden; }" +
-      ".forms-print-sheet { margin: 0 auto; background: #fff; color: #000; position: relative; overflow: hidden; page-break-after: auto; page-break-inside: avoid; }" +
+      ".forms-print-sheet { margin: 0 auto; background: #fff; color: #000; position: relative; overflow: hidden; page-break-after: always; break-after: page; page-break-inside: avoid; }" +
+      ".forms-print-sheet:last-child { page-break-after: auto; break-after: auto; }" +
       ".forms-print-sheet[data-orientation=\"portrait\"] { width: 210mm; height: 297mm; }" +
       ".forms-print-sheet[data-orientation=\"landscape\"] { width: 297mm; height: 210mm; }" +
       ".forms-print-frame { position: absolute; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
@@ -92,7 +110,11 @@
       ".forms-el-table-wrap { overflow: visible; }" +
       ".forms-el-table { width: 100%; border-collapse: collapse; border-spacing: 0; table-layout: fixed; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
       ".forms-el-table td { padding: 4px; vertical-align: top; background: #fff; color: #000; overflow: visible !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
-      ".forms-print-table-cell { display: block; width: 100%; overflow: visible !important; height: auto !important; max-height: none !important; padding: 0; margin: 0; background: transparent; color: #000; font-size: 12pt; line-height: 1.35; word-wrap: break-word; overflow-wrap: break-word; }"
+      ".forms-print-table-cell { display: block; width: 100%; overflow: visible !important; height: auto !important; max-height: none !important; padding: 0; margin: 0; background: transparent; color: #000; font-size: 12pt; line-height: 1.35; word-wrap: break-word; overflow-wrap: break-word; }" +
+      ".forms-el-image { display: flex; width: 100%; }" +
+      ".forms-el-image-frame { display: inline-block; max-width: 100%; box-sizing: border-box; padding: 2mm; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
+      ".forms-el-image-frame img { display: block; width: 100%; height: auto; max-width: 100%; }" +
+      ".forms-el-image-actions, .forms-el-image-placeholder { display: none !important; }"
     );
   }
 
@@ -107,13 +129,134 @@
       if (isNaN(val)) val = def;
       return Math.round(Math.max(lo, Math.min(hi, val)) * 10) / 10;
     }
+    var pageCount = parseInt(src.page_count, 10);
+    if (isNaN(pageCount)) pageCount = 1;
+    pageCount = Math.max(1, Math.min(MAX_PAGES, pageCount));
     return {
       margin_mm: mm("margin_mm", 12, 0, 40),
       border_inset_mm: mm("border_inset_mm", 8, 0, 40),
       border_width_mm: mm("border_width_mm", 1, 0.1, 5),
       border_style: style,
       border_color: "#000000",
+      page_count: pageCount,
     };
+  }
+
+  function ensureElementPage(elData) {
+    if (!elData) return 0;
+    var p = parseInt(elData.page, 10);
+    if (isNaN(p) || p < 0) p = 0;
+    elData.page = Math.max(0, Math.min(MAX_PAGES - 1, p));
+    return elData.page;
+  }
+
+  function syncFormPageCount(form) {
+    if (!form) return 1;
+    var ps = ensureFormPageSettings(form);
+    var maxPage = 0;
+    (form.elements || []).forEach(function (el) {
+      maxPage = Math.max(maxPage, ensureElementPage(el));
+    });
+    ps.page_count = Math.max(ps.page_count, maxPage + 1);
+    ps.page_count = Math.max(1, Math.min(MAX_PAGES, ps.page_count));
+    if (currentPageIndex >= ps.page_count) currentPageIndex = ps.page_count - 1;
+    if (currentPageIndex < 0) currentPageIndex = 0;
+    return ps.page_count;
+  }
+
+  function getCurrentPageIndex(form) {
+    syncFormPageCount(form);
+    return currentPageIndex;
+  }
+
+  function setCurrentPage(index, opts) {
+    var form = currentForm();
+    if (!form) return;
+    var count = syncFormPageCount(form);
+    var next = parseInt(index, 10);
+    if (isNaN(next)) next = 0;
+    next = Math.max(0, Math.min(count - 1, next));
+    if (!(opts && opts.skipCapture)) captureEditorState();
+    currentPageIndex = next;
+    setActiveHeading(null);
+    setActiveImage(null);
+    syncTableToolbar(null);
+    renderPagesBar();
+    renderCanvas({ skipCapture: true });
+  }
+
+  function renderPagesBar() {
+    var form = currentForm();
+    if (!pagesTabsEl) return;
+    pagesTabsEl.innerHTML = "";
+    if (!form) return;
+    var count = syncFormPageCount(form);
+    for (var i = 0; i < count; i++) {
+      (function (pageIdx) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "forms-page-tab" + (pageIdx === currentPageIndex ? " is-active" : "");
+        btn.setAttribute("role", "tab");
+        btn.setAttribute("aria-selected", pageIdx === currentPageIndex ? "true" : "false");
+        btn.textContent = "Стр. " + (pageIdx + 1);
+        btn.addEventListener("click", function () {
+          if (pageIdx === currentPageIndex) return;
+          setCurrentPage(pageIdx);
+        });
+        pagesTabsEl.appendChild(btn);
+      })(i);
+    }
+    if (pageDelBtn) {
+      pageDelBtn.disabled = !canEdit || count <= 1;
+    }
+    if (pageAddBtn) {
+      pageAddBtn.disabled = !canEdit || count >= MAX_PAGES;
+    }
+  }
+
+  function addFormPage() {
+    var form = currentForm();
+    if (!canEdit || !form) return;
+    var count = syncFormPageCount(form);
+    if (count >= MAX_PAGES) {
+      alert("Достигнут лимит страниц (" + MAX_PAGES + ").");
+      return;
+    }
+    captureEditorState();
+    form.page_settings.page_count = count + 1;
+    currentPageIndex = count;
+    setActiveHeading(null);
+    setActiveImage(null);
+    syncTableToolbar(null);
+    renderPagesBar();
+    renderCanvas({ skipCapture: true });
+    scheduleSave();
+  }
+
+  function deleteCurrentFormPage() {
+    var form = currentForm();
+    if (!canEdit || !form) return;
+    var count = syncFormPageCount(form);
+    if (count <= 1) return;
+    if (!confirm("Удалить страницу " + (currentPageIndex + 1) + " вместе с её содержимым?")) return;
+    captureEditorState();
+    var delIdx = currentPageIndex;
+    form.elements = (form.elements || []).filter(function (el) {
+      return ensureElementPage(el) !== delIdx;
+    }).map(function (el) {
+      if (ensureElementPage(el) > delIdx) el.page = el.page - 1;
+      return el;
+    });
+    form.page_settings.page_count = count - 1;
+    if (currentPageIndex >= form.page_settings.page_count) {
+      currentPageIndex = form.page_settings.page_count - 1;
+    }
+    setActiveHeading(null);
+    setActiveImage(null);
+    syncTableToolbar(null);
+    renderPagesBar();
+    renderCanvas({ skipCapture: true });
+    scheduleSave();
   }
 
   function setPanelVisible(el, visible) {
@@ -193,6 +336,227 @@
       applyHeadingStyles(h, elData);
       autoGrowTextarea(h);
     }
+  }
+
+  function normHexColor(color, fallback) {
+    var c = String(color || "").trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(c)) return c.toLowerCase();
+    return fallback || DEFAULT_IMAGE_FRAME_COLOR;
+  }
+
+  function ensureImageFields(elData) {
+    if (!elData || elData.type !== "image") return;
+    elData.src = String(elData.src || "");
+    elData.frame_color = normHexColor(elData.frame_color, DEFAULT_IMAGE_FRAME_COLOR);
+    var fw = parseFloat(elData.frame_width_mm);
+    if (isNaN(fw)) fw = 1.5;
+    elData.frame_width_mm = Math.round(Math.max(0.3, Math.min(5, fw)) * 10) / 10;
+    var wp = parseFloat(elData.width_pct);
+    if (isNaN(wp)) wp = 60;
+    elData.width_pct = Math.round(Math.max(20, Math.min(100, wp)) * 10) / 10;
+    elData.align = normHeadingAlign(elData.align || "center");
+    if (elData.align !== "left" && elData.align !== "center" && elData.align !== "right") {
+      elData.align = "center";
+    }
+    elData.alt = String(elData.alt || "");
+  }
+
+  function applyImageFrameStyles(block, elData) {
+    if (!block || !elData) return;
+    ensureImageFields(elData);
+    var justify = elData.align === "left" ? "flex-start" : elData.align === "right" ? "flex-end" : "center";
+    block.style.justifyContent = justify;
+    var frame = block.querySelector(".forms-el-image-frame");
+    if (!frame) return;
+    frame.style.width = elData.width_pct + "%";
+    frame.style.border = elData.frame_width_mm + "mm solid " + elData.frame_color;
+    frame.style.boxSizing = "border-box";
+  }
+
+  function syncImagePropsUi(elData) {
+    if (!imagePropsBlock) return;
+    if (!canEdit || !elData || elData.type !== "image") {
+      setPanelVisible(imagePropsBlock, false);
+      return;
+    }
+    ensureImageFields(elData);
+    setPanelVisible(imagePropsBlock, true);
+    if (imageFrameColorInput) imageFrameColorInput.value = elData.frame_color;
+    if (imageFrameWidthInput) imageFrameWidthInput.value = String(elData.frame_width_mm);
+    if (imageWidthInput) imageWidthInput.value = String(elData.width_pct);
+    imageAlignBtns.forEach(function (btn) {
+      btn.classList.toggle("is-active", btn.getAttribute("data-align") === elData.align);
+    });
+  }
+
+  function setActiveImage(elData) {
+    if (elData && elData.type === "image") {
+      activeImageId = elData.id;
+      syncImagePropsUi(elData);
+    } else {
+      activeImageId = null;
+      syncImagePropsUi(null);
+    }
+  }
+
+  function getActiveImage() {
+    var elData = findElementById(activeImageId);
+    return elData && elData.type === "image" ? elData : null;
+  }
+
+  function updateActiveImageDom(elData) {
+    if (!elData || !sheetInnerEl) return;
+    var wrap = sheetInnerEl.querySelector('.forms-el[data-el-id="' + elData.id + '"]');
+    var block = wrap && wrap.querySelector(".forms-el-image");
+    if (block) applyImageFrameStyles(block, elData);
+  }
+
+  function ensureImageFileInput() {
+    if (imageFileInput) return imageFileInput;
+    imageFileInput = document.createElement("input");
+    imageFileInput.type = "file";
+    imageFileInput.accept = "image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp";
+    imageFileInput.style.display = "none";
+    root.appendChild(imageFileInput);
+    imageFileInput.addEventListener("change", function () {
+      var file = imageFileInput.files && imageFileInput.files[0];
+      var targetId = imageFileInput.getAttribute("data-target-id") || "";
+      imageFileInput.value = "";
+      if (!file || !targetId) return;
+      uploadImageForElement(targetId, file);
+    });
+    return imageFileInput;
+  }
+
+  function pickImageFile(elData) {
+    if (!canEdit || !elData || elData.type !== "image") return;
+    var input = ensureImageFileInput();
+    input.setAttribute("data-target-id", elData.id);
+    input.click();
+  }
+
+  function uploadImageForElement(elId, file) {
+    var elData = findElementById(elId);
+    if (!elData || elData.type !== "image" || !apiUploadUrl) return Promise.resolve();
+    var fd = new FormData();
+    fd.append("file", normalizeImageFile(file));
+    return fetchJson(apiUploadUrl, { method: "POST", body: fd }).then(function (data) {
+      elData.src = data.url || "";
+      renderCanvas({ skipCapture: true });
+      setActiveImage(elData);
+      scheduleSave();
+      return elData;
+    }).catch(function (e) {
+      alert(e.message || "Не удалось загрузить изображение");
+    });
+  }
+
+  function normalizeImageFile(file) {
+    if (!file) return file;
+    if (file.name) return file;
+    var mime = file.type || "image/png";
+    var ext = (mime.split("/")[1] || "png").toLowerCase();
+    if (ext === "jpeg") ext = "jpg";
+    try {
+      return new File([file], "clipboard." + ext, { type: mime });
+    } catch (e) {
+      return file;
+    }
+  }
+
+  function createImageElementData() {
+    var form = currentForm();
+    return {
+      id: uid(),
+      type: "image",
+      page: form ? getCurrentPageIndex(form) : 0,
+      src: "",
+      frame_color: DEFAULT_IMAGE_FRAME_COLOR,
+      frame_width_mm: 1.5,
+      width_pct: 60,
+      align: "center",
+      alt: "",
+    };
+  }
+
+  function insertImageFromFile(file, preferActive) {
+    var form = currentForm();
+    if (!canEdit || !form || !file) return;
+    var active = preferActive ? getActiveImage() : null;
+    if (active) {
+      uploadImageForElement(active.id, file);
+      return;
+    }
+    var el = createImageElementData();
+    form.elements = form.elements || [];
+    form.elements.push(el);
+    renderCanvas({ skipCapture: true });
+    setActiveImage(el);
+    uploadImageForElement(el.id, file);
+  }
+
+  function getClipboardImageFile(clipboardData) {
+    if (!clipboardData) return null;
+    var items = clipboardData.items;
+    if (items) {
+      for (var i = 0; i < items.length; i++) {
+        if (items[i] && items[i].type && items[i].type.indexOf("image/") === 0) {
+          var asFile = items[i].getAsFile();
+          if (asFile) return asFile;
+        }
+      }
+    }
+    var files = clipboardData.files;
+    if (files && files.length) {
+      for (var j = 0; j < files.length; j++) {
+        if (files[j] && files[j].type && files[j].type.indexOf("image/") === 0) {
+          return files[j];
+        }
+      }
+    }
+    return null;
+  }
+
+  function renderImageElement(elData, wrap) {
+    ensureImageFields(elData);
+    var block = document.createElement("div");
+    block.className = "forms-el-image";
+    var frame = document.createElement("div");
+    frame.className = "forms-el-image-frame";
+    if (elData.src) {
+      var img = document.createElement("img");
+      img.src = elData.src;
+      img.alt = elData.alt || "";
+      img.draggable = false;
+      frame.appendChild(img);
+    } else {
+      var ph = document.createElement("div");
+      ph.className = "forms-el-image-placeholder";
+      ph.textContent = "Нет изображения — файл или Ctrl+V";
+      frame.appendChild(ph);
+    }
+    if (canEdit) {
+      var actions = document.createElement("div");
+      actions.className = "forms-el-image-actions";
+      var pickBtn = document.createElement("button");
+      pickBtn.type = "button";
+      pickBtn.className = "forms-el-image-pick";
+      pickBtn.textContent = elData.src ? "Заменить" : "Выбрать файл";
+      pickBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        setActiveImage(elData);
+        pickImageFile(elData);
+      });
+      actions.appendChild(pickBtn);
+      frame.appendChild(actions);
+      frame.addEventListener("click", function () {
+        setActiveImage(elData);
+      });
+    }
+    block.appendChild(frame);
+    applyImageFrameStyles(block, elData);
+    wrap.appendChild(block);
   }
 
   function normOrientation(orientation) {
@@ -1344,7 +1708,10 @@
         if (h) elData.text = h.value;
       } else if (elData.type === "text") {
         var ta = wrap.querySelector(".forms-el-text");
-        if (ta) elData.text = ta.value;
+        if (ta) {
+          elData.text = ta.value;
+          elData.height_px = Math.max(0, Math.min(2000, Math.round(ta.offsetHeight || 0)));
+        }
       } else if (elData.type === "checkbox") {
         var lbl = wrap.querySelector(".forms-el-checkbox-label");
         var box = wrap.querySelector(".forms-el-checkbox-box");
@@ -1485,6 +1852,7 @@
   function showFormUi(form) {
     if (!form) {
       setActiveHeading(null);
+      setActiveImage(null);
       syncTableToolbar(null);
       setPanelVisible(emptyEl, true);
       setPanelVisible(editorEl, false);
@@ -1494,7 +1862,10 @@
       return;
     }
     setActiveHeading(null);
+    setActiveImage(null);
     syncTableToolbar(null);
+    currentPageIndex = 0;
+    syncFormPageCount(form);
     setPanelVisible(emptyEl, false);
     setPanelVisible(editorEl, true);
     setPanelVisible(propsPanel, true);
@@ -1504,7 +1875,8 @@
     if (orientationSelect) orientationSelect.value = form.orientation || "portrait";
     syncBorderPanelUi(form);
     updateSheetScalerWidth(form);
-    renderCanvas();
+    renderPagesBar();
+    renderCanvas({ skipCapture: true });
     renderList();
   }
 
@@ -1546,19 +1918,37 @@
     }
 
     bar.appendChild(mkBtn("↑", "Выше", function () {
-      if (index <= 0) return;
       var form = currentForm();
-      var tmp = form.elements[index - 1];
-      form.elements[index - 1] = form.elements[index];
+      if (!form) return;
+      var page = ensureElementPage(elData);
+      var prev = -1;
+      for (var i = index - 1; i >= 0; i--) {
+        if (ensureElementPage(form.elements[i]) === page) {
+          prev = i;
+          break;
+        }
+      }
+      if (prev < 0) return;
+      var tmp = form.elements[prev];
+      form.elements[prev] = form.elements[index];
       form.elements[index] = tmp;
       renderCanvas();
       scheduleSave();
     }));
     bar.appendChild(mkBtn("↓", "Ниже", function () {
       var form = currentForm();
-      if (index >= form.elements.length - 1) return;
-      var tmp = form.elements[index + 1];
-      form.elements[index + 1] = form.elements[index];
+      if (!form) return;
+      var page = ensureElementPage(elData);
+      var next = -1;
+      for (var i = index + 1; i < form.elements.length; i++) {
+        if (ensureElementPage(form.elements[i]) === page) {
+          next = i;
+          break;
+        }
+      }
+      if (next < 0) return;
+      var tmp = form.elements[next];
+      form.elements[next] = form.elements[index];
       form.elements[index] = tmp;
       renderCanvas();
       scheduleSave();
@@ -1771,7 +2161,7 @@
   }
 
   function materializePrintFields(root, liveRoot, form) {
-    root.querySelectorAll(".forms-el-toolbar, .forms-table-toolbar").forEach(function (node) {
+    root.querySelectorAll(".forms-el-toolbar, .forms-table-toolbar, .forms-el-image-actions").forEach(function (node) {
       node.remove();
     });
     root.querySelectorAll("textarea").forEach(function (ta) {
@@ -1791,6 +2181,21 @@
         div.style.width = "100%";
         div.style.whiteSpace = "pre-wrap";
         div.style.lineHeight = "1.35";
+      }
+      if (ta.classList.contains("forms-el-text")) {
+        var wrap = ta.closest(".forms-el");
+        var elData = elementDataByWrap(wrap, form);
+        var h = elData && parseInt(elData.height_px, 10);
+        if (!h || isNaN(h) || h <= 0) {
+          var liveTa = findLiveTextarea(ta, liveRoot);
+          h = liveTa ? Math.round(liveTa.offsetHeight || 0) : 0;
+        }
+        if (h > 0) {
+          div.classList.remove("forms-print-static-text");
+          div.style.setProperty("min-height", h + "px", "important");
+          div.style.setProperty("height", h + "px", "important");
+          div.style.overflow = "hidden";
+        }
       }
       ta.parentNode.replaceChild(div, ta);
     });
@@ -1845,7 +2250,27 @@
       ta.value = elData.text || "";
       ta.placeholder = "Текстовый блок";
       if (!canEdit) ta.readOnly = true;
+      var savedH = parseInt(elData.height_px, 10);
+      if (!isNaN(savedH) && savedH > 0) {
+        ta.style.height = savedH + "px";
+      }
       bindTextInput(ta, elData, "text");
+      if (canEdit) {
+        var lastTextH = Math.round(ta.offsetHeight || 0);
+        function syncTextHeight() {
+          var h = Math.max(0, Math.min(2000, Math.round(ta.offsetHeight || 0)));
+          if (h === lastTextH) return;
+          lastTextH = h;
+          elData.height_px = h;
+          scheduleSave();
+        }
+        ta.addEventListener("mouseup", syncTextHeight);
+        ta.addEventListener("pointerup", syncTextHeight);
+        ta.addEventListener("blur", function () {
+          syncTextHeight();
+          flushSave();
+        });
+      }
       wrap.appendChild(ta);
     } else if (elData.type === "table") {
       renderTableElement(elData, wrap);
@@ -1953,17 +2378,22 @@
       var hr = document.createElement("hr");
       hr.className = "forms-el-line";
       wrap.appendChild(hr);
+    } else if (elData.type === "image") {
+      renderImageElement(elData, wrap);
     }
 
     return wrap;
   }
 
-  function renderCanvas() {
+  function renderCanvas(opts) {
     var form = currentForm();
     if (!form) return;
-    captureEditorState();
+    if (!(opts && opts.skipCapture) && !suppressCapture) captureEditorState();
+    var pageIdx = getCurrentPageIndex(form);
     sheetInnerEl.innerHTML = "";
     (form.elements || []).forEach(function (el, i) {
+      ensureElementPage(el);
+      if (el.page !== pageIdx) return;
       sheetInnerEl.appendChild(renderElement(el, i));
     });
     if (activeTableId) {
@@ -1976,6 +2406,8 @@
       }
     }
     syncHeadingPropsUi(getActiveHeading());
+    syncImagePropsUi(getActiveImage());
+    renderPagesBar();
     scheduleSheetFitScale();
   }
 
@@ -1993,7 +2425,7 @@
     var form = currentForm();
     if (!form) return;
 
-    var el = { id: uid(), type: type };
+    var el = { id: uid(), type: type, page: getCurrentPageIndex(form) };
 
     if (type === "table") {
       openPrompt("Таблица", (
@@ -2056,11 +2488,23 @@
       el.font_size = 16;
     } else if (type === "text") {
       el.text = "";
+      el.height_px = 0;
+    } else if (type === "image") {
+      el.src = "";
+      el.frame_color = DEFAULT_IMAGE_FRAME_COLOR;
+      el.frame_width_mm = 1.5;
+      el.width_pct = 60;
+      el.align = "center";
+      el.alt = "";
     }
 
     form.elements.push(el);
     renderCanvas();
     scheduleSave();
+    if (type === "image") {
+      setActiveImage(el);
+      pickImageFile(el);
+    }
   }
 
   function deleteForm(id) {
@@ -2106,18 +2550,33 @@
     if (!form || !sheetInnerEl) return;
     captureEditorState();
     form.orientation = normOrientation(form.orientation);
+    var savedPage = currentPageIndex;
+    var count = syncFormPageCount(form);
+    var sheetsHtml = "";
 
-    var sheet = document.createElement("div");
-    sheet.className = "forms-print-sheet";
-    sheet.setAttribute("data-orientation", form.orientation);
-    var frame = document.createElement("div");
-    frame.className = "forms-print-frame";
-    var inner = document.createElement("div");
-    inner.className = "forms-print-inner";
-    inner.appendChild(buildPrintBody(form));
-    frame.appendChild(inner);
-    sheet.appendChild(frame);
-    applyPrintPageLayout(form, sheet, frame, inner);
+    suppressCapture = true;
+    try {
+      for (var p = 0; p < count; p++) {
+        currentPageIndex = p;
+        renderCanvas({ skipCapture: true });
+        var sheet = document.createElement("div");
+        sheet.className = "forms-print-sheet";
+        sheet.setAttribute("data-orientation", form.orientation);
+        var frame = document.createElement("div");
+        frame.className = "forms-print-frame";
+        var inner = document.createElement("div");
+        inner.className = "forms-print-inner";
+        inner.appendChild(buildPrintBody(form));
+        frame.appendChild(inner);
+        sheet.appendChild(frame);
+        applyPrintPageLayout(form, sheet, frame, inner);
+        sheetsHtml += sheet.outerHTML;
+      }
+    } finally {
+      currentPageIndex = savedPage;
+      renderCanvas({ skipCapture: true });
+      suppressCapture = false;
+    }
 
     var pageSize = form.orientation === "landscape" ? "A4 landscape" : "A4 portrait";
     var sheetW = form.orientation === "landscape" ? "297mm" : "210mm";
@@ -2135,7 +2594,7 @@
       "<!DOCTYPE html><html lang=\"ru\"><head><meta charset=\"utf-8\"><style>" +
       formsPrintCss(pageSize) +
       "</style></head><body>" +
-      sheet.outerHTML +
+      sheetsHtml +
       "</body></html>"
     );
     doc.close();
@@ -2229,17 +2688,32 @@
 
   root.addEventListener("focusin", function (e) {
     if (headingPropsBlock && headingPropsBlock.contains(e.target)) return;
+    if (imagePropsBlock && imagePropsBlock.contains(e.target)) return;
     if (tablePropsBlock && tablePropsBlock.contains(e.target)) return;
     var wrap = e.target.closest(".forms-el");
     if (!wrap || !sheetInnerEl || !sheetInnerEl.contains(wrap)) {
       setActiveHeading(null);
+      setActiveImage(null);
       syncTableToolbar(null);
       return;
     }
     var elData = findElementById(wrap.getAttribute("data-el-id") || "");
     if (elData && elData.type === "heading") setActiveHeading(elData);
     else setActiveHeading(null);
+    if (elData && elData.type === "image") setActiveImage(elData);
+    else setActiveImage(null);
     if (!elData || elData.type !== "table") syncTableToolbar(null);
+  });
+
+  root.addEventListener("click", function (e) {
+    if (imagePropsBlock && imagePropsBlock.contains(e.target)) return;
+    var wrap = e.target.closest(".forms-el");
+    if (!wrap || !sheetInnerEl || !sheetInnerEl.contains(wrap)) return;
+    var elData = findElementById(wrap.getAttribute("data-el-id") || "");
+    if (elData && elData.type === "image") {
+      setActiveHeading(null);
+      setActiveImage(elData);
+    }
   });
 
   headingAlignBtns.forEach(function (btn) {
@@ -2270,6 +2744,105 @@
       flushSave();
     });
   }
+
+  if (imageFrameColorInput) {
+    imageFrameColorInput.addEventListener("input", function () {
+      var elData = getActiveImage();
+      if (!elData) return;
+      elData.frame_color = normHexColor(imageFrameColorInput.value, DEFAULT_IMAGE_FRAME_COLOR);
+      updateActiveImageDom(elData);
+      scheduleSave();
+    });
+    imageFrameColorInput.addEventListener("change", function () {
+      var elData = getActiveImage();
+      if (!elData) return;
+      elData.frame_color = normHexColor(imageFrameColorInput.value, DEFAULT_IMAGE_FRAME_COLOR);
+      updateActiveImageDom(elData);
+      flushSave();
+    });
+  }
+
+  if (imageFrameWidthInput) {
+    imageFrameWidthInput.addEventListener("input", function () {
+      var elData = getActiveImage();
+      if (!elData) return;
+      var fw = parseFloat(imageFrameWidthInput.value);
+      if (isNaN(fw)) return;
+      elData.frame_width_mm = Math.round(Math.max(0.3, Math.min(5, fw)) * 10) / 10;
+      updateActiveImageDom(elData);
+      scheduleSave();
+    });
+    imageFrameWidthInput.addEventListener("change", function () {
+      var elData = getActiveImage();
+      if (!elData) return;
+      var fw = parseFloat(imageFrameWidthInput.value);
+      if (isNaN(fw)) fw = 1.5;
+      elData.frame_width_mm = Math.round(Math.max(0.3, Math.min(5, fw)) * 10) / 10;
+      imageFrameWidthInput.value = String(elData.frame_width_mm);
+      updateActiveImageDom(elData);
+      flushSave();
+    });
+  }
+
+  if (imageWidthInput) {
+    imageWidthInput.addEventListener("input", function () {
+      var elData = getActiveImage();
+      if (!elData) return;
+      var wp = parseFloat(imageWidthInput.value);
+      if (isNaN(wp)) return;
+      elData.width_pct = Math.round(Math.max(20, Math.min(100, wp)) * 10) / 10;
+      updateActiveImageDom(elData);
+      scheduleSave();
+    });
+    imageWidthInput.addEventListener("change", function () {
+      var elData = getActiveImage();
+      if (!elData) return;
+      var wp = parseFloat(imageWidthInput.value);
+      if (isNaN(wp)) wp = 60;
+      elData.width_pct = Math.round(Math.max(20, Math.min(100, wp)) * 10) / 10;
+      imageWidthInput.value = String(elData.width_pct);
+      updateActiveImageDom(elData);
+      flushSave();
+    });
+  }
+
+  imageAlignBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var elData = getActiveImage();
+      if (!elData) return;
+      elData.align = normHeadingAlign(btn.getAttribute("data-align"));
+      updateActiveImageDom(elData);
+      syncImagePropsUi(elData);
+      scheduleSave();
+    });
+  });
+
+  if (imageReplaceBtn) {
+    imageReplaceBtn.addEventListener("click", function () {
+      var elData = getActiveImage();
+      if (!elData) return;
+      pickImageFile(elData);
+    });
+  }
+
+  if (pageAddBtn) {
+    pageAddBtn.addEventListener("click", function () {
+      addFormPage();
+    });
+  }
+  if (pageDelBtn) {
+    pageDelBtn.addEventListener("click", function () {
+      deleteCurrentFormPage();
+    });
+  }
+
+  root.addEventListener("paste", function (e) {
+    if (!canEdit || !currentForm() || editorEl.hidden) return;
+    var file = getClipboardImageFile(e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData));
+    if (!file) return;
+    e.preventDefault();
+    insertImageFromFile(file, true);
+  });
 
   if (nameInput) nameInput.addEventListener("input", function () {
     var form = currentForm();

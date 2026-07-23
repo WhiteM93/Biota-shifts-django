@@ -46,6 +46,7 @@ urlpatterns = [
     path("calculator/", views.calculator_view, name="calculator"),
     path("forms/", forms_views.forms_view, name="forms"),
     path("forms/api/", forms_views.forms_api_list, name="forms_api_list"),
+    path("forms/api/upload/", forms_views.forms_api_upload, name="forms_api_upload"),
     path("forms/api/<int:pk>/", forms_views.forms_api_detail, name="forms_api_detail"),
     path("products/", product_views.products_list_view, name="products_list"),
     path("products/<int:pk>/delete/", product_views.product_delete_view, name="product_delete"),
