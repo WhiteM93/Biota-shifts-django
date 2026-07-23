@@ -10,6 +10,7 @@ from django.core.management.base import BaseCommand
 from shifts.insert_constants import build_insert_display_name, normalize_insert_machining_apps
 from shifts.models import (
     CenterDrillSpec,
+    ColletSpec,
     CountersinkSpec,
     DrillSpec,
     EndMillSpec,
@@ -19,11 +20,13 @@ from shifts.models import (
     normalize_work_material_codes,
 )
 
-CATEGORIES = ("end_mill", "tap", "center_drill", "countersink", "drill", "insert")
+CATEGORIES = ("end_mill", "tap", "center_drill", "countersink", "drill", "insert", "collet")
 END_MILL_TYPES_CYCLE = ("end", "roughing", "ball", "radius", "t_slot")
-COATINGS = ("none", "yellow", "black", "brown", "multicolor")
-MATERIALS = ("hss", "hss_co", "carbide")
+COATINGS = ("none", "yellow", "black", "brown", "multicolor", "blue")
+MATERIALS = ("hss", "hss_co", "carbide", "hrc55", "hrc65")
 WORK_MATS = ("P", "M", "K", "N", "P,M", "M,K", "P,K,N", "S", "H", "PW")
+ER_SIZES = ("ER08", "ER11", "ER16", "ER20", "ER25", "ER32", "ER40")
+CLAMP_RANGES = ("1-2", "2-3", "3-4", "4-5", "5-6", "6-7", "7-8", "8-10")
 
 
 class Command(BaseCommand):
@@ -186,6 +189,29 @@ class Command(BaseCommand):
             iso_name = build_insert_display_name(spec.iso_designation, spec.milling_family, spec.chipbreaker_grade)
             tool.name = f"{prefix} {iso_name}".strip()
             tool.save(update_fields=["name"])
+            created += 1
+
+            er = ER_SIZES[(i - 1) % len(ER_SIZES)]
+            clamp = CLAMP_RANGES[(i - 1) % len(CLAMP_RANGES)]
+            n = f"{prefix} цанга {er} {clamp} #{i:02d}"
+            tool = ToolItem.objects.create(
+                category="collet",
+                name=n,
+                tool_material="",
+                coating_type="none",
+                work_material="",
+                main_diameter_mm=None,
+                quantity=qty,
+                notes="Автотест склада",
+            )
+            ColletSpec.objects.create(
+                tool=tool,
+                collet_type="er",
+                er_size=er,
+                clamp_range=clamp,
+                high_precision_aa=(i % 4 == 0),
+                size_label=f"{er} Ø{clamp}",
+            )
             created += 1
 
         self.stdout.write(

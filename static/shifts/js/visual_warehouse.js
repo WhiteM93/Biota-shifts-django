@@ -9,6 +9,7 @@
   var apiContTpl = root.getAttribute("data-api-container-tpl") || "";
   var apiItemUpsert = root.getAttribute("data-api-item-upsert") || "";
   var apiItemDelTpl = root.getAttribute("data-api-item-del-tpl") || "";
+  var apiAuditsTpl = root.getAttribute("data-api-audits-tpl") || "";
 
   var floorEl = root.querySelector(".js-vw-floor");
   var emptyEl = root.querySelector(".js-vw-empty");
@@ -29,13 +30,28 @@
   var contForm = document.querySelector(".js-vw-cont-form");
   var itemForm = document.querySelector(".js-vw-item-form");
   var itemsEl = document.querySelector(".js-vw-items");
+  var stockToolsEl = document.querySelector(".js-vw-stock-tools");
+  var rulesBlock = document.querySelector(".js-vw-rules-block");
+  var auditsEl = document.querySelector(".js-vw-audits");
+  var viewPane = document.querySelector(".js-vw-view-pane");
+  var auditPane = document.querySelector(".js-vw-audit-pane");
+  var auditLinesEl = document.querySelector(".js-vw-audit-lines");
+  var auditNotesEl = document.querySelector(".js-vw-audit-notes");
+  var auditMsgEl = document.querySelector(".js-vw-audit-msg");
+  var btnStartAudit = document.querySelector(".js-vw-start-audit");
+  var btnCancelAudit = document.querySelector(".js-vw-cancel-audit");
+  var btnSaveAudit = document.querySelector(".js-vw-save-audit");
   var btnDelCab = document.querySelector(".js-vw-del-cabinet");
   var btnDelCont = document.querySelector(".js-vw-del-container");
+  var btnOpenContents = document.querySelector(".js-vw-open-contents");
 
   var cabinets = [];
   var editMode = false;
   var openContainerId = null;
+  var openContainerData = null;
   var editingCabinetId = null;
+  var auditMode = false;
+  var savingAudit = false;
 
   var CAT_LABELS = {
     end_mill: "Фрезы",
@@ -112,6 +128,7 @@
     if (!dlg) return;
     dlg.hidden = true;
     dlg.setAttribute("hidden", "");
+    if (dlg === dlgContents) setAuditMode(false);
     if (!document.querySelector(".vw-modal:not([hidden])")) {
       document.body.classList.remove("vw-modal-open");
     }
@@ -131,9 +148,11 @@
     }
     if (modeHint) {
       modeHint.textContent = editMode
-        ? "Правка: «+» на полке — новый ящик. Клик по ящику — изменить. Готово — снова только просмотр."
-        : "Как в цехе: откройте шкаф глазами — нажмите на ящик, чтобы увидеть что внутри";
+        ? "Правка: «+» на полке — новый ящик. Клик по ящику — изменить ячейку. «Готово» — снова только просмотр содержимого."
+        : "Нажмите на ящик, чтобы увидеть список инструментов";
     }
+    if (itemForm) setVisible(itemForm, editMode && canEdit);
+    if (rulesBlock) setVisible(rulesBlock, editMode && canEdit);
     renderFloor();
   }
 
@@ -349,10 +368,17 @@
     text.className = "vw-bin-text";
     text.textContent = cont.label || "Ящик";
     btn.appendChild(text);
+    var auditDate = cont.last_audited_at || "";
+    var stamp = document.createElement("span");
+    stamp.className = "vw-bin-audit" + (auditDate ? "" : " is-empty");
+    stamp.textContent = auditDate ? ("инв. " + auditDate.split(" ")[0]) : "не проверялся";
+    btn.appendChild(stamp);
     btn.title = editMode
-      ? ((cont.label || "Ящик") + " — изменить")
-      : ((cont.label || "Ящик") + " — открыть");
-    btn.addEventListener("click", function () {
+      ? ((cont.label || "Ящик") + " — изменить ячейку")
+      : ((cont.label || "Ящик") + " — список инструментов" + (auditDate ? ("; инв. " + auditDate) : ""));
+    btn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
       if (editMode) openContainerForm(cab, cont);
       else openContents(cont.id);
     });
@@ -409,6 +435,7 @@
     contForm.querySelector(".js-vw-cont-shelf").removeAttribute("max");
     contForm.querySelector(".js-vw-cont-column").removeAttribute("max");
     setVisible(btnDelCont, !!cont);
+    setVisible(btnOpenContents, !!cont);
     syncPaletteActive();
     openDialog(dlgCont);
   }
@@ -587,6 +614,15 @@
     });
   }
 
+  if (btnOpenContents) {
+    btnOpenContents.addEventListener("click", function () {
+      var id = contForm.querySelector(".js-vw-cont-id").value;
+      if (!id) return;
+      closeDialog(dlgCont);
+      openContents(id);
+    });
+  }
+
   function saveItem() {
     if (!openContainerId || !itemForm) return;
     var title = (itemForm.querySelector(".js-vw-item-title").value || "").trim();
@@ -614,12 +650,332 @@
       .catch(function (e) { alert(e.message); });
   }
 
+  function appendToolStockMeta(metaEl, tool, extraParts) {
+    var parts = [];
+    if (tool.category_label) parts.push(tool.category_label);
+    if (tool.diameter_mm != null) parts.push("Ø " + tool.diameter_mm);
+    if (tool.tool_material_label) parts.push(tool.tool_material_label);
+    if (Array.isArray(extraParts)) {
+      extraParts.forEach(function (p) {
+        if (p) parts.push(p);
+      });
+    }
+    if (tool.notes) parts.push(tool.notes);
+
+    var line = document.createElement("div");
+    line.textContent = parts.join(" · ") || "—";
+    metaEl.appendChild(line);
+
+    var badges = document.createElement("div");
+    badges.className = "vw-tool-badges";
+
+    var coating = tool.coating_type || "none";
+    var coatWrap = document.createElement("span");
+    coatWrap.className = "vw-coating-cell";
+    coatWrap.title = tool.coating_title || tool.coating_label || "";
+    var coatDot = document.createElement("span");
+    coatDot.className = "vw-coating-dot swatch-" + coating;
+    coatWrap.appendChild(coatDot);
+    if (coating === "none") {
+      var coatLab = document.createElement("span");
+      coatLab.className = "vw-coating-label";
+      coatLab.textContent = "без покрытия";
+      coatWrap.appendChild(coatLab);
+    }
+    badges.appendChild(coatWrap);
+
+    var codes = tool.work_material_codes || [];
+    if (codes.length) {
+      var wmWrap = document.createElement("span");
+      wmWrap.className = "vw-wm-squares";
+      codes.forEach(function (code) {
+        var sq = document.createElement("span");
+        sq.className = "vw-wm-square wm-" + String(code || "").toLowerCase();
+        sq.textContent = code;
+        sq.title = tool.work_material_label || code;
+        wmWrap.appendChild(sq);
+      });
+      badges.appendChild(wmWrap);
+    } else if (tool.work_material_label) {
+      var wmTxt = document.createElement("span");
+      wmTxt.className = "vw-wm-text";
+      wmTxt.textContent = tool.work_material_label;
+      badges.appendChild(wmTxt);
+    }
+
+    metaEl.appendChild(badges);
+  }
+
+  function renderStockTools(container) {
+    if (!stockToolsEl) return;
+    stockToolsEl.innerHTML = "";
+    var tools = container.stock_tools || [];
+    if (!tools.length) {
+      stockToolsEl.innerHTML =
+        "<li class='vw-item'><span class='vw-item-meta'>На складе нет подходящих инструментов. " +
+        (editMode
+          ? "Добавьте правило содержимого ниже (категория и Ø)."
+          : "В режиме «Редактировать» можно настроить содержимое ящика.") +
+        "</span></li>";
+      return;
+    }
+    tools.forEach(function (tool) {
+      var li = document.createElement("li");
+      li.className = "vw-item";
+      var top = document.createElement("div");
+      top.className = "vw-item-top";
+      var left = document.createElement("div");
+      var title = document.createElement("div");
+      title.className = "vw-item-title";
+      title.textContent = tool.name || "Инструмент";
+      left.appendChild(title);
+      var meta = document.createElement("div");
+      meta.className = "vw-item-meta";
+      appendToolStockMeta(meta, tool, ["кол-во: " + (tool.quantity != null ? tool.quantity : 0)]);
+      left.appendChild(meta);
+      top.appendChild(left);
+      var qty = document.createElement("span");
+      qty.className = "vw-item-qty";
+      qty.textContent = String(tool.quantity != null ? tool.quantity : 0);
+      qty.title = "Количество на складе";
+      top.appendChild(qty);
+      li.appendChild(top);
+      stockToolsEl.appendChild(li);
+    });
+  }
+
+  function renderAudits(audits) {
+    if (!auditsEl) return;
+    auditsEl.innerHTML = "";
+    if (!audits || !audits.length) {
+      auditsEl.innerHTML = "<p class='vw-item-meta'>Проверок ещё не было.</p>";
+      return;
+    }
+    audits.forEach(function (a) {
+      var card = document.createElement("article");
+      card.className = "vw-audit-card";
+      var head = document.createElement("div");
+      head.className = "vw-audit-card-head";
+      head.textContent =
+        (a.audited_at || "") +
+        " · " +
+        (a.audited_by || "—") +
+        (a.changes_count
+          ? (" · изменено " + a.changes_count)
+          : " · без расхождений");
+      card.appendChild(head);
+      if (a.notes) {
+        var note = document.createElement("p");
+        note.className = "vw-item-meta";
+        note.textContent = a.notes;
+        card.appendChild(note);
+      }
+      var changed = (a.lines || []).filter(function (ln) {
+        return ln.status === "adjusted" || ln.delta;
+      });
+      if (changed.length) {
+        var ul = document.createElement("ul");
+        ul.className = "vw-audit-changes";
+        changed.forEach(function (ln) {
+          var li = document.createElement("li");
+          var sign = ln.delta > 0 ? "+" : "";
+          li.textContent =
+            (ln.tool_name || ("#" + ln.tool_id)) +
+            ": " +
+            ln.expected_qty +
+            "→" +
+            ln.counted_qty +
+            " (" +
+            sign +
+            ln.delta +
+            ")" +
+            (ln.note ? " — " + ln.note : "");
+          ul.appendChild(li);
+        });
+        card.appendChild(ul);
+      }
+      auditsEl.appendChild(card);
+    });
+  }
+
+  function loadAudits(containerId) {
+    if (!apiAuditsTpl) return Promise.resolve([]);
+    return fetchJson(detailUrl(apiAuditsTpl, containerId)).then(function (data) {
+      renderAudits(data.audits || []);
+      return data.audits || [];
+    }).catch(function () {
+      renderAudits([]);
+      return [];
+    });
+  }
+
+  function setAuditMode(on) {
+    auditMode = !!on && canEdit;
+    setVisible(viewPane, !auditMode);
+    setVisible(auditPane, auditMode);
+    if (btnStartAudit) setVisible(btnStartAudit, !auditMode && canEdit);
+    if (!auditMode && auditMsgEl) auditMsgEl.textContent = "";
+  }
+
+  function startAuditMode() {
+    if (!canEdit || !openContainerData) return;
+    var tools = openContainerData.stock_tools || [];
+    if (!tools.length) {
+      alert("В ящике нет позиций для проверки.");
+      return;
+    }
+    if (!auditLinesEl) return;
+    auditLinesEl.innerHTML = "";
+    if (auditNotesEl) auditNotesEl.value = "";
+    if (auditMsgEl) auditMsgEl.textContent = "";
+    tools.forEach(function (tool) {
+      var row = document.createElement("div");
+      row.className = "vw-audit-row";
+      row.dataset.toolId = String(tool.id);
+      row.dataset.expected = String(tool.quantity != null ? tool.quantity : 0);
+
+      var name = document.createElement("div");
+      name.className = "vw-audit-row-name";
+      var nameTitle = document.createElement("div");
+      nameTitle.textContent = tool.name || ("#" + tool.id);
+      name.appendChild(nameTitle);
+      var meta = document.createElement("div");
+      meta.className = "vw-item-meta";
+      appendToolStockMeta(meta, tool, [
+        "ожидается: " + (tool.quantity != null ? tool.quantity : 0),
+      ]);
+      name.appendChild(meta);
+      row.appendChild(name);
+
+      var countedLabel = document.createElement("label");
+      countedLabel.className = "vw-audit-field";
+      countedLabel.innerHTML = "<span>Факт</span>";
+      var countedInp = document.createElement("input");
+      countedInp.type = "number";
+      countedInp.min = "0";
+      countedInp.step = "1";
+      countedInp.className = "vw-control js-vw-audit-counted";
+      countedInp.value = String(tool.quantity != null ? tool.quantity : 0);
+      countedLabel.appendChild(countedInp);
+      row.appendChild(countedLabel);
+
+      var noteLabel = document.createElement("label");
+      noteLabel.className = "vw-audit-field vw-audit-field--note";
+      noteLabel.innerHTML = "<span>Примечание</span>";
+      var noteInp = document.createElement("input");
+      noteInp.type = "text";
+      noteInp.maxLength = 300;
+      noteInp.className = "vw-control js-vw-audit-note";
+      noteInp.placeholder = "Если расхождение — почему";
+      noteLabel.appendChild(noteInp);
+      row.appendChild(noteLabel);
+
+      auditLinesEl.appendChild(row);
+    });
+    setAuditMode(true);
+  }
+
+  function cancelAuditMode() {
+    setAuditMode(false);
+  }
+
+  function saveAudit() {
+    if (!openContainerId || savingAudit || !auditLinesEl) return;
+    var rows = auditLinesEl.querySelectorAll(".vw-audit-row");
+    if (!rows.length) {
+      alert("Нет позиций для проверки.");
+      return;
+    }
+    var lines = [];
+    rows.forEach(function (row) {
+      var toolId = parseInt(row.dataset.toolId, 10);
+      var countedInp = row.querySelector(".js-vw-audit-counted");
+      var noteInp = row.querySelector(".js-vw-audit-note");
+      var counted = parseInt(countedInp && countedInp.value, 10);
+      if (isNaN(counted) || counted < 0) counted = 0;
+      lines.push({
+        tool_id: toolId,
+        counted_qty: counted,
+        note: noteInp ? noteInp.value : "",
+      });
+    });
+    savingAudit = true;
+    if (btnSaveAudit) {
+      btnSaveAudit.disabled = true;
+      btnSaveAudit.textContent = "Сохранение…";
+    }
+    if (auditMsgEl) {
+      auditMsgEl.textContent = "";
+      auditMsgEl.classList.remove("is-error");
+    }
+    fetchJson(detailUrl(apiAuditsTpl, openContainerId), {
+      method: "POST",
+      body: {
+        notes: auditNotesEl ? auditNotesEl.value : "",
+        lines: lines,
+      },
+    })
+      .then(function (data) {
+        var changes = (data.audit && data.audit.changes_count) || 0;
+        if (auditMsgEl) {
+          auditMsgEl.textContent = changes
+            ? ("Проверка сохранена: изменено " + changes)
+            : "Проверка сохранена: без расхождений";
+        }
+        if (data.container) {
+          openContainerData = data.container;
+          applyContentsView(data.container);
+        }
+        setAuditMode(false);
+        return loadAudits(openContainerId).then(function () {
+          return loadCabinets();
+        });
+      })
+      .catch(function (e) {
+        if (auditMsgEl) {
+          auditMsgEl.textContent = e.message || "Ошибка";
+          auditMsgEl.classList.add("is-error");
+        } else {
+          alert(e.message);
+        }
+      })
+      .then(function () {
+        savingAudit = false;
+        if (btnSaveAudit) {
+          btnSaveAudit.disabled = false;
+          btnSaveAudit.textContent = "Сохранить проверку";
+        }
+      });
+  }
+
+  function applyContentsView(cont) {
+    var titleEl = document.querySelector(".js-vw-contents-title");
+    var metaEl = document.querySelector(".js-vw-contents-meta");
+    if (titleEl) titleEl.textContent = cont.label;
+    if (metaEl) {
+      var n = (cont.stock_tools || []).length;
+      var parts = [
+        "Полка " + cont.shelf + ", место " + cont.column,
+        "позиций: " + n,
+      ];
+      if (cont.notes) parts.splice(1, 0, cont.notes);
+      if (cont.last_audited_at) {
+        parts.push("инв. " + cont.last_audited_at + (cont.last_audited_by ? (" · " + cont.last_audited_by) : ""));
+      } else {
+        parts.push("инвентаризация не проводилась");
+      }
+      metaEl.textContent = parts.join(" · ");
+    }
+    renderStockTools(cont);
+    renderItems(cont);
+  }
+
   function renderItems(container) {
     if (!itemsEl) return;
     itemsEl.innerHTML = "";
     var items = container.items || [];
     if (!items.length) {
-      itemsEl.innerHTML = "<li class='vw-item'><span class='vw-item-meta'>Пусто</span></li>";
+      itemsEl.innerHTML = "<li class='vw-item'><span class='vw-item-meta'>Правил пока нет — список выше строится по подписи ящика.</span></li>";
       return;
     }
     items.forEach(function (it) {
@@ -644,7 +1000,7 @@
       meta.textContent = parts.join(" · ") || "—";
       left.appendChild(meta);
       top.appendChild(left);
-      if (canEdit) {
+      if (canEdit && editMode) {
         var del = document.createElement("button");
         del.type = "button";
         del.className = "vw-item-del";
@@ -665,18 +1021,32 @@
 
   function openContents(containerId) {
     openContainerId = containerId;
+    setAuditMode(false);
+    if (itemForm) setVisible(itemForm, editMode && canEdit);
+    if (rulesBlock) setVisible(rulesBlock, editMode && canEdit);
     return fetchJson(detailUrl(apiContTpl, containerId)).then(function (data) {
       var cont = data.container;
-      var titleEl = document.querySelector(".js-vw-contents-title");
-      var metaEl = document.querySelector(".js-vw-contents-meta");
-      if (titleEl) titleEl.textContent = cont.label;
-      if (metaEl) {
-        metaEl.textContent = "Полка " + cont.shelf + ", место " + cont.column +
-          (cont.notes ? " · " + cont.notes : "");
-      }
-      renderItems(cont);
+      openContainerData = cont;
+      applyContentsView(cont);
       openDialog(dlgContents);
+      return loadAudits(containerId);
     }).catch(function (e) { alert(e.message); });
+  }
+
+  if (btnStartAudit) {
+    btnStartAudit.addEventListener("click", function () {
+      startAuditMode();
+    });
+  }
+  if (btnCancelAudit) {
+    btnCancelAudit.addEventListener("click", function () {
+      cancelAuditMode();
+    });
+  }
+  if (btnSaveAudit) {
+    btnSaveAudit.addEventListener("click", function () {
+      saveAudit();
+    });
   }
 
   setEditMode(false);

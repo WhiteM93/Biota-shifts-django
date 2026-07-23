@@ -14,6 +14,7 @@
   data-api-container-tpl="{% url 'visual_warehouse_api_container_detail' 0 %}"
   data-api-item-upsert="{% url 'visual_warehouse_api_item_upsert' %}"
   data-api-item-del-tpl="{% url 'visual_warehouse_api_item_delete' 0 %}"
+  data-api-audits-tpl="{% url 'visual_warehouse_api_container_audits' 0 %}"
   data-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}"
 >
   <header class="vw-topbar">
@@ -126,6 +127,7 @@
       <p class="vw-hint-inline">Ярус 1 на полке. Ярус 2 — поверх другого ящика в том же месте.</p>
       <div class="vw-dialog-actions">
         <button type="button" class="vw-btn-danger js-vw-del-container vw-is-hidden" hidden>Удалить</button>
+        <button type="button" class="vw-btn-secondary js-vw-open-contents vw-is-hidden" hidden>Содержимое</button>
         <span class="vw-dialog-spacer"></span>
         <button type="button" class="vw-btn-secondary js-vw-dlg-cancel">Отмена</button>
         <button type="button" class="vw-btn-primary js-vw-cont-save">Сохранить</button>
@@ -143,41 +145,75 @@
           <h2 id="vw-dlg-contents-title" class="vw-dialog-title js-vw-contents-title">Ящик</h2>
           <p class="vw-contents-meta js-vw-contents-meta"></p>
         </div>
-        <button type="button" class="vw-btn-secondary js-vw-dlg-cancel">Закрыть</button>
-      </div>
-      <ul class="vw-items js-vw-items" role="list"></ul>
-      {% if biota_can_edit %}
-      <div class="vw-item-form js-vw-item-form">
-        <h3 class="vw-props-heading">Добавить содержимое</h3>
-        <label class="vw-row">
-          <span class="vw-row-label">Что лежит</span>
-          <input type="text" class="vw-control js-vw-item-title" maxlength="200" autocomplete="off" placeholder="Фреза Ø0.8">
-        </label>
-        <label class="vw-row">
-          <span class="vw-row-label">Категория склада</span>
-          <select class="vw-control js-vw-item-category">
-            <option value="">— не привязывать —</option>
-            {% for cat in tool_categories %}
-            <option value="{{ cat.value }}">{{ cat.label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <div class="vw-row-pair">
-          <label class="vw-row">
-            <span class="vw-row-label">Ø от, мм</span>
-            <input type="number" class="vw-control js-vw-item-dfrom" min="0" step="0.01">
-          </label>
-          <label class="vw-row">
-            <span class="vw-row-label">Ø до, мм</span>
-            <input type="number" class="vw-control js-vw-item-dto" min="0" step="0.01">
-          </label>
+        <div class="vw-contents-head-actions">
+          {% if biota_can_edit %}
+          <button type="button" class="vw-btn-primary js-vw-start-audit">Инвентаризация</button>
+          {% endif %}
+          <button type="button" class="vw-btn-secondary js-vw-dlg-cancel">Закрыть</button>
         </div>
+      </div>
+
+      <div class="js-vw-view-pane">
+        <h3 class="vw-props-heading js-vw-tools-heading">Инструменты на складе</h3>
+        <ul class="vw-items js-vw-stock-tools" role="list"></ul>
+        <div class="vw-audits-block">
+          <h3 class="vw-props-heading">История проверок</h3>
+          <div class="vw-audits js-vw-audits"></div>
+        </div>
+        <div class="vw-rules-block js-vw-rules-block" hidden>
+          <h3 class="vw-props-heading">Правила содержимого</h3>
+          <ul class="vw-items js-vw-items" role="list"></ul>
+        </div>
+        {% if biota_can_edit %}
+        <div class="vw-item-form js-vw-item-form" hidden>
+          <h3 class="vw-props-heading">Добавить содержимое</h3>
+          <label class="vw-row">
+            <span class="vw-row-label">Что лежит</span>
+            <input type="text" class="vw-control js-vw-item-title" maxlength="200" autocomplete="off" placeholder="Фреза Ø0.8">
+          </label>
+          <label class="vw-row">
+            <span class="vw-row-label">Категория склада</span>
+            <select class="vw-control js-vw-item-category">
+              <option value="">— не привязывать —</option>
+              {% for cat in tool_categories %}
+              <option value="{{ cat.value }}">{{ cat.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="vw-row-pair">
+            <label class="vw-row">
+              <span class="vw-row-label">Ø от, мм</span>
+              <input type="number" class="vw-control js-vw-item-dfrom" min="0" step="0.01">
+            </label>
+            <label class="vw-row">
+              <span class="vw-row-label">Ø до, мм</span>
+              <input type="number" class="vw-control js-vw-item-dto" min="0" step="0.01">
+            </label>
+          </div>
+          <label class="vw-row">
+            <span class="vw-row-label">Кол-во (заметка)</span>
+            <input type="text" class="vw-control js-vw-item-qty" maxlength="80" autocomplete="off">
+          </label>
+          <div class="vw-dialog-actions">
+            <button type="button" class="vw-btn-primary js-vw-item-save">Добавить</button>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if biota_can_edit %}
+      <div class="js-vw-audit-pane" hidden>
+        <h3 class="vw-props-heading">Проверка позиций</h3>
+        <p class="vw-hint-inline">Пройдите по каждой позиции: оставьте кол-во или исправьте и укажите примечание.</p>
+        <div class="vw-audit-lines js-vw-audit-lines"></div>
         <label class="vw-row">
-          <span class="vw-row-label">Кол-во (заметка)</span>
-          <input type="text" class="vw-control js-vw-item-qty" maxlength="80" autocomplete="off">
+          <span class="vw-row-label">Примечание к проверке</span>
+          <input type="text" class="vw-control js-vw-audit-notes" maxlength="500" autocomplete="off" placeholder="Необязательно">
         </label>
+        <p class="vw-form-msg js-vw-audit-msg" aria-live="polite"></p>
         <div class="vw-dialog-actions">
-          <button type="button" class="vw-btn-primary js-vw-item-save">Добавить</button>
+          <button type="button" class="vw-btn-secondary js-vw-cancel-audit">Отмена</button>
+          <button type="button" class="vw-btn-primary js-vw-save-audit">Сохранить проверку</button>
         </div>
       </div>
       {% endif %}

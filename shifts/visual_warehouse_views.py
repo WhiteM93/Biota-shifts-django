@@ -5,20 +5,40 @@ import json
 import re
 from decimal import Decimal, InvalidOperation
 
+from django.db import transaction
 from django.db.models import Count, Prefetch, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
-from .models import ToolItem, VisualCabinet, VisualContainer, VisualContainerItem
+from .models import (
+    COATING_TYPE_TOOLTIPS,
+    InventoryStockEvent,
+    StockMovement,
+    ToolItem,
+    VisualCabinet,
+    VisualContainer,
+    VisualContainerAudit,
+    VisualContainerAuditLine,
+    VisualContainerItem,
+)
 
 MAX_CABINETS = 40
 MAX_SHELVES = 20
 MAX_COLUMNS = 12
 MAX_ITEMS_PER_CONTAINER = 80
+MAX_AUDIT_LINES = 120
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _VALID_CATEGORIES = {c for c, _ in VisualContainerItem.TOOL_CATEGORY_CHOICES if c}
+
+
+def _fmt_dt(dt) -> str:
+    if not dt:
+        return ""
+    local = timezone.localtime(dt) if timezone.is_aware(dt) else dt
+    return local.strftime("%d.%m.%Y %H:%M")
 
 
 def _json_body(request):
@@ -84,6 +104,133 @@ def _stock_qty_for_item(item: VisualContainerItem) -> int | None:
     return int(total or 0)
 
 
+def _infer_filter_from_label(label: str) -> dict | None:
+    """Грубая подсказка фильтра по подписи ящика: «Фрезы концевые 0-1»."""
+    text = (label or "").strip().lower().replace("–", "-").replace("—", "-")
+    if not text:
+        return None
+    category = ""
+    if "фрез" in text:
+        category = "end_mill"
+    elif "сверл" in text:
+        category = "drill"
+    elif "центров" in text:
+        category = "center_drill"
+    elif "зенкер" in text:
+        category = "countersink"
+    elif "резьб" in text or "метчик" in text or " плаш" in text:
+        category = "tap"
+    elif "пластин" in text:
+        category = "insert"
+    elif "цанг" in text:
+        category = "collet"
+    if not category:
+        return None
+    d_from = d_to = None
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*[-/]\s*(\d+(?:[.,]\d+)?)", text)
+    if m:
+        try:
+            d_from = Decimal(m.group(1).replace(",", "."))
+            d_to = Decimal(m.group(2).replace(",", "."))
+        except (InvalidOperation, TypeError, ValueError):
+            d_from = d_to = None
+    else:
+        m1 = re.search(r"[øØ⌀]\s*(\d+(?:[.,]\d+)?)", text)
+        if m1:
+            try:
+                d_from = d_to = Decimal(m1.group(1).replace(",", "."))
+            except (InvalidOperation, TypeError, ValueError):
+                d_from = d_to = None
+    return {
+        "tool_category": category,
+        "diameter_from_mm": d_from,
+        "diameter_to_mm": d_to,
+    }
+
+
+def _serialize_tool(tool: ToolItem) -> dict:
+    diam = float(tool.main_diameter_mm) if tool.main_diameter_mm is not None else None
+    coating = (tool.coating_type or "none").strip() or "none"
+    coating_label = "без покрытия" if coating == "none" else str(tool.get_coating_type_display())
+    wm_codes = tool.work_material_codes_list()
+    return {
+        "id": tool.id,
+        "name": tool.name,
+        "category": tool.category or "",
+        "category_label": tool.get_category_display() if tool.category else "",
+        "diameter_mm": diam,
+        "quantity": int(tool.quantity or 0),
+        "notes": tool.notes or "",
+        "tool_material": (tool.tool_material or "").strip(),
+        "tool_material_label": tool.get_tool_material_display() or "",
+        "coating_type": coating,
+        "coating_label": coating_label,
+        "coating_title": COATING_TYPE_TOOLTIPS.get(coating, coating_label),
+        "work_material_codes": wm_codes,
+        "work_material_label": tool.get_work_materials_display() or "",
+    }
+
+
+def _tool_qs_for_filter(
+    *,
+    tool_item_id: int | None = None,
+    category: str = "",
+    d_from=None,
+    d_to=None,
+):
+    if tool_item_id:
+        return ToolItem.objects.filter(pk=tool_item_id, is_deleted=False)
+    if not category:
+        return ToolItem.objects.none()
+    qs = ToolItem.objects.filter(is_deleted=False, category=category)
+    if d_from is not None:
+        qs = qs.filter(main_diameter_mm__gte=d_from)
+    if d_to is not None:
+        qs = qs.filter(main_diameter_mm__lte=d_to)
+    return qs
+
+
+def _matching_tools_for_container(c: VisualContainer, items: list[VisualContainerItem] | None = None) -> list[dict]:
+    """Список реальных позиций склада, попадающих под содержимое ящика."""
+    seen: set[int] = set()
+    out: list[dict] = []
+    rows = items if items is not None else list(c.items.select_related("tool_item").all())
+
+    def _add_from_qs(qs):
+        for tool in qs.order_by("category", "main_diameter_mm", "name")[:120]:
+            if tool.pk in seen:
+                continue
+            seen.add(tool.pk)
+            out.append(_serialize_tool(tool))
+
+    has_rule = False
+    for item in rows:
+        if item.tool_item_id:
+            has_rule = True
+            _add_from_qs(_tool_qs_for_filter(tool_item_id=item.tool_item_id))
+        elif item.tool_category:
+            has_rule = True
+            _add_from_qs(
+                _tool_qs_for_filter(
+                    category=item.tool_category,
+                    d_from=item.diameter_from_mm,
+                    d_to=item.diameter_to_mm,
+                )
+            )
+
+    if not has_rule:
+        inferred = _infer_filter_from_label(c.label or "")
+        if inferred:
+            _add_from_qs(
+                _tool_qs_for_filter(
+                    category=inferred["tool_category"],
+                    d_from=inferred["diameter_from_mm"],
+                    d_to=inferred["diameter_to_mm"],
+                )
+            )
+    return out
+
+
 def _serialize_container(c: VisualContainer, *, with_items: bool = False) -> dict:
     color = (c.color or "").strip()
     if not _HEX_RE.match(color):
@@ -100,12 +247,50 @@ def _serialize_container(c: VisualContainer, *, with_items: bool = False) -> dic
         "color": color,
         "notes": c.notes or "",
         "items_count": getattr(c, "items_count", None),
+        "last_audited_at": _fmt_dt(getattr(c, "last_audited_at", None)),
+        "last_audited_by": (getattr(c, "last_audited_by", None) or ""),
+        "last_audited_at_iso": (
+            timezone.localtime(c.last_audited_at).isoformat()
+            if getattr(c, "last_audited_at", None)
+            else ""
+        ),
     }
     if data["items_count"] is None:
         data["items_count"] = c.items.count()
     if with_items:
         items = list(c.items.select_related("tool_item").all())
         data["items"] = [_serialize_item(it, _stock_qty_for_item(it)) for it in items]
+        data["stock_tools"] = _matching_tools_for_container(c, items)
+    return data
+
+
+def _serialize_audit_line(line: VisualContainerAuditLine) -> dict:
+    tool = line.tool
+    return {
+        "id": line.id,
+        "tool_id": line.tool_id,
+        "tool_name": tool.name if tool else "",
+        "expected_qty": line.expected_qty,
+        "counted_qty": line.counted_qty,
+        "delta": line.delta,
+        "note": line.note or "",
+        "status": line.status,
+        "stock_movement_id": line.stock_movement_id,
+    }
+
+
+def _serialize_audit(audit: VisualContainerAudit, *, with_lines: bool = True) -> dict:
+    data = {
+        "id": audit.id,
+        "container_id": audit.container_id,
+        "audited_by": audit.audited_by or "",
+        "audited_at": _fmt_dt(audit.audited_at),
+        "notes": audit.notes or "",
+        "changes_count": int(audit.changes_count or 0),
+    }
+    if with_lines:
+        lines = list(audit.lines.select_related("tool").all())
+        data["lines"] = [_serialize_audit_line(ln) for ln in lines]
     return data
 
 
@@ -436,3 +621,187 @@ def visual_warehouse_api_item_delete(request, pk: int):
     item = get_object_or_404(VisualContainerItem, pk=pk)
     item.delete()
     return JsonResponse({"ok": True})
+
+
+@biota_login_required
+@nav_permission_required("visual_warehouse")
+@require_http_methods(["GET", "POST"])
+def visual_warehouse_api_container_audits(request, pk: int):
+    cont = get_object_or_404(
+        VisualContainer.objects.select_related("cabinet").prefetch_related(
+            Prefetch("items", queryset=VisualContainerItem.objects.select_related("tool_item"))
+        ),
+        pk=pk,
+    )
+    if request.method == "GET":
+        audits = (
+            VisualContainerAudit.objects.filter(container=cont)
+            .prefetch_related(Prefetch("lines", queryset=VisualContainerAuditLine.objects.select_related("tool")))
+            .order_by("-audited_at", "-id")[:20]
+        )
+        return JsonResponse({
+            "ok": True,
+            "container": _serialize_container(cont),
+            "audits": [_serialize_audit(a) for a in audits],
+        })
+    return _container_audit_create(request, cont)
+
+
+@write_permission_required
+def _container_audit_create(request, cont: VisualContainer):
+    body = _json_body(request)
+    if body is None:
+        return _err("Некорректный JSON")
+    raw_lines = body.get("lines")
+    if not isinstance(raw_lines, list) or not raw_lines:
+        return _err("Укажите строки инвентаризации")
+    if len(raw_lines) > MAX_AUDIT_LINES:
+        return _err(f"Слишком много строк (макс. {MAX_AUDIT_LINES})")
+
+    notes = str(body.get("notes") or "").strip()[:500]
+    who = _username(request) or "unknown"
+    label = (cont.label or "Ящик").strip()
+
+    parsed: list[tuple[int, int, str]] = []
+    seen: set[int] = set()
+    for row in raw_lines:
+        if not isinstance(row, dict):
+            return _err("Некорректная строка инвентаризации")
+        try:
+            tool_id = int(row.get("tool_id"))
+        except (TypeError, ValueError):
+            return _err("Некорректный инструмент в строке")
+        if tool_id <= 0 or tool_id in seen:
+            return _err("Дубликат или пустой инструмент в строках")
+        seen.add(tool_id)
+        counted = _clamp_int(row.get("counted_qty"), -1, 0, 999999)
+        if counted < 0:
+            return _err("Укажите фактическое количество")
+        note = str(row.get("note") or "").strip()[:300]
+        parsed.append((tool_id, counted, note))
+
+    allowed_ids = {t["id"] for t in _matching_tools_for_container(cont)}
+    if allowed_ids and not seen.issubset(allowed_ids):
+        return _err("В проверке есть инструмент, которого нет в этом ящике")
+
+    today = timezone.localdate()
+
+    try:
+        with transaction.atomic():
+            tools = {
+                t.pk: t
+                for t in ToolItem.objects.select_for_update().filter(pk__in=seen, is_deleted=False)
+            }
+            if len(tools) != len(seen):
+                raise ValueError("Один или несколько инструментов не найдены")
+
+            # Предпроверка остатков до записи
+            for tool_id, counted, _note in parsed:
+                tool = tools[tool_id]
+                expected = int(tool.quantity or 0)
+                delta = counted - expected
+                if delta < 0 and expected < abs(delta):
+                    raise ValueError(f"Недостаточно остатков у «{tool.name}»: доступно {expected}")
+
+            audit = VisualContainerAudit.objects.create(
+                container=cont,
+                audited_by=who[:120],
+                notes=notes,
+                changes_count=0,
+            )
+            changes = 0
+            line_rows: list[VisualContainerAuditLine] = []
+            change_summaries: list[str] = []
+
+            for tool_id, counted, note in parsed:
+                tool = tools[tool_id]
+                expected = int(tool.quantity or 0)
+                delta = counted - expected
+                movement = None
+                status = VisualContainerAuditLine.STATUS_OK
+                if delta != 0:
+                    status = VisualContainerAuditLine.STATUS_ADJUSTED
+                    changes += 1
+                    move_qty = abs(delta)
+                    move_type = "restock" if delta > 0 else "writeoff"
+                    reason = note or "расхождение"
+                    comment = f"Инвентаризация «{label}»: {reason}"[:300]
+                    if delta < 0:
+                        tool.quantity = expected - move_qty
+                    else:
+                        tool.quantity = expected + move_qty
+                    tool.save(update_fields=["quantity", "updated_at"])
+                    movement = StockMovement.objects.create(
+                        movement_type=move_type,
+                        tool=tool,
+                        quantity=move_qty,
+                        employee_name="",
+                        movement_date=today,
+                        comment=comment,
+                        created_by_account=who[:120],
+                    )
+                    sign = "+" if delta > 0 else ""
+                    change_summaries.append(f"{tool.name}: {expected}→{counted} ({sign}{delta})")
+
+                line_rows.append(
+                    VisualContainerAuditLine(
+                        audit=audit,
+                        tool=tool,
+                        expected_qty=expected,
+                        counted_qty=counted,
+                        delta=delta,
+                        note=note,
+                        stock_movement=movement,
+                        status=status,
+                    )
+                )
+
+            VisualContainerAuditLine.objects.bulk_create(line_rows)
+            audit.changes_count = changes
+            audit.save(update_fields=["changes_count"])
+
+            now = timezone.now()
+            cont.last_audited_at = now
+            cont.last_audited_by = who[:120]
+            cont.save(update_fields=["last_audited_at", "last_audited_by", "updated_at"])
+
+            summary = (
+                f"Инвентаризация ящика «{label}»: без расхождений"
+                if changes == 0
+                else f"Инвентаризация ящика «{label}»: изменено {changes}"
+            )
+            InventoryStockEvent.objects.create(
+                actor_username=who[:120],
+                event_type=InventoryStockEvent.EVENT_CONTAINER_AUDIT,
+                summary=summary[:500],
+                details={
+                    "container_id": cont.id,
+                    "cabinet_id": cont.cabinet_id,
+                    "label": label,
+                    "audit_id": audit.id,
+                    "changes_count": changes,
+                    "changes": change_summaries[:40],
+                    "notes": notes,
+                },
+            )
+
+            cont = (
+                VisualContainer.objects.annotate(items_count=Count("items"))
+                .prefetch_related(
+                    Prefetch("items", queryset=VisualContainerItem.objects.select_related("tool_item"))
+                )
+                .get(pk=cont.pk)
+            )
+            audit = (
+                VisualContainerAudit.objects.prefetch_related(
+                    Prefetch("lines", queryset=VisualContainerAuditLine.objects.select_related("tool"))
+                ).get(pk=audit.pk)
+            )
+    except ValueError as e:
+        return _err(str(e))
+
+    return JsonResponse({
+        "ok": True,
+        "audit": _serialize_audit(audit),
+        "container": _serialize_container(cont, with_items=True),
+    })

@@ -923,12 +923,14 @@ class InventoryStockEvent(models.Model):
     EVENT_TOOL_DELETE = "tool_delete"
     EVENT_ROLLBACK = "rollback"
     EVENT_PRIVILEGE = "privilege_stock"
+    EVENT_CONTAINER_AUDIT = "container_audit"
 
     EVENT_TYPES = [
         (EVENT_TOOL_EDIT, "Редактирование позиции"),
         (EVENT_TOOL_DELETE, "Удаление позиции"),
         (EVENT_ROLLBACK, "Откат движения"),
         (EVENT_PRIVILEGE, "Право на склад"),
+        (EVENT_CONTAINER_AUDIT, "Инвентаризация ящика"),
     ]
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Когда")
@@ -2526,6 +2528,8 @@ class VisualContainer(models.Model):
     label = models.CharField(max_length=120, verbose_name="Подпись")
     color = models.CharField(max_length=7, blank=True, default="#e74c3c", verbose_name="Цвет")
     notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
+    last_audited_at = models.DateTimeField(null=True, blank=True, verbose_name="Последняя инвентаризация")
+    last_audited_by = models.CharField(max_length=120, blank=True, default="", verbose_name="Кто проверял")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -2536,6 +2540,79 @@ class VisualContainer(models.Model):
 
     def __str__(self) -> str:
         return f"{self.label} ({self.cabinet_id}:п{self.shelf}/с{self.stack}/{self.column})"
+
+
+class VisualContainerAudit(models.Model):
+    """Проверка (инвентаризация) содержимого ящика."""
+
+    container = models.ForeignKey(
+        VisualContainer,
+        on_delete=models.CASCADE,
+        related_name="audits",
+        verbose_name="Контейнер",
+    )
+    audited_by = models.CharField(max_length=120, verbose_name="Кто проверял")
+    audited_at = models.DateTimeField(auto_now_add=True, verbose_name="Когда")
+    notes = models.CharField(max_length=500, blank=True, default="", verbose_name="Примечание к проверке")
+    changes_count = models.PositiveIntegerField(default=0, verbose_name="Изменений")
+
+    class Meta:
+        ordering = ("-audited_at", "-id")
+        verbose_name = "Инвентаризация ящика"
+        verbose_name_plural = "Инвентаризации ящиков"
+
+    def __str__(self) -> str:
+        return f"Инв. {self.container_id} @ {self.audited_at}"
+
+
+class VisualContainerAuditLine(models.Model):
+    """Строка инвентаризации: ожидаемое / факт / движение."""
+
+    STATUS_OK = "ok"
+    STATUS_ADJUSTED = "adjusted"
+    STATUS_CHOICES = (
+        (STATUS_OK, "Без изменений"),
+        (STATUS_ADJUSTED, "Скорректировано"),
+    )
+
+    audit = models.ForeignKey(
+        VisualContainerAudit,
+        on_delete=models.CASCADE,
+        related_name="lines",
+        verbose_name="Проверка",
+    )
+    tool = models.ForeignKey(
+        ToolItem,
+        on_delete=models.PROTECT,
+        related_name="visual_audit_lines",
+        verbose_name="Инструмент",
+    )
+    expected_qty = models.PositiveIntegerField(verbose_name="Ожидалось")
+    counted_qty = models.PositiveIntegerField(verbose_name="Факт")
+    delta = models.IntegerField(default=0, verbose_name="Разница")
+    note = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
+    stock_movement = models.ForeignKey(
+        StockMovement,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="visual_audit_lines",
+        verbose_name="Движение склада",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_OK,
+        verbose_name="Статус",
+    )
+
+    class Meta:
+        ordering = ("id",)
+        verbose_name = "Строка инвентаризации ящика"
+        verbose_name_plural = "Строки инвентаризации ящиков"
+
+    def __str__(self) -> str:
+        return f"{self.tool_id}: {self.expected_qty}→{self.counted_qty}"
 
 
 class VisualContainerItem(models.Model):
