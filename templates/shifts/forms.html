@@ -21,8 +21,14 @@
     <button type="button" class="forms-btn-print js-forms-print" disabled title="Печать">Печать</button>
   </header>
 
+  <nav class="forms-mobile-nav js-forms-mobile-nav" aria-label="Разделы конструктора">
+    <button type="button" class="forms-mobile-nav-btn is-active js-forms-mobile-pane" data-pane="list">Бланки</button>
+    <button type="button" class="forms-mobile-nav-btn js-forms-mobile-pane" data-pane="canvas">Лист</button>
+    <button type="button" class="forms-mobile-nav-btn js-forms-mobile-pane" data-pane="props">Настройки</button>
+  </nav>
+
   <div class="forms-layout">
-    <aside class="forms-panel forms-panel--list" aria-label="Список бланков">
+    <aside class="forms-panel forms-panel--list" data-forms-pane="list" aria-label="Список бланков">
       <div class="forms-panel-head">
         <span class="forms-panel-title">Бланки</span>
         <button type="button" class="forms-btn-icon js-forms-new" title="Новый бланк" aria-label="Новый бланк">+</button>
@@ -30,7 +36,7 @@
       <ul class="forms-list js-forms-list" role="list"></ul>
     </aside>
 
-    <main class="forms-panel forms-panel--canvas" aria-label="Превью листа">
+    <main class="forms-panel forms-panel--canvas" data-forms-pane="canvas" aria-label="Превью листа">
       <div class="forms-empty js-forms-empty">
         <p>Выберите бланк слева или создайте новый.</p>
       </div>
@@ -55,7 +61,7 @@
       </div>
     </main>
 
-    <aside class="forms-panel forms-panel--props js-forms-props forms-is-hidden" aria-label="Настройки" hidden>
+    <aside class="forms-panel forms-panel--props js-forms-props forms-is-hidden" data-forms-pane="props" aria-label="Настройки" hidden>
       <section class="forms-props-block">
         <h2 class="forms-props-heading">Лист</h2>
         <label class="forms-row">
@@ -147,6 +153,10 @@
             <button type="button" class="forms-align-btn js-forms-image-align" data-align="right" title="Справа">Справа</button>
           </div>
         </div>
+        <label class="forms-row">
+          <span class="forms-row-label">Подпись</span>
+          <textarea class="forms-control js-forms-image-caption" rows="2" maxlength="300" placeholder="Что изображено на картинке"></textarea>
+        </label>
         <button type="button" class="forms-add-btn js-forms-image-replace" style="width:100%;margin-top:4px">Заменить файл</button>
       </section>
 

@@ -2483,3 +2483,121 @@ class PrintForm(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class VisualCabinet(models.Model):
+    """Шкаф визуального склада: сетка полок × столбцов."""
+
+    name = models.CharField(max_length=120, verbose_name="Название")
+    shelves = models.PositiveSmallIntegerField(default=4, verbose_name="Число полок")
+    columns = models.PositiveSmallIntegerField(default=3, verbose_name="Число столбцов")
+    notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    created_by = models.CharField(max_length=150, blank=True, default="", verbose_name="Автор")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("sort_order", "name", "id")
+        verbose_name = "Визуальный шкаф"
+        verbose_name_plural = "Визуальные шкафы"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class VisualContainer(models.Model):
+    """Контейнер в шкафу: полка → слой (друг на друга) → позиция слева направо."""
+
+    cabinet = models.ForeignKey(
+        VisualCabinet,
+        on_delete=models.CASCADE,
+        related_name="containers",
+        verbose_name="Шкаф",
+    )
+    shelf = models.PositiveSmallIntegerField(verbose_name="Полка (сверху = 1)")
+    stack = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Слой на полке (1 = верхний)",
+    )
+    column = models.PositiveSmallIntegerField(verbose_name="Позиция слева (1…)")
+    col_span = models.PositiveSmallIntegerField(default=1, verbose_name="Ширина (ячеек)")
+    row_span = models.PositiveSmallIntegerField(default=1, verbose_name="Высота (полок, устар.)")
+    label = models.CharField(max_length=120, verbose_name="Подпись")
+    color = models.CharField(max_length=7, blank=True, default="#e74c3c", verbose_name="Цвет")
+    notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("shelf", "stack", "column", "id")
+        verbose_name = "Контейнер визуального склада"
+        verbose_name_plural = "Контейнеры визуального склада"
+
+    def __str__(self) -> str:
+        return f"{self.label} ({self.cabinet_id}:п{self.shelf}/с{self.stack}/{self.column})"
+
+
+class VisualContainerItem(models.Model):
+    """Содержимое контейнера: тип инструмента / описание."""
+
+    TOOL_CATEGORY_CHOICES = (
+        ("", "—"),
+        ("end_mill", "Фрезы"),
+        ("tap", "Резьбовой инструмент"),
+        ("center_drill", "Центровки"),
+        ("countersink", "Зенкера"),
+        ("drill", "Сверла"),
+        ("insert", "Пластинки"),
+        ("collet", "Цанги"),
+    )
+
+    container = models.ForeignKey(
+        VisualContainer,
+        on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name="Контейнер",
+    )
+    title = models.CharField(max_length=200, verbose_name="Что лежит")
+    tool_category = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        choices=TOOL_CATEGORY_CHOICES,
+        verbose_name="Категория склада",
+    )
+    diameter_from_mm = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Ø от, мм",
+    )
+    diameter_to_mm = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Ø до, мм",
+    )
+    tool_item = models.ForeignKey(
+        "ToolItem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="visual_placements",
+        verbose_name="Позиция склада",
+    )
+    quantity_note = models.CharField(max_length=80, blank=True, default="", verbose_name="Кол-во (заметка)")
+    notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Содержимое контейнера"
+        verbose_name_plural = "Содержимое контейнеров"
+
+    def __str__(self) -> str:
+        return self.title

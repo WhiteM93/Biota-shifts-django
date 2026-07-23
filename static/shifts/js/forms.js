@@ -37,6 +37,7 @@
   var imageWidthInput = root.querySelector(".js-forms-image-width");
   var imageAlignBtns = root.querySelectorAll(".js-forms-image-align");
   var imageReplaceBtn = root.querySelector(".js-forms-image-replace");
+  var imageCaptionInput = root.querySelector(".js-forms-image-caption");
   var activeImageId = null;
   var tablePropsBlock = root.querySelector(".js-forms-table-props");
   var tableToolbarHost = root.querySelector(".js-forms-table-toolbar-host");
@@ -112,8 +113,11 @@
       ".forms-el-table td { padding: 4px; vertical-align: top; background: #fff; color: #000; overflow: visible !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
       ".forms-print-table-cell { display: block; width: 100%; overflow: visible !important; height: auto !important; max-height: none !important; padding: 0; margin: 0; background: transparent; color: #000; font-size: 12pt; line-height: 1.35; word-wrap: break-word; overflow-wrap: break-word; }" +
       ".forms-el-image { display: flex; width: 100%; }" +
-      ".forms-el-image-frame { display: inline-block; max-width: 100%; box-sizing: border-box; padding: 2mm; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
+      ".forms-el-image-col { display: block; max-width: 100%; box-sizing: border-box; }" +
+      ".forms-el-image-frame { display: block; width: 100%; box-sizing: border-box; padding: 2mm; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
       ".forms-el-image-frame img { display: block; width: 100%; height: auto; max-width: 100%; }" +
+      ".forms-el-image-caption { display: block; margin: 2mm 0 0; padding: 0; font-size: 10pt; line-height: 1.3; text-align: center; color: #000; white-space: pre-wrap; word-wrap: break-word; }" +
+      ".forms-el-image-caption:empty { display: none !important; }" +
       ".forms-el-image-actions, .forms-el-image-placeholder { display: none !important; }"
     );
   }
@@ -358,7 +362,8 @@
     if (elData.align !== "left" && elData.align !== "center" && elData.align !== "right") {
       elData.align = "center";
     }
-    elData.alt = String(elData.alt || "");
+    elData.caption = String(elData.caption || "").slice(0, 300);
+    elData.alt = String(elData.alt || elData.caption || "").slice(0, 200);
   }
 
   function applyImageFrameStyles(block, elData) {
@@ -366,9 +371,14 @@
     ensureImageFields(elData);
     var justify = elData.align === "left" ? "flex-start" : elData.align === "right" ? "flex-end" : "center";
     block.style.justifyContent = justify;
+    var col = block.querySelector(".forms-el-image-col");
     var frame = block.querySelector(".forms-el-image-frame");
+    if (col) {
+      col.style.width = elData.width_pct + "%";
+    } else if (frame) {
+      frame.style.width = elData.width_pct + "%";
+    }
     if (!frame) return;
-    frame.style.width = elData.width_pct + "%";
     frame.style.border = elData.frame_width_mm + "mm solid " + elData.frame_color;
     frame.style.boxSizing = "border-box";
   }
@@ -384,6 +394,7 @@
     if (imageFrameColorInput) imageFrameColorInput.value = elData.frame_color;
     if (imageFrameWidthInput) imageFrameWidthInput.value = String(elData.frame_width_mm);
     if (imageWidthInput) imageWidthInput.value = String(elData.width_pct);
+    if (imageCaptionInput) imageCaptionInput.value = elData.caption || "";
     imageAlignBtns.forEach(function (btn) {
       btn.classList.toggle("is-active", btn.getAttribute("data-align") === elData.align);
     });
@@ -409,6 +420,18 @@
     var wrap = sheetInnerEl.querySelector('.forms-el[data-el-id="' + elData.id + '"]');
     var block = wrap && wrap.querySelector(".forms-el-image");
     if (block) applyImageFrameStyles(block, elData);
+    var cap = wrap && wrap.querySelector(".forms-el-image-caption");
+    if (cap) {
+      var text = elData.caption || "";
+      if (cap.isContentEditable) {
+        if ((cap.textContent || "") !== text) cap.textContent = text;
+      } else {
+        cap.textContent = text;
+      }
+      cap.hidden = !text && !canEdit;
+      var img = wrap.querySelector(".forms-el-image-frame img");
+      if (img) img.alt = elData.alt || text || "";
+    }
   }
 
   function ensureImageFileInput() {
@@ -476,6 +499,7 @@
       width_pct: 60,
       align: "center",
       alt: "",
+      caption: "",
     };
   }
 
@@ -521,12 +545,14 @@
     ensureImageFields(elData);
     var block = document.createElement("div");
     block.className = "forms-el-image";
+    var col = document.createElement("div");
+    col.className = "forms-el-image-col";
     var frame = document.createElement("div");
     frame.className = "forms-el-image-frame";
     if (elData.src) {
       var img = document.createElement("img");
       img.src = elData.src;
-      img.alt = elData.alt || "";
+      img.alt = elData.alt || elData.caption || "";
       img.draggable = false;
       frame.appendChild(img);
     } else {
@@ -554,7 +580,37 @@
         setActiveImage(elData);
       });
     }
-    block.appendChild(frame);
+    var caption = document.createElement("div");
+    caption.className = "forms-el-image-caption";
+    caption.textContent = elData.caption || "";
+    if (canEdit) {
+      caption.contentEditable = "true";
+      caption.setAttribute("spellcheck", "true");
+      caption.setAttribute("data-placeholder", "Подпись к картинке");
+      caption.addEventListener("focus", function () {
+        setActiveImage(elData);
+      });
+      caption.addEventListener("input", function () {
+        elData.caption = String(caption.textContent || "").slice(0, 300);
+        elData.alt = elData.caption.slice(0, 200);
+        var imgEl = frame.querySelector("img");
+        if (imgEl) imgEl.alt = elData.alt;
+        if (imageCaptionInput && activeImageId === elData.id) {
+          imageCaptionInput.value = elData.caption;
+        }
+        scheduleSave();
+      });
+      caption.addEventListener("blur", function () {
+        elData.caption = String(caption.textContent || "").slice(0, 300);
+        elData.alt = elData.caption.slice(0, 200);
+        flushSave();
+      });
+    } else if (!elData.caption) {
+      caption.hidden = true;
+    }
+    col.appendChild(frame);
+    col.appendChild(caption);
+    block.appendChild(col);
     applyImageFrameStyles(block, elData);
     wrap.appendChild(block);
   }
@@ -578,6 +634,26 @@
     }, 40);
   }
 
+  function isMobileFormsLayout() {
+    return window.matchMedia("(max-width: 720px)").matches;
+  }
+
+  function setMobilePane(pane) {
+    var next = pane === "props" || pane === "canvas" ? pane : "list";
+    if (next === "props" && !currentForm()) {
+      next = "list";
+    }
+    root.setAttribute("data-mobile-pane", next);
+    root.querySelectorAll(".js-forms-mobile-pane").forEach(function (btn) {
+      btn.classList.toggle("is-active", btn.getAttribute("data-pane") === next);
+    });
+    if (next === "canvas") {
+      requestAnimationFrame(function () {
+        scheduleSheetFitScale();
+      });
+    }
+  }
+
   function updateSheetFitScale() {
     if (!canvasStage || !sheetEl || !sheetScaler) return;
     var form = currentForm();
@@ -585,10 +661,14 @@
     var size = sheetPageSizeMm(form.orientation);
     var pageW = size.w * MM_PX;
     var pageH = size.h * MM_PX;
-    var pad = 32;
+    var mobile = isMobileFormsLayout();
+    var pad = mobile ? 16 : 32;
     var availW = Math.max(80, canvasStage.clientWidth - pad);
     var availH = Math.max(80, canvasStage.clientHeight - pad);
-    var scale = Math.min(availW / pageW, availH / pageH, 1);
+    // On phone fit by width so A4 stays readable; stage scrolls vertically.
+    var scale = mobile
+      ? Math.min(availW / pageW, 1)
+      : Math.min(availW / pageW, availH / pageH, 1);
     sheetEl.style.transform = "scale(" + scale + ")";
     sheetEl.style.transformOrigin = "top left";
     sheetScaler.style.width = Math.round(pageW * scale) + "px";
@@ -1748,6 +1828,12 @@
             elData.cells[r][c].text = cellTa.value;
           }
         });
+      } else if (elData.type === "image") {
+        var capEl = wrap.querySelector(".forms-el-image-caption");
+        if (capEl) {
+          elData.caption = String(capEl.textContent || "").slice(0, 300);
+          elData.alt = elData.caption.slice(0, 200);
+        }
       }
     });
   }
@@ -1827,7 +1913,10 @@
       btn.type = "button";
       btn.className = "forms-list-btn" + (f.id === currentId ? " is-active" : "");
       btn.textContent = f.name || "Без названия";
-      btn.addEventListener("click", function () { selectForm(f.id); });
+      btn.addEventListener("click", function () {
+        selectForm(f.id);
+        if (isMobileFormsLayout()) setMobilePane("canvas");
+      });
 
       li.appendChild(btn);
 
@@ -2540,6 +2629,7 @@
       if (newNameInput) newNameInput.value = "";
       selectForm(data.form.id);
       renderList();
+      if (isMobileFormsLayout()) setMobilePane("canvas");
     }).catch(function (e) {
       alert(e.message || "Не удалось создать форму");
     });
@@ -2825,6 +2915,25 @@
     });
   }
 
+  if (imageCaptionInput) {
+    imageCaptionInput.addEventListener("input", function () {
+      var elData = getActiveImage();
+      if (!elData) return;
+      elData.caption = String(imageCaptionInput.value || "").slice(0, 300);
+      elData.alt = elData.caption.slice(0, 200);
+      updateActiveImageDom(elData);
+      scheduleSave();
+    });
+    imageCaptionInput.addEventListener("change", function () {
+      var elData = getActiveImage();
+      if (!elData) return;
+      elData.caption = String(imageCaptionInput.value || "").slice(0, 300);
+      elData.alt = elData.caption.slice(0, 200);
+      updateActiveImageDom(elData);
+      flushSave();
+    });
+  }
+
   if (pageAddBtn) {
     pageAddBtn.addEventListener("click", function () {
       addFormPage();
@@ -2917,6 +3026,15 @@
   }
 
   window.addEventListener("resize", scheduleSheetFitScale);
+
+  root.querySelectorAll(".js-forms-mobile-pane").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      setMobilePane(btn.getAttribute("data-pane") || "list");
+    });
+  });
+  if (!root.getAttribute("data-mobile-pane")) {
+    setMobilePane("list");
+  }
 
   loadForms();
 })();

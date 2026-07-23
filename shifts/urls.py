@@ -15,6 +15,7 @@ from . import product_views
 from . import skud_views
 from . import forms_views
 from . import machines_views
+from . import visual_warehouse_views
 from . import views
 
 urlpatterns = [
@@ -48,6 +49,37 @@ urlpatterns = [
     path("forms/api/", forms_views.forms_api_list, name="forms_api_list"),
     path("forms/api/upload/", forms_views.forms_api_upload, name="forms_api_upload"),
     path("forms/api/<int:pk>/", forms_views.forms_api_detail, name="forms_api_detail"),
+    path("visual-warehouse/", visual_warehouse_views.visual_warehouse_view, name="visual_warehouse"),
+    path(
+        "visual-warehouse/api/cabinets/",
+        visual_warehouse_views.visual_warehouse_api_cabinets,
+        name="visual_warehouse_api_cabinets",
+    ),
+    path(
+        "visual-warehouse/api/cabinets/<int:pk>/",
+        visual_warehouse_views.visual_warehouse_api_cabinet_detail,
+        name="visual_warehouse_api_cabinet_detail",
+    ),
+    path(
+        "visual-warehouse/api/containers/",
+        visual_warehouse_views.visual_warehouse_api_container_upsert,
+        name="visual_warehouse_api_container_upsert",
+    ),
+    path(
+        "visual-warehouse/api/containers/<int:pk>/",
+        visual_warehouse_views.visual_warehouse_api_container_detail,
+        name="visual_warehouse_api_container_detail",
+    ),
+    path(
+        "visual-warehouse/api/items/",
+        visual_warehouse_views.visual_warehouse_api_item_upsert,
+        name="visual_warehouse_api_item_upsert",
+    ),
+    path(
+        "visual-warehouse/api/items/<int:pk>/",
+        visual_warehouse_views.visual_warehouse_api_item_delete,
+        name="visual_warehouse_api_item_delete",
+    ),
     path("products/", product_views.products_list_view, name="products_list"),
     path("products/<int:pk>/delete/", product_views.product_delete_view, name="product_delete"),
     path("products/new/", product_views.product_create_view, name="product_create"),

@@ -573,6 +573,7 @@ NAV_KEYS = (
     "machines",
     "calculator",
     "forms",
+    "visual_warehouse",
 )
 USER_ROLE_MANAGER = "manager"
 USER_ROLE_EXECUTOR = "executor"
@@ -591,6 +592,7 @@ NAV_LABELS_RU = {
     "machines": "Станки",
     "calculator": "Калькулятор",
     "forms": "Формы",
+    "visual_warehouse": "Визуальный склад",
 }
 NAV_LABELS_SHORT = {
     "home": "Главная",
@@ -606,6 +608,7 @@ NAV_LABELS_SHORT = {
     "machines": "Станки",
     "calculator": "Калькулятор",
     "forms": "Формы",
+    "visual_warehouse": "Виз. склад",
 }
 
 

@@ -40,6 +40,9 @@
   {% include "shifts/includes/nav_inventory_icon.html" %}
 </a>
 {% endif %}
+{% if biota_nav.visual_warehouse %}
+<a href="{% url 'visual_warehouse' %}" class="{% if request.resolver_match.url_name == 'visual_warehouse' or request.resolver_match.url_name == 'visual_warehouse_api_cabinets' or request.resolver_match.url_name == 'visual_warehouse_api_cabinet_detail' or request.resolver_match.url_name == 'visual_warehouse_api_container_upsert' or request.resolver_match.url_name == 'visual_warehouse_api_container_detail' or request.resolver_match.url_name == 'visual_warehouse_api_item_upsert' or request.resolver_match.url_name == 'visual_warehouse_api_item_delete' %}active{% endif %}" title="Визуальный склад">Виз. склад</a>
+{% endif %}
 {% if biota_nav.defects or biota_nav.payroll or biota_nav.employees %}
 <details class="nav-dropdown">
   <summary class="{% if request.resolver_match.url_name == 'inventory' and request.GET.panel == 'defects' or request.resolver_match.url_name == 'payroll_settlement' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'payroll' or request.resolver_match.url_name == 'employee_payroll_detail' or request.resolver_match.url_name == 'inventory' and request.GET.panel == 'employees' %}active{% endif %}">Кадры и ЗП</summary>

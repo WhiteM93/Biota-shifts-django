@@ -253,6 +253,7 @@ def _norm_elements(raw) -> list[dict]:
                 align = "center"
             el["align"] = align
             el["alt"] = str(item.get("alt") or "")[:200]
+            el["caption"] = str(item.get("caption") or "")[:300]
         try:
             page = int(item.get("page") or 0)
         except (TypeError, ValueError):
