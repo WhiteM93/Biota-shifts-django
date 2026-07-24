@@ -538,6 +538,109 @@ class ToolItem(models.Model):
             "qty": qty,
         }
 
+    def issue_filter_metrics(self) -> dict:
+        """Поля для каскадных фильтров выдачи (как на складе)."""
+
+        def fmt_num(v) -> str:
+            if v is None:
+                return ""
+            from decimal import Decimal
+
+            if isinstance(v, Decimal):
+                s = format(v, "f").rstrip("0").rstrip(".")
+                return s or "0"
+            try:
+                f = float(v)
+            except (TypeError, ValueError):
+                return ""
+            if f != f:
+                return ""
+            s = ("%f" % f).rstrip("0").rstrip(".")
+            return s or "0"
+
+        out = {
+            "material": (self.tool_material or "").strip(),
+            "coating": (self.coating_type or "none").strip() or "none",
+            "mill_type": "",
+            "diameter": "",
+            "radius": "",
+            "length": "",
+            "cutting_length": "",
+            "flutes": "",
+            "tap_type": "",
+            "tap_size": "",
+            "tap_pitch": "",
+            "tap_thread": "",
+            "tap_hole": "",
+            "angle": "",
+            "countersink_type": "",
+            "size_label": "",
+            "ins_iso": "",
+            "ins_shape": "",
+            "ins_family": "",
+            "collet_type": "",
+            "er_size": "",
+            "clamp_range": "",
+        }
+        cat = self.category
+        if cat == "end_mill":
+            em = getattr(self, "end_mill_spec", None)
+            if em:
+                out["mill_type"] = (em.mill_type or "").strip()
+                out["diameter"] = fmt_num(em.diameter_mm)
+                out["radius"] = fmt_num(em.corner_radius_mm)
+                out["length"] = fmt_num(em.overall_length_mm)
+                out["cutting_length"] = fmt_num(em.cutting_length_mm)
+                out["flutes"] = str(em.flutes_count) if em.flutes_count is not None else ""
+        elif cat == "tap":
+            tp = getattr(self, "tap_spec", None)
+            if tp:
+                out["tap_type"] = (tp.tap_type or "").strip()
+                out["tap_size"] = (tp.size_label or "").strip()
+                out["tap_pitch"] = fmt_num(tp.pitch_mm)
+                out["tap_thread"] = (tp.thread_standard or "").strip()
+                out["tap_hole"] = (tp.hole_type or "").strip()
+                out["length"] = fmt_num(tp.overall_length_mm)
+                out["cutting_length"] = fmt_num(tp.cutting_length_mm)
+        elif cat == "center_drill":
+            cd = getattr(self, "center_drill_spec", None)
+            if cd:
+                out["diameter"] = fmt_num(cd.diameter_mm)
+                out["length"] = fmt_num(cd.overall_length_mm)
+                out["angle"] = str(cd.angle_deg or "").strip()
+        elif cat == "countersink":
+            cs = getattr(self, "countersink_spec", None)
+            if cs:
+                out["countersink_type"] = (cs.countersink_type or "").strip()
+                out["diameter"] = fmt_num(cs.diameter_mm)
+                out["angle"] = str(cs.angle_deg or "").strip()
+                out["length"] = fmt_num(cs.overall_length_mm)
+                out["flutes"] = str(cs.flutes_count) if cs.flutes_count is not None else ""
+                out["size_label"] = (cs.size_label or "").strip()
+        elif cat == "drill":
+            dr = getattr(self, "drill_spec", None)
+            if dr:
+                out["diameter"] = fmt_num(dr.diameter_mm)
+                out["length"] = fmt_num(dr.overall_length_mm)
+                out["cutting_length"] = fmt_num(dr.cutting_length_mm)
+                out["angle"] = fmt_num(dr.angle_deg)
+        elif cat == "insert":
+            ins = getattr(self, "insert_spec", None)
+            if ins:
+                out["ins_iso"] = (getattr(ins, "iso_designation", None) or "").strip()
+                out["ins_shape"] = (ins.insert_shape or "").strip()
+                out["ins_family"] = (ins.milling_family or "").strip()
+                out["radius"] = fmt_num(ins.nose_radius_mm)
+                out["length"] = fmt_num(ins.cutting_edge_length_mm)
+        elif cat == "collet":
+            cl = getattr(self, "collet_spec", None)
+            if cl:
+                out["collet_type"] = (cl.collet_type or "").strip()
+                out["er_size"] = (cl.er_size or "").strip()
+                out["clamp_range"] = (cl.clamp_range or "").strip()
+                out["size_label"] = (cl.size_label or "").strip()
+        return out
+
 
 class EndMillSpec(models.Model):
     tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="end_mill_spec")
@@ -2488,9 +2591,22 @@ class PrintForm(models.Model):
 
 
 class VisualCabinet(models.Model):
-    """Шкаф визуального склада: сетка полок × столбцов."""
+    """Шкаф / стеллаж визуального склада: сетка полок × столбцов."""
+
+    KIND_CABINET = "cabinet"
+    KIND_RACK = "rack"
+    KIND_CHOICES = (
+        (KIND_CABINET, "Шкаф"),
+        (KIND_RACK, "Стеллаж"),
+    )
 
     name = models.CharField(max_length=120, verbose_name="Название")
+    kind = models.CharField(
+        max_length=16,
+        choices=KIND_CHOICES,
+        default=KIND_CABINET,
+        verbose_name="Тип",
+    )
     shelves = models.PositiveSmallIntegerField(default=4, verbose_name="Число полок")
     columns = models.PositiveSmallIntegerField(default=3, verbose_name="Число столбцов")
     notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
@@ -2509,13 +2625,26 @@ class VisualCabinet(models.Model):
 
 
 class VisualContainer(models.Model):
-    """Контейнер в шкафу: полка → слой (друг на друга) → позиция слева направо."""
+    """Контейнер в шкафу/стеллаже: полка → слой → позиция слева направо."""
+
+    KIND_BIN = "bin"
+    KIND_SHELF_SLOT = "shelf_slot"
+    KIND_CHOICES = (
+        (KIND_BIN, "Контейнер"),
+        (KIND_SHELF_SLOT, "На полке"),
+    )
 
     cabinet = models.ForeignKey(
         VisualCabinet,
         on_delete=models.CASCADE,
         related_name="containers",
         verbose_name="Шкаф",
+    )
+    kind = models.CharField(
+        max_length=16,
+        choices=KIND_CHOICES,
+        default=KIND_BIN,
+        verbose_name="Тип",
     )
     shelf = models.PositiveSmallIntegerField(verbose_name="Полка (сверху = 1)")
     stack = models.PositiveSmallIntegerField(
@@ -2526,7 +2655,7 @@ class VisualContainer(models.Model):
     col_span = models.PositiveSmallIntegerField(default=1, verbose_name="Ширина (ячеек)")
     row_span = models.PositiveSmallIntegerField(default=1, verbose_name="Высота (полок, устар.)")
     label = models.CharField(max_length=120, verbose_name="Подпись")
-    color = models.CharField(max_length=7, blank=True, default="#e74c3c", verbose_name="Цвет")
+    color = models.CharField(max_length=7, blank=True, default="#e74c3c", verbose_name="Цвет этикетки")
     notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
     last_audited_at = models.DateTimeField(null=True, blank=True, verbose_name="Последняя инвентаризация")
     last_audited_by = models.CharField(max_length=120, blank=True, default="", verbose_name="Кто проверял")

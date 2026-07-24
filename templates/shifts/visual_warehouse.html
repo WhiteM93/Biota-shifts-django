@@ -25,14 +25,14 @@
     <div class="vw-topbar-actions">
       {% if biota_can_edit %}
       <button type="button" class="vw-btn-secondary js-vw-toggle-edit" aria-pressed="false">Редактировать</button>
-      <button type="button" class="vw-btn-primary js-vw-new-cabinet">+ Шкаф</button>
+      <button type="button" class="vw-btn-primary js-vw-new-cabinet">+ Мебель</button>
       {% endif %}
     </div>
   </header>
 
   <div class="vw-floor js-vw-floor">
     <div class="vw-empty js-vw-empty">
-      <p>Пока нет шкафов.{% if biota_can_edit %} Создайте первый — «+ Шкаф».{% endif %}</p>
+      <p>Пока нет шкафов и стеллажей.{% if biota_can_edit %} Создайте первый — «+ Мебель».{% endif %}</p>
     </div>
   </div>
 </div>
@@ -44,6 +44,13 @@
     <div class="vw-dialog-body js-vw-cab-form">
       <h2 id="vw-dlg-cab-title" class="vw-dialog-title js-vw-cab-form-title">Новый шкаф</h2>
       <input type="hidden" class="js-vw-cab-id" value="">
+      <label class="vw-row">
+        <span class="vw-row-label">Тип</span>
+        <select class="vw-control js-vw-cab-kind">
+          <option value="cabinet">Шкаф</option>
+          <option value="rack">Стеллаж</option>
+        </select>
+      </label>
       <label class="vw-row">
         <span class="vw-row-label">Название</span>
         <input type="text" class="vw-control js-vw-cab-name" maxlength="120" autocomplete="off" placeholder="Шкаф №1">
@@ -58,7 +65,7 @@
           <input type="number" class="vw-control js-vw-cab-columns" min="1" max="12" value="4">
         </label>
       </div>
-      <p class="vw-hint-inline">Несколько полок сверху вниз. На полке — ящики рядом и стопкой.</p>
+      <p class="vw-hint-inline">Шкаф — с дверцами и контейнерами. Стеллаж — открытый: контейнеры или содержимое прямо на полке.</p>
       <label class="vw-row">
         <span class="vw-row-label">Примечание</span>
         <input type="text" class="vw-control js-vw-cab-notes" maxlength="300" autocomplete="off">
@@ -80,12 +87,20 @@
       <h2 id="vw-dlg-cont-title" class="vw-dialog-title js-vw-cont-form-title">Ящик</h2>
       <input type="hidden" class="js-vw-cont-id" value="">
       <input type="hidden" class="js-vw-cont-cabinet" value="">
-      <label class="vw-row">
-        <span class="vw-row-label">Подпись на ящике</span>
-        <input type="text" class="vw-control js-vw-cont-label" maxlength="120" autocomplete="off" placeholder="Фрезы 0–1">
+      <label class="vw-row js-vw-cont-kind-row" hidden>
+        <span class="vw-row-label">Тип</span>
+        <select class="vw-control js-vw-cont-kind">
+          <option value="bin">Контейнер</option>
+          <option value="shelf_slot">На полке</option>
+        </select>
       </label>
       <label class="vw-row">
-        <span class="vw-row-label">Цвет ящика</span>
+        <span class="vw-row-label">Подпись на этикетке</span>
+        <textarea class="vw-control js-vw-cont-label" maxlength="120" rows="2" autocomplete="off" placeholder="Фрезы 0–1"></textarea>
+      </label>
+      <p class="vw-hint-inline">Перенос строки — Enter. Без Enter текст в одну строку (шрифт подгонится).</p>
+      <label class="vw-row">
+        <span class="vw-row-label">Цвет этикетки</span>
         <div class="vw-color-row">
           <input type="color" class="vw-control vw-control--color js-vw-cont-color" value="#e74c3c">
           <div class="vw-palette js-vw-palette">

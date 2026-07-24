@@ -323,9 +323,6 @@ var INV = (function () {
   });
 })();
 (function () {
-  var categorySelects = document.querySelectorAll(".js-tool-category");
-  var searchInputs = document.querySelectorAll(".js-tool-search");
-
   function normalizeText(s) {
     return String(s || "")
       .toLowerCase()
@@ -531,25 +528,265 @@ var INV = (function () {
     });
   }
 
-  function filterToolOptions(targetId) {
-    if (!targetId) return;
+  function parseFilterNum(s) {
+    var t = normalizeText(s).replace(/[^\d.\-]/g, "");
+    if (!t) return null;
+    var n = parseFloat(t);
+    return isFinite(n) ? n : null;
+  }
+
+  function numsEqual(a, b) {
+    if (a == null || b == null) return false;
+    return Math.abs(a - b) < 1e-6;
+  }
+
+  function fmtFilterOptLabel(n) {
+    if (n == null || !isFinite(n)) return "";
+    var s = String(n);
+    if (s.indexOf("e") !== -1 || s.indexOf("E") !== -1) s = n.toFixed(4);
+    return s.replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "").replace(/\.$/, "");
+  }
+
+  function readRadioFilter(selector) {
+    var el = document.querySelector(selector + ":checked");
+    return el ? String(el.value || "").trim() : "";
+  }
+
+  function loadInvOptions() {
+    if (window.__invOptionsCache) return window.__invOptionsCache;
+    var el = document.getElementById("inv-options");
+    var data = {};
+    if (el) {
+      try { data = JSON.parse(el.textContent || "{}"); } catch (e) { data = {}; }
+    }
+    window.__invOptionsCache = data;
+    return data;
+  }
+
+  function choiceLabel(choiceKey, value) {
+    var opts = loadInvOptions()[choiceKey] || [];
+    for (var i = 0; i < opts.length; i++) {
+      if (String(opts[i].value) === String(value)) return opts[i].label || value;
+    }
+    return value;
+  }
+
+  function optF(opt, key) {
+    return (opt.getAttribute("data-f-" + key) || "").trim();
+  }
+
+  function valuesMatch(a, b, isNum) {
+    if (!a && !b) return true;
+    if (isNum) {
+      var an = parseFilterNum(a);
+      var bn = parseFilterNum(b);
+      if (an == null || bn == null) return String(a) === String(b);
+      return numsEqual(an, bn);
+    }
+    return String(a) === String(b);
+  }
+
+  function fillSelect(sel, values, current, choiceKey, isNum) {
+    if (!sel) return;
+    var keep = current != null ? String(current) : "";
+    sel.innerHTML = "";
+    var all = document.createElement("option");
+    all.value = "";
+    all.textContent = "Все";
+    sel.appendChild(all);
+    values.forEach(function (v) {
+      var opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = choiceKey ? choiceLabel(choiceKey, v) : v;
+      sel.appendChild(opt);
+    });
+    if (keep) {
+      var found = "";
+      Array.prototype.forEach.call(sel.options, function (o) {
+        if (!o.value) return;
+        if (valuesMatch(o.value, keep, isNum)) found = o.value;
+      });
+      sel.value = found;
+    } else {
+      sel.value = "";
+    }
+    sel.disabled = sel.options.length <= 1;
+  }
+
+  function collectFValues(toolSelect, category, filters, key, isNum) {
+    var map = {};
+    Array.prototype.forEach.call(toolSelect.options, function (opt, idx) {
+      if (idx === 0) return;
+      if (category && opt.getAttribute("data-category") !== category) return;
+      var ok = true;
+      Object.keys(filters).forEach(function (fk) {
+        if (!ok || fk === key) return;
+        var want = filters[fk];
+        if (!want) return;
+        var got = optF(opt, fk);
+        var asNum = parseFilterNum(want) != null && parseFilterNum(got) != null;
+        if (!valuesMatch(got, want, asNum)) ok = false;
+      });
+      if (!ok) return;
+      var raw = optF(opt, key);
+      if (!raw) return;
+      if (isNum) {
+        var n = parseFilterNum(raw);
+        if (n == null) return;
+        var lab = fmtFilterOptLabel(n);
+        map[lab] = lab;
+      } else {
+        map[raw] = raw;
+      }
+    });
+    var keys = Object.keys(map);
+    if (isNum) keys.sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
+    else keys.sort(function (a, b) { return a.localeCompare(b, "ru", { numeric: true }); });
+    return keys;
+  }
+
+  function readPanelFilters(panel) {
+    var filters = {};
+    if (!panel) return filters;
+    panel.querySelectorAll("select.js-issue-f").forEach(function (sel) {
+      var key = sel.getAttribute("data-fkey");
+      if (!key) return;
+      filters[key] = String(sel.value || "").trim();
+    });
+    return filters;
+  }
+
+  function syncIssueCatPanel(root, toolSelect, category, clearValues) {
+    root.querySelectorAll(".js-issue-cat-panel").forEach(function (p) {
+      var show = category && p.getAttribute("data-cat") === category;
+      p.hidden = !show;
+    });
+    var common = root.querySelectorAll(".js-issue-common-filters");
+    common.forEach(function (el) {
+      // материал/покрытие скрываем для цанг, как на складе
+      el.hidden = category === "collet";
+    });
+    if (!category) return;
+    var panel = root.querySelector('.js-issue-cat-panel[data-cat="' + category + '"]');
+    if (!panel) return;
+    if (clearValues) {
+      panel.querySelectorAll("select.js-issue-f").forEach(function (sel) { sel.value = ""; });
+    }
+    // Два прохода: сначала subtype, потом размеры от выбранного subtype
+    function rebuildPass() {
+      var filters = readPanelFilters(panel);
+      panel.querySelectorAll("select.js-issue-f").forEach(function (sel) {
+        var key = sel.getAttribute("data-fkey");
+        if (!key) return;
+        var isNum = sel.getAttribute("data-num") === "1";
+        var choiceKey = sel.getAttribute("data-choice") || "";
+        var cur = clearValues ? "" : String(sel.value || "").trim();
+        var vals = collectFValues(toolSelect, category, filters, key, isNum);
+        fillSelect(sel, vals, cur, choiceKey, isNum);
+      });
+    }
+    rebuildPass();
+    rebuildPass();
+
+    // материалы по типу
+    var picker = root.querySelector(".js-tool-filter-material-picker");
+    if (picker && category !== "collet") {
+      var present = {};
+      Array.prototype.forEach.call(toolSelect.options, function (opt, idx) {
+        if (idx === 0) return;
+        if (opt.getAttribute("data-category") !== category) return;
+        var m = optF(opt, "material");
+        if (m) present[m] = true;
+      });
+      picker.querySelectorAll(".issue-mat-chip[data-mat-code]").forEach(function (chip) {
+        var code = chip.getAttribute("data-mat-code") || "";
+        chip.hidden = !present[code];
+      });
+      var checked = picker.querySelector(".js-tool-filter-material:checked");
+      if (checked && checked.value && !present[checked.value]) {
+        var allRadio = picker.querySelector('.js-tool-filter-material[value=""]');
+        if (allRadio) allRadio.checked = true;
+      }
+    }
+  }
+
+  function filterToolOptions(targetId, opts) {
+    opts = opts || {};
+    var root = document.getElementById("issue-block");
     var toolSelect = document.getElementById(targetId);
-    if (!toolSelect) return;
-    var categorySelect = document.querySelector('.js-tool-category[data-target-select="' + targetId + '"]');
-    var searchInput = document.querySelector('.js-tool-search[data-target-select="' + targetId + '"]');
-    var selectedCategory = categorySelect ? categorySelect.value : "";
+    if (!root || !toolSelect) return;
+
+    var categorySelect = root.querySelector(".js-tool-category");
+    var category = opts.category != null
+      ? String(opts.category)
+      : (categorySelect ? categorySelect.value : "");
+
+    if (opts.resetCat) {
+      syncIssueCatPanel(root, toolSelect, category, true);
+    } else if (!opts.skipPanelSync) {
+      syncIssueCatPanel(root, toolSelect, category, false);
+    }
+
+    var panel = category
+      ? root.querySelector('.js-issue-cat-panel[data-cat="' + category + '"]')
+      : null;
+    var filters = readPanelFilters(panel);
+    var searchInput = root.querySelector(".js-tool-search");
     var queryRaw = normalizeText(searchInput ? searchInput.value : "");
     var queryCompact = queryRaw.replace(/\.0+\b/g, "");
+    var wantMat = category === "collet"
+      ? ""
+      : readRadioFilter('#issue-block .js-tool-filter-material');
+    var wantCoat = category === "collet"
+      ? ""
+      : readRadioFilter('#issue-block .js-tool-filter-coating');
 
+    var placeholder = toolSelect.options[0] || null;
+    var items = [];
     Array.prototype.forEach.call(toolSelect.options, function (opt, idx) {
-      if (idx === 0) { opt.hidden = false; return; }
+      if (idx === 0) return;
       var optionCategory = opt.getAttribute("data-category");
-      var categoryMatch = !selectedCategory || optionCategory === selectedCategory;
+      var categoryMatch = !category || optionCategory === category;
       var text = normalizeText(opt.textContent);
       var textCompact = text.replace(/\.0+\b/g, "");
       var searchMatch = !queryRaw || text.indexOf(queryRaw) !== -1 || textCompact.indexOf(queryCompact) !== -1;
-      opt.hidden = !(categoryMatch && searchMatch);
+      var specMatch = true;
+      Object.keys(filters).forEach(function (fk) {
+        if (!specMatch) return;
+        var want = filters[fk];
+        if (!want) return;
+        var got = optF(opt, fk);
+        var asNum = parseFilterNum(want) != null && parseFilterNum(got) != null;
+        if (!valuesMatch(got, want, asNum)) specMatch = false;
+      });
+      var mat = optF(opt, "material");
+      var coat = optF(opt, "coating") || "none";
+      var matMatch = !wantMat || mat === wantMat;
+      var coatMatch = !wantCoat || coat === wantCoat;
+      var visible = categoryMatch && searchMatch && specMatch && matMatch && coatMatch;
+      opt.hidden = !visible;
+      items.push({
+        opt: opt,
+        d: parseFilterNum(optF(opt, "diameter")),
+        size: optF(opt, "tap_size") || optF(opt, "diameter") || optF(opt, "ins_iso") || ""
+      });
     });
+
+    // Сортировка по диаметру / размеру при активных фильтрах
+    if (category || Object.keys(filters).some(function (k) { return !!filters[k]; })) {
+      items.sort(function (a, b) {
+        var av = a.d;
+        var bv = b.d;
+        if (av != null || bv != null) {
+          if (av == null) return 1;
+          if (bv == null) return -1;
+          if (av !== bv) return av - bv;
+        }
+        return String(a.size).localeCompare(String(b.size), "ru", { numeric: true });
+      });
+      items.forEach(function (it) { toolSelect.appendChild(it.opt); });
+      if (placeholder) toolSelect.insertBefore(placeholder, toolSelect.firstChild);
+    }
 
     var wrap = toolSelect.closest(".js-issue-tool-combo");
     if (wrap) {
@@ -562,17 +799,38 @@ var INV = (function () {
     if (wrap) comboUpdateLabel(wrap, toolSelect);
   }
 
-  if (categorySelects.length || searchInputs.length) {
-    Array.prototype.forEach.call(categorySelects, function (select) {
-      var targetId = select.getAttribute("data-target-select");
-      select.addEventListener("change", function () { filterToolOptions(targetId); });
-      filterToolOptions(targetId);
+  function bindIssueFilters(targetId) {
+    var root = document.getElementById("issue-block");
+    if (!root) return;
+    var cat = root.querySelector(".js-tool-category");
+    var search = root.querySelector(".js-tool-search");
+
+    if (cat) {
+      cat.addEventListener("change", function () {
+        filterToolOptions(targetId, { category: cat.value, resetCat: true });
+      });
+    }
+    if (search) {
+      search.addEventListener("input", function () {
+        filterToolOptions(targetId, { skipPanelSync: true });
+      });
+    }
+    root.querySelectorAll("select.js-issue-f").forEach(function (sel) {
+      sel.addEventListener("change", function () {
+        filterToolOptions(targetId);
+      });
     });
-    Array.prototype.forEach.call(searchInputs, function (input) {
-      var targetId = input.getAttribute("data-target-select");
-      input.addEventListener("input", function () { filterToolOptions(targetId); });
-      filterToolOptions(targetId);
+    root.querySelectorAll(".js-tool-filter-material, .js-tool-filter-coating").forEach(function (el) {
+      el.addEventListener("change", function () {
+        filterToolOptions(targetId, { skipPanelSync: true });
+      });
     });
+
+    filterToolOptions(targetId, { resetCat: true });
+  }
+
+  if (document.getElementById("issue-tool-select")) {
+    bindIssueFilters("issue-tool-select");
   }
 
   /* Initialize issue panel combo */

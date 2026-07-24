@@ -812,6 +812,82 @@
     margin: 0;
   }
   /* Кастомный выбор инструмента (выдача): не нативный select */
+  #issue-block .issue-filter-hint {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 12px;
+  }
+  #issue-block .issue-cat-panel {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px 16px;
+    align-items: end;
+  }
+  #issue-block .issue-cat-panel[hidden] {
+    display: none !important;
+  }
+  #issue-block .issue-filter-chips-field {
+    grid-column: 1 / -1;
+  }
+  #issue-block .issue-filter-chips-field[hidden] {
+    display: none !important;
+  }
+  #issue-block .issue-filter-chips-field > span {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: var(--bio-caption-soft, var(--vw-muted, #9bb0d8));
+  }
+  #issue-block .issue-mat-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  #issue-block .issue-mat-chip {
+    display: inline-flex;
+    cursor: pointer;
+    margin: 0;
+  }
+  #issue-block .issue-mat-chip input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  #issue-block .issue-mat-chip-face {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--bio-input-border, #44557c);
+    background: var(--bio-input-bg, rgba(16, 21, 32, 0.85));
+    color: var(--bio-input-fg, #eaf0ff);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    user-select: none;
+  }
+  #issue-block .issue-mat-chip input:checked + .issue-mat-chip-face {
+    border-color: #9fb2ff;
+    box-shadow: 0 0 0 2px rgba(120, 146, 255, 0.35);
+    color: #fff;
+  }
+  html[data-theme="dawn"] #issue-block .issue-mat-chip-face {
+    background: #fffefb;
+    border-color: #d6c9b8;
+    color: #292524;
+  }
+  html[data-theme="dawn"] #issue-block .issue-mat-chip input:checked + .issue-mat-chip-face {
+    border-color: #0d9488;
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.28);
+    color: #134e4a;
+  }
+  #issue-block .coating-picker {
+    gap: 6px;
+  }
   #issue-block .issue-tool-field {
     min-width: min(100%, 420px);
     max-width: 100%;

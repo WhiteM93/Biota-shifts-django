@@ -192,12 +192,16 @@
     cabinets.forEach(function (cab) {
       floorEl.appendChild(buildCabinetCard(cab));
     });
+    requestAnimationFrame(function () {
+      floorEl.querySelectorAll(".vw-bin-text").forEach(fitLabelText);
+    });
   }
 
   function buildCabinetCard(cab) {
     var wrap = document.createElement("section");
     wrap.className = "vw-cabinet";
     wrap.dataset.cabinetId = String(cab.id);
+    wrap.dataset.kind = cab.kind === "rack" ? "rack" : "cabinet";
 
     var name = document.createElement("h2");
     name.className = "vw-cabinet-name";
@@ -237,7 +241,7 @@
       var btnEdit = document.createElement("button");
       btnEdit.type = "button";
       btnEdit.className = "vw-btn-ghost";
-      btnEdit.textContent = "Параметры шкафа";
+      btnEdit.textContent = cab.kind === "rack" ? "Параметры стеллажа" : "Параметры шкафа";
       btnEdit.addEventListener("click", function () { openCabinetForm(cab); });
       bar.appendChild(btnEdit);
       wrap.appendChild(bar);
@@ -358,29 +362,68 @@
     return y > 160 ? "#1a1a1a" : "#f5f5f5";
   }
 
+  function fitLabelText(el) {
+    if (!el) return;
+    var minPx = 7;
+    var maxPx = 12;
+    var size = maxPx;
+    el.style.fontSize = size + "px";
+    // Shrink until each line fits width and block fits parent height.
+    var guard = 0;
+    while (size > minPx && guard < 40) {
+      guard += 1;
+      var overflowW = el.scrollWidth > el.clientWidth + 1;
+      var overflowH = el.scrollHeight > el.clientHeight + 1;
+      var parent = el.parentElement;
+      if (parent) {
+        overflowH = overflowH || el.scrollHeight > parent.clientHeight + 1;
+      }
+      if (!overflowW && !overflowH) break;
+      size -= 0.5;
+      el.style.fontSize = size + "px";
+    }
+  }
+
   function buildBin(cab, cont) {
+    var isSlot = cont.kind === "shelf_slot";
     var btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "vw-bin";
-    btn.style.background = cont.color || "#e74c3c";
-    btn.style.color = contrastText(cont.color);
+    btn.className = isSlot ? "vw-shelf-slot" : "vw-bin";
+    btn.dataset.kind = isSlot ? "shelf_slot" : "bin";
+
+    var labelWrap = document.createElement("span");
+    labelWrap.className = "vw-bin-label";
+    var color = cont.color || "#e74c3c";
+    labelWrap.style.background = color;
+    labelWrap.style.color = contrastText(color);
+
     var text = document.createElement("span");
     text.className = "vw-bin-text";
-    text.textContent = cont.label || "Ящик";
-    btn.appendChild(text);
+    // Keep user newlines; no auto-wrap (CSS white-space: pre)
+    text.textContent = cont.label || (isSlot ? "На полке" : "Контейнер");
+    labelWrap.appendChild(text);
+    btn.appendChild(labelWrap);
+
     var auditDate = cont.last_audited_at || "";
     var stamp = document.createElement("span");
     stamp.className = "vw-bin-audit" + (auditDate ? "" : " is-empty");
     stamp.textContent = auditDate ? ("инв. " + auditDate.split(" ")[0]) : "не проверялся";
     btn.appendChild(stamp);
+
+    var titleBase = cont.label || (isSlot ? "На полке" : "Контейнер");
     btn.title = editMode
-      ? ((cont.label || "Ящик") + " — изменить ячейку")
-      : ((cont.label || "Ящик") + " — список инструментов" + (auditDate ? ("; инв. " + auditDate) : ""));
+      ? (titleBase + " — изменить")
+      : (titleBase + " — список инструментов" + (auditDate ? ("; инв. " + auditDate) : ""));
     btn.addEventListener("click", function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
       if (editMode) openContainerForm(cab, cont);
       else openContents(cont.id);
+    });
+
+    // Fit after layout
+    requestAnimationFrame(function () {
+      fitLabelText(text);
     });
     return btn;
   }
@@ -399,20 +442,37 @@
 
   function openCabinetForm(cab) {
     editingCabinetId = cab ? cab.id : null;
-    cabForm.querySelector(".js-vw-cab-form-title").textContent = cab ? "Параметры шкафа" : "Новый шкаф";
+    var isRack = cab && cab.kind === "rack";
+    cabForm.querySelector(".js-vw-cab-form-title").textContent = cab
+      ? (isRack ? "Параметры стеллажа" : "Параметры шкафа")
+      : "Новая мебель";
     cabForm.querySelector(".js-vw-cab-id").value = cab ? String(cab.id) : "";
+    var kindEl = cabForm.querySelector(".js-vw-cab-kind");
+    if (kindEl) kindEl.value = cab ? (cab.kind === "rack" ? "rack" : "cabinet") : "cabinet";
     cabForm.querySelector(".js-vw-cab-name").value = cab ? cab.name : "";
     cabForm.querySelector(".js-vw-cab-shelves").value = cab ? String(cab.shelves) : "5";
     cabForm.querySelector(".js-vw-cab-columns").value = cab ? String(cab.columns) : "4";
     cabForm.querySelector(".js-vw-cab-notes").value = cab ? (cab.notes || "") : "";
     setVisible(btnDelCab, !!cab);
+    if (btnDelCab) btnDelCab.textContent = isRack ? "Удалить стеллаж" : "Удалить шкаф";
     openDialog(dlgCab);
   }
 
   function openContainerForm(cab, cont, shelf, stack, col) {
-    contForm.querySelector(".js-vw-cont-form-title").textContent = cont ? "Ящик" : "Новый ящик";
+    var isRack = cab && cab.kind === "rack";
+    var contKind = cont ? (cont.kind === "shelf_slot" ? "shelf_slot" : "bin") : "bin";
+    contForm.querySelector(".js-vw-cont-form-title").textContent = cont
+      ? (contKind === "shelf_slot" ? "На полке" : "Контейнер")
+      : (isRack ? "Новое содержимое" : "Новый контейнер");
     contForm.querySelector(".js-vw-cont-id").value = cont ? String(cont.id) : "";
     contForm.querySelector(".js-vw-cont-cabinet").value = String(cab.id);
+    var kindRow = contForm.querySelector(".js-vw-cont-kind-row");
+    var kindSel = contForm.querySelector(".js-vw-cont-kind");
+    if (kindRow && kindSel) {
+      setVisible(kindRow, !!isRack);
+      kindSel.value = contKind;
+      kindSel.disabled = !isRack;
+    }
     contForm.querySelector(".js-vw-cont-label").value = cont ? cont.label : "";
     contForm.querySelector(".js-vw-cont-color").value = (cont && cont.color) || "#e74c3c";
     contForm.querySelector(".js-vw-cont-shelf").value = String(cont ? cont.shelf : shelf || 1);
@@ -494,8 +554,10 @@
       return;
     }
     savingCabinet = true;
+    var kindEl = cabForm.querySelector(".js-vw-cab-kind");
     var body = {
       name: name,
+      kind: kindEl ? kindEl.value : "cabinet",
       shelves: cabForm.querySelector(".js-vw-cab-shelves").value,
       columns: cabForm.querySelector(".js-vw-cab-columns").value,
       notes: cabForm.querySelector(".js-vw-cab-notes").value,
@@ -516,23 +578,33 @@
   function saveContainer() {
     if (!contForm || savingContainer) return;
     var cabinetId = parseInt(contForm.querySelector(".js-vw-cont-cabinet").value, 10);
-    var label = (contForm.querySelector(".js-vw-cont-label").value || "").trim();
+    var label = (contForm.querySelector(".js-vw-cont-label").value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    label = label.replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").replace(/^\n+|\n+$/g, "");
     if (!cabinetId) {
       window.alert("Не выбран шкаф — закройте окно и нажмите «+» на полке ещё раз");
       return;
     }
-    if (!label) {
-      window.alert("Напишите подпись на ящике");
+    if (!label.trim()) {
+      window.alert("Напишите подпись на этикетке");
       contForm.querySelector(".js-vw-cont-label").focus();
       return;
     }
     savingContainer = true;
     var idVal = contForm.querySelector(".js-vw-cont-id").value;
     var notesEl = contForm.querySelector(".js-vw-cont-notes");
+    var kindSel = contForm.querySelector(".js-vw-cont-kind");
+    var cab = cabinets.find(function (c) { return c.id === cabinetId; });
+    var contKind = "bin";
+    if (cab && cab.kind === "rack" && kindSel) {
+      contKind = kindSel.value === "shelf_slot" ? "shelf_slot" : "bin";
+    }
+    var stackVal = parseInt(contForm.querySelector(".js-vw-cont-stack").value, 10) || 1;
+    if (contKind === "shelf_slot") stackVal = 1;
     var body = {
       cabinet_id: cabinetId,
+      kind: contKind,
       shelf: parseInt(contForm.querySelector(".js-vw-cont-shelf").value, 10) || 1,
-      stack: parseInt(contForm.querySelector(".js-vw-cont-stack").value, 10) || 1,
+      stack: stackVal,
       column: parseInt(contForm.querySelector(".js-vw-cont-column").value, 10) || 1,
       col_span: parseInt(contForm.querySelector(".js-vw-cont-colspan").value, 10) || 1,
       label: label,

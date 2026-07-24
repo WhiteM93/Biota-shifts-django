@@ -1052,17 +1052,170 @@
         <option value="countersink">Зенкера</option>
         <option value="drill">Сверла</option>
         <option value="insert">Пластинки</option>
+        <option value="collet">Цанги</option>
       </select>
     </label>
     <label class="field"><span>Поиск инструмента</span>
       <input type="text" class="js-tool-search" data-target-select="issue-tool-select" placeholder="Например: 1, 1.0, M6, D1">
     </label>
+
+    <div class="js-issue-cat-panel issue-cat-panel" data-cat="end_mill" hidden>
+      <label class="field"><span>Тип фрезы</span>
+        <select class="js-issue-f" data-fkey="mill_type" data-choice="end_mill_types"></select>
+      </label>
+      <label class="field"><span>Диаметр, мм</span>
+        <select class="js-issue-f" data-fkey="diameter" data-num="1"></select>
+      </label>
+      <label class="field"><span>Радиус, мм</span>
+        <select class="js-issue-f" data-fkey="radius" data-num="1"></select>
+      </label>
+      <label class="field"><span>Длина общая, мм</span>
+        <select class="js-issue-f" data-fkey="length" data-num="1"></select>
+      </label>
+      <label class="field"><span>Длина реж. части, мм</span>
+        <select class="js-issue-f" data-fkey="cutting_length" data-num="1"></select>
+      </label>
+      <label class="field"><span>Кромки</span>
+        <select class="js-issue-f" data-fkey="flutes" data-num="1"></select>
+      </label>
+    </div>
+
+    <div class="js-issue-cat-panel issue-cat-panel" data-cat="tap" hidden>
+      <label class="field"><span>Тип инструмента</span>
+        <select class="js-issue-f" data-fkey="tap_type" data-choice="tap_tool_types" data-subtype="1"></select>
+      </label>
+      <label class="field"><span>Размер</span>
+        <select class="js-issue-f" data-fkey="tap_size"></select>
+      </label>
+      <label class="field"><span>Шаг, мм</span>
+        <select class="js-issue-f" data-fkey="tap_pitch" data-num="1"></select>
+      </label>
+      <label class="field"><span>Стандарт резьбы</span>
+        <select class="js-issue-f" data-fkey="tap_thread" data-choice="thread_standards"></select>
+      </label>
+      <label class="field"><span>Тип отверстия</span>
+        <select class="js-issue-f" data-fkey="tap_hole" data-choice="tap_hole_types"></select>
+      </label>
+      <label class="field"><span>Длина общая, мм</span>
+        <select class="js-issue-f" data-fkey="length" data-num="1"></select>
+      </label>
+      <label class="field"><span>Длина реж. части, мм</span>
+        <select class="js-issue-f" data-fkey="cutting_length" data-num="1"></select>
+      </label>
+    </div>
+
+    <div class="js-issue-cat-panel issue-cat-panel" data-cat="center_drill" hidden>
+      <label class="field"><span>Диаметр, мм</span>
+        <select class="js-issue-f" data-fkey="diameter" data-num="1"></select>
+      </label>
+      <label class="field"><span>Длина, мм</span>
+        <select class="js-issue-f" data-fkey="length" data-num="1"></select>
+      </label>
+      <label class="field"><span>Угол, °</span>
+        <select class="js-issue-f" data-fkey="angle" data-choice="center_drill_angles"></select>
+      </label>
+    </div>
+
+    <div class="js-issue-cat-panel issue-cat-panel" data-cat="countersink" hidden>
+      <label class="field"><span>Тип зенкера</span>
+        <select class="js-issue-f" data-fkey="countersink_type" data-choice="countersink_types" data-subtype="1"></select>
+      </label>
+      <label class="field"><span>Диаметр, мм</span>
+        <select class="js-issue-f" data-fkey="diameter" data-num="1"></select>
+      </label>
+      <label class="field"><span>Угол, °</span>
+        <select class="js-issue-f" data-fkey="angle" data-choice="countersink_angles"></select>
+      </label>
+      <label class="field"><span>Длина, мм</span>
+        <select class="js-issue-f" data-fkey="length" data-num="1"></select>
+      </label>
+      <label class="field"><span>Кромки</span>
+        <select class="js-issue-f" data-fkey="flutes" data-num="1"></select>
+      </label>
+      <label class="field"><span>Размер</span>
+        <select class="js-issue-f" data-fkey="size_label"></select>
+      </label>
+    </div>
+
+    <div class="js-issue-cat-panel issue-cat-panel" data-cat="drill" hidden>
+      <label class="field"><span>Диаметр, мм</span>
+        <select class="js-issue-f" data-fkey="diameter" data-num="1"></select>
+      </label>
+      <label class="field"><span>Длина, мм</span>
+        <select class="js-issue-f" data-fkey="length" data-num="1"></select>
+      </label>
+      <label class="field"><span>Длина реж. части, мм</span>
+        <select class="js-issue-f" data-fkey="cutting_length" data-num="1"></select>
+      </label>
+      <label class="field"><span>Угол, °</span>
+        <select class="js-issue-f" data-fkey="angle" data-num="1"></select>
+      </label>
+    </div>
+
+    <div class="js-issue-cat-panel issue-cat-panel" data-cat="insert" hidden>
+      <label class="field"><span>Семейство</span>
+        <select class="js-issue-f" data-fkey="ins_family" data-choice="milling_insert_families" data-subtype="1"></select>
+      </label>
+      <label class="field"><span>Форма</span>
+        <select class="js-issue-f" data-fkey="ins_shape" data-choice="insert_shapes"></select>
+      </label>
+      <label class="field"><span>ISO</span>
+        <select class="js-issue-f" data-fkey="ins_iso"></select>
+      </label>
+      <label class="field"><span>R, мм</span>
+        <select class="js-issue-f" data-fkey="radius" data-num="1"></select>
+      </label>
+    </div>
+
+    <div class="js-issue-cat-panel issue-cat-panel" data-cat="collet" hidden>
+      <label class="field"><span>Тип цанги</span>
+        <select class="js-issue-f" data-fkey="collet_type" data-choice="collet_types" data-subtype="1"></select>
+      </label>
+      <label class="field"><span>Размер ER</span>
+        <select class="js-issue-f" data-fkey="er_size" data-choice="er_collet_sizes"></select>
+      </label>
+      <label class="field"><span>Диапазон зажима</span>
+        <select class="js-issue-f" data-fkey="clamp_range" data-choice="er_clamp_ranges"></select>
+      </label>
+    </div>
+
+    <div class="field issue-filter-chips-field js-issue-common-filters">
+      <span>Материал инструмента</span>
+      <div class="issue-mat-picker js-tool-filter-material-picker" data-target-select="issue-tool-select" role="radiogroup" aria-label="Материал инструмента">
+        <label class="issue-mat-chip">
+          <input type="radio" name="issue_ui_material" class="js-tool-filter-material" data-target-select="issue-tool-select" value="" checked>
+          <span class="issue-mat-chip-face">Все</span>
+        </label>
+        {% for code, label in tool_material_types %}
+        <label class="issue-mat-chip" data-mat-code="{{ code }}">
+          <input type="radio" name="issue_ui_material" class="js-tool-filter-material" data-target-select="issue-tool-select" value="{{ code }}">
+          <span class="issue-mat-chip-face" title="{{ label }}">{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="field issue-filter-chips-field js-issue-common-filters">
+      <span>Покрытие</span>
+      <div class="coating-picker js-tool-filter-coating-picker" data-target-select="issue-tool-select" role="radiogroup" aria-label="Покрытие">
+        <label class="coating-chip">
+          <input type="radio" name="issue_ui_coating" class="js-tool-filter-coating" data-target-select="issue-tool-select" value="" checked>
+          <span class="swatch swatch-all" title="Все"></span>
+        </label>
+        {% for key, label in coating_types %}
+        <label class="coating-chip">
+          <input type="radio" name="issue_ui_coating" class="js-tool-filter-coating" data-target-select="issue-tool-select" value="{{ key }}">
+          <span class="swatch swatch-{{ key }}" title="{{ key|coating_hover_title }}"></span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <p class="muted issue-filter-hint">Сначала тип, затем подтип (если есть) — размеры подставляются из позиций на складе.</p>
     <label class="field issue-tool-field"><span>Инструмент</span>
       <div class="issue-tool-combo js-issue-tool-combo">
         <select id="issue-tool-select" name="tool_id" required class="issue-tool-combo-native" tabindex="-1" aria-hidden="true">
           <option value="">Выбрать...</option>
           {% for t in movement_tool_options %}
-          {% with card=t.issue_combo_card coat=t.coating_type|default:'none' %}
+          {% with card=t.issue_combo_card coat=t.coating_type|default:'none' m=t.issue_filter_metrics %}
           <option
             value="{{ t.id }}"
             data-category="{{ t.category }}"
@@ -1074,6 +1227,28 @@
             data-issue-coating-title="{{ coat|coating_hover_title|escape }}"
             data-issue-wm="{{ t.work_material|default:''|escape }}"
             data-issue-wm-title="{% if t.work_material %}{{ t.get_work_material_display|escape }}{% endif %}"
+            data-f-material="{{ m.material|escape }}"
+            data-f-coating="{{ m.coating|escape }}"
+            data-f-mill_type="{{ m.mill_type|escape }}"
+            data-f-diameter="{{ m.diameter }}"
+            data-f-radius="{{ m.radius }}"
+            data-f-length="{{ m.length }}"
+            data-f-cutting_length="{{ m.cutting_length }}"
+            data-f-flutes="{{ m.flutes }}"
+            data-f-tap_type="{{ m.tap_type|escape }}"
+            data-f-tap_size="{{ m.tap_size|escape }}"
+            data-f-tap_pitch="{{ m.tap_pitch }}"
+            data-f-tap_thread="{{ m.tap_thread|escape }}"
+            data-f-tap_hole="{{ m.tap_hole|escape }}"
+            data-f-angle="{{ m.angle|escape }}"
+            data-f-countersink_type="{{ m.countersink_type|escape }}"
+            data-f-size_label="{{ m.size_label|escape }}"
+            data-f-ins_iso="{{ m.ins_iso|escape }}"
+            data-f-ins_shape="{{ m.ins_shape|escape }}"
+            data-f-ins_family="{{ m.ins_family|escape }}"
+            data-f-collet_type="{{ m.collet_type|escape }}"
+            data-f-er_size="{{ m.er_size|escape }}"
+            data-f-clamp_range="{{ m.clamp_range|escape }}"
           >{{ t.issue_select_label }}</option>
           {% endwith %}
           {% endfor %}

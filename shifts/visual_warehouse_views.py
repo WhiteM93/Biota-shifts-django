@@ -231,6 +231,20 @@ def _matching_tools_for_container(c: VisualContainer, items: list[VisualContaine
     return out
 
 
+def _normalize_cabinet_kind(raw) -> str:
+    kind = str(raw or "").strip().lower()
+    if kind == VisualCabinet.KIND_RACK:
+        return VisualCabinet.KIND_RACK
+    return VisualCabinet.KIND_CABINET
+
+
+def _normalize_container_kind(raw) -> str:
+    kind = str(raw or "").strip().lower()
+    if kind == VisualContainer.KIND_SHELF_SLOT:
+        return VisualContainer.KIND_SHELF_SLOT
+    return VisualContainer.KIND_BIN
+
+
 def _serialize_container(c: VisualContainer, *, with_items: bool = False) -> dict:
     color = (c.color or "").strip()
     if not _HEX_RE.match(color):
@@ -238,6 +252,7 @@ def _serialize_container(c: VisualContainer, *, with_items: bool = False) -> dic
     data = {
         "id": c.id,
         "cabinet_id": c.cabinet_id,
+        "kind": _normalize_container_kind(getattr(c, "kind", None)),
         "shelf": c.shelf,
         "stack": max(1, int(c.stack or 1)),
         "column": c.column,
@@ -330,6 +345,7 @@ def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> d
     data = {
         "id": cab.id,
         "name": cab.name,
+        "kind": _normalize_cabinet_kind(getattr(cab, "kind", None)),
         "shelves": cab.shelves,
         "columns": cab.columns,
         "notes": cab.notes or "",
@@ -388,11 +404,13 @@ def _cabinets_create(request):
     name = str(body.get("name") or "").strip()[:120]
     if not name:
         return _err("Укажите название шкафа")
+    kind = _normalize_cabinet_kind(body.get("kind"))
     shelves = _clamp_int(body.get("shelves"), 4, 1, MAX_SHELVES)
     columns = _clamp_int(body.get("columns"), 3, 1, MAX_COLUMNS)
     notes = str(body.get("notes") or "").strip()[:300]
     cab = VisualCabinet.objects.create(
         name=name,
+        kind=kind,
         shelves=shelves,
         columns=columns,
         notes=notes,
@@ -433,6 +451,13 @@ def _cabinet_mutate(request, cab: VisualCabinet):
         if not name:
             return _err("Укажите название")
         cab.name = name
+    if "kind" in body:
+        new_kind = _normalize_cabinet_kind(body.get("kind"))
+        if new_kind == VisualCabinet.KIND_CABINET:
+            has_slot = cab.containers.filter(kind=VisualContainer.KIND_SHELF_SLOT).exists()
+            if has_slot:
+                return _err("Нельзя сделать шкаф: на стеллаже есть зоны «на полке». Удалите их или оставьте стеллаж.")
+        cab.kind = new_kind
     if "notes" in body:
         cab.notes = str(body.get("notes") or "").strip()[:300]
     if "shelves" in body or "columns" in body:
@@ -471,13 +496,22 @@ def visual_warehouse_api_container_upsert(request):
     # при columns=1 сжимается в 1 и всегда пересекается с первым ящиком.
     column = _clamp_int(body.get("column"), 0, 1, MAX_COLUMNS)
     col_span = _clamp_int(body.get("col_span"), 1, 1, MAX_COLUMNS)
-    label = str(body.get("label") or "").strip()[:120]
-    if not label:
+    # Сохраняем ручные переносы (\n), обрезаем края строк
+    label_raw = str(body.get("label") or "")
+    label = "\n".join(line.rstrip() for line in label_raw.replace("\r\n", "\n").replace("\r", "\n").split("\n"))
+    label = label.strip("\n")[:120]
+    if not label.strip():
         return _err("Укажите подпись контейнера")
     color = str(body.get("color") or "#e74c3c").strip()
     if not _HEX_RE.match(color):
         color = "#e74c3c"
     notes = str(body.get("notes") or "").strip()[:300]
+    cont_kind = _normalize_container_kind(body.get("kind"))
+    cab_kind = _normalize_cabinet_kind(cab.kind)
+    if cont_kind == VisualContainer.KIND_SHELF_SLOT and cab_kind != VisualCabinet.KIND_RACK:
+        return _err("Зона «на полке» доступна только на стеллаже")
+    if cont_kind == VisualContainer.KIND_SHELF_SLOT and stack > 1:
+        return _err("Зона «на полке» не ставится в стопку — только ярус 1")
     cid = body.get("id")
     exclude_id = int(cid) if cid else None
 
@@ -500,6 +534,7 @@ def visual_warehouse_api_container_upsert(request):
         return _err(overlap)
     if cid:
         cont = get_object_or_404(VisualContainer, pk=cid, cabinet=cab)
+        cont.kind = cont_kind
         cont.shelf = shelf
         cont.stack = stack
         cont.column = column
@@ -512,6 +547,7 @@ def visual_warehouse_api_container_upsert(request):
     else:
         cont = VisualContainer.objects.create(
             cabinet=cab,
+            kind=cont_kind,
             shelf=shelf,
             stack=stack,
             column=column,
