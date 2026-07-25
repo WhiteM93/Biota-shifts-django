@@ -6,7 +6,8 @@ import re
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
-from django.db.models import Count, Prefetch, Sum
+from django.db.models import Count, F, Prefetch, Sum
+from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -15,6 +16,7 @@ from django.views.decorators.http import require_http_methods
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
 from .models import (
     COATING_TYPE_TOOLTIPS,
+    END_MILL_TYPES,
     InventoryStockEvent,
     StockMovement,
     ToolItem,
@@ -32,6 +34,13 @@ MAX_ITEMS_PER_CONTAINER = 80
 MAX_AUDIT_LINES = 120
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _VALID_CATEGORIES = {c for c, _ in VisualContainerItem.TOOL_CATEGORY_CHOICES if c}
+_VALID_MILL_TYPES = {c for c, _ in END_MILL_TYPES}
+_DIAMETER_FIELD_BY_CATEGORY = {
+    "end_mill": "end_mill_spec__diameter_mm",
+    "drill": "drill_spec__diameter_mm",
+    "center_drill": "center_drill_spec__diameter_mm",
+    "countersink": "countersink_spec__diameter_mm",
+}
 
 
 def _fmt_dt(dt) -> str:
@@ -80,6 +89,7 @@ def _serialize_item(item: VisualContainerItem, stock_qty: int | None = None) -> 
         "id": item.id,
         "title": item.title,
         "tool_category": item.tool_category or "",
+        "mill_type": (getattr(item, "mill_type", None) or ""),
         "diameter_from_mm": float(item.diameter_from_mm) if item.diameter_from_mm is not None else None,
         "diameter_to_mm": float(item.diameter_to_mm) if item.diameter_to_mm is not None else None,
         "tool_item_id": item.tool_item_id,
@@ -90,16 +100,34 @@ def _serialize_item(item: VisualContainerItem, stock_qty: int | None = None) -> 
     }
 
 
+def _cutting_diameter_mm(tool: ToolItem):
+    cat = tool.category or ""
+    if cat == "end_mill":
+        em = getattr(tool, "end_mill_spec", None)
+        return em.diameter_mm if em else None
+    if cat == "drill":
+        dr = getattr(tool, "drill_spec", None)
+        return dr.diameter_mm if dr else None
+    if cat == "center_drill":
+        cd = getattr(tool, "center_drill_spec", None)
+        return cd.diameter_mm if cd else None
+    if cat == "countersink":
+        cs = getattr(tool, "countersink_spec", None)
+        return cs.diameter_mm if cs else None
+    return tool.main_diameter_mm
+
+
 def _stock_qty_for_item(item: VisualContainerItem) -> int | None:
     if item.tool_item_id and item.tool_item and not item.tool_item.is_deleted:
         return int(item.tool_item.quantity or 0)
     if not item.tool_category:
         return None
-    qs = ToolItem.objects.filter(is_deleted=False, category=item.tool_category)
-    if item.diameter_from_mm is not None:
-        qs = qs.filter(main_diameter_mm__gte=item.diameter_from_mm)
-    if item.diameter_to_mm is not None:
-        qs = qs.filter(main_diameter_mm__lte=item.diameter_to_mm)
+    qs = _tool_qs_for_filter(
+        category=item.tool_category,
+        d_from=item.diameter_from_mm,
+        d_to=item.diameter_to_mm,
+        mill_type=getattr(item, "mill_type", None) or "",
+    )
     total = qs.aggregate(s=Sum("quantity"))["s"]
     return int(total or 0)
 
@@ -149,16 +177,26 @@ def _infer_filter_from_label(label: str) -> dict | None:
 
 
 def _serialize_tool(tool: ToolItem) -> dict:
-    diam = float(tool.main_diameter_mm) if tool.main_diameter_mm is not None else None
+    cutting = _cutting_diameter_mm(tool)
+    diam = float(cutting) if cutting is not None else None
     coating = (tool.coating_type or "none").strip() or "none"
     coating_label = "без покрытия" if coating == "none" else str(tool.get_coating_type_display())
     wm_codes = tool.work_material_codes_list()
+    mill_type = ""
+    mill_type_label = ""
+    if tool.category == "end_mill":
+        em = getattr(tool, "end_mill_spec", None)
+        if em:
+            mill_type = (em.mill_type or "").strip()
+            mill_type_label = em.get_mill_type_display() if mill_type else ""
     return {
         "id": tool.id,
         "name": tool.name,
         "category": tool.category or "",
         "category_label": tool.get_category_display() if tool.category else "",
         "diameter_mm": diam,
+        "mill_type": mill_type,
+        "mill_type_label": mill_type_label,
         "quantity": int(tool.quantity or 0),
         "notes": tool.notes or "",
         "tool_material": (tool.tool_material or "").strip(),
@@ -177,16 +215,41 @@ def _tool_qs_for_filter(
     category: str = "",
     d_from=None,
     d_to=None,
+    mill_type: str = "",
 ):
     if tool_item_id:
-        return ToolItem.objects.filter(pk=tool_item_id, is_deleted=False)
+        return ToolItem.objects.filter(pk=tool_item_id, is_deleted=False).select_related(
+            "end_mill_spec",
+            "drill_spec",
+            "center_drill_spec",
+            "countersink_spec",
+            "tap_spec",
+        )
     if not category:
         return ToolItem.objects.none()
-    qs = ToolItem.objects.filter(is_deleted=False, category=category)
-    if d_from is not None:
-        qs = qs.filter(main_diameter_mm__gte=d_from)
-    if d_to is not None:
-        qs = qs.filter(main_diameter_mm__lte=d_to)
+    qs = ToolItem.objects.filter(is_deleted=False, category=category).select_related(
+        "end_mill_spec",
+        "drill_spec",
+        "center_drill_spec",
+        "countersink_spec",
+        "tap_spec",
+    )
+    diam_field = _DIAMETER_FIELD_BY_CATEGORY.get(category)
+    if diam_field and (d_from is not None or d_to is not None):
+        # Режущий Ø из спецификации; если пусто — запасной main_diameter_mm
+        qs = qs.annotate(_match_diameter=Coalesce(F(diam_field), F("main_diameter_mm")))
+        if d_from is not None:
+            qs = qs.filter(_match_diameter__gte=d_from)
+        if d_to is not None:
+            qs = qs.filter(_match_diameter__lte=d_to)
+    elif category == "tap":
+        # У метчиков режущий Ø обычно в main_diameter / размере — оставляем запасной фильтр
+        if d_from is not None:
+            qs = qs.filter(main_diameter_mm__gte=d_from)
+        if d_to is not None:
+            qs = qs.filter(main_diameter_mm__lte=d_to)
+    if category == "end_mill" and mill_type:
+        qs = qs.filter(end_mill_spec__mill_type=mill_type)
     return qs
 
 
@@ -197,7 +260,7 @@ def _matching_tools_for_container(c: VisualContainer, items: list[VisualContaine
     rows = items if items is not None else list(c.items.select_related("tool_item").all())
 
     def _add_from_qs(qs):
-        for tool in qs.order_by("category", "main_diameter_mm", "name")[:120]:
+        for tool in qs.order_by("category", "name")[:120]:
             if tool.pk in seen:
                 continue
             seen.add(tool.pk)
@@ -215,6 +278,7 @@ def _matching_tools_for_container(c: VisualContainer, items: list[VisualContaine
                     category=item.tool_category,
                     d_from=item.diameter_from_mm,
                     d_to=item.diameter_to_mm,
+                    mill_type=getattr(item, "mill_type", None) or "",
                 )
             )
 
@@ -369,6 +433,7 @@ def visual_warehouse_view(request):
                 for v, lab in VisualContainerItem.TOOL_CATEGORY_CHOICES
                 if v
             ],
+            "end_mill_types": [{"value": v, "label": lab} for v, lab in END_MILL_TYPES],
         },
     )
 
@@ -609,6 +674,11 @@ def visual_warehouse_api_item_upsert(request):
     category = str(body.get("tool_category") or "").strip()
     if category and category not in _VALID_CATEGORIES:
         return _err("Некорректная категория")
+    mill_type = str(body.get("mill_type") or "").strip()
+    if mill_type and mill_type not in _VALID_MILL_TYPES:
+        return _err("Некорректный тип фрезы")
+    if category != "end_mill":
+        mill_type = ""
     d_from = _dec(body.get("diameter_from_mm"))
     d_to = _dec(body.get("diameter_to_mm"))
     quantity_note = str(body.get("quantity_note") or "").strip()[:80]
@@ -625,6 +695,7 @@ def visual_warehouse_api_item_upsert(request):
         item = get_object_or_404(VisualContainerItem, pk=item_id, container=cont)
         item.title = title
         item.tool_category = category
+        item.mill_type = mill_type
         item.diameter_from_mm = d_from
         item.diameter_to_mm = d_to
         item.quantity_note = quantity_note
@@ -638,6 +709,7 @@ def visual_warehouse_api_item_upsert(request):
             container=cont,
             title=title,
             tool_category=category,
+            mill_type=mill_type,
             diameter_from_mm=d_from,
             diameter_to_mm=d_to,
             quantity_note=quantity_note,

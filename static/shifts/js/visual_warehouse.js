@@ -62,6 +62,13 @@
     insert: "Пластинки",
     collet: "Цанги",
   };
+  var MILL_TYPE_LABELS = {
+    end: "Концевая",
+    roughing: "Обдирочная",
+    t_slot: "Т-образная",
+    radius: "Радиусная",
+    ball: "Сферическая",
+  };
 
   function csrfToken() {
     var m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
@@ -702,10 +709,13 @@
       alert("Укажите, что лежит");
       return;
     }
+    var category = itemForm.querySelector(".js-vw-item-category").value;
+    var millTypeEl = itemForm.querySelector(".js-vw-item-mill-type");
     var body = {
       container_id: openContainerId,
       title: title,
-      tool_category: itemForm.querySelector(".js-vw-item-category").value,
+      tool_category: category,
+      mill_type: category === "end_mill" && millTypeEl ? millTypeEl.value : "",
       diameter_from_mm: itemForm.querySelector(".js-vw-item-dfrom").value,
       diameter_to_mm: itemForm.querySelector(".js-vw-item-dto").value,
       quantity_note: itemForm.querySelector(".js-vw-item-qty").value,
@@ -716,15 +726,30 @@
         itemForm.querySelector(".js-vw-item-dfrom").value = "";
         itemForm.querySelector(".js-vw-item-dto").value = "";
         itemForm.querySelector(".js-vw-item-qty").value = "";
+        if (millTypeEl) millTypeEl.value = "";
         return openContents(openContainerId);
       })
       .then(function () { return loadCabinets(); })
       .catch(function (e) { alert(e.message); });
   }
 
+  function syncItemMillTypeRow() {
+    if (!itemForm) return;
+    var cat = itemForm.querySelector(".js-vw-item-category");
+    var row = itemForm.querySelector(".js-vw-item-mill-type-row");
+    if (!cat || !row) return;
+    var show = cat.value === "end_mill";
+    row.hidden = !show;
+    if (!show) {
+      var mt = itemForm.querySelector(".js-vw-item-mill-type");
+      if (mt) mt.value = "";
+    }
+  }
+
   function appendToolStockMeta(metaEl, tool, extraParts) {
     var parts = [];
     if (tool.category_label) parts.push(tool.category_label);
+    if (tool.mill_type_label) parts.push(tool.mill_type_label);
     if (tool.diameter_mm != null) parts.push("Ø " + tool.diameter_mm);
     if (tool.tool_material_label) parts.push(tool.tool_material_label);
     if (Array.isArray(extraParts)) {
@@ -1064,6 +1089,9 @@
       meta.className = "vw-item-meta";
       var parts = [];
       if (it.tool_category) parts.push(CAT_LABELS[it.tool_category] || it.tool_category);
+      if (it.tool_category === "end_mill" && it.mill_type) {
+        parts.push(MILL_TYPE_LABELS[it.mill_type] || it.mill_type);
+      }
       if (it.diameter_from_mm != null || it.diameter_to_mm != null) {
         parts.push("Ø " + (it.diameter_from_mm != null ? it.diameter_from_mm : "?") + "–" + (it.diameter_to_mm != null ? it.diameter_to_mm : "?"));
       }
@@ -1119,6 +1147,12 @@
     btnSaveAudit.addEventListener("click", function () {
       saveAudit();
     });
+  }
+
+  if (itemForm) {
+    var catSel = itemForm.querySelector(".js-vw-item-category");
+    if (catSel) catSel.addEventListener("change", syncItemMillTypeRow);
+    syncItemMillTypeRow();
   }
 
   setEditMode(false);

@@ -195,6 +195,15 @@
               {% endfor %}
             </select>
           </label>
+          <label class="vw-row js-vw-item-mill-type-row" hidden>
+            <span class="vw-row-label">Тип фрезы</span>
+            <select class="vw-control js-vw-item-mill-type">
+              <option value="">Все типы</option>
+              {% for mt in end_mill_types %}
+              <option value="{{ mt.value }}">{{ mt.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
           <div class="vw-row-pair">
             <label class="vw-row">
               <span class="vw-row-label">Ø от, мм</span>

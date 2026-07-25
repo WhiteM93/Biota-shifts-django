@@ -2772,6 +2772,13 @@ class VisualContainerItem(models.Model):
         choices=TOOL_CATEGORY_CHOICES,
         verbose_name="Категория склада",
     )
+    mill_type = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        choices=[("", "Все типы")] + list(END_MILL_TYPES),
+        verbose_name="Тип фрезы",
+    )
     diameter_from_mm = models.DecimalField(
         max_digits=6,
         decimal_places=2,
