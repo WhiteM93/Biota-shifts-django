@@ -48,7 +48,7 @@
   <header class="inv-payroll__head">
     <h2>Расчёт заработной платы</h2>
     <p class="inv-payroll__lead">Сотрудники по вашим правам «Расчёт ЗП». Клик по ФИО — табель и расчёт за {{ payroll_month_name }} {{ payroll_year }}. Отметки «Аванс» и «ЗП» — в карточке сотрудника.</p>
-    <form method="get" class="inv-payroll__toolbar">
+    <form method="get" class="inv-payroll__toolbar" id="inv-payroll-filter-form">
       <input type="hidden" name="panel" value="payroll">
       <label class="field"><span>Год</span>
         <select name="year">
@@ -64,12 +64,33 @@
           {% endfor %}
         </select>
       </label>
+      {% if payroll_dept_options %}
+      <div class="inv-payroll-dd" id="inv-payroll-dep-dd">
+        <span class="inv-payroll-dd__caption">Отдел</span>
+        <button type="button" class="inv-payroll-dd__btn" id="inv-payroll-dep-btn" aria-expanded="false" aria-haspopup="listbox">
+          <span class="inv-payroll-dd__txt" id="inv-payroll-dep-txt">Все</span>
+          <svg class="inv-payroll-dd__arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 6 8 10 12 6"/></svg>
+        </button>
+        <div class="inv-payroll-dd__panel" id="inv-payroll-dep-panel" hidden>
+          <div class="inv-payroll-dd__actions">
+            <button type="button" class="inv-payroll-dd__all">Все</button>
+            <button type="button" class="inv-payroll-dd__none">Снять</button>
+          </div>
+          {% for d in payroll_dept_options %}
+          <label class="inv-payroll-dd__item">
+            <input type="checkbox" name="dep" value="{{ d }}" {% if d in payroll_depts_selected %}checked{% endif %}>
+            <span class="inv-payroll-dd__item-label">{{ d }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
       <button type="submit" class="btn">Показать</button>
     </form>
   </header>
 
   {% if payroll_rows %}
-  <p class="inv-payroll__meta">В списке: {{ payroll_rows|length }} · {{ payroll_month_name }} {{ payroll_year }}</p>
+  <p class="inv-payroll__meta">В списке: {{ payroll_rows|length }} · {{ payroll_month_name }} {{ payroll_year }}{% if payroll_depts_selected %} · отделы: {{ payroll_depts_selected|join:", " }}{% endif %}</p>
   {% endif %}
 
   <div class="inv-payroll-table-wrap">
@@ -97,12 +118,65 @@
           <td class="col-action" data-label="Расчёт"><a class="btn btn-sm" href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">Расчёт</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="inv-payroll-table__empty muted">Нет сотрудников для расчёта (права по отделам или недоступна БД Biota).</td></tr>
+        <tr><td colspan="7" class="inv-payroll-table__empty muted">Нет сотрудников для расчёта (права по отделам, фильтр отделов или недоступна БД Biota).</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </section>
+<script>
+(function () {
+  var dd = document.getElementById("inv-payroll-dep-dd");
+  if (!dd) return;
+  var btn = document.getElementById("inv-payroll-dep-btn");
+  var panel = document.getElementById("inv-payroll-dep-panel");
+  var txt = document.getElementById("inv-payroll-dep-txt");
+  if (!btn || !panel || !txt) return;
+  var cbs = Array.prototype.slice.call(panel.querySelectorAll("input[type='checkbox']"));
+
+  function updateLabel() {
+    var checked = cbs.filter(function (cb) { return cb.checked; });
+    if (!checked.length || checked.length === cbs.length) {
+      txt.textContent = "Все";
+    } else if (checked.length <= 2) {
+      txt.textContent = checked.map(function (cb) { return cb.value; }).join(", ");
+    } else {
+      txt.textContent = "Выбрано: " + checked.length;
+    }
+  }
+
+  function setOpen(open) {
+    panel.hidden = !open;
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  btn.addEventListener("click", function (e) {
+    e.preventDefault();
+    setOpen(panel.hidden);
+  });
+  document.addEventListener("click", function (e) {
+    if (!dd.contains(e.target)) setOpen(false);
+  });
+  var allBtn = panel.querySelector(".inv-payroll-dd__all");
+  var noneBtn = panel.querySelector(".inv-payroll-dd__none");
+  if (allBtn) {
+    allBtn.addEventListener("click", function () {
+      cbs.forEach(function (cb) { cb.checked = true; });
+      updateLabel();
+    });
+  }
+  if (noneBtn) {
+    noneBtn.addEventListener("click", function () {
+      cbs.forEach(function (cb) { cb.checked = false; });
+      updateLabel();
+    });
+  }
+  cbs.forEach(function (cb) {
+    cb.addEventListener("change", updateLabel);
+  });
+  updateLabel();
+})();
+</script>
 {% endif %}
 
 {% if panel == "employees" %}

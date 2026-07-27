@@ -620,19 +620,39 @@ def build_payroll_employee_rows(
     username: str,
     year: int,
     month: int,
-) -> tuple[pd.DataFrame, dict[str, float], list[int]]:
-    """DataFrame сотрудников для payroll, суммы СКУД за месяц, годы для селектора."""
+    *,
+    selected_departments: list[str] | None = None,
+) -> tuple[pd.DataFrame, dict[str, float], list[int], list[str]]:
+    """DataFrame сотрудников для payroll, суммы СКУД за месяц, годы и отделы для селекторов."""
     try:
         cfg = biota_db.db_config()
         full = biota_db.load_employees(cfg)
     except Exception:
-        return pd.DataFrame(), {}, [datetime.now().year]
+        return pd.DataFrame(), {}, [datetime.now().year], []
     df = employees_df_for_nav(username, "payroll", full)
     if df is None or getattr(df, "empty", True):
-        return df, {}, payroll_year_options_for_employees(df)
+        return df if df is not None else pd.DataFrame(), {}, payroll_year_options_for_employees(df), []
+    dept_options: list[str] = []
+    if "department_name" in df.columns:
+        dept_options = sorted(
+            {
+                str(v).strip()
+                for v in df["department_name"].tolist()
+                if str(v).strip()
+            },
+            key=lambda x: x.lower(),
+        )
+    if selected_departments:
+        allowed = set(dept_options)
+        wanted = {str(d).strip() for d in selected_departments if str(d).strip() in allowed}
+        # Полный набор отделов = без фильтра
+        if wanted and wanted != allowed:
+            df = df[df["department_name"].isin(wanted)].copy()
+    if df is None or getattr(df, "empty", True):
+        return df if df is not None else pd.DataFrame(), {}, payroll_year_options_for_employees(df), dept_options
     totals, _ = skud_hours_for_payroll_month(df, year, month)
     years = payroll_year_options_for_employees(df)
-    return df, totals, years
+    return df, totals, years, dept_options
 
 
 def resolve_payroll_employee(username: str, emp_code: str) -> dict | None:

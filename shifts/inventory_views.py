@@ -2434,12 +2434,26 @@ def inventory_view(request):
     payroll_month = date.today().month
     payroll_month_name = MONTH_NAMES_RU[payroll_month]
     payroll_year_options: list[int] = []
+    payroll_dept_options: list[str] = []
+    payroll_depts_selected: list[str] = []
     if panel == "payroll":
         from .payroll_helpers import build_payroll_employee_rows, parse_payroll_year_month
 
         payroll_year, payroll_month = parse_payroll_year_month(request)
         payroll_month_name = MONTH_NAMES_RU[payroll_month]
-        pay_df, skud_totals, payroll_year_options = build_payroll_employee_rows(username, payroll_year, payroll_month)
+        payroll_depts_selected = [d.strip() for d in request.GET.getlist("dep") if str(d).strip()]
+        pay_df, skud_totals, payroll_year_options, payroll_dept_options = build_payroll_employee_rows(
+            username,
+            payroll_year,
+            payroll_month,
+            selected_departments=payroll_depts_selected or None,
+        )
+        # Оставляем в UI только реально существующие; полный набор = «все»
+        if payroll_depts_selected and payroll_dept_options:
+            allowed_deps = set(payroll_dept_options)
+            payroll_depts_selected = [d for d in payroll_depts_selected if d in allowed_deps]
+            if set(payroll_depts_selected) == allowed_deps:
+                payroll_depts_selected = []
         if pay_df is not None and not getattr(pay_df, "empty", True):
             for _, r in pay_df.iterrows():
                 ec = normalize_emp_code(str(r.get("emp_code") or ""))
@@ -2730,6 +2744,8 @@ def inventory_view(request):
         "payroll_month": payroll_month,
         "payroll_month_name": payroll_month_name,
         "payroll_year_options": payroll_year_options,
+        "payroll_dept_options": payroll_dept_options,
+        "payroll_depts_selected": payroll_depts_selected,
         "month_choices_payroll": [(mm, MONTH_NAMES_RU[mm]) for mm in range(1, 13)],
     }
     if panel == "analysis":
