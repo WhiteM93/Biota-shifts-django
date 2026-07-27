@@ -46,6 +46,10 @@
   var auditNewCategory = document.querySelector(".js-vw-audit-new-category");
   var auditNewMillRow = document.querySelector(".js-vw-audit-new-mill-row");
   var auditNewMillType = document.querySelector(".js-vw-audit-new-mill-type");
+  var auditNewTapTypeRow = document.querySelector(".js-vw-audit-new-tap-type-row");
+  var auditNewTapType = document.querySelector(".js-vw-audit-new-tap-type");
+  var auditNewHoleRow = document.querySelector(".js-vw-audit-new-hole-row");
+  var auditNewHoleType = document.querySelector(".js-vw-audit-new-hole-type");
   var auditNewDiamRow = document.querySelector(".js-vw-audit-new-diam-row");
   var auditNewDiameter = document.querySelector(".js-vw-audit-new-diameter");
   var auditNewSizeRow = document.querySelector(".js-vw-audit-new-size-row");
@@ -83,6 +87,27 @@
     radius: "Радиусная",
     ball: "Сферическая",
   };
+  var TAP_TYPE_LABELS = {
+    cutting: "Режущий метчик",
+    forming: "Метчик-раскатник",
+    thread_mill: "Резьбофреза",
+  };
+  var HOLE_TYPE_LABELS = {
+    through: "Сквозное",
+    blind: "Глухое",
+    any: "Универсальное",
+  };
+  var COUNTERSINK_TYPE_LABELS = {
+    hand: "Ручной",
+    machine: "Машинный",
+  };
+  var SUBTYPE_OPTIONS = {};
+  try {
+    var subtypeEl = document.getElementById("vw-subtype-options");
+    if (subtypeEl) SUBTYPE_OPTIONS = JSON.parse(subtypeEl.textContent || "{}") || {};
+  } catch (e) {
+    SUBTYPE_OPTIONS = {};
+  }
 
   function csrfToken() {
     var m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
@@ -1058,12 +1083,20 @@
       return;
     }
     var category = itemForm.querySelector(".js-vw-item-category").value;
-    var millTypeEl = itemForm.querySelector(".js-vw-item-mill-type");
+    var subtypeEl = itemForm.querySelector(".js-vw-item-subtype");
+    var sizeEl = itemForm.querySelector(".js-vw-item-size");
+    var holeEl = itemForm.querySelector(".js-vw-item-hole-type");
+    var subtype = subtypeEl ? subtypeEl.value : "";
     var body = {
       container_id: openContainerId,
       title: title,
       tool_category: category,
-      mill_type: category === "end_mill" && millTypeEl ? millTypeEl.value : "",
+      mill_type: category === "end_mill" ? subtype : "",
+      tap_type: category === "tap" ? subtype : "",
+      hole_type: category === "tap" && holeEl ? holeEl.value : "",
+      countersink_type: category === "countersink" ? subtype : "",
+      collet_type: category === "collet" ? subtype : "",
+      size_label: category === "tap" && sizeEl ? (sizeEl.value || "").trim() : "",
       diameter_from_mm: itemForm.querySelector(".js-vw-item-dfrom").value,
       diameter_to_mm: itemForm.querySelector(".js-vw-item-dto").value,
       quantity_note: itemForm.querySelector(".js-vw-item-qty").value,
@@ -1074,30 +1107,79 @@
         itemForm.querySelector(".js-vw-item-dfrom").value = "";
         itemForm.querySelector(".js-vw-item-dto").value = "";
         itemForm.querySelector(".js-vw-item-qty").value = "";
-        if (millTypeEl) millTypeEl.value = "";
+        if (subtypeEl) subtypeEl.value = "";
+        if (sizeEl) sizeEl.value = "";
+        if (holeEl) holeEl.value = "";
         return openContents(openContainerId);
       })
       .then(function () { return loadCabinets(); })
       .catch(function (e) { alert(e.message); });
   }
 
-  function syncItemMillTypeRow() {
+  function syncItemFilterFields() {
     if (!itemForm) return;
-    var cat = itemForm.querySelector(".js-vw-item-category");
-    var row = itemForm.querySelector(".js-vw-item-mill-type-row");
-    if (!cat || !row) return;
-    var show = cat.value === "end_mill";
-    setVisible(row, show);
-    if (!show) {
-      var mt = itemForm.querySelector(".js-vw-item-mill-type");
-      if (mt) mt.value = "";
+    var catEl = itemForm.querySelector(".js-vw-item-category");
+    var subtypeRow = itemForm.querySelector(".js-vw-item-subtype-row");
+    var subtypeLabel = itemForm.querySelector(".js-vw-item-subtype-label");
+    var subtypeSel = itemForm.querySelector(".js-vw-item-subtype");
+    var sizeRow = itemForm.querySelector(".js-vw-item-size-row");
+    var holeRow = itemForm.querySelector(".js-vw-item-hole-row");
+    var diamRow = itemForm.querySelector(".js-vw-item-diam-row");
+    if (!catEl) return;
+    var cat = catEl.value;
+    var cfg = SUBTYPE_OPTIONS[cat];
+    var showSubtype = !!cfg;
+    var showSize = cat === "tap";
+    var showHole = cat === "tap";
+    var showDiam = cat === "end_mill" || cat === "drill" || cat === "center_drill" || cat === "countersink" || cat === "";
+    if (subtypeRow) setVisible(subtypeRow, showSubtype);
+    if (sizeRow) setVisible(sizeRow, showSize);
+    if (holeRow) setVisible(holeRow, showHole);
+    if (diamRow) setVisible(diamRow, showDiam || !cat);
+    if (subtypeSel) {
+      var prev = subtypeSel.value;
+      subtypeSel.innerHTML = "";
+      var allOpt = document.createElement("option");
+      allOpt.value = "";
+      allOpt.textContent = "Все типы";
+      subtypeSel.appendChild(allOpt);
+      if (cfg && Array.isArray(cfg.options)) {
+        if (subtypeLabel) subtypeLabel.textContent = cfg.label || "Тип";
+        cfg.options.forEach(function (opt) {
+          var o = document.createElement("option");
+          o.value = opt.value;
+          o.textContent = opt.label;
+          subtypeSel.appendChild(o);
+        });
+      }
+      if (prev && Array.prototype.some.call(subtypeSel.options, function (o) { return o.value === prev; })) {
+        subtypeSel.value = prev;
+      } else {
+        subtypeSel.value = "";
+      }
+      if (!showSubtype) subtypeSel.value = "";
     }
+    if (!showSize) {
+      var sizeEl = itemForm.querySelector(".js-vw-item-size");
+      if (sizeEl) sizeEl.value = "";
+    }
+    if (!showHole) {
+      var holeEl = itemForm.querySelector(".js-vw-item-hole-type");
+      if (holeEl) holeEl.value = "";
+    }
+  }
+
+  function syncItemMillTypeRow() {
+    syncItemFilterFields();
   }
 
   function appendToolStockMeta(metaEl, tool, extraParts) {
     var parts = [];
     if (tool.category_label) parts.push(tool.category_label);
-    if (tool.mill_type_label) parts.push(tool.mill_type_label);
+    if (tool.subtype_label) parts.push(tool.subtype_label);
+    else if (tool.mill_type_label) parts.push(tool.mill_type_label);
+    if (tool.hole_type_label) parts.push(tool.hole_type_label);
+    if (tool.size_label) parts.push(tool.size_label);
     if (tool.diameter_mm != null) parts.push("Ø " + tool.diameter_mm);
     if (tool.tool_material_label) parts.push(tool.tool_material_label);
     if (Array.isArray(extraParts)) {
@@ -1278,6 +1360,8 @@
     var isTap = cat === "tap";
     var needsDiam = cat === "end_mill" || cat === "drill" || cat === "center_drill" || cat === "countersink";
     setVisible(auditNewMillRow, isMill);
+    setVisible(auditNewTapTypeRow, isTap);
+    setVisible(auditNewHoleRow, isTap);
     setVisible(auditNewFlutesRow, isMill);
     setVisible(auditNewDiamRow, needsDiam);
     setVisible(auditNewSizeRow, isTap);
@@ -1292,6 +1376,8 @@
     if (auditNewFlutes) auditNewFlutes.value = "";
     if (auditNewNote) auditNewNote.value = "";
     if (auditNewMillType) auditNewMillType.value = "end";
+    if (auditNewTapType) auditNewTapType.value = "cutting";
+    if (auditNewHoleType) auditNewHoleType.value = "through";
     var items = (openContainerData && openContainerData.items) || [];
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
@@ -1299,6 +1385,9 @@
         auditNewDiameter.value = String(it.diameter_from_mm);
       }
       if (it.mill_type && auditNewMillType) auditNewMillType.value = it.mill_type;
+      if (it.tap_type && auditNewTapType) auditNewTapType.value = it.tap_type;
+      if (it.hole_type && auditNewHoleType) auditNewHoleType.value = it.hole_type;
+      if (it.size_label && auditNewSize) auditNewSize.value = it.size_label;
       break;
     }
     syncAuditNewFields();
@@ -1416,6 +1505,8 @@
     var sizeLabel = auditNewSize ? (auditNewSize.value || "").trim() : "";
     var name = auditNewName ? (auditNewName.value || "").trim() : "";
     var millType = category === "end_mill" && auditNewMillType ? auditNewMillType.value : "";
+    var tapType = category === "tap" && auditNewTapType ? auditNewTapType.value : "";
+    var holeType = category === "tap" && auditNewHoleType ? auditNewHoleType.value : "";
     var flutes = auditNewFlutes ? auditNewFlutes.value : "";
     var note = auditNewNote ? (auditNewNote.value || "").trim() : "";
 
@@ -1436,6 +1527,8 @@
     var payload = {
       category: category,
       mill_type: millType,
+      tap_type: tapType,
+      hole_type: holeType,
       diameter_mm: needsDiam ? diameter : "",
       size_label: sizeLabel,
       name: name,
@@ -1445,6 +1538,8 @@
     };
     var metaParts = [CAT_LABELS[category] || category];
     if (millType) metaParts.push(MILL_TYPE_LABELS[millType] || millType);
+    if (tapType) metaParts.push(TAP_TYPE_LABELS[tapType] || tapType);
+    if (holeType) metaParts.push(HOLE_TYPE_LABELS[holeType] || holeType);
     if (needsDiam) metaParts.push("Ø " + diameter);
     if (sizeLabel) metaParts.push(sizeLabel);
     appendAuditRow({
@@ -1599,6 +1694,19 @@
       if (it.tool_category === "end_mill" && it.mill_type) {
         parts.push(MILL_TYPE_LABELS[it.mill_type] || it.mill_type);
       }
+      if (it.tool_category === "tap" && it.tap_type) {
+        parts.push(TAP_TYPE_LABELS[it.tap_type] || it.tap_type);
+      }
+      if (it.tool_category === "tap" && it.hole_type) {
+        parts.push(HOLE_TYPE_LABELS[it.hole_type] || it.hole_type);
+      }
+      if (it.tool_category === "countersink" && it.countersink_type) {
+        parts.push(COUNTERSINK_TYPE_LABELS[it.countersink_type] || it.countersink_type);
+      }
+      if (it.tool_category === "collet" && it.collet_type) {
+        parts.push(it.collet_type.toUpperCase());
+      }
+      if (it.size_label) parts.push(it.size_label);
       if (it.diameter_from_mm != null || it.diameter_to_mm != null) {
         parts.push("Ø " + (it.diameter_from_mm != null ? it.diameter_from_mm : "?") + "–" + (it.diameter_to_mm != null ? it.diameter_to_mm : "?"));
       }
@@ -1667,8 +1775,8 @@
 
   if (itemForm) {
     var catSel = itemForm.querySelector(".js-vw-item-category");
-    if (catSel) catSel.addEventListener("change", syncItemMillTypeRow);
-    syncItemMillTypeRow();
+    if (catSel) catSel.addEventListener("change", syncItemFilterFields);
+    syncItemFilterFields();
   }
 
   setEditMode(false);

@@ -14,9 +14,13 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
+from .collet_constants import COLLET_TYPES, COLLET_TYPE_VALUES
 from .models import (
     COATING_TYPE_TOOLTIPS,
+    COUNTERSINK_TYPES,
     END_MILL_TYPES,
+    TAP_HOLE_TYPES,
+    TAP_TOOL_TYPES,
     CenterDrillSpec,
     CountersinkSpec,
     DrillSpec,
@@ -42,6 +46,10 @@ MAX_ORGANIZER_COLUMNS = 6
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _VALID_CATEGORIES = {c for c, _ in VisualContainerItem.TOOL_CATEGORY_CHOICES if c}
 _VALID_MILL_TYPES = {c for c, _ in END_MILL_TYPES}
+_VALID_TAP_TYPES = {c for c, _ in TAP_TOOL_TYPES}
+_VALID_TAP_HOLE_TYPES = {c for c, _ in TAP_HOLE_TYPES}
+_VALID_COUNTERSINK_TYPES = {c for c, _ in COUNTERSINK_TYPES}
+_VALID_COLLET_TYPES = set(COLLET_TYPE_VALUES)
 _DIAMETER_FIELD_BY_CATEGORY = {
     "end_mill": "end_mill_spec__diameter_mm",
     "drill": "drill_spec__diameter_mm",
@@ -97,6 +105,11 @@ def _serialize_item(item: VisualContainerItem, stock_qty: int | None = None) -> 
         "title": item.title,
         "tool_category": item.tool_category or "",
         "mill_type": (getattr(item, "mill_type", None) or ""),
+        "tap_type": (getattr(item, "tap_type", None) or ""),
+        "hole_type": (getattr(item, "hole_type", None) or ""),
+        "countersink_type": (getattr(item, "countersink_type", None) or ""),
+        "collet_type": (getattr(item, "collet_type", None) or ""),
+        "size_label": (getattr(item, "size_label", None) or ""),
         "diameter_from_mm": float(item.diameter_from_mm) if item.diameter_from_mm is not None else None,
         "diameter_to_mm": float(item.diameter_to_mm) if item.diameter_to_mm is not None else None,
         "tool_item_id": item.tool_item_id,
@@ -134,6 +147,11 @@ def _stock_qty_for_item(item: VisualContainerItem) -> int | None:
         d_from=item.diameter_from_mm,
         d_to=item.diameter_to_mm,
         mill_type=getattr(item, "mill_type", None) or "",
+        tap_type=getattr(item, "tap_type", None) or "",
+        hole_type=getattr(item, "hole_type", None) or "",
+        countersink_type=getattr(item, "countersink_type", None) or "",
+        collet_type=getattr(item, "collet_type", None) or "",
+        size_label=getattr(item, "size_label", None) or "",
     )
     total = qs.aggregate(s=Sum("quantity"))["s"]
     return int(total or 0)
@@ -191,11 +209,36 @@ def _serialize_tool(tool: ToolItem) -> dict:
     wm_codes = tool.work_material_codes_list()
     mill_type = ""
     mill_type_label = ""
+    subtype = ""
+    subtype_label = ""
+    size_label = ""
+    hole_type = ""
+    hole_type_label = ""
     if tool.category == "end_mill":
         em = getattr(tool, "end_mill_spec", None)
         if em:
             mill_type = (em.mill_type or "").strip()
             mill_type_label = em.get_mill_type_display() if mill_type else ""
+            subtype = mill_type
+            subtype_label = mill_type_label
+    elif tool.category == "tap":
+        tap = getattr(tool, "tap_spec", None)
+        if tap:
+            subtype = (tap.tap_type or "").strip()
+            subtype_label = tap.get_tap_type_display() if subtype else ""
+            size_label = (tap.size_label or "").strip()
+            hole_type = (tap.hole_type or "").strip()
+            hole_type_label = tap.get_hole_type_display() if hole_type else ""
+    elif tool.category == "countersink":
+        cs = getattr(tool, "countersink_spec", None)
+        if cs:
+            subtype = (cs.countersink_type or "").strip()
+            subtype_label = cs.get_countersink_type_display() if subtype else ""
+    elif tool.category == "collet":
+        cl = getattr(tool, "collet_spec", None)
+        if cl:
+            subtype = (cl.collet_type or "").strip()
+            subtype_label = cl.get_collet_type_display() if subtype else ""
     return {
         "id": tool.id,
         "name": tool.name,
@@ -204,6 +247,11 @@ def _serialize_tool(tool: ToolItem) -> dict:
         "diameter_mm": diam,
         "mill_type": mill_type,
         "mill_type_label": mill_type_label,
+        "subtype": subtype,
+        "subtype_label": subtype_label,
+        "size_label": size_label,
+        "hole_type": hole_type,
+        "hole_type_label": hole_type_label,
         "quantity": int(tool.quantity or 0),
         "notes": tool.notes or "",
         "tool_material": (tool.tool_material or "").strip(),
@@ -223,6 +271,11 @@ def _tool_qs_for_filter(
     d_from=None,
     d_to=None,
     mill_type: str = "",
+    tap_type: str = "",
+    hole_type: str = "",
+    countersink_type: str = "",
+    collet_type: str = "",
+    size_label: str = "",
 ):
     if tool_item_id:
         return ToolItem.objects.filter(pk=tool_item_id, is_deleted=False).select_related(
@@ -231,6 +284,7 @@ def _tool_qs_for_filter(
             "center_drill_spec",
             "countersink_spec",
             "tap_spec",
+            "collet_spec",
         )
     if not category:
         return ToolItem.objects.none()
@@ -240,6 +294,7 @@ def _tool_qs_for_filter(
         "center_drill_spec",
         "countersink_spec",
         "tap_spec",
+        "collet_spec",
     )
     diam_field = _DIAMETER_FIELD_BY_CATEGORY.get(category)
     if diam_field and (d_from is not None or d_to is not None):
@@ -257,6 +312,16 @@ def _tool_qs_for_filter(
             qs = qs.filter(main_diameter_mm__lte=d_to)
     if category == "end_mill" and mill_type:
         qs = qs.filter(end_mill_spec__mill_type=mill_type)
+    if category == "tap" and tap_type:
+        qs = qs.filter(tap_spec__tap_type=tap_type)
+    if category == "tap" and hole_type:
+        qs = qs.filter(tap_spec__hole_type=hole_type)
+    if category == "tap" and size_label:
+        qs = qs.filter(tap_spec__size_label__icontains=size_label.strip())
+    if category == "countersink" and countersink_type:
+        qs = qs.filter(countersink_spec__countersink_type=countersink_type)
+    if category == "collet" and collet_type:
+        qs = qs.filter(collet_spec__collet_type=collet_type)
     return qs
 
 
@@ -286,6 +351,11 @@ def _matching_tools_for_container(c: VisualContainer, items: list[VisualContaine
                     d_from=item.diameter_from_mm,
                     d_to=item.diameter_to_mm,
                     mill_type=getattr(item, "mill_type", None) or "",
+                    tap_type=getattr(item, "tap_type", None) or "",
+                    hole_type=getattr(item, "hole_type", None) or "",
+                    countersink_type=getattr(item, "countersink_type", None) or "",
+                    collet_type=getattr(item, "collet_type", None) or "",
+                    size_label=getattr(item, "size_label", None) or "",
                 )
             )
 
@@ -521,6 +591,10 @@ def visual_warehouse_view(request):
                 if v
             ],
             "end_mill_types": [{"value": v, "label": lab} for v, lab in END_MILL_TYPES],
+            "tap_types": [{"value": v, "label": lab} for v, lab in TAP_TOOL_TYPES],
+            "tap_hole_types": [{"value": v, "label": lab} for v, lab in TAP_HOLE_TYPES],
+            "countersink_types": [{"value": v, "label": lab} for v, lab in COUNTERSINK_TYPES],
+            "collet_types": [{"value": v, "label": lab} for v, lab in COLLET_TYPES],
         },
     )
 
@@ -831,6 +905,29 @@ def visual_warehouse_api_item_upsert(request):
         return _err("Некорректный тип фрезы")
     if category != "end_mill":
         mill_type = ""
+    tap_type = str(body.get("tap_type") or "").strip()
+    if tap_type and tap_type not in _VALID_TAP_TYPES:
+        return _err("Некорректный тип резьбового инструмента")
+    if category != "tap":
+        tap_type = ""
+    hole_type = str(body.get("hole_type") or "").strip()
+    if hole_type and hole_type not in _VALID_TAP_HOLE_TYPES:
+        return _err("Некорректный тип отверстия")
+    if category != "tap":
+        hole_type = ""
+    countersink_type = str(body.get("countersink_type") or "").strip()
+    if countersink_type and countersink_type not in _VALID_COUNTERSINK_TYPES:
+        return _err("Некорректный тип зенкера")
+    if category != "countersink":
+        countersink_type = ""
+    collet_type = str(body.get("collet_type") or "").strip()
+    if collet_type and collet_type not in _VALID_COLLET_TYPES:
+        return _err("Некорректный тип цанги")
+    if category != "collet":
+        collet_type = ""
+    size_label = str(body.get("size_label") or "").strip()[:32]
+    if category != "tap":
+        size_label = ""
     d_from = _dec(body.get("diameter_from_mm"))
     d_to = _dec(body.get("diameter_to_mm"))
     quantity_note = str(body.get("quantity_note") or "").strip()[:80]
@@ -848,6 +945,11 @@ def visual_warehouse_api_item_upsert(request):
         item.title = title
         item.tool_category = category
         item.mill_type = mill_type
+        item.tap_type = tap_type
+        item.hole_type = hole_type
+        item.countersink_type = countersink_type
+        item.collet_type = collet_type
+        item.size_label = size_label
         item.diameter_from_mm = d_from
         item.diameter_to_mm = d_to
         item.quantity_note = quantity_note
@@ -862,6 +964,11 @@ def visual_warehouse_api_item_upsert(request):
             title=title,
             tool_category=category,
             mill_type=mill_type,
+            tap_type=tap_type,
+            hole_type=hole_type,
+            countersink_type=countersink_type,
+            collet_type=collet_type,
+            size_label=size_label,
             diameter_from_mm=d_from,
             diameter_to_mm=d_to,
             quantity_note=quantity_note,
@@ -907,7 +1014,15 @@ def visual_warehouse_api_container_audits(request, pk: int):
     return _container_audit_create(request, cont)
 
 
-def _auto_tool_name(category: str, *, diameter=None, mill_type: str = "", size_label: str = "") -> str:
+def _auto_tool_name(
+    category: str,
+    *,
+    diameter=None,
+    mill_type: str = "",
+    tap_type: str = "",
+    hole_type: str = "",
+    size_label: str = "",
+) -> str:
     cat_labels = dict(VisualContainerItem.TOOL_CATEGORY_CHOICES)
     base = cat_labels.get(category) or "Инструмент"
     if category == "end_mill":
@@ -915,7 +1030,10 @@ def _auto_tool_name(category: str, *, diameter=None, mill_type: str = "", size_l
         parts = [p for p in [mt or "Фреза", f"Ø{diameter}" if diameter is not None else ""] if p]
         return " ".join(parts)[:200] or base
     if category == "tap":
-        return (f"Метчик {size_label}".strip() if size_label else base)[:200]
+        tt = dict(TAP_TOOL_TYPES).get(tap_type) or "Метчик"
+        ht = dict(TAP_HOLE_TYPES).get(hole_type) or ""
+        parts = [p for p in [tt, size_label, ht] if p]
+        return (" ".join(parts) if parts else tt)[:200]
     if diameter is not None:
         return f"{base} Ø{diameter}"[:200]
     return base[:200]
@@ -937,12 +1055,29 @@ def _create_tool_for_audit(data: dict) -> ToolItem:
         raise ValueError("Некорректный тип фрезы")
     if category != "end_mill":
         mill_type = ""
+    tap_type = str(data.get("tap_type") or "").strip()
+    if tap_type and tap_type not in _VALID_TAP_TYPES:
+        raise ValueError("Некорректный тип резьбового инструмента")
+    if category != "tap":
+        tap_type = ""
+    hole_type = str(data.get("hole_type") or "").strip()
+    if hole_type and hole_type not in _VALID_TAP_HOLE_TYPES:
+        raise ValueError("Некорректный тип отверстия")
+    if category != "tap":
+        hole_type = ""
     size_label = str(data.get("size_label") or "").strip()[:32]
     flutes = _clamp_int(data.get("flutes_count"), 0, 0, 20) or None
     main_d = _dec(data.get("main_diameter_mm"))
     name = str(data.get("name") or "").strip()[:200]
     if not name:
-        name = _auto_tool_name(category, diameter=diameter, mill_type=mill_type, size_label=size_label)
+        name = _auto_tool_name(
+            category,
+            diameter=diameter,
+            mill_type=mill_type,
+            tap_type=tap_type,
+            hole_type=hole_type,
+            size_label=size_label,
+        )
 
     if category in {"end_mill", "drill", "center_drill", "countersink"} and diameter is None:
         raise ValueError("Укажите диаметр нового инструмента")
@@ -971,7 +1106,12 @@ def _create_tool_for_audit(data: dict) -> ToolItem:
     elif category == "countersink":
         CountersinkSpec.objects.create(tool=tool, diameter_mm=diameter)
     elif category == "tap":
-        TapSpec.objects.create(tool=tool, size_label=size_label)
+        TapSpec.objects.create(
+            tool=tool,
+            size_label=size_label,
+            tap_type=tap_type or "cutting",
+            hole_type=hole_type or "any",
+        )
     return tool
 
 

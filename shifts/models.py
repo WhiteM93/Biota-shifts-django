@@ -2801,6 +2801,41 @@ class VisualContainerItem(models.Model):
         choices=[("", "Все типы")] + list(END_MILL_TYPES),
         verbose_name="Тип фрезы",
     )
+    tap_type = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        choices=[("", "Все типы")] + list(TAP_TOOL_TYPES),
+        verbose_name="Тип резьбового",
+    )
+    hole_type = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        choices=[("", "Все")] + list(TAP_HOLE_TYPES),
+        verbose_name="Отверстие (метчик)",
+    )
+    countersink_type = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        choices=[("", "Все типы")] + list(COUNTERSINK_TYPES),
+        verbose_name="Тип зенкера",
+    )
+    collet_type = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        choices=[("", "Все типы")] + list(COLLET_TYPES),
+        verbose_name="Тип цанги",
+    )
+    size_label = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        verbose_name="Размер (метчик)",
+        help_text="Например M6 — фильтр по размеру на складе",
+    )
     diameter_from_mm = models.DecimalField(
         max_digits=6,
         decimal_places=2,

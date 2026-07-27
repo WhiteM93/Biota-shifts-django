@@ -209,16 +209,26 @@
               {% endfor %}
             </select>
           </label>
-          <label class="vw-row js-vw-item-mill-type-row" hidden>
-            <span class="vw-row-label">Тип фрезы</span>
-            <select class="vw-control js-vw-item-mill-type">
+          <label class="vw-row js-vw-item-subtype-row" hidden>
+            <span class="vw-row-label js-vw-item-subtype-label">Тип</span>
+            <select class="vw-control js-vw-item-subtype">
               <option value="">Все типы</option>
-              {% for mt in end_mill_types %}
-              <option value="{{ mt.value }}">{{ mt.label }}</option>
+            </select>
+          </label>
+          <label class="vw-row js-vw-item-hole-row" hidden>
+            <span class="vw-row-label">Отверстие</span>
+            <select class="vw-control js-vw-item-hole-type">
+              <option value="">Все</option>
+              {% for ht in tap_hole_types %}
+              <option value="{{ ht.value }}">{{ ht.label }}</option>
               {% endfor %}
             </select>
           </label>
-          <div class="vw-row-pair">
+          <label class="vw-row js-vw-item-size-row" hidden>
+            <span class="vw-row-label">Размер (метчик)</span>
+            <input type="text" class="vw-control js-vw-item-size" maxlength="32" autocomplete="off" placeholder="M6">
+          </label>
+          <div class="vw-row-pair js-vw-item-diam-row">
             <label class="vw-row">
               <span class="vw-row-label">Ø от, мм</span>
               <input type="number" class="vw-control js-vw-item-dfrom" min="0" step="0.01">
@@ -261,6 +271,22 @@
               <select class="vw-control js-vw-audit-new-mill-type">
                 {% for mt in end_mill_types %}
                 <option value="{{ mt.value }}">{{ mt.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="vw-row js-vw-audit-new-tap-type-row" hidden>
+              <span class="vw-row-label">Тип</span>
+              <select class="vw-control js-vw-audit-new-tap-type">
+                {% for tt in tap_types %}
+                <option value="{{ tt.value }}">{{ tt.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="vw-row js-vw-audit-new-hole-row" hidden>
+              <span class="vw-row-label">Отверстие</span>
+              <select class="vw-control js-vw-audit-new-hole-type">
+                {% for ht in tap_hole_types %}
+                <option value="{{ ht.value }}">{{ ht.label }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -311,5 +337,13 @@
   </div>
 </div>
 
+<script type="application/json" id="vw-subtype-options">
+{
+  "end_mill": {"label": "Тип фрезы", "options": [{% for mt in end_mill_types %}{"value": "{{ mt.value }}", "label": "{{ mt.label }}"}{% if not forloop.last %},{% endif %}{% endfor %}]},
+  "tap": {"label": "Тип", "options": [{% for tt in tap_types %}{"value": "{{ tt.value }}", "label": "{{ tt.label }}"}{% if not forloop.last %},{% endif %}{% endfor %}]},
+  "countersink": {"label": "Тип зенкера", "options": [{% for ct in countersink_types %}{"value": "{{ ct.value }}", "label": "{{ ct.label }}"}{% if not forloop.last %},{% endif %}{% endfor %}]},
+  "collet": {"label": "Тип цанги", "options": [{% for ct in collet_types %}{"value": "{{ ct.value }}", "label": "{{ ct.label }}"}{% if not forloop.last %},{% endif %}{% endfor %}]}
+}
+</script>
 <script src="{% static 'shifts/js/visual_warehouse.js' %}?v={{ static_asset_version }}"></script>
 {% endblock %}
