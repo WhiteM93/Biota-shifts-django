@@ -174,6 +174,7 @@
     }
     if (itemForm) setVisible(itemForm, editMode && canEdit);
     if (rulesBlock) setVisible(rulesBlock, editMode && canEdit);
+    syncItemMillTypeRow();
     renderFloor();
   }
 
@@ -948,7 +949,7 @@
     var row = itemForm.querySelector(".js-vw-item-mill-type-row");
     if (!cat || !row) return;
     var show = cat.value === "end_mill";
-    row.hidden = !show;
+    setVisible(row, show);
     if (!show) {
       var mt = itemForm.querySelector(".js-vw-item-mill-type");
       if (mt) mt.value = "";
@@ -1138,10 +1139,10 @@
     var isMill = cat === "end_mill";
     var isTap = cat === "tap";
     var needsDiam = cat === "end_mill" || cat === "drill" || cat === "center_drill" || cat === "countersink";
-    if (auditNewMillRow) auditNewMillRow.hidden = !isMill;
-    if (auditNewFlutesRow) auditNewFlutesRow.hidden = !isMill;
-    if (auditNewDiamRow) auditNewDiamRow.hidden = !needsDiam;
-    if (auditNewSizeRow) auditNewSizeRow.hidden = !isTap;
+    setVisible(auditNewMillRow, isMill);
+    setVisible(auditNewFlutesRow, isMill);
+    setVisible(auditNewDiamRow, needsDiam);
+    setVisible(auditNewSizeRow, isTap);
   }
 
   function prefillsAuditNewForm() {
@@ -1492,6 +1493,7 @@
     setAuditMode(false);
     if (itemForm) setVisible(itemForm, editMode && canEdit);
     if (rulesBlock) setVisible(rulesBlock, editMode && canEdit);
+    syncItemMillTypeRow();
     return fetchJson(detailUrl(apiContTpl, containerId)).then(function (data) {
       var cont = data.container;
       openContainerData = cont;

@@ -739,6 +739,10 @@ html[data-theme="dawn"] .vw-modal-backdrop {
 }
 
 .vw-row { display: flex; flex-direction: column; gap: 4px; }
+.vw-row[hidden],
+.vw-row-pair[hidden] {
+  display: none !important;
+}
 .vw-row-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .vw-row-label { font-size: 12px; color: var(--vw-muted); }
 
