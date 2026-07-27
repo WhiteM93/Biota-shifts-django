@@ -147,6 +147,10 @@ html[data-theme="dawn"] .vw-floor {
   width: min(380px, 96vw);
 }
 
+.vw-cabinet[data-kind="drawer_chest"] {
+  width: min(400px, 96vw);
+}
+
 .vw-cabinet-name {
   margin: 0;
   font-size: 14px;
@@ -175,6 +179,13 @@ html[data-theme="dawn"] .vw-floor {
   background: linear-gradient(180deg, #c5c9ce, #9ea4ab 45%, #7f858c);
 }
 
+.vw-cabinet[data-kind="drawer_chest"] .vw-cab-frame {
+  grid-template-columns: 14px 1fr 14px;
+  padding: 10px 0 12px;
+  background: linear-gradient(180deg, #b8bec6, #8e959e 40%, #6d747c);
+  border-radius: 3px;
+}
+
 .vw-cab-door {
   background: linear-gradient(90deg, var(--cab-door), var(--cab-door-dark));
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
@@ -183,6 +194,10 @@ html[data-theme="dawn"] .vw-floor {
 }
 
 .vw-cabinet[data-kind="rack"] .vw-cab-door {
+  display: none;
+}
+
+.vw-cabinet[data-kind="drawer_chest"] .vw-cab-door {
   display: none;
 }
 
@@ -219,6 +234,16 @@ html[data-theme="dawn"] .vw-floor {
     linear-gradient(180deg, #6a7076, #8a9096);
   border-color: #5a6066;
   box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.22);
+}
+
+.vw-cabinet[data-kind="drawer_chest"] .vw-cab-interior {
+  gap: 6px;
+  padding: 8px 8px 10px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent 8%, transparent 92%, rgba(0, 0, 0, 0.22)),
+    linear-gradient(180deg, #4e545a, #6a7076);
+  border-color: #3f454b;
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.35);
 }
 
 .vw-bay {
@@ -287,6 +312,138 @@ html[data-theme="dawn"] .vw-floor {
   height: 100%;
   min-height: 72px;
   justify-content: flex-end;
+}
+
+/* Многоярусный ящик с разделителями */
+.vw-bay--drawer {
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.vw-bay--drawer .vw-bay-ledge {
+  display: none;
+}
+
+.vw-drawer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid #2f3439;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #7a828a, #5c646c 55%, #4a5158);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+}
+
+.vw-drawer-handle {
+  height: 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent);
+}
+
+.vw-drawer-handle::after {
+  content: "";
+  width: 42%;
+  max-width: 120px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #c8ced4, #8a929a);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+.vw-drawer-cells {
+  display: grid;
+  gap: 0;
+  align-items: stretch;
+  min-height: 70px;
+  padding: 4px;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.18), transparent 30%),
+    #6a727a;
+}
+
+.vw-drawer-cell-slot {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  padding: 0 1px;
+}
+
+.vw-drawer-cell-slot:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  right: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(20, 24, 28, 0.75));
+  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.08);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.vw-drawer-cell {
+  position: relative;
+  border: 1px solid rgba(160, 175, 190, 0.55);
+  border-radius: 2px;
+  padding: 6px 4px 4px;
+  margin: 0;
+  font: inherit;
+  line-height: 1.1;
+  text-align: center;
+  cursor: pointer;
+  min-height: 62px;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 2px;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.42) 0%, rgba(215, 225, 235, 0.28) 50%, rgba(175, 190, 200, 0.38) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  overflow: hidden;
+  transition: filter 0.12s, transform 0.12s;
+}
+
+.vw-drawer-cell:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.vw-drawer-cell:focus-visible {
+  outline: 2px solid var(--vw-accent, #3d8bfd);
+  outline-offset: 1px;
+}
+
+.vw-drawer-cell .vw-bin-label {
+  min-height: 28px;
+}
+
+.vw-drawer-cell .vw-bin-audit {
+  font-size: 8px;
+}
+
+.vw-drawer-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  padding: 18px 6px;
+}
+
+.vw-bay--drawer .vw-bay-add {
+  margin-top: 4px;
 }
 
 /* Прозрачный контейнер + цветная этикетка */
@@ -863,6 +1020,9 @@ html[data-theme="dawn"] .vw-audit-card {
 html[data-theme="dawn"] .vw-audit-row {
   background: #f5f5f5;
 }
+.vw-audit-row.is-new {
+  border-color: var(--vw-accent, #3d8bfd);
+}
 
 .vw-audit-row-name {
   font-size: 13px;
@@ -876,6 +1036,25 @@ html[data-theme="dawn"] .vw-audit-row {
   gap: 4px;
   font-size: 11px;
   color: var(--vw-muted);
+}
+
+.vw-audit-add {
+  margin: 8px 0 12px;
+  border: 1px dashed var(--vw-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.vw-audit-add > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vw-text);
+}
+.vw-audit-add-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .vw-form-msg {

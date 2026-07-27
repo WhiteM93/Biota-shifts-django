@@ -2591,13 +2591,15 @@ class PrintForm(models.Model):
 
 
 class VisualCabinet(models.Model):
-    """Шкаф / стеллаж визуального склада: сетка полок × столбцов."""
+    """Шкаф / стеллаж / тумба с ящиками визуального склада."""
 
     KIND_CABINET = "cabinet"
     KIND_RACK = "rack"
+    KIND_DRAWER_CHEST = "drawer_chest"
     KIND_CHOICES = (
         (KIND_CABINET, "Шкаф"),
         (KIND_RACK, "Стеллаж"),
+        (KIND_DRAWER_CHEST, "Тумба с ящиками"),
     )
 
     name = models.CharField(max_length=120, verbose_name="Название")
@@ -2625,13 +2627,15 @@ class VisualCabinet(models.Model):
 
 
 class VisualContainer(models.Model):
-    """Контейнер в шкафу/стеллаже: полка → слой → позиция слева направо."""
+    """Контейнер в шкафу/стеллаже/тумбе: полка → слой → позиция слева направо."""
 
     KIND_BIN = "bin"
     KIND_SHELF_SLOT = "shelf_slot"
+    KIND_DRAWER_CELL = "drawer_cell"
     KIND_CHOICES = (
         (KIND_BIN, "Контейнер"),
         (KIND_SHELF_SLOT, "На полке"),
+        (KIND_DRAWER_CELL, "Ячейка ящика"),
     )
 
     cabinet = models.ForeignKey(

@@ -49,6 +49,7 @@
         <select class="vw-control js-vw-cab-kind">
           <option value="cabinet">Шкаф</option>
           <option value="rack">Стеллаж</option>
+          <option value="drawer_chest">Тумба с ящиками</option>
         </select>
       </label>
       <label class="vw-row">
@@ -57,15 +58,15 @@
       </label>
       <div class="vw-row-pair">
         <label class="vw-row">
-          <span class="vw-row-label">Полок</span>
+          <span class="vw-row-label js-vw-cab-shelves-label">Полок</span>
           <input type="number" class="vw-control js-vw-cab-shelves" min="1" max="20" value="5">
         </label>
         <label class="vw-row">
-          <span class="vw-row-label">Мест в ряд (макс.)</span>
+          <span class="vw-row-label js-vw-cab-columns-label">Мест в ряд (макс.)</span>
           <input type="number" class="vw-control js-vw-cab-columns" min="1" max="12" value="4">
         </label>
       </div>
-      <p class="vw-hint-inline">Шкаф — с дверцами и контейнерами. Стеллаж — открытый: контейнеры или содержимое прямо на полке.</p>
+      <p class="vw-hint-inline js-vw-cab-kind-hint">Шкаф — с дверцами и контейнерами. Стеллаж — открытый. Тумба — многоярусные ящики с разделителями на ячейки.</p>
       <label class="vw-row">
         <span class="vw-row-label">Примечание</span>
         <input type="text" class="vw-control js-vw-cab-notes" maxlength="300" autocomplete="off">
@@ -92,6 +93,7 @@
         <select class="vw-control js-vw-cont-kind">
           <option value="bin">Контейнер</option>
           <option value="shelf_slot">На полке</option>
+          <option value="drawer_cell">Ячейка ящика</option>
         </select>
       </label>
       <label class="vw-row">
@@ -133,13 +135,13 @@
           <span class="vw-row-label">Место слева</span>
           <input type="number" class="vw-control js-vw-cont-column" min="1" value="1">
         </label>
-        <label class="vw-row">
+        <label class="vw-row js-vw-cont-stack-row">
           <span class="vw-row-label">Ярус (1 — на полке)</span>
           <input type="number" class="vw-control js-vw-cont-stack" min="1" value="1">
         </label>
       </div>
       <input type="hidden" class="js-vw-cont-notes" value="">
-      <p class="vw-hint-inline">Ярус 1 на полке. Ярус 2 — поверх другого ящика в том же месте.</p>
+      <p class="vw-hint-inline js-vw-cont-stack-hint">Ярус 1 на полке. Ярус 2 — поверх другого ящика в том же месте.</p>
       <div class="vw-dialog-actions">
         <button type="button" class="vw-btn-danger js-vw-del-container vw-is-hidden" hidden>Удалить</button>
         <button type="button" class="vw-btn-secondary js-vw-open-contents vw-is-hidden" hidden>Содержимое</button>
@@ -228,8 +230,60 @@
       {% if biota_can_edit %}
       <div class="js-vw-audit-pane" hidden>
         <h3 class="vw-props-heading">Проверка позиций</h3>
-        <p class="vw-hint-inline">Пройдите по каждой позиции: оставьте кол-во или исправьте и укажите примечание.</p>
+        <p class="vw-hint-inline">Пройдите по каждой позиции: оставьте кол-во или исправьте и укажите примечание. Можно добавить инструмент, которого не было в списке.</p>
         <div class="vw-audit-lines js-vw-audit-lines"></div>
+
+        <details class="vw-audit-add js-vw-audit-add">
+          <summary>Добавить новый инструмент</summary>
+          <div class="vw-audit-add-body">
+            <label class="vw-row">
+              <span class="vw-row-label">Категория</span>
+              <select class="vw-control js-vw-audit-new-category">
+                {% for cat in tool_categories %}
+                <option value="{{ cat.value }}">{{ cat.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="vw-row js-vw-audit-new-mill-row" hidden>
+              <span class="vw-row-label">Тип фрезы</span>
+              <select class="vw-control js-vw-audit-new-mill-type">
+                {% for mt in end_mill_types %}
+                <option value="{{ mt.value }}">{{ mt.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="vw-row js-vw-audit-new-diam-row">
+              <span class="vw-row-label">Ø, мм</span>
+              <input type="number" class="vw-control js-vw-audit-new-diameter" min="0" step="0.01" placeholder="1">
+            </label>
+            <label class="vw-row js-vw-audit-new-size-row" hidden>
+              <span class="vw-row-label">Размер (метчик)</span>
+              <input type="text" class="vw-control js-vw-audit-new-size" maxlength="32" placeholder="M6" autocomplete="off">
+            </label>
+            <label class="vw-row">
+              <span class="vw-row-label">Название</span>
+              <input type="text" class="vw-control js-vw-audit-new-name" maxlength="200" autocomplete="off" placeholder="Необязательно — подставится само">
+            </label>
+            <div class="vw-row-pair">
+              <label class="vw-row">
+                <span class="vw-row-label">Кол-во</span>
+                <input type="number" class="vw-control js-vw-audit-new-qty" min="0" step="1" value="1">
+              </label>
+              <label class="vw-row js-vw-audit-new-flutes-row" hidden>
+                <span class="vw-row-label">Кромки</span>
+                <input type="number" class="vw-control js-vw-audit-new-flutes" min="1" max="20" step="1" placeholder="2">
+              </label>
+            </div>
+            <label class="vw-row">
+              <span class="vw-row-label">Примечание</span>
+              <input type="text" class="vw-control js-vw-audit-new-note" maxlength="300" autocomplete="off" placeholder="Найден в ящике">
+            </label>
+            <div class="vw-dialog-actions">
+              <button type="button" class="vw-btn-secondary js-vw-audit-add-tool">В список проверки</button>
+            </div>
+          </div>
+        </details>
+
         <label class="vw-row">
           <span class="vw-row-label">Примечание к проверке</span>
           <input type="text" class="vw-control js-vw-audit-notes" maxlength="500" autocomplete="off" placeholder="Необязательно">

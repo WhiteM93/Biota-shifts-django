@@ -146,3 +146,80 @@ class VisualWarehouseAuditTests(TestCase):
         self.assertEqual(adjusted[0]["counted_qty"], 9)
         self.assertEqual(body["container"]["last_audited_by"], "admin")
         self.assertTrue(body["container"]["last_audited_at"])
+
+    def test_audit_add_new_tool(self):
+        res = self.client.post(
+            self.audits_url,
+            data=json.dumps(
+                {
+                    "notes": "нашли ещё одну",
+                    "lines": [
+                        {"tool_id": self.tool_a.pk, "counted_qty": 10, "note": ""},
+                        {"tool_id": self.tool_b.pk, "counted_qty": 5, "note": ""},
+                    ],
+                    "new_tools": [
+                        {
+                            "category": "end_mill",
+                            "mill_type": "end",
+                            "diameter_mm": "0.6",
+                            "quantity": 3,
+                            "flutes_count": 2,
+                            "note": "лежит в ящике",
+                        }
+                    ],
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(res.status_code, 200, res.content[:500])
+        body = res.json()
+        self.assertTrue(body.get("ok"), body)
+        self.assertGreaterEqual(body["audit"]["changes_count"], 1)
+        new_tool = ToolItem.objects.filter(name__icontains="0.6").order_by("-id").first()
+        self.assertIsNotNone(new_tool)
+        self.assertEqual(new_tool.quantity, 3)
+        self.assertEqual(new_tool.category, "end_mill")
+        self.assertTrue(
+            VisualContainerItem.objects.filter(container=self.cont, tool_item=new_tool).exists()
+        )
+        mv = StockMovement.objects.get(tool=new_tool)
+        self.assertEqual(mv.movement_type, "restock")
+        self.assertEqual(mv.quantity, 3)
+        stock_ids = {t["id"] for t in body["container"]["stock_tools"]}
+        self.assertIn(new_tool.pk, stock_ids)
+
+    def test_audit_only_new_tool_empty_box(self):
+        empty = VisualContainer.objects.create(
+            cabinet=self.cab,
+            shelf=2,
+            stack=1,
+            column=1,
+            label="Пустой",
+            color="#333333",
+        )
+        url = reverse("visual_warehouse_api_container_audits", kwargs={"pk": empty.pk})
+        res = self.client.post(
+            url,
+            data=json.dumps(
+                {
+                    "lines": [],
+                    "new_tools": [
+                        {
+                            "category": "drill",
+                            "diameter_mm": "5",
+                            "quantity": 2,
+                            "name": "Сверло тестовое Ø5",
+                        }
+                    ],
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(res.status_code, 200, res.content[:500])
+        body = res.json()
+        self.assertTrue(body.get("ok"), body)
+        tool = ToolItem.objects.get(name="Сверло тестовое Ø5")
+        self.assertEqual(tool.quantity, 2)
+        self.assertEqual(tool.category, "drill")

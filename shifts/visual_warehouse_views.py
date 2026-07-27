@@ -17,8 +17,13 @@ from .auth_utils import biota_login_required, biota_user, nav_permission_require
 from .models import (
     COATING_TYPE_TOOLTIPS,
     END_MILL_TYPES,
+    CenterDrillSpec,
+    CountersinkSpec,
+    DrillSpec,
+    EndMillSpec,
     InventoryStockEvent,
     StockMovement,
+    TapSpec,
     ToolItem,
     VisualCabinet,
     VisualContainer,
@@ -299,6 +304,8 @@ def _normalize_cabinet_kind(raw) -> str:
     kind = str(raw or "").strip().lower()
     if kind == VisualCabinet.KIND_RACK:
         return VisualCabinet.KIND_RACK
+    if kind == VisualCabinet.KIND_DRAWER_CHEST:
+        return VisualCabinet.KIND_DRAWER_CHEST
     return VisualCabinet.KIND_CABINET
 
 
@@ -306,6 +313,8 @@ def _normalize_container_kind(raw) -> str:
     kind = str(raw or "").strip().lower()
     if kind == VisualContainer.KIND_SHELF_SLOT:
         return VisualContainer.KIND_SHELF_SLOT
+    if kind == VisualContainer.KIND_DRAWER_CELL:
+        return VisualContainer.KIND_DRAWER_CELL
     return VisualContainer.KIND_BIN
 
 
@@ -518,10 +527,18 @@ def _cabinet_mutate(request, cab: VisualCabinet):
         cab.name = name
     if "kind" in body:
         new_kind = _normalize_cabinet_kind(body.get("kind"))
-        if new_kind == VisualCabinet.KIND_CABINET:
+        if new_kind != VisualCabinet.KIND_RACK:
             has_slot = cab.containers.filter(kind=VisualContainer.KIND_SHELF_SLOT).exists()
             if has_slot:
-                return _err("Нельзя сделать шкаф: на стеллаже есть зоны «на полке». Удалите их или оставьте стеллаж.")
+                return _err(
+                    "Нельзя сменить тип: есть зоны «на полке». Удалите их или оставьте стеллаж."
+                )
+        if new_kind != VisualCabinet.KIND_DRAWER_CHEST:
+            has_cells = cab.containers.filter(kind=VisualContainer.KIND_DRAWER_CELL).exists()
+            if has_cells:
+                return _err(
+                    "Нельзя сменить тип: есть ячейки ящика. Удалите их или оставьте тумбу с ящиками."
+                )
         cab.kind = new_kind
     if "notes" in body:
         cab.notes = str(body.get("notes") or "").strip()[:300]
@@ -577,6 +594,15 @@ def visual_warehouse_api_container_upsert(request):
         return _err("Зона «на полке» доступна только на стеллаже")
     if cont_kind == VisualContainer.KIND_SHELF_SLOT and stack > 1:
         return _err("Зона «на полке» не ставится в стопку — только ярус 1")
+    if cont_kind == VisualContainer.KIND_DRAWER_CELL and cab_kind != VisualCabinet.KIND_DRAWER_CHEST:
+        return _err("Ячейка ящика доступна только в тумбе с ящиками")
+    if cont_kind == VisualContainer.KIND_DRAWER_CELL and stack > 1:
+        return _err("Ячейка ящика не ставится в стопку — только ярус 1")
+    if cab_kind == VisualCabinet.KIND_DRAWER_CHEST and cont_kind == VisualContainer.KIND_SHELF_SLOT:
+        return _err("На тумбе с ящиками нельзя зону «на полке» — используйте ячейку ящика")
+    # В тумбе по умолчанию ячейки лежат в одном ярусе-ящике
+    if cab_kind == VisualCabinet.KIND_DRAWER_CHEST and cont_kind == VisualContainer.KIND_BIN and stack > 1:
+        return _err("В тумбе с ящиками стопки не используются — ячейки в одном ярусе")
     cid = body.get("id")
     exclude_id = int(cid) if cid else None
 
@@ -755,15 +781,107 @@ def visual_warehouse_api_container_audits(request, pk: int):
     return _container_audit_create(request, cont)
 
 
+def _auto_tool_name(category: str, *, diameter=None, mill_type: str = "", size_label: str = "") -> str:
+    cat_labels = dict(VisualContainerItem.TOOL_CATEGORY_CHOICES)
+    base = cat_labels.get(category) or "Инструмент"
+    if category == "end_mill":
+        mt = dict(END_MILL_TYPES).get(mill_type) or ""
+        parts = [p for p in [mt or "Фреза", f"Ø{diameter}" if diameter is not None else ""] if p]
+        return " ".join(parts)[:200] or base
+    if category == "tap":
+        return (f"Метчик {size_label}".strip() if size_label else base)[:200]
+    if diameter is not None:
+        return f"{base} Ø{diameter}"[:200]
+    return base[:200]
+
+
+def _create_tool_for_audit(data: dict) -> ToolItem:
+    """Создать позицию склада из строки «новый инструмент» при инвентаризации (qty=0)."""
+    if not isinstance(data, dict):
+        raise ValueError("Некорректные данные нового инструмента")
+    category = str(data.get("category") or "").strip()
+    if category not in _VALID_CATEGORIES:
+        raise ValueError("Укажите категорию нового инструмента")
+    counted = _clamp_int(data.get("quantity"), -1, 0, 999999)
+    if counted < 0:
+        raise ValueError("Укажите количество нового инструмента")
+    diameter = _dec(data.get("diameter_mm"))
+    mill_type = str(data.get("mill_type") or "").strip()
+    if mill_type and mill_type not in _VALID_MILL_TYPES:
+        raise ValueError("Некорректный тип фрезы")
+    if category != "end_mill":
+        mill_type = ""
+    size_label = str(data.get("size_label") or "").strip()[:32]
+    flutes = _clamp_int(data.get("flutes_count"), 0, 0, 20) or None
+    main_d = _dec(data.get("main_diameter_mm"))
+    name = str(data.get("name") or "").strip()[:200]
+    if not name:
+        name = _auto_tool_name(category, diameter=diameter, mill_type=mill_type, size_label=size_label)
+
+    if category in {"end_mill", "drill", "center_drill", "countersink"} and diameter is None:
+        raise ValueError("Укажите диаметр нового инструмента")
+    if category == "tap" and not size_label:
+        raise ValueError("Укажите размер метчика (например M6)")
+    if category in {"insert", "collet"} and not str(data.get("name") or "").strip():
+        raise ValueError("Укажите название пластины/цанги")
+
+    tool = ToolItem.objects.create(
+        category=category,
+        name=name,
+        main_diameter_mm=main_d if main_d is not None else diameter,
+        quantity=0,
+    )
+    if category == "end_mill":
+        EndMillSpec.objects.create(
+            tool=tool,
+            mill_type=mill_type or "end",
+            diameter_mm=diameter,
+            flutes_count=flutes,
+        )
+    elif category == "drill":
+        DrillSpec.objects.create(tool=tool, diameter_mm=diameter)
+    elif category == "center_drill":
+        CenterDrillSpec.objects.create(tool=tool, diameter_mm=diameter)
+    elif category == "countersink":
+        CountersinkSpec.objects.create(tool=tool, diameter_mm=diameter)
+    elif category == "tap":
+        TapSpec.objects.create(tool=tool, size_label=size_label)
+    return tool
+
+
+def _link_tool_to_container(cont: VisualContainer, tool: ToolItem) -> None:
+    """Привязать найденный инструмент к ящику, чтобы он оставался в списке."""
+    if VisualContainerItem.objects.filter(container=cont, tool_item=tool).exists():
+        return
+    if cont.items.count() >= MAX_ITEMS_PER_CONTAINER:
+        raise ValueError(f"В ящике слишком много правил (макс. {MAX_ITEMS_PER_CONTAINER})")
+    VisualContainerItem.objects.create(
+        container=cont,
+        title=(tool.name or "Инструмент")[:200],
+        tool_category=tool.category or "",
+        tool_item=tool,
+        sort_order=900 + cont.items.count(),
+    )
+
+
 @write_permission_required
 def _container_audit_create(request, cont: VisualContainer):
     body = _json_body(request)
     if body is None:
         return _err("Некорректный JSON")
     raw_lines = body.get("lines")
-    if not isinstance(raw_lines, list) or not raw_lines:
-        return _err("Укажите строки инвентаризации")
-    if len(raw_lines) > MAX_AUDIT_LINES:
+    if raw_lines is None:
+        raw_lines = []
+    if not isinstance(raw_lines, list):
+        return _err("Некорректные строки инвентаризации")
+    raw_new = body.get("new_tools")
+    if raw_new is None:
+        raw_new = []
+    if not isinstance(raw_new, list):
+        return _err("Некорректный список новых инструментов")
+    if not raw_lines and not raw_new:
+        return _err("Укажите строки инвентаризации или добавьте новый инструмент")
+    if len(raw_lines) + len(raw_new) > MAX_AUDIT_LINES:
         return _err(f"Слишком много строк (макс. {MAX_AUDIT_LINES})")
 
     notes = str(body.get("notes") or "").strip()[:500]
@@ -788,14 +906,32 @@ def _container_audit_create(request, cont: VisualContainer):
         note = str(row.get("note") or "").strip()[:300]
         parsed.append((tool_id, counted, note))
 
+    new_payloads: list[dict] = []
+    for row in raw_new:
+        if not isinstance(row, dict):
+            return _err("Некорректные данные нового инструмента")
+        new_payloads.append(row)
+
     allowed_ids = {t["id"] for t in _matching_tools_for_container(cont)}
-    if allowed_ids and not seen.issubset(allowed_ids):
+    if allowed_ids and seen and not seen.issubset(allowed_ids):
         return _err("В проверке есть инструмент, которого нет в этом ящике")
 
     today = timezone.localdate()
 
     try:
         with transaction.atomic():
+            created_ids: set[int] = set()
+            for payload in new_payloads:
+                tool = _create_tool_for_audit(payload)
+                _link_tool_to_container(cont, tool)
+                created_ids.add(tool.pk)
+                counted = _clamp_int(payload.get("quantity"), -1, 0, 999999)
+                note = str(payload.get("note") or "").strip()[:300] or "найден при инвентаризации"
+                if tool.pk in seen:
+                    raise ValueError("Дубликат инструмента в строках")
+                seen.add(tool.pk)
+                parsed.append((tool.pk, counted, note))
+
             tools = {
                 t.pk: t
                 for t in ToolItem.objects.select_for_update().filter(pk__in=seen, is_deleted=False)
@@ -832,7 +968,7 @@ def _container_audit_create(request, cont: VisualContainer):
                     changes += 1
                     move_qty = abs(delta)
                     move_type = "restock" if delta > 0 else "writeoff"
-                    reason = note or "расхождение"
+                    reason = note or ("новый инструмент" if tool_id in created_ids else "расхождение")
                     comment = f"Инвентаризация «{label}»: {reason}"[:300]
                     if delta < 0:
                         tool.quantity = expected - move_qty
@@ -890,6 +1026,7 @@ def _container_audit_create(request, cont: VisualContainer):
                     "changes_count": changes,
                     "changes": change_summaries[:40],
                     "notes": notes,
+                    "new_tools_count": len(created_ids),
                 },
             )
 

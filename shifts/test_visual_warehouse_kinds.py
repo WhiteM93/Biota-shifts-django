@@ -103,3 +103,87 @@ class VisualWarehouseKindsTests(TestCase):
         res = self._post_json(self.cabinets_url, {"name": "Шкаф Б", "shelves": 4, "columns": 3})
         self.assertEqual(res.status_code, 201, res.content[:500])
         self.assertEqual(res.json()["cabinet"]["kind"], "cabinet")
+
+    def test_create_drawer_chest_and_cells(self):
+        res = self._post_json(
+            self.cabinets_url,
+            {"name": "Тумба инструментов", "kind": "drawer_chest", "shelves": 5, "columns": 4},
+        )
+        self.assertEqual(res.status_code, 201, res.content[:500])
+        body = res.json()
+        self.assertTrue(body.get("ok"), body)
+        self.assertEqual(body["cabinet"]["kind"], "drawer_chest")
+        cab_id = body["cabinet"]["id"]
+
+        res2 = self._post_json(
+            self.upsert_url,
+            {
+                "cabinet_id": cab_id,
+                "kind": "drawer_cell",
+                "shelf": 1,
+                "stack": 1,
+                "column": 1,
+                "col_span": 1,
+                "label": "Фрезы Ø1",
+                "color": "#5dade2",
+            },
+        )
+        self.assertEqual(res2.status_code, 200, res2.content[:500])
+        data = res2.json()
+        self.assertTrue(data.get("ok"), data)
+        self.assertEqual(data["container"]["kind"], "drawer_cell")
+
+        res3 = self._post_json(
+            self.upsert_url,
+            {
+                "cabinet_id": cab_id,
+                "kind": "drawer_cell",
+                "shelf": 1,
+                "stack": 1,
+                "column": 2,
+                "col_span": 2,
+                "label": "Сверла",
+                "color": "#82e0aa",
+            },
+        )
+        self.assertEqual(res3.status_code, 200, res3.content[:500])
+        self.assertEqual(VisualContainer.objects.filter(cabinet_id=cab_id).count(), 2)
+
+    def test_drawer_cell_rejected_on_cabinet(self):
+        cab = VisualCabinet.objects.create(name="Шкаф", kind=VisualCabinet.KIND_CABINET, shelves=2, columns=2)
+        res = self._post_json(
+            self.upsert_url,
+            {
+                "cabinet_id": cab.pk,
+                "kind": "drawer_cell",
+                "shelf": 1,
+                "stack": 1,
+                "column": 1,
+                "label": "Нельзя",
+            },
+        )
+        self.assertEqual(res.status_code, 400, res.content[:500])
+        body = res.json()
+        self.assertFalse(body.get("ok", True))
+        self.assertIn("тумб", (body.get("error") or "").lower())
+
+    def test_cannot_convert_drawer_chest_with_cells(self):
+        cab = VisualCabinet.objects.create(
+            name="Тумба",
+            kind=VisualCabinet.KIND_DRAWER_CHEST,
+            shelves=3,
+            columns=3,
+        )
+        VisualContainer.objects.create(
+            cabinet=cab,
+            kind=VisualContainer.KIND_DRAWER_CELL,
+            shelf=1,
+            stack=1,
+            column=1,
+            label="Ячейка",
+        )
+        detail = reverse("visual_warehouse_api_cabinet_detail", kwargs={"pk": cab.pk})
+        res = self._patch_json(detail, {"kind": "cabinet"})
+        self.assertEqual(res.status_code, 400, res.content[:500])
+        cab.refresh_from_db()
+        self.assertEqual(cab.kind, VisualCabinet.KIND_DRAWER_CHEST)
