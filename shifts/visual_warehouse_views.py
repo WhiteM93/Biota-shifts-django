@@ -37,6 +37,8 @@ MAX_SHELVES = 20
 MAX_COLUMNS = 12
 MAX_ITEMS_PER_CONTAINER = 80
 MAX_AUDIT_LINES = 120
+MAX_ORGANIZER_TIERS = 8
+MAX_ORGANIZER_COLUMNS = 6
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _VALID_CATEGORIES = {c for c, _ in VisualContainerItem.TOOL_CATEGORY_CHOICES if c}
 _VALID_MILL_TYPES = {c for c, _ in END_MILL_TYPES}
@@ -315,22 +317,42 @@ def _normalize_container_kind(raw) -> str:
         return VisualContainer.KIND_SHELF_SLOT
     if kind == VisualContainer.KIND_DRAWER_CELL:
         return VisualContainer.KIND_DRAWER_CELL
+    if kind == VisualContainer.KIND_ORGANIZER:
+        return VisualContainer.KIND_ORGANIZER
     return VisualContainer.KIND_BIN
 
 
-def _serialize_container(c: VisualContainer, *, with_items: bool = False) -> dict:
+def _default_organizer_cell_label(tier: int, col: int, cols: int) -> str:
+    if cols == 2:
+        side = "СК" if col == 1 else "ГЛ"
+        return f"Ярус {tier} {side}"
+    return f"Ярус {tier} · {col}"
+
+
+def _serialize_container(
+    c: VisualContainer,
+    *,
+    with_items: bool = False,
+    children: list[VisualContainer] | None = None,
+) -> dict:
     color = (c.color or "").strip()
     if not _HEX_RE.match(color):
         color = "#e74c3c"
+    kind = _normalize_container_kind(getattr(c, "kind", None))
+    if getattr(c, "parent_id", None) and kind == VisualContainer.KIND_BIN:
+        kind = VisualContainer.KIND_DRAWER_CELL
     data = {
         "id": c.id,
         "cabinet_id": c.cabinet_id,
-        "kind": _normalize_container_kind(getattr(c, "kind", None)),
+        "parent_id": getattr(c, "parent_id", None),
+        "kind": kind,
         "shelf": c.shelf,
         "stack": max(1, int(c.stack or 1)),
         "column": c.column,
         "col_span": max(1, int(c.col_span or 1)),
         "row_span": max(1, int(c.row_span or 1)),
+        "inner_tiers": max(1, int(getattr(c, "inner_tiers", 1) or 1)),
+        "inner_columns": max(1, int(getattr(c, "inner_columns", 1) or 1)),
         "label": c.label,
         "color": color,
         "notes": c.notes or "",
@@ -345,10 +367,114 @@ def _serialize_container(c: VisualContainer, *, with_items: bool = False) -> dic
     }
     if data["items_count"] is None:
         data["items_count"] = c.items.count()
+    if children is not None:
+        data["children"] = [
+            _serialize_container(ch) for ch in sorted(children, key=lambda x: (x.shelf, x.column, x.id))
+        ]
+    elif kind == VisualContainer.KIND_ORGANIZER:
+        kids = list(c.children.all()) if hasattr(c, "_prefetched_objects_cache") and "children" in getattr(c, "_prefetched_objects_cache", {}) else list(c.children.all())
+        data["children"] = [
+            _serialize_container(ch) for ch in sorted(kids, key=lambda x: (x.shelf, x.column, x.id))
+        ]
     if with_items:
         items = list(c.items.select_related("tool_item").all())
         data["items"] = [_serialize_item(it, _stock_qty_for_item(it)) for it in items]
         data["stock_tools"] = _matching_tools_for_container(c, items)
+    return data
+
+
+def _cells_of(shelf: int, stack: int, column: int, col_span: int):
+    for c in range(column, column + col_span):
+        yield (shelf, stack, c)
+
+
+def _container_overlap_error(
+    cab: VisualCabinet,
+    *,
+    shelf: int,
+    stack: int,
+    column: int,
+    col_span: int,
+    exclude_id: int | None = None,
+) -> str | None:
+    if shelf < 1 or shelf > cab.shelves:
+        return "Некорректный номер полки"
+    if column < 1 or col_span < 1:
+        return "Некорректное место на полке"
+    occupied: set[tuple[int, int, int]] = set()
+    qs = VisualContainer.objects.filter(cabinet=cab, parent__isnull=True)
+    if exclude_id:
+        qs = qs.exclude(pk=exclude_id)
+    for other in qs:
+        cs = max(1, int(other.col_span or 1))
+        st = max(1, int(other.stack or 1))
+        occupied.update(_cells_of(other.shelf, st, other.column, cs))
+    for cell in _cells_of(shelf, stack, column, col_span):
+        if cell in occupied:
+            return "Это место уже занято другим ящиком. Выберите другое «место слева» или нажмите «+» на полке."
+    return None
+
+
+def _ensure_organizer_children(org: VisualContainer) -> None:
+    tiers = max(1, min(MAX_ORGANIZER_TIERS, int(org.inner_tiers or 1)))
+    cols = max(1, min(MAX_ORGANIZER_COLUMNS, int(org.inner_columns or 1)))
+    org.inner_tiers = tiers
+    org.inner_columns = cols
+    existing = {(ch.shelf, ch.column): ch for ch in org.children.all()}
+    to_create: list[VisualContainer] = []
+    for t in range(1, tiers + 1):
+        for c in range(1, cols + 1):
+            if (t, c) in existing:
+                continue
+            to_create.append(
+                VisualContainer(
+                    cabinet_id=org.cabinet_id,
+                    parent=org,
+                    kind=VisualContainer.KIND_DRAWER_CELL,
+                    shelf=t,
+                    stack=1,
+                    column=c,
+                    col_span=1,
+                    row_span=1,
+                    inner_tiers=1,
+                    inner_columns=1,
+                    label=_default_organizer_cell_label(t, c, cols),
+                    color=org.color or "#e74c3c",
+                )
+            )
+    if to_create:
+        VisualContainer.objects.bulk_create(to_create)
+    # Удаляем лишние пустые ячейки за пределами сетки
+    for (t, c), ch in existing.items():
+        if t > tiers or c > cols:
+            if ch.items.exists():
+                continue
+            ch.delete()
+
+
+def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> dict:
+    data = {
+        "id": cab.id,
+        "name": cab.name,
+        "kind": _normalize_cabinet_kind(getattr(cab, "kind", None)),
+        "shelves": cab.shelves,
+        "columns": cab.columns,
+        "notes": cab.notes or "",
+        "sort_order": cab.sort_order,
+    }
+    if with_containers:
+        all_conts = list(cab.containers.all())
+        children_by_parent: dict[int, list[VisualContainer]] = {}
+        tops: list[VisualContainer] = []
+        for c in all_conts:
+            if getattr(c, "parent_id", None):
+                children_by_parent.setdefault(c.parent_id, []).append(c)
+            else:
+                tops.append(c)
+        data["containers"] = [
+            _serialize_container(c, children=children_by_parent.get(c.id, []))
+            for c in tops
+        ]
     return data
 
 
@@ -379,54 +505,6 @@ def _serialize_audit(audit: VisualContainerAudit, *, with_lines: bool = True) ->
     if with_lines:
         lines = list(audit.lines.select_related("tool").all())
         data["lines"] = [_serialize_audit_line(ln) for ln in lines]
-    return data
-
-
-def _cells_of(shelf: int, stack: int, column: int, col_span: int):
-    for c in range(column, column + col_span):
-        yield (shelf, stack, c)
-
-
-def _container_overlap_error(
-    cab: VisualCabinet,
-    *,
-    shelf: int,
-    stack: int,
-    column: int,
-    col_span: int,
-    exclude_id: int | None = None,
-) -> str | None:
-    if shelf < 1 or shelf > cab.shelves:
-        return "Некорректный номер полки"
-    if column < 1 or col_span < 1:
-        return "Некорректное место на полке"
-    occupied: set[tuple[int, int, int]] = set()
-    qs = VisualContainer.objects.filter(cabinet=cab)
-    if exclude_id:
-        qs = qs.exclude(pk=exclude_id)
-    for other in qs:
-        cs = max(1, int(other.col_span or 1))
-        st = max(1, int(other.stack or 1))
-        occupied.update(_cells_of(other.shelf, st, other.column, cs))
-    for cell in _cells_of(shelf, stack, column, col_span):
-        if cell in occupied:
-            return "Это место уже занято другим ящиком. Выберите другое «место слева» или нажмите «+» на полке."
-    return None
-
-
-def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> dict:
-    data = {
-        "id": cab.id,
-        "name": cab.name,
-        "kind": _normalize_cabinet_kind(getattr(cab, "kind", None)),
-        "shelves": cab.shelves,
-        "columns": cab.columns,
-        "notes": cab.notes or "",
-        "sort_order": cab.sort_order,
-    }
-    if with_containers:
-        containers = list(cab.containers.all())
-        data["containers"] = [_serialize_container(c) for c in containers]
     return data
 
 
@@ -534,7 +612,10 @@ def _cabinet_mutate(request, cab: VisualCabinet):
                     "Нельзя сменить тип: есть зоны «на полке». Удалите их или оставьте стеллаж."
                 )
         if new_kind != VisualCabinet.KIND_DRAWER_CHEST:
-            has_cells = cab.containers.filter(kind=VisualContainer.KIND_DRAWER_CELL).exists()
+            has_cells = cab.containers.filter(
+                kind=VisualContainer.KIND_DRAWER_CELL,
+                parent__isnull=True,
+            ).exists()
             if has_cells:
                 return _err(
                     "Нельзя сменить тип: есть ячейки ящика. Удалите их или оставьте тумбу с ящиками."
@@ -545,7 +626,7 @@ def _cabinet_mutate(request, cab: VisualCabinet):
     if "shelves" in body or "columns" in body:
         shelves = _clamp_int(body.get("shelves", cab.shelves), cab.shelves, 1, MAX_SHELVES)
         columns = _clamp_int(body.get("columns", cab.columns), cab.columns, 1, MAX_COLUMNS)
-        for cont in cab.containers.all():
+        for cont in cab.containers.filter(parent__isnull=True):
             cs = max(1, int(cont.col_span or 1))
             if cont.shelf > shelves or cont.column + cs - 1 > columns:
                 return _err("Уменьшить сетку нельзя: контейнеры не помещаются")
@@ -590,41 +671,75 @@ def visual_warehouse_api_container_upsert(request):
     notes = str(body.get("notes") or "").strip()[:300]
     cont_kind = _normalize_container_kind(body.get("kind"))
     cab_kind = _normalize_cabinet_kind(cab.kind)
+    parent_id = body.get("parent_id")
+    parent = None
+    if parent_id:
+        try:
+            parent = VisualContainer.objects.get(pk=int(parent_id), cabinet=cab, kind=VisualContainer.KIND_ORGANIZER)
+        except (TypeError, ValueError, VisualContainer.DoesNotExist):
+            return _err("Некорректный органайзер для ячейки")
+
     if cont_kind == VisualContainer.KIND_SHELF_SLOT and cab_kind != VisualCabinet.KIND_RACK:
         return _err("Зона «на полке» доступна только на стеллаже")
     if cont_kind == VisualContainer.KIND_SHELF_SLOT and stack > 1:
         return _err("Зона «на полке» не ставится в стопку — только ярус 1")
-    if cont_kind == VisualContainer.KIND_DRAWER_CELL and cab_kind != VisualCabinet.KIND_DRAWER_CHEST:
-        return _err("Ячейка ящика доступна только в тумбе с ящиками")
-    if cont_kind == VisualContainer.KIND_DRAWER_CELL and stack > 1:
-        return _err("Ячейка ящика не ставится в стопку — только ярус 1")
+    if cont_kind == VisualContainer.KIND_DRAWER_CELL:
+        if parent:
+            pass  # ячейка внутри органайзера в шкафу/стеллаже
+        elif cab_kind != VisualCabinet.KIND_DRAWER_CHEST:
+            return _err("Ячейка ящика доступна только в тумбе с ящиками или внутри органайзера")
+        if stack > 1:
+            return _err("Ячейка ящика не ставится в стопку — только ярус 1")
+    if cont_kind == VisualContainer.KIND_ORGANIZER:
+        if parent:
+            return _err("Органайзер нельзя вложить в другой органайзер")
+        if cab_kind == VisualCabinet.KIND_DRAWER_CHEST:
+            return _err("Органайзер ставьте в шкаф или на стеллаж, не в тумбу с ящиками")
+        stack = 1
     if cab_kind == VisualCabinet.KIND_DRAWER_CHEST and cont_kind == VisualContainer.KIND_SHELF_SLOT:
         return _err("На тумбе с ящиками нельзя зону «на полке» — используйте ячейку ящика")
     # В тумбе по умолчанию ячейки лежат в одном ярусе-ящике
     if cab_kind == VisualCabinet.KIND_DRAWER_CHEST and cont_kind == VisualContainer.KIND_BIN and stack > 1:
         return _err("В тумбе с ящиками стопки не используются — ячейки в одном ярусе")
+
+    inner_tiers = _clamp_int(body.get("inner_tiers"), 3, 1, MAX_ORGANIZER_TIERS)
+    inner_columns = _clamp_int(body.get("inner_columns"), 2, 1, MAX_ORGANIZER_COLUMNS)
+    if cont_kind != VisualContainer.KIND_ORGANIZER:
+        inner_tiers = 1
+        inner_columns = 1
+
     cid = body.get("id")
     exclude_id = int(cid) if cid else None
 
-    need_cols = column + col_span - 1
-    if need_cols > MAX_COLUMNS:
-        return _err(f"Максимум мест в ряд: {MAX_COLUMNS}")
-    if need_cols > cab.columns:
-        cab.columns = need_cols
-        cab.save(update_fields=["columns", "updated_at"])
+    # Ячейки органайзера не занимают место на полке шкафа — координаты внутри родителя
+    if parent:
+        shelf = _clamp_int(body.get("shelf"), 1, 1, max(1, int(parent.inner_tiers or 1)))
+        column = _clamp_int(body.get("column"), 1, 1, max(1, int(parent.inner_columns or 1)))
+        col_span = 1
+        stack = 1
+    else:
+        need_cols = column + col_span - 1
+        if need_cols > MAX_COLUMNS:
+            return _err(f"Максимум мест в ряд: {MAX_COLUMNS}")
+        if need_cols > cab.columns:
+            cab.columns = need_cols
+            cab.save(update_fields=["columns", "updated_at"])
 
-    overlap = _container_overlap_error(
-        cab,
-        shelf=shelf,
-        stack=stack,
-        column=column,
-        col_span=col_span,
-        exclude_id=exclude_id,
-    )
-    if overlap:
-        return _err(overlap)
+        overlap = _container_overlap_error(
+            cab,
+            shelf=shelf,
+            stack=stack,
+            column=column,
+            col_span=col_span,
+            exclude_id=exclude_id,
+        )
+        if overlap:
+            return _err(overlap)
+
     if cid:
         cont = get_object_or_404(VisualContainer, pk=cid, cabinet=cab)
+        if cont.parent_id and cont_kind == VisualContainer.KIND_ORGANIZER:
+            return _err("Нельзя превратить ячейку в органайзер")
         cont.kind = cont_kind
         cont.shelf = shelf
         cont.stack = stack
@@ -634,24 +749,35 @@ def visual_warehouse_api_container_upsert(request):
         cont.label = label
         cont.color = color
         cont.notes = notes
+        if cont_kind == VisualContainer.KIND_ORGANIZER:
+            cont.inner_tiers = inner_tiers
+            cont.inner_columns = inner_columns
         cont.save()
+        if cont_kind == VisualContainer.KIND_ORGANIZER:
+            _ensure_organizer_children(cont)
     else:
         cont = VisualContainer.objects.create(
             cabinet=cab,
+            parent=parent,
             kind=cont_kind,
             shelf=shelf,
             stack=stack,
             column=column,
             col_span=col_span,
             row_span=1,
+            inner_tiers=inner_tiers if cont_kind == VisualContainer.KIND_ORGANIZER else 1,
+            inner_columns=inner_columns if cont_kind == VisualContainer.KIND_ORGANIZER else 1,
             label=label,
             color=color,
             notes=notes,
         )
+        if cont_kind == VisualContainer.KIND_ORGANIZER:
+            _ensure_organizer_children(cont)
     cont = (
         VisualContainer.objects.annotate(items_count=Count("items"))
         .prefetch_related(
-            Prefetch("items", queryset=VisualContainerItem.objects.select_related("tool_item"))
+            Prefetch("items", queryset=VisualContainerItem.objects.select_related("tool_item")),
+            "children",
         )
         .get(pk=cont.pk)
     )

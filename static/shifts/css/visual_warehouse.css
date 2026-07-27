@@ -302,6 +302,98 @@ html[data-theme="dawn"] .vw-floor {
   background: rgba(0, 0, 0, 0.25);
 }
 
+/* Органайзер внутри шкафа: мини-тумба с ярусами и разделителями */
+.vw-organizer {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid #3a4046;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #8a929a, #5c646c 55%, #4a5158);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.vw-organizer-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  color: #f0f2f4;
+  padding: 2px 4px;
+  line-height: 1.2;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.vw-organizer-tier {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid #2f3439;
+  border-radius: 2px;
+  overflow: hidden;
+  background: #6a727a;
+}
+
+.vw-organizer-tier-handle {
+  height: 6px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vw-organizer-tier-handle::after {
+  content: "";
+  width: 36%;
+  height: 2px;
+  border-radius: 1px;
+  background: #b8c0c8;
+}
+
+.vw-organizer-tier-cells {
+  display: grid;
+  gap: 0;
+  min-height: 36px;
+}
+
+.vw-organizer-tier-cells .vw-drawer-cell-slot {
+  min-height: 36px;
+}
+
+.vw-organizer-tier-cells .vw-drawer-cell {
+  min-height: 34px;
+  padding: 3px 2px 2px;
+}
+
+.vw-organizer-tier-cells .vw-bin-label {
+  min-height: 18px;
+  padding: 1px 2px;
+}
+
+.vw-organizer-tier-cells .vw-bin-text {
+  font-size: 8px;
+}
+
+.vw-organizer-tier-cells .vw-bin-audit {
+  display: none;
+}
+
+.vw-organizer-edit {
+  margin: 0;
+  padding: 2px 4px;
+  font-size: 10px;
+  border: 0;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #e8eaed;
+  cursor: pointer;
+}
+.vw-organizer-edit:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
 .vw-pile {
   display: flex;
   flex-direction: column-reverse;

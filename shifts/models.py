@@ -2632,10 +2632,12 @@ class VisualContainer(models.Model):
     KIND_BIN = "bin"
     KIND_SHELF_SLOT = "shelf_slot"
     KIND_DRAWER_CELL = "drawer_cell"
+    KIND_ORGANIZER = "organizer"
     KIND_CHOICES = (
         (KIND_BIN, "Контейнер"),
         (KIND_SHELF_SLOT, "На полке"),
         (KIND_DRAWER_CELL, "Ячейка ящика"),
+        (KIND_ORGANIZER, "Органайзер (ярусы)"),
     )
 
     cabinet = models.ForeignKey(
@@ -2643,6 +2645,14 @@ class VisualContainer(models.Model):
         on_delete=models.CASCADE,
         related_name="containers",
         verbose_name="Шкаф",
+    )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="children",
+        verbose_name="Родительский органайзер",
     )
     kind = models.CharField(
         max_length=16,
@@ -2658,6 +2668,14 @@ class VisualContainer(models.Model):
     column = models.PositiveSmallIntegerField(verbose_name="Позиция слева (1…)")
     col_span = models.PositiveSmallIntegerField(default=1, verbose_name="Ширина (ячеек)")
     row_span = models.PositiveSmallIntegerField(default=1, verbose_name="Высота (полок, устар.)")
+    inner_tiers = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Ярусов внутри (органайзер)",
+    )
+    inner_columns = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Ячеек в ярусе (разделители)",
+    )
     label = models.CharField(max_length=120, verbose_name="Подпись")
     color = models.CharField(max_length=7, blank=True, default="#e74c3c", verbose_name="Цвет этикетки")
     notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")

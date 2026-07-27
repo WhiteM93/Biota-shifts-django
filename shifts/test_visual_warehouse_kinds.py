@@ -187,3 +187,37 @@ class VisualWarehouseKindsTests(TestCase):
         self.assertEqual(res.status_code, 400, res.content[:500])
         cab.refresh_from_db()
         self.assertEqual(cab.kind, VisualCabinet.KIND_DRAWER_CHEST)
+
+    def test_create_organizer_in_cabinet(self):
+        cab = VisualCabinet.objects.create(name="Шкаф", kind=VisualCabinet.KIND_CABINET, shelves=3, columns=3)
+        res = self._post_json(
+            self.upsert_url,
+            {
+                "cabinet_id": cab.pk,
+                "kind": "organizer",
+                "shelf": 1,
+                "stack": 1,
+                "column": 1,
+                "col_span": 1,
+                "label": "Метчики",
+                "inner_tiers": 3,
+                "inner_columns": 2,
+                "color": "#5dade2",
+            },
+        )
+        self.assertEqual(res.status_code, 200, res.content[:500])
+        body = res.json()
+        self.assertTrue(body.get("ok"), body)
+        self.assertEqual(body["container"]["kind"], "organizer")
+        self.assertEqual(body["container"]["inner_tiers"], 3)
+        self.assertEqual(body["container"]["inner_columns"], 2)
+        self.assertEqual(len(body["container"]["children"]), 6)
+        org = VisualContainer.objects.get(pk=body["container"]["id"])
+        self.assertEqual(org.children.count(), 6)
+        labels = set(org.children.values_list("label", flat=True))
+        self.assertIn("Ярус 1 СК", labels)
+        self.assertIn("Ярус 1 ГЛ", labels)
+        # дочерние не на верхнем уровне шкафа
+        tops = [c for c in body["cabinet"]["containers"] if not c.get("parent_id")]
+        self.assertEqual(len(tops), 1)
+        self.assertEqual(tops[0]["kind"], "organizer")

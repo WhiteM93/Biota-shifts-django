@@ -235,6 +235,7 @@
   function containerKindLabel(kind) {
     if (kind === "shelf_slot") return "На полке";
     if (kind === "drawer_cell") return "Ячейка";
+    if (kind === "organizer") return "Органайзер";
     return "Контейнер";
   }
 
@@ -504,7 +505,75 @@
     }
   }
 
+  function buildOrganizer(cab, cont) {
+    var wrap = document.createElement("div");
+    wrap.className = "vw-organizer";
+    wrap.dataset.kind = "organizer";
+    wrap.dataset.containerId = String(cont.id);
+
+    var title = document.createElement("div");
+    title.className = "vw-organizer-title";
+    title.textContent = cont.label || "Органайзер";
+    wrap.appendChild(title);
+
+    var tiers = Math.max(1, parseInt(cont.inner_tiers, 10) || 1);
+    var cols = Math.max(1, parseInt(cont.inner_columns, 10) || 1);
+    var children = (cont.children || []).slice().sort(function (a, b) {
+      return (a.shelf - b.shelf) || (a.column - b.column);
+    });
+    var byKey = {};
+    children.forEach(function (ch) {
+      byKey[ch.shelf + ":" + ch.column] = ch;
+    });
+
+    for (var t = 1; t <= tiers; t++) {
+      var tier = document.createElement("div");
+      tier.className = "vw-organizer-tier";
+      var handle = document.createElement("div");
+      handle.className = "vw-organizer-tier-handle";
+      handle.setAttribute("aria-hidden", "true");
+      tier.appendChild(handle);
+      var cells = document.createElement("div");
+      cells.className = "vw-organizer-tier-cells";
+      cells.style.gridTemplateColumns = "repeat(" + cols + ", minmax(0, 1fr))";
+      for (var c = 1; c <= cols; c++) {
+        var slot = document.createElement("div");
+        slot.className = "vw-drawer-cell-slot";
+        var child = byKey[t + ":" + c];
+        if (child) {
+          slot.appendChild(buildBin(cab, child));
+        } else {
+          var empty = document.createElement("div");
+          empty.className = "vw-drawer-empty";
+          empty.style.padding = "8px 2px";
+          empty.textContent = "—";
+          slot.appendChild(empty);
+        }
+        cells.appendChild(slot);
+      }
+      tier.appendChild(cells);
+      wrap.appendChild(tier);
+    }
+
+    if (editMode && canEdit) {
+      var editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "vw-organizer-edit";
+      editBtn.textContent = "Параметры органайзера";
+      editBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openContainerForm(cab, cont);
+      });
+      wrap.appendChild(editBtn);
+    }
+    return wrap;
+  }
+
   function buildBin(cab, cont) {
+    if (cont.kind === "organizer") {
+      return buildOrganizer(cab, cont);
+    }
     var isSlot = cont.kind === "shelf_slot";
     var isCell = cont.kind === "drawer_cell" || cabinetKindOf(cab) === "drawer_chest";
     var btn = document.createElement("button");
@@ -620,33 +689,55 @@
     openDialog(dlgCab);
   }
 
-  function syncContainerKindOptions(cabKind, selected) {
+  function syncContainerKindOptions(cabKind, selected, isChild) {
     var kindSel = contForm.querySelector(".js-vw-cont-kind");
     if (!kindSel) return selected || "bin";
     var allowed;
-    if (cabKind === "rack") allowed = ["bin", "shelf_slot"];
+    if (isChild) allowed = ["drawer_cell"];
+    else if (cabKind === "rack") allowed = ["bin", "shelf_slot", "organizer"];
     else if (cabKind === "drawer_chest") allowed = ["drawer_cell", "bin"];
-    else allowed = ["bin"];
+    else allowed = ["bin", "organizer"];
     [].forEach.call(kindSel.options, function (opt) {
-      opt.hidden = allowed.indexOf(opt.value) < 0;
-      opt.disabled = opt.hidden;
+      var ok = allowed.indexOf(opt.value) >= 0;
+      opt.hidden = !ok;
+      opt.disabled = !ok;
     });
     var value = selected && allowed.indexOf(selected) >= 0
       ? selected
-      : (cabKind === "drawer_chest" ? "drawer_cell" : "bin");
+      : allowed[0];
     kindSel.value = value;
+    if (kindSel.value !== value) {
+      [].forEach.call(kindSel.options, function (opt) {
+        if (opt.value === value) opt.selected = true;
+      });
+    }
     return value;
+  }
+
+  function syncOrganizerFields(contKind, cont) {
+    var orgRow = contForm.querySelector(".js-vw-cont-organizer-row");
+    var orgHint = contForm.querySelector(".js-vw-cont-organizer-hint");
+    var show = contKind === "organizer";
+    setVisible(orgRow, show);
+    setVisible(orgHint, show);
+    var tiersEl = contForm.querySelector(".js-vw-cont-inner-tiers");
+    var colsEl = contForm.querySelector(".js-vw-cont-inner-cols");
+    if (tiersEl) tiersEl.value = String(cont && cont.inner_tiers ? cont.inner_tiers : 3);
+    if (colsEl) colsEl.value = String(cont && cont.inner_columns ? cont.inner_columns : 2);
   }
 
   function openContainerForm(cab, cont, shelf, stack, col) {
     var cabKind = cabinetKindOf(cab);
+    var isChild = !!(cont && cont.parent_id);
     var contKind = cont
       ? (cont.kind === "shelf_slot"
         ? "shelf_slot"
-        : (cont.kind === "drawer_cell" ? "drawer_cell" : "bin"))
-      : (cabKind === "drawer_chest" ? "drawer_cell" : "bin");
+        : (cont.kind === "organizer"
+          ? "organizer"
+          : (cont.kind === "drawer_cell" || isChild ? "drawer_cell" : "bin")))
+      : "bin";
     contForm.querySelector(".js-vw-cont-form-title").textContent = cont
-      ? containerKindLabel(contKind)
+      ? (isChild ? "Ячейка органайзера" : containerKindLabel(contKind))
       : (cabKind === "drawer_chest"
         ? "Новая ячейка"
         : (cabKind === "rack" ? "Новое содержимое" : "Новый контейнер"));
@@ -655,27 +746,36 @@
     var kindRow = contForm.querySelector(".js-vw-cont-kind-row");
     var kindSel = contForm.querySelector(".js-vw-cont-kind");
     if (kindRow && kindSel) {
-      var showKind = cabKind === "rack" || cabKind === "drawer_chest";
-      setVisible(kindRow, showKind);
-      contKind = syncContainerKindOptions(cabKind, contKind);
-      kindSel.disabled = !showKind;
+      setVisible(kindRow, true);
+      contKind = syncContainerKindOptions(cabKind, contKind, isChild);
+      kindSel.disabled = isChild;
     }
+    syncOrganizerFields(contKind, cont);
     contForm.querySelector(".js-vw-cont-label").value = cont ? cont.label : "";
     contForm.querySelector(".js-vw-cont-color").value = (cont && cont.color) || "#e74c3c";
     contForm.querySelector(".js-vw-cont-shelf").value = String(cont ? cont.shelf : shelf || 1);
     var stackEl = contForm.querySelector(".js-vw-cont-stack");
     var stackRow = contForm.querySelector(".js-vw-cont-stack-row");
     var stackHint = contForm.querySelector(".js-vw-cont-stack-hint");
-    var hideStack = cabKind === "drawer_chest" || contKind === "shelf_slot" || contKind === "drawer_cell";
+    var hideStack = isChild || cabKind === "drawer_chest" || contKind === "shelf_slot" || contKind === "drawer_cell" || contKind === "organizer";
     if (stackEl) stackEl.value = String(hideStack ? 1 : (cont ? (cont.stack || 1) : stack || 1));
     if (stackRow) setVisible(stackRow, !hideStack);
     if (stackHint) {
-      setVisible(stackHint, !hideStack);
-      if (cabKind === "drawer_chest") {
+      if (contKind === "organizer") {
+        stackHint.textContent = "Органайзер занимает одно место на полке; ярусы и разделители — внутри него.";
+        setVisible(stackHint, true);
+      } else if (isChild) {
+        stackHint.textContent = "Подпись ячейки (например «M2 СК»). Ярус и место — внутри органайзера.";
+        setVisible(stackHint, true);
+      } else if (cabKind === "drawer_chest") {
         stackHint.textContent = "В тумбе каждый ярус — отдельный ящик; ячейки разделяются внутри него.";
+        setVisible(stackHint, true);
+      } else if (hideStack) {
+        stackHint.textContent = "Для этого типа ярус всегда 1.";
         setVisible(stackHint, true);
       } else {
         stackHint.textContent = "Ярус 1 на полке. Ярус 2 — поверх другого ящика в том же месте.";
+        setVisible(stackHint, true);
       }
     }
     contForm.querySelector(".js-vw-cont-column").value = String(cont ? cont.column : col || 1);
@@ -689,6 +789,7 @@
         spanSel.appendChild(opt);
       }
       spanSel.value = spanVal;
+      spanSel.disabled = isChild || contKind === "organizer";
     }
     var notesEl = contForm.querySelector(".js-vw-cont-notes");
     if (notesEl) notesEl.value = cont ? (cont.notes || "") : "";
@@ -699,10 +800,20 @@
       contForm.querySelector(".js-vw-cont-shelf").closest(".vw-row") &&
       contForm.querySelector(".js-vw-cont-shelf").closest(".vw-row").querySelector(".vw-row-label");
     if (shelfLabel) {
-      shelfLabel.textContent = cabKind === "drawer_chest" ? "Ящик (1 — верхний)" : "Полка (1 — верхняя)";
+      if (isChild) shelfLabel.textContent = "Ярус внутри";
+      else if (cabKind === "drawer_chest") shelfLabel.textContent = "Ящик (1 — верхний)";
+      else shelfLabel.textContent = "Полка (1 — верхняя)";
     }
+    var colLabel = contForm.querySelector(".js-vw-cont-column") &&
+      contForm.querySelector(".js-vw-cont-column").closest(".vw-row") &&
+      contForm.querySelector(".js-vw-cont-column").closest(".vw-row").querySelector(".vw-row-label");
+    if (colLabel) {
+      colLabel.textContent = isChild ? "Ячейка слева" : "Место слева";
+    }
+    // parent id for child cells
+    contForm.dataset.parentId = cont && cont.parent_id ? String(cont.parent_id) : "";
     setVisible(btnDelCont, !!cont);
-    setVisible(btnOpenContents, !!cont);
+    setVisible(btnOpenContents, !!cont && contKind !== "organizer");
     syncPaletteActive();
     openDialog(dlgCont);
   }
@@ -752,6 +863,20 @@
   var cabKindSelect = document.querySelector(".js-vw-cab-kind");
   if (cabKindSelect) {
     cabKindSelect.addEventListener("change", syncCabinetKindLabels);
+  }
+  var contKindSelect = document.querySelector(".js-vw-cont-kind");
+  if (contKindSelect) {
+    contKindSelect.addEventListener("change", function () {
+      var cabId = parseInt(contForm.querySelector(".js-vw-cont-cabinet").value, 10);
+      var cab = cabinets.find(function (c) { return c.id === cabId; });
+      var kind = contKindSelect.value;
+      syncOrganizerFields(kind, null);
+      var hideStack = kind === "shelf_slot" || kind === "drawer_cell" || kind === "organizer" || cabinetKindOf(cab) === "drawer_chest";
+      var stackRow = contForm.querySelector(".js-vw-cont-stack-row");
+      if (stackRow) setVisible(stackRow, !hideStack);
+      var spanSel = contForm.querySelector(".js-vw-cont-colspan");
+      if (spanSel) spanSel.disabled = kind === "organizer";
+    });
   }
 
   var savingCabinet = false;
@@ -807,16 +932,26 @@
     var kindSel = contForm.querySelector(".js-vw-cont-kind");
     var cab = cabinets.find(function (c) { return c.id === cabinetId; });
     var cabKind = cabinetKindOf(cab);
+    var rawKind = kindSel ? kindSel.value : "bin";
+    var parentId = parseInt(contForm.dataset.parentId || "", 10) || 0;
     var contKind = "bin";
-    if (cabKind === "rack" && kindSel) {
-      contKind = kindSel.value === "shelf_slot" ? "shelf_slot" : "bin";
+    if (parentId) {
+      contKind = "drawer_cell";
+    } else if (rawKind === "organizer") {
+      contKind = "organizer";
+    } else if (cabKind === "rack") {
+      contKind = rawKind === "shelf_slot" ? "shelf_slot" : (rawKind === "organizer" ? "organizer" : "bin");
     } else if (cabKind === "drawer_chest") {
-      contKind = (kindSel && kindSel.value === "bin") ? "bin" : "drawer_cell";
+      contKind = rawKind === "bin" ? "bin" : "drawer_cell";
+    } else {
+      contKind = rawKind === "organizer" ? "organizer" : "bin";
     }
     var stackVal = parseInt(contForm.querySelector(".js-vw-cont-stack").value, 10) || 1;
-    if (contKind === "shelf_slot" || contKind === "drawer_cell" || cabKind === "drawer_chest") {
+    if (contKind === "shelf_slot" || contKind === "drawer_cell" || contKind === "organizer" || cabKind === "drawer_chest") {
       stackVal = 1;
     }
+    var tiersEl = contForm.querySelector(".js-vw-cont-inner-tiers");
+    var colsEl = contForm.querySelector(".js-vw-cont-inner-cols");
     var body = {
       cabinet_id: cabinetId,
       kind: contKind,
@@ -827,7 +962,10 @@
       label: label,
       color: contForm.querySelector(".js-vw-cont-color").value || "#e74c3c",
       notes: notesEl ? notesEl.value : "",
+      inner_tiers: tiersEl ? parseInt(tiersEl.value, 10) || 3 : 3,
+      inner_columns: colsEl ? parseInt(colsEl.value, 10) || 2 : 2,
     };
+    if (parentId) body.parent_id = parentId;
     if (idVal) body.id = parseInt(idVal, 10);
     var saveBtn = document.querySelector(".js-vw-cont-save");
     if (saveBtn) {

@@ -88,14 +88,26 @@
       <h2 id="vw-dlg-cont-title" class="vw-dialog-title js-vw-cont-form-title">Ящик</h2>
       <input type="hidden" class="js-vw-cont-id" value="">
       <input type="hidden" class="js-vw-cont-cabinet" value="">
-      <label class="vw-row js-vw-cont-kind-row" hidden>
+      <label class="vw-row js-vw-cont-kind-row">
         <span class="vw-row-label">Тип</span>
         <select class="vw-control js-vw-cont-kind">
           <option value="bin">Контейнер</option>
           <option value="shelf_slot">На полке</option>
           <option value="drawer_cell">Ячейка ящика</option>
+          <option value="organizer">Органайзер (ярусы + разделители)</option>
         </select>
       </label>
+      <div class="vw-row-pair js-vw-cont-organizer-row" hidden>
+        <label class="vw-row">
+          <span class="vw-row-label">Ярусов</span>
+          <input type="number" class="vw-control js-vw-cont-inner-tiers" min="1" max="8" value="3">
+        </label>
+        <label class="vw-row">
+          <span class="vw-row-label">Ячеек в ярусе</span>
+          <input type="number" class="vw-control js-vw-cont-inner-cols" min="1" max="6" value="2">
+        </label>
+      </div>
+      <p class="vw-hint-inline js-vw-cont-organizer-hint" hidden>Как на фото: 3 яруса × 2 ячейки (СК / ГЛ). Подписи ячеек можно сменить отдельно.</p>
       <label class="vw-row">
         <span class="vw-row-label">Подпись на этикетке</span>
         <textarea class="vw-control js-vw-cont-label" maxlength="120" rows="2" autocomplete="off" placeholder="Фрезы 0–1"></textarea>
