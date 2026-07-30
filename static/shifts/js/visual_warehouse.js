@@ -1174,13 +1174,41 @@
   }
 
   function appendToolStockMeta(metaEl, tool, extraParts) {
+    if (!metaEl || !tool) return;
+
+    var typeLabel = (tool.type_label || tool.category_label || "").trim();
+    if (typeLabel) {
+      var typeLine = document.createElement("div");
+      typeLine.className = "vw-tool-type";
+      typeLine.textContent = typeLabel;
+      metaEl.appendChild(typeLine);
+    }
+
+    var specsText = (tool.specs || "").trim();
+    if (!specsText || specsText === "—") {
+      var fallback = [];
+      if (tool.subtype_label) fallback.push(tool.subtype_label);
+      else if (tool.mill_type_label) fallback.push(tool.mill_type_label);
+      if (tool.hole_type_label) fallback.push(tool.hole_type_label);
+      if (tool.size_label) fallback.push(tool.size_label);
+      if (tool.diameter_mm != null) fallback.push("Ø " + tool.diameter_mm);
+      if (tool.corner_radius_mm != null) fallback.push("R " + tool.corner_radius_mm);
+      if (tool.overall_length_mm != null) fallback.push("L " + tool.overall_length_mm);
+      if (tool.cutting_length_mm != null) fallback.push("Lc " + tool.cutting_length_mm);
+      if (tool.flutes_count != null) fallback.push("Z " + tool.flutes_count);
+      if (tool.pitch_mm != null) fallback.push("шаг " + tool.pitch_mm);
+      if (tool.angle_deg != null && tool.angle_deg !== "") fallback.push("∠ " + tool.angle_deg);
+      if (tool.main_diameter_mm != null) fallback.push("Dосн " + tool.main_diameter_mm);
+      specsText = fallback.join(" · ");
+    }
+    if (specsText) {
+      var specsLine = document.createElement("div");
+      specsLine.className = "vw-tool-specs";
+      specsLine.textContent = specsText;
+      metaEl.appendChild(specsLine);
+    }
+
     var parts = [];
-    if (tool.category_label) parts.push(tool.category_label);
-    if (tool.subtype_label) parts.push(tool.subtype_label);
-    else if (tool.mill_type_label) parts.push(tool.mill_type_label);
-    if (tool.hole_type_label) parts.push(tool.hole_type_label);
-    if (tool.size_label) parts.push(tool.size_label);
-    if (tool.diameter_mm != null) parts.push("Ø " + tool.diameter_mm);
     if (tool.tool_material_label) parts.push(tool.tool_material_label);
     if (Array.isArray(extraParts)) {
       extraParts.forEach(function (p) {
@@ -1188,10 +1216,11 @@
       });
     }
     if (tool.notes) parts.push(tool.notes);
-
-    var line = document.createElement("div");
-    line.textContent = parts.join(" · ") || "—";
-    metaEl.appendChild(line);
+    if (parts.length) {
+      var line = document.createElement("div");
+      line.textContent = parts.join(" · ");
+      metaEl.appendChild(line);
+    }
 
     var badges = document.createElement("div");
     badges.className = "vw-tool-badges";
@@ -1254,8 +1283,14 @@
       var left = document.createElement("div");
       var title = document.createElement("div");
       title.className = "vw-item-title";
-      title.textContent = tool.name || "Инструмент";
+      title.textContent = tool.type_label || tool.name || "Инструмент";
       left.appendChild(title);
+      if (tool.name && tool.type_label && tool.name !== tool.type_label) {
+        var nameSub = document.createElement("div");
+        nameSub.className = "vw-item-subname";
+        nameSub.textContent = tool.name;
+        left.appendChild(nameSub);
+      }
       var meta = document.createElement("div");
       meta.className = "vw-item-meta";
       appendToolStockMeta(meta, tool, ["кол-во: " + (tool.quantity != null ? tool.quantity : 0)]);
@@ -1411,6 +1446,12 @@
     var nameTitle = document.createElement("div");
     nameTitle.textContent = opts.name || ("#" + (opts.toolId || ""));
     name.appendChild(nameTitle);
+    if (opts.tool && opts.tool.name && opts.name && opts.tool.name !== opts.name) {
+      var sub = document.createElement("div");
+      sub.className = "vw-item-subname";
+      sub.textContent = opts.tool.name;
+      name.appendChild(sub);
+    }
     var meta = document.createElement("div");
     meta.className = "vw-item-meta";
     if (opts.isNew) {
@@ -1479,7 +1520,7 @@
       appendAuditRow({
         toolId: tool.id,
         tool: tool,
-        name: tool.name || ("#" + tool.id),
+        name: tool.type_label || tool.name || ("#" + tool.id),
         expected: tool.quantity != null ? tool.quantity : 0,
         counted: tool.quantity != null ? tool.quantity : 0,
       });

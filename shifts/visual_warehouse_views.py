@@ -214,6 +214,12 @@ def _serialize_tool(tool: ToolItem) -> dict:
     size_label = ""
     hole_type = ""
     hole_type_label = ""
+    overall_length_mm = None
+    cutting_length_mm = None
+    flutes_count = None
+    corner_radius_mm = None
+    pitch_mm = None
+    angle_deg = None
     if tool.category == "end_mill":
         em = getattr(tool, "end_mill_spec", None)
         if em:
@@ -221,6 +227,10 @@ def _serialize_tool(tool: ToolItem) -> dict:
             mill_type_label = em.get_mill_type_display() if mill_type else ""
             subtype = mill_type
             subtype_label = mill_type_label
+            overall_length_mm = float(em.overall_length_mm) if em.overall_length_mm is not None else None
+            cutting_length_mm = float(em.cutting_length_mm) if em.cutting_length_mm is not None else None
+            flutes_count = int(em.flutes_count) if em.flutes_count is not None else None
+            corner_radius_mm = float(em.corner_radius_mm) if em.corner_radius_mm is not None else None
     elif tool.category == "tap":
         tap = getattr(tool, "tap_spec", None)
         if tap:
@@ -229,16 +239,35 @@ def _serialize_tool(tool: ToolItem) -> dict:
             size_label = (tap.size_label or "").strip()
             hole_type = (tap.hole_type or "").strip()
             hole_type_label = tap.get_hole_type_display() if hole_type else ""
+            overall_length_mm = float(tap.overall_length_mm) if tap.overall_length_mm is not None else None
+            cutting_length_mm = float(tap.cutting_length_mm) if tap.cutting_length_mm is not None else None
+            pitch_mm = float(tap.pitch_mm) if tap.pitch_mm is not None else None
     elif tool.category == "countersink":
         cs = getattr(tool, "countersink_spec", None)
         if cs:
             subtype = (cs.countersink_type or "").strip()
             subtype_label = cs.get_countersink_type_display() if subtype else ""
+            overall_length_mm = float(cs.overall_length_mm) if cs.overall_length_mm is not None else None
+            flutes_count = int(cs.flutes_count) if cs.flutes_count is not None else None
+            angle_deg = str(cs.angle_deg) if cs.angle_deg else ""
+            size_label = (cs.size_label or "").strip()
     elif tool.category == "collet":
         cl = getattr(tool, "collet_spec", None)
         if cl:
             subtype = (cl.collet_type or "").strip()
             subtype_label = cl.get_collet_type_display() if subtype else ""
+    elif tool.category == "center_drill":
+        cd = getattr(tool, "center_drill_spec", None)
+        if cd:
+            overall_length_mm = float(cd.overall_length_mm) if cd.overall_length_mm is not None else None
+            angle_deg = str(cd.angle_deg) if cd.angle_deg else ""
+    elif tool.category == "drill":
+        dr = getattr(tool, "drill_spec", None)
+        if dr:
+            overall_length_mm = float(dr.overall_length_mm) if dr.overall_length_mm is not None else None
+            cutting_length_mm = float(dr.cutting_length_mm) if dr.cutting_length_mm is not None else None
+            angle_deg = float(dr.angle_deg) if dr.angle_deg is not None else None
+    card = tool.issue_combo_card()
     return {
         "id": tool.id,
         "name": tool.name,
@@ -252,6 +281,15 @@ def _serialize_tool(tool: ToolItem) -> dict:
         "size_label": size_label,
         "hole_type": hole_type,
         "hole_type_label": hole_type_label,
+        "overall_length_mm": overall_length_mm,
+        "cutting_length_mm": cutting_length_mm,
+        "flutes_count": flutes_count,
+        "corner_radius_mm": corner_radius_mm,
+        "pitch_mm": pitch_mm,
+        "angle_deg": angle_deg if angle_deg not in ("", None) else None,
+        "type_label": (card.get("tool_type") or "").strip(),
+        "specs": (card.get("specs") or "").strip(),
+        "main_diameter_mm": float(tool.main_diameter_mm) if tool.main_diameter_mm is not None else None,
         "quantity": int(tool.quantity or 0),
         "notes": tool.notes or "",
         "tool_material": (tool.tool_material or "").strip(),
@@ -285,6 +323,7 @@ def _tool_qs_for_filter(
             "countersink_spec",
             "tap_spec",
             "collet_spec",
+            "insert_spec",
         )
     if not category:
         return ToolItem.objects.none()
@@ -295,6 +334,7 @@ def _tool_qs_for_filter(
         "countersink_spec",
         "tap_spec",
         "collet_spec",
+        "insert_spec",
     )
     diam_field = _DIAMETER_FIELD_BY_CATEGORY.get(category)
     if diam_field and (d_from is not None or d_to is not None):
@@ -332,7 +372,7 @@ def _matching_tools_for_container(c: VisualContainer, items: list[VisualContaine
     rows = items if items is not None else list(c.items.select_related("tool_item").all())
 
     def _add_from_qs(qs):
-        for tool in qs.order_by("category", "name")[:120]:
+        for tool in qs.order_by("category", "name"):
             if tool.pk in seen:
                 continue
             seen.add(tool.pk)
@@ -369,6 +409,22 @@ def _matching_tools_for_container(c: VisualContainer, items: list[VisualContaine
                     d_to=inferred["diameter_to_mm"],
                 )
             )
+
+    def _sort_key(t: dict):
+        diam = t.get("diameter_mm")
+        length = t.get("overall_length_mm")
+        cutting = t.get("cutting_length_mm")
+        return (
+            t.get("category") or "",
+            diam if diam is not None else 1e9,
+            length if length is not None else 1e9,
+            cutting if cutting is not None else 1e9,
+            (t.get("size_label") or "").lower(),
+            (t.get("name") or "").lower(),
+            t.get("id") or 0,
+        )
+
+    out.sort(key=_sort_key)
     return out
 
 

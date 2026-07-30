@@ -905,6 +905,25 @@ html[data-theme="dawn"] .vw-item { background: #f5f5f5; }
 .vw-item-top { display: flex; justify-content: space-between; gap: 8px; }
 .vw-item-title { font-size: 14px; font-weight: 500; }
 .vw-item-meta { margin-top: 4px; font-size: 12px; color: var(--vw-muted); }
+.vw-item-subname {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--vw-muted);
+  font-weight: 400;
+}
+.vw-tool-type {
+  font-size: 12px;
+  color: var(--vw-text);
+  font-weight: 600;
+}
+.vw-tool-specs {
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--vw-text);
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
 
 .vw-item-del {
   border: none;
@@ -1098,16 +1117,16 @@ html[data-theme="dawn"] .vw-audit-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: min(50vh, 420px);
+  max-height: min(70vh, 720px);
   overflow-y: auto;
   margin: 10px 0;
 }
 
 .vw-audit-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) 88px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.8fr) 88px minmax(0, 1fr);
   gap: 8px;
-  align-items: end;
+  align-items: start;
   padding: 10px;
   border: 1px solid var(--vw-border);
   border-radius: 6px;

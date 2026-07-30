@@ -331,6 +331,41 @@ var INV = (function () {
       .trim();
   }
 
+  /** Search: Ø/⌀ → d so placeholder queries like D1 match mill labels. */
+  function normalizeSearchText(s) {
+    return normalizeText(s).replace(/[ø⌀]/g, "d");
+  }
+
+  function optionSearchHaystack(opt) {
+    if (!opt) return "";
+    var parts = [opt.textContent || ""];
+    Array.prototype.forEach.call(opt.attributes || [], function (attr) {
+      if (!attr || !attr.name) return;
+      if (attr.name.indexOf("data-f-") === 0 || attr.name.indexOf("data-issue-") === 0) {
+        parts.push(attr.value || "");
+      }
+    });
+    return normalizeSearchText(parts.join(" "));
+  }
+
+  function optionMatchesQuery(opt, queryRaw) {
+    if (!queryRaw) return true;
+    var hay = optionSearchHaystack(opt);
+    var query = normalizeSearchText(queryRaw);
+    var hayCompact = hay.replace(/\.0+\b/g, "");
+    var queryCompact = query.replace(/\.0+\b/g, "");
+    return hay.indexOf(query) !== -1 || hayCompact.indexOf(queryCompact) !== -1;
+  }
+
+  function comboFindOptionByValue(sel, value) {
+    if (!sel) return null;
+    var want = String(value == null ? "" : value);
+    for (var i = 0; i < sel.options.length; i++) {
+      if (String(sel.options[i].value) === want) return sel.options[i];
+    }
+    return null;
+  }
+
   /* --- Generic combo helpers (pure DOM builders, no global state) --- */
 
   function combNormCoatingClass(code) {
@@ -456,32 +491,39 @@ var INV = (function () {
     textEl.textContent = (!opt || !opt.value) ? "Выбрать..." : (opt.textContent || "").trim();
   }
 
-  function comboEnsurePanel(wrap, sel) {
+  function comboEnsurePanel(wrap, sel, forceRebuild) {
     var panel = wrap && wrap.querySelector(".js-issue-tool-combo-panel");
     if (!sel || !panel) return;
-    if (panel.getAttribute("data-built") === "1") return;
+    var alreadyBuilt = panel.getAttribute("data-built") === "1";
+    if (alreadyBuilt && !forceRebuild) return;
+
+    if (!alreadyBuilt) {
+      panel.addEventListener("click", function (e) {
+        var ob = e.target.closest(".issue-tool-combo-opt");
+        if (!ob || !wrap.contains(ob) || ob.hidden) return;
+        var val = ob.getAttribute("data-opt-value");
+        if (val == null || val === "") return;
+        sel.value = val;
+        try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (eCh) {}
+        comboUpdateLabel(wrap, sel);
+        comboClose(wrap);
+      });
+    }
+
     panel.setAttribute("data-built", "1");
     panel.innerHTML = "";
     Array.prototype.forEach.call(sel.options, function (opt, idx) {
       if (idx === 0) return;
+      if (!opt.value) return;
       var b = document.createElement("button");
       b.type = "button";
       b.className = "issue-tool-combo-opt";
       b.setAttribute("role", "option");
-      b.setAttribute("data-opt-index", String(idx));
+      // Key by option value (tool/issue id), not DOM index — filters reorder <option>s.
+      b.setAttribute("data-opt-value", opt.value);
       combFillOptionButton(b, opt);
       b.hidden = !!opt.hidden;
       panel.appendChild(b);
-    });
-    panel.addEventListener("click", function (e) {
-      var ob = e.target.closest(".issue-tool-combo-opt");
-      if (!ob || !wrap.contains(ob) || ob.hidden) return;
-      var idx = parseInt(ob.getAttribute("data-opt-index"), 10);
-      if (isNaN(idx) || idx < 1) return;
-      sel.selectedIndex = idx;
-      try { sel.dispatchEvent(new Event("change", { bubbles: true })); } catch (eCh) {}
-      comboUpdateLabel(wrap, sel);
-      comboClose(wrap);
     });
   }
 
@@ -489,9 +531,12 @@ var INV = (function () {
     var panel = wrap && wrap.querySelector(".js-issue-tool-combo-panel");
     if (!sel || !panel || panel.getAttribute("data-built") !== "1") return;
     Array.prototype.forEach.call(panel.querySelectorAll(".issue-tool-combo-opt"), function (btn) {
-      var idx = parseInt(btn.getAttribute("data-opt-index"), 10);
-      var opt = sel.options[idx];
-      if (!opt) return;
+      var val = btn.getAttribute("data-opt-value");
+      var opt = comboFindOptionByValue(sel, val);
+      if (!opt) {
+        btn.hidden = true;
+        return;
+      }
       btn.hidden = !!opt.hidden;
     });
   }
@@ -732,8 +777,7 @@ var INV = (function () {
       : null;
     var filters = readPanelFilters(panel);
     var searchInput = root.querySelector(".js-tool-search");
-    var queryRaw = normalizeText(searchInput ? searchInput.value : "");
-    var queryCompact = queryRaw.replace(/\.0+\b/g, "");
+    var queryRaw = searchInput ? searchInput.value : "";
     var wantMat = category === "collet"
       ? ""
       : readRadioFilter('#issue-block .js-tool-filter-material');
@@ -747,9 +791,7 @@ var INV = (function () {
       if (idx === 0) return;
       var optionCategory = opt.getAttribute("data-category");
       var categoryMatch = !category || optionCategory === category;
-      var text = normalizeText(opt.textContent);
-      var textCompact = text.replace(/\.0+\b/g, "");
-      var searchMatch = !queryRaw || text.indexOf(queryRaw) !== -1 || textCompact.indexOf(queryCompact) !== -1;
+      var searchMatch = optionMatchesQuery(opt, queryRaw);
       var specMatch = true;
       Object.keys(filters).forEach(function (fk) {
         if (!specMatch) return;
@@ -790,7 +832,8 @@ var INV = (function () {
 
     var wrap = toolSelect.closest(".js-issue-tool-combo");
     if (wrap) {
-      comboEnsurePanel(wrap, toolSelect);
+      // Rebuild after option reorder so list order matches filters; selection uses ids.
+      comboEnsurePanel(wrap, toolSelect, true);
       comboSyncVisibility(wrap, toolSelect);
     }
     if (toolSelect.selectedIndex > 0 && toolSelect.options[toolSelect.selectedIndex].hidden) {
@@ -846,15 +889,12 @@ var INV = (function () {
     var outcomeSearch = document.getElementById("issue-search-input");
     if (outcomeSearch) {
       function filterOutcomeOptions() {
-        var queryRaw = normalizeText(outcomeSearch.value);
-        var queryCompact = queryRaw.replace(/\.0+\b/g, "");
+        var queryRaw = outcomeSearch.value;
         Array.prototype.forEach.call(outcomeSel.options, function (opt, idx) {
           if (idx === 0) { opt.hidden = false; return; }
-          var text = normalizeText(opt.textContent + " " + (opt.getAttribute("data-issue-extra") || ""));
-          var textCompact = text.replace(/\.0+\b/g, "");
-          opt.hidden = !(!queryRaw || text.indexOf(queryRaw) !== -1 || textCompact.indexOf(queryCompact) !== -1);
+          opt.hidden = !optionMatchesQuery(opt, queryRaw);
         });
-        comboEnsurePanel(outcomeWrap, outcomeSel);
+        comboEnsurePanel(outcomeWrap, outcomeSel, true);
         comboSyncVisibility(outcomeWrap, outcomeSel);
         if (outcomeSel.selectedIndex > 0 && outcomeSel.options[outcomeSel.selectedIndex].hidden) {
           outcomeSel.selectedIndex = 0;
