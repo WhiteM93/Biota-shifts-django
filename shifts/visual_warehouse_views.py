@@ -1278,6 +1278,7 @@ def _container_audit_create(request, cont: VisualContainer):
             changes = 0
             line_rows: list[VisualContainerAuditLine] = []
             change_summaries: list[str] = []
+            change_rows: list[dict] = []
 
             for tool_id, counted, note in parsed:
                 tool = tools[tool_id]
@@ -1308,6 +1309,18 @@ def _container_audit_create(request, cont: VisualContainer):
                     )
                     sign = "+" if delta > 0 else ""
                     change_summaries.append(f"{tool.name}: {expected}→{counted} ({sign}{delta})")
+                    change_rows.append(
+                        {
+                            "tool_id": tool.pk,
+                            "tool_name": (tool.name or "")[:200],
+                            "expected": expected,
+                            "counted": counted,
+                            "delta": delta,
+                            "movement_id": movement.pk if movement else None,
+                            "kind": "surplus" if delta > 0 else "deficit",
+                            "note": note[:200],
+                        }
+                    )
 
                 line_rows.append(
                     VisualContainerAuditLine(
@@ -1347,6 +1360,7 @@ def _container_audit_create(request, cont: VisualContainer):
                     "audit_id": audit.id,
                     "changes_count": changes,
                     "changes": change_summaries[:40],
+                    "change_rows": change_rows[:40],
                     "notes": notes,
                     "new_tools_count": len(created_ids),
                 },

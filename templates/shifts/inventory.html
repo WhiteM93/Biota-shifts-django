@@ -2273,7 +2273,93 @@
         {% if e.actor_username %}
         <p class="inv-history-card__meta-line"><span class="inv-history-fact__label">Кто</span> {{ e.actor_username }}</p>
         {% endif %}
-        {% if e.details %}
+        {% if e.event_type == "container_audit" and row.audit_details %}
+          {% with ad=row.audit_details %}
+          {% if ad.label %}
+          <p class="inv-history-card__meta-line"><span class="inv-history-fact__label">Ящик</span> {{ ad.label }}</p>
+          {% endif %}
+          {% if ad.notes %}
+          <p class="inv-history-card__note">{{ ad.notes }}</p>
+          {% endif %}
+          {% if ad.new_tools_count %}
+          <p class="inv-history-card__meta-line">Новых позиций: {{ ad.new_tools_count }}</p>
+          {% endif %}
+          {% if ad.change_rows %}
+          <ul class="inv-audit-changes">
+            {% for ch in ad.change_rows %}
+            <li class="inv-audit-change inv-audit-change--{{ ch.kind }}">
+              <div class="inv-audit-change__name">{{ ch.tool_name }}</div>
+              <div class="inv-audit-change__qty">
+                {% if ch.expected is not None and ch.counted is not None %}
+                было <strong>{{ ch.expected }}</strong> → факт <strong>{{ ch.counted }}</strong>
+                <span class="inv-audit-change__delta">{% if ch.delta > 0 %}+{% endif %}{{ ch.delta }}</span>
+                {% elif ch.legacy_text %}
+                {{ ch.legacy_text }}
+                {% endif %}
+              </div>
+              {% if ch.kind == "surplus" %}
+                <details class="inv-audit-takers"{% if ch.can_link_return %} open{% endif %}>
+                  <summary class="inv-audit-takers__summary">
+                    {% if ch.surplus_left <= 0 and ch.takers %}
+                      Излишек распределён · кто брал ({{ ch.takers|length }})
+                    {% elif ch.open_issues %}
+                      Кто брал этот инструмент — нажмите, список и возврат
+                      <span class="inv-audit-takers__left">открытых выдач: {{ ch.open_issues|length }}{% if ch.surplus_left %} · распределить ещё {{ ch.surplus_left }} шт.{% endif %}</span>
+                    {% elif ch.takers %}
+                      Кто брал · {{ ch.takers|length }} (открытых выдач нет)
+                    {% else %}
+                      Никто не брал эту позицию по журналу выдач
+                    {% endif %}
+                  </summary>
+                  {% if ch.takers %}
+                  <ul class="inv-audit-takers-list">
+                    {% for iss in ch.takers %}
+                    <li class="inv-audit-taker{% if not iss.is_open %} is-closed{% endif %}">
+                      <div class="inv-audit-taker__main">
+                        <div class="inv-audit-taker__who">{{ iss.employee_name }}</div>
+                        <div class="inv-audit-taker__meta">
+                          выдача #{{ iss.id }}
+                          {% if iss.date %} · {{ iss.date }}{% endif %}
+                          · взял {{ iss.issued }} шт.
+                          · {% if iss.is_open %}осталось вернуть <strong>{{ iss.remaining }}</strong>{% else %}закрыта{% endif %}
+                        </div>
+                        {% if iss.comment %}<div class="inv-audit-taker__comment">{{ iss.comment }}</div>{% endif %}
+                      </div>
+                      {% if iss.is_open and ch.surplus_left > 0 %}
+                      <form method="post" action="{% url 'inventory' %}" class="inv-audit-taker__form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="link_audit_surplus_return">
+                        <input type="hidden" name="tool_id" value="{{ ch.tool_id }}">
+                        <input type="hidden" name="issue_id" value="{{ iss.id }}">
+                        <label class="inv-audit-taker__qty">
+                          <span>шт.</span>
+                          <input type="number" name="returned_qty" min="1" max="{{ iss.remaining }}"
+                                 value="{% if iss.remaining < ch.surplus_left %}{{ iss.remaining }}{% else %}{{ ch.surplus_left }}{% endif %}"
+                                 required>
+                        </label>
+                        <button type="submit" class="btn btn-sm">Вернуть</button>
+                      </form>
+                      {% elif not iss.is_open %}
+                      <span class="inv-audit-taker__badge">Закрыта</span>
+                      {% endif %}
+                    </li>
+                    {% endfor %}
+                  </ul>
+                  {% else %}
+                  <p class="inv-audit-change__hint">В журнале нет выдач по этой позиции.</p>
+                  {% endif %}
+                </details>
+              {% elif ch.kind == "deficit" %}
+              <p class="inv-audit-change__hint">Недостача списана со склада</p>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% elif not ad.changes_count %}
+          <p class="inv-history-card__meta-line muted">Расхождений нет</p>
+          {% endif %}
+          {% endwith %}
+        {% elif e.details %}
         <pre class="inv-history-card__details">{{ e.details }}</pre>
         {% endif %}
       </li>

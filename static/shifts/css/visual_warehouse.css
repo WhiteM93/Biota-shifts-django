@@ -1118,6 +1118,8 @@ html[data-theme="dawn"] .vw-audit-card {
   font-size: 12px;
   color: var(--vw-muted);
 }
+.vw-audit-changes .is-surplus { color: #2f8f7f; }
+.vw-audit-changes .is-deficit { color: #c45c5c; }
 
 .js-vw-audit-pane[hidden],
 .js-vw-view-pane[hidden] {

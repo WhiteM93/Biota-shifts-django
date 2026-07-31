@@ -256,6 +256,191 @@
   color: var(--bio-body-fg);
 }
 
+.inv-history-card--evt-container_audit .inv-history-badge {
+  background: color-mix(in srgb, #8b7cf8 20%, var(--bio-surface-item));
+  border-color: color-mix(in srgb, #8b7cf8 42%, transparent);
+  color: var(--bio-body-fg);
+}
+
+.inv-audit-changes {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inv-audit-change {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--bio-surface-item-border);
+  background: var(--bio-surface-deep);
+}
+
+.inv-audit-change--surplus {
+  border-color: color-mix(in srgb, #3a9a8f 45%, var(--bio-surface-item-border));
+  background: color-mix(in srgb, #3a9a8f 10%, var(--bio-surface-deep));
+}
+
+.inv-audit-change--deficit {
+  border-color: color-mix(in srgb, #e07070 45%, var(--bio-surface-item-border));
+  background: color-mix(in srgb, #e07070 10%, var(--bio-surface-deep));
+}
+
+.inv-audit-change__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bio-body-fg);
+  margin-bottom: 4px;
+}
+
+.inv-audit-change__qty {
+  font-size: 13px;
+  color: var(--bio-body-fg);
+}
+
+.inv-audit-change__delta {
+  margin-left: 6px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.inv-audit-change--surplus .inv-audit-change__delta { color: #2f8f7f; }
+.inv-audit-change--deficit .inv-audit-change__delta { color: #c45c5c; }
+
+.inv-audit-change__hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--bio-muted, var(--bio-text-muted));
+  line-height: 1.35;
+}
+
+.inv-audit-takers {
+  margin-top: 8px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, #3a9a8f 35%, var(--bio-surface-item-border));
+  background: color-mix(in srgb, #3a9a8f 6%, var(--bio-surface-item));
+  overflow: hidden;
+}
+
+.inv-audit-takers__summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bio-body-fg);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  user-select: none;
+}
+
+.inv-audit-takers__summary::-webkit-details-marker { display: none; }
+
+.inv-audit-takers__summary::before {
+  content: "▸ ";
+  color: #2f8f7f;
+}
+
+.inv-audit-takers[open] .inv-audit-takers__summary::before {
+  content: "▾ ";
+}
+
+.inv-audit-takers__left {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bio-muted, var(--bio-text-muted));
+}
+
+.inv-audit-takers-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inv-audit-taker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--bio-surface-item-border);
+  background: var(--bio-surface-item);
+}
+
+.inv-audit-taker.is-closed {
+  opacity: 0.72;
+}
+
+.inv-audit-taker__who {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--bio-body-fg);
+}
+
+.inv-audit-taker__meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--bio-muted, var(--bio-text-muted));
+  line-height: 1.35;
+}
+
+.inv-audit-taker__comment {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--bio-body-fg);
+  opacity: 0.85;
+}
+
+.inv-audit-taker__form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.inv-audit-taker__qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--bio-muted, var(--bio-text-muted));
+}
+
+.inv-audit-taker__qty input {
+  width: 64px;
+  min-height: 36px;
+  border-radius: 8px;
+  border: 1.5px solid var(--bio-input-border);
+  background: var(--bio-input-bg);
+  color: var(--bio-input-fg);
+  padding: 4px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.inv-audit-taker__badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bio-muted, var(--bio-text-muted));
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--bio-surface-item-border);
+}
+
 .inv-history-card__actions {
   margin-top: 12px;
   padding-top: 10px;

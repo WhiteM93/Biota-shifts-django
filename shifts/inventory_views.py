@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal, InvalidOperation
 import json
+import re
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -288,6 +289,183 @@ def _log_inventory_stock_event(
         stock_movement=stock_movement,
         details=details or {},
     )
+
+
+def _issue_remaining_qty(issue: StockMovement) -> int:
+    processed = (
+        StockMovement.objects.filter(parent_issue=issue, movement_type__in=["restock", "writeoff"])
+        .aggregate(total=Coalesce(Sum("quantity"), Value(0, output_field=IntegerField())))
+        .get("total", 0)
+    )
+    return max(0, int(issue.quantity or 0) - int(processed or 0))
+
+
+def _parse_legacy_audit_change(text: str) -> dict | None:
+    """Parse legacy 'name: 2→4 (+2)' strings from older audit events."""
+    raw = (text or "").strip()
+    if not raw or ":" not in raw:
+        return None
+    name, rest = raw.split(":", 1)
+    name = name.strip()
+    rest = rest.strip()
+    m = re.search(r"(\d+)\s*[→\-]\s*(\d+)", rest)
+    if not m:
+        return {
+            "tool_id": None,
+            "tool_name": name,
+            "expected": None,
+            "counted": None,
+            "delta": None,
+            "movement_id": None,
+            "kind": "unknown",
+            "note": "",
+            "legacy_text": raw,
+        }
+    expected = int(m.group(1))
+    counted = int(m.group(2))
+    delta = counted - expected
+    return {
+        "tool_id": None,
+        "tool_name": name,
+        "expected": expected,
+        "counted": counted,
+        "delta": delta,
+        "movement_id": None,
+        "kind": "surplus" if delta > 0 else ("deficit" if delta < 0 else "ok"),
+        "note": "",
+        "legacy_text": raw,
+    }
+
+
+def _enrich_container_audit_details(details: dict | None) -> dict:
+    """Human-readable audit card payload + open issues for surplus lines."""
+    d = dict(details or {}) if isinstance(details, dict) else {}
+    rows = d.get("change_rows")
+    if not isinstance(rows, list) or not rows:
+        rows = []
+        for text in d.get("changes") or []:
+            parsed = _parse_legacy_audit_change(str(text))
+            if parsed:
+                rows.append(parsed)
+
+    # Подтянуть tool_id / movement_id из строк аудита (старые события без change_rows)
+    audit_id = d.get("audit_id")
+    try:
+        audit_id_int = int(audit_id) if audit_id is not None else 0
+    except (TypeError, ValueError):
+        audit_id_int = 0
+    if audit_id_int:
+        from .models import VisualContainerAuditLine
+
+        line_by_name: dict[str, object] = {}
+        line_by_tool: dict[int, object] = {}
+        for ln in VisualContainerAuditLine.objects.filter(audit_id=audit_id_int, delta__gt=0).select_related(
+            "tool", "stock_movement"
+        ):
+            if ln.tool_id:
+                line_by_tool[ln.tool_id] = ln
+            if ln.tool and ln.tool.name:
+                line_by_name[(ln.tool.name or "").strip().lower()] = ln
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            if int(r.get("delta") or 0) <= 0:
+                continue
+            ln = None
+            if r.get("tool_id"):
+                ln = line_by_tool.get(int(r["tool_id"]))
+            if ln is None and r.get("tool_name"):
+                ln = line_by_name.get(str(r["tool_name"]).strip().lower())
+            if ln is None:
+                continue
+            if not r.get("tool_id"):
+                r["tool_id"] = ln.tool_id
+            if not r.get("movement_id") and ln.stock_movement_id:
+                r["movement_id"] = ln.stock_movement_id
+            if r.get("expected") is None:
+                r["expected"] = ln.expected_qty
+            if r.get("counted") is None:
+                r["counted"] = ln.counted_qty
+            if r.get("delta") is None:
+                r["delta"] = ln.delta
+
+    enriched: list[dict] = []
+    surplus_tool_ids = [
+        int(r["tool_id"])
+        for r in rows
+        if isinstance(r, dict) and r.get("tool_id") and int(r.get("delta") or 0) > 0
+    ]
+    issues_by_tool: dict[int, list[dict]] = {tid: [] for tid in surplus_tool_ids}
+    unallocated_by_tool: dict[int, int] = {tid: 0 for tid in surplus_tool_ids}
+    if surplus_tool_ids:
+        issues = (
+            StockMovement.objects.filter(movement_type="issue", tool_id__in=surplus_tool_ids)
+            .select_related("tool")
+            .annotate(
+                processed_qty=Coalesce(
+                    Sum("issue_outcomes__quantity"),
+                    Value(0, output_field=IntegerField()),
+                )
+            )
+            .annotate(remaining_qty=F("quantity") - F("processed_qty"))
+            .order_by("-movement_date", "-id")[:120]
+        )
+        for iss in issues:
+            rem = int(iss.remaining_qty or 0)
+            issues_by_tool.setdefault(iss.tool_id, []).append(
+                {
+                    "id": iss.id,
+                    "employee_name": (iss.employee_name or "").strip() or "Без ФИО",
+                    "date": iss.movement_date.strftime("%d.%m.%Y") if iss.movement_date else "",
+                    "issued": int(iss.quantity or 0),
+                    "remaining": max(0, rem),
+                    "is_open": rem > 0,
+                    "comment": (iss.comment or "").strip()[:120],
+                }
+            )
+        for mid, tid, qty in (
+            StockMovement.objects.filter(
+                tool_id__in=surplus_tool_ids,
+                movement_type="restock",
+                parent_issue_id__isnull=True,
+                is_reverted=False,
+            )
+            .filter(Q(comment__startswith="Инвентаризация"))
+            .values_list("id", "tool_id", "quantity")
+        ):
+            unallocated_by_tool[tid] = unallocated_by_tool.get(tid, 0) + int(qty or 0)
+
+    movement_ids = [
+        int(r["movement_id"])
+        for r in rows
+        if isinstance(r, dict) and r.get("movement_id")
+    ]
+    linked_map: dict[int, int] = {}
+    if movement_ids:
+        for mid, pid in StockMovement.objects.filter(id__in=movement_ids).values_list("id", "parent_issue_id"):
+            if pid:
+                linked_map[int(mid)] = int(pid)
+
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        row = dict(r)
+        delta = int(row.get("delta") or 0)
+        mid = row.get("movement_id")
+        tid = int(row["tool_id"]) if row.get("tool_id") else None
+        row["kind"] = row.get("kind") or ("surplus" if delta > 0 else ("deficit" if delta < 0 else "ok"))
+        row["return_linked"] = bool(mid and int(mid) in linked_map)
+        row["linked_issue_id"] = linked_map.get(int(mid)) if mid else None
+        takers = issues_by_tool.get(tid, []) if tid and delta > 0 else []
+        row["takers"] = takers
+        row["open_issues"] = [t for t in takers if t.get("is_open")]
+        row["surplus_left"] = int(unallocated_by_tool.get(tid, 0)) if tid else 0
+        row["can_link_return"] = bool(delta > 0 and tid and row["surplus_left"] > 0 and row["open_issues"])
+        enriched.append(row)
+
+    d["change_rows"] = enriched
+    d["label"] = (d.get("label") or "").replace("\n", " ").strip()
+    return d
 
 
 def _can_rollback_stock_movement(m: StockMovement) -> bool:
@@ -1372,6 +1550,100 @@ def inventory_view(request):
                 )
         messages.success(request, "Операция по выданному инструменту сохранена.")
         return redirect("inventory")
+
+    if action == "link_audit_surplus_return":
+        tool_id = _to_int(request.POST.get("tool_id"), 0)
+        issue_id = _to_int(request.POST.get("issue_id"), 0)
+        returned_qty = _to_int(request.POST.get("returned_qty"), 0)
+        comment = (request.POST.get("comment") or "").strip()
+        if tool_id <= 0 or issue_id <= 0 or returned_qty <= 0:
+            messages.error(request, "Выберите сотрудника и количество для возврата.")
+            return redirect(f"{reverse('inventory')}?panel=history")
+        with transaction.atomic():
+            issue = (
+                StockMovement.objects.select_for_update()
+                .select_related("tool")
+                .filter(id=issue_id, movement_type="issue", tool_id=tool_id)
+                .first()
+            )
+            if not issue:
+                messages.error(request, "Выдача не найдена для этой позиции.")
+                return redirect(f"{reverse('inventory')}?panel=history")
+            remaining = _issue_remaining_qty(issue)
+            if remaining <= 0:
+                messages.error(request, "По этой выдаче уже нечего возвращать.")
+                return redirect(f"{reverse('inventory')}?panel=history")
+            qty = min(returned_qty, remaining)
+
+            pool = list(
+                StockMovement.objects.select_for_update()
+                .filter(
+                    tool_id=tool_id,
+                    movement_type="restock",
+                    parent_issue_id__isnull=True,
+                    is_reverted=False,
+                )
+                .filter(Q(comment__startswith="Инвентаризация"))
+                .order_by("id")
+            )
+            pool_qty = sum(int(m.quantity or 0) for m in pool)
+            if pool_qty <= 0:
+                messages.error(
+                    request,
+                    "Нет нераспределённого излишка инвентаризации по этой позиции.",
+                )
+                return redirect(f"{reverse('inventory')}?panel=history")
+            qty = min(qty, pool_qty)
+
+            left = qty
+            for mv in pool:
+                if left <= 0:
+                    break
+                take = min(int(mv.quantity or 0), left)
+                if take <= 0:
+                    continue
+                if take < int(mv.quantity or 0):
+                    mv.quantity = int(mv.quantity) - take
+                    mv.save(update_fields=["quantity"])
+                else:
+                    mv.delete()
+                left -= take
+
+            note = comment or "вернули в ящик при инвентаризации"
+            linked = StockMovement.objects.create(
+                movement_type="restock",
+                tool=issue.tool,
+                parent_issue=issue,
+                quantity=qty,
+                employee_name=(issue.employee_name or "")[:200],
+                movement_date=timezone.localdate(),
+                comment=f"Возврат по выдаче #{issue.id} (из инвентаризации). {note}"[:300],
+                created_by_account=username,
+            )
+            # Склад уже увеличен инвентаризацией — quantity инструмента не трогаем.
+            _log_inventory_stock_event(
+                actor=username,
+                event_type=InventoryStockEvent.EVENT_TOOL_EDIT,
+                tool=issue.tool,
+                stock_movement=linked,
+                summary=(
+                    f"Возврат из инвентаризации: {issue.employee_name or 'без ФИО'} · "
+                    f"{issue.tool.name} · {qty} шт. (выдача #{issue.id})"
+                ),
+                details={
+                    "movement_id": linked.id,
+                    "issue_id": issue.id,
+                    "quantity": qty,
+                    "tool_id": tool_id,
+                    "employee_name": issue.employee_name or "",
+                },
+            )
+        messages.success(
+            request,
+            f"Возврат оформлен: {issue.employee_name or 'без ФИО'} · {qty} шт. "
+            f"(выдача #{issue_id}). Остаток склада не менялся.",
+        )
+        return redirect(f"{reverse('inventory')}?panel=history")
 
     if action == "add_arrival_new":
         category = (request.POST.get("new_category") or "").strip()
@@ -2532,12 +2804,17 @@ def inventory_view(request):
             }
         )
     for e in ev_hist:
+        event_payload = e
+        audit_details = None
+        if e.event_type == InventoryStockEvent.EVENT_CONTAINER_AUDIT:
+            audit_details = _enrich_container_audit_details(e.details if isinstance(e.details, dict) else {})
         timeline.append(
             {
                 "kind": "event",
                 "ts": e.created_at,
                 "tid": 10**12 + e.id,
-                "event": e,
+                "event": event_payload,
+                "audit_details": audit_details,
                 "show_rollback": False,
             }
         )

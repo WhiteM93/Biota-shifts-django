@@ -1353,17 +1353,22 @@
         changed.forEach(function (ln) {
           var li = document.createElement("li");
           var sign = ln.delta > 0 ? "+" : "";
+          var kind = ln.delta > 0 ? "surplus" : (ln.delta < 0 ? "deficit" : "");
+          if (kind) li.className = "is-" + kind;
+          var title = ln.delta > 0 ? "Излишек" : (ln.delta < 0 ? "Недостача" : "Изменение");
           li.textContent =
-            (ln.tool_name || ("#" + ln.tool_id)) +
+            title +
             ": " +
+            (ln.tool_name || ("#" + ln.tool_id)) +
+            " — было " +
             ln.expected_qty +
-            "→" +
+            ", факт " +
             ln.counted_qty +
             " (" +
             sign +
             ln.delta +
             ")" +
-            (ln.note ? " — " + ln.note : "");
+            (ln.note ? ". " + ln.note : "");
           ul.appendChild(li);
         });
         card.appendChild(ul);
