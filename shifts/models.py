@@ -2557,6 +2557,22 @@ class MachinesBoardState(models.Model):
         return "Станки (общая сводка)"
 
 
+class CalculatorModesState(models.Model):
+    """Общая база режимов резания калькулятора (фрезы / резьба / сверла) для всех пользователей."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    payload = models.JSONField(default=dict, blank=True, verbose_name="Данные (JSON)")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+    updated_by = models.CharField(max_length=200, blank=True, default="", verbose_name="Кто обновил")
+
+    class Meta:
+        verbose_name = "Калькулятор: общая база режимов"
+        verbose_name_plural = "Калькулятор: общая база режимов"
+
+    def __str__(self) -> str:
+        return "Режимы резания (общая база)"
+
+
 class PrintForm(models.Model):
     """Шаблон печатной формы A4 (конструктор «Формы»)."""
 

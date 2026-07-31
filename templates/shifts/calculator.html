@@ -4,8 +4,9 @@
 {% block content %}
 <script type="application/json" id="calc-products-json">{{ products_json|safe }}</script>
 <script type="application/json" id="calc-cutting-modes-json">{{ cutting_modes_json|safe }}</script>
+<script type="application/json" id="calc-shared-modes-json">{{ shared_modes_json|safe }}</script>
 
-<div class="calc-page" data-calc-username="{{ biota_username|default:''|escape }}">
+<div class="calc-page" data-calc-username="{{ biota_username|default:''|escape }}" data-can-edit-modes="{% if can_edit_modes %}1{% else %}0{% endif %}">
 
   <!-- ── Шапка ── -->
   <div class="calc-header">
@@ -475,7 +476,8 @@
       <div id="m-formula-mill" hidden>
         <div class="calc-formula-label">Режимы фрезерования</div>
         <div class="calc-formula-desc">
-          Обороты, подача и глубины (ae / ap) задаются в строке. Типы фрез — со склада.
+          Базовые режимы: Vc, fz, n, F. Z — кромки конкретной фрезы в строке.
+          «Пересчитать F по Z фрезы» считает F = n·Z·fz для каждой строки по её Z.
         </div>
       </div>
       <div id="m-formula-drill" hidden>
@@ -501,6 +503,44 @@
         </svg>
         Добавить строку
       </button>
+    </div>
+
+    <div class="calc-modes-filters" id="m-mill-filters" hidden>
+      <div class="calc-modes-filters-main">
+        <div class="calc-modes-filter-row">
+          <span class="calc-modes-filter-label">Материал</span>
+          <div class="calc-modes-chips calc-modes-chips--mat" id="m-mat-chips" role="group" aria-label="Фильтр по материалу"></div>
+        </div>
+        <div class="calc-modes-filter-row">
+          <span class="calc-modes-filter-label">Диаметр</span>
+          <div class="calc-modes-chips calc-modes-chips--d" id="m-d-chips" role="group" aria-label="Фильтр по диаметру"></div>
+        </div>
+        <div class="calc-modes-filter-row">
+          <span class="calc-modes-filter-label">Обработка</span>
+          <div class="calc-modes-chips calc-modes-chips--op" id="m-op-chips" role="group" aria-label="Фильтр по обработке"></div>
+        </div>
+      </div>
+      <aside class="calc-modes-filters-side" aria-label="Станок и действия">
+        <div class="calc-modes-side-card">
+          <label class="calc-modes-filter-label" for="m-nmax">Макс. обороты станка</label>
+          <div class="calc-modes-nmax-row">
+            <input type="number" id="m-nmax" class="calc-modes-nmax-inp" min="100" step="100" placeholder="12000" inputmode="numeric" title="Максимальные обороты шпинделя станка, об/мин">
+            <span class="calc-modes-nmax-unit">об/мин</span>
+          </div>
+          <div class="calc-modes-side-actions">
+            <button type="button" class="calc-modes-act-btn" id="m-recalc-nmax" title="Ограничить n лимитом станка и пересчитать F">
+              Пересчитать под n<sub>max</sub>
+            </button>
+            <button type="button" class="calc-modes-act-btn" id="m-recalc-z" title="Для каждой фрезы: F = n × Z × fz по Z этой строки (кромки не меняются)">
+              Пересчитать F по Z фрезы
+            </button>
+            <button type="button" class="calc-modes-act-btn calc-modes-act-btn--primary" id="m-fill-baselines" title="Черновой, винт. радиальное/осевое, спираль и чистовой для всех Ø">
+              Заполнить базовые
+            </button>
+          </div>
+          <p class="calc-modes-save-status" id="m-save-status" aria-live="polite"></p>
+        </div>
+      </aside>
     </div>
 
     <!-- Таблица -->
@@ -998,6 +1038,7 @@
      ВКЛАДКА 2 — РЕЖИМЫ РЕЗАНИЯ
   ════════════════════════════════ */
   var CUTTING_MODES = (function () {
+    var millDiameters = ["16", "12", "10", "8", "6", "4", "3", "2.5", "2", "1.5", "1"];
     var fallback = {
       modes: [
         { id: "thread", label: "Резьба", form: "thread", tool_types: ["Метчик", "Раскатник", "Резьбофреза"] },
@@ -1006,10 +1047,15 @@
           tool_types: ["Концевая фреза", "Обдирочная фреза", "Т-образная фреза", "Радиусная фреза", "Сферическая фреза"],
           operation_types: [
             { id: "rough", label: "Черновой" },
+            { id: "helical_rad", label: "Винт. радиальное" },
+            { id: "helical_ax", label: "Винт. осевое" },
+            { id: "spiral", label: "Спираль" },
             { id: "adaptive", label: "Адаптив" },
             { id: "finish", label: "Чистовой" }
           ],
-          tool_presets: {}
+          tool_presets: {},
+          diameters: millDiameters,
+          baselines: {}
         },
         {
           id: "drill", label: "Сверла", form: "drill",
@@ -1018,12 +1064,12 @@
         }
       ],
       materials: [
-        { id: "steel", label: "Сталь" },
-        { id: "steel_hard", label: "Сталь зак." },
-        { id: "alum", label: "Алюминий" },
-        { id: "cast_iron", label: "Чугун" },
-        { id: "brass", label: "Латунь" },
-        { id: "titan", label: "Нерж./Титан" }
+        { id: "d16", label: "Д16" },
+        { id: "ls59", label: "ЛС59" },
+        { id: "amg6", label: "Амг6" },
+        { id: "st30", label: "Ст30" },
+        { id: "st45", label: "Ст45" },
+        { id: "x18h9t", label: "12Х18Н9Т" }
       ]
     };
     try {
@@ -1044,11 +1090,156 @@
   var mFormulaThread = document.getElementById("m-formula-thread");
   var mFormulaMill = document.getElementById("m-formula-mill");
   var mFormulaDrill = document.getElementById("m-formula-drill");
+  var mMillFilters = document.getElementById("m-mill-filters");
+  var mMatChips = document.getElementById("m-mat-chips");
+  var mDChips = document.getElementById("m-d-chips");
+  var mOpChips = document.getElementById("m-op-chips");
+  var mFillBaselines = document.getElementById("m-fill-baselines");
+  var mNmaxInp = document.getElementById("m-nmax");
+  var mRecalcNmax = document.getElementById("m-recalc-nmax");
+  var mRecalcZ = document.getElementById("m-recalc-z");
   var currentModeId = (CUTTING_MODES.modes[0] && CUTTING_MODES.modes[0].id) || "thread";
+  var millFilterMat = "";
+  var millFilterD = "";
+  var millFilterOp = "";
+  var NMAX_LS_KEY = "calc_modes_machine_nmax_v1";
   var calcPageEl = document.querySelector(".calc-page");
   var CALC_USERNAME = (calcPageEl && calcPageEl.dataset.calcUsername) || "";
+  var CAN_EDIT_MODES = !(calcPageEl && calcPageEl.dataset.canEditModes === "0");
+  var mSaveStatus = document.getElementById("m-save-status");
+  var SHARED_BY_MODE = (function () {
+    try {
+      var el = document.getElementById("calc-shared-modes-json");
+      if (!el || !el.textContent.trim()) return {};
+      var data = JSON.parse(el.textContent);
+      return (data && data.by_mode && typeof data.by_mode === "object") ? data.by_mode : {};
+    } catch (e) { return {}; }
+  })();
+  var saveModesTimer = null;
+  var saveModesPending = {};
 
-  function lsKey() { return "calc_modes_" + currentModeId + "_v4"; }
+  function modesCsrfToken() {
+    var m = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+
+  function setModesSaveStatus(text, isError) {
+    if (!mSaveStatus) return;
+    mSaveStatus.textContent = text || "";
+    mSaveStatus.classList.toggle("is-error", !!isError);
+  }
+
+  function serverHasAnyModes() {
+    var keys = Object.keys(SHARED_BY_MODE || {});
+    for (var i = 0; i < keys.length; i++) {
+      var rows = SHARED_BY_MODE[keys[i]];
+      if (Array.isArray(rows) && rows.length) return true;
+    }
+    return false;
+  }
+
+  function readLegacyLocalRows(modeId) {
+    try {
+      var key = "calc_modes_" + modeId + "_v6";
+      var raw = localStorage.getItem(key);
+      if (!raw && modeId === "thread") {
+        raw = localStorage.getItem("calc_modes_tap_v2")
+          || localStorage.getItem("calc_modes_thread_v3");
+      }
+      if (!raw && modeId === "end_mill") {
+        raw = localStorage.getItem("calc_modes_end_mill_v5")
+          || localStorage.getItem("calc_modes_end_mill_v4");
+      }
+      if (!raw) return [];
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+
+  function persistModeToServer(modeId, rows) {
+    if (!CAN_EDIT_MODES) return;
+    setModesSaveStatus("Сохранение…");
+    fetch(window.location.pathname, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": modesCsrfToken(),
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      body: JSON.stringify({
+        action: "save_cutting_modes",
+        mode_id: modeId,
+        rows: rows || []
+      })
+    }).then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok || !r.data || !r.data.ok) {
+          setModesSaveStatus((r.data && r.data.error) || "Ошибка сохранения", true);
+          return;
+        }
+        SHARED_BY_MODE[modeId] = rows || [];
+        var who = r.data.updated_by ? (" · " + r.data.updated_by) : "";
+        setModesSaveStatus("Общая база · " + (r.data.updated_at || "сохранено") + who);
+      })
+      .catch(function () {
+        setModesSaveStatus("Нет связи с сервером", true);
+      });
+  }
+
+  function schedulePersistMode(modeId, rows) {
+    if (!CAN_EDIT_MODES) return;
+    saveModesPending[modeId] = rows;
+    if (saveModesTimer) clearTimeout(saveModesTimer);
+    saveModesTimer = setTimeout(function () {
+      saveModesTimer = null;
+      var pending = saveModesPending;
+      saveModesPending = {};
+      Object.keys(pending).forEach(function (mid) {
+        persistModeToServer(mid, pending[mid]);
+      });
+    }, 450);
+  }
+
+  function maybeSeedServerFromLocalStorage() {
+    if (!CAN_EDIT_MODES || serverHasAnyModes()) return;
+    var modeIds = ["thread", "end_mill", "drill"];
+    var any = false;
+    modeIds.forEach(function (mid) {
+      var rows = readLegacyLocalRows(mid);
+      if (rows.length) {
+        SHARED_BY_MODE[mid] = rows;
+        any = true;
+      }
+    });
+    if (!any) return;
+    modeIds.forEach(function (mid) {
+      if ((SHARED_BY_MODE[mid] || []).length) persistModeToServer(mid, SHARED_BY_MODE[mid]);
+    });
+  }
+
+  function getMachineNmax() {
+    if (!mNmaxInp) return 0;
+    var n = parseFloat(String(mNmaxInp.value || "").replace(",", "."));
+    if (isNaN(n) || n < 100) return 0;
+    return Math.round(n);
+  }
+
+  function loadMachineNmax() {
+    if (!mNmaxInp) return;
+    try {
+      var saved = localStorage.getItem(NMAX_LS_KEY);
+      if (saved) mNmaxInp.value = saved;
+    } catch (e) {}
+  }
+
+  function saveMachineNmax() {
+    if (!mNmaxInp) return;
+    try {
+      var v = String(mNmaxInp.value || "").trim();
+      if (v) localStorage.setItem(NMAX_LS_KEY, v);
+      else localStorage.removeItem(NMAX_LS_KEY);
+    } catch (e) {}
+  }
 
   function currentMode() {
     var modes = CUTTING_MODES.modes || [];
@@ -1109,6 +1300,371 @@
         mModeHint.textContent = "Нет режимов — добавьте инструменты на склад.";
       }
     }
+    syncMillFiltersUi();
+  }
+
+  function syncMillFiltersUi() {
+    var show = isMillForm();
+    if (mMillFilters) mMillFilters.hidden = !show;
+    if (!show) return;
+    renderFilterChips(mMatChips, [{ id: "", label: "Все" }].concat(CUTTING_MODES.materials || []), millFilterMat, function (v) {
+      millFilterMat = v;
+      applyMillRowFilters();
+    });
+    var mode = currentMode();
+    var diameters = (mode && mode.diameters) || [];
+    renderFilterChips(
+      mDChips,
+      [{ id: "", label: "Все" }].concat(diameters.map(function (d) { return { id: String(d), label: String(d) }; })),
+      millFilterD,
+      function (v) {
+        millFilterD = v;
+        applyMillRowFilters();
+      }
+    );
+    var ops = (mode && mode.operation_types) || [];
+    renderFilterChips(
+      mOpChips,
+      [{ id: "", label: "Все" }].concat(ops.map(function (op) { return { id: op.id, label: op.label }; })),
+      millFilterOp,
+      function (v) {
+        millFilterOp = v;
+        applyMillRowFilters();
+      }
+    );
+    applyMillRowFilters();
+  }
+
+  function renderFilterChips(root, items, activeId, onPick) {
+    if (!root) return;
+    root.innerHTML = "";
+    items.forEach(function (it) {
+      var btn = mk("button", "calc-modes-chip" + (String(it.id) === String(activeId) ? " is-active" : ""));
+      btn.type = "button";
+      btn.textContent = it.label;
+      btn.dataset.filterId = String(it.id);
+      btn.setAttribute("aria-pressed", String(it.id) === String(activeId) ? "true" : "false");
+      btn.addEventListener("click", function () {
+        onPick(it.id);
+        Array.prototype.forEach.call(root.querySelectorAll(".calc-modes-chip"), function (b) {
+          var active = String(b.dataset.filterId) === String(it.id);
+          b.classList.toggle("is-active", active);
+          b.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+      });
+      root.appendChild(btn);
+    });
+  }
+
+  function normalizeDiameterKey(raw) {
+    var n = parseFloat(String(raw || "").replace(",", "."));
+    if (isNaN(n)) return "";
+    if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+    return String(n);
+  }
+
+  function lookupMillBaseline(mat, d, op) {
+    var mode = currentMode();
+    if (!mode || !mode.baselines) return null;
+    var byMat = mode.baselines[mat];
+    if (!byMat) return null;
+    var key = normalizeDiameterKey(d);
+    var bucket = byMat[key] || byMat[String(d)] || null;
+    if (!bucket) return null;
+    return bucket[op] || null;
+  }
+
+  function applyMillBaseline(tr, force) {
+    if (!tr || tr.classList.contains("is-row-locked")) return;
+    var matEl = tr.querySelector(".m-inp-mat");
+    var dEl = tr.querySelector(".m-inp-d");
+    var opEl = tr.querySelector(".m-inp-op");
+    if (!matEl || !dEl || !opEl) return;
+    var b = lookupMillBaseline(matEl.value, dEl.value, opEl.value);
+    if (!b) return;
+    function setVal(cls, val) {
+      var el = tr.querySelector("." + cls);
+      if (!el || val == null || val === "") return;
+      if (force || !el.value) el.value = val;
+    }
+    setVal("m-inp-flutes", b.flutes);
+    setVal("m-inp-vc", b.vc);
+    setVal("m-inp-fz", b.fz);
+    setVal("m-inp-n", b.n);
+    setVal("m-inp-feed", b.feed);
+    setVal("m-inp-ae", b.ae);
+    setVal("m-inp-ap", b.ap);
+    setVal("m-inp-allowance", b.allowance);
+    clampMillRowToNmax(tr, false);
+    syncMillCutDerived(tr, "n");
+    rememberRowFz(tr);
+  }
+
+  function millRowBaseline(tr) {
+    var matEl = tr.querySelector(".m-inp-mat");
+    var dEl = tr.querySelector(".m-inp-d");
+    var opEl = tr.querySelector(".m-inp-op");
+    if (!matEl || !dEl || !opEl) return null;
+    return lookupMillBaseline(matEl.value, dEl.value, opEl.value);
+  }
+
+  function parseMillNum(el) {
+    if (!el) return NaN;
+    return parseFloat(String(el.value || "").replace(",", "."));
+  }
+
+  function fmtMillNum(v, digits) {
+    if (v == null || !isFinite(v)) return "";
+    var s = Number(v).toFixed(digits);
+    if (digits > 0) s = s.replace(/\.?0+$/, "");
+    return s || "0";
+  }
+
+  function rowFz(tr, baseline) {
+    var fzEl = tr.querySelector(".m-inp-fz");
+    var fzDirect = parseMillNum(fzEl);
+    if (!isNaN(fzDirect) && fzDirect > 0) return fzDirect;
+    var n = parseMillNum(tr.querySelector(".m-inp-n"));
+    var f = parseMillNum(tr.querySelector(".m-inp-feed"));
+    var z = parseMillNum(tr.querySelector(".m-inp-flutes"));
+    if (!isNaN(n) && !isNaN(f) && !isNaN(z) && n > 0 && z > 0) return f / (n * z);
+    if (baseline && baseline.fz) {
+      var fz = parseFloat(String(baseline.fz).replace(",", "."));
+      if (!isNaN(fz) && fz > 0) return fz;
+    }
+    return null;
+  }
+
+  function rememberRowFz(tr) {
+    if (!tr) return null;
+    var fz = rowFz(tr, millRowBaseline(tr));
+    if (fz != null) {
+      tr.dataset.fz = String(fz);
+      var fzEl = tr.querySelector(".m-inp-fz");
+      if (fzEl && !fzEl.value) fzEl.value = fmtMillNum(fz, 3);
+    }
+    return fz;
+  }
+
+  function getStoredFz(tr) {
+    if (!tr) return null;
+    var fzEl = tr.querySelector(".m-inp-fz");
+    var fzDirect = parseMillNum(fzEl);
+    if (!isNaN(fzDirect) && fzDirect > 0) {
+      tr.dataset.fz = String(fzDirect);
+      return fzDirect;
+    }
+    if (tr.dataset.fz) {
+      var stored = parseFloat(tr.dataset.fz);
+      if (!isNaN(stored) && stored > 0) return stored;
+    }
+    return rememberRowFz(tr);
+  }
+
+  function setMillRowFeedFromFz(tr, n, z, fz) {
+    var fEl = tr.querySelector(".m-inp-feed");
+    var fzEl = tr.querySelector(".m-inp-fz");
+    if (fzEl && fz != null) fzEl.value = fmtMillNum(fz, 3);
+    if (!fEl || fz == null || isNaN(n) || n <= 0 || isNaN(z) || z <= 0) return;
+    fEl.value = String(Math.max(1, Math.round(n * z * fz)));
+    tr.dataset.fz = String(fz);
+  }
+
+  /** source: vc|n|fz|feed|z|d — что изменил пользователь. */
+  function syncMillCutDerived(tr, source) {
+    if (!tr || tr.classList.contains("is-row-locked")) return;
+    var dEl = tr.querySelector(".m-inp-d");
+    var zEl = tr.querySelector(".m-inp-flutes");
+    var vcEl = tr.querySelector(".m-inp-vc");
+    var fzEl = tr.querySelector(".m-inp-fz");
+    var nEl = tr.querySelector(".m-inp-n");
+    var fEl = tr.querySelector(".m-inp-feed");
+    if (!dEl || !zEl || !vcEl || !fzEl || !nEl || !fEl) return;
+
+    var d = parseMillNum(dEl);
+    var z = parseMillNum(zEl);
+    var vc = parseMillNum(vcEl);
+    var fz = parseMillNum(fzEl);
+    var n = parseMillNum(nEl);
+    var f = parseMillNum(fEl);
+
+    if (source === "vc" && !isNaN(vc) && vc > 0 && !isNaN(d) && d > 0) {
+      n = Math.max(1, Math.round((1000 * vc) / (Math.PI * d) / 10) * 10);
+      nEl.value = String(n);
+    } else if (source === "d" && !isNaN(vc) && vc > 0 && !isNaN(d) && d > 0) {
+      n = Math.max(1, Math.round((1000 * vc) / (Math.PI * d) / 10) * 10);
+      nEl.value = String(n);
+    } else if ((source === "n" || source === "d") && !isNaN(n) && n > 0 && !isNaN(d) && d > 0) {
+      vc = (Math.PI * d * n) / 1000;
+      vcEl.value = fmtMillNum(vc, 1);
+    }
+
+    n = parseMillNum(nEl);
+    z = parseMillNum(zEl);
+    fz = parseMillNum(fzEl);
+    f = parseMillNum(fEl);
+
+    if (source === "feed" && !isNaN(f) && f > 0 && !isNaN(n) && n > 0 && !isNaN(z) && z > 0) {
+      fz = f / (n * z);
+      fzEl.value = fmtMillNum(fz, 3);
+      tr.dataset.fz = String(fz);
+    } else {
+      if ((isNaN(fz) || fz <= 0) && !isNaN(f) && f > 0 && !isNaN(n) && n > 0 && !isNaN(z) && z > 0) {
+        fz = f / (n * z);
+        fzEl.value = fmtMillNum(fz, 3);
+      }
+      if (!isNaN(fz) && fz > 0 && !isNaN(n) && n > 0 && !isNaN(z) && z > 0) {
+        fEl.value = String(Math.max(1, Math.round(n * z * fz)));
+        tr.dataset.fz = String(fz);
+      }
+    }
+
+    if (!isNaN(n) && n > 0 && !isNaN(d) && d > 0 && source !== "vc") {
+      vcEl.value = fmtMillNum((Math.PI * d * n) / 1000, 1);
+    }
+  }
+
+  /** Ограничить n лимитом станка и пересчитать F при том же fz. */
+  function clampMillRowToNmax(tr, forceToMax) {
+    if (!tr || tr.classList.contains("is-row-locked")) return false;
+    var nmax = getMachineNmax();
+    if (!nmax) return false;
+    var nEl = tr.querySelector(".m-inp-n");
+    var fEl = tr.querySelector(".m-inp-feed");
+    var zEl = tr.querySelector(".m-inp-flutes");
+    if (!nEl || !fEl) return false;
+    var n = parseFloat(nEl.value);
+    if (isNaN(n) || n <= 0) return false;
+    var nNew = forceToMax ? nmax : Math.min(n, nmax);
+    if (!forceToMax && nNew >= n) return false;
+    var fz = getStoredFz(tr);
+    nEl.value = String(nNew);
+    var z = parseFloat(zEl && zEl.value);
+    if (isNaN(z) || z <= 0) z = 1;
+    if (fz != null) setMillRowFeedFromFz(tr, nNew, z, fz);
+    else {
+      var fOld = parseFloat(fEl.value);
+      if (!isNaN(fOld) && fOld > 0) fEl.value = String(Math.max(1, Math.round(fOld * (nNew / n))));
+      rememberRowFz(tr);
+    }
+    syncMillCutDerived(tr, "n");
+    return true;
+  }
+
+  function recalcVisibleMillRowsToNmax(forceToMax) {
+    if (!isMillForm()) return 0;
+    var nmax = getMachineNmax();
+    if (!nmax) {
+      alert("Укажите максимальные обороты станка (об/мин).");
+      if (mNmaxInp) mNmaxInp.focus();
+      return 0;
+    }
+    saveMachineNmax();
+    var changed = 0;
+    Array.prototype.forEach.call(mTbody.rows, function (tr) {
+      if (tr.hidden) return;
+      if (clampMillRowToNmax(tr, !!forceToMax)) changed += 1;
+    });
+    saveTable();
+    return changed;
+  }
+
+  /** Пересчитать F по Z конкретной фрезы в строке (Z не меняем). */
+  function recalcMillRowFeedByOwnFlutes(tr) {
+    if (!tr || tr.classList.contains("is-row-locked")) return false;
+    var nEl = tr.querySelector(".m-inp-n");
+    var zEl = tr.querySelector(".m-inp-flutes");
+    if (!nEl || !zEl) return false;
+    var z = parseInt(zEl.value, 10);
+    var n = parseFloat(nEl.value);
+    if (isNaN(z) || z < 1 || isNaN(n) || n <= 0) return false;
+    var fz = getStoredFz(tr);
+    if (fz == null) return false;
+    setMillRowFeedFromFz(tr, n, z, fz);
+    syncMillCutDerived(tr, "z");
+    return true;
+  }
+
+  function recalcVisibleMillRowsByOwnFlutes() {
+    if (!isMillForm()) return 0;
+    var changed = 0;
+    Array.prototype.forEach.call(mTbody.rows, function (tr) {
+      if (tr.hidden) return;
+      if (recalcMillRowFeedByOwnFlutes(tr)) changed += 1;
+    });
+    saveTable();
+    return changed;
+  }
+
+  function recalcMillRowFeedAfterNzChange(tr) {
+    if (!tr || tr.classList.contains("is-row-locked")) return;
+    syncMillCutDerived(tr, "z");
+  }
+
+  function applyMillRowFilters() {
+    if (!mTbody) return;
+    if (!isMillForm()) {
+      Array.prototype.forEach.call(mTbody.rows, function (tr) { tr.hidden = false; });
+      syncEmpty();
+      return;
+    }
+    var visible = 0;
+    Array.prototype.forEach.call(mTbody.rows, function (tr) {
+      var mat = (tr.querySelector(".m-inp-mat") || {}).value || "";
+      var d = normalizeDiameterKey((tr.querySelector(".m-inp-d") || {}).value || "");
+      var op = (tr.querySelector(".m-inp-op") || {}).value || "";
+      var okMat = !millFilterMat || mat === millFilterMat;
+      var okD = !millFilterD || d === normalizeDiameterKey(millFilterD);
+      var okOp = !millFilterOp || op === millFilterOp;
+      var show = okMat && okD && okOp;
+      tr.hidden = !show;
+      if (show) visible += 1;
+    });
+    if (!mEmpty) return;
+    var hint = mEmpty.querySelector("p");
+    if (!mTbody.rows.length) {
+      mEmpty.hidden = false;
+      if (hint) hint.textContent = "Нажмите «+ Добавить строку» или «Заполнить базовые режимы»";
+    } else if (!visible) {
+      mEmpty.hidden = false;
+      if (hint) hint.textContent = "Нет строк по текущему фильтру";
+    } else {
+      mEmpty.hidden = true;
+    }
+  }
+
+  function fillMillBaselines() {
+    if (!isMillForm()) return;
+    var mode = currentMode();
+    if (!mode) return;
+    var mat = millFilterMat || "st45";
+    var diameters = mode.diameters || [];
+    if (!diameters.length) return;
+    var defaultType = (mode.tool_types && mode.tool_types[0]) || "Концевая фреза";
+    Array.prototype.slice.call(mTbody.rows).forEach(function (tr) {
+      if (!tr.classList.contains("is-row-locked")) tr.remove();
+    });
+    diameters.forEach(function (d) {
+      ["rough", "helical_rad", "helical_ax", "spiral", "finish"].forEach(function (op) {
+        var b = lookupMillBaseline(mat, d, op) || {};
+        addMillRow({
+          type: defaultType,
+          d: String(d),
+          mat: mat,
+          op: op,
+          flutes: b.flutes || "",
+          vc: b.vc || "",
+          fz: b.fz || "",
+          n: b.n || "",
+          feed: b.feed || "",
+          ae: b.ae || "",
+          ap: b.ap || "",
+          allowance: b.allowance || ""
+        }, true);
+      });
+    });
+    saveTable();
+    applyMillRowFilters();
   }
 
   function syncFormulaCard() {
@@ -1146,13 +1702,16 @@
     } else {
       cols = [
         { label: "Инструмент", cls: "mc-type" },
-        { label: "D, мм", cls: "mc-mill-d" },
+        { label: "D", sub: "мм", title: "Диаметр, мм", cls: "mc-mill-d" },
         { label: "Материал", cls: "mc-mat" },
-        { label: "Z", cls: "mc-mill-z" },
-        { label: "n, об/мин", cls: "mc-n" },
-        { label: "F, мм/мин", cls: "mc-mill-feed" },
-        { label: "ae, мм", cls: "mc-mill-ae" },
-        { label: "ap, мм", cls: "mc-mill-ap" },
+        { label: "Z", sub: "зубья", title: "Число зубьев", cls: "mc-mill-z" },
+        { label: "Vc", sub: "м/мин", title: "Скорость резания Vc, м/мин", cls: "mc-mill-vc mc-th-cut" },
+        { label: "fz", sub: "мм/зуб", title: "Подача на зуб fz, мм/зуб", cls: "mc-mill-fz mc-th-cut" },
+        { label: "n", sub: "об/мин", title: "Обороты шпинделя n, об/мин", cls: "mc-n mc-th-cut" },
+        { label: "F", sub: "мм/мин", title: "Минутная подача F, мм/мин", cls: "mc-mill-feed mc-th-cut" },
+        { label: "ae", sub: "мм", title: "Радиальная ширина ae, мм", cls: "mc-mill-ae" },
+        { label: "ap", sub: "мм", title: "Осевая глубина ap, мм", cls: "mc-mill-ap" },
+        { label: "Прип.", sub: "мм", title: "Припуск, мм", cls: "mc-mill-allow" },
         { label: "Обработка", cls: "mc-mill-op" },
         { label: "", cls: "mc-actions" }
       ];
@@ -1160,7 +1719,17 @@
     cols.forEach(function (c) {
       var th = mk("th");
       if (c.cls) th.className = c.cls;
-      th.textContent = c.label;
+      if (c.title) th.title = c.title;
+      if (c.sub) {
+        var main = mk("span", "mc-th-main");
+        main.textContent = c.label;
+        var sub = mk("span", "mc-th-sub");
+        sub.textContent = c.sub;
+        th.appendChild(main);
+        th.appendChild(sub);
+      } else {
+        th.textContent = c.label;
+      }
       tr.appendChild(th);
     });
     mThead.innerHTML = "";
@@ -1383,12 +1952,15 @@
       } else {
         row = {
           type: g("m-inp-type"), d: g("m-inp-d"), mat: g("m-inp-mat"), flutes: g("m-inp-flutes"),
-          n: g("m-inp-n"), feed: g("m-inp-feed"), ae: g("m-inp-ae"), ap: g("m-inp-ap"), op: g("m-inp-op")
+          vc: g("m-inp-vc"), fz: g("m-inp-fz"),
+          n: g("m-inp-n"), feed: g("m-inp-feed"), ae: g("m-inp-ae"), ap: g("m-inp-ap"),
+          allowance: g("m-inp-allowance"), op: g("m-inp-op")
         };
       }
       rows.push(Object.assign(row, meta));
     });
-    try { localStorage.setItem(lsKey(), JSON.stringify(rows)); } catch (e) {}
+    SHARED_BY_MODE[currentModeId] = rows;
+    schedulePersistMode(currentModeId, rows);
   }
 
   function appendTd(tr, el) {
@@ -1475,17 +2047,51 @@
     if (!data) dInp.focus();
   }
 
-  function addMillRow(data) {
+  function mkMillDSelect(data, mode) {
+    var diameters = (mode && mode.diameters) || [];
+    var sel = mk("select", "mc-inp m-inp-d");
+    var current = data && data.d != null && data.d !== "" ? normalizeDiameterKey(data.d) : "";
+    var seen = {};
+    diameters.forEach(function (d) {
+      var key = normalizeDiameterKey(d);
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      var o = mk("option");
+      o.value = key;
+      // Без «Ø» — иначе в узкой ячейке «Ø16» обрезается и выглядит как «Ø1».
+      o.textContent = key;
+      sel.appendChild(o);
+    });
+    if (current && !seen[current]) {
+      var custom = mk("option");
+      custom.value = current;
+      custom.textContent = current;
+      sel.appendChild(custom);
+      seen[current] = true;
+    }
+    if (!sel.options.length) {
+      var empty = mk("option");
+      empty.value = "";
+      empty.textContent = "—";
+      sel.appendChild(empty);
+    }
+    if (current && seen[current]) sel.value = current;
+    else if (sel.options.length && sel.options[0].value) sel.selectedIndex = 0;
+    return sel;
+  }
+
+  function addMillRow(data, skipBaseline) {
     var tr = mk("tr");
     var mode = currentMode();
     var sel = mkTypeSelect(data);
     sel.addEventListener("change", function () {
       applyMillPreset(tr, sel.value);
       saveTable();
+      applyMillRowFilters();
     });
     appendTd(tr, sel);
 
-    var dInp = mkNumInp("m-inp-d", "мм", data && data.d);
+    var dInp = mkMillDSelect(data, mode);
     appendTd(tr, dInp);
 
     var matSel = mkMatSelect(data);
@@ -1494,6 +2100,13 @@
     var zInp = mkNumInp("m-inp-flutes", "Z", data && data.flutes);
     zInp.step = "1";
     appendTd(tr, zInp);
+
+    var vcInp = mkNumInp("m-inp-vc", "м/мин", data && data.vc);
+    appendTd(tr, vcInp);
+
+    var fzInp = mkNumInp("m-inp-fz", "мм/зуб", data && data.fz);
+    fzInp.step = "0.001";
+    appendTd(tr, fzInp);
 
     var nInp = mkNumInp("m-inp-n", "об/мин", data && data.n);
     appendTd(tr, nInp);
@@ -1507,6 +2120,9 @@
     var apInp = mkNumInp("m-inp-ap", "выс", data && data.ap);
     appendTd(tr, apInp);
 
+    var allowInp = mkNumInp("m-inp-allowance", "прип", data && data.allowance);
+    appendTd(tr, allowInp);
+
     var opSel = mk("select", "mc-inp m-inp-op");
     (mode && mode.operation_types || []).forEach(function (op) {
       var o = mk("option");
@@ -1518,11 +2134,51 @@
     appendTd(tr, opSel);
 
     appendActionCell(tr, data);
-    bindRowInputs(tr, [sel, dInp, matSel, zInp, nInp, feedInp, aeInp, apInp, opSel], saveTable);
+
+    function onMillFieldChange(forceBaseline) {
+      if (forceBaseline) applyMillBaseline(tr, true);
+      saveTable();
+      applyMillRowFilters();
+    }
+
+    dInp.addEventListener("change", function () { onMillFieldChange(true); });
+    matSel.addEventListener("change", function () { onMillFieldChange(true); });
+    opSel.addEventListener("change", function () { onMillFieldChange(true); });
+
+    function onCutParam(source) {
+      rememberRowFz(tr);
+      syncMillCutDerived(tr, source);
+      saveTable();
+      applyMillRowFilters();
+    }
+
+    function bindCutParamLive(el, source) {
+      el.addEventListener("focus", function () { rememberRowFz(tr); });
+      el.addEventListener("input", function () { onCutParam(source); });
+      el.addEventListener("change", function () { onCutParam(source); });
+    }
+
+    bindCutParamLive(zInp, "z");
+    bindCutParamLive(vcInp, "vc");
+    bindCutParamLive(fzInp, "fz");
+    bindCutParamLive(nInp, "n");
+    bindCutParamLive(feedInp, "feed");
+
+    bindRowInputs(tr, [sel, aeInp, apInp, allowInp], function () {
+      saveTable();
+      applyMillRowFilters();
+    });
 
     mTbody.appendChild(tr);
     if (!data && sel.value) applyMillPreset(tr, sel.value);
+    if (!skipBaseline && !(data && (data.n || data.feed || data.vc || data.fz || data.ae || data.ap))) {
+      applyMillBaseline(tr, true);
+    } else {
+      if (!(data && data.vc) || !(data && data.fz)) syncMillCutDerived(tr, "n");
+      rememberRowFz(tr);
+    }
     syncEmpty();
+    applyMillRowFilters();
     if (!data) dInp.focus();
   }
 
@@ -1541,22 +2197,68 @@
   }
 
   mAddBtn.addEventListener("click", function () { addRow(null); });
+  if (mFillBaselines) {
+    mFillBaselines.addEventListener("click", function () {
+      fillMillBaselines();
+      if (getMachineNmax()) recalcVisibleMillRowsToNmax(false);
+    });
+  }
+  loadMachineNmax();
+  if (mNmaxInp) {
+    mNmaxInp.addEventListener("change", saveMachineNmax);
+    mNmaxInp.addEventListener("blur", saveMachineNmax);
+  }
+  if (mRecalcNmax) {
+    mRecalcNmax.addEventListener("click", function () {
+      var n = recalcVisibleMillRowsToNmax(false);
+      if (n > 0) mRecalcNmax.title = "Пересчитано строк: " + n;
+      else if (getMachineNmax()) alert("Все видимые строки уже в пределах nmax (или заблокированы).");
+    });
+    mRecalcNmax.addEventListener("dblclick", function (e) {
+      e.preventDefault();
+      if (!confirm("Поставить n = макс. обороты станка во всех видимых строках и пересчитать F?")) return;
+      var n = recalcVisibleMillRowsToNmax(true);
+      if (n > 0) mRecalcNmax.title = "Выставлено nmax, строк: " + n;
+    });
+  }
+  if (mRecalcZ) {
+    mRecalcZ.addEventListener("click", function () {
+      var n = recalcVisibleMillRowsByOwnFlutes();
+      if (n > 0) mRecalcZ.title = "F пересчитан по Z каждой фрезы, строк: " + n;
+      else alert("Нет строк для пересчёта (нужны n, Z и fz у фрезы).");
+    });
+  }
 
   function reloadTableFromStorage() {
     mTbody.innerHTML = "";
     try {
-      if (currentModeId === "thread" && !localStorage.getItem(lsKey())) {
-        var legacy = localStorage.getItem("calc_modes_tap_v2");
-        if (legacy) localStorage.setItem(lsKey(), legacy);
+      var saved = SHARED_BY_MODE[currentModeId];
+      if (!Array.isArray(saved) || !saved.length) {
+        saved = readLegacyLocalRows(currentModeId);
+        if (saved.length) SHARED_BY_MODE[currentModeId] = saved;
       }
-      if (currentModeId === "thread" && !localStorage.getItem(lsKey())) {
-        var legacy3 = localStorage.getItem("calc_modes_thread_v3");
-        if (legacy3) localStorage.setItem(lsKey(), legacy3);
-      }
-      var saved = JSON.parse(localStorage.getItem(lsKey()) || "[]");
       if (Array.isArray(saved) && saved.length) saved.forEach(function (d) { addRow(d); });
     } catch (e) {}
     syncEmpty();
+    applyMillRowFilters();
+    applyModesEditLock();
+  }
+
+  function applyModesEditLock() {
+    if (CAN_EDIT_MODES) return;
+    if (mAddBtn) mAddBtn.disabled = true;
+    if (mFillBaselines) mFillBaselines.disabled = true;
+    if (mTable) {
+      mTable.querySelectorAll("input, select, button").forEach(function (el) {
+        el.disabled = true;
+      });
+    }
+    setModesSaveStatus("Общая база (только просмотр)");
+  }
+
+  maybeSeedServerFromLocalStorage();
+  if (serverHasAnyModes() && mSaveStatus) {
+    setModesSaveStatus("Общая база режимов");
   }
 
   if (mModeSel) {

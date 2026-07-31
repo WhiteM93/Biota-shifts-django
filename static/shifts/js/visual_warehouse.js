@@ -115,7 +115,19 @@
   }
 
   function detailUrl(tpl, id) {
-    return String(tpl || "").replace(/\/0\/?$/, "/" + id + "/");
+    var s = String(tpl || "");
+    var sid = encodeURIComponent(String(id));
+    if (!s) return s;
+    // Placeholder pk=0: /…/0/ или /…/0/audits/
+    if (s.indexOf("/0/") !== -1) return s.replace("/0/", "/" + sid + "/");
+    if (/\/0\/?$/.test(s)) return s.replace(/\/0\/?$/, "/" + sid + "/");
+    return s;
+  }
+
+  function containerAuditsUrl(containerId) {
+    var base = detailUrl(apiContTpl, containerId);
+    if (base) return String(base).replace(/\/?$/, "/") + "audits/";
+    return detailUrl(apiAuditsTpl, containerId);
   }
 
   function fetchJson(url, opts) {
@@ -1362,7 +1374,7 @@
 
   function loadAudits(containerId) {
     if (!apiAuditsTpl) return Promise.resolve([]);
-    return fetchJson(detailUrl(apiAuditsTpl, containerId)).then(function (data) {
+    return fetchJson(containerAuditsUrl(containerId)).then(function (data) {
       renderAudits(data.audits || []);
       return data.audits || [];
     }).catch(function () {
@@ -1647,7 +1659,7 @@
       auditMsgEl.textContent = "";
       auditMsgEl.classList.remove("is-error");
     }
-    fetchJson(detailUrl(apiAuditsTpl, openContainerId), {
+    fetchJson(containerAuditsUrl(openContainerId), {
       method: "POST",
       body: {
         notes: auditNotesEl ? auditNotesEl.value : "",

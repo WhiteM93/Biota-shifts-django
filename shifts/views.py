@@ -337,6 +337,106 @@ def refresh_db_cache(request):
     return redirect(request.META.get("HTTP_REFERER") or "/")
 
 
+def _normalize_cutting_mode_rows(raw) -> list[dict]:
+    """Ограничить и очистить строки режимов резания перед записью в общую базу."""
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for item in raw[:500]:
+        if not isinstance(item, dict):
+            continue
+        row: dict = {}
+        for k, v in item.items():
+            key = str(k).strip()[:40]
+            if not key:
+                continue
+            if v is None:
+                row[key] = ""
+            elif isinstance(v, bool):
+                row[key] = v
+            elif isinstance(v, (int, float)):
+                row[key] = v
+            else:
+                row[key] = str(v)[:200]
+        out.append(row)
+    return out
+
+
+def _calculator_shared_modes_payload() -> dict:
+    from .models import CalculatorModesState
+
+    row = CalculatorModesState.objects.filter(pk=1).first()
+    by_mode: dict = {}
+    updated_at = ""
+    updated_by = ""
+    if row and isinstance(row.payload, dict):
+        raw_by = row.payload.get("by_mode")
+        if isinstance(raw_by, dict):
+            for mid, rows in raw_by.items():
+                key = str(mid).strip()[:40]
+                if not key:
+                    continue
+                by_mode[key] = _normalize_cutting_mode_rows(rows)
+        updated_at = row.updated_at.strftime("%d.%m.%Y %H:%M") if row.updated_at else ""
+        updated_by = (row.updated_by or "").strip()
+    return {"by_mode": by_mode, "updated_at": updated_at, "updated_by": updated_by}
+
+
+def _calculator_save_cutting_modes(request):
+    import json as _json
+
+    from biota_shifts.auth import user_is_executor
+
+    from .models import CalculatorModesState
+
+    u = biota_user(request)
+    if u and not _is_admin(u) and user_is_executor(u):
+        return JsonResponse(
+            {"ok": False, "error": "У вас роль «исполнитель»: изменение общей базы режимов недоступно."},
+            status=403,
+        )
+
+    mode_id = ""
+    rows_raw = None
+    if (request.content_type or "").startswith("application/json"):
+        try:
+            body = _json.loads(request.body.decode("utf-8") or "{}")
+        except (_json.JSONDecodeError, UnicodeDecodeError):
+            return JsonResponse({"ok": False, "error": "Некорректный JSON."}, status=400)
+        mode_id = str(body.get("mode_id") or "").strip()
+        rows_raw = body.get("rows")
+    else:
+        mode_id = (request.POST.get("mode_id") or "").strip()
+        rows_json = request.POST.get("rows_json") or "[]"
+        try:
+            rows_raw = _json.loads(rows_json)
+        except _json.JSONDecodeError:
+            return JsonResponse({"ok": False, "error": "Некорректный JSON строк."}, status=400)
+
+    if mode_id not in {"thread", "end_mill", "drill"}:
+        return JsonResponse({"ok": False, "error": "Неизвестный режим."}, status=400)
+
+    rows = _normalize_cutting_mode_rows(rows_raw)
+    state, _created = CalculatorModesState.objects.get_or_create(pk=1)
+    payload = state.payload if isinstance(state.payload, dict) else {}
+    by_mode = payload.get("by_mode") if isinstance(payload.get("by_mode"), dict) else {}
+    by_mode = dict(by_mode)
+    by_mode[mode_id] = rows
+    payload = {**payload, "by_mode": by_mode}
+    state.payload = payload
+    state.updated_by = (u or "").strip() or "?"
+    state.save(update_fields=["payload", "updated_at", "updated_by"])
+    return JsonResponse(
+        {
+            "ok": True,
+            "mode_id": mode_id,
+            "count": len(rows),
+            "updated_at": state.updated_at.strftime("%d.%m.%Y %H:%M"),
+            "updated_by": state.updated_by,
+        }
+    )
+
+
 @biota_login_required
 @require_http_methods(["GET", "POST"])
 def calculator_view(request):
@@ -347,6 +447,14 @@ def calculator_view(request):
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
+        if not action and (request.content_type or "").startswith("application/json"):
+            try:
+                body = _json.loads(request.body.decode("utf-8") or "{}")
+                action = str(body.get("action") or "").strip()
+            except (_json.JSONDecodeError, UnicodeDecodeError):
+                action = ""
+        if action == "save_cutting_modes":
+            return _calculator_save_cutting_modes(request)
         if action != "save_piece_norm":
             return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
         u = biota_user(request)
@@ -468,9 +576,17 @@ def calculator_view(request):
             for s in p["setups"]:
                 s["latest_norm"] = latest_by_setup.get(s["id"])
 
+    from biota_shifts.auth import user_is_executor
+
     from .calculator_modes import cutting_modes_payload
+
+    u = biota_user(request)
+    can_edit_modes = bool(u) and (_is_admin(u) or not user_is_executor(u))
+    shared_modes = _calculator_shared_modes_payload()
 
     return render(request, "shifts/calculator.html", {
         "products_json": _json.dumps(products_data, ensure_ascii=False),
         "cutting_modes_json": _json.dumps(cutting_modes_payload(), ensure_ascii=False),
+        "shared_modes_json": _json.dumps(shared_modes, ensure_ascii=False),
+        "can_edit_modes": can_edit_modes,
     })

@@ -795,6 +795,17 @@ html[data-theme="dawn"] .vw-modal-backdrop {
 
 .vw-modal--wide .vw-modal-card {
   width: min(520px, 100%);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.vw-modal--wide .vw-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(90vh, 720px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .vw-dialog-body {
@@ -1117,8 +1128,8 @@ html[data-theme="dawn"] .vw-audit-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: min(70vh, 720px);
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
   margin: 10px 0;
 }
 
