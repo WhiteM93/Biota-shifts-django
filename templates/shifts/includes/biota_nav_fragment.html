@@ -24,16 +24,23 @@
 {% endif %}
 {% if biota_nav.hours and biota_nav.skud %}
 <details class="nav-dropdown">
-  <summary class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' or request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">Часы и СКУД</summary>
+  <summary class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' or request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' or request.resolver_match.url_name == 'discipline' %}active{% endif %}">Часы и СКУД</summary>
   <div class="nav-dropdown-menu">
     <a href="{% url 'hours' %}" class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' %}active{% endif %}">Часы по дням</a>
     <a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
+    <a href="{% url 'discipline' %}" class="{% if request.resolver_match.url_name == 'discipline' %}active{% endif %}">Нарушение дисциплины</a>
   </div>
 </details>
 {% elif biota_nav.hours %}
 <a href="{% url 'hours' %}" class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' %}active{% endif %}">Часы по дням</a>
 {% elif biota_nav.skud %}
-<a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
+<details class="nav-dropdown">
+  <summary class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' or request.resolver_match.url_name == 'discipline' %}active{% endif %}">СКУД</summary>
+  <div class="nav-dropdown-menu">
+    <a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
+    <a href="{% url 'discipline' %}" class="{% if request.resolver_match.url_name == 'discipline' %}active{% endif %}">Нарушение дисциплины</a>
+  </div>
+</details>
 {% endif %}
 {% if biota_nav.inventory %}
 <a href="{% url 'inventory' %}" class="nav-inventory-link nav-inventory-link--icon-only {% if request.resolver_match.url_name == 'inventory' and request.GET.panel != 'defects' and request.GET.panel != 'payroll' and request.GET.panel != 'employees' %}active{% endif %}" title="Склад" aria-label="Склад">

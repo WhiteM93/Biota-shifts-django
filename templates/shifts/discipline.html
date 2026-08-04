@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% static 'shifts/css/discipline.css' %}?v={{ static_asset_version }}">
+
+<div class="calc-page disc-page">
+
+  <div class="calc-header">
+    <div class="calc-header-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M12 7v5l3 2"/>
+        <path d="M5 19l2-2M19 19l-2-2"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="calc-title">Нарушение дисциплины</h1>
+      <p class="calc-subtitle">Опоздания и ранние уходы по графику за месяц</p>
+    </div>
+  </div>
+
+  <div class="calc-glass-card disc-filters-card">
+    <form method="get" action="{% url 'discipline' %}" class="disc-filters auto-submit-form" id="disc-period-form">
+      <label class="calc-field">
+        <span class="calc-label">Год</span>
+        <select name="year" class="calc-sel">
+          {% for yy in year_options %}
+          <option value="{{ yy }}" {% if yy == year %}selected{% endif %}>{{ yy }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="calc-field">
+        <span class="calc-label">Месяц</span>
+        <select name="month" class="calc-sel">
+          {% for mm, mlab in month_choices %}
+          <option value="{{ mm }}" {% if mm == month %}selected{% endif %}>{{ mlab }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="disc-filter-actions">
+        <button type="submit" class="btn">Показать</button>
+      </div>
+    </form>
+  </div>
+
+  {% if error %}
+  <div class="disc-alert" role="alert">{{ error }}</div>
+  {% else %}
+
+  <div class="disc-summary">
+    <div class="disc-stat">
+      <span class="disc-stat__value">{{ emp_count }}</span>
+      <span class="disc-stat__label">Сотрудников с нарушениями</span>
+    </div>
+    <div class="disc-stat">
+      <span class="disc-stat__value">{{ total_late_h }}</span>
+      <span class="disc-stat__label">Опоздания за {{ month_name }}</span>
+    </div>
+    <div class="disc-stat">
+      <span class="disc-stat__value">{{ total_early_h }}</span>
+      <span class="disc-stat__label">Ранний уход за {{ month_name }}</span>
+    </div>
+    <div class="disc-stat disc-stat--accent">
+      <span class="disc-stat__value">{{ total_all_h }}</span>
+      <span class="disc-stat__label">Всего нарушений</span>
+    </div>
+  </div>
+
+  {% if not rows %}
+  <p class="disc-empty">За {{ month_name }} {{ year }} нет опозданий и ранних уходов по доступным сотрудникам.</p>
+  {% else %}
+  <div class="disc-list">
+    {% for r in rows %}
+    <details class="disc-card">
+      <summary class="disc-card__summary">
+        <div class="disc-card__who">
+          <span class="disc-card__name">{{ r.label }}</span>
+          {% if r.department %}<span class="disc-card__dept">{{ r.department }}</span>{% endif %}
+        </div>
+        <div class="disc-card__totals">
+          <span class="disc-pill disc-pill--late" title="Опоздания">опозд. {{ r.late_h }} · {{ r.late_days }} дн.</span>
+          <span class="disc-pill disc-pill--early" title="Ранний уход">уход {{ r.early_h }} · {{ r.early_days }} дн.</span>
+          <span class="disc-pill disc-pill--sum">всего {{ r.total_h }}</span>
+        </div>
+      </summary>
+      <div class="disc-card__body">
+        <table class="disc-days">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>График</th>
+              <th>Пришёл</th>
+              <th>Ушёл</th>
+              <th>Опоздание</th>
+              <th>Ранний уход</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in r.days %}
+            <tr>
+              <td>{{ d.date }}{% if d.weekday %} <span class="muted">{{ d.weekday }}</span>{% endif %}</td>
+              <td>{{ d.graph }}</td>
+              <td>{{ d.arrived }}</td>
+              <td>{{ d.left }}</td>
+              <td class="{% if d.late_min > 0 %}is-late{% endif %}">{{ d.late_h }}</td>
+              <td class="{% if d.early_min > 0 %}is-early{% endif %}">{{ d.early_h }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% endif %}
+
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById("disc-period-form");
+  if (!form) return;
+  form.querySelectorAll("select").forEach(function (el) {
+    el.addEventListener("change", function () { form.submit(); });
+  });
+})();
+</script>
+{% endblock %}

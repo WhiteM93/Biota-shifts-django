@@ -7,6 +7,7 @@ from . import debug_log_views
 from . import graph_mobile_views
 from . import graph_views
 from . import perf_diagnostic_views
+from . import discipline_views
 from . import hours_views
 from . import employee_payroll_views
 from . import inventory_views
@@ -27,6 +28,7 @@ urlpatterns = [
     path("hours/", hours_views.hours_view, name="hours"),
     path("hours/excel/", hours_views.hours_excel, name="hours_excel"),
     path("hours/pdf/", hours_views.hours_pdf, name="hours_pdf"),
+    path("discipline/", discipline_views.discipline_view, name="discipline"),
     path("skud/", skud_views.skud_view, name="skud"),
     path("skud/punches.csv", skud_views.skud_punches_csv, name="skud_punches_csv"),
     path("skud/stats.xlsx", skud_views.skud_stats_excel, name="skud_stats_excel"),
