@@ -132,6 +132,47 @@ def worksheet_name_candidates(year: int, month: int) -> list[str]:
     return out
 
 
+def _prefer_ipv4_dns() -> None:
+    """
+    urllib3/requests ходят по адресам по порядку DNS.
+    На многих VPS IPv6 к Google «чёрная дыра» (curl при этом ок — Happy Eyeballs).
+    Форсируем IPv4, чтобы OAuth/Sheets не зависали бесконечно.
+    """
+    import socket
+
+    if getattr(socket, "_biota_google_ipv4_patched", False):
+        return
+    _orig = socket.getaddrinfo
+
+    def getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):  # noqa: A002
+        if family in (0, socket.AF_UNSPEC):
+            try:
+                return _orig(host, port, socket.AF_INET, type, proto, flags)
+            except OSError:
+                pass
+        return _orig(host, port, family, type, proto, flags)
+
+    socket.getaddrinfo = getaddrinfo  # type: ignore[method-assign]
+    socket._biota_google_ipv4_patched = True  # type: ignore[attr-defined]
+
+
+def _google_http_timeout_sec() -> float:
+    raw = _config_str("BIOTA_GOOGLE_HTTP_TIMEOUT", "25").strip()
+    try:
+        return max(5.0, float(raw))
+    except ValueError:
+        return 25.0
+
+
+def _ensure_google_network() -> None:
+    """IPv4 + таймаут сокета, чтобы API Google не вешал gunicorn."""
+    import socket
+
+    _prefer_ipv4_dns()
+    if socket.getdefaulttimeout() is None:
+        socket.setdefaulttimeout(_google_http_timeout_sec())
+
+
 def _get_gspread_client():
     try:
         import gspread
@@ -149,6 +190,7 @@ def _get_gspread_client():
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
+    _ensure_google_network()
     credentials = Credentials.from_service_account_file(str(creds_path), scopes=scopes)
     return gspread.authorize(credentials)
 
