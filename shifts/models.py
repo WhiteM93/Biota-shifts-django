@@ -1407,12 +1407,12 @@ class InventoryWatchTemplate(models.Model):
 
 
 DEFECT_PAYROLL_ADJUST_KIND_CHOICES = [
-    ("bonus_percent", "Премия, % от начисления по табелю"),
-    ("bonus_rub", "Премия, ₽ (фикс)"),
-    ("penalty_quality_pct", "Качество, % от начисления (0–20)"),
-    ("penalty_result_pct", "Результат, % от начисления (0–20)"),
-    ("penalty_mode_pct", "Режим, % от начисления (0–10)"),
-    ("penalty_rub", "Штраф, ₽"),
+    ("bonus_percent", "Премия — % (пункты)"),
+    ("bonus_rub", "Премия — ₽"),
+    ("penalty_quality_pct", "Качество — % (0…20)"),
+    ("penalty_result_pct", "Результат — % (0…20)"),
+    ("penalty_mode_pct", "Режим — % (0…10)"),
+    ("penalty_rub", "Штраф — ₽"),
 ]
 
 

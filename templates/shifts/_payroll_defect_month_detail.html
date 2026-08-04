@@ -1,13 +1,15 @@
 {% if defect_records %}
-<p class="muted" style="margin:0 0 8px 0;font-size:12px;line-height:1.4;">
-  Отбор по сотруднику «{{ employee.label }}» (как в списке ЗП).
+<p class="pr-defects-lead muted">
+  Сотрудник «{{ employee.label }}» · {{ month_name }} {{ year }} · записей: <strong>{{ defect_month.count }}</strong>
 </p>
-<p class="muted" style="margin:0 0 14px 0;font-size:12px;line-height:1.45;">
-  Итого за {{ month_name }}: записей <strong>{{ defect_month.count }}</strong>.
-</p>
+
+<div class="payroll-defect-cards">
 {% for rec in defect_records %}
-<div class="payroll-defect-entry">
-  <h4 class="payroll-defect-entry-title">Запись {{ forloop.counter }} · {{ rec.defect_date|date:"d.m.Y" }}</h4>
+<article class="payroll-defect-card">
+  <header class="payroll-defect-card__head">
+    <h4 class="payroll-defect-card__title">Запись {{ forloop.counter }} · {{ rec.defect_date|date:"d.m.Y" }}</h4>
+  </header>
+
   <dl class="payroll-defect-dl">
     <dt>Дата</dt>
     <dd>{{ rec.defect_date|date:"d.m.Y" }}</dd>
@@ -17,67 +19,132 @@
     <dd>{{ rec.responsible_name|default:"—" }}</dd>
     <dt>Сотрудник</dt>
     <dd>{{ rec.employee_name }}</dd>
-    <dt>Причина брака</dt>
+    <dt>Причина</dt>
     <dd>{{ rec.defect_reason }}</dd>
-    <dt>Создано в системе</dt>
+    <dt>Создано</dt>
     <dd>{{ rec.created_at|date:"d.m.Y H:i" }}</dd>
   </dl>
+
   {% with adj_list=rec.payroll_adjustments.all %}
   {% if adj_list %}
-  <div class="payroll-defect-adj-existing" style="margin-top:10px;">
+  <div class="payroll-defect-adj-existing">
+    <p class="payroll-defect-adj-heading">Корректировки в ЗП</p>
     {% if biota_can_edit %}
       {% for a in adj_list %}
-      <form method="post" class="payroll-defect-adj-row-form" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;margin-bottom:10px;">
+      <form method="post" class="payroll-defect-adj-row-form">
         {% csrf_token %}
         <input type="hidden" name="defect_adjust_action" value="save">
         <input type="hidden" name="defect_id" value="{{ rec.id }}">
         <input type="hidden" name="mark_year" value="{{ year }}">
         <input type="hidden" name="mark_month" value="{{ month }}">
         <input type="hidden" name="adjust_kind" value="{{ a.adjust_kind }}">
-        <label class="field" style="flex:1 1 160px;min-width:0;"><span>{{ a.get_adjust_kind_display }}</span>
-          <input type="text" name="adjust_amount" class="payroll-live-field" inputmode="decimal" value="{{ a.amount }}" autocomplete="off">
+        <label class="field payroll-defect-adj-field">
+          <span>{{ a.get_adjust_kind_display }}</span>
+          <div class="payroll-defect-adj-input-wrap">
+            <input
+              type="text"
+              name="adjust_amount"
+              class="payroll-live-field"
+              inputmode="decimal"
+              value="{{ a.amount }}"
+              autocomplete="off"
+              aria-label="Значение корректировки"
+            >
+            <span class="payroll-defect-adj-unit" aria-hidden="true">{% if a.adjust_kind == 'bonus_rub' or a.adjust_kind == 'penalty_rub' %}₽{% else %}%{% endif %}</span>
+          </div>
         </label>
-        <span class="filter-actions" style="margin:0;display:flex;flex-wrap:wrap;gap:6px;">
+        <span class="filter-actions payroll-defect-adj-actions">
           <button type="submit" name="defect_adjust_intent" value="save" class="btn btn-sm">Сохранить</button>
           <button type="submit" name="defect_adjust_intent" value="delete" class="btn btn-sm btn-ghost">Удалить</button>
         </span>
       </form>
       {% endfor %}
+      <p class="payroll-defect-hint muted">Дроби: <strong>1,5</strong> или <strong>−0,5</strong> (точка или запятая). Для % — это пункты процента, не рубли.</p>
     {% else %}
-      <ul class="muted" style="margin:0;padding-left:18px;font-size:12px;line-height:1.5;">
+      <ul class="payroll-defect-adj-readonly muted">
         {% for a in adj_list %}
-        <li>{{ a.get_adjust_kind_display }}: {{ a.amount }}</li>
+        <li>{{ a.get_adjust_kind_display }}: <strong>{{ a.amount }}</strong>{% if a.adjust_kind == 'bonus_rub' or a.adjust_kind == 'penalty_rub' %} ₽{% else %} %{% endif %}</li>
         {% endfor %}
       </ul>
     {% endif %}
   </div>
   {% endif %}
   {% endwith %}
+
   {% if biota_can_edit %}
-  <form method="post" class="payroll-defect-adj-form">
+  <form method="post" class="payroll-defect-adj-form js-defect-adj-add">
     {% csrf_token %}
     <input type="hidden" name="defect_adjust_action" value="save">
     <input type="hidden" name="defect_id" value="{{ rec.id }}">
     <input type="hidden" name="mark_year" value="{{ year }}">
     <input type="hidden" name="mark_month" value="{{ month }}">
     <input type="hidden" name="defect_adjust_intent" value="save">
-    <div class="filter-grid" style="gap:10px;">
-      <label class="field"><span>Поле в расчёте ЗП</span>
-        <select name="adjust_kind" class="payroll-defect-adj-kind">
+    <p class="payroll-defect-adj-heading">Добавить корректировку</p>
+    <div class="filter-grid payroll-defect-adj-grid">
+      <label class="field">
+        <span>Куда в ЗП</span>
+        <select name="adjust_kind" class="payroll-defect-adj-kind js-defect-adj-kind">
           {% for kval, klabel in defect_adjust_kind_choices %}
-          <option value="{{ kval }}">{{ klabel }}</option>
+          <option
+            value="{{ kval }}"
+            data-unit="{% if kval == 'bonus_rub' or kval == 'penalty_rub' %}rub{% else %}pct{% endif %}"
+            data-hint="{% if kval == 'bonus_rub' or kval == 'penalty_rub' %}Сумма в рублях, например 500 или −200{% elif kval == 'penalty_mode_pct' %}Процентные пункты (обычно от −10 до 10), дробь можно: −1,5{% elif kval == 'penalty_quality_pct' or kval == 'penalty_result_pct' %}Процентные пункты (обычно от −20 до 20), дробь: 0,5{% else %}Процентные пункты премии, дробь: 1,5 или −2{% endif %}"
+          >{{ klabel }}</option>
           {% endfor %}
         </select>
       </label>
-      <label class="field"><span>Добавка (0 — сбросить)</span>
-        <input type="text" name="adjust_amount" class="payroll-live-field" inputmode="decimal" placeholder="напр. 500 или −2" value="" autocomplete="off">
+      <label class="field">
+        <span class="js-defect-adj-amount-label">Значение, %</span>
+        <div class="payroll-defect-adj-input-wrap">
+          <input
+            type="text"
+            name="adjust_amount"
+            class="payroll-live-field js-defect-adj-amount"
+            inputmode="decimal"
+            value=""
+            autocomplete="off"
+            placeholder=""
+          >
+          <span class="payroll-defect-adj-unit js-defect-adj-unit" aria-hidden="true">%</span>
+        </div>
       </label>
     </div>
-    <p class="filter-actions" style="margin:10px 0 0 0;"><button type="submit" class="btn btn-sm">Добавить к записи</button></p>
+    <p class="payroll-defect-hint muted js-defect-adj-hint">Процентные пункты (обычно от −10 до 10), дробь можно: −1,5</p>
+    <p class="filter-actions payroll-defect-adj-add-actions">
+      <button type="submit" class="btn btn-sm">Добавить к записи</button>
+    </p>
   </form>
   {% endif %}
-</div>
+</article>
 {% endfor %}
+</div>
+
+{% if biota_can_edit %}
+<script>
+(function () {
+  function syncAddForm(form) {
+    var sel = form.querySelector(".js-defect-adj-kind");
+    if (!sel) return;
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt) return;
+    var unit = opt.getAttribute("data-unit") || "pct";
+    var hint = opt.getAttribute("data-hint") || "";
+    var label = form.querySelector(".js-defect-adj-amount-label");
+    var unitEl = form.querySelector(".js-defect-adj-unit");
+    var hintEl = form.querySelector(".js-defect-adj-hint");
+    if (label) label.textContent = unit === "rub" ? "Сумма, ₽" : "Значение, %";
+    if (unitEl) unitEl.textContent = unit === "rub" ? "₽" : "%";
+    if (hintEl) hintEl.textContent = hint;
+  }
+  document.querySelectorAll(".js-defect-adj-add").forEach(function (form) {
+    syncAddForm(form);
+    var sel = form.querySelector(".js-defect-adj-kind");
+    if (sel) sel.addEventListener("change", function () { syncAddForm(form); });
+  });
+})();
+</script>
+{% endif %}
+
 {% else %}
 <p class="muted" style="margin:0;">За этот месяц записей учёта брака по сотруднику «{{ employee.label }}» нет.</p>
 {% endif %}
