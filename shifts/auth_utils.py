@@ -45,7 +45,7 @@ def _nav_key_for_url_name(url_name: str) -> str | None:
         return "graph"
     if n.startswith("hours"):
         return "hours"
-    if n.startswith("skud") or n == "discipline":
+    if n.startswith("skud") or n == "discipline" or n == "discipline_print":
         return "skud"
     if n == "inventory":
         return "inventory"

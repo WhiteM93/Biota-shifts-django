@@ -105,10 +105,15 @@ def _build_discipline_rows(
         early_total = 0
         late_days = 0
         early_days = 0
+        same_mark_days = 0
         for _, row in stats.iterrows():
             late = biota_logic._stat_minutes_cell_to_int(row.get("Опоздал (мин)"))
             early = biota_logic._stat_minutes_cell_to_int(row.get("Ранний уход (мин)"))
-            if late <= 0 and early <= 0:
+            arrived = str(row.get("Пришел") or "").strip()
+            left = str(row.get("Ушел") or "").strip()
+            # Одна и та же отметка на приход и уход → забыли отметиться с одной стороны
+            same_mark = bool(arrived and left and arrived == left)
+            if late <= 0 and early <= 0 and not same_mark:
                 continue
             late_total += late
             early_total += early
@@ -116,6 +121,8 @@ def _build_discipline_rows(
                 late_days += 1
             if early > 0:
                 early_days += 1
+            if same_mark:
+                same_mark_days += 1
             raw_date = row.get("Дата")
             try:
                 d_obj = pd.Timestamp(raw_date).date()
@@ -124,17 +131,22 @@ def _build_discipline_rows(
             except Exception:
                 date_label = str(raw_date or "")
                 weekday = ""
+            note = ""
+            if same_mark:
+                note = "Одинаковое время прихода и ухода — вероятно, забыли отметиться на приходе или на уходе"
             days.append(
                 {
                     "date": date_label,
                     "weekday": weekday,
                     "graph": str(row.get("График") or "—"),
-                    "arrived": str(row.get("Пришел") or "—"),
-                    "left": str(row.get("Ушел") or "—"),
+                    "arrived": arrived or "—",
+                    "left": left or "—",
                     "late_min": late,
                     "early_min": early,
                     "late_h": _fmt_minutes_human(late),
                     "early_h": _fmt_minutes_human(early),
+                    "same_mark": same_mark,
+                    "note": note,
                 }
             )
         if not days:
@@ -156,6 +168,7 @@ def _build_discipline_rows(
                 "total_h": _fmt_minutes_human(late_total + early_total),
                 "late_days": late_days,
                 "early_days": early_days,
+                "same_mark_days": same_mark_days,
                 "days": days,
             }
         )
@@ -167,6 +180,43 @@ def _build_discipline_rows(
 @biota_login_required
 @nav_permission_required("skud")
 def discipline_view(request):
+    return render(request, "shifts/discipline.html", _discipline_context(request))
+
+
+@biota_login_required
+@nav_permission_required("skud")
+def discipline_print_view(request):
+    """Версия для печати: сводка + каждый сотрудник отдельным блоком."""
+    ctx = _discipline_context(request)
+    emp = (request.GET.get("emp") or "").strip()
+    if emp:
+        ec = biota_logic.normalize_emp_code(emp) or emp
+        ctx["rows"] = [r for r in ctx["rows"] if r.get("emp_code") == ec]
+        ctx["emp_count"] = len(ctx["rows"])
+        ctx["print_one"] = True
+        ctx["print_all"] = False
+    else:
+        # Для раздачи: отдел → ФИО, чтобы листы можно было разложить по подразделениям
+        ctx["rows"] = sorted(
+            ctx["rows"],
+            key=lambda r: (
+                (r.get("department") or "\uffff").casefold(),
+                (r.get("label") or "").casefold(),
+            ),
+        )
+        ctx["print_one"] = False
+        ctx["print_all"] = True
+    total_late = sum(r["late_total"] for r in ctx["rows"])
+    total_early = sum(r["early_total"] for r in ctx["rows"])
+    total_same = sum(int(r.get("same_mark_days") or 0) for r in ctx["rows"])
+    ctx["total_late_h"] = _fmt_minutes_human(total_late)
+    ctx["total_early_h"] = _fmt_minutes_human(total_early)
+    ctx["total_all_h"] = _fmt_minutes_human(total_late + total_early)
+    ctx["total_same_mark_days"] = total_same
+    return render(request, "shifts/discipline_print.html", ctx)
+
+
+def _discipline_context(request) -> dict:
     now = datetime.now()
     y, m = _parse_year_month(request, now.year, now.month)
     employees_df = _employees_for_user(request)
@@ -204,20 +254,16 @@ def discipline_view(request):
     total_late = sum(r["late_total"] for r in rows)
     total_early = sum(r["early_total"] for r in rows)
 
-    return render(
-        request,
-        "shifts/discipline.html",
-        {
-            "year": y,
-            "month": m,
-            "month_name": MONTH_NAMES_RU[m],
-            "year_options": year_options,
-            "month_choices": [(mm, MONTH_NAMES_RU[mm]) for mm in range(1, 13)],
-            "error": error,
-            "rows": rows,
-            "emp_count": len(rows),
-            "total_late_h": _fmt_minutes_human(total_late),
-            "total_early_h": _fmt_minutes_human(total_early),
-            "total_all_h": _fmt_minutes_human(total_late + total_early),
-        },
-    )
+    return {
+        "year": y,
+        "month": m,
+        "month_name": MONTH_NAMES_RU[m],
+        "year_options": year_options,
+        "month_choices": [(mm, MONTH_NAMES_RU[mm]) for mm in range(1, 13)],
+        "error": error,
+        "rows": rows,
+        "emp_count": len(rows),
+        "total_late_h": _fmt_minutes_human(total_late),
+        "total_early_h": _fmt_minutes_human(total_early),
+        "total_all_h": _fmt_minutes_human(total_late + total_early),
+    }

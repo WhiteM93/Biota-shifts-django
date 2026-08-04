@@ -1,0 +1,130 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Нарушение дисциплины — {{ month_name }} {{ year }}{% if print_one and rows %} — {{ rows.0.label }}{% endif %}</title>
+  <link rel="stylesheet" href="{% static 'shifts/css/discipline_print.css' %}?v={{ static_asset_version }}">
+</head>
+<body class="{% if print_all %}is-print-all{% endif %}{% if print_one %} is-print-one{% endif %}">
+  <div class="disc-print-toolbar no-print">
+    <button type="button" class="disc-print-btn" onclick="window.print()">Печать</button>
+    {% if print_all %}
+    <span class="disc-print-hint">Сводка + отдельный лист на каждого сотрудника (по отделам)</span>
+    {% endif %}
+    <a class="disc-print-back" href="{% url 'discipline' %}?year={{ year }}&amp;month={{ month }}">← К отчёту</a>
+  </div>
+
+  {% if print_all and rows %}
+  <section class="disc-print-toc">
+    <header class="disc-print-head">
+      <h1>Нарушение дисциплины — сводка</h1>
+      <p class="disc-print-period">{{ month_name }} {{ year }}</p>
+      <p class="disc-print-sum">
+        Сотрудников: {{ emp_count }} ·
+        опоздания: {{ total_late_h }} ·
+        ранний уход: {{ total_early_h }}{% if total_same_mark_days %} ·
+        забыл отметиться: {{ total_same_mark_days }} дн.{% endif %} ·
+        всего: {{ total_all_h }}
+      </p>
+    </header>
+    <table class="disc-print-table disc-print-toc-table">
+      <thead>
+        <tr>
+          <th>№</th>
+          <th>Сотрудник</th>
+          <th>Отдел</th>
+          <th>Опоздания</th>
+          <th>Ранний уход</th>
+          <th>Забыл отметиться</th>
+          <th>Всего</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>{{ r.label }}</td>
+          <td>{% if r.department %}{{ r.department }}{% else %}—{% endif %}</td>
+          <td>{{ r.late_h }} ({{ r.late_days }} дн.)</td>
+          <td>{{ r.early_h }} ({{ r.early_days }} дн.)</td>
+          <td>{% if r.same_mark_days %}{{ r.same_mark_days }} дн.{% else %}—{% endif %}</td>
+          <td><strong>{{ r.total_h }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="disc-print-toc-note">Далее — детализация по каждому сотруднику (отдельный лист).</p>
+  </section>
+  {% elif not print_all %}
+  <header class="disc-print-head">
+    <h1>Нарушение дисциплины</h1>
+    <p class="disc-print-period">{{ month_name }} {{ year }}{% if print_one and rows %} — {{ rows.0.label }}{% endif %}</p>
+    {% if not error and rows %}
+    <p class="disc-print-sum">
+      Сотрудников: {{ emp_count }} ·
+      опоздания: {{ total_late_h }} ·
+      ранний уход: {{ total_early_h }} ·
+      всего: {{ total_all_h }}
+    </p>
+    {% endif %}
+  </header>
+  {% endif %}
+
+  {% if error %}
+  <p class="disc-print-error">{{ error }}</p>
+  {% elif not rows %}
+  <p class="disc-print-empty">За период нет нарушений.</p>
+  {% else %}
+  {% for r in rows %}
+  <section class="disc-print-emp">
+    <h2>{{ r.label }}</h2>
+    {% if r.department %}<p class="disc-print-dept">{{ r.department }}</p>{% endif %}
+    <p class="disc-print-emp-sum">
+      {{ month_name }} {{ year }} ·
+      Опоздания: <strong>{{ r.late_h }}</strong> ({{ r.late_days }} дн.) ·
+      Ранний уход: <strong>{{ r.early_h }}</strong> ({{ r.early_days }} дн.){% if r.same_mark_days %} ·
+      Забыл отметиться: <strong>{{ r.same_mark_days }}</strong> дн.{% endif %} ·
+      Всего: <strong>{{ r.total_h }}</strong>
+    </p>
+    <table class="disc-print-table">
+      <thead>
+        <tr>
+          <th>Дата</th>
+          <th>День</th>
+          <th>График</th>
+          <th>Пришёл</th>
+          <th>Ушёл</th>
+          <th>Опоздание</th>
+          <th>Ранний уход</th>
+          <th>Заметка</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in r.days %}
+        <tr class="{% if d.same_mark %}is-same-mark{% endif %}">
+          <td>{{ d.date }}</td>
+          <td>{{ d.weekday }}</td>
+          <td>{{ d.graph }}</td>
+          <td>{{ d.arrived }}</td>
+          <td>{{ d.left }}</td>
+          <td class="{% if d.late_min > 0 %}is-late{% endif %}">{% if d.late_min > 0 %}{{ d.late_h }}{% else %}—{% endif %}</td>
+          <td class="{% if d.early_min > 0 %}is-early{% endif %}">{% if d.early_min > 0 %}{{ d.early_h }}{% else %}—{% endif %}</td>
+          <td>{% if d.note %}{{ d.note }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endfor %}
+  {% endif %}
+
+  <script>
+  (function () {
+    if (/\bautoprint=1\b/.test(location.search || "")) {
+      window.addEventListener("load", function () { setTimeout(function () { window.print(); }, 200); });
+    }
+  })();
+  </script>
+</body>
+</html>

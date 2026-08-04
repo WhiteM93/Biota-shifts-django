@@ -29,6 +29,7 @@ urlpatterns = [
     path("hours/excel/", hours_views.hours_excel, name="hours_excel"),
     path("hours/pdf/", hours_views.hours_pdf, name="hours_pdf"),
     path("discipline/", discipline_views.discipline_view, name="discipline"),
+    path("discipline/print/", discipline_views.discipline_print_view, name="discipline_print"),
     path("skud/", skud_views.skud_view, name="skud"),
     path("skud/punches.csv", skud_views.skud_punches_csv, name="skud_punches_csv"),
     path("skud/stats.xlsx", skud_views.skud_stats_excel, name="skud_stats_excel"),

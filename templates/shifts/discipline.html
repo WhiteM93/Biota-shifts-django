@@ -41,6 +41,9 @@
       </label>
       <div class="disc-filter-actions">
         <button type="submit" class="btn">Показать</button>
+        {% if not error and rows %}
+        <a class="btn disc-print-all" href="{% url 'discipline_print' %}?year={{ year }}&amp;month={{ month }}&amp;autoprint=1" target="_blank" rel="noopener" title="Сводка и отдельный лист на каждого">Печать всем</a>
+        {% endif %}
       </div>
     </form>
   </div>
@@ -71,6 +74,10 @@
   {% if not rows %}
   <p class="disc-empty">За {{ month_name }} {{ year }} нет опозданий и ранних уходов по доступным сотрудникам.</p>
   {% else %}
+  <div class="disc-list-bar">
+    <span class="disc-list-bar__title">По сотрудникам</span>
+    <a class="btn disc-print-all" href="{% url 'discipline_print' %}?year={{ year }}&amp;month={{ month }}&amp;autoprint=1" target="_blank" rel="noopener">Печать всем ({{ emp_count }})</a>
+  </div>
   <div class="disc-list">
     {% for r in rows %}
     <details class="disc-card">
@@ -82,7 +89,11 @@
         <div class="disc-card__totals">
           <span class="disc-pill disc-pill--late" title="Опоздания">опозд. {{ r.late_h }} · {{ r.late_days }} дн.</span>
           <span class="disc-pill disc-pill--early" title="Ранний уход">уход {{ r.early_h }} · {{ r.early_days }} дн.</span>
+          {% if r.same_mark_days %}
+          <span class="disc-pill disc-pill--mark" title="Одинаковое время прихода и ухода">забыл отметиться · {{ r.same_mark_days }} дн.</span>
+          {% endif %}
           <span class="disc-pill disc-pill--sum">всего {{ r.total_h }}</span>
+          <a class="disc-pill disc-pill--print" href="{% url 'discipline_print' %}?year={{ year }}&amp;month={{ month }}&amp;emp={{ r.emp_code|urlencode }}&amp;autoprint=1" target="_blank" rel="noopener" title="Печать этого сотрудника" onclick="event.preventDefault(); event.stopPropagation(); window.open(this.href, '_blank', 'noopener');">Печать</a>
         </div>
       </summary>
       <div class="disc-card__body">
@@ -95,17 +106,19 @@
               <th>Ушёл</th>
               <th>Опоздание</th>
               <th>Ранний уход</th>
+              <th>Заметка</th>
             </tr>
           </thead>
           <tbody>
             {% for d in r.days %}
-            <tr>
+            <tr class="{% if d.same_mark %}is-same-mark{% endif %}">
               <td>{{ d.date }}{% if d.weekday %} <span class="muted">{{ d.weekday }}</span>{% endif %}</td>
               <td>{{ d.graph }}</td>
               <td>{{ d.arrived }}</td>
               <td>{{ d.left }}</td>
               <td class="{% if d.late_min > 0 %}is-late{% endif %}">{{ d.late_h }}</td>
               <td class="{% if d.early_min > 0 %}is-early{% endif %}">{{ d.early_h }}</td>
+              <td class="disc-note">{% if d.note %}<span class="disc-note__badge">{{ d.note }}</span>{% else %}—{% endif %}</td>
             </tr>
             {% endfor %}
           </tbody>
