@@ -1475,25 +1475,94 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     width: 100%;
   }
   .setup-program-file-item-side {
+    display: block;
     align-items: stretch;
     gap: 6px;
     position: relative;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
   }
   .product-side-program-files .setup-side-program-download {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    justify-content: flex-start;
+    text-align: left;
     background: linear-gradient(180deg, var(--bio-btn-primary-bg1) 0%, var(--bio-btn-primary-bg2) 100%);
     border: 1px solid var(--bio-nav-refresh-border);
     color: #fff;
     border-radius: 8px;
     box-shadow: var(--bio-btn-sm-shadow);
-    padding: 8px 10px;
+    padding: 8px 42px 8px 10px;
     text-decoration: none;
     font-size: 13px;
     font-weight: 600;
+    line-height: 1.25;
   }
   .product-side-program-files .setup-side-program-download:hover,
   .product-side-program-files .setup-side-program-download:focus {
     filter: brightness(1.06);
     color: #fff;
+  }
+  .setup-program-file-actions {
+    position: absolute;
+    right: 3px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    z-index: 2;
+    max-width: calc(100% - 8px);
+    pointer-events: none;
+  }
+  .setup-program-file-actions > * {
+    pointer-events: auto;
+  }
+  .setup-program-preview-btn.btn.btn-ghost,
+  .setup-program-file-item-side .setup-program-file-delete.btn {
+    align-items: center;
+    justify-content: center;
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+    max-width: 26px !important;
+    min-height: 26px !important;
+    padding: 0 !important;
+    line-height: 0;
+    margin: 0;
+    flex: 0 0 26px !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .setup-program-preview-btn.btn.btn-ghost {
+    background: transparent !important;
+  }
+  .setup-program-preview-btn.btn.btn-ghost:hover,
+  .setup-program-preview-btn.btn.btn-ghost:focus {
+    background: transparent !important;
+    color: #fff;
+    filter: brightness(1.2);
+  }
+  .setup-program-preview-btn .ui-icon {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+    line-height: 1;
   }
   .product-side-program-files .js-setup-program-file-delete {
     display: none !important;
@@ -1501,12 +1570,16 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   .setup-inline-edit-enabled .product-side-program-files .js-setup-program-file-delete {
     display: inline-flex !important;
   }
+  .setup-inline-edit-enabled .product-side-program-files .setup-side-program-download {
+    padding-right: 58px;
+  }
   .setup-program-file-item-side .setup-program-file-delete {
-    position: absolute;
-    right: 6px;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 2;
+    background: rgba(0, 0, 0, 0.35) !important;
+  }
+  .setup-program-file-item-side .setup-program-file-delete:hover,
+  .setup-program-file-item-side .setup-program-file-delete:focus {
+    background: rgba(0, 0, 0, 0.5) !important;
+    color: #fff;
   }
   .product-side-program-files .setup-program-upload-wrap {
     display: none;
@@ -5037,3 +5110,115 @@ html[data-theme="dawn"] .pd-save-notice {
     grid-template-columns: 1fr;
   }
 }
+
+/* G/M program preview modal */
+.setup-program-preview-modal[hidden] {
+  display: none !important;
+}
+.setup-program-preview-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1520;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
+    max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+}
+.setup-program-preview-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 11, 18, 0.72);
+  backdrop-filter: blur(2px);
+}
+.setup-program-preview-modal-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(960px, 100%);
+  height: min(860px, 100%);
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--bio-filter-border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+  box-shadow: var(--bio-filter-shadow);
+  overflow: hidden;
+}
+html[data-theme="dawn"] .setup-program-preview-modal-dialog {
+  background: linear-gradient(180deg, #fffefb 0%, #f4ebe0 100%);
+}
+.setup-program-preview-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--bio-surface-item-border, var(--bio-input-border));
+  flex: 0 0 auto;
+}
+.setup-program-preview-modal-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.setup-program-preview-modal-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.setup-program-preview-modal-status {
+  padding: 8px 14px 0;
+  font-size: 13px;
+  flex: 0 0 auto;
+}
+.setup-program-preview-code {
+  margin: 10px 12px 12px;
+  padding: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.45;
+  tab-size: 4;
+}
+.setup-program-preview-code code {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 12px;
+  padding: 12px 14px 14px 0;
+  min-width: max-content;
+  box-sizing: border-box;
+}
+.setup-program-preview-code .gcode-ln {
+  text-align: right;
+  color: #64748b;
+  user-select: none;
+  padding-left: 12px;
+  border-right: 1px solid rgba(148, 163, 184, 0.18);
+  padding-right: 10px;
+}
+.setup-program-preview-code .gcode-line {
+  white-space: pre;
+  padding-right: 16px;
+}
+.setup-program-preview-code .gcode-comment { color: #94a3b8; font-style: italic; }
+.setup-program-preview-code .gcode-g { color: #38bdf8; font-weight: 650; }
+.setup-program-preview-code .gcode-m { color: #f472b6; font-weight: 650; }
+.setup-program-preview-code .gcode-tool { color: #fbbf24; font-weight: 650; }
+.setup-program-preview-code .gcode-axis { color: #34d399; }
+.setup-program-preview-code .gcode-fs { color: #c084fc; }
+.setup-program-preview-code .gcode-num { color: #fdba74; }
+.setup-program-preview-code .gcode-pct { color: #67e8f9; }

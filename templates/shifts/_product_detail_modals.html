@@ -31,3 +31,17 @@
     </div>
   </div>
 </div>
+<div id="setup-program-preview-modal" class="setup-program-preview-modal" hidden aria-hidden="true">
+  <div class="setup-program-preview-modal-backdrop" data-close-setup-program-preview="1"></div>
+  <div class="setup-program-preview-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="setup-program-preview-title">
+    <div class="setup-program-preview-modal-head">
+      <h2 id="setup-program-preview-title" class="setup-program-preview-modal-title">Программа</h2>
+      <div class="setup-program-preview-modal-head-actions">
+        <a href="#" class="btn btn-ghost setup-program-preview-download js-setup-program-preview-download" download hidden>Скачать</a>
+        <button type="button" class="btn btn-ghost" data-close-setup-program-preview="1" aria-label="Закрыть">×</button>
+      </div>
+    </div>
+    <div class="setup-program-preview-modal-status muted js-setup-program-preview-status" hidden></div>
+    <pre class="setup-program-preview-code js-setup-program-preview-code" tabindex="0" aria-label="Текст программы"><code></code></pre>
+  </div>
+</div>

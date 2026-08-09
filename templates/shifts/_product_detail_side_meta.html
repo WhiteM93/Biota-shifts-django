@@ -139,9 +139,21 @@
         {% for pf in setup.program_file_list %}
         <li class="setup-program-file-item setup-program-file-item-side" data-program-file-id="{{ pf.pk }}">
           <a href="{{ pf.file.url }}" download class="btn product-btn-program setup-side-program-download">{{ pf.display_name }}</a>
-          {% if biota_can_edit %}
+          <div class="setup-program-file-actions">
+            <button
+              type="button"
+              class="btn btn-ghost setup-program-preview-btn js-setup-program-preview"
+              data-program-url="{{ pf.file.url }}"
+              data-program-name="{{ pf.display_name|escape }}"
+              title="Предпросмотр G/M кода"
+              aria-label="Предпросмотр {{ pf.display_name }}"
+            >
+              <i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>
+            </button>
+            {% if biota_can_edit %}
             <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 setup-program-file-delete js-setup-program-file-delete js-phased-delete" data-step="0" data-program-file-id="{{ pf.pk }}" data-setup-id="{{ setup.pk }}" title="Удалить файл" aria-label="Удалить файл программы">{% include "shifts/includes/biota_delete_icon.html" %}</button>
-          {% endif %}
+            {% endif %}
+          </div>
         </li>
         {% endfor %}
       </ul>

@@ -2978,7 +2978,9 @@ function saveSetupToolNoteEditor() {
         if (setupIndex) setupTab.textContent = "Уст. " + setupIndex;
         var setupOption = document.querySelector('#setup-tab-select option[value="' + tabName + '"]');
         if (setupOption) {
-          setupOption.textContent = setupIndex ? ("Уст. " + setupIndex + " — " + setupName) : setupName;
+          // Только название (и ● если в работе) — без «Уст. N», иначе номер расходится с именем/порядком
+          var inWork = setupOption.getAttribute("data-setup-in-work") === "1";
+          setupOption.textContent = (inWork ? "● " : "") + setupName;
         }
       }
     }
@@ -3306,7 +3308,7 @@ function saveSetupToolNoteEditor() {
       var slugMatch = (tabSlug || "").match(/^setup-(\d+)$/);
       if (!panel || !slugMatch) {
         alert(
-          "Не удалось определить активную установку. В списке «Изделие / Уст. …» выберите нужную установку и снова нажмите «Сохранить изменения».\n(Сейчас в списке: «" +
+          "Не удалось определить активную установку. В списке «Изделие / установки» выберите нужную установку и снова нажмите «Сохранить изменения».\n(Сейчас в списке: «" +
             (tabSlug || "(пусто)") +
             "».)"
         );
@@ -4339,18 +4341,46 @@ function saveSetupToolNoteEditor() {
             a.className = isSide ? "btn product-btn-program setup-side-program-download" : "setup-program-file-link";
             a.textContent = f.name || "";
             li.appendChild(a);
-            if (editMode) {
-              var del = document.createElement("button");
-              del.type = "button";
-              del.className = "btn btn-inv-delete btn-inv-delete--s0 setup-program-file-delete js-setup-program-file-delete js-phased-delete";
-              del.setAttribute("data-step", "0");
-              del.setAttribute("data-program-file-id", String(f.id));
-              del.setAttribute("data-setup-id", String(setupId));
-              del.title = "Удалить файл";
-              del.setAttribute("aria-label", "Удалить файл программы");
-              del.innerHTML = BDB.TRASH_SVG || "";
-              phasedDeleteInit(del);
-              li.appendChild(del);
+            if (isSide) {
+              var actions = document.createElement("div");
+              actions.className = "setup-program-file-actions";
+              var previewBtn = document.createElement("button");
+              previewBtn.type = "button";
+              previewBtn.className = "btn btn-ghost setup-program-preview-btn js-setup-program-preview";
+              previewBtn.setAttribute("data-program-url", f.url || "");
+              previewBtn.setAttribute("data-program-name", f.name || "");
+              previewBtn.title = "Предпросмотр G/M кода";
+              previewBtn.setAttribute("aria-label", "Предпросмотр " + (f.name || "программы"));
+              previewBtn.innerHTML = '<i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>';
+              actions.appendChild(previewBtn);
+              if (editMode) {
+                var del = document.createElement("button");
+                del.type = "button";
+                del.className =
+                  "btn btn-inv-delete btn-inv-delete--s0 setup-program-file-delete js-setup-program-file-delete js-phased-delete";
+                del.setAttribute("data-step", "0");
+                del.setAttribute("data-program-file-id", String(f.id));
+                del.setAttribute("data-setup-id", String(setupId));
+                del.title = "Удалить файл";
+                del.setAttribute("aria-label", "Удалить файл программы");
+                del.innerHTML = BDB.TRASH_SVG || "";
+                phasedDeleteInit(del);
+                actions.appendChild(del);
+              }
+              li.appendChild(actions);
+            } else if (editMode) {
+              var delPlain = document.createElement("button");
+              delPlain.type = "button";
+              delPlain.className =
+                "btn btn-inv-delete btn-inv-delete--s0 setup-program-file-delete js-setup-program-file-delete js-phased-delete";
+              delPlain.setAttribute("data-step", "0");
+              delPlain.setAttribute("data-program-file-id", String(f.id));
+              delPlain.setAttribute("data-setup-id", String(setupId));
+              delPlain.title = "Удалить файл";
+              delPlain.setAttribute("aria-label", "Удалить файл программы");
+              delPlain.innerHTML = BDB.TRASH_SVG || "";
+              phasedDeleteInit(delPlain);
+              li.appendChild(delPlain);
             }
             ul.appendChild(li);
           });
@@ -4361,6 +4391,189 @@ function saveSetupToolNoteEditor() {
       );
       if (emptyMsg) emptyMsg.hidden = files.length > 0;
     }
+
+    var GCODE_PREVIEW_MAX_CHARS = 400000;
+
+    function escapeGcodeHtml(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function highlightGcodeLine(line) {
+      var src = String(line || "");
+      var out = "";
+      var i = 0;
+      while (i < src.length) {
+        var ch = src.charAt(i);
+        if (ch === ";") {
+          out += '<span class="gcode-comment">' + escapeGcodeHtml(src.slice(i)) + "</span>";
+          break;
+        }
+        if (ch === "(") {
+          var endParen = src.indexOf(")", i + 1);
+          if (endParen === -1) {
+            out += '<span class="gcode-comment">' + escapeGcodeHtml(src.slice(i)) + "</span>";
+            break;
+          }
+          out += '<span class="gcode-comment">' + escapeGcodeHtml(src.slice(i, endParen + 1)) + "</span>";
+          i = endParen + 1;
+          continue;
+        }
+        if (ch === "%") {
+          out += '<span class="gcode-pct">%</span>';
+          i += 1;
+          continue;
+        }
+        var rest = src.slice(i);
+        var mWord = /^(?:([GM])(\d+(?:\.\d+)?)|([THD])(\d+)|([XYZABCIJKFRSPO])([+\-]?(?:\d+\.?\d*|\.\d+))|([+\-]?(?:\d+\.?\d*|\.\d+)))/i.exec(rest);
+        if (mWord) {
+          var token = mWord[0];
+          var cls = "gcode-num";
+          if (mWord[1]) {
+            cls = String(mWord[1]).toUpperCase() === "G" ? "gcode-g" : "gcode-m";
+          } else if (mWord[3]) {
+            cls = "gcode-tool";
+          } else if (mWord[5]) {
+            var axis = String(mWord[5]).toUpperCase();
+            cls = axis === "F" || axis === "S" ? "gcode-fs" : "gcode-axis";
+          }
+          out += '<span class="' + cls + '">' + escapeGcodeHtml(token) + "</span>";
+          i += token.length;
+          continue;
+        }
+        out += escapeGcodeHtml(ch);
+        i += 1;
+      }
+      return out;
+    }
+
+    function highlightGcodeText(text) {
+      var raw = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      var truncated = false;
+      if (raw.length > GCODE_PREVIEW_MAX_CHARS) {
+        raw = raw.slice(0, GCODE_PREVIEW_MAX_CHARS);
+        truncated = true;
+      }
+      var lines = raw.split("\n");
+      var html = [];
+      for (var n = 0; n < lines.length; n++) {
+        html.push('<span class="gcode-ln">' + (n + 1) + "</span>");
+        html.push('<span class="gcode-line">' + highlightGcodeLine(lines[n]) + "</span>");
+      }
+      return { html: html.join(""), truncated: truncated, lineCount: lines.length };
+    }
+
+    function closeSetupProgramPreviewModal() {
+      var modal = document.getElementById("setup-program-preview-modal");
+      if (!modal) return;
+      modal.hidden = true;
+      modal.setAttribute("aria-hidden", "true");
+      var noteModal = document.getElementById("setup-tool-note-edit-modal");
+      var photoModal = document.getElementById("setup-photo-modal");
+      if ((!noteModal || noteModal.hidden) && (!photoModal || photoModal.hidden)) {
+        document.body.style.overflow = "";
+      }
+    }
+
+    function setSetupProgramPreviewStatus(text, show) {
+      var status = document.querySelector(".js-setup-program-preview-status");
+      if (!status) return;
+      if (!show) {
+        status.hidden = true;
+        status.textContent = "";
+        return;
+      }
+      status.hidden = false;
+      status.textContent = text || "";
+    }
+
+    async function openSetupProgramPreview(url, name) {
+      var modal = document.getElementById("setup-program-preview-modal");
+      var title = document.getElementById("setup-program-preview-title");
+      var codeEl = document.querySelector(".js-setup-program-preview-code code");
+      var downloadLink = document.querySelector(".js-setup-program-preview-download");
+      if (!modal || !codeEl) return;
+      var fileName = (name || "").trim() || "Программа";
+      if (title) title.textContent = fileName;
+      if (downloadLink) {
+        downloadLink.href = url || "#";
+        downloadLink.setAttribute("download", fileName);
+        downloadLink.hidden = !url;
+      }
+      codeEl.innerHTML = "";
+      setSetupProgramPreviewStatus("Загрузка…", true);
+      modal.hidden = false;
+      modal.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+      if (!url) {
+        setSetupProgramPreviewStatus("Файл программы не найден.", true);
+        return;
+      }
+      try {
+        var res = await fetch(url, { credentials: "same-origin" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        var buf = await res.arrayBuffer();
+        var text = "";
+        try {
+          text = new TextDecoder("utf-8").decode(buf);
+        } catch (_dec) {
+          var bytes = new Uint8Array(buf);
+          var chunk = [];
+          var limit = Math.min(bytes.length, GCODE_PREVIEW_MAX_CHARS);
+          for (var bi = 0; bi < limit; bi++) chunk.push(String.fromCharCode(bytes[bi]));
+          text = chunk.join("");
+        }
+        if (text.indexOf("\u0000") !== -1) {
+          setSetupProgramPreviewStatus("Файл похож на бинарный — текстовый предпросмотр недоступен. Скачайте файл.", true);
+          codeEl.textContent = "";
+          return;
+        }
+        var highlighted = highlightGcodeText(text);
+        codeEl.innerHTML = highlighted.html;
+        if (highlighted.truncated) {
+          setSetupProgramPreviewStatus(
+            "Показаны первые ~" + highlighted.lineCount + " строк (файл большой, предпросмотр обрезан).",
+            true
+          );
+        } else {
+          setSetupProgramPreviewStatus("", false);
+        }
+        var pre = codeEl.parentElement;
+        if (pre) pre.scrollTop = 0;
+      } catch (err) {
+        setSetupProgramPreviewStatus("Не удалось загрузить программу для предпросмотра.", true);
+        codeEl.textContent = "";
+      }
+    }
+
+    (function initSetupProgramPreviewModal() {
+      var modal = document.getElementById("setup-program-preview-modal");
+      if (!modal) return;
+      modal.addEventListener("click", function (e) {
+        var t = e.target;
+        if (t && t.getAttribute && t.getAttribute("data-close-setup-program-preview") === "1") {
+          closeSetupProgramPreviewModal();
+        }
+      });
+      document.addEventListener("click", function (e) {
+        var btn = e.target && e.target.closest && e.target.closest(".js-setup-program-preview");
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openSetupProgramPreview(
+          (btn.getAttribute("data-program-url") || "").trim(),
+          (btn.getAttribute("data-program-name") || "").trim()
+        );
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && modal && !modal.hidden) {
+          closeSetupProgramPreviewModal();
+        }
+      });
+    })();
 
     async function uploadSetupProgramFile(setupId, file, panelHint) {
         if (!file || !setupId) return;
@@ -4912,6 +5125,21 @@ function saveSetupToolNoteEditor() {
       });
     }
 
+    function syncSetupTabIndexesFromSelectOrder() {
+      var select = document.getElementById("setup-tab-select");
+      if (!select) return;
+      var idx = 0;
+      Array.prototype.forEach.call(select.options, function (opt) {
+        var m = /^setup-(\d+)$/.exec(opt.value || "");
+        if (!m) return;
+        idx += 1;
+        var tab = document.getElementById("tab-setup-" + m[1]);
+        if (!tab) return;
+        tab.setAttribute("data-setup-index", String(idx));
+        tab.textContent = "Уст. " + idx;
+      });
+    }
+
     function reorderSetupSelectInWork(setupOrder) {
       var select = document.getElementById("setup-tab-select");
       if (!select || !setupOrder || !setupOrder.length) return;
@@ -4928,6 +5156,7 @@ function saveSetupToolNoteEditor() {
         select.appendChild(opt);
       });
       select.setAttribute("data-setup-order-ids", nextIds);
+      syncSetupTabIndexesFromSelectOrder();
     }
 
     function initSetupSelectInWorkOrder() {
@@ -4944,6 +5173,11 @@ function saveSetupToolNoteEditor() {
         return 0;
       });
       setupOpts.forEach(function (opt) {
+        // Сбрасываем возможный устаревший «Уст. N — …» после прошлого сохранения
+        var raw = (opt.textContent || "").replace(/^\s*●\s*/, "").trim();
+        var stripped = raw.replace(/^Уст\.\s*\d+\s*[—\-–]\s*/i, "").trim();
+        var inWork = opt.getAttribute("data-setup-in-work") === "1";
+        opt.textContent = (inWork ? "● " : "") + (stripped || raw || "без названия");
         select.appendChild(opt);
       });
       select.setAttribute(
@@ -4956,6 +5190,7 @@ function saveSetupToolNoteEditor() {
           .filter(Boolean)
           .join(",")
       );
+      syncSetupTabIndexesFromSelectOrder();
     }
     initSetupSelectInWorkOrder();
 
