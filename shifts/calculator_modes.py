@@ -231,6 +231,159 @@ def build_end_mill_baselines() -> dict[str, dict[str, dict[str, dict[str, str]]]
 END_MILL_BASELINES = build_end_mill_baselines()
 
 
+# Ø свёрл для базовых режимов (твердосплав / HSS ориентиры).
+DRILL_BASELINE_DIAMETERS: tuple[float, ...] = (
+    16,
+    12,
+    10,
+    8,
+    6,
+    5,
+    4,
+    3,
+    2.5,
+    2,
+    1.5,
+    1,
+)
+
+# Vc (м/мин) и подача на оборот f (мм/об): f ≈ f0 + fk·D.
+_MAT_DRILL_PARAMS: dict[str, dict[str, float]] = {
+    "d16": {"vc": 140, "f0": 0.04, "fk": 0.018, "angle": 130},
+    "ls59": {"vc": 100, "f0": 0.035, "fk": 0.015, "angle": 118},
+    "amg6": {"vc": 120, "f0": 0.035, "fk": 0.016, "angle": 130},
+    "st30": {"vc": 45, "f0": 0.025, "fk": 0.012, "angle": 118},
+    "st45": {"vc": 35, "f0": 0.02, "fk": 0.01, "angle": 118},
+    "x18h9t": {"vc": 18, "f0": 0.015, "fk": 0.008, "angle": 135},
+}
+
+
+def _drill_feed_per_rev(d: float, f0: float, fk: float) -> float:
+    return max(0.015, f0 + fk * d)
+
+
+def _drill_entry(d: float, vc: float, f_rev: float, angle: float) -> dict[str, str]:
+    n = _spindle_n(vc, d)
+    feed = max(1, int(round(n * f_rev)))
+    depth = 3.0 * d
+    # Глубина прохода (peck): ~D, но не больше 4 мм для мелких.
+    peck = d if d >= 3 else max(0.5, d)
+    if d > 8:
+        peck = min(d, 6.0)
+    return {
+        "n": str(n),
+        "feed": str(feed),
+        "angle": _fmt_num(angle, 1),
+        "depth": _fmt_num(depth, 2),
+        "pass": _fmt_num(peck, 2),
+        "vc": str(int(round(vc))),
+        "f": _fmt_num(f_rev, 3),
+    }
+
+
+def build_drill_baselines() -> dict[str, dict[str, dict[str, str]]]:
+    """Материал → Ø → параметры сверления (n, F, угол, глубина, проход)."""
+    out: dict[str, dict[str, dict[str, str]]] = {}
+    for mat_id, p in _MAT_DRILL_PARAMS.items():
+        by_d: dict[str, dict[str, str]] = {}
+        for d in DRILL_BASELINE_DIAMETERS:
+            f_rev = _drill_feed_per_rev(d, p["f0"], p["fk"])
+            by_d[_diameter_key(d)] = _drill_entry(d, p["vc"], f_rev, p["angle"])
+        out[mat_id] = by_d
+    return out
+
+
+DRILL_BASELINES = build_drill_baselines()
+
+
+# Метрические размеры для базовых режимов резьбы (крупный шаг).
+THREAD_BASELINE_SIZES: tuple[tuple[str, float, float], ...] = (
+    ("M3", 3.0, 0.5),
+    ("M4", 4.0, 0.7),
+    ("M5", 5.0, 0.8),
+    ("M6", 6.0, 1.0),
+    ("M8", 8.0, 1.25),
+    ("M10", 10.0, 1.5),
+    ("M12", 12.0, 1.75),
+    ("M16", 16.0, 2.0),
+    ("M20", 20.0, 2.5),
+)
+
+# Vc (м/мин): метчик / раскатник / резьбофреза.
+_MAT_THREAD_PARAMS: dict[str, dict[str, float]] = {
+    "d16": {"vc_tap": 30, "vc_form": 40, "vc_mill": 120},
+    "ls59": {"vc_tap": 22, "vc_form": 30, "vc_mill": 90},
+    "amg6": {"vc_tap": 25, "vc_form": 35, "vc_mill": 100},
+    "st30": {"vc_tap": 12, "vc_form": 16, "vc_mill": 55},
+    "st45": {"vc_tap": 9, "vc_form": 13, "vc_mill": 45},
+    "x18h9t": {"vc_tap": 5, "vc_form": 7, "vc_mill": 28},
+}
+
+
+def _thread_vc_for_type(mat_params: dict[str, float], tool_type: str) -> float:
+    if tool_type == "Раскатник":
+        return mat_params["vc_form"]
+    if tool_type == "Резьбофреза":
+        return mat_params["vc_mill"]
+    return mat_params["vc_tap"]
+
+
+def _thread_spindle_n(vc: float, d: float, *, tool_type: str = "Метчик") -> int:
+    """Обороты для резьбы — ниже потолок, чем у фрез (метчик/раскатник)."""
+    if d <= 0:
+        return 0
+    raw = (1000.0 * vc) / (math.pi * d)
+    step = 50 if raw >= 1000 else 25
+    n = int(round(raw / step) * step)
+    if tool_type == "Резьбофреза":
+        if d < 4:
+            cap = 12000
+        elif d < 8:
+            cap = 8000
+        elif d < 12:
+            cap = 5000
+        else:
+            cap = 3000
+        return max(200, min(n, cap))
+    if d < 4:
+        cap = 4000
+    elif d < 8:
+        cap = 2500
+    elif d < 12:
+        cap = 1500
+    else:
+        cap = 900
+    return max(80, min(n, cap))
+
+
+def _thread_entry(m_label: str, d: float, pitch: float, vc: float, tool_type: str) -> dict[str, str]:
+    n = _thread_spindle_n(vc, d, tool_type=tool_type)
+    return {
+        "m": m_label,
+        "pitch": _fmt_num(pitch, 3),
+        "n": str(n),
+        "vc": str(int(round(vc))),
+    }
+
+
+def build_thread_baselines() -> dict[str, dict[str, dict[str, dict[str, str]]]]:
+    """Материал → M → тип инструмента → параметры (шаг, n)."""
+    out: dict[str, dict[str, dict[str, dict[str, str]]]] = {}
+    for mat_id, p in _MAT_THREAD_PARAMS.items():
+        by_m: dict[str, dict[str, dict[str, str]]] = {}
+        for m_label, d, pitch in THREAD_BASELINE_SIZES:
+            by_type: dict[str, dict[str, str]] = {}
+            for tool_type in SETUP_THREAD_TOOL_TYPES:
+                vc = _thread_vc_for_type(p, tool_type)
+                by_type[tool_type] = _thread_entry(m_label, d, pitch, vc, tool_type)
+            by_m[m_label] = by_type
+        out[mat_id] = by_m
+    return out
+
+
+THREAD_BASELINES = build_thread_baselines()
+
+
 def warehouse_thread_tool_types() -> list[str]:
     """Типы резьбового инструмента, которые реально есть на складе."""
     found: set[str] = set()
@@ -341,22 +494,32 @@ def cutting_modes_payload() -> dict:
     thread_types = warehouse_thread_tool_types() or list(SETUP_THREAD_TOOL_TYPES)
     mill_types = warehouse_end_mill_tool_types()
     drill_types = warehouse_drill_tool_types()
-    diameters = [_diameter_key(d) for d in END_MILL_BASELINE_DIAMETERS]
+    mill_diameters = [_diameter_key(d) for d in END_MILL_BASELINE_DIAMETERS]
+    drill_diameters = [_diameter_key(d) for d in DRILL_BASELINE_DIAMETERS]
+    thread_sizes = [m for m, _d, _p in THREAD_BASELINE_SIZES]
 
     modes: list[dict] = [
         {
             "id": CUTTING_MODE_THREAD,
             "label": "Резьба",
-            "hint": "Типы со склада: " + ", ".join(thread_types) + ". Колонка «Инструмент».",
+            "hint": (
+                "Базовые режимы M"
+                + ", ".join(s.replace("M", "") for s in thread_sizes)
+                + ". F = n × p. Типы: "
+                + ", ".join(thread_types)
+                + "."
+            ),
             "form": CUTTING_MODE_THREAD,
             "tool_types": thread_types,
+            "sizes": thread_sizes,
+            "baselines": THREAD_BASELINES,
         },
         {
             "id": CUTTING_MODE_END_MILL,
             "label": "Фрезы",
             "hint": (
                 "Базовые режимы для Ø"
-                + ", ".join(diameters)
+                + ", ".join(mill_diameters)
                 + ". Винтовое как в NX: радиальное (ae) и осевое (ap = шаг винта). "
                 "Спираль: ae = stepover."
             ),
@@ -364,16 +527,24 @@ def cutting_modes_payload() -> dict:
             "tool_types": mill_types,
             "operation_types": [{"id": oid, "label": lbl} for oid, lbl in MILL_OPERATION_TYPES],
             "tool_presets": warehouse_end_mill_presets(),
-            "diameters": diameters,
+            "diameters": mill_diameters,
             "baselines": END_MILL_BASELINES,
         },
         {
             "id": CUTTING_MODE_DRILL,
             "label": "Сверла",
-            "hint": "Типы со склада: " + ", ".join(drill_types) + ". Колонка «Инструмент».",
+            "hint": (
+                "Базовые режимы для Ø"
+                + ", ".join(drill_diameters)
+                + ". F = n × f (мм/об). Типы со склада: "
+                + ", ".join(drill_types)
+                + "."
+            ),
             "form": CUTTING_MODE_DRILL,
             "tool_types": drill_types,
             "tool_presets": warehouse_drill_presets(),
+            "diameters": drill_diameters,
+            "baselines": DRILL_BASELINES,
         },
     ]
     return {

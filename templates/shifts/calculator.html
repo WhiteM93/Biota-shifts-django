@@ -470,7 +470,8 @@
           <span class="cf-term">p</span>
         </div>
         <div class="calc-formula-desc">
-          подача (мм/мин) = обороты (об/мин) × шаг резьбы (мм)
+          подача (мм/мин) = обороты (об/мин) × шаг резьбы (мм).
+          «Заполнить базовые» — метчик / раскатник / резьбофреза для M3…M20.
         </div>
       </div>
       <div id="m-formula-mill" hidden>
@@ -483,7 +484,8 @@
       <div id="m-formula-drill" hidden>
         <div class="calc-formula-label">Режимы сверления</div>
         <div class="calc-formula-desc">
-          Диаметр, угол, общая глубина и глубина прохода задаются в строке. Обороты и подача — вручную. Типы сверл — со склада.
+          Базовые режимы: Vc → n, F = n·f (мм/об). Глубина ≈ 3·D, проход (peck) ≈ D.
+          Угол зависит от материала (118° / 130° / 135°).
         </div>
       </div>
     </div>
@@ -511,19 +513,19 @@
           <span class="calc-modes-filter-label">Материал</span>
           <div class="calc-modes-chips calc-modes-chips--mat" id="m-mat-chips" role="group" aria-label="Фильтр по материалу"></div>
         </div>
-        <div class="calc-modes-filter-row">
-          <span class="calc-modes-filter-label">Диаметр</span>
-          <div class="calc-modes-chips calc-modes-chips--d" id="m-d-chips" role="group" aria-label="Фильтр по диаметру"></div>
+        <div class="calc-modes-filter-row" id="m-d-filter-row">
+          <span class="calc-modes-filter-label" id="m-d-filter-label">Диаметр</span>
+          <div class="calc-modes-chips calc-modes-chips--d" id="m-d-chips" role="group" aria-label="Фильтр по диаметру / размеру"></div>
         </div>
-        <div class="calc-modes-filter-row">
+        <div class="calc-modes-filter-row" id="m-op-filter-row">
           <span class="calc-modes-filter-label">Обработка</span>
           <div class="calc-modes-chips calc-modes-chips--op" id="m-op-chips" role="group" aria-label="Фильтр по обработке"></div>
         </div>
       </div>
       <aside class="calc-modes-filters-side" aria-label="Станок и действия">
         <div class="calc-modes-side-card">
-          <label class="calc-modes-filter-label" for="m-nmax">Макс. обороты станка</label>
-          <div class="calc-modes-nmax-row">
+          <label class="calc-modes-filter-label" for="m-nmax" id="m-nmax-label">Макс. обороты станка</label>
+          <div class="calc-modes-nmax-row" id="m-nmax-row">
             <input type="number" id="m-nmax" class="calc-modes-nmax-inp" min="100" step="100" placeholder="12000" inputmode="numeric" title="Максимальные обороты шпинделя станка, об/мин">
             <span class="calc-modes-nmax-unit">об/мин</span>
           </div>
@@ -534,7 +536,7 @@
             <button type="button" class="calc-modes-act-btn" id="m-recalc-z" title="Для каждой фрезы: F = n × Z × fz по Z этой строки (кромки не меняются)">
               Пересчитать F по Z фрезы
             </button>
-            <button type="button" class="calc-modes-act-btn calc-modes-act-btn--primary" id="m-fill-baselines" title="Черновой, винт. радиальное/осевое, спираль и чистовой для всех Ø">
+            <button type="button" class="calc-modes-act-btn calc-modes-act-btn--primary" id="m-fill-baselines" title="Заполнить базовые режимы для выбранного материала">
               Заполнить базовые
             </button>
           </div>
@@ -1039,9 +1041,16 @@
   ════════════════════════════════ */
   var CUTTING_MODES = (function () {
     var millDiameters = ["16", "12", "10", "8", "6", "4", "3", "2.5", "2", "1.5", "1"];
+    var drillDiameters = ["16", "12", "10", "8", "6", "5", "4", "3", "2.5", "2", "1.5", "1"];
+    var threadSizes = ["M3", "M4", "M5", "M6", "M8", "M10", "M12", "M16", "M20"];
     var fallback = {
       modes: [
-        { id: "thread", label: "Резьба", form: "thread", tool_types: ["Метчик", "Раскатник", "Резьбофреза"] },
+        {
+          id: "thread", label: "Резьба", form: "thread",
+          tool_types: ["Метчик", "Раскатник", "Резьбофреза"],
+          sizes: threadSizes,
+          baselines: {}
+        },
         {
           id: "end_mill", label: "Фрезы", form: "end_mill",
           tool_types: ["Концевая фреза", "Обдирочная фреза", "Т-образная фреза", "Радиусная фреза", "Сферическая фреза"],
@@ -1060,7 +1069,9 @@
         {
           id: "drill", label: "Сверла", form: "drill",
           tool_types: ["Сверло"],
-          tool_presets: {}
+          tool_presets: {},
+          diameters: drillDiameters,
+          baselines: {}
         }
       ],
       materials: [
@@ -1098,6 +1109,11 @@
   var mNmaxInp = document.getElementById("m-nmax");
   var mRecalcNmax = document.getElementById("m-recalc-nmax");
   var mRecalcZ = document.getElementById("m-recalc-z");
+  var mDFilterRow = document.getElementById("m-d-filter-row");
+  var mDFilterLabel = document.getElementById("m-d-filter-label");
+  var mOpFilterRow = document.getElementById("m-op-filter-row");
+  var mNmaxRow = document.getElementById("m-nmax-row");
+  var mNmaxLabel = document.getElementById("m-nmax-label");
   var currentModeId = (CUTTING_MODES.modes[0] && CUTTING_MODES.modes[0].id) || "thread";
   var millFilterMat = "";
   var millFilterD = "";
@@ -1304,34 +1320,57 @@
   }
 
   function syncMillFiltersUi() {
-    var show = isMillForm();
+    var show = isMillForm() || isDrillForm() || isThreadForm();
     if (mMillFilters) mMillFilters.hidden = !show;
     if (!show) return;
+
+    if (mOpFilterRow) mOpFilterRow.hidden = !isMillForm();
+    if (mRecalcZ) mRecalcZ.hidden = !isMillForm();
+    if (mRecalcNmax) mRecalcNmax.hidden = !isMillForm();
+    if (mNmaxRow) mNmaxRow.hidden = !isMillForm();
+    if (mNmaxLabel) mNmaxLabel.hidden = !isMillForm();
+    if (mDFilterLabel) {
+      mDFilterLabel.textContent = isThreadForm() ? "Размер" : "Диаметр";
+    }
+    if (mFillBaselines) {
+      if (isMillForm()) {
+        mFillBaselines.title = "Черновой, винт. радиальное/осевое, спираль и чистовой для всех Ø";
+      } else if (isDrillForm()) {
+        mFillBaselines.title = "Базовые режимы сверления для всех Ø выбранного материала";
+      } else {
+        mFillBaselines.title = "Базовые режимы резьбы M3…M20 для метчика, раскатника и резьбофрезы";
+      }
+    }
+
     renderFilterChips(mMatChips, [{ id: "", label: "Все" }].concat(CUTTING_MODES.materials || []), millFilterMat, function (v) {
       millFilterMat = v;
       applyMillRowFilters();
     });
     var mode = currentMode();
-    var diameters = (mode && mode.diameters) || [];
+    var sizeItems = isThreadForm()
+      ? ((mode && mode.sizes) || [])
+      : ((mode && mode.diameters) || []);
     renderFilterChips(
       mDChips,
-      [{ id: "", label: "Все" }].concat(diameters.map(function (d) { return { id: String(d), label: String(d) }; })),
+      [{ id: "", label: "Все" }].concat(sizeItems.map(function (d) { return { id: String(d), label: String(d) }; })),
       millFilterD,
       function (v) {
         millFilterD = v;
         applyMillRowFilters();
       }
     );
-    var ops = (mode && mode.operation_types) || [];
-    renderFilterChips(
-      mOpChips,
-      [{ id: "", label: "Все" }].concat(ops.map(function (op) { return { id: op.id, label: op.label }; })),
-      millFilterOp,
-      function (v) {
-        millFilterOp = v;
-        applyMillRowFilters();
-      }
-    );
+    if (isMillForm()) {
+      var ops = (mode && mode.operation_types) || [];
+      renderFilterChips(
+        mOpChips,
+        [{ id: "", label: "Все" }].concat(ops.map(function (op) { return { id: op.id, label: op.label }; })),
+        millFilterOp,
+        function (v) {
+          millFilterOp = v;
+          applyMillRowFilters();
+        }
+      );
+    }
     applyMillRowFilters();
   }
 
@@ -1603,7 +1642,7 @@
 
   function applyMillRowFilters() {
     if (!mTbody) return;
-    if (!isMillForm()) {
+    if (!isMillForm() && !isDrillForm() && !isThreadForm()) {
       Array.prototype.forEach.call(mTbody.rows, function (tr) { tr.hidden = false; });
       syncEmpty();
       return;
@@ -1611,11 +1650,19 @@
     var visible = 0;
     Array.prototype.forEach.call(mTbody.rows, function (tr) {
       var mat = (tr.querySelector(".m-inp-mat") || {}).value || "";
-      var d = normalizeDiameterKey((tr.querySelector(".m-inp-d") || {}).value || "");
+      var sizeRaw = isThreadForm()
+        ? ((tr.querySelector(".m-inp-m") || {}).value || "")
+        : ((tr.querySelector(".m-inp-d") || {}).value || "");
+      var size = isThreadForm()
+        ? String(sizeRaw || "").trim().toUpperCase()
+        : normalizeDiameterKey(sizeRaw);
+      var filterSize = isThreadForm()
+        ? String(millFilterD || "").trim().toUpperCase()
+        : normalizeDiameterKey(millFilterD);
       var op = (tr.querySelector(".m-inp-op") || {}).value || "";
       var okMat = !millFilterMat || mat === millFilterMat;
-      var okD = !millFilterD || d === normalizeDiameterKey(millFilterD);
-      var okOp = !millFilterOp || op === millFilterOp;
+      var okD = !filterSize || size === filterSize;
+      var okOp = !isMillForm() || !millFilterOp || op === millFilterOp;
       var show = okMat && okD && okOp;
       tr.hidden = !show;
       if (show) visible += 1;
@@ -1631,6 +1678,28 @@
     } else {
       mEmpty.hidden = true;
     }
+  }
+
+  function lookupDrillBaseline(mat, d) {
+    var mode = currentMode();
+    if (!mode || !mode.baselines) return null;
+    var byMat = mode.baselines[mat];
+    if (!byMat) return null;
+    var key = normalizeDiameterKey(d);
+    return byMat[key] || byMat[String(d)] || null;
+  }
+
+  function lookupThreadBaseline(mat, mSize, toolType) {
+    var mode = currentMode();
+    if (!mode || !mode.baselines) return null;
+    var byMat = mode.baselines[mat];
+    if (!byMat) return null;
+    var key = String(mSize || "").trim().toUpperCase();
+    var byType = byMat[key] || byMat[String(mSize)] || null;
+    if (!byType) return null;
+    if (toolType && byType[toolType]) return byType[toolType];
+    var keys = Object.keys(byType);
+    return keys.length ? byType[keys[0]] : null;
   }
 
   function fillMillBaselines() {
@@ -1665,6 +1734,69 @@
     });
     saveTable();
     applyMillRowFilters();
+  }
+
+  function fillDrillBaselines() {
+    if (!isDrillForm()) return;
+    var mode = currentMode();
+    if (!mode) return;
+    var mat = millFilterMat || "st45";
+    var diameters = mode.diameters || [];
+    if (!diameters.length) return;
+    var defaultType = (mode.tool_types && mode.tool_types[0]) || "Сверло";
+    Array.prototype.slice.call(mTbody.rows).forEach(function (tr) {
+      if (!tr.classList.contains("is-row-locked")) tr.remove();
+    });
+    diameters.forEach(function (d) {
+      var b = lookupDrillBaseline(mat, d) || {};
+      addDrillRow({
+        type: defaultType,
+        d: String(d),
+        mat: mat,
+        angle: b.angle || "118",
+        depth: b.depth || "",
+        pass: b.pass || "",
+        n: b.n || "",
+        feed: b.feed || ""
+      });
+    });
+    saveTable();
+    applyMillRowFilters();
+  }
+
+  function fillThreadBaselines() {
+    if (!isThreadForm()) return;
+    var mode = currentMode();
+    if (!mode) return;
+    var mat = millFilterMat || "st45";
+    var sizes = mode.sizes || [];
+    if (!sizes.length) return;
+    var toolTypes = (mode.tool_types && mode.tool_types.length)
+      ? mode.tool_types.slice()
+      : ["Метчик", "Раскатник", "Резьбофреза"];
+    Array.prototype.slice.call(mTbody.rows).forEach(function (tr) {
+      if (!tr.classList.contains("is-row-locked")) tr.remove();
+    });
+    sizes.forEach(function (mSize) {
+      toolTypes.forEach(function (toolType) {
+        var b = lookupThreadBaseline(mat, mSize, toolType) || {};
+        addThreadRow({
+          type: toolType,
+          m: b.m || String(mSize),
+          mat: mat,
+          pitch: b.pitch || "",
+          n: b.n || ""
+        });
+      });
+    });
+    saveTable();
+    applyMillRowFilters();
+  }
+
+  function fillCurrentBaselines() {
+    if (isMillForm()) fillMillBaselines();
+    else if (isDrillForm()) fillDrillBaselines();
+    else if (isThreadForm()) fillThreadBaselines();
   }
 
   function syncFormulaCard() {
@@ -2189,6 +2321,8 @@
   }
 
   function switchMode() {
+    millFilterD = "";
+    millFilterOp = "";
     buildThead();
     applyTableFormClass();
     syncFormulaCard();
@@ -2199,8 +2333,8 @@
   mAddBtn.addEventListener("click", function () { addRow(null); });
   if (mFillBaselines) {
     mFillBaselines.addEventListener("click", function () {
-      fillMillBaselines();
-      if (getMachineNmax()) recalcVisibleMillRowsToNmax(false);
+      fillCurrentBaselines();
+      if (isMillForm() && getMachineNmax()) recalcVisibleMillRowsToNmax(false);
     });
   }
   loadMachineNmax();
