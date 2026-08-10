@@ -17,6 +17,7 @@
   <div class="machines-layout">
     <section class="machines-panel machines-panel--quick" aria-label="Быстрая сводка по станкам">
       <div class="machines-panel-head machines-panel-head--quick-toolbar">
+        <span class="machines-panel-head-title">Сводка</span>
         <div class="machines-quick-toolbar-actions">
           {% if biota_machines_quick_edit %}
           <button
@@ -57,10 +58,14 @@
       </div>
       <div class="machines-quick-rows" data-server-quick-count="{{ machine_rows|length }}">
         {% for row in machine_rows %}
-        <div class="machines-quick-row">
-          <div class="machines-cell machines-cell--code">
+        <div class="machines-quick-row" data-machine-code="{{ row.code|escape }}">
+          <div
+            class="machines-cell machines-cell--code{% if row.tools %} has-machine-tools{% endif %}"
+            data-machine-code="{{ row.code|escape }}"
+            title="{% if row.tools %}Показать инструмент в станке ({{ row.tools|length }}){% else %}Инструмент в станке не загружен{% endif %}"
+          >
             <span class="machines-quick-row-drag-handle" role="button" aria-label="Перетащить строку" tabindex="-1" title="Перетащить">⠿</span>
-            <span class="machines-quick-row-code-text">{{ row.code }}</span>
+            <span class="machines-quick-row-code-text js-machines-view-tools" role="button" tabindex="0" aria-label="Показать инструмент станка {{ row.code }}">{{ row.code }}</span>
           </div>
           <div
             class="machines-cell machines-cell--field{% if not row.current %} is-empty{% endif %}"
@@ -73,7 +78,7 @@
             {% endif %}
           >
             <button type="button" class="machines-cell-clear js-machines-cell-clear" data-confirm-phase="0" aria-label="Очистить" tabindex="-1"></button>
-            <div class="machines-quick-field-and-setup">
+            <div class="machines-quick-field-and-setup{% if row.current_setup_options|length > 1 %} has-multi-setup{% endif %}">
               <span
                 class="machines-quick-field-view{% if row.current_title %} is-split{% endif %}"
                 {% if row.current_product_id %}
@@ -116,7 +121,7 @@
             {% endif %}
           >
             <button type="button" class="machines-cell-clear js-machines-cell-clear" data-confirm-phase="0" aria-label="Очистить" tabindex="-1"></button>
-            <div class="machines-quick-field-and-setup">
+            <div class="machines-quick-field-and-setup{% if row.next_setup_options|length > 1 %} has-multi-setup{% endif %}">
               <span
                 class="machines-quick-field-view{% if row.next_title %} is-split{% endif %}"
                 {% if row.next_product_id %}
@@ -272,7 +277,7 @@
     <div class="machines-quick-row" data-client-row="1">
       <div class="machines-cell machines-cell--code is-empty">
         <span class="machines-quick-row-drag-handle" role="button" aria-label="Перетащить строку" tabindex="-1" title="Перетащить">⠿</span>
-        <span class="machines-quick-row-code-text"></span>
+        <span class="machines-quick-row-code-text js-machines-view-tools" role="button" tabindex="0" aria-label="Показать инструмент станка"></span>
       </div>
       <div class="machines-cell machines-cell--field is-empty">
         <button type="button" class="machines-cell-clear js-machines-cell-clear" data-confirm-phase="0" aria-label="Очистить" tabindex="-1"></button>
@@ -346,6 +351,34 @@
     <div class="machines-quick-preview-pop-empty muted">Превью не сохранено</div>
   </div>
   {{ machines_products_json|json_script:"machines-products-data" }}
+  {{ machines_tools_by_code|json_script:"machines-tools-by-code" }}
+  <div id="machines-tools-modal" class="machines-tools-modal" hidden aria-hidden="true">
+    <div class="machines-tools-modal-backdrop" data-close-machines-tools="1"></div>
+    <div class="machines-tools-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="machines-tools-modal-title">
+      <div class="machines-tools-modal-head">
+        <h2 id="machines-tools-modal-title" class="machines-tools-modal-title">Инструмент в станке</h2>
+        <button type="button" class="btn btn-ghost" data-close-machines-tools="1" aria-label="Закрыть">×</button>
+      </div>
+      <p class="muted machines-tools-modal-meta" id="machines-tools-modal-meta"></p>
+      <div class="machines-tools-modal-table-wrap">
+        <table class="data-grid machines-tools-table" id="machines-tools-table">
+          <thead>
+            <tr>
+              <th>Деталь</th>
+              <th>Установка</th>
+              <th>№</th>
+              <th>Тип</th>
+              <th>⌀</th>
+              <th>Вылет</th>
+              <th>Прим.</th>
+            </tr>
+          </thead>
+          <tbody id="machines-tools-tbody"></tbody>
+        </table>
+        <p class="machines-tools-empty muted" id="machines-tools-empty" hidden>В этот станок инструмент ещё не загружали.</p>
+      </div>
+    </div>
+  </div>
   <div id="machines-color-picker-pop" class="machines-color-picker-pop" hidden role="dialog" aria-label="Выбор цвета"></div>
 </div>
 

@@ -1,5 +1,6 @@
 """Раздел «Станки» (учёт станков, план на станке)."""
 import json
+import re
 
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -14,7 +15,7 @@ from .models import MachinesBoardState, Product, ProductSetup
 
 # Версия «заглушечного» контента с сервера: при изменении дефолтов в коде увеличить,
 # чтобы у клиентов сбросился локальный оверлей (localStorage) и подтянулись новые строки.
-MACHINES_CONTENT_VERSION = 6
+MACHINES_CONTENT_VERSION = 15
 
 # Заглушка до расширения логики: список станков и строка «график» справа (если в БД нет сохранённой сводки).
 # PK-заглушка для шаблона URL карточки наладки в JS (подменяется на реальный id).
@@ -318,6 +319,22 @@ def _normalize_machine_rows(raw, valid_pids: set[int] | None = None) -> list[dic
                 current_setup_id = setup_id
             else:
                 next_setup_id = setup_id
+        tools_setup_id = None
+        tsi_raw = r.get("tools_setup_id")
+        if tsi_raw not in (None, ""):
+            try:
+                tools_setup_id = int(tsi_raw)
+            except (TypeError, ValueError):
+                tools_setup_id = None
+        tools_product_id = None
+        tpi_raw = r.get("tools_product_id")
+        if tpi_raw not in (None, ""):
+            try:
+                tools_product_id = int(tpi_raw)
+            except (TypeError, ValueError):
+                tools_product_id = None
+            if tools_product_id is not None and tools_product_id not in valid:
+                tools_product_id = None
         out.append(
             {
                 "code": str(r.get("code") or "").strip()[:32],
@@ -329,6 +346,12 @@ def _normalize_machine_rows(raw, valid_pids: set[int] | None = None) -> list[dic
                 "next_product_id": npi,
                 "current_setup_id": current_setup_id,
                 "next_setup_id": next_setup_id,
+                "tools": _normalize_machine_tools(r.get("tools")),
+                "tools_setup_id": tools_setup_id,
+                "tools_product_id": tools_product_id,
+                "tools_product_name": str(r.get("tools_product_name") or "").strip()[:300],
+                "tools_setup_name": str(r.get("tools_setup_name") or "").strip()[:180],
+                "tools_loaded_at": str(r.get("tools_loaded_at") or "").strip()[:40],
             }
         )
     return out
@@ -401,6 +424,252 @@ def _board_payload_from_db() -> dict | None:
     return p
 
 
+def _normalize_machine_tools(raw) -> list[dict]:
+    out: list[dict] = []
+    if not isinstance(raw, list):
+        return out
+    for t in raw[:80]:
+        if not isinstance(t, dict):
+            continue
+        product_id = None
+        setup_id = None
+        for attr in ("product_id", "setup_id"):
+            raw_id = t.get(attr)
+            if raw_id in (None, ""):
+                continue
+            try:
+                val = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            if attr == "product_id":
+                product_id = val
+            else:
+                setup_id = val
+        out.append(
+            {
+                "tool_number": str(t.get("tool_number") or "").strip()[:20],
+                "correction_enabled": bool(t.get("correction_enabled")),
+                "kor_n": str(t.get("kor_n") or "").strip()[:20],
+                "kor_d": str(t.get("kor_d") or "").strip()[:20],
+                "tool_type": str(t.get("tool_type") or "").strip()[:80],
+                "diameter": str(t.get("diameter") or "").strip()[:40],
+                "overhang": str(t.get("overhang") or "").strip()[:40],
+                "note": str(t.get("note") or t.get("name") or "").strip()[:300],
+                "product_name": str(t.get("product_name") or "").strip()[:300],
+                "setup_name": str(t.get("setup_name") or "").strip()[:180],
+                "product_id": product_id,
+                "setup_id": setup_id,
+            }
+        )
+    return out
+
+
+def _norm_tool_number_key(tool_number: str) -> str:
+    raw = " ".join((tool_number or "").split()).strip().upper()
+    if not raw:
+        return ""
+    m = re.match(r"^(?:T\s*)?(\d{1,4})$", raw)
+    if m:
+        n = int(m.group(1))
+        if n < 100:
+            return f"T{n:02d}"
+        return f"T{n}"
+    return raw
+
+
+def _tools_snapshot_for_setup(setup: ProductSetup, *, product: Product | None = None) -> list[dict]:
+    rows = list(setup.tools.all().order_by("sort_order", "id"))
+    product_name = ((product.name if product else "") or "").strip()[:300]
+    if not product_name and setup.product_id:
+        product_name = (getattr(setup.product, "name", None) or "").strip()[:300]
+    setup_name = (setup.name or "").strip()[:180]
+    out: list[dict] = []
+    for row in rows:
+        tn = (row.tool_number or "").strip()[:20]
+        if not tn:
+            continue
+        out.append(
+            {
+                "tool_number": tn,
+                "correction_enabled": bool(row.correction_enabled),
+                "kor_n": (row.kor_n or "").strip()[:20],
+                "kor_d": (row.kor_d or "").strip()[:20],
+                "tool_type": (row.tool_type or "").strip()[:80],
+                "diameter": (row.diameter or "").strip()[:40],
+                "overhang": (row.overhang or "").strip()[:40],
+                "note": (row.name or "").strip()[:300],
+                "product_name": product_name,
+                "setup_name": setup_name,
+                "product_id": product.pk if product else setup.product_id,
+                "setup_id": setup.pk,
+            }
+        )
+    return out
+
+
+def _tool_number_sort_key(tool_number: str) -> tuple[int, int | str]:
+    key = _norm_tool_number_key(tool_number)
+    if key.startswith("T") and key[1:].isdigit():
+        return (0, int(key[1:]))
+    if key.startswith("__empty_"):
+        return (2, key)
+    return (1, key)
+
+
+def _merge_machine_tools_by_number(existing: list[dict], incoming: list[dict]) -> tuple[list[dict], int, int]:
+    """Заменяет только совпадающие номера инструмента; остальные позиции станка сохраняет."""
+    by_key: dict[str, dict] = {}
+    for t in existing or []:
+        if not isinstance(t, dict):
+            continue
+        key = _norm_tool_number_key(str(t.get("tool_number") or ""))
+        if not key:
+            key = f"__empty_{len(by_key)}"
+        by_key[key] = dict(t)
+
+    replaced = 0
+    added = 0
+    for t in incoming or []:
+        if not isinstance(t, dict):
+            continue
+        key = _norm_tool_number_key(str(t.get("tool_number") or ""))
+        if not key:
+            continue
+        if key in by_key:
+            replaced += 1
+        else:
+            added += 1
+        by_key[key] = dict(t)
+
+    merged = sorted(
+        by_key.values(),
+        key=lambda row: _tool_number_sort_key(str(row.get("tool_number") or "")),
+    )
+    return merged[:80], replaced, added
+
+
+def _merge_preserved_machine_tools(new_rows: list[dict], old_rows: list[dict]) -> list[dict]:
+    """Сохраняет снимок инструмента при сохранении доски из UI станков (там tools не передаются)."""
+    old_by_code = {_norm_machine_code_key(str(r.get("code") or "")): r for r in old_rows}
+    out: list[dict] = []
+    for r in new_rows:
+        d = dict(r)
+        code = _norm_machine_code_key(str(d.get("code") or ""))
+        if not d.get("tools"):
+            old = old_by_code.get(code)
+            if old and old.get("tools"):
+                d["tools"] = list(old.get("tools") or [])
+                if old.get("tools_setup_id") not in (None, ""):
+                    d["tools_setup_id"] = old.get("tools_setup_id")
+                if old.get("tools_product_id") not in (None, ""):
+                    d["tools_product_id"] = old.get("tools_product_id")
+                if old.get("tools_product_name"):
+                    d["tools_product_name"] = old.get("tools_product_name")
+                if old.get("tools_setup_name"):
+                    d["tools_setup_name"] = old.get("tools_setup_name")
+                if old.get("tools_loaded_at"):
+                    d["tools_loaded_at"] = old.get("tools_loaded_at")
+        out.append(d)
+    return out
+
+
+def list_machine_codes() -> list[str]:
+    valid_pids = set(Product.objects.values_list("id", flat=True))
+    board = _board_payload_from_db()
+    if board:
+        rows = _normalize_machine_rows(board.get("machine_rows"), valid_pids)
+    else:
+        rows = _normalize_machine_rows(_DEFAULT_MACHINE_ROWS, valid_pids)
+    codes: list[str] = []
+    seen: set[str] = set()
+    for r in rows:
+        code = str(r.get("code") or "").strip()
+        key = _norm_machine_code_key(code)
+        if not code or key in seen:
+            continue
+        seen.add(key)
+        codes.append(code)
+    return codes
+
+
+def assign_product_setup_to_machine(*, machine_code: str, product: Product, setup: ProductSetup) -> dict:
+    """Ставит изделие+установку в «В работе» и подменяет в станке только совпадающие номера инструмента."""
+    code_key = _norm_machine_code_key(machine_code)
+    if not code_key:
+        return {"ok": False, "error": "Укажите станок."}
+    if setup.product_id != product.pk:
+        return {"ok": False, "error": "Установка не принадлежит этому изделию."}
+
+    valid_pids = set(Product.objects.values_list("id", flat=True))
+    board = _board_payload_from_db()
+    if board:
+        mrows = _normalize_machine_rows(board.get("machine_rows"), valid_pids)
+        srows = _normalize_schedule_rows(board.get("schedule_rows"), valid_pids)
+        cv = board.get("content_version")
+    else:
+        mrows = _normalize_machine_rows(_DEFAULT_MACHINE_ROWS, valid_pids)
+        srows = _normalize_schedule_rows(_DEFAULT_SCHEDULE_ROWS, valid_pids)
+        cv = MACHINES_CONTENT_VERSION
+
+    if not mrows:
+        return {"ok": False, "error": "Список станков пуст."}
+    if not srows:
+        srows = _normalize_schedule_rows(_DEFAULT_SCHEDULE_ROWS, valid_pids)
+
+    idx = None
+    for i, r in enumerate(mrows):
+        if _norm_machine_code_key(str(r.get("code") or "")) == code_key:
+            idx = i
+            break
+    if idx is None:
+        return {"ok": False, "error": f"Станок «{machine_code.strip()}» не найден в списке."}
+
+    incoming = _tools_snapshot_for_setup(setup, product=product)
+    if not incoming:
+        return {"ok": False, "error": "В установке нет строк инструмента с номером (T01…)."}
+
+    existing = list(mrows[idx].get("tools") or [])
+    merged, replaced, added = _merge_machine_tools_by_number(existing, incoming)
+    display_code = str(mrows[idx].get("code") or machine_code).strip()
+    prev_current = str(mrows[idx].get("current") or "").strip()
+    mrows[idx]["current"] = (product.name or "").strip()[:500]
+    mrows[idx]["current_product_id"] = product.pk
+    mrows[idx]["current_setup_id"] = setup.pk
+    mrows[idx]["tools"] = merged
+    mrows[idx]["tools_setup_id"] = setup.pk
+    mrows[idx]["tools_product_id"] = product.pk
+    mrows[idx]["tools_product_name"] = (product.name or "").strip()[:300]
+    mrows[idx]["tools_setup_name"] = (setup.name or "").strip()[:180]
+    from django.utils import timezone
+
+    mrows[idx]["tools_loaded_at"] = timezone.now().isoformat(timespec="seconds")
+
+    try:
+        cv_int = int(cv) if cv is not None and str(cv).strip() != "" else int(MACHINES_CONTENT_VERSION)
+    except (TypeError, ValueError):
+        cv_int = int(MACHINES_CONTENT_VERSION)
+    cv_int = max(cv_int, int(MACHINES_CONTENT_VERSION)) + 1
+
+    payload = {
+        "machine_rows": mrows,
+        "schedule_rows": srows,
+        "content_version": cv_int,
+    }
+    MachinesBoardState.objects.update_or_create(pk=1, defaults={"payload": payload})
+    return {
+        "ok": True,
+        "machine_code": display_code,
+        "tools_count": len(incoming),
+        "tools_total": len(merged),
+        "tools_replaced": replaced,
+        "tools_added": added,
+        "setup_id": setup.pk,
+        "setup_name": (setup.name or "").strip(),
+        "previous_current": prev_current,
+        "content_version": cv_int,
+    }
+
+
 def _machines_post_save(request):
     u = biota_user(request)
     if not machines_quick_edit_for_user(u):
@@ -409,10 +678,16 @@ def _machines_post_save(request):
         body = json.loads(request.body.decode("utf-8") or "{}")
     except json.JSONDecodeError:
         return JsonResponse({"ok": False, "error": "Некорректный JSON."}, status=400)
-    if (body.get("action") or "").strip() != "save_machines_board":
+    action = (body.get("action") or "").strip()
+    if action != "save_machines_board":
         return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
     valid_pids = set(Product.objects.values_list("id", flat=True))
-    mrows = _normalize_machine_rows(body.get("machine_rows"), valid_pids)
+    old_board = _board_payload_from_db() or {}
+    old_mrows = _normalize_machine_rows(old_board.get("machine_rows"), valid_pids)
+    mrows = _merge_preserved_machine_tools(
+        _normalize_machine_rows(body.get("machine_rows"), valid_pids),
+        old_mrows,
+    )
     srows = _sort_schedule_rows(_normalize_schedule_rows(body.get("schedule_rows"), valid_pids))
     if not mrows:
         return JsonResponse({"ok": False, "error": "Нужна хотя бы одна строка станка."}, status=400)
@@ -489,6 +764,65 @@ def machines_view(request):
 
     product_detail_url_sentinel = reverse("product_detail", args=[_MACHINES_DETAIL_URL_SENTINEL])
 
+    # Подтянуть имена детали/установки для старых снимков без сохранённых подписей
+    missing_product_ids: set[int] = set()
+    missing_setup_ids: set[int] = set()
+    for r in machine_rows:
+        if not r.get("tools"):
+            continue
+        if not (r.get("tools_product_name") or "").strip():
+            pid = r.get("tools_product_id") or r.get("current_product_id")
+            if pid is not None:
+                try:
+                    missing_product_ids.add(int(pid))
+                except (TypeError, ValueError):
+                    pass
+        if not (r.get("tools_setup_name") or "").strip():
+            sid = r.get("tools_setup_id") or r.get("current_setup_id")
+            if sid is not None:
+                try:
+                    missing_setup_ids.add(int(sid))
+                except (TypeError, ValueError):
+                    pass
+    product_name_by_id = {
+        p.id: (p.name or "")
+        for p in Product.objects.filter(pk__in=missing_product_ids).only("id", "name")
+    } if missing_product_ids else {}
+    setup_name_by_id = {
+        s.id: (s.name or "")
+        for s in ProductSetup.objects.filter(pk__in=missing_setup_ids).only("id", "name")
+    } if missing_setup_ids else {}
+
+    tools_by_machine_code: dict[str, dict] = {}
+    for r in machine_rows:
+        code = str(r.get("code") or "").strip()
+        if not code:
+            continue
+        product_name = str(r.get("tools_product_name") or "").strip()
+        setup_name = str(r.get("tools_setup_name") or "").strip()
+        if not product_name:
+            pid = r.get("tools_product_id") or r.get("current_product_id")
+            try:
+                product_name = product_name_by_id.get(int(pid), "") if pid is not None else ""
+            except (TypeError, ValueError):
+                product_name = ""
+            if not product_name:
+                product_name = str(r.get("current") or "").strip()
+        if not setup_name:
+            sid = r.get("tools_setup_id") or r.get("current_setup_id")
+            try:
+                setup_name = setup_name_by_id.get(int(sid), "") if sid is not None else ""
+            except (TypeError, ValueError):
+                setup_name = ""
+        tools_by_machine_code[code] = {
+            "tools": list(r.get("tools") or []),
+            "product_name": product_name,
+            "setup_name": setup_name,
+            "product_id": r.get("tools_product_id") or r.get("current_product_id") or None,
+            "setup_id": r.get("tools_setup_id") or r.get("current_setup_id") or None,
+            "loaded_at": r.get("tools_loaded_at") or "",
+        }
+
     return render(
         request,
         "shifts/machines.html",
@@ -500,6 +834,7 @@ def machines_view(request):
             "schedule_rows": schedule_rows,
             "product_options": product_options,
             "machines_products_json": machines_products_json,
+            "machines_tools_by_code": tools_by_machine_code,
             "product_detail_url_sentinel": product_detail_url_sentinel,
             "machines_detail_url_sentinel_pk": _MACHINES_DETAIL_URL_SENTINEL,
         },

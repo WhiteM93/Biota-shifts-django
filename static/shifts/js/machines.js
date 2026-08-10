@@ -187,16 +187,40 @@
       var span = codeCell.querySelector(".machines-quick-row-code-text");
       var handle = codeCell.querySelector(".machines-quick-row-drag-handle");
       if (!span) {
-        var text = (codeCell.textContent || "").replace(/\s+/g, " ").trim();
-        codeCell.textContent = "";
+        var text = "";
+        Array.prototype.slice.call(codeCell.childNodes).forEach(function (node) {
+          if (node.nodeType === 1 && node.classList && node.classList.contains("machines-quick-row-drag-handle")) {
+            return;
+          }
+          text += node.textContent || "";
+        });
+        text = text.replace(/\s+/g, " ").trim();
+        Array.prototype.slice.call(codeCell.childNodes).forEach(function (node) {
+          if (node.nodeType === 1 && node.classList && node.classList.contains("machines-quick-row-drag-handle")) {
+            return;
+          }
+          codeCell.removeChild(node);
+        });
         if (!handle) handle = createQuickRowDragHandle();
         span = document.createElement("span");
-        span.className = "machines-quick-row-code-text";
+        span.className = "machines-quick-row-code-text js-machines-view-tools";
+        span.setAttribute("role", "button");
+        span.tabIndex = 0;
         span.textContent = text;
-        codeCell.appendChild(handle);
+        if (!handle.parentNode) codeCell.insertBefore(handle, codeCell.firstChild);
         codeCell.appendChild(span);
-      } else if (!handle) {
-        codeCell.insertBefore(createQuickRowDragHandle(), span);
+      } else {
+        if (!span.classList.contains("js-machines-view-tools")) {
+          span.classList.add("js-machines-view-tools");
+        }
+        if (!span.getAttribute("role")) span.setAttribute("role", "button");
+        if (!span.hasAttribute("tabindex")) span.tabIndex = 0;
+        if (!handle) codeCell.insertBefore(createQuickRowDragHandle(), span);
+      }
+      var codeText = (span.textContent || "").replace(/\s+/g, " ").trim();
+      if (codeText) {
+        span.setAttribute("aria-label", "Показать инструмент станка " + codeText);
+        codeCell.setAttribute("data-machine-code", codeText);
       }
       return codeCell;
     }
@@ -500,6 +524,7 @@
     }
 
     function syncQuickFieldSetupSelect(fieldCell) {
+      var wrap = fieldCell.querySelector(".machines-quick-field-and-setup");
       var sel = fieldCell.querySelector(".js-machines-quick-setup-select");
       if (!sel) return;
       var qrow = fieldCell.closest(".machines-quick-row");
@@ -519,6 +544,7 @@
         sel.appendChild(z0);
         sel.value = "";
         sel.disabled = true;
+        if (wrap) wrap.classList.remove("has-multi-setup");
         return;
       }
       if (!setups.length) {
@@ -528,8 +554,10 @@
         sel.appendChild(z1);
         sel.value = "";
         sel.disabled = true;
+        if (wrap) wrap.classList.remove("has-multi-setup");
         return;
       }
+      if (wrap) wrap.classList.toggle("has-multi-setup", setups.length > 1);
       if (setups.length > 1) {
         var ph = document.createElement("option");
         ph.value = "";
@@ -1772,6 +1800,214 @@
       true
     );
 
+    (function initMachinesToolsViewer() {
+      var toolsModal = document.getElementById("machines-tools-modal");
+      var toolsTitle = document.getElementById("machines-tools-modal-title");
+      var toolsMeta = document.getElementById("machines-tools-modal-meta");
+      var toolsTbody = document.getElementById("machines-tools-tbody");
+      var toolsEmpty = document.getElementById("machines-tools-empty");
+      var toolsTable = document.getElementById("machines-tools-table");
+      if (!toolsModal || !toolsTbody) return;
+
+      var toolsByCode = {};
+      try {
+        var toolsDataEl = document.getElementById("machines-tools-by-code");
+        toolsByCode = toolsDataEl ? JSON.parse(toolsDataEl.textContent || "{}") : {};
+      } catch (eTools) {
+        toolsByCode = {};
+      }
+
+      function closeToolsModal() {
+        toolsModal.hidden = true;
+        toolsModal.setAttribute("aria-hidden", "true");
+      }
+
+      function escCell(v) {
+        return String(v == null ? "" : v)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function resolveToolsPayload(machineCode) {
+        var code = String(machineCode || "").trim();
+        var raw = toolsByCode[code];
+        if (raw == null) {
+          var keyUp = code.toUpperCase();
+          Object.keys(toolsByCode).some(function (k) {
+            if (String(k).toUpperCase() === keyUp) {
+              raw = toolsByCode[k];
+              return true;
+            }
+            return false;
+          });
+        }
+        if (Array.isArray(raw)) {
+          return { tools: raw, product_name: "", setup_name: "" };
+        }
+        if (raw && typeof raw === "object") {
+          return {
+            tools: Array.isArray(raw.tools) ? raw.tools : [],
+            product_name: String(raw.product_name || "").trim(),
+            setup_name: String(raw.setup_name || "").trim(),
+            product_id: raw.product_id != null && raw.product_id !== "" ? String(raw.product_id) : "",
+            setup_id: raw.setup_id != null && raw.setup_id !== "" ? String(raw.setup_id) : "",
+            loaded_at: String(raw.loaded_at || "").trim(),
+          };
+        }
+        return { tools: [], product_name: "", setup_name: "", product_id: "", setup_id: "" };
+      }
+
+      function toolNumberSortKey(toolNumber) {
+        var raw = String(toolNumber || "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .toUpperCase();
+        var m = raw.match(/^(?:T\s*)?(\d{1,4})$/);
+        if (m) {
+          var n = parseInt(m[1], 10) || 0;
+          return [0, n];
+        }
+        if (!raw) return [2, ""];
+        return [1, raw];
+      }
+
+      function sortToolsByNumber(list) {
+        return (list || []).slice().sort(function (a, b) {
+          var ka = toolNumberSortKey(a && a.tool_number);
+          var kb = toolNumberSortKey(b && b.tool_number);
+          if (ka[0] !== kb[0]) return ka[0] - kb[0];
+          if (ka[0] === 0) return ka[1] - kb[1];
+          if (ka[1] < kb[1]) return -1;
+          if (ka[1] > kb[1]) return 1;
+          return 0;
+        });
+      }
+
+      function openToolsModal(machineCode) {
+        var code = String(machineCode || "").trim();
+        if (!code) return;
+        var payload = resolveToolsPayload(code);
+        var tools = sortToolsByNumber(payload.tools || []);
+        var productName = payload.product_name || "—";
+        var setupName = payload.setup_name || "—";
+        if (toolsTitle) toolsTitle.textContent = "Инструмент · " + code;
+        if (toolsMeta) {
+          toolsMeta.textContent = tools.length
+            ? "Загружено позиций: " + tools.length
+            : "Снимок инструмента для этого станка пуст.";
+        }
+        toolsTbody.innerHTML = "";
+        if (!tools.length) {
+          if (toolsTable) toolsTable.hidden = true;
+          if (toolsEmpty) toolsEmpty.hidden = false;
+        } else {
+          if (toolsTable) toolsTable.hidden = false;
+          if (toolsEmpty) toolsEmpty.hidden = true;
+          tools.forEach(function (t) {
+            var tr = document.createElement("tr");
+            var rowProduct = String((t && t.product_name) || productName || "—").trim() || "—";
+            var rowSetup = String((t && t.setup_name) || setupName || "—").trim() || "—";
+            var rowPid =
+              t && t.product_id != null && t.product_id !== ""
+                ? String(t.product_id)
+                : payload.product_id || "";
+            var rowSid =
+              t && t.setup_id != null && t.setup_id !== ""
+                ? String(t.setup_id)
+                : payload.setup_id || "";
+            var setupHref = "";
+            if (rowPid && rowSid) {
+              setupHref = productSetupDetailHref(productDetailHrefFromId(rowPid), rowSid);
+            } else if (rowPid) {
+              setupHref = productDetailHrefFromId(rowPid);
+            }
+            var setupCellHtml = escCell(rowSetup);
+            if (setupHref && rowSetup && rowSetup !== "—") {
+              setupCellHtml =
+                '<a class="machines-tools-setup-link" href="' +
+                escCell(setupHref) +
+                '" title="Открыть установку наладки">' +
+                escCell(rowSetup) +
+                "</a>";
+            }
+            var productCellHtml = escCell(rowProduct);
+            if (rowPid && rowProduct && rowProduct !== "—") {
+              var productHref = productDetailHrefFromId(rowPid);
+              if (productHref) {
+                productCellHtml =
+                  '<a class="machines-tools-product-link" href="' +
+                  escCell(productHref) +
+                  '" title="Открыть наладку">' +
+                  escCell(rowProduct) +
+                  "</a>";
+              }
+            }
+            tr.innerHTML =
+              '<td class="machines-tools-col-product">' +
+              productCellHtml +
+              '</td><td class="machines-tools-col-setup">' +
+              setupCellHtml +
+              "</td><td>" +
+              escCell(t.tool_number) +
+              "</td><td>" +
+              escCell(t.tool_type) +
+              "</td><td>" +
+              escCell(t.diameter) +
+              "</td><td>" +
+              escCell(t.overhang) +
+              "</td><td>" +
+              escCell(t.note || t.name) +
+              "</td>";
+            toolsTbody.appendChild(tr);
+          });
+        }
+        toolsModal.hidden = false;
+        toolsModal.setAttribute("aria-hidden", "false");
+      }
+
+      quickWrap.addEventListener("click", function (e) {
+        if (root.getAttribute("data-inline-edit-mode") === "1") return;
+        if (e.target.closest(".machines-quick-row-drag-handle")) return;
+        var codeHit =
+          e.target.closest(".js-machines-view-tools") ||
+          e.target.closest(".machines-quick-row > .machines-cell--code");
+        if (!codeHit) return;
+        var codeCell = codeHit.classList.contains("machines-cell--code")
+          ? codeHit
+          : codeHit.closest(".machines-cell--code");
+        if (!codeCell) return;
+        e.preventDefault();
+        var code =
+          codeCell.getAttribute("data-machine-code") ||
+          readQuickRowCode(codeCell) ||
+          "";
+        openToolsModal(code);
+      });
+
+      quickWrap.addEventListener("keydown", function (e) {
+        if (root.getAttribute("data-inline-edit-mode") === "1") return;
+        if (e.key !== "Enter" && e.key !== " ") return;
+        var hit = e.target.closest(".js-machines-view-tools");
+        if (!hit) return;
+        e.preventDefault();
+        var codeCell = hit.closest(".machines-cell--code");
+        openToolsModal(
+          (codeCell && codeCell.getAttribute("data-machine-code")) || readQuickRowCode(codeCell) || hit.textContent || ""
+        );
+      });
+
+      toolsModal.addEventListener("click", function (e) {
+        if (e.target && e.target.getAttribute("data-close-machines-tools") === "1") {
+          closeToolsModal();
+        }
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && toolsModal && !toolsModal.hidden) closeToolsModal();
+      });
+    })();
+
     quickWrap.addEventListener("mousedown", onQuickRowPointerDown);
 
     scheduleWrap.addEventListener(
@@ -2718,4 +2954,7 @@
     syncScheduleColorsToQuickRows();
     sortScheduleRowsByPriorityQty();
     initMachinesConfirmButtons(root);
+    try {
+      syncAllQuickFieldSetupSelects();
+    } catch (eSyncSetups) {}
   })();

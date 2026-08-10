@@ -723,8 +723,10 @@ function saveSetupToolNoteEditor() {
       var isSetupTab = /^setup-\d+$/.test(tabName || "");
       var exportSpecsBtn = document.getElementById("setup-export-specs-btn");
       var exportPhotosBtn = document.getElementById("setup-export-photos-btn");
+      var loadMachineBtn = document.getElementById("setup-load-to-machine-btn");
       if (exportSpecsBtn) exportSpecsBtn.hidden = !isSetupTab;
       if (exportPhotosBtn) exportPhotosBtn.hidden = !isSetupTab;
+      if (loadMachineBtn) loadMachineBtn.hidden = !isSetupTab;
       if (isSetupTab) {
         var m = (tabName || "").match(/^setup-(\d+)$/);
         var setupId = m ? m[1] : "";
@@ -1668,6 +1670,55 @@ function saveSetupToolNoteEditor() {
       var n = max + 1;
       if (n < 100) return "T" + String(n).padStart(2, "0");
       return "T" + n;
+    }
+
+    function isSetupToolRowEmpty(row) {
+      if (!row) return true;
+      var type = getRowToolType(row);
+      if (type) return false;
+      var diamCell = row.querySelector('td[data-tool-col="diameter"]');
+      var diam = ((diamCell && diamCell.textContent) || "").trim().replace(/^[⌀ØφΦ]\s*$/, "").trim();
+      if (diam) return false;
+      var overCell = row.querySelector('td[data-tool-col="overhang"]');
+      var over = ((overCell && overCell.textContent) || "").trim();
+      if (over) return false;
+      var noteCell = row.querySelector('td[data-tool-col="note"]');
+      if (getSetupToolNoteValue(noteCell)) return false;
+      var corCell = row.querySelector('td[data-tool-col="correction_enabled"]');
+      if (corCell && corCell.getAttribute("data-correction-enabled") === "1") return false;
+      var numCell = row.querySelector('td[data-tool-col="tool_number"]');
+      if (getSetupToolNumberPhotoUrl(numCell)) return false;
+      var korN = row.querySelector('td[data-tool-col="kor_n"]');
+      var korD = row.querySelector('td[data-tool-col="kor_d"]');
+      var digitsN = ((korN && korN.textContent) || "").replace(/[^0-9]/g, "");
+      var digitsD = ((korD && korD.textContent) || "").replace(/[^0-9]/g, "");
+      var toolNo = getSetupToolNumberValue(numCell);
+      var exp = expectedCorrectors(toolNo);
+      var hasManualKor =
+        !!(digitsN && (!exp.h || ("H" + digitsN).toUpperCase() !== exp.h)) ||
+        !!(digitsD && (!exp.d || ("D" + digitsD).toUpperCase() !== exp.d));
+      if (hasManualKor) return false;
+      return true;
+    }
+
+    function removeEmptySetupToolRows(panel) {
+      if (!panel) return 0;
+      var tbody = panel.querySelector(".setup-tools-view tbody");
+      if (!tbody) return 0;
+      var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr"));
+      if (rows.length <= 1) return 0;
+      var removed = 0;
+      rows.forEach(function (tr) {
+        if (tbody.querySelectorAll("tr").length <= 1) return;
+        if (!isSetupToolRowEmpty(tr)) return;
+        tr.remove();
+        removed += 1;
+      });
+      if (removed) {
+        syncRowOrderDisplay(panel);
+        syncToolOverrideClasses(panel);
+      }
+      return removed;
     }
 
     function appendSetupToolRow(panel) {
@@ -3182,6 +3233,182 @@ function saveSetupToolNoteEditor() {
       }
     }
 
+    (function initLoadSetupToMachine() {
+      var loadBtn = document.getElementById("setup-load-to-machine-btn");
+      var modal = document.getElementById("setup-load-machine-modal");
+      var listEl = document.getElementById("setup-load-machine-list");
+      var emptyEl = document.getElementById("setup-load-machine-empty");
+      var setupLabelEl = document.getElementById("setup-load-machine-setup-label");
+      if (!loadBtn || !modal || !listEl) return;
+      var busy = false;
+
+      function closeLoadMachineModal() {
+        modal.hidden = true;
+        modal.setAttribute("aria-hidden", "true");
+      }
+
+      function currentSetupId() {
+        var tabName = getCurrentTabName();
+        var m = (tabName || "").match(/^setup-(\d+)$/);
+        return m ? m[1] : "";
+      }
+
+      function currentSetupName() {
+        var tabName = getCurrentTabName();
+        var btn = root.querySelector('.product-tab[data-tab="' + tabName + '"]');
+        if (btn) {
+          var nm = (btn.getAttribute("data-setup-name") || "").trim();
+          if (nm) return nm;
+        }
+        var panel = activeSetupPanel();
+        var nameEl = panel && panel.querySelector(".product-setup-name");
+        return nameEl ? (nameEl.textContent || "").trim() : "";
+      }
+
+      function machineCodesFromPd() {
+        var codes = PD && Array.isArray(PD.machine_codes) ? PD.machine_codes.slice() : [];
+        return codes
+          .map(function (c) {
+            return String(c || "").trim();
+          })
+          .filter(Boolean);
+      }
+
+      function renderMachineList(codes) {
+        listEl.innerHTML = "";
+        if (!codes.length) {
+          if (emptyEl) emptyEl.hidden = false;
+          return;
+        }
+        if (emptyEl) emptyEl.hidden = true;
+        codes.forEach(function (code) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "setup-load-machine-item js-setup-load-machine-pick";
+          btn.setAttribute("data-machine-code", code);
+          btn.setAttribute("role", "listitem");
+          btn.innerHTML =
+            '<span class="setup-load-machine-item__code"></span>' +
+            '<span class="setup-load-machine-item__action">Загрузить</span>';
+          btn.querySelector(".setup-load-machine-item__code").textContent = code;
+          listEl.appendChild(btn);
+        });
+      }
+
+      async function refreshMachineCodes() {
+        var codes = machineCodesFromPd();
+        renderMachineList(codes);
+        try {
+          var fd = new FormData();
+          fd.append("action", "list_machine_codes");
+          var res = await fetch(window.location.href, {
+            method: "POST",
+            headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+            body: fd,
+            credentials: "same-origin",
+          });
+          var data = await res.json();
+          if (res.ok && data && data.ok && Array.isArray(data.machines)) {
+            if (PD) PD.machine_codes = data.machines;
+            renderMachineList(data.machines);
+          }
+        } catch (_err) {}
+      }
+
+      async function openLoadMachineModal() {
+        var setupId = currentSetupId();
+        if (!setupId) {
+          alert("Откройте вкладку установки.");
+          return;
+        }
+        if (setupLabelEl) {
+          var sn = currentSetupName();
+          setupLabelEl.textContent = sn ? "Установка: " + sn : "Установка #" + setupId;
+        }
+        modal.hidden = false;
+        modal.setAttribute("aria-hidden", "false");
+        await refreshMachineCodes();
+      }
+
+      async function assignToMachine(machineCode) {
+        if (busy) return;
+        var setupId = currentSetupId();
+        if (!setupId || !machineCode) return;
+        var confirmMsg =
+          "Загрузить инструмент текущей установки в станок «" +
+          machineCode +
+          "»?\nЗаменятся только совпадающие номера (T01, T02…), остальные позиции в станке останутся.";
+        if (!window.confirm(confirmMsg)) return;
+        busy = true;
+        try {
+          var fd = new FormData();
+          fd.append("action", "assign_setup_to_machine");
+          fd.append("setup_id", setupId);
+          fd.append("machine_code", machineCode);
+          var res = await fetch(window.location.href, {
+            method: "POST",
+            headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+            body: fd,
+            credentials: "same-origin",
+          });
+          var data = await res.json().catch(function () {
+            return null;
+          });
+          if (!res.ok || !data || !data.ok) {
+            alert((data && data.error) || "Не удалось загрузить в станок.");
+            return;
+          }
+          closeLoadMachineModal();
+          var replaced = data.tools_replaced != null ? data.tools_replaced : 0;
+          var added = data.tools_added != null ? data.tools_added : 0;
+          var total = data.tools_total != null ? data.tools_total : data.tools_count || 0;
+          var msg =
+            "Станок «" +
+            (data.machine_code || machineCode) +
+            "»: обновлено " +
+            replaced +
+            ", добавлено " +
+            added +
+            ", всего в станке " +
+            total +
+            ".";
+          if (data.machines_url || (PD && PD.machines_url)) {
+            if (window.confirm(msg + "\nОткрыть страницу «Станки»?")) {
+              window.open(data.machines_url || PD.machines_url, "_blank", "noopener");
+            }
+          } else {
+            alert(msg);
+          }
+        } catch (_err) {
+          alert("Ошибка сети при загрузке в станок.");
+        } finally {
+          busy = false;
+        }
+      }
+
+      loadBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        openLoadMachineModal();
+      });
+      modal.addEventListener("click", function (e) {
+        var t = e.target;
+        if (t && t.getAttribute("data-close-setup-load-machine") === "1") {
+          closeLoadMachineModal();
+          return;
+        }
+        var pick = t && t.closest && t.closest(".js-setup-load-machine-pick");
+        if (pick) {
+          e.preventDefault();
+          assignToMachine(pick.getAttribute("data-machine-code") || "");
+        }
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && modal && !modal.hidden) {
+          closeLoadMachineModal();
+        }
+      });
+    })();
+
     document.addEventListener("click", function (e) {
       var photoPin = e.target && e.target.closest && e.target.closest(".js-setup-tool-photo-pin");
       if (photoPin) {
@@ -3409,6 +3636,17 @@ function saveSetupToolNoteEditor() {
         if (!inlineEditMode) return;
         var panelAdd = addToolBtn.closest(".product-tab-panel");
         if (panelAdd) appendSetupToolRow(panelAdd);
+        return;
+      }
+      var clearEmptyBtn = el.closest && el.closest(".js-setup-tools-clear-empty");
+      if (clearEmptyBtn) {
+        if (!inlineEditMode) return;
+        var panelClear = clearEmptyBtn.closest(".product-tab-panel");
+        if (!panelClear) return;
+        var removedEmpty = removeEmptySetupToolRows(panelClear);
+        if (!removedEmpty) {
+          alert("Пустых строк нет (или осталась одна — её нельзя удалить).");
+        }
         return;
       }
       var correctionCell = el.closest ? el.closest('td[data-tool-col="correction_enabled"]') : null;

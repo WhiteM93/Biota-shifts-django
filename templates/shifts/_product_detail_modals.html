@@ -45,3 +45,16 @@
     <pre class="setup-program-preview-code js-setup-program-preview-code" tabindex="0" aria-label="Текст программы"><code></code></pre>
   </div>
 </div>
+<div id="setup-load-machine-modal" class="setup-load-machine-modal" hidden aria-hidden="true">
+  <div class="setup-load-machine-modal-backdrop" data-close-setup-load-machine="1"></div>
+  <div class="setup-load-machine-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="setup-load-machine-title">
+    <div class="setup-load-machine-modal-head">
+      <h2 id="setup-load-machine-title" class="setup-load-machine-modal-title">Загрузить в станок</h2>
+      <button type="button" class="btn btn-ghost" data-close-setup-load-machine="1" aria-label="Закрыть">×</button>
+    </div>
+    <p class="muted setup-load-machine-modal-hint">Выберите станок — в «В работе» встанет это изделие и установка. В списке инструмента станка заменятся только совпадающие номера (T01, T02…).</p>
+    <p class="setup-load-machine-modal-setup muted" id="setup-load-machine-setup-label"></p>
+    <div class="setup-load-machine-list" id="setup-load-machine-list" role="list"></div>
+    <p class="setup-load-machine-empty muted" id="setup-load-machine-empty" hidden>Станки не найдены. Добавьте их на странице «Станки».</p>
+  </div>
+</div>
