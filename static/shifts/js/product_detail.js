@@ -4707,6 +4707,7 @@ function saveSetupToolNoteEditor() {
     function closeSetupProgramPreviewModal() {
       var modal = document.getElementById("setup-program-preview-modal");
       if (!modal) return;
+      resetSetupProgramPreviewSearch();
       modal.hidden = true;
       modal.setAttribute("aria-hidden", "true");
       var noteModal = document.getElementById("setup-tool-note-edit-modal");
@@ -4728,6 +4729,152 @@ function saveSetupToolNoteEditor() {
       status.textContent = text || "";
     }
 
+    var setupProgramPreviewSearch = { matches: [], index: -1, query: "" };
+
+    function getSetupProgramPreviewCodeRoot() {
+      return document.querySelector(".js-setup-program-preview-code code");
+    }
+
+    function clearSetupProgramPreviewSearchMarks() {
+      var codeEl = getSetupProgramPreviewCodeRoot();
+      if (!codeEl) return;
+      codeEl.querySelectorAll(".gcode-line.gcode-search-hit, .gcode-line.gcode-search-current").forEach(function (el) {
+        el.classList.remove("gcode-search-hit", "gcode-search-current");
+      });
+      codeEl.querySelectorAll("mark.gcode-search-mark").forEach(function (mark) {
+        var parent = mark.parentNode;
+        if (!parent) return;
+        while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+        parent.removeChild(mark);
+        parent.normalize();
+      });
+    }
+
+    function updateSetupProgramPreviewSearchCount() {
+      var countEl = document.querySelector(".js-setup-program-preview-search-count");
+      if (!countEl) return;
+      var total = setupProgramPreviewSearch.matches.length;
+      if (!setupProgramPreviewSearch.query || !total) {
+        if (!setupProgramPreviewSearch.query) {
+          countEl.hidden = true;
+          countEl.textContent = "0/0";
+          return;
+        }
+        countEl.hidden = false;
+        countEl.textContent = "0/0";
+        return;
+      }
+      countEl.hidden = false;
+      countEl.textContent = (setupProgramPreviewSearch.index + 1) + "/" + total;
+    }
+
+    function wrapTextNodeMatches(textNode, queryLower) {
+      var text = textNode.nodeValue || "";
+      if (!text) return;
+      var lower = text.toLowerCase();
+      var q = queryLower;
+      if (!q || lower.indexOf(q) === -1) return;
+      var frag = document.createDocumentFragment();
+      var start = 0;
+      var idx = lower.indexOf(q, start);
+      while (idx !== -1) {
+        if (idx > start) frag.appendChild(document.createTextNode(text.slice(start, idx)));
+        var mark = document.createElement("mark");
+        mark.className = "gcode-search-mark";
+        mark.textContent = text.slice(idx, idx + q.length);
+        frag.appendChild(mark);
+        start = idx + q.length;
+        idx = lower.indexOf(q, start);
+      }
+      if (start < text.length) frag.appendChild(document.createTextNode(text.slice(start)));
+      textNode.parentNode.replaceChild(frag, textNode);
+    }
+
+    function markMatchesInLine(lineEl, queryLower) {
+      var walker = document.createTreeWalker(lineEl, NodeFilter.SHOW_TEXT, null);
+      var nodes = [];
+      var node;
+      while ((node = walker.nextNode())) nodes.push(node);
+      nodes.forEach(function (tn) {
+        wrapTextNodeMatches(tn, queryLower);
+      });
+    }
+
+    function focusSetupProgramPreviewMatch(index, scroll) {
+      var matches = setupProgramPreviewSearch.matches;
+      if (!matches.length) {
+        setupProgramPreviewSearch.index = -1;
+        updateSetupProgramPreviewSearchCount();
+        return;
+      }
+      var next = ((index % matches.length) + matches.length) % matches.length;
+      matches.forEach(function (el, i) {
+        el.classList.toggle("gcode-search-current", i === next);
+      });
+      setupProgramPreviewSearch.index = next;
+      updateSetupProgramPreviewSearchCount();
+      if (scroll !== false) {
+        var current = matches[next];
+        if (current && typeof current.scrollIntoView === "function") {
+          current.scrollIntoView({ block: "center", inline: "nearest" });
+        }
+      }
+    }
+
+    function runSetupProgramPreviewSearch(query, keepIndex) {
+      clearSetupProgramPreviewSearchMarks();
+      var q = String(query || "").trim();
+      setupProgramPreviewSearch.query = q;
+      setupProgramPreviewSearch.matches = [];
+      setupProgramPreviewSearch.index = -1;
+      if (!q) {
+        updateSetupProgramPreviewSearchCount();
+        return;
+      }
+      var codeEl = getSetupProgramPreviewCodeRoot();
+      if (!codeEl) {
+        updateSetupProgramPreviewSearchCount();
+        return;
+      }
+      var qLower = q.toLowerCase();
+      var lines = codeEl.querySelectorAll(".gcode-line");
+      var hits = [];
+      lines.forEach(function (line) {
+        var text = (line.textContent || "").toLowerCase();
+        if (text.indexOf(qLower) === -1) return;
+        line.classList.add("gcode-search-hit");
+        markMatchesInLine(line, qLower);
+        hits.push(line);
+      });
+      setupProgramPreviewSearch.matches = hits;
+      if (!hits.length) {
+        updateSetupProgramPreviewSearchCount();
+        return;
+      }
+      var idx = 0;
+      if (keepIndex && setupProgramPreviewSearch.index >= 0) {
+        idx = Math.min(setupProgramPreviewSearch.index, hits.length - 1);
+      }
+      focusSetupProgramPreviewMatch(idx, true);
+    }
+
+    function resetSetupProgramPreviewSearch() {
+      var input = document.querySelector(".js-setup-program-preview-search");
+      if (input) input.value = "";
+      setupProgramPreviewSearch = { matches: [], index: -1, query: "" };
+      clearSetupProgramPreviewSearchMarks();
+      updateSetupProgramPreviewSearchCount();
+    }
+
+    function stepSetupProgramPreviewSearch(delta) {
+      if (!setupProgramPreviewSearch.matches.length) {
+        var input = document.querySelector(".js-setup-program-preview-search");
+        if (input && input.value.trim()) runSetupProgramPreviewSearch(input.value, false);
+        return;
+      }
+      focusSetupProgramPreviewMatch(setupProgramPreviewSearch.index + delta, true);
+    }
+
     async function openSetupProgramPreview(url, name) {
       var modal = document.getElementById("setup-program-preview-modal");
       var title = document.getElementById("setup-program-preview-title");
@@ -4741,6 +4888,7 @@ function saveSetupToolNoteEditor() {
         downloadLink.setAttribute("download", fileName);
         downloadLink.hidden = !url;
       }
+      resetSetupProgramPreviewSearch();
       codeEl.innerHTML = "";
       setSetupProgramPreviewStatus("Загрузка…", true);
       modal.hidden = false;
@@ -4781,6 +4929,10 @@ function saveSetupToolNoteEditor() {
         }
         var pre = codeEl.parentElement;
         if (pre) pre.scrollTop = 0;
+        var searchInput = document.querySelector(".js-setup-program-preview-search");
+        if (searchInput) {
+          try { searchInput.focus({ preventScroll: true }); } catch (_f) { searchInput.focus(); }
+        }
       } catch (err) {
         setSetupProgramPreviewStatus("Не удалось загрузить программу для предпросмотра.", true);
         codeEl.textContent = "";
@@ -4790,10 +4942,49 @@ function saveSetupToolNoteEditor() {
     (function initSetupProgramPreviewModal() {
       var modal = document.getElementById("setup-program-preview-modal");
       if (!modal) return;
+      var searchTimer = null;
       modal.addEventListener("click", function (e) {
         var t = e.target;
         if (t && t.getAttribute && t.getAttribute("data-close-setup-program-preview") === "1") {
           closeSetupProgramPreviewModal();
+        }
+      });
+      modal.addEventListener("click", function (e) {
+        var prev = e.target && e.target.closest && e.target.closest(".js-setup-program-preview-search-prev");
+        if (prev) {
+          e.preventDefault();
+          stepSetupProgramPreviewSearch(-1);
+          return;
+        }
+        var next = e.target && e.target.closest && e.target.closest(".js-setup-program-preview-search-next");
+        if (next) {
+          e.preventDefault();
+          stepSetupProgramPreviewSearch(1);
+        }
+      });
+      modal.addEventListener("input", function (e) {
+        var input = e.target && e.target.closest && e.target.closest(".js-setup-program-preview-search");
+        if (!input) return;
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+          runSetupProgramPreviewSearch(input.value, false);
+        }, 120);
+      });
+      modal.addEventListener("keydown", function (e) {
+        var input = e.target && e.target.closest && e.target.closest(".js-setup-program-preview-search");
+        if (!input) return;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.shiftKey) stepSetupProgramPreviewSearch(-1);
+          else stepSetupProgramPreviewSearch(1);
+          return;
+        }
+        if (e.key === "F3") {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.shiftKey) stepSetupProgramPreviewSearch(-1);
+          else stepSetupProgramPreviewSearch(1);
         }
       });
       document.addEventListener("click", function (e) {

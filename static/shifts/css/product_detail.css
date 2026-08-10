@@ -5249,12 +5249,18 @@ html[data-theme="dawn"] .setup-program-preview-modal-dialog {
 }
 .setup-program-preview-modal-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--bio-surface-item-border, var(--bio-input-border));
   flex: 0 0 auto;
+}
+.setup-program-preview-modal-head-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
 }
 .setup-program-preview-modal-title {
   margin: 0;
@@ -5270,6 +5276,44 @@ html[data-theme="dawn"] .setup-program-preview-modal-dialog {
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
+}
+.setup-program-preview-modal-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.setup-program-preview-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid var(--bio-input-border, rgba(148, 163, 184, 0.35));
+  background: var(--bio-input-bg, rgba(15, 23, 42, 0.35));
+  color: var(--bio-text, inherit);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.setup-program-preview-search-input:focus {
+  outline: none;
+  border-color: var(--bio-accent, #60a5fa);
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.22);
+}
+.setup-program-preview-search-count {
+  flex: 0 0 auto;
+  font-size: 12px;
+  min-width: 3.2em;
+  text-align: right;
+  white-space: nowrap;
+}
+.setup-program-preview-search-nav {
+  flex: 0 0 auto;
+  min-width: 32px;
+  padding-left: 8px;
+  padding-right: 8px;
+  font-size: 14px;
+  line-height: 1;
 }
 .setup-program-preview-modal-status {
   padding: 8px 14px 0;
@@ -5319,3 +5363,21 @@ html[data-theme="dawn"] .setup-program-preview-modal-dialog {
 .setup-program-preview-code .gcode-fs { color: #c084fc; }
 .setup-program-preview-code .gcode-num { color: #fdba74; }
 .setup-program-preview-code .gcode-pct { color: #67e8f9; }
+.setup-program-preview-code .gcode-line.gcode-search-hit {
+  background: rgba(250, 204, 21, 0.16);
+}
+.setup-program-preview-code .gcode-line.gcode-search-current {
+  background: rgba(250, 204, 21, 0.38);
+  outline: 1px solid rgba(250, 204, 21, 0.55);
+  outline-offset: -1px;
+}
+.setup-program-preview-code mark.gcode-search-mark {
+  background: rgba(250, 204, 21, 0.55);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.setup-program-preview-code .gcode-search-current mark.gcode-search-mark {
+  background: rgba(250, 204, 21, 0.85);
+  color: #0f172a;
+}

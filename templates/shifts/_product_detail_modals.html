@@ -35,10 +35,25 @@
   <div class="setup-program-preview-modal-backdrop" data-close-setup-program-preview="1"></div>
   <div class="setup-program-preview-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="setup-program-preview-title">
     <div class="setup-program-preview-modal-head">
-      <h2 id="setup-program-preview-title" class="setup-program-preview-modal-title">Программа</h2>
-      <div class="setup-program-preview-modal-head-actions">
-        <a href="#" class="btn btn-ghost setup-program-preview-download js-setup-program-preview-download" download hidden>Скачать</a>
-        <button type="button" class="btn btn-ghost" data-close-setup-program-preview="1" aria-label="Закрыть">×</button>
+      <div class="setup-program-preview-modal-head-top">
+        <h2 id="setup-program-preview-title" class="setup-program-preview-modal-title">Программа</h2>
+        <div class="setup-program-preview-modal-head-actions">
+          <a href="#" class="btn btn-ghost setup-program-preview-download js-setup-program-preview-download" download hidden>Скачать</a>
+          <button type="button" class="btn btn-ghost" data-close-setup-program-preview="1" aria-label="Закрыть">×</button>
+        </div>
+      </div>
+      <div class="setup-program-preview-modal-search" role="search">
+        <input
+          type="search"
+          class="setup-program-preview-search-input js-setup-program-preview-search"
+          placeholder="Поиск в программе…"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Поиск в программе"
+        >
+        <span class="setup-program-preview-search-count js-setup-program-preview-search-count muted" aria-live="polite" hidden>0/0</span>
+        <button type="button" class="btn btn-ghost setup-program-preview-search-nav js-setup-program-preview-search-prev" aria-label="Предыдущее совпадение" title="Предыдущее (Shift+Enter)">↑</button>
+        <button type="button" class="btn btn-ghost setup-program-preview-search-nav js-setup-program-preview-search-next" aria-label="Следующее совпадение" title="Следующее (Enter)">↓</button>
       </div>
     </div>
     <div class="setup-program-preview-modal-status muted js-setup-program-preview-status" hidden></div>
