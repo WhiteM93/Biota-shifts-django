@@ -3942,6 +3942,53 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   .setup-load-machine-icon {
     display: block;
   }
+  .product-toast-host {
+    position: fixed;
+    z-index: 3000;
+    left: 50%;
+    bottom: max(20px, env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    width: min(440px, calc(100vw - 24px));
+    pointer-events: none;
+  }
+  .product-toast {
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    color: #f8fafc;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    box-shadow: 0 10px 28px rgba(2, 6, 23, 0.45);
+    animation: product-toast-in 0.22s ease-out;
+  }
+  .product-toast--ok {
+    border-color: rgba(74, 222, 128, 0.45);
+  }
+  .product-toast--err {
+    border-color: rgba(248, 113, 113, 0.5);
+  }
+  .product-toast.is-leaving {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  html[data-theme="dawn"] .product-toast {
+    background: linear-gradient(180deg, #fffefb 0%, #f4ebe0 100%);
+    color: #1f2937;
+    box-shadow: 0 10px 24px rgba(120, 80, 40, 0.18);
+  }
+  @keyframes product-toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
   .setup-tools-view td[data-tool-col="note"]:not(.is-inline-edit) {
     cursor: default;
   }

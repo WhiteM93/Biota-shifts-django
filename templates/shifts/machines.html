@@ -357,9 +357,21 @@
     <div class="machines-tools-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="machines-tools-modal-title">
       <div class="machines-tools-modal-head">
         <h2 id="machines-tools-modal-title" class="machines-tools-modal-title">Инструмент в станке</h2>
-        <button type="button" class="btn btn-ghost" data-close-machines-tools="1" aria-label="Закрыть">×</button>
+        <div class="machines-tools-modal-head-actions">
+          {% if biota_machines_quick_edit %}
+          <button type="button" class="btn btn-ghost machines-tools-clear-btn js-machines-tools-clear" hidden>
+            Очистить магазин
+          </button>
+          {% endif %}
+          <button type="button" class="btn btn-ghost" data-close-machines-tools="1" aria-label="Закрыть">×</button>
+        </div>
       </div>
       <p class="muted machines-tools-modal-meta" id="machines-tools-modal-meta"></p>
+      <p class="machines-tools-legend" id="machines-tools-legend" hidden>
+        <span class="machines-tools-legend-item machines-tools-legend-item--added">новое</span>
+        <span class="machines-tools-legend-item machines-tools-legend-item--changed">изменено</span>
+        — подсветка последней загрузки в станок
+      </p>
       <div class="machines-tools-modal-table-wrap">
         <table class="data-grid machines-tools-table" id="machines-tools-table">
           <thead>

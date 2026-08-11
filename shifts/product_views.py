@@ -957,17 +957,41 @@ def _tool_row_dict_sort_tuple(row: dict) -> tuple:
     return (2, "")
 
 
-def _default_tool_number_list() -> list[str]:
-    """Слоты по умолчанию на карточке и в форме: T01–T24 (без T00 / T99)."""
-    return [f"T{n:02d}" for n in range(1, 25)]
-
-
 def _expected_correctors(tool_no: str) -> tuple[str, str]:
     norm = _normalize_tool_number(tool_no)
     if not norm.startswith("T") or len(norm) < 2:
         return "", ""
     suffix = norm[1:].zfill(2)
     return f"H{suffix}", f"D{suffix}"
+
+
+def _setup_tool_fields_are_empty(
+    *,
+    tool_type: str = "",
+    diameter: str = "",
+    overhang: str = "",
+    note: str = "",
+    correction_enabled: bool = False,
+    kor_n: str = "",
+    kor_d: str = "",
+    has_photo: bool = False,
+) -> bool:
+    """Пустой слот магазина: есть только № (или вообще ничего) — без рабочего содержимого."""
+    if (tool_type or "").strip():
+        return False
+    if (diameter or "").strip():
+        return False
+    if (overhang or "").strip():
+        return False
+    if (note or "").strip():
+        return False
+    if correction_enabled:
+        return False
+    if (kor_n or "").strip() or (kor_d or "").strip():
+        return False
+    if has_photo:
+        return False
+    return True
 
 
 def _formset_initial_dict_from_db_row(row: ProductSetupToolRow) -> dict:
@@ -1001,47 +1025,22 @@ def _build_formset_initial_for_setup_edit(existing_rows: list[ProductSetupToolRo
 
 
 def _build_default_tool_rows(existing_rows: list[ProductSetupToolRow] | None = None) -> list[dict]:
+    """Строки для формы: только реальные позиции, без пустых слотов T01–T24."""
     existing_rows = existing_rows or []
-    mapped: dict[str, ProductSetupToolRow] = {}
-    for row in existing_rows:
-        key = _normalize_tool_number(row.tool_number)
-        if key:
-            mapped[key] = row
-
-    out = []
-    for tool_no in _default_tool_number_list():
-        row = mapped.get(tool_no)
-        if row:
-            out.append(
-                {
-                    "tool_number": str(int(tool_no[1:])),
-                    "correction_enabled": bool(row.correction_enabled),
-                    "kor_n": row.kor_n or "",
-                    "kor_d": row.kor_d or "",
-                    "tool_type": row.tool_type or "",
-                    "tap_hole_type": row.tap_hole_type or "",
-                    "name": row.name or "",
-                    "diameter": row.diameter or "",
-                    "overhang": row.overhang or "",
-                }
-            )
+    out: list[dict] = []
+    for row in sorted(existing_rows, key=_tool_row_sort_key):
+        if _setup_tool_fields_are_empty(
+            tool_type=row.tool_type or "",
+            diameter=row.diameter or "",
+            overhang=row.overhang or "",
+            note=row.name or "",
+            correction_enabled=bool(row.correction_enabled),
+            kor_n=row.kor_n or "",
+            kor_d=row.kor_d or "",
+            has_photo=bool(row.photo),
+        ):
             continue
-
-        default_row = {
-            "tool_number": str(int(tool_no[1:])),
-            "correction_enabled": False,
-            "kor_n": "",
-            "kor_d": "",
-            "tool_type": "",
-            "tap_hole_type": "",
-            "name": "",
-            "diameter": "",
-            "overhang": "",
-        }
-        if tool_no == "T20":
-            default_row["tool_type"] = "Датчик привязки"
-            default_row["diameter"] = "Шарик ⌀6 мм"
-        out.append(default_row)
+        out.append(_formset_initial_dict_from_db_row(row))
     return out
 
 
@@ -1080,34 +1079,24 @@ def _display_dict_from_tool_row(row: ProductSetupToolRow) -> dict:
 
 
 def _build_display_tool_rows(existing_rows: list[ProductSetupToolRow] | None = None) -> list[dict]:
+    """Отображение на карточке: только заполненные позиции (без пустых T01–T24)."""
     existing_rows = existing_rows or []
     ordered = sorted(existing_rows, key=_tool_row_sort_key)
-    if not ordered:
-        out: list[dict] = []
-        for tool_no in _default_tool_number_list():
-            default_row = {
-                "id": None,
-                "tool_number": tool_no,
-                "correction_enabled": False,
-                "kor_n": "",
-                "kor_d": "",
-                "tool_type": "",
-                "tap_hole_type": "",
-                "diameter": "",
-                "overhang": "",
-                "note": "",
-                "photo_url": "",
-                "kor_n_override": False,
-                "kor_d_override": False,
-            }
-            if tool_no == "T20":
-                default_row["tool_type"] = "Датчик привязки"
-                default_row["diameter"] = _format_tool_diameter_display(
-                    "Шарик ⌀6 мм", default_row["tool_type"]
-                )
-            out.append(default_row)
-        return out
-    return [_display_dict_from_tool_row(r) for r in ordered]
+    out: list[dict] = []
+    for row in ordered:
+        if _setup_tool_fields_are_empty(
+            tool_type=row.tool_type or "",
+            diameter=row.diameter or "",
+            overhang=row.overhang or "",
+            note=row.name or "",
+            correction_enabled=bool(row.correction_enabled),
+            kor_n=row.kor_n or "",
+            kor_d=row.kor_d or "",
+            has_photo=bool(row.photo),
+        ):
+            continue
+        out.append(_display_dict_from_tool_row(row))
+    return out
 
 
 @biota_login_required
@@ -1440,6 +1429,17 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
                 row_id = int(str(row_id_raw).strip())
             row_vals = (row_tool_number, row_kor_n, row_kor_d, row_tool_type, row_diameter, row_overhang, row_note)
             if all(v == "" for v in row_vals) and not row_correction_enabled:
+                continue
+            # Не сохраняем «пустые слоты» с одним только номером T04…
+            if _setup_tool_fields_are_empty(
+                tool_type=row_tool_type,
+                diameter=row_diameter,
+                overhang=row_overhang,
+                note=row_note,
+                correction_enabled=row_correction_enabled,
+                kor_n=row_kor_n,
+                kor_d=row_kor_d,
+            ):
                 continue
             parsed_rows.append(
                 {
@@ -2170,6 +2170,16 @@ def product_setup_edit_view(request, pk: int, setup_pk: int):
                     cd.get("overhang"),
                 )
                 if all((v or "").strip() == "" for v in row_vals):
+                    continue
+                if _setup_tool_fields_are_empty(
+                    tool_type=cd.get("tool_type") or "",
+                    diameter=cd.get("diameter") or "",
+                    overhang=cd.get("overhang") or "",
+                    note=cd.get("name") or "",
+                    correction_enabled=False,
+                    kor_n=cd.get("kor_n") or "",
+                    kor_d=cd.get("kor_d") or "",
+                ):
                     continue
                 row_tt = cd.get("tool_type") or ""
                 ProductSetupToolRow.objects.create(

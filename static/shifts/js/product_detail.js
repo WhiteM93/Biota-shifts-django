@@ -7,6 +7,35 @@ var PD = (function () {
 })();
 
 var BDB = window.BiotaDeleteBtn || {};
+var _productToastTimer = null;
+
+function showProductToast(message, opts) {
+  var text = String(message || "").trim();
+  if (!text) return;
+  var kind = (opts && opts.kind) || "ok";
+  var ms = (opts && opts.ms) || 4200;
+  var host = document.getElementById("product-toast-host");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "product-toast-host";
+    host.className = "product-toast-host";
+    host.setAttribute("aria-live", "polite");
+    document.body.appendChild(host);
+  }
+  host.innerHTML = "";
+  var toast = document.createElement("div");
+  toast.className = "product-toast product-toast--" + kind;
+  toast.setAttribute("role", "status");
+  toast.textContent = text;
+  host.appendChild(toast);
+  if (_productToastTimer) clearTimeout(_productToastTimer);
+  _productToastTimer = setTimeout(function () {
+    toast.classList.add("is-leaving");
+    setTimeout(function () {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 220);
+  }, ms);
+}
 
 function getBdb() {
   return window.BiotaDeleteBtn || BDB;
@@ -3362,23 +3391,18 @@ function saveSetupToolNoteEditor() {
           var replaced = data.tools_replaced != null ? data.tools_replaced : 0;
           var added = data.tools_added != null ? data.tools_added : 0;
           var total = data.tools_total != null ? data.tools_total : data.tools_count || 0;
+          var codeLabel = data.machine_code || machineCode;
           var msg =
-            "Станок «" +
-            (data.machine_code || machineCode) +
+            "В магазин «" +
+            codeLabel +
             "»: обновлено " +
             replaced +
             ", добавлено " +
             added +
-            ", всего в станке " +
+            ", всего " +
             total +
             ".";
-          if (data.machines_url || (PD && PD.machines_url)) {
-            if (window.confirm(msg + "\nОткрыть страницу «Станки»?")) {
-              window.open(data.machines_url || PD.machines_url, "_blank", "noopener");
-            }
-          } else {
-            alert(msg);
-          }
+          showProductToast(msg, { kind: "ok", ms: 5000 });
         } catch (_err) {
           alert("Ошибка сети при загрузке в станок.");
         } finally {

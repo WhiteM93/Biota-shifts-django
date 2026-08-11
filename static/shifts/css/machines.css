@@ -627,6 +627,86 @@
     justify-content: space-between;
     gap: 8px;
   }
+  .machines-tools-modal-head-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+  .machines-tools-clear-btn {
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.35);
+  }
+  .machines-tools-clear-btn:hover {
+    background: rgba(248, 113, 113, 0.12);
+  }
+  .machines-tools-legend {
+    margin: 0;
+    font-size: 12px;
+    color: var(--bio-text-muted, #94a3b8);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+  }
+  .machines-tools-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 650;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    text-transform: lowercase;
+    padding: 2px 7px;
+    border-radius: 999px;
+  }
+  .machines-tools-legend-item--added {
+    color: #166534;
+    background: rgba(74, 222, 128, 0.22);
+  }
+  .machines-tools-legend-item--changed {
+    color: #92400e;
+    background: rgba(251, 191, 36, 0.28);
+  }
+  html[data-theme="dawn"] .machines-tools-legend-item--added {
+    color: #14532d;
+    background: rgba(134, 239, 172, 0.45);
+  }
+  html[data-theme="dawn"] .machines-tools-legend-item--changed {
+    color: #78350f;
+    background: rgba(253, 230, 138, 0.65);
+  }
+  .machines-tools-table tr.is-tool-added > td {
+    background: rgba(74, 222, 128, 0.14);
+  }
+  .machines-tools-table tr.is-tool-changed > td {
+    background: rgba(251, 191, 36, 0.16);
+  }
+  html[data-theme="dawn"] .machines-tools-table tr.is-tool-added > td {
+    background: rgba(134, 239, 172, 0.35);
+  }
+  html[data-theme="dawn"] .machines-tools-table tr.is-tool-changed > td {
+    background: rgba(253, 230, 138, 0.55);
+  }
+  .machines-tools-change-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .machines-tools-change-badge--added {
+    color: #166534;
+    background: rgba(74, 222, 128, 0.28);
+  }
+  .machines-tools-change-badge--changed {
+    color: #92400e;
+    background: rgba(251, 191, 36, 0.35);
+  }
   .machines-tools-modal-title {
     margin: 0;
     font-size: 16px;

@@ -1804,12 +1804,15 @@
       var toolsModal = document.getElementById("machines-tools-modal");
       var toolsTitle = document.getElementById("machines-tools-modal-title");
       var toolsMeta = document.getElementById("machines-tools-modal-meta");
+      var toolsLegend = document.getElementById("machines-tools-legend");
       var toolsTbody = document.getElementById("machines-tools-tbody");
       var toolsEmpty = document.getElementById("machines-tools-empty");
       var toolsTable = document.getElementById("machines-tools-table");
+      var toolsClearBtn = document.querySelector(".js-machines-tools-clear");
       if (!toolsModal || !toolsTbody) return;
 
       var toolsByCode = {};
+      var currentToolsMachineCode = "";
       try {
         var toolsDataEl = document.getElementById("machines-tools-by-code");
         toolsByCode = toolsDataEl ? JSON.parse(toolsDataEl.textContent || "{}") : {};
@@ -1820,6 +1823,8 @@
       function closeToolsModal() {
         toolsModal.hidden = true;
         toolsModal.setAttribute("aria-hidden", "true");
+        currentToolsMachineCode = "";
+        if (toolsClearBtn) toolsClearBtn.hidden = true;
       }
 
       function escCell(v) {
@@ -1856,7 +1861,39 @@
             loaded_at: String(raw.loaded_at || "").trim(),
           };
         }
-        return { tools: [], product_name: "", setup_name: "", product_id: "", setup_id: "" };
+        return { tools: [], product_name: "", setup_name: "", product_id: "", setup_id: "", loaded_at: "" };
+      }
+
+      function setToolsPayload(machineCode, payload) {
+        var code = String(machineCode || "").trim();
+        if (!code) return;
+        toolsByCode[code] = payload || {
+          tools: [],
+          product_name: "",
+          setup_name: "",
+          product_id: "",
+          setup_id: "",
+          loaded_at: "",
+        };
+        Object.keys(toolsByCode).forEach(function (k) {
+          if (k !== code && String(k).toUpperCase() === code.toUpperCase()) {
+            toolsByCode[k] = toolsByCode[code];
+          }
+        });
+      }
+
+      function syncMachineCodeToolsAffordance(machineCode, hasTools) {
+        var code = String(machineCode || "").trim();
+        if (!code || !quickWrap) return;
+        var cells = quickWrap.querySelectorAll(".machines-quick-row > .machines-cell--code");
+        Array.prototype.forEach.call(cells, function (cell) {
+          var cellCode =
+            cell.getAttribute("data-machine-code") ||
+            readQuickRowCode(cell) ||
+            "";
+          if (String(cellCode).trim().toUpperCase() !== code.toUpperCase()) return;
+          cell.classList.toggle("has-machine-tools", !!hasTools);
+        });
       }
 
       function toolNumberSortKey(toolNumber) {
@@ -1885,28 +1922,45 @@
         });
       }
 
+      function toolChangeKind(tool, loadedAt) {
+        var kind = String((tool && tool.change_kind) || "").trim().toLowerCase();
+        if (kind !== "added" && kind !== "changed") return "";
+        var at = String((tool && tool.change_at) || "").trim();
+        var batch = String(loadedAt || "").trim();
+        if (batch && at && at !== batch) return "";
+        return kind;
+      }
+
       function openToolsModal(machineCode) {
         var code = String(machineCode || "").trim();
         if (!code) return;
+        currentToolsMachineCode = code;
         var payload = resolveToolsPayload(code);
         var tools = sortToolsByNumber(payload.tools || []);
         var productName = payload.product_name || "—";
         var setupName = payload.setup_name || "—";
+        var addedCount = 0;
+        var changedCount = 0;
         if (toolsTitle) toolsTitle.textContent = "Инструмент · " + code;
-        if (toolsMeta) {
-          toolsMeta.textContent = tools.length
-            ? "Загружено позиций: " + tools.length
-            : "Снимок инструмента для этого станка пуст.";
-        }
         toolsTbody.innerHTML = "";
         if (!tools.length) {
           if (toolsTable) toolsTable.hidden = true;
           if (toolsEmpty) toolsEmpty.hidden = false;
+          if (toolsLegend) toolsLegend.hidden = true;
+          if (toolsMeta) toolsMeta.textContent = "Снимок инструмента для этого станка пуст.";
         } else {
           if (toolsTable) toolsTable.hidden = false;
           if (toolsEmpty) toolsEmpty.hidden = true;
           tools.forEach(function (t) {
             var tr = document.createElement("tr");
+            var changeKind = toolChangeKind(t, payload.loaded_at);
+            if (changeKind === "added") {
+              addedCount += 1;
+              tr.classList.add("is-tool-added");
+            } else if (changeKind === "changed") {
+              changedCount += 1;
+              tr.classList.add("is-tool-changed");
+            }
             var rowProduct = String((t && t.product_name) || productName || "—").trim() || "—";
             var rowSetup = String((t && t.setup_name) || setupName || "—").trim() || "—";
             var rowPid =
@@ -1944,13 +1998,21 @@
                   "</a>";
               }
             }
+            var numHtml = escCell(t.tool_number);
+            if (changeKind === "added") {
+              numHtml +=
+                '<span class="machines-tools-change-badge machines-tools-change-badge--added">новое</span>';
+            } else if (changeKind === "changed") {
+              numHtml +=
+                '<span class="machines-tools-change-badge machines-tools-change-badge--changed">изм.</span>';
+            }
             tr.innerHTML =
               '<td class="machines-tools-col-product">' +
               productCellHtml +
               '</td><td class="machines-tools-col-setup">' +
               setupCellHtml +
               "</td><td>" +
-              escCell(t.tool_number) +
+              numHtml +
               "</td><td>" +
               escCell(t.tool_type) +
               "</td><td>" +
@@ -1962,9 +2024,74 @@
               "</td>";
             toolsTbody.appendChild(tr);
           });
+          var metaParts = ["Загружено позиций: " + tools.length];
+          if (addedCount) metaParts.push("новых: " + addedCount);
+          if (changedCount) metaParts.push("изменено: " + changedCount);
+          if (toolsMeta) toolsMeta.textContent = metaParts.join(" · ");
+          if (toolsLegend) toolsLegend.hidden = !(addedCount || changedCount);
+        }
+        if (toolsClearBtn) {
+          toolsClearBtn.hidden = !(
+            root.getAttribute("data-machines-quick-edit") === "1" && tools.length
+          );
+          toolsClearBtn.disabled = false;
         }
         toolsModal.hidden = false;
         toolsModal.setAttribute("aria-hidden", "false");
+      }
+
+      async function clearCurrentMachineTools() {
+        var code = currentToolsMachineCode;
+        if (!code) return;
+        if (
+          !confirm(
+            "Очистить магазин инструмента станка «" + code + "»? Все позиции будут удалены."
+          )
+        ) {
+          return;
+        }
+        if (toolsClearBtn) toolsClearBtn.disabled = true;
+        try {
+          var token = (getCookie("csrftoken") || "").trim();
+          if (!token) {
+            alert("Нет CSRF-токена (csrftoken). Обновите страницу.");
+            return;
+          }
+          var res = await fetch(window.location.pathname || "/machines/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": token,
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            credentials: "same-origin",
+            body: JSON.stringify({
+              action: "clear_machine_tools",
+              machine_code: code,
+            }),
+          });
+          var data = await res.json().catch(function () {
+            return {};
+          });
+          if (!res.ok || !data.ok) {
+            alert((data && data.error) || "Не удалось очистить магазин.");
+            return;
+          }
+          setToolsPayload(code, {
+            tools: [],
+            product_name: "",
+            setup_name: "",
+            product_id: "",
+            setup_id: "",
+            loaded_at: "",
+          });
+          syncMachineCodeToolsAffordance(code, false);
+          openToolsModal(code);
+        } catch (err) {
+          alert("Ошибка сети при очистке магазина.");
+        } finally {
+          if (toolsClearBtn) toolsClearBtn.disabled = false;
+        }
       }
 
       quickWrap.addEventListener("click", function (e) {
@@ -2001,6 +2128,11 @@
       toolsModal.addEventListener("click", function (e) {
         if (e.target && e.target.getAttribute("data-close-machines-tools") === "1") {
           closeToolsModal();
+          return;
+        }
+        if (e.target && e.target.closest && e.target.closest(".js-machines-tools-clear")) {
+          e.preventDefault();
+          clearCurrentMachineTools();
         }
       });
       document.addEventListener("keydown", function (e) {
