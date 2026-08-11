@@ -3942,6 +3942,189 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   .setup-load-machine-icon {
     display: block;
   }
+  .setup-tools-compare-modal[hidden] {
+    display: none !important;
+  }
+  .setup-tools-compare-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1525;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  .setup-tools-compare-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(7, 11, 18, 0.55);
+  }
+  .setup-tools-compare-modal-dialog {
+    position: relative;
+    z-index: 1;
+    width: min(760px, 100%);
+    max-height: min(88vh, 720px);
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px 16px;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 10px;
+    background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+    box-shadow: var(--bio-filter-shadow);
+  }
+  html[data-theme="dawn"] .setup-tools-compare-modal-dialog {
+    background: linear-gradient(180deg, #fffefb 0%, #f4ebe0 100%);
+  }
+  .setup-tools-compare-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .setup-tools-compare-modal-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 650;
+  }
+  .setup-tools-compare-hint {
+    margin: 0;
+    font-size: 13px;
+  }
+  .setup-tools-compare-pickers {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 10px;
+  }
+  @media (max-width: 640px) {
+    .setup-tools-compare-pickers {
+      grid-template-columns: 1fr;
+    }
+  }
+  .setup-tools-compare-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+    min-width: 0;
+  }
+  .setup-tools-compare-field > span {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--bio-text-muted, #94a3b8);
+  }
+  .setup-tools-compare-field input,
+  .setup-tools-compare-field select {
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 7px;
+    border: 1px solid var(--bio-input-border, rgba(148, 163, 184, 0.35));
+    background: var(--bio-input-bg, rgba(15, 23, 42, 0.35));
+    color: inherit;
+    font: inherit;
+    font-size: 13px;
+  }
+  .setup-tools-compare-suggest {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 2px);
+    z-index: 2;
+    max-height: 220px;
+    overflow: auto;
+    border: 1px solid var(--bio-filter-border);
+    border-radius: 8px;
+    background: var(--bio-filter-bg1, #111827);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  }
+  .setup-tools-compare-suggest-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 8px 10px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .setup-tools-compare-suggest-item:hover,
+  .setup-tools-compare-suggest-item:focus-visible {
+    background: rgba(96, 165, 250, 0.16);
+    outline: none;
+  }
+  .setup-tools-compare-suggest-item.is-current::after {
+    content: " · эта";
+    opacity: 0.65;
+    font-size: 12px;
+  }
+  .setup-tools-compare-source {
+    margin: 0;
+    font-size: 12.5px;
+  }
+  .setup-tools-compare-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 18px;
+    align-items: center;
+    font-size: 13px;
+  }
+  .setup-tools-compare-toolbar label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .setup-tools-compare-table-wrap {
+    min-height: 120px;
+    max-height: min(42vh, 360px);
+    overflow: auto;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 8px;
+  }
+  .setup-tools-compare-table {
+    margin: 0;
+    width: 100%;
+  }
+  .setup-tools-compare-table th,
+  .setup-tools-compare-table td {
+    font-size: 12.5px;
+    padding: 6px 8px;
+  }
+  .setup-tools-compare-table tr.is-present > td {
+    background: rgba(148, 163, 184, 0.08);
+  }
+  .setup-tools-compare-table tr.is-conflict > td {
+    background: rgba(251, 191, 36, 0.12);
+  }
+  .setup-tools-compare-status {
+    font-size: 11px;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .setup-tools-compare-status--absent {
+    color: #4ade80;
+  }
+  .setup-tools-compare-status--empty {
+    color: #60a5fa;
+  }
+  .setup-tools-compare-status--filled {
+    color: #fbbf24;
+  }
+  .setup-tools-compare-empty {
+    margin: 16px;
+    font-size: 13px;
+  }
+  .setup-tools-compare-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
   .product-toast-host {
     position: fixed;
     z-index: 3000;

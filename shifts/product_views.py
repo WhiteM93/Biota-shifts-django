@@ -2008,6 +2008,68 @@ def product_detail_view(request, pk: int):
         if action == "list_machine_codes":
             return JsonResponse({"ok": True, "machines": list_machine_codes()})
 
+        if action == "search_naladki_for_tools_compare":
+            q = (request.POST.get("q") or "").strip()
+            qs = Product.objects.filter(catalog_section=Product.CATALOG_NALADKI).order_by("name")
+            if q:
+                qs = qs.filter(Q(name__icontains=q) | Q(description__icontains=q))
+            items = [
+                {"id": p.pk, "name": (p.name or "").strip() or f"#{p.pk}", "is_current": p.pk == product.pk}
+                for p in qs[:40]
+            ]
+            return JsonResponse({"ok": True, "products": items})
+
+        if action == "get_product_setups_tools_for_compare":
+            pid_raw = (request.POST.get("product_id") or "").strip()
+            pid = int(pid_raw) if pid_raw.isdigit() else 0
+            src_product = Product.objects.filter(pk=pid, catalog_section=Product.CATALOG_NALADKI).first()
+            if not src_product:
+                return JsonResponse({"ok": False, "error": "Наладка не найдена."}, status=404)
+            setups_out = []
+            for su in _product_setups_qs(src_product).prefetch_related("tools"):
+                tools_out = []
+                for row in sorted(su.tools.all(), key=_tool_row_sort_key):
+                    if _setup_tool_fields_are_empty(
+                        tool_type=row.tool_type or "",
+                        diameter=row.diameter or "",
+                        overhang=row.overhang or "",
+                        note=row.name or "",
+                        correction_enabled=bool(row.correction_enabled),
+                        kor_n=row.kor_n or "",
+                        kor_d=row.kor_d or "",
+                        has_photo=bool(row.photo),
+                    ):
+                        continue
+                    disp = _display_dict_from_tool_row(row)
+                    tools_out.append(
+                        {
+                            "tool_number": disp.get("tool_number") or "",
+                            "correction_enabled": bool(disp.get("correction_enabled")),
+                            "kor_n": disp.get("kor_n") or "",
+                            "kor_d": disp.get("kor_d") or "",
+                            "tool_type": disp.get("tool_type") or "",
+                            "diameter": disp.get("diameter") or "",
+                            "overhang": disp.get("overhang") or "",
+                            "note": disp.get("note") or "",
+                        }
+                    )
+                setups_out.append(
+                    {
+                        "id": su.pk,
+                        "name": (su.name or "").strip() or f"Установка {su.pk}",
+                        "tools_count": len(tools_out),
+                        "tools": tools_out,
+                    }
+                )
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "product_id": src_product.pk,
+                    "product_name": (src_product.name or "").strip(),
+                    "setups": setups_out,
+                }
+            )
+
         if action == "assign_setup_to_machine":
             setup_id_raw = (request.POST.get("setup_id") or "").strip()
             machine_code = (request.POST.get("machine_code") or "").strip()

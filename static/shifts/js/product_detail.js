@@ -1750,11 +1750,12 @@ function saveSetupToolNoteEditor() {
       return removed;
     }
 
-    function appendSetupToolRow(panel) {
-      if (!panel) return;
+    function appendSetupToolRow(panel, seedData) {
+      if (!panel) return null;
       var tbody = panel.querySelector(".setup-tools-view tbody");
-      if (!tbody) return;
-      var toolNo = nextToolNumberDisplay(panel);
+      if (!tbody) return null;
+      var seed = seedData && typeof seedData === "object" ? seedData : null;
+      var toolNo = (seed && seed.tool_number) || nextToolNumberDisplay(panel);
       var tr = document.createElement("tr");
       var tdActions = document.createElement("td");
       tdActions.className = "setup-tools-row-actions-cell";
@@ -1805,10 +1806,112 @@ function saveSetupToolNoteEditor() {
       tdNote.appendChild(buildSetupToolNoteWrap(""));
       tr.appendChild(tdNote);
       tbody.appendChild(tr);
+      if (seed) applyToolDataToRow(tr, seed, { keepNumber: true });
       sortSetupToolsTbodyByToolNumber(tbody);
       syncRowOrderDisplay(panel);
       if (inlineEditMode) setToolsEditMode(panel, true, tr);
       syncToolOverrideClasses(panel);
+      return tr;
+    }
+
+    function toolNumberKey(raw) {
+      var n = normalizeToolNumber(String(raw || "").trim());
+      if (!n) return "";
+      if (n.charAt(0) === "T" && /^\d+$/.test(n.slice(1))) {
+        return "T" + String(parseInt(n.slice(1), 10));
+      }
+      return n.toUpperCase();
+    }
+
+    function findToolRowByNumber(panel, toolNumber) {
+      if (!panel) return null;
+      var want = toolNumberKey(toolNumber);
+      if (!want) return null;
+      var rows = panel.querySelectorAll(".setup-tools-view tbody tr");
+      for (var i = 0; i < rows.length; i++) {
+        var cell = rows[i].querySelector('td[data-tool-col="tool_number"]');
+        if (toolNumberKey(getSetupToolNumberValue(cell)) === want) return rows[i];
+      }
+      return null;
+    }
+
+    function setToolRowPlainCell(row, col, value) {
+      var cell = row.querySelector('td[data-tool-col="' + col + '"]');
+      if (!cell) return;
+      var text = value == null ? "" : String(value);
+      if (col === "tool_type") {
+        var sel = cell.querySelector("select.js-inline-tool-type");
+        cell.setAttribute("data-tool-type-value", text);
+        if (sel) sel.value = text;
+        else cell.textContent = text;
+        return;
+      }
+      if (col === "note") {
+        setSetupToolNoteValue(cell, text);
+        return;
+      }
+      if (col === "kor_n" || col === "kor_d") {
+        var digits = text.replace(/[^0-9]/g, "");
+        if (cell.isContentEditable || cell.classList.contains("is-inline-edit")) {
+          cell.textContent = digits;
+        } else {
+          cell.textContent = digits ? (col === "kor_n" ? "H" : "D") + digits : "";
+        }
+        return;
+      }
+      if (col === "diameter") {
+        cell.textContent = formatToolDiameterDisplay(text, getRowToolType(row));
+        return;
+      }
+      if (col === "overhang") {
+        cell.textContent = formatToolOverhangDisplay(text);
+        return;
+      }
+      cell.textContent = text;
+    }
+
+    function applyToolDataToRow(row, data, opts) {
+      if (!row || !data) return;
+      var keepNumber = !!(opts && opts.keepNumber);
+      if (!keepNumber && data.tool_number) {
+        var numCell = row.querySelector('td[data-tool-col="tool_number"]');
+        if (numCell) {
+          ensureSetupToolNumberCellStructure(numCell);
+          var span = numCell.querySelector(".setup-tool-number-text");
+          var tn = normalizeToolNumber(data.tool_number) || String(data.tool_number || "").trim();
+          if (span) span.textContent = tn;
+          else numCell.textContent = tn;
+          syncSetupToolNumberDisplay(numCell);
+        }
+      }
+      var corCell = row.querySelector('td[data-tool-col="correction_enabled"]');
+      if (corCell) {
+        var on = !!data.correction_enabled;
+        corCell.setAttribute("data-correction-enabled", on ? "1" : "0");
+        var box = corCell.querySelector(".setup-tool-correction-box");
+        if (box) box.classList.toggle("is-checked", on);
+      }
+      setToolRowPlainCell(row, "tool_type", data.tool_type || "");
+      setToolRowPlainCell(row, "diameter", data.diameter || "");
+      setToolRowPlainCell(row, "overhang", data.overhang || "");
+      setToolRowPlainCell(row, "note", data.note || "");
+      setToolRowPlainCell(row, "kor_n", data.kor_n || "");
+      setToolRowPlainCell(row, "kor_d", data.kor_d || "");
+    }
+
+    function currentLocalToolsMap(panel) {
+      var map = {};
+      if (!panel) return map;
+      panel.querySelectorAll(".setup-tools-view tbody tr").forEach(function (tr) {
+        var cell = tr.querySelector('td[data-tool-col="tool_number"]');
+        var key = toolNumberKey(getSetupToolNumberValue(cell));
+        if (!key) return;
+        map[key] = {
+          empty: isSetupToolRowEmpty(tr),
+          row: tr,
+        };
+      });
+      return map;
     }
 
     function getRowToolType(row) {
@@ -3262,6 +3365,427 @@ function saveSetupToolNoteEditor() {
       }
     }
 
+    var setupToolsCompareTargetPanel = null;
+    var setupToolsCompareState = { productId: "", productName: "", setups: [], setupId: "" };
+    var setupToolsCompareSearchTimer = null;
+
+    function closeSetupToolsCompareModal() {
+      var modal = document.getElementById("setup-tools-compare-modal");
+      if (!modal) return;
+      modal.hidden = true;
+      modal.setAttribute("hidden", "");
+      modal.setAttribute("aria-hidden", "true");
+      setupToolsCompareTargetPanel = null;
+      var suggest = document.querySelector(".js-setup-tools-compare-suggest");
+      if (suggest) {
+        suggest.hidden = true;
+        suggest.innerHTML = "";
+      }
+    }
+
+    function syncSetupToolsCompareApplyEnabled() {
+      var applyBtn = document.querySelector(".js-setup-tools-compare-apply");
+      var tbody = document.querySelector(".js-setup-tools-compare-tbody");
+      if (!applyBtn || !tbody) return;
+      var checked = tbody.querySelectorAll('input.js-setup-tools-compare-row:checked').length;
+      applyBtn.disabled = checked === 0;
+    }
+
+    function renderSetupToolsCompareRows(tools) {
+      var tbody = document.querySelector(".js-setup-tools-compare-tbody");
+      var table = document.querySelector(".setup-tools-compare-table");
+      var emptyEl = document.querySelector(".js-setup-tools-compare-empty");
+      var toolbar = document.querySelector(".setup-tools-compare-toolbar");
+      var allCb = document.querySelector(".js-setup-tools-compare-all");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+      var localMap = currentLocalToolsMap(setupToolsCompareTargetPanel);
+      var list = Array.isArray(tools) ? tools : [];
+      if (!list.length) {
+        if (table) table.hidden = true;
+        if (toolbar) toolbar.hidden = true;
+        if (emptyEl) {
+          emptyEl.hidden = false;
+          emptyEl.textContent = "В этой установке нет заполненного инструмента.";
+        }
+        syncSetupToolsCompareApplyEnabled();
+        return;
+      }
+      if (table) table.hidden = false;
+      if (toolbar) toolbar.hidden = false;
+      if (emptyEl) emptyEl.hidden = true;
+      list.forEach(function (tool, idx) {
+        var key = toolNumberKey(tool.tool_number);
+        var local = key ? localMap[key] : null;
+        var status = "нет";
+        var statusCls = "setup-tools-compare-status--absent";
+        var rowCls = "";
+        var precheck = true;
+        if (local) {
+          if (local.empty) {
+            status = "пустой слот";
+            statusCls = "setup-tools-compare-status--empty";
+            rowCls = "is-present";
+          } else {
+            status = "занят";
+            statusCls = "setup-tools-compare-status--filled";
+            rowCls = "is-conflict";
+            precheck = false;
+          }
+        }
+        var tr = document.createElement("tr");
+        if (rowCls) tr.className = rowCls;
+        tr.innerHTML =
+          '<td><input type="checkbox" class="js-setup-tools-compare-row" data-idx="' +
+          idx +
+          '"' +
+          (precheck ? " checked" : "") +
+          "></td>" +
+          "<td>" +
+          escHtml(tool.tool_number || "") +
+          "</td><td>" +
+          escHtml(tool.tool_type || "") +
+          "</td><td>" +
+          escHtml(tool.diameter || "") +
+          "</td><td>" +
+          escHtml(tool.overhang || "") +
+          "</td><td>" +
+          escHtml(tool.note || "") +
+          '</td><td><span class="setup-tools-compare-status ' +
+          statusCls +
+          '">' +
+          status +
+          "</span></td>";
+        tbody.appendChild(tr);
+      });
+      tbody._compareTools = list;
+      if (allCb) {
+        var boxes = tbody.querySelectorAll("input.js-setup-tools-compare-row");
+        allCb.checked = boxes.length > 0 && Array.prototype.every.call(boxes, function (b) { return b.checked; });
+      }
+      syncSetupToolsCompareApplyEnabled();
+    }
+
+    function escHtml(v) {
+      return String(v == null ? "" : v)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function fillCompareSetupSelect(setups, preferSetupId) {
+      var sel = document.querySelector(".js-setup-tools-compare-setup");
+      if (!sel) return;
+      sel.innerHTML = "";
+      if (!setups || !setups.length) {
+        var empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = "Нет установок";
+        sel.appendChild(empty);
+        sel.disabled = true;
+        renderSetupToolsCompareRows([]);
+        return;
+      }
+      sel.disabled = false;
+      setups.forEach(function (su) {
+        var opt = document.createElement("option");
+        opt.value = String(su.id);
+        opt.textContent = (su.name || ("#" + su.id)) + " · " + (su.tools_count || 0) + " инстр.";
+        sel.appendChild(opt);
+      });
+      var prefer = preferSetupId ? String(preferSetupId) : "";
+      if (prefer && Array.prototype.some.call(sel.options, function (o) { return o.value === prefer; })) {
+        sel.value = prefer;
+      } else {
+        sel.selectedIndex = 0;
+      }
+      setupToolsCompareState.setupId = sel.value;
+      var chosen = setups.filter(function (s) { return String(s.id) === sel.value; })[0];
+      renderSetupToolsCompareRows(chosen && chosen.tools);
+    }
+
+    async function loadCompareProduct(productId, productName) {
+      setupToolsCompareState.productId = String(productId || "");
+      setupToolsCompareState.productName = productName || "";
+      var sourceEl = document.querySelector(".js-setup-tools-compare-source");
+      if (sourceEl) {
+        sourceEl.hidden = false;
+        sourceEl.textContent = "Наладка: " + (productName || "#" + productId);
+      }
+      var search = document.querySelector(".js-setup-tools-compare-search");
+      if (search) search.value = productName || "";
+      var suggest = document.querySelector(".js-setup-tools-compare-suggest");
+      if (suggest) {
+        suggest.hidden = true;
+        suggest.innerHTML = "";
+      }
+      try {
+        var fd = new FormData();
+        fd.append("action", "get_product_setups_tools_for_compare");
+        fd.append("product_id", String(productId));
+        var res = await fetch(window.location.href, {
+          method: "POST",
+          headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+          body: fd,
+          credentials: "same-origin",
+        });
+        var data = await res.json();
+        if (!res.ok || !data || !data.ok) {
+          alert((data && data.error) || "Не удалось загрузить установки.");
+          return;
+        }
+        setupToolsCompareState.setups = data.setups || [];
+        var currentSetupId = "";
+        var tabName = getCurrentTabName();
+        var m = (tabName || "").match(/^setup-(\d+)$/);
+        if (m && String(data.product_id) === String((PD && PD.product_id) || "")) {
+          currentSetupId = "";
+          // Prefer another setup of the same product if available.
+          var other = (data.setups || []).filter(function (s) { return String(s.id) !== m[1]; })[0];
+          if (other) currentSetupId = String(other.id);
+        }
+        fillCompareSetupSelect(data.setups || [], currentSetupId);
+      } catch (_err) {
+        alert("Ошибка сети при загрузке наладки.");
+      }
+    }
+
+    async function searchCompareProducts(q) {
+      var suggest = document.querySelector(".js-setup-tools-compare-suggest");
+      if (!suggest) return;
+      try {
+        var fd = new FormData();
+        fd.append("action", "search_naladki_for_tools_compare");
+        fd.append("q", q || "");
+        var res = await fetch(window.location.href, {
+          method: "POST",
+          headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+          body: fd,
+          credentials: "same-origin",
+        });
+        var data = await res.json();
+        if (!res.ok || !data || !data.ok) {
+          suggest.hidden = true;
+          return;
+        }
+        var products = data.products || [];
+        suggest.innerHTML = "";
+        if (!products.length) {
+          var empty = document.createElement("div");
+          empty.className = "setup-tools-compare-suggest-item";
+          empty.textContent = "Ничего не найдено";
+          suggest.appendChild(empty);
+          suggest.hidden = false;
+          return;
+        }
+        products.forEach(function (p) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "setup-tools-compare-suggest-item" + (p.is_current ? " is-current" : "");
+          btn.setAttribute("data-product-id", String(p.id));
+          btn.setAttribute("data-product-name", p.name || "");
+          btn.textContent = p.name || ("#" + p.id);
+          suggest.appendChild(btn);
+        });
+        suggest.hidden = false;
+      } catch (_err) {
+        suggest.hidden = true;
+      }
+    }
+
+    function resolveSetupToolsComparePanel(fromEl) {
+      var panel = null;
+      if (fromEl && fromEl.closest) {
+        panel = fromEl.closest(".product-tab-panel");
+      }
+      if (!panel) panel = activeSetupPanel();
+      return panel;
+    }
+
+    function openSetupToolsCompareModal(panel) {
+      var modal = document.getElementById("setup-tools-compare-modal");
+      if (!modal) {
+        alert("Модальное окно сравнения не найдено. Обновите страницу (Ctrl+F5).");
+        return;
+      }
+      if (!panel) {
+        alert("Не удалось определить активную установку. Выберите установку и попробуйте снова.");
+        return;
+      }
+      setupToolsCompareTargetPanel = panel;
+      setupToolsCompareState = { productId: "", productName: "", setups: [], setupId: "" };
+      var search = modal.querySelector(".js-setup-tools-compare-search");
+      if (search) search.value = "";
+      var sel = modal.querySelector(".js-setup-tools-compare-setup");
+      if (sel) {
+        sel.innerHTML = '<option value="">Сначала выберите наладку</option>';
+        sel.disabled = true;
+      }
+      var sourceEl = modal.querySelector(".js-setup-tools-compare-source");
+      if (sourceEl) {
+        sourceEl.hidden = true;
+        sourceEl.textContent = "";
+      }
+      var table = modal.querySelector(".setup-tools-compare-table");
+      var toolbar = modal.querySelector(".setup-tools-compare-toolbar");
+      var tbody = modal.querySelector(".js-setup-tools-compare-tbody");
+      if (tbody) {
+        tbody.innerHTML = "";
+        tbody._compareTools = null;
+      }
+      if (table) table.hidden = true;
+      if (toolbar) toolbar.hidden = true;
+      var emptyEl = modal.querySelector(".js-setup-tools-compare-empty");
+      if (emptyEl) {
+        emptyEl.hidden = false;
+        emptyEl.textContent = "Выберите наладку и установку.";
+      }
+      syncSetupToolsCompareApplyEnabled();
+      modal.hidden = false;
+      modal.removeAttribute("hidden");
+      modal.setAttribute("aria-hidden", "false");
+      var currentId = (PD && PD.product_id) || "";
+      var currentName = (PD && PD.product_name) || "";
+      if (currentId) {
+        loadCompareProduct(currentId, currentName || "Текущая наладка");
+      } else if (search) {
+        search.focus();
+      }
+    }
+
+    function applySelectedCompareTools() {
+      var panel = setupToolsCompareTargetPanel;
+      var tbody = document.querySelector(".js-setup-tools-compare-tbody");
+      if (!panel || !tbody || !tbody._compareTools) return;
+      var replaceCb = document.querySelector(".js-setup-tools-compare-replace");
+      var replaceExisting = !!(replaceCb && replaceCb.checked);
+      var selected = [];
+      tbody.querySelectorAll("input.js-setup-tools-compare-row:checked").forEach(function (cb) {
+        var idx = parseInt(cb.getAttribute("data-idx") || "", 10);
+        if (!isNaN(idx) && tbody._compareTools[idx]) selected.push(tbody._compareTools[idx]);
+      });
+      if (!selected.length) return;
+      var added = 0;
+      var updated = 0;
+      var skipped = 0;
+      selected.forEach(function (tool) {
+        var existing = findToolRowByNumber(panel, tool.tool_number);
+        if (existing) {
+          if (isSetupToolRowEmpty(existing) || replaceExisting) {
+            applyToolDataToRow(existing, tool, { keepNumber: true });
+            if (inlineEditMode) setToolsEditMode(panel, true, existing);
+            updated += 1;
+          } else {
+            skipped += 1;
+          }
+          return;
+        }
+        appendSetupToolRow(panel, tool);
+        added += 1;
+      });
+      syncToolOverrideClasses(panel);
+      closeSetupToolsCompareModal();
+      var parts = [];
+      if (added) parts.push("добавлено " + added);
+      if (updated) parts.push("обновлено " + updated);
+      if (skipped) parts.push("пропущено " + skipped + " (заняты)");
+      showProductToast(
+        parts.length ? ("Инструмент: " + parts.join(", ") + ".") : "Нечего добавлять.",
+        { kind: "ok", ms: 4500 }
+      );
+    }
+
+    (function initSetupToolsCompareModal() {
+      var modal = document.getElementById("setup-tools-compare-modal");
+      if (!modal) return;
+      var search = modal.querySelector(".js-setup-tools-compare-search");
+      var suggest = modal.querySelector(".js-setup-tools-compare-suggest");
+      var setupSel = modal.querySelector(".js-setup-tools-compare-setup");
+      var allCb = modal.querySelector(".js-setup-tools-compare-all");
+      var applyBtn = modal.querySelector(".js-setup-tools-compare-apply");
+
+      // Capture phase so open is not blocked by other handlers on #product-tabs.
+      document.addEventListener(
+        "click",
+        function (e) {
+          var t = e.target;
+          var compareBtn = t && t.closest ? t.closest(".js-setup-tools-compare") : null;
+          if (!compareBtn) return;
+          if (!root.contains(compareBtn)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (!inlineEditMode) {
+            showProductToast("Включите быстрое редактирование, чтобы сравнивать инструмент.", {
+              kind: "err",
+              ms: 3500,
+            });
+            return;
+          }
+          openSetupToolsCompareModal(resolveSetupToolsComparePanel(compareBtn));
+        },
+        true
+      );
+
+      modal.addEventListener("click", function (e) {
+        var t = e.target;
+        if (t && t.getAttribute && t.getAttribute("data-close-setup-tools-compare") === "1") {
+          closeSetupToolsCompareModal();
+          return;
+        }
+        var pick = t && t.closest && t.closest(".setup-tools-compare-suggest-item[data-product-id]");
+        if (pick) {
+          e.preventDefault();
+          loadCompareProduct(pick.getAttribute("data-product-id"), pick.getAttribute("data-product-name") || "");
+        }
+      });
+      if (search) {
+        search.addEventListener("input", function () {
+          if (setupToolsCompareSearchTimer) clearTimeout(setupToolsCompareSearchTimer);
+          var q = search.value;
+          setupToolsCompareSearchTimer = setTimeout(function () {
+            searchCompareProducts(q);
+          }, 180);
+        });
+        search.addEventListener("focus", function () {
+          searchCompareProducts(search.value || "");
+        });
+      }
+      if (setupSel) {
+        setupSel.addEventListener("change", function () {
+          setupToolsCompareState.setupId = setupSel.value;
+          var chosen = (setupToolsCompareState.setups || []).filter(function (s) {
+            return String(s.id) === String(setupSel.value);
+          })[0];
+          renderSetupToolsCompareRows(chosen && chosen.tools);
+        });
+      }
+      if (allCb) {
+        allCb.addEventListener("change", function () {
+          var tbody = modal.querySelector(".js-setup-tools-compare-tbody");
+          if (!tbody) return;
+          tbody.querySelectorAll("input.js-setup-tools-compare-row").forEach(function (cb) {
+            cb.checked = allCb.checked;
+          });
+          syncSetupToolsCompareApplyEnabled();
+        });
+      }
+      modal.addEventListener("change", function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains("js-setup-tools-compare-row")) {
+          syncSetupToolsCompareApplyEnabled();
+        }
+      });
+      if (applyBtn) {
+        applyBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          applySelectedCompareTools();
+        });
+      }
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && modal && !modal.hidden) closeSetupToolsCompareModal();
+      });
+    })();
+
     (function initLoadSetupToMachine() {
       var loadBtn = document.getElementById("setup-load-to-machine-btn");
       var modal = document.getElementById("setup-load-machine-modal");
@@ -3671,6 +4195,11 @@ function saveSetupToolNoteEditor() {
         if (!removedEmpty) {
           alert("Пустых строк нет (или осталась одна — её нельзя удалить).");
         }
+        return;
+      }
+      var compareBtn = el.closest && el.closest(".js-setup-tools-compare");
+      if (compareBtn) {
+        // Handled by document listener in initSetupToolsCompareModal.
         return;
       }
       var correctionCell = el.closest ? el.closest('td[data-tool-col="correction_enabled"]') : null;

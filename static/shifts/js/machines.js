@@ -1809,10 +1809,19 @@
       var toolsEmpty = document.getElementById("machines-tools-empty");
       var toolsTable = document.getElementById("machines-tools-table");
       var toolsClearBtn = document.querySelector(".js-machines-tools-clear");
+      var toolsAddForm = document.querySelector(".js-machines-tools-add-form");
+      var toolsAddNumber = document.querySelector(".js-machines-tools-add-number");
+      var toolsAddType = document.querySelector(".js-machines-tools-add-type");
+      var toolsAddDiameter = document.querySelector(".js-machines-tools-add-diameter");
+      var toolsAddOverhang = document.querySelector(".js-machines-tools-add-overhang");
+      var toolsAddNote = document.querySelector(".js-machines-tools-add-note");
+      var toolsAddSubmit = document.querySelector(".js-machines-tools-add-submit");
       if (!toolsModal || !toolsTbody) return;
 
       var toolsByCode = {};
       var currentToolsMachineCode = "";
+      var toolsBusy = false;
+      var canEditTools = root.getAttribute("data-machines-quick-edit") === "1";
       try {
         var toolsDataEl = document.getElementById("machines-tools-by-code");
         toolsByCode = toolsDataEl ? JSON.parse(toolsDataEl.textContent || "{}") : {};
@@ -1825,6 +1834,7 @@
         toolsModal.setAttribute("aria-hidden", "true");
         currentToolsMachineCode = "";
         if (toolsClearBtn) toolsClearBtn.hidden = true;
+        if (toolsAddForm) toolsAddForm.hidden = true;
       }
 
       function escCell(v) {
@@ -1931,6 +1941,39 @@
         return kind;
       }
 
+      function nextFreeToolNumber(tools) {
+        var used = {};
+        (tools || []).forEach(function (t) {
+          var key = toolNumberSortKey(t && t.tool_number);
+          if (key[0] === 0) used[key[1]] = true;
+        });
+        var n = 1;
+        while (used[n] && n < 200) n += 1;
+        return n < 100 ? "T" + String(n).padStart(2, "0") : "T" + n;
+      }
+
+      function applyServerToolsPayload(code, data) {
+        if (!data) return;
+        setToolsPayload(code, {
+          tools: Array.isArray(data.tools) ? data.tools : [],
+          product_name: String(data.product_name || "").trim(),
+          setup_name: String(data.setup_name || "").trim(),
+          product_id: data.product_id != null && data.product_id !== "" ? String(data.product_id) : "",
+          setup_id: data.setup_id != null && data.setup_id !== "" ? String(data.setup_id) : "",
+          loaded_at: String(data.loaded_at || "").trim(),
+        });
+        syncMachineCodeToolsAffordance(code, !!(data.tools && data.tools.length));
+      }
+
+      function resetAddForm(tools) {
+        if (!toolsAddForm) return;
+        if (toolsAddNumber) toolsAddNumber.value = nextFreeToolNumber(tools || []);
+        if (toolsAddType) toolsAddType.value = "";
+        if (toolsAddDiameter) toolsAddDiameter.value = "";
+        if (toolsAddOverhang) toolsAddOverhang.value = "";
+        if (toolsAddNote) toolsAddNote.value = "";
+      }
+
       function openToolsModal(machineCode) {
         var code = String(machineCode || "").trim();
         if (!code) return;
@@ -2006,6 +2049,15 @@
               numHtml +=
                 '<span class="machines-tools-change-badge machines-tools-change-badge--changed">изм.</span>';
             }
+            var actionsHtml = "";
+            if (canEditTools) {
+              actionsHtml =
+                '<td class="machines-tools-col-actions">' +
+                '<button type="button" class="machines-tools-row-del js-machines-tools-row-del" data-tool-number="' +
+                escCell(t.tool_number) +
+                '" title="Удалить позицию" aria-label="Удалить">×</button>' +
+                "</td>";
+            }
             tr.innerHTML =
               '<td class="machines-tools-col-product">' +
               productCellHtml +
@@ -2021,7 +2073,8 @@
               escCell(t.overhang) +
               "</td><td>" +
               escCell(t.note || t.name) +
-              "</td>";
+              "</td>" +
+              actionsHtml;
             toolsTbody.appendChild(tr);
           });
           var metaParts = ["Загружено позиций: " + tools.length];
@@ -2031,18 +2084,47 @@
           if (toolsLegend) toolsLegend.hidden = !(addedCount || changedCount);
         }
         if (toolsClearBtn) {
-          toolsClearBtn.hidden = !(
-            root.getAttribute("data-machines-quick-edit") === "1" && tools.length
-          );
+          toolsClearBtn.hidden = !(canEditTools && tools.length);
           toolsClearBtn.disabled = false;
+        }
+        if (toolsAddForm) {
+          toolsAddForm.hidden = !canEditTools;
+          resetAddForm(tools);
+          if (toolsAddSubmit) toolsAddSubmit.disabled = false;
         }
         toolsModal.hidden = false;
         toolsModal.setAttribute("aria-hidden", "false");
       }
 
+      async function postMachineToolsAction(body) {
+        var token = (getCookie("csrftoken") || "").trim();
+        if (!token) {
+          alert("Нет CSRF-токена (csrftoken). Обновите страницу.");
+          return null;
+        }
+        var res = await fetch(window.location.pathname || "/machines/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": token,
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          credentials: "same-origin",
+          body: JSON.stringify(body),
+        });
+        var data = await res.json().catch(function () {
+          return {};
+        });
+        if (!res.ok || !data.ok) {
+          alert((data && data.error) || "Не удалось выполнить действие.");
+          return null;
+        }
+        return data;
+      }
+
       async function clearCurrentMachineTools() {
         var code = currentToolsMachineCode;
-        if (!code) return;
+        if (!code || toolsBusy) return;
         if (
           !confirm(
             "Очистить магазин инструмента станка «" + code + "»? Все позиции будут удалены."
@@ -2050,47 +2132,101 @@
         ) {
           return;
         }
+        toolsBusy = true;
         if (toolsClearBtn) toolsClearBtn.disabled = true;
         try {
-          var token = (getCookie("csrftoken") || "").trim();
-          if (!token) {
-            alert("Нет CSRF-токена (csrftoken). Обновите страницу.");
-            return;
-          }
-          var res = await fetch(window.location.pathname || "/machines/", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-CSRFToken": token,
-              "X-Requested-With": "XMLHttpRequest",
-            },
-            credentials: "same-origin",
-            body: JSON.stringify({
-              action: "clear_machine_tools",
-              machine_code: code,
-            }),
+          var data = await postMachineToolsAction({
+            action: "clear_machine_tools",
+            machine_code: code,
           });
-          var data = await res.json().catch(function () {
-            return {};
-          });
-          if (!res.ok || !data.ok) {
-            alert((data && data.error) || "Не удалось очистить магазин.");
-            return;
-          }
-          setToolsPayload(code, {
-            tools: [],
-            product_name: "",
-            setup_name: "",
-            product_id: "",
-            setup_id: "",
-            loaded_at: "",
-          });
-          syncMachineCodeToolsAffordance(code, false);
+          if (!data) return;
+          applyServerToolsPayload(code, data);
           openToolsModal(code);
         } catch (err) {
           alert("Ошибка сети при очистке магазина.");
         } finally {
+          toolsBusy = false;
           if (toolsClearBtn) toolsClearBtn.disabled = false;
+        }
+      }
+
+      async function upsertManualTool(e) {
+        if (e) e.preventDefault();
+        var code = currentToolsMachineCode;
+        if (!code || toolsBusy || !canEditTools) return;
+        var toolNumber = toolsAddNumber ? String(toolsAddNumber.value || "").trim() : "";
+        var toolType = toolsAddType ? String(toolsAddType.value || "").trim() : "";
+        var diameter = toolsAddDiameter ? String(toolsAddDiameter.value || "").trim() : "";
+        var overhang = toolsAddOverhang ? String(toolsAddOverhang.value || "").trim() : "";
+        var note = toolsAddNote ? String(toolsAddNote.value || "").trim() : "";
+        if (!toolNumber) {
+          alert("Укажите номер инструмента (T01…).");
+          if (toolsAddNumber) toolsAddNumber.focus();
+          return;
+        }
+        if (!(toolType || diameter || overhang || note)) {
+          alert("Заполните тип, ⌀, вылет или примечание.");
+          if (toolsAddType) toolsAddType.focus();
+          return;
+        }
+        var existing = resolveToolsPayload(code).tools || [];
+        var keyWanted = toolNumberSortKey(toolNumber);
+        var clash = existing.some(function (t) {
+          var k = toolNumberSortKey(t && t.tool_number);
+          return k[0] === keyWanted[0] && k[1] === keyWanted[1];
+        });
+        if (
+          clash &&
+          !confirm("Позиция «" + toolNumber + "» уже есть. Заменить её?")
+        ) {
+          return;
+        }
+        toolsBusy = true;
+        if (toolsAddSubmit) toolsAddSubmit.disabled = true;
+        try {
+          var data = await postMachineToolsAction({
+            action: "upsert_machine_tool",
+            machine_code: code,
+            tool: {
+              tool_number: toolNumber,
+              tool_type: toolType,
+              diameter: diameter,
+              overhang: overhang,
+              note: note,
+            },
+          });
+          if (!data) return;
+          applyServerToolsPayload(code, data);
+          openToolsModal(code);
+          if (toolsAddType) toolsAddType.focus();
+        } catch (err) {
+          alert("Ошибка сети при добавлении инструмента.");
+        } finally {
+          toolsBusy = false;
+          if (toolsAddSubmit) toolsAddSubmit.disabled = false;
+        }
+      }
+
+      async function removeToolRow(toolNumber) {
+        var code = currentToolsMachineCode;
+        if (!code || toolsBusy || !canEditTools) return;
+        var tn = String(toolNumber || "").trim();
+        if (!tn) return;
+        if (!confirm("Удалить позицию «" + tn + "» из магазина?")) return;
+        toolsBusy = true;
+        try {
+          var data = await postMachineToolsAction({
+            action: "remove_machine_tool",
+            machine_code: code,
+            tool_number: tn,
+          });
+          if (!data) return;
+          applyServerToolsPayload(code, data);
+          openToolsModal(code);
+        } catch (err) {
+          alert("Ошибка сети при удалении.");
+        } finally {
+          toolsBusy = false;
         }
       }
 
@@ -2133,8 +2269,17 @@
         if (e.target && e.target.closest && e.target.closest(".js-machines-tools-clear")) {
           e.preventDefault();
           clearCurrentMachineTools();
+          return;
+        }
+        var delBtn = e.target && e.target.closest && e.target.closest(".js-machines-tools-row-del");
+        if (delBtn) {
+          e.preventDefault();
+          removeToolRow(delBtn.getAttribute("data-tool-number") || "");
         }
       });
+      if (toolsAddForm) {
+        toolsAddForm.addEventListener("submit", upsertManualTool);
+      }
       document.addEventListener("keydown", function (e) {
         if (e.key === "Escape" && toolsModal && !toolsModal.hidden) closeToolsModal();
       });

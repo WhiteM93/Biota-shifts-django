@@ -396,6 +396,7 @@
             {% if biota_can_edit %}
             <div class="setup-tools-add-row" hidden>
               <button type="button" class="btn btn-ghost js-setup-tools-add-row">+ Строка инструмента</button>
+              <button type="button" class="btn btn-ghost js-setup-tools-compare" title="Сравнить с инструментом другой наладки и выбрать позиции">Сравнить с наладкой</button>
               <button type="button" class="btn btn-ghost js-setup-tools-clear-empty" title="Удалить строки без типа, диаметра, вылета, примечания и фото">Удалить пустые</button>
             </div>
             {% endif %}
@@ -546,6 +547,8 @@
 
 <script type="application/json" id="pd-piece-norms">{{ piece_norms_json|default:"{}"|safe }}</script>
 <script type="application/json" id="pd-options">{
+  "product_id": {{ product.pk }},
+  "product_name": "{{ product.name|default:''|escapejs }}",
   "pdf_url_specs": "{% url 'product_setup_pdf_export' product.pk 0 'specs' %}",
   "pdf_url_photos": "{% url 'product_setup_pdf_export' product.pk 0 'photos' %}",
   "stl_preview_url": "{{ preview_stl_url|default:'' }}",

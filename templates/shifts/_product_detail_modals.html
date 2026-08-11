@@ -73,3 +73,57 @@
     <p class="setup-load-machine-empty muted" id="setup-load-machine-empty" hidden>Станки не найдены. Добавьте их на странице «Станки».</p>
   </div>
 </div>
+<div id="setup-tools-compare-modal" class="setup-tools-compare-modal" hidden aria-hidden="true">
+  <div class="setup-tools-compare-modal-backdrop" data-close-setup-tools-compare="1"></div>
+  <div class="setup-tools-compare-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="setup-tools-compare-title">
+    <div class="setup-tools-compare-modal-head">
+      <h2 id="setup-tools-compare-title" class="setup-tools-compare-modal-title">Сравнить инструмент с наладкой</h2>
+      <button type="button" class="btn btn-ghost" data-close-setup-tools-compare="1" aria-label="Закрыть">×</button>
+    </div>
+    <p class="muted setup-tools-compare-hint">Выберите наладку и установку, отметьте позиции и добавьте их в текущую таблицу.</p>
+    <div class="setup-tools-compare-pickers">
+      <label class="setup-tools-compare-field">
+        <span>Наладка</span>
+        <input type="search" class="js-setup-tools-compare-search" placeholder="Поиск по названию…" autocomplete="off">
+        <div class="setup-tools-compare-suggest js-setup-tools-compare-suggest" hidden role="listbox"></div>
+      </label>
+      <label class="setup-tools-compare-field">
+        <span>Установка</span>
+        <select class="js-setup-tools-compare-setup" disabled>
+          <option value="">Сначала выберите наладку</option>
+        </select>
+      </label>
+    </div>
+    <p class="setup-tools-compare-source muted js-setup-tools-compare-source" hidden></p>
+    <div class="setup-tools-compare-toolbar" hidden>
+      <label class="setup-tools-compare-checkall">
+        <input type="checkbox" class="js-setup-tools-compare-all"> Выбрать все
+      </label>
+      <label class="setup-tools-compare-replace">
+        <input type="checkbox" class="js-setup-tools-compare-replace" checked>
+        Заменять совпадающие №
+      </label>
+    </div>
+    <div class="setup-tools-compare-table-wrap">
+      <table class="data-grid setup-tools-compare-table" hidden>
+        <thead>
+          <tr>
+            <th></th>
+            <th>№</th>
+            <th>Тип</th>
+            <th>⌀</th>
+            <th>Вылет</th>
+            <th>Прим.</th>
+            <th>У вас</th>
+          </tr>
+        </thead>
+        <tbody class="js-setup-tools-compare-tbody"></tbody>
+      </table>
+      <p class="muted setup-tools-compare-empty js-setup-tools-compare-empty">Выберите наладку и установку.</p>
+    </div>
+    <div class="setup-tools-compare-actions">
+      <button type="button" class="btn btn-ghost" data-close-setup-tools-compare="1">Отмена</button>
+      <button type="button" class="btn btn-primary js-setup-tools-compare-apply" disabled>Добавить выбранные</button>
+    </div>
+  </div>
+</div>

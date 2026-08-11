@@ -383,12 +383,62 @@
               <th>⌀</th>
               <th>Вылет</th>
               <th>Прим.</th>
+              {% if biota_machines_quick_edit %}<th class="machines-tools-col-actions"></th>{% endif %}
             </tr>
           </thead>
           <tbody id="machines-tools-tbody"></tbody>
         </table>
         <p class="machines-tools-empty muted" id="machines-tools-empty" hidden>В этот станок инструмент ещё не загружали.</p>
       </div>
+      {% if biota_machines_quick_edit %}
+      <form class="machines-tools-add-form js-machines-tools-add-form" id="machines-tools-add-form" hidden>
+        <div class="machines-tools-add-form-title">Добавить вручную</div>
+        <div class="machines-tools-add-form-grid">
+          <label class="machines-tools-add-field">
+            <span>№</span>
+            <input type="text" name="tool_number" class="js-machines-tools-add-number" placeholder="T05" autocomplete="off" required maxlength="20">
+          </label>
+          <label class="machines-tools-add-field machines-tools-add-field--wide">
+            <span>Тип</span>
+            <input type="text" name="tool_type" class="js-machines-tools-add-type" list="machines-tools-type-list" placeholder="Сверло / фреза…" autocomplete="off" maxlength="80">
+          </label>
+          <label class="machines-tools-add-field">
+            <span>⌀</span>
+            <input type="text" name="diameter" class="js-machines-tools-add-diameter" placeholder="6" autocomplete="off" maxlength="40">
+          </label>
+          <label class="machines-tools-add-field">
+            <span>Вылет</span>
+            <input type="text" name="overhang" class="js-machines-tools-add-overhang" placeholder="мм" autocomplete="off" maxlength="40">
+          </label>
+          <label class="machines-tools-add-field machines-tools-add-field--note">
+            <span>Прим.</span>
+            <input type="text" name="note" class="js-machines-tools-add-note" placeholder="примечание" autocomplete="off" maxlength="300">
+          </label>
+          <button type="submit" class="btn btn-primary machines-tools-add-submit js-machines-tools-add-submit">Добавить</button>
+        </div>
+        <datalist id="machines-tools-type-list">
+          <option value="Метчик"></option>
+          <option value="Раскатник"></option>
+          <option value="Резьбофреза"></option>
+          <option value="Центровка"></option>
+          <option value="Зенкер"></option>
+          <option value="Развертка"></option>
+          <option value="Сверло"></option>
+          <option value="Сверло твердосплавное"></option>
+          <option value="Т-образная фреза"></option>
+          <option value="Радиусная"></option>
+          <option value="Сферическая"></option>
+          <option value="Фреза обдирочная"></option>
+          <option value="Фреза черновая"></option>
+          <option value="Фреза чистовая"></option>
+          <option value="Фреза профильная"></option>
+          <option value="Фреза фасочная"></option>
+          <option value="Фреза с СМП"></option>
+          <option value="Датчик привязки"></option>
+          <option value="Другое"></option>
+        </datalist>
+      </form>
+      {% endif %}
     </div>
   </div>
   <div id="machines-color-picker-pop" class="machines-color-picker-pop" hidden role="dialog" aria-label="Выбор цвета"></div>

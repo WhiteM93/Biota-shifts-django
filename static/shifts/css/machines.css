@@ -707,6 +707,92 @@
     color: #92400e;
     background: rgba(251, 191, 36, 0.35);
   }
+  .machines-tools-col-actions {
+    width: 40px;
+    text-align: center !important;
+  }
+  .machines-tools-row-del {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: #f87171;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+  .machines-tools-row-del:hover {
+    background: rgba(248, 113, 113, 0.14);
+  }
+  .machines-tools-add-form {
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--bio-filter-border, rgba(148, 163, 184, 0.28));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--bio-filter-bg1, #111827) 88%, transparent);
+  }
+  .machines-tools-add-form[hidden] {
+    display: none !important;
+  }
+  .machines-tools-add-form-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--bio-text-muted, #94a3b8);
+    margin-bottom: 8px;
+  }
+  .machines-tools-add-form-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: end;
+  }
+  .machines-tools-add-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 72px;
+    flex: 0 1 auto;
+  }
+  .machines-tools-add-field span {
+    font-size: 11px;
+    font-weight: 650;
+    color: var(--bio-text-muted, #94a3b8);
+  }
+  .machines-tools-add-field input {
+    height: 32px;
+    padding: 0 8px;
+    border-radius: 6px;
+    border: 1px solid var(--bio-input-border, rgba(148, 163, 184, 0.35));
+    background: var(--bio-input-bg, rgba(15, 23, 42, 0.4));
+    color: inherit;
+    font: inherit;
+    font-size: 13px;
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+  }
+  .machines-tools-add-field input:focus {
+    outline: none;
+    border-color: var(--bio-accent, #60a5fa);
+  }
+  .machines-tools-add-field--wide {
+    flex: 1 1 140px;
+    min-width: 120px;
+  }
+  .machines-tools-add-field--note {
+    flex: 1 1 160px;
+    min-width: 120px;
+  }
+  .machines-tools-add-field:not(.machines-tools-add-field--wide):not(.machines-tools-add-field--note) {
+    width: 76px;
+  }
+  .machines-tools-add-submit {
+    height: 32px;
+    flex: 0 0 auto;
+  }
   .machines-tools-modal-title {
     margin: 0;
     font-size: 16px;

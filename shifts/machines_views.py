@@ -15,7 +15,7 @@ from .models import MachinesBoardState, Product, ProductSetup, ProductSetupToolR
 
 # Версия «заглушечного» контента с сервера: при изменении дефолтов в коде увеличить,
 # чтобы у клиентов сбросился локальный оверлей (localStorage) и подтянулись новые строки.
-MACHINES_CONTENT_VERSION = 17
+MACHINES_CONTENT_VERSION = 18
 
 # Заглушка до расширения логики: список станков и строка «график» справа (если в БД нет сохранённой сводки).
 # PK-заглушка для шаблона URL карточки наладки в JS (подменяется на реальный id).
@@ -790,8 +790,158 @@ def clear_machine_tools(*, machine_code: str) -> dict:
         "ok": True,
         "machine_code": display_code,
         "tools_cleared": cleared,
+        "tools": [],
+        "tools_total": 0,
+        "loaded_at": "",
+        "product_name": "",
+        "setup_name": "",
+        "product_id": None,
+        "setup_id": None,
         "content_version": cv_int,
     }
+
+
+def _machine_tools_response_fields(row: dict, *, display_code: str) -> dict:
+    return {
+        "machine_code": display_code,
+        "tools": list(row.get("tools") or []),
+        "tools_total": len(row.get("tools") or []),
+        "loaded_at": str(row.get("tools_loaded_at") or ""),
+        "product_name": str(row.get("tools_product_name") or "").strip(),
+        "setup_name": str(row.get("tools_setup_name") or "").strip(),
+        "product_id": row.get("tools_product_id"),
+        "setup_id": row.get("tools_setup_id"),
+    }
+
+
+def _load_board_machine_rows_for_code(machine_code: str) -> tuple[list[dict], list[dict], object, int | None, str]:
+    """Вернуть (mrows, srows, cv, idx, display_code) или ошибку через idx=None + error в display_code."""
+    code_key = _norm_machine_code_key(machine_code)
+    if not code_key:
+        return [], [], None, None, "Укажите станок."
+    valid_pids = set(Product.objects.values_list("id", flat=True))
+    board = _board_payload_from_db()
+    if board:
+        mrows = _normalize_machine_rows(board.get("machine_rows"), valid_pids)
+        srows = _normalize_schedule_rows(board.get("schedule_rows"), valid_pids)
+        cv = board.get("content_version")
+    else:
+        mrows = _normalize_machine_rows(_DEFAULT_MACHINE_ROWS, valid_pids)
+        srows = _normalize_schedule_rows(_DEFAULT_SCHEDULE_ROWS, valid_pids)
+        cv = MACHINES_CONTENT_VERSION
+    if not mrows:
+        return [], [], cv, None, "Список станков пуст."
+    if not srows:
+        srows = _normalize_schedule_rows(_DEFAULT_SCHEDULE_ROWS, valid_pids)
+    idx = None
+    for i, r in enumerate(mrows):
+        if _norm_machine_code_key(str(r.get("code") or "")) == code_key:
+            idx = i
+            break
+    if idx is None:
+        return mrows, srows, cv, None, f"Станок «{machine_code.strip()}» не найден в списке."
+    display_code = str(mrows[idx].get("code") or machine_code).strip()
+    return mrows, srows, cv, idx, display_code
+
+
+def upsert_machine_tool(*, machine_code: str, tool: dict | None = None) -> dict:
+    """Добавить или заменить одну позицию в магазине станка вручную."""
+    tool = tool if isinstance(tool, dict) else {}
+    mrows, srows, cv, idx, display_or_err = _load_board_machine_rows_for_code(machine_code)
+    if idx is None:
+        return {"ok": False, "error": display_or_err}
+    display_code = display_or_err
+
+    tn_raw = str(tool.get("tool_number") or "").strip()
+    tn_key = _norm_tool_number_key(tn_raw)
+    tn = tn_key or tn_raw[:20]
+    if not tn:
+        return {"ok": False, "error": "Укажите номер инструмента (T01…)."}
+
+    tool_type = str(tool.get("tool_type") or "").strip()[:80]
+    diameter = str(tool.get("diameter") or "").strip()[:40]
+    overhang = str(tool.get("overhang") or "").strip()[:40]
+    note = str(tool.get("note") or tool.get("name") or "").strip()[:300]
+    if not (tool_type or diameter or overhang or note):
+        return {"ok": False, "error": "Заполните тип, ⌀, вылет или примечание."}
+
+    from django.utils import timezone
+
+    loaded_at = timezone.now().isoformat(timespec="seconds")
+    incoming = [
+        {
+            "tool_number": tn,
+            "correction_enabled": bool(tool.get("correction_enabled")),
+            "kor_n": str(tool.get("kor_n") or "").strip()[:20],
+            "kor_d": str(tool.get("kor_d") or "").strip()[:20],
+            "tool_type": tool_type,
+            "diameter": diameter,
+            "overhang": overhang,
+            "note": note,
+            "product_name": str(tool.get("product_name") or "Вручную").strip()[:300] or "Вручную",
+            "setup_name": str(tool.get("setup_name") or "Вручную").strip()[:180] or "Вручную",
+            "product_id": None,
+            "setup_id": None,
+        }
+    ]
+    existing = list(mrows[idx].get("tools") or [])
+    merged, replaced, added = _merge_machine_tools_by_number(existing, incoming, change_at=loaded_at)
+    mrows[idx]["tools"] = merged
+    mrows[idx]["tools_loaded_at"] = loaded_at
+
+    cv_int = _bump_machines_content_version(cv)
+    payload = {
+        "machine_rows": mrows,
+        "schedule_rows": srows,
+        "content_version": cv_int,
+    }
+    MachinesBoardState.objects.update_or_create(pk=1, defaults={"payload": payload})
+    out = {"ok": True, "tools_added": added, "tools_replaced": replaced, "content_version": cv_int}
+    out.update(_machine_tools_response_fields(mrows[idx], display_code=display_code))
+    return out
+
+
+def remove_machine_tool(*, machine_code: str, tool_number: str) -> dict:
+    """Удалить одну позицию магазина по номеру."""
+    mrows, srows, cv, idx, display_or_err = _load_board_machine_rows_for_code(machine_code)
+    if idx is None:
+        return {"ok": False, "error": display_or_err}
+    display_code = display_or_err
+    key = _norm_tool_number_key(str(tool_number or ""))
+    if not key:
+        return {"ok": False, "error": "Укажите номер инструмента."}
+
+    existing = list(mrows[idx].get("tools") or [])
+    kept: list[dict] = []
+    removed = 0
+    for t in existing:
+        if not isinstance(t, dict):
+            continue
+        if _norm_tool_number_key(str(t.get("tool_number") or "")) == key:
+            removed += 1
+            continue
+        kept.append(t)
+    if not removed:
+        return {"ok": False, "error": f"Позиция «{tool_number}» не найдена в магазине."}
+
+    mrows[idx]["tools"] = kept
+    if not kept:
+        mrows[idx]["tools_setup_id"] = None
+        mrows[idx]["tools_product_id"] = None
+        mrows[idx]["tools_product_name"] = ""
+        mrows[idx]["tools_setup_name"] = ""
+        mrows[idx]["tools_loaded_at"] = ""
+
+    cv_int = _bump_machines_content_version(cv)
+    payload = {
+        "machine_rows": mrows,
+        "schedule_rows": srows,
+        "content_version": cv_int,
+    }
+    MachinesBoardState.objects.update_or_create(pk=1, defaults={"payload": payload})
+    out = {"ok": True, "tools_removed": removed, "content_version": cv_int}
+    out.update(_machine_tools_response_fields(mrows[idx], display_code=display_code))
+    return out
 
 
 def _machines_post_save(request):
@@ -805,6 +955,22 @@ def _machines_post_save(request):
     action = (body.get("action") or "").strip()
     if action == "clear_machine_tools":
         result = clear_machine_tools(machine_code=str(body.get("machine_code") or ""))
+        if not result.get("ok"):
+            return JsonResponse(result, status=400)
+        return JsonResponse(result)
+    if action == "upsert_machine_tool":
+        result = upsert_machine_tool(
+            machine_code=str(body.get("machine_code") or ""),
+            tool=body.get("tool") if isinstance(body.get("tool"), dict) else body,
+        )
+        if not result.get("ok"):
+            return JsonResponse(result, status=400)
+        return JsonResponse(result)
+    if action == "remove_machine_tool":
+        result = remove_machine_tool(
+            machine_code=str(body.get("machine_code") or ""),
+            tool_number=str(body.get("tool_number") or ""),
+        )
         if not result.get("ok"):
             return JsonResponse(result, status=400)
         return JsonResponse(result)
