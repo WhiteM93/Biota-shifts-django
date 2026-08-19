@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
@@ -34,12 +35,14 @@ from .models import (
     VisualContainerAudit,
     VisualContainerAuditLine,
     VisualContainerItem,
+    VisualContainerPhoto,
 )
 
 MAX_CABINETS = 40
 MAX_SHELVES = 20
 MAX_COLUMNS = 12
 MAX_ITEMS_PER_CONTAINER = 80
+MAX_CONTAINER_PHOTOS = 1
 MAX_AUDIT_LINES = 120
 MAX_ORGANIZER_TIERS = 8
 MAX_ORGANIZER_COLUMNS = 6
@@ -63,6 +66,24 @@ def _fmt_dt(dt) -> str:
         return ""
     local = timezone.localtime(dt) if timezone.is_aware(dt) else dt
     return local.strftime("%d.%m.%Y %H:%M")
+
+
+def _fmt_date(d: date | None) -> str:
+    if not d:
+        return ""
+    return d.strftime("%d.%m.%Y")
+
+
+def _parse_photo_date(raw) -> date | None:
+    s = str(raw or "").strip()
+    if not s:
+        return timezone.localdate()
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
 def _json_body(request):
@@ -455,6 +476,61 @@ def _default_organizer_cell_label(tier: int, col: int, cols: int) -> str:
     return f"Ярус {tier} · {col}"
 
 
+def _serialize_photo(photo: VisualContainerPhoto) -> dict:
+    return {
+        "id": photo.id,
+        "url": photo.image.url if photo.image else "",
+        "photo_date": _fmt_date(photo.photo_date),
+        "photo_date_iso": photo.photo_date.isoformat() if photo.photo_date else "",
+        "caption": photo.caption or "",
+        "uploaded_by": photo.uploaded_by or "",
+        "created_at": _fmt_dt(photo.created_at),
+    }
+
+
+def _attach_photo_summaries(containers: list[VisualContainer]) -> None:
+    ids = [c.id for c in containers if c and c.id]
+    if not ids:
+        return
+    latest_by_id: dict[int, VisualContainerPhoto] = {}
+    counts: dict[int, int] = {}
+    for photo in VisualContainerPhoto.objects.filter(container_id__in=ids).order_by(
+        "container_id", "-photo_date", "-id"
+    ):
+        counts[photo.container_id] = counts.get(photo.container_id, 0) + 1
+        if photo.container_id not in latest_by_id:
+            latest_by_id[photo.container_id] = photo
+    for cont in containers:
+        latest = latest_by_id.get(cont.id)
+        cont._vw_latest_photo = latest  # noqa: SLF001
+        cont._vw_photos_count = counts.get(cont.id, 0)  # noqa: SLF001
+
+
+def _photo_summary_fields(cont: VisualContainer) -> dict:
+    latest = getattr(cont, "_vw_latest_photo", None)
+    if latest is None and not hasattr(cont, "_vw_photos_count"):
+        latest = (
+            VisualContainerPhoto.objects.filter(container=cont)
+            .order_by("-photo_date", "-id")
+            .first()
+        )
+        photos_count = VisualContainerPhoto.objects.filter(container=cont).count()
+    else:
+        photos_count = int(getattr(cont, "_vw_photos_count", 0) or 0)
+        if latest is None and photos_count:
+            latest = (
+                VisualContainerPhoto.objects.filter(container=cont)
+                .order_by("-photo_date", "-id")
+                .first()
+            )
+    return {
+        "content_photo_date": _fmt_date(latest.photo_date) if latest else "",
+        "content_photo_date_iso": latest.photo_date.isoformat() if latest and latest.photo_date else "",
+        "content_photo_url": latest.image.url if latest and latest.image else "",
+        "photos_count": photos_count,
+    }
+
+
 def _serialize_container(
     c: VisualContainer,
     *,
@@ -491,6 +567,7 @@ def _serialize_container(
             else ""
         ),
     }
+    data.update(_photo_summary_fields(c))
     if data["items_count"] is None:
         data["items_count"] = c.items.count()
     if children is not None:
@@ -506,6 +583,8 @@ def _serialize_container(
         items = list(c.items.select_related("tool_item").all())
         data["items"] = [_serialize_item(it, _stock_qty_for_item(it)) for it in items]
         data["stock_tools"] = _matching_tools_for_container(c, items)
+        photos = list(c.photos.all()) if hasattr(c, "_prefetched_objects_cache") and "photos" in getattr(c, "_prefetched_objects_cache", {}) else list(VisualContainerPhoto.objects.filter(container=c).order_by("-photo_date", "-id"))
+        data["photos"] = [_serialize_photo(p) for p in photos]
     return data
 
 
@@ -597,6 +676,10 @@ def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> d
                 children_by_parent.setdefault(c.parent_id, []).append(c)
             else:
                 tops.append(c)
+        flat_containers = list(all_conts)
+        for kids in children_by_parent.values():
+            flat_containers.extend(kids)
+        _attach_photo_summaries(flat_containers)
         data["containers"] = [
             _serialize_container(c, children=children_by_parent.get(c.id, []))
             for c in tops
@@ -926,7 +1009,8 @@ def visual_warehouse_api_container_upsert(request):
 def visual_warehouse_api_container_detail(request, pk: int):
     cont = get_object_or_404(
         VisualContainer.objects.select_related("cabinet").prefetch_related(
-            Prefetch("items", queryset=VisualContainerItem.objects.select_related("tool_item"))
+            Prefetch("items", queryset=VisualContainerItem.objects.select_related("tool_item")),
+            Prefetch("photos", queryset=VisualContainerPhoto.objects.order_by("-photo_date", "-id")),
         ),
         pk=pk,
     )
@@ -1044,6 +1128,78 @@ def visual_warehouse_api_item_delete(request, pk: int):
     item = get_object_or_404(VisualContainerItem, pk=pk)
     item.delete()
     return JsonResponse({"ok": True})
+
+
+@biota_login_required
+@nav_permission_required("visual_warehouse")
+@require_http_methods(["GET", "POST"])
+def visual_warehouse_api_container_photos(request, pk: int):
+    cont = get_object_or_404(VisualContainer, pk=pk)
+    if request.method == "GET":
+        photos = VisualContainerPhoto.objects.filter(container=cont).order_by("-photo_date", "-id")
+        _attach_photo_summaries([cont])
+        return JsonResponse({
+            "ok": True,
+            "photos": [_serialize_photo(p) for p in photos],
+            "container": _serialize_container(cont),
+        })
+    return _container_photo_upload(request, cont)
+
+
+def _delete_container_photos(cont: VisualContainer) -> None:
+    for old in VisualContainerPhoto.objects.filter(container=cont):
+        if old.image:
+            try:
+                old.image.delete(save=False)
+            except Exception:
+                pass
+        old.delete()
+
+
+@write_permission_required
+def _container_photo_upload(request, cont: VisualContainer):
+    image = request.FILES.get("image")
+    if not image:
+        return _err("Выберите файл фото")
+    author = (biota_user(request) or "").strip() or "?"
+    _delete_container_photos(cont)
+    photo = VisualContainerPhoto.objects.create(
+        container=cont,
+        image=image,
+        photo_date=timezone.localdate(),
+        caption="",
+        uploaded_by=author[:120],
+    )
+    _attach_photo_summaries([cont])
+    photos = list(VisualContainerPhoto.objects.filter(container=cont).order_by("-photo_date", "-id"))
+    return JsonResponse({
+        "ok": True,
+        "photo": _serialize_photo(photo),
+        "photos": [_serialize_photo(p) for p in photos],
+        "container": _serialize_container(cont, with_items=True),
+    })
+
+
+@biota_login_required
+@nav_permission_required("visual_warehouse")
+@write_permission_required
+@require_http_methods(["DELETE"])
+def visual_warehouse_api_container_photo_delete(request, pk: int):
+    photo = get_object_or_404(VisualContainerPhoto.objects.select_related("container"), pk=pk)
+    cont = photo.container
+    if photo.image:
+        try:
+            photo.image.delete(save=False)
+        except Exception:
+            pass
+    photo.delete()
+    _attach_photo_summaries([cont])
+    photos = list(VisualContainerPhoto.objects.filter(container=cont).order_by("-photo_date", "-id"))
+    return JsonResponse({
+        "ok": True,
+        "photos": [_serialize_photo(p) for p in photos],
+        "container": _serialize_container(cont),
+    })
 
 
 @biota_login_required

@@ -2887,3 +2887,31 @@ class VisualContainerItem(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+
+class VisualContainerPhoto(models.Model):
+    """Фото содержимого контейнера визуального склада."""
+
+    container = models.ForeignKey(
+        VisualContainer,
+        on_delete=models.CASCADE,
+        related_name="photos",
+        verbose_name="Контейнер",
+    )
+    image = models.FileField(
+        upload_to="visual_warehouse/container_photos/",
+        verbose_name="Фото",
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png", "webp", "gif"])],
+    )
+    photo_date = models.DateField(verbose_name="Дата фото")
+    caption = models.CharField(max_length=200, blank=True, default="", verbose_name="Подпись")
+    uploaded_by = models.CharField(max_length=120, blank=True, default="", verbose_name="Загрузил")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-photo_date", "-id")
+        verbose_name = "Фото содержимого контейнера"
+        verbose_name_plural = "Фото содержимого контейнеров"
+
+    def __str__(self) -> str:
+        return f"Фото {self.container_id} @ {self.photo_date}"

@@ -79,6 +79,16 @@ urlpatterns = [
         name="visual_warehouse_api_container_audits",
     ),
     path(
+        "visual-warehouse/api/containers/<int:pk>/photos/",
+        visual_warehouse_views.visual_warehouse_api_container_photos,
+        name="visual_warehouse_api_container_photos",
+    ),
+    path(
+        "visual-warehouse/api/container-photos/<int:pk>/",
+        visual_warehouse_views.visual_warehouse_api_container_photo_delete,
+        name="visual_warehouse_api_container_photo_delete",
+    ),
+    path(
         "visual-warehouse/api/items/",
         visual_warehouse_views.visual_warehouse_api_item_upsert,
         name="visual_warehouse_api_item_upsert",

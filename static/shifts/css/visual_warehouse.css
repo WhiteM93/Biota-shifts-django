@@ -617,20 +617,22 @@ html[data-theme="dawn"] .vw-floor {
 }
 
 .vw-bin-audit {
-  font-size: 8px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  opacity: 0.85;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+  opacity: 0.9;
   pointer-events: none;
   white-space: nowrap;
   max-width: 100%;
   overflow: hidden;
-  text-overflow: ellipsis;
-  color: rgba(30, 40, 50, 0.75);
+  text-overflow: clip;
+  color: rgba(30, 40, 50, 0.8);
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .vw-bin-audit.is-empty {
-  opacity: 0.5;
+  opacity: 0.45;
   font-weight: 500;
 }
 
@@ -808,6 +810,17 @@ html[data-theme="dawn"] .vw-modal-backdrop {
   -webkit-overflow-scrolling: touch;
 }
 
+.js-vw-dlg-contents .vw-dialog-body {
+  padding: 0;
+  gap: 0;
+}
+
+.js-vw-dlg-contents .js-vw-view-pane,
+.js-vw-dlg-contents .js-vw-audit-pane {
+  padding: 14px 16px 16px;
+  gap: 10px;
+}
+
 .vw-dialog-body {
   padding: 16px;
   display: flex;
@@ -891,7 +904,132 @@ html[data-theme="dawn"] .vw-control { background: #f5f5f5; }
   gap: 12px;
 }
 
-.vw-contents-meta { margin: 4px 0 0; font-size: 12px; color: var(--vw-muted); }
+.js-vw-dlg-contents .vw-contents-head {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--vw-border);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--vw-surface);
+}
+
+.vw-contents-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 10px;
+}
+
+.vw-contents-head-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.js-vw-dlg-contents .vw-dialog-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.vw-contents-sub {
+  margin: 5px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--vw-muted);
+}
+
+.vw-contents-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin: -2px -4px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vw-muted);
+  font-size: 24px;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.vw-contents-close:hover {
+  color: var(--vw-text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="dawn"] .vw-contents-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.vw-contents-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--vw-border);
+  border-top: 1px solid var(--vw-border);
+}
+
+.vw-contents-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 16px;
+  background: var(--vw-surface);
+}
+
+.vw-contents-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--vw-muted);
+}
+
+.vw-contents-stat-value {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--vw-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vw-contents-stat.is-muted .vw-contents-stat-value {
+  color: var(--vw-muted);
+}
+
+.vw-contents-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+html[data-theme="dawn"] .vw-contents-toolbar {
+  background: #fafafa;
+}
+
+.vw-contents-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vw-contents-meta--text { margin: 4px 0 0; font-size: 12px; color: var(--vw-muted); }
 
 .vw-items {
   list-style: none;
@@ -900,8 +1038,6 @@ html[data-theme="dawn"] .vw-control { background: #f5f5f5; }
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 300px;
-  overflow-y: auto;
 }
 
 .vw-item {
@@ -1077,23 +1213,15 @@ html[data-theme="dawn"] .vw-coating-dot.swatch-none {
   line-height: 1.35;
 }
 
-.vw-contents-head-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.vw-audits-block {
-  margin-top: 12px;
+.vw-modal--wide.js-vw-dlg-audits .vw-audits {
+  max-height: min(62vh, 640px);
 }
 
 .vw-audits {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 220px;
+  max-height: min(62vh, 640px);
   overflow-y: auto;
 }
 
@@ -1204,6 +1332,244 @@ html[data-theme="dawn"] .vw-audit-row {
 .vw-page.is-readonly .js-vw-new-cabinet,
 .vw-page.is-readonly .vw-item-form {
   display: none;
+}
+
+/* Модалки переносятся в body — скрытие загрузки фото через класс на body */
+body:not(.vw-is-edit) .js-vw-photo-upload {
+  display: none !important;
+}
+
+.vw-is-hidden {
+  display: none !important;
+}
+
+.vw-photos-block {
+  margin-bottom: 14px;
+}
+
+.vw-photo-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vw-photos {
+  width: 100%;
+}
+
+.vw-photo-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 200px;
+  padding: 16px 12px;
+  border: 1px dashed var(--vw-border);
+  border-radius: 8px;
+  color: var(--vw-muted, rgba(255, 255, 255, 0.55));
+  font-size: 13px;
+}
+
+.vw-photo-empty .ui-icon {
+  font-size: 16px;
+  opacity: 0.75;
+}
+
+.vw-photo-current {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--vw-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+html[data-theme="dawn"] .vw-photo-current {
+  background: #fafafa;
+}
+
+.vw-photo-current-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: #111;
+  cursor: zoom-in;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.vw-photo-current-btn img {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 200px;
+  max-height: min(420px, 42vh);
+  object-fit: contain;
+  background: #111;
+}
+
+.vw-photo-current-meta {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--vw-muted, rgba(255, 255, 255, 0.7));
+}
+
+.vw-photo-current-del {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.vw-photo-upload {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.vw-photo-pick.vw-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.vw-photo-pick .ui-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.vw-photo-pick-name {
+  flex: 1 1 140px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--vw-muted, rgba(255, 255, 255, 0.65));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vw-photo-upload .vw-form-msg {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 12px;
+  color: var(--vw-muted, rgba(255, 255, 255, 0.65));
+}
+
+.vw-photo-view-card {
+  max-width: min(920px, 96vw);
+}
+
+/* Просмотр фото — почти на весь экран */
+.vw-modal--photo {
+  padding: 8px;
+}
+
+.vw-modal--photo .vw-modal-backdrop {
+  background: rgba(0, 0, 0, 0.82);
+}
+
+.vw-modal--photo .vw-photo-view-card {
+  width: min(98vw, 1600px);
+  max-width: none;
+  height: min(96vh, 100%);
+  max-height: 96vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vw-modal--photo .vw-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px 14px;
+}
+
+.vw-photo-view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.vw-photo-view-img {
+  display: block;
+  width: 100%;
+  max-height: min(72vh, 720px);
+  object-fit: contain;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.vw-modal--photo .vw-photo-view-head {
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+}
+
+.vw-modal--photo .vw-photo-view-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0f172a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.vw-modal--photo .vw-photo-view-img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 0;
+  background: transparent;
+  cursor: zoom-out;
+}
+
+.vw-modal--photo .vw-photo-view-meta {
+  flex: 0 0 auto;
+  margin-top: 8px;
+}
+
+.vw-photo-view-meta {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .vw-contents-stats {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {

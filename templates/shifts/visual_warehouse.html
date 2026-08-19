@@ -15,6 +15,8 @@
   data-api-item-upsert="{% url 'visual_warehouse_api_item_upsert' %}"
   data-api-item-del-tpl="{% url 'visual_warehouse_api_item_delete' 0 %}"
   data-api-audits-tpl="{% url 'visual_warehouse_api_container_audits' 0 %}"
+  data-api-photos-tpl="{% url 'visual_warehouse_api_container_photos' 0 %}"
+  data-api-photo-del-tpl="{% url 'visual_warehouse_api_container_photo_delete' 0 %}"
   data-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}"
 >
   <header class="vw-topbar">
@@ -170,25 +172,44 @@
   <div class="vw-modal-card" role="dialog" aria-modal="true" aria-labelledby="vw-dlg-contents-title">
     <div class="vw-dialog-body">
       <div class="vw-contents-head">
-        <div>
-          <h2 id="vw-dlg-contents-title" class="vw-dialog-title js-vw-contents-title">Ящик</h2>
-          <p class="vw-contents-meta js-vw-contents-meta"></p>
+        <div class="vw-contents-head-row">
+          <div class="vw-contents-head-main">
+            <h2 id="vw-dlg-contents-title" class="vw-dialog-title js-vw-contents-title">Ящик</h2>
+            <p class="vw-contents-sub js-vw-contents-sub"></p>
+          </div>
+          <button type="button" class="vw-contents-close js-vw-dlg-cancel" aria-label="Закрыть" title="Закрыть">×</button>
         </div>
-        <div class="vw-contents-head-actions">
+        <div class="vw-contents-stats js-vw-contents-stats"></div>
+        <div class="vw-contents-toolbar">
+          <button type="button" class="vw-btn-secondary js-vw-show-audits">
+            <span class="js-vw-show-audits-label">История</span>
+          </button>
           {% if biota_can_edit %}
           <button type="button" class="vw-btn-primary js-vw-start-audit">Инвентаризация</button>
           {% endif %}
-          <button type="button" class="vw-btn-secondary js-vw-dlg-cancel">Закрыть</button>
         </div>
       </div>
 
       <div class="js-vw-view-pane">
+        <div class="vw-photos-block">
+          <h3 class="vw-props-heading">Фото содержимого</h3>
+          <div class="vw-photo-panel">
+            <div class="vw-photos js-vw-photos"></div>
+            {% if biota_can_edit %}
+            <div class="vw-photo-upload js-vw-photo-upload">
+              <input type="file" class="js-vw-photo-file" hidden accept="image/jpeg,image/png,image/webp,image/gif">
+              <button type="button" class="vw-btn-secondary vw-photo-pick js-vw-photo-pick">
+                <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+                <span class="js-vw-photo-pick-label">Загрузить фото</span>
+              </button>
+              <span class="vw-photo-pick-name js-vw-photo-pick-name"></span>
+              <span class="vw-form-msg js-vw-photo-msg" aria-live="polite"></span>
+            </div>
+            {% endif %}
+          </div>
+        </div>
         <h3 class="vw-props-heading js-vw-tools-heading">Инструменты на складе</h3>
         <ul class="vw-items js-vw-stock-tools" role="list"></ul>
-        <div class="vw-audits-block">
-          <h3 class="vw-props-heading">История проверок</h3>
-          <div class="vw-audits js-vw-audits"></div>
-        </div>
         <div class="vw-rules-block js-vw-rules-block" hidden>
           <h3 class="vw-props-heading">Правила содержимого</h3>
           <ul class="vw-items js-vw-items" role="list"></ul>
@@ -333,6 +354,38 @@
         </div>
       </div>
       {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="vw-modal vw-modal--wide js-vw-dlg-audits" hidden>
+  <button type="button" class="vw-modal-backdrop js-vw-audits-close" aria-label="Закрыть"></button>
+  <div class="vw-modal-card" role="dialog" aria-modal="true" aria-labelledby="vw-dlg-audits-title">
+    <div class="vw-dialog-body">
+      <div class="vw-contents-head">
+        <div>
+          <h2 id="vw-dlg-audits-title" class="vw-dialog-title">История проверок</h2>
+          <p class="vw-contents-meta js-vw-audits-meta"></p>
+        </div>
+        <button type="button" class="vw-btn-secondary js-vw-audits-close">Закрыть</button>
+      </div>
+      <div class="vw-audits js-vw-audits"></div>
+    </div>
+  </div>
+</div>
+
+<div class="vw-modal vw-modal--photo js-vw-dlg-photo" hidden>
+  <button type="button" class="vw-modal-backdrop js-vw-photo-close" aria-label="Закрыть"></button>
+  <div class="vw-modal-card vw-photo-view-card" role="dialog" aria-modal="true" aria-labelledby="vw-dlg-photo-title">
+    <div class="vw-dialog-body">
+      <div class="vw-photo-view-head">
+        <h2 id="vw-dlg-photo-title" class="vw-dialog-title js-vw-photo-view-title">Фото</h2>
+        <button type="button" class="vw-btn-secondary js-vw-photo-close">Закрыть</button>
+      </div>
+      <div class="vw-photo-view-stage">
+        <img class="vw-photo-view-img js-vw-photo-view-img" src="" alt="" />
+      </div>
+      <p class="vw-photo-view-meta js-vw-photo-view-meta muted"></p>
     </div>
   </div>
 </div>

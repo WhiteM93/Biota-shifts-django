@@ -10,6 +10,8 @@
   var apiItemUpsert = root.getAttribute("data-api-item-upsert") || "";
   var apiItemDelTpl = root.getAttribute("data-api-item-del-tpl") || "";
   var apiAuditsTpl = root.getAttribute("data-api-audits-tpl") || "";
+  var apiPhotosTpl = root.getAttribute("data-api-photos-tpl") || "";
+  var apiPhotoDelTpl = root.getAttribute("data-api-photo-del-tpl") || "";
 
   var floorEl = root.querySelector(".js-vw-floor");
   var emptyEl = root.querySelector(".js-vw-empty");
@@ -20,7 +22,9 @@
   var dlgCab = document.querySelector(".js-vw-dlg-cabinet");
   var dlgCont = document.querySelector(".js-vw-dlg-container");
   var dlgContents = document.querySelector(".js-vw-dlg-contents");
-  [dlgCab, dlgCont, dlgContents].forEach(function (dlg) {
+  var dlgAudits = document.querySelector(".js-vw-dlg-audits");
+  var dlgPhoto = document.querySelector(".js-vw-dlg-photo");
+  [dlgCab, dlgCont, dlgContents, dlgAudits, dlgPhoto].forEach(function (dlg) {
     if (dlg && dlg.parentElement !== document.body) {
       document.body.appendChild(dlg);
     }
@@ -33,6 +37,21 @@
   var stockToolsEl = document.querySelector(".js-vw-stock-tools");
   var rulesBlock = document.querySelector(".js-vw-rules-block");
   var auditsEl = document.querySelector(".js-vw-audits");
+  var auditsMetaEl = document.querySelector(".js-vw-audits-meta");
+  var btnShowAudits = document.querySelector(".js-vw-show-audits");
+  var btnShowAuditsLabel = document.querySelector(".js-vw-show-audits-label");
+  var subEl = document.querySelector(".js-vw-contents-sub");
+  var statsEl = document.querySelector(".js-vw-contents-stats");
+  var photosEl = document.querySelector(".js-vw-photos");
+  var photoUploadWrap = document.querySelector(".js-vw-photo-upload");
+  var photoFileInput = document.querySelector(".js-vw-photo-file");
+  var photoPickBtn = document.querySelector(".js-vw-photo-pick");
+  var photoPickLabel = document.querySelector(".js-vw-photo-pick-label");
+  var photoPickNameEl = document.querySelector(".js-vw-photo-pick-name");
+  var photoMsgEl = document.querySelector(".js-vw-photo-msg");
+  var photoViewTitle = document.querySelector(".js-vw-photo-view-title");
+  var photoViewImg = document.querySelector(".js-vw-photo-view-img");
+  var photoViewMeta = document.querySelector(".js-vw-photo-view-meta");
   var viewPane = document.querySelector(".js-vw-view-pane");
   var auditPane = document.querySelector(".js-vw-audit-pane");
   var auditLinesEl = document.querySelector(".js-vw-audit-lines");
@@ -130,6 +149,12 @@
     return detailUrl(apiAuditsTpl, containerId);
   }
 
+  function containerPhotosUrl(containerId) {
+    var base = detailUrl(apiContTpl, containerId);
+    if (base) return String(base).replace(/\/?$/, "/") + "photos/";
+    return detailUrl(apiPhotosTpl, containerId);
+  }
+
   function fetchJson(url, opts) {
     opts = opts || {};
     var headers = {
@@ -159,6 +184,74 @@
         return data;
       });
     });
+  }
+
+  function fetchForm(url, formData, method) {
+    return fetch(url, {
+      method: method || "POST",
+      credentials: "same-origin",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+        Accept: "application/json",
+        "X-CSRFToken": csrfToken(),
+      },
+      body: formData,
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch (_e) {
+          throw new Error(res.ok ? "Некорректный ответ сервера" : ("Ошибка " + res.status));
+        }
+        if (!res.ok || data.ok === false) {
+          throw new Error((data && (data.error || data.message)) || ("Ошибка " + res.status));
+        }
+        return data;
+      });
+    });
+  }
+
+  function todayIsoDate() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  function formatBinAuditDate(raw) {
+    var s = String(raw || "").trim();
+    if (!s) return "";
+    var datePart = s.split(" ")[0];
+    var m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(datePart);
+    if (m) return m[1] + "." + m[2] + "." + m[3].slice(-2);
+    var iso = s.slice(0, 10);
+    var p = iso.split("-");
+    if (p.length === 3 && p[0].length === 4) {
+      return p[2] + "." + p[1] + "." + p[0].slice(-2);
+    }
+    return datePart;
+  }
+
+  function syncPhotoUploadLabel() {
+    if (!photoPickLabel) return;
+    var hasPhoto =
+      !!(openContainerData && ((openContainerData.photos && openContainerData.photos.length) || openContainerData.content_photo_date));
+    photoPickLabel.textContent = hasPhoto ? "Заменить фото" : "Загрузить фото";
+  }
+
+  function resetPhotoPickUi() {
+    if (photoFileInput) photoFileInput.value = "";
+    if (photoPickNameEl) photoPickNameEl.textContent = "";
+    if (photoPickBtn) photoPickBtn.disabled = false;
+    if (photoMsgEl) photoMsgEl.textContent = "";
+    syncPhotoUploadLabel();
+  }
+
+  function setPhotoUploadBusy(busy, message) {
+    if (photoPickBtn) photoPickBtn.disabled = !!busy;
+    if (photoPickNameEl && message) photoPickNameEl.textContent = message;
+    if (photoMsgEl && message) photoMsgEl.textContent = message;
   }
 
   function escapeHtml(s) {
@@ -193,7 +286,7 @@
   }
 
   function closeAllDialogs() {
-    [dlgCab, dlgCont, dlgContents].forEach(closeDialog);
+    [dlgCab, dlgCont, dlgContents, dlgAudits, dlgPhoto].forEach(closeDialog);
   }
 
   function setEditMode(on) {
@@ -211,7 +304,10 @@
     }
     if (itemForm) setVisible(itemForm, editMode && canEdit);
     if (rulesBlock) setVisible(rulesBlock, editMode && canEdit);
+    if (photoUploadWrap) setVisible(photoUploadWrap, editMode && canEdit);
+    document.body.classList.toggle("vw-is-edit", editMode);
     syncItemMillTypeRow();
+    if (openContainerData) renderPhotos(openContainerData);
     renderFloor();
   }
 
@@ -639,10 +735,10 @@
     labelWrap.appendChild(text);
     btn.appendChild(labelWrap);
 
-    var auditDate = cont.last_audited_at || "";
+    var auditDate = formatBinAuditDate(cont.last_audited_at || "");
     var stamp = document.createElement("span");
     stamp.className = "vw-bin-audit" + (auditDate ? "" : " is-empty");
-    stamp.textContent = auditDate ? ("инв. " + auditDate.split(" ")[0]) : "не проверялся";
+    stamp.textContent = auditDate || "—";
     btn.appendChild(stamp);
 
     var titleBase = cont.label || containerKindLabel(cont.kind);
@@ -1321,6 +1417,7 @@
   function renderAudits(audits) {
     if (!auditsEl) return;
     auditsEl.innerHTML = "";
+    syncAuditsButton(audits);
     if (!audits || !audits.length) {
       auditsEl.innerHTML = "<p class='vw-item-meta'>Проверок ещё не было.</p>";
       return;
@@ -1375,6 +1472,64 @@
       }
       auditsEl.appendChild(card);
     });
+  }
+
+  function syncAuditsButton(audits) {
+    if (!btnShowAuditsLabel) return;
+    var n = (audits || []).length;
+    btnShowAuditsLabel.textContent = n ? "История (" + n + ")" : "История";
+  }
+
+  function appendContentsStat(parent, label, value, muted) {
+    var item = document.createElement("div");
+    item.className = "vw-contents-stat" + (muted ? " is-muted" : "");
+    var lbl = document.createElement("span");
+    lbl.className = "vw-contents-stat-label";
+    lbl.textContent = label;
+    var val = document.createElement("span");
+    val.className = "vw-contents-stat-value";
+    val.textContent = value;
+    item.appendChild(lbl);
+    item.appendChild(val);
+    parent.appendChild(item);
+  }
+
+  function renderContentsHeadInfo(cont) {
+    if (!cont) return;
+    if (subEl) {
+      var parts = ["Полка " + cont.shelf + ", место " + cont.column];
+      var n = (cont.stock_tools || []).length;
+      parts.push(n + " поз.");
+      if (cont.notes) parts.push(cont.notes);
+      subEl.textContent = parts.join(" · ");
+    }
+    if (statsEl) {
+      statsEl.innerHTML = "";
+      appendContentsStat(
+        statsEl,
+        "Инвентаризация",
+        cont.last_audited_at
+          ? cont.last_audited_at + (cont.last_audited_by ? " · " + cont.last_audited_by : "")
+          : "не проводилась",
+        !cont.last_audited_at
+      );
+      appendContentsStat(
+        statsEl,
+        "Фото содержимого",
+        cont.content_photo_date || "не загружалось",
+        !cont.content_photo_date
+      );
+    }
+  }
+
+  function openAuditsHistory() {
+    if (!dlgAudits) return;
+    if (auditsMetaEl && openContainerData) {
+      auditsMetaEl.textContent = openContainerData.label || "";
+    } else if (auditsMetaEl) {
+      auditsMetaEl.textContent = "";
+    }
+    openDialog(dlgAudits);
   }
 
   function loadAudits(containerId) {
@@ -1707,24 +1862,127 @@
 
   function applyContentsView(cont) {
     var titleEl = document.querySelector(".js-vw-contents-title");
-    var metaEl = document.querySelector(".js-vw-contents-meta");
     if (titleEl) titleEl.textContent = cont.label;
-    if (metaEl) {
-      var n = (cont.stock_tools || []).length;
-      var parts = [
-        "Полка " + cont.shelf + ", место " + cont.column,
-        "позиций: " + n,
-      ];
-      if (cont.notes) parts.splice(1, 0, cont.notes);
-      if (cont.last_audited_at) {
-        parts.push("инв. " + cont.last_audited_at + (cont.last_audited_by ? (" · " + cont.last_audited_by) : ""));
-      } else {
-        parts.push("инвентаризация не проводилась");
-      }
-      metaEl.textContent = parts.join(" · ");
-    }
+    renderContentsHeadInfo(cont);
+    renderPhotos(cont);
+    syncPhotoUploadLabel();
     renderStockTools(cont);
     renderItems(cont);
+  }
+
+  function openPhotoView(photo) {
+    if (!dlgPhoto || !photo || !photo.url) return;
+    if (photoViewTitle) photoViewTitle.textContent = photo.caption || "Фото содержимого";
+    if (photoViewImg) {
+      photoViewImg.src = photo.url;
+      photoViewImg.alt = photo.caption || "Фото содержимого";
+    }
+    if (photoViewMeta) {
+      var metaParts = [];
+      if (photo.photo_date) metaParts.push("дата фото: " + photo.photo_date);
+      if (photo.uploaded_by) metaParts.push(photo.uploaded_by);
+      if (photo.created_at) metaParts.push("загружено " + photo.created_at);
+      photoViewMeta.textContent = metaParts.join(" · ");
+    }
+    openDialog(dlgPhoto);
+  }
+
+  function closePhotoView() {
+    if (!dlgPhoto) return;
+    dlgPhoto.hidden = true;
+    document.body.classList.remove("vw-modal-open");
+    if (photoViewImg) {
+      photoViewImg.removeAttribute("src");
+      photoViewImg.alt = "";
+    }
+  }
+
+  function renderPhotos(container) {
+    if (!photosEl) return;
+    photosEl.innerHTML = "";
+    var photos = (container && container.photos) || [];
+    var photo = photos.length ? photos[0] : null;
+    if (!photo) {
+      var empty = document.createElement("div");
+      empty.className = "vw-photo-empty";
+      empty.innerHTML = '<i class="fi fi-rr-picture ui-icon" aria-hidden="true"></i><span>Фото не загружено</span>';
+      photosEl.appendChild(empty);
+      return;
+    }
+    var wrap = document.createElement("div");
+    wrap.className = "vw-photo-current";
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "vw-photo-current-btn";
+    btn.title = "Открыть фото";
+    var img = document.createElement("img");
+    img.src = photo.url || "";
+    img.alt = "Фото содержимого";
+    img.loading = "lazy";
+    btn.appendChild(img);
+    btn.addEventListener("click", function () {
+      openPhotoView(photo);
+    });
+    wrap.appendChild(btn);
+    var meta = document.createElement("div");
+    meta.className = "vw-photo-current-meta";
+    meta.textContent = "Загружено " + (photo.photo_date || "—");
+    wrap.appendChild(meta);
+    if (canEdit && editMode) {
+      var del = document.createElement("button");
+      del.type = "button";
+      del.className = "vw-photo-current-del";
+      del.textContent = "×";
+      del.title = "Удалить фото";
+      del.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (!confirm("Удалить фото содержимого?")) return;
+        fetchJson(detailUrl(apiPhotoDelTpl, photo.id), { method: "DELETE" })
+          .then(function (data) {
+            if (data.container) {
+              openContainerData = Object.assign({}, openContainerData || {}, data.container, { photos: data.photos || [] });
+              applyContentsView(openContainerData);
+            }
+            resetPhotoPickUi();
+            return loadCabinets();
+          })
+          .catch(function (e) {
+            alert(e.message);
+          });
+      });
+      wrap.appendChild(del);
+    }
+    photosEl.appendChild(wrap);
+  }
+
+  function uploadContainerPhoto(file) {
+    if (!canEdit || !editMode || !openContainerId) return;
+    file = file || (photoFileInput && photoFileInput.files && photoFileInput.files[0]);
+    if (!file) {
+      if (photoMsgEl) photoMsgEl.textContent = "Выберите файл изображения.";
+      return;
+    }
+    var fd = new FormData();
+    fd.append("image", file);
+    setPhotoUploadBusy(true, "Загрузка «" + file.name + "»…");
+    fetchForm(containerPhotosUrl(openContainerId), fd, "POST")
+      .then(function (data) {
+        if (data.container) {
+          openContainerData = data.container;
+          applyContentsView(openContainerData);
+        } else if (data.photos) {
+          openContainerData = Object.assign({}, openContainerData || {}, { photos: data.photos });
+          applyContentsView(openContainerData);
+        }
+        resetPhotoPickUi();
+        return loadCabinets();
+      })
+      .catch(function (e) {
+        if (photoMsgEl) photoMsgEl.textContent = e.message;
+        if (photoPickNameEl) photoPickNameEl.textContent = "";
+        if (photoPickBtn) photoPickBtn.disabled = false;
+      });
   }
 
   function renderItems(container) {
@@ -1795,8 +2053,12 @@
   function openContents(containerId) {
     openContainerId = containerId;
     setAuditMode(false);
+    if (dlgAudits) closeDialog(dlgAudits);
     if (itemForm) setVisible(itemForm, editMode && canEdit);
     if (rulesBlock) setVisible(rulesBlock, editMode && canEdit);
+    if (photoUploadWrap) setVisible(photoUploadWrap, editMode && canEdit);
+    if (photoMsgEl) photoMsgEl.textContent = "";
+    resetPhotoPickUi();
     syncItemMillTypeRow();
     return fetchJson(detailUrl(apiContTpl, containerId)).then(function (data) {
       var cont = data.container;
@@ -1830,6 +2092,44 @@
   if (auditNewCategory) {
     auditNewCategory.addEventListener("change", syncAuditNewFields);
   }
+
+  if (btnShowAudits) {
+    btnShowAudits.addEventListener("click", function () {
+      openAuditsHistory();
+    });
+  }
+  document.querySelectorAll(".js-vw-audits-close").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      closeDialog(dlgAudits);
+    });
+  });
+
+  if (photoPickBtn && photoFileInput) {
+    photoPickBtn.addEventListener("click", function () {
+      if (!canEdit || !editMode) {
+        if (photoMsgEl) photoMsgEl.textContent = "Сначала включите режим «Редактировать».";
+        return;
+      }
+      photoFileInput.click();
+    });
+    photoFileInput.addEventListener("change", function () {
+      var file = photoFileInput.files && photoFileInput.files[0];
+      if (!file) return;
+      uploadContainerPhoto(file);
+    });
+  }
+  document.querySelectorAll(".js-vw-photo-close").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      closePhotoView();
+    });
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && dlgPhoto && !dlgPhoto.hidden) {
+      closePhotoView();
+    }
+  });
 
   if (itemForm) {
     var catSel = itemForm.querySelector(".js-vw-item-category");
