@@ -87,10 +87,22 @@ function productDetailDeleteBtnHtml(extraClass, attrs) {
   );
 }
 
-var SETUP_TOOL_NOTE_EYE_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">' +
-  '<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8a3 3 0 100 6 3 3 0 000-6z"/>' +
-  "</svg>";
+var SETUP_TOOL_NOTE_EYE_SVG = (function () {
+  var tpl = document.getElementById("setup-tool-note-eye-icon-tpl");
+  if (tpl && tpl.content && tpl.content.firstElementChild) {
+    return tpl.content.firstElementChild.outerHTML;
+  }
+  if (window.BiotaIcons) {
+    var fromRegistry = window.BiotaIcons.html("setup.tool_note_view", "setup-tool-note-eye-icon");
+    if (fromRegistry) return fromRegistry;
+  }
+  return (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="setup-tool-note-eye-icon" aria-hidden="true" focusable="false">' +
+    '<path d="M2.42 12.71C3.55 9.5 6.9 5 12 5s8.45 4.5 9.58 7.71C21.72 14.5 18.1 19 12 19S2.28 14.5 2.42 12.71Z"/>' +
+    '<path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>' +
+    "</svg>"
+  );
+})();
 
 var SETUP_TOOL_PHOTO_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true" focusable="false">' +
@@ -2394,10 +2406,10 @@ function saveSetupToolNoteEditor() {
         link.setAttribute("data-photo-url", url);
         link.setAttribute("data-photo-caption", caption);
         link.setAttribute("aria-label", "Открыть фото: " + label);
-        link.innerHTML = '<i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>';
+        link.innerHTML = window.BiotaIcons ? window.BiotaIcons.html("action.camera", "ui-icon") : '<i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>';
         rail.insertBefore(link, btn);
       }
-      btn.innerHTML = '<i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i>';
+      btn.innerHTML = window.BiotaIcons ? window.BiotaIcons.html("action.add_document", "ui-icon") : '<i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i>';
     }
 
     function buildExtraSpecBoxFromSource(sourceBox, clearValues) {
@@ -5011,7 +5023,7 @@ function saveSetupToolNoteEditor() {
         preview.className = "btn btn-ghost product-drawing-preview-btn";
         preview.title = "Открыть в новой вкладке";
         preview.setAttribute("aria-label", "Открыть " + label);
-        preview.innerHTML = '<i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>';
+        preview.innerHTML = window.BiotaIcons ? window.BiotaIcons.html("action.search", "ui-icon") : '<i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>';
         actions.appendChild(preview);
         if (editMode) {
           var del = document.createElement("button");
@@ -5142,7 +5154,7 @@ function saveSetupToolNoteEditor() {
               previewBtn.setAttribute("data-program-name", f.name || "");
               previewBtn.title = "Предпросмотр G/M кода";
               previewBtn.setAttribute("aria-label", "Предпросмотр " + (f.name || "программы"));
-              previewBtn.innerHTML = '<i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>';
+              previewBtn.innerHTML = window.BiotaIcons ? window.BiotaIcons.html("action.search", "ui-icon") : '<i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>';
               actions.appendChild(previewBtn);
               if (editMode) {
                 var del = document.createElement("button");

@@ -1,0 +1,29 @@
+<form method="post" class="cabinet-icon-preset-toggle">
+  {% csrf_token %}
+  <div class="cabinet-icon-preset-toggle__inner">
+    <span class="cabinet-icon-preset-toggle__label">На сайте:</span>
+    <div class="cabinet-icon-preset-toggle__group" role="group" aria-label="Набор иконок на сайте">
+      <button type="submit"
+              name="action"
+              value="preset_default"
+              class="cabinet-icon-preset-toggle__btn{% if icon_preset == 'default' %} is-active{% endif %}"
+              {% if icon_preset == 'default' %}aria-pressed="true"{% endif %}>
+        Старые иконки
+      </button>
+      <button type="submit"
+              name="action"
+              value="preset_hugeicons"
+              class="cabinet-icon-preset-toggle__btn{% if icon_preset == 'hugeicons' %} is-active{% endif %}"
+              {% if icon_preset == 'hugeicons' %}aria-pressed="true"{% endif %}>
+        Новые (Hugeicons)
+      </button>
+    </div>
+    <span class="cabinet-icon-preset-toggle__status muted">
+      {% if icon_preset == 'hugeicons' %}
+        сейчас Hugeicons · {{ hugeicons_preset_count|default:"31" }} иконок
+      {% else %}
+        сейчас стандартные
+      {% endif %}
+    </span>
+  </div>
+</form>

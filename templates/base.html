@@ -141,6 +141,8 @@
       });
     })();
   </script>
+  <script>window.__biotaIcons = {{ biota_icons_json|safe }};</script>
+  <script src="{% static 'shifts/js/biota_icons.js' %}?v={{ static_asset_version }}"></script>
   {% if perf_diagnostics and biota_username %}
   <script>
     window.__biotaPerfDiag = {

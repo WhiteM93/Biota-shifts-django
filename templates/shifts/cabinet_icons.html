@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load static biota_icons %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
+<link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css">
+<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
+{% block content %}
+<div class="cabinet-subpage cabinet-icons-page">
+  <a class="cabinet-subpage__back" href="{% url 'cabinet' %}">← Кабинет администратора</a>
+
+  <header class="cabinet-hero">
+    <p class="cabinet-hero__eyebrow">Администрирование</p>
+    <h1>Иконки сайта</h1>
+    <p class="cabinet-section__lead cabinet-icons-page__lead">
+      Наведите на иконку — подсказка с ключом и значением. Клик — редактирование в панели ниже.
+      {% if overrides_count %}Переопределено: {{ overrides_count }}.{% endif %}
+      <a href="{% url 'cabinet_icons_preview' %}">Hugeicons — превью и замена →</a>
+    </p>
+  </header>
+
+  {% include "shifts/includes/cabinet_icons_preset_toggle.html" %}
+
+  <div class="cabinet-icon-editor" id="cabinet-icon-editor" hidden>
+    <div class="cabinet-icon-editor__head">
+      <div>
+        <p class="cabinet-icon-editor__eyebrow">Редактирование</p>
+        <h2 class="cabinet-icon-editor__title" id="cabinet-icon-editor-title">—</h2>
+        <p class="cabinet-icon-editor__key"><code id="cabinet-icon-editor-key"></code></p>
+      </div>
+      <button type="button" class="btn btn-ghost cabinet-icon-editor__close" id="cabinet-icon-editor-close">Закрыть</button>
+    </div>
+    <div class="cabinet-icon-editor__preview" id="cabinet-icon-editor-preview" aria-hidden="true"></div>
+    <div class="cabinet-icon-editor__fields">
+      <label class="cabinet-icon-editor__field">
+        <span>Тип</span>
+        <select id="cabinet-icon-editor-kind">
+          <option value="emoji">emoji</option>
+          <option value="flaticon">flaticon</option>
+          <option value="hugeicons">hugeicons</option>
+          <option value="svg_static">svg_static</option>
+          <option value="text">text</option>
+          <option value="partial">partial (SVG)</option>
+        </select>
+      </label>
+      <label class="cabinet-icon-editor__field cabinet-icon-editor__field--wide">
+        <span>Значение</span>
+        <input type="text" id="cabinet-icon-editor-value" maxlength="240" autocomplete="off">
+      </label>
+    </div>
+    <p class="cabinet-icon-editor__default muted" id="cabinet-icon-editor-default"></p>
+  </div>
+
+  <form method="post" class="cabinet-icons-form" id="cabinet-icons-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save">
+
+    {% for row in icon_rows %}
+    <input type="hidden" name="icon_{{ row.form_key }}_kind" value="{{ row.kind }}" data-icon-field="kind" data-form-key="{{ row.form_key }}">
+    <input type="hidden" name="icon_{{ row.form_key }}_value" value="{{ row.value }}" data-icon-field="value" data-form-key="{{ row.form_key }}">
+    {% endfor %}
+
+    {% regroup icon_rows by group as grouped_icons %}
+    {% for group in grouped_icons %}
+    <section class="cabinet-section cabinet-icons-group">
+      <div class="cabinet-section__head">
+        <h2>{{ group.grouper }}</h2>
+        <p class="cabinet-section__lead">{{ group.list|length }} иконок</p>
+      </div>
+      <div class="cabinet-icons-matrix" role="list">
+        {% for row in group.list %}
+        <button type="button" class="cabinet-icon-tile{% if row.is_overridden %} is-overridden{% endif %}"
+                role="listitem"
+                data-form-key="{{ row.form_key }}"
+                data-icon-key="{{ row.key }}"
+                data-icon-label="{{ row.label }}"
+                data-icon-group="{{ row.group }}"
+                data-icon-kind="{{ row.kind }}"
+                data-icon-value="{{ row.value }}"
+                data-icon-default-kind="{{ row.default_kind }}"
+                data-icon-default-value="{{ row.default_value }}"
+                aria-label="{{ row.label }}: {{ row.key }}">
+          <span class="cabinet-icon-tile__glyph">{% biota_icon row.key %}</span>
+          <span class="cabinet-icon-tile__tip" role="tooltip">
+            <strong class="cabinet-icon-tile__tip-title">{{ row.label }}</strong>
+            <span class="cabinet-icon-tile__tip-row"><span>Ключ</span><code>{{ row.key }}</code></span>
+            <span class="cabinet-icon-tile__tip-row"><span>Тип</span><code>{{ row.kind }}</code></span>
+            <span class="cabinet-icon-tile__tip-row"><span>Значение</span><code>{{ row.value }}</code></span>
+            <span class="cabinet-icon-tile__tip-row"><span>По умолчанию</span><code>{{ row.default_kind }} · {{ row.default_value }}</code></span>
+            {% if row.is_overridden %}<span class="cabinet-icon-tile__tip-badge">изменено</span>{% endif %}
+          </span>
+        </button>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+
+    <div class="cabinet-icons-actions">
+      <button type="submit" class="btn">Сохранить иконки</button>
+      <button type="submit" class="btn btn-ghost" name="action" value="reset"
+              onclick="return confirm('Сбросить все иконки к значениям по умолчанию?');">Сбросить всё</button>
+    </div>
+  </form>
+</div>
+
+<script src="{% static 'shifts/js/cabinet_icons.js' %}?v={{ static_asset_version }}"></script>
+{% endblock %}

@@ -245,6 +245,15 @@ var INV = (function () {
     });
   });
 
+  function defectRowLockIconHtml(unlocked) {
+    var key = unlocked ? "ui.unlock" : "ui.lock";
+    if (window.BiotaIcons) {
+      var html = window.BiotaIcons.html(key, "defects-row-lock-icon");
+      if (html) return html;
+    }
+    return unlocked ? "🔓" : "🔒";
+  }
+
   rowToggles.forEach(function (btn) {
     var formId = btn.getAttribute("data-defect-form-id") || "";
     if (!formId) return;
@@ -254,7 +263,7 @@ var INV = (function () {
       if (editing) editableForms.add(formId);
       else editableForms.delete(formId);
       applyRowEditState(formId, editing);
-      btn.textContent = editing ? "🔓" : "🔒";
+      btn.innerHTML = defectRowLockIconHtml(editing);
       btn.title = editing ? "Выключить редактирование строки" : "Включить редактирование строки";
       btn.setAttribute("aria-label", btn.title);
     });

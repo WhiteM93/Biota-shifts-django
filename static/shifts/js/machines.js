@@ -22,6 +22,16 @@
     ];
     var colorPickerTarget = null;
 
+    function machinesIconHtml(key, extraClass) {
+      if (window.BiotaIcons) {
+        var html = window.BiotaIcons.html(key, extraClass || "");
+        if (html) return html;
+      }
+      if (key === "ui.close" || key === "action.delete") return "×";
+      if (key === "action.plus") return "+";
+      return "";
+    }
+
     var root = document.querySelector(".machines-page");
     var toggleBtn = document.querySelector(".js-machines-inline-edit-toggle");
     var canQuickEdit = root && (root.getAttribute("data-machines-quick-edit") || "") === "1";
@@ -2055,7 +2065,9 @@
                 '<td class="machines-tools-col-actions">' +
                 '<button type="button" class="machines-tools-row-del js-machines-tools-row-del" data-tool-number="' +
                 escCell(t.tool_number) +
-                '" title="Удалить позицию" aria-label="Удалить">×</button>' +
+                '" title="Удалить позицию" aria-label="Удалить">' +
+                machinesIconHtml("action.delete", "machines-tools-row-del__icon btn-inv-delete__icon") +
+                "</button>" +
                 "</td>";
             }
             tr.innerHTML =

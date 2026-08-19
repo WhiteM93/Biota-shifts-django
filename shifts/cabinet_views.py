@@ -840,3 +840,139 @@ def notifications_settings_view(request):
         "cron_evening": _notify_cron_line(settings.get("evening_time"), "evening"),
     }
     return render(request, "shifts/cabinet_notifications.html", ctx)
+
+
+def _icon_form_key(key: str) -> str:
+    return key.replace(".", "__")
+
+
+def _handle_icon_preset_action(request, action: str) -> bool:
+    from biota_shifts.hugeicons_map import apply_default_icons_preset, apply_hugeicons_preset, preset_count
+
+    if action == "preset_hugeicons":
+        apply_hugeicons_preset()
+        messages.success(
+            request,
+            f"На сайте включены новые иконки Hugeicons ({preset_count()}). Обновите страницы (Ctrl+F5).",
+        )
+        return True
+    if action == "preset_default":
+        apply_default_icons_preset()
+        messages.success(request, "На сайте включены стандартные иконки. Обновите страницы (Ctrl+F5).")
+        return True
+    return False
+
+
+def _icon_settings_context() -> dict:
+    from biota_shifts.hugeicons_map import preset_count
+    from biota_shifts.icon_settings import get_icon_preset, load_icon_settings
+
+    preset = get_icon_preset()
+    return {
+        "icon_preset": preset,
+        "icon_preset_is_hugeicons": preset == "hugeicons",
+        "hugeicons_preset_count": preset_count(),
+        "manual_overrides_count": len((load_icon_settings().get("overrides") or {})),
+    }
+
+
+@biota_login_required
+@require_http_methods(["GET", "POST"])
+def icons_settings_view(request):
+    """Справочник иконок сайта: просмотр и глобальные переопределения."""
+    user = biota_user(request)
+    if not user or not _is_admin(user):
+        messages.error(request, "Доступ запрещен")
+        return redirect("cabinet")
+
+    from biota_shifts.icon_registry import DEFAULT_ICON_REGISTRY, ICON_KINDS
+    from biota_shifts.icon_settings import get_effective_overrides, load_icon_settings, save_icon_settings
+    from biota_shifts.icons import get_icon, list_icons_grouped
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if _handle_icon_preset_action(request, action):
+            return redirect("cabinet_icons")
+        if action == "reset":
+            save_icon_settings({}, preset="default")
+            messages.success(request, "Все иконки сброшены к значениям по умолчанию.")
+        elif action == "save":
+            overrides: dict[str, dict] = {}
+            for key in DEFAULT_ICON_REGISTRY:
+                fk = _icon_form_key(key)
+                kind = (request.POST.get(f"icon_{fk}_kind") or "").strip()
+                value = (request.POST.get(f"icon_{fk}_value") or "").strip()
+                if kind in ICON_KINDS and value:
+                    overrides[key] = {"kind": kind, "value": value}
+            save_icon_settings(overrides)
+            messages.success(request, "Иконки сохранены. Обновите страницы сайта (Ctrl+F5).")
+        return redirect("cabinet_icons")
+
+    icon_rows = []
+    for key in sorted(DEFAULT_ICON_REGISTRY.keys()):
+        spec = get_icon(key)
+        default = DEFAULT_ICON_REGISTRY[key]
+        icon_rows.append(
+            {
+                "key": key,
+                "form_key": _icon_form_key(key),
+                "label": spec["label"],
+                "group": spec["group"],
+                "kind": spec["kind"],
+                "value": spec["value"],
+                "default_kind": default["kind"],
+                "default_value": default["value"],
+                "is_overridden": spec["kind"] != default["kind"] or spec["value"] != default["value"],
+            }
+        )
+
+    ctx = {
+        "icon_groups": list_icons_grouped(),
+        "icon_rows": icon_rows,
+        "icon_kinds": ICON_KINDS,
+        "overrides_count": len(get_effective_overrides()),
+        **_icon_settings_context(),
+    }
+    return render(request, "shifts/cabinet_icons.html", ctx)
+
+
+@biota_login_required
+@require_http_methods(["GET", "POST"])
+def icons_preview_view(request):
+    """Превью новых SVG из Figma (кандидаты) рядом с текущими иконками."""
+    user = biota_user(request)
+    if not user or not _is_admin(user):
+        messages.error(request, "Доступ запрещен")
+        return redirect("cabinet")
+
+    from biota_shifts.icon_candidates import (
+        apply_all_candidates,
+        candidates_count,
+        figma_inventory,
+        list_preview_rows,
+    )
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if _handle_icon_preset_action(request, action):
+            return redirect("cabinet_icons_preview")
+        if action == "apply":
+            n = apply_all_candidates()
+            if n:
+                messages.success(
+                    request,
+                    f"Применено {n} иконок. Обновите страницы сайта (Ctrl+F5).",
+                )
+            else:
+                messages.warning(request, "Нет SVG-кандидатов в static/icons/candidates/.")
+        return redirect("cabinet_icons_preview")
+
+    rows = list_preview_rows()
+    ctx = {
+        "preview_rows": rows,
+        "candidates_count": candidates_count(),
+        "figma_rows": figma_inventory(),
+        "total_icons": len(rows),
+        **_icon_settings_context(),
+    }
+    return render(request, "shifts/cabinet_icons_preview.html", ctx)

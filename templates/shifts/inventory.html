@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static biota_icons %}
 {% load inventory_tags static %}
 
 {% block extra_styles %}
@@ -670,21 +670,6 @@
         <option value="collet" {% if filters.category == "collet" %}selected{% endif %}>Цанги</option>
       </select>
     </label>
-    <label class="field"><span>Показывать нулевые остатки</span>
-      <select name="show_all">
-        <option value="0" {% if not filters.show_all %}selected{% endif %}>Нет</option>
-        <option value="1" {% if filters.show_all %}selected{% endif %}>Да</option>
-      </select>
-    </label>
-    <label class="field"><span>От кого</span>
-      <select name="arrival_supplier">
-        <option value="" {% if not filters.arrival_supplier %}selected{% endif %}>Все</option>
-        <option value="ООО МВ" {% if filters.arrival_supplier == "ООО МВ" %}selected{% endif %}>ООО МВ</option>
-        <option value="ИП Иванов" {% if filters.arrival_supplier == "ИП Иванов" %}selected{% endif %}>ИП Иванов</option>
-        <option value="ИП Игнатьев" {% if filters.arrival_supplier == "ИП Игнатьев" %}selected{% endif %}>ИП Игнатьев</option>
-        <option value="ИП Ясинов" {% if filters.arrival_supplier == "ИП Ясинов" %}selected{% endif %}>ИП Ясинов</option>
-      </select>
-    </label>
     {% if filters.category == "end_mill" %}
     <label class="field"><span>Тип фрезы</span>
       <select name="mill_type">
@@ -702,6 +687,117 @@
         {% endfor %}
       </select>
     </label>
+    {% elif filters.category == "tap" %}
+    <label class="field"><span>Тип инструмента</span>
+      <select name="tap_tool_type">
+        <option value="">Все</option>
+        {% for key, label in tap_tool_types %}
+          {% if key in tap_filter_options.tool_types %}
+          <option value="{{ key }}" {% if filters.tap_tool_type == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Размер</span>
+      <select name="tap_size">
+        <option value="">Все</option>
+        {% for v in tap_filter_options.sizes %}
+        <option value="{{ v }}" {% if filters.tap_size == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "center_drill" %}
+    <label class="field"><span>Диаметр, мм</span>
+      <select name="center_diameter_mm">
+        <option value="">Все</option>
+        {% for v in center_drill_filter_options.diameters %}
+        <option value="{{ v }}" {% if filters.center_diameter_mm == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "countersink" %}
+    <label class="field"><span>Тип зенкера</span>
+      <select name="countersink_type">
+        <option value="">Все</option>
+        {% for key, label in countersink_types %}
+          {% if key in countersink_filter_options.types %}
+          <option value="{{ key }}" {% if filters.countersink_type == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Размер</span>
+      <select name="countersink_size_label">
+        <option value="">Все</option>
+        {% for v in countersink_filter_options.sizes %}
+        <option value="{{ v }}" {% if filters.countersink_size_label == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "drill" %}
+    <label class="field"><span>Диаметр, мм</span>
+      <select name="drill_diameter_mm">
+        <option value="">Все</option>
+        {% for v in drill_filter_options.diameters %}
+        <option value="{{ v }}" {% if filters.drill_diameter_mm == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "insert" %}
+    {% with tips=insert_column_tooltips %}
+    <label class="field"><span title="{{ tips.shape }}">Форма</span>
+      <select name="ins_shape" title="{{ tips.shape }}">
+        <option value="">Все</option>
+        {% for key, label in insert_shapes %}
+          {% if key in insert_filter_options.shapes %}
+          <option value="{{ key }}" {% if filters.ins_shape == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.iso }}">Маркировка ISO</span>
+      <select name="ins_iso" title="{{ tips.iso }}">
+        <option value="">Все</option>
+        {% for v in insert_filter_options.isos %}
+        <option value="{{ v }}" {% if filters.ins_iso == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endwith %}
+    {% elif filters.category == "collet" %}
+    <label class="field"><span>Тип цанги</span>
+      <select name="collet_type">
+        <option value="">Все</option>
+        {% for key, label in collet_types %}
+        <option value="{{ key }}" {% if filters.collet_type == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Размер ER</span>
+      <select name="collet_er_size">
+        <option value="">Все</option>
+        {% for key, label in er_collet_sizes %}
+        <option value="{{ key }}" {% if filters.collet_er_size == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <label class="field"><span>Показывать нулевые остатки</span>
+      <select name="show_all">
+        <option value="0" {% if not filters.show_all %}selected{% endif %}>Нет</option>
+        <option value="1" {% if filters.show_all %}selected{% endif %}>Да</option>
+      </select>
+    </label>
+    <label class="field" hidden aria-hidden="true"><span>От кого</span>
+      <select name="arrival_supplier">
+        <option value="" {% if not filters.arrival_supplier %}selected{% endif %}>Все</option>
+        <option value="ООО МВ" {% if filters.arrival_supplier == "ООО МВ" %}selected{% endif %}>ООО МВ</option>
+        <option value="ИП Иванов" {% if filters.arrival_supplier == "ИП Иванов" %}selected{% endif %}>ИП Иванов</option>
+        <option value="ИП Игнатьев" {% if filters.arrival_supplier == "ИП Игнатьев" %}selected{% endif %}>ИП Игнатьев</option>
+        <option value="ИП Ясинов" {% if filters.arrival_supplier == "ИП Ясинов" %}selected{% endif %}>ИП Ясинов</option>
+      </select>
+    </label>
+    {% if filters.category == "end_mill" %}
     <label class="field"><span>Радиус, мм</span>
       <select name="mill_corner_radius_mm">
         <option value="">Все</option>
@@ -735,14 +831,6 @@
       </select>
     </label>
     {% elif filters.category == "tap" %}
-    <label class="field"><span>Размер</span>
-      <select name="tap_size">
-        <option value="">Все</option>
-        {% for v in tap_filter_options.sizes %}
-        <option value="{{ v }}" {% if filters.tap_size == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
     <label class="field"><span>Шаг, мм</span>
       <select name="tap_pitch">
         <option value="">Все</option>
@@ -771,16 +859,6 @@
         {% endfor %}
       </select>
     </label>
-    <label class="field"><span>Тип инструмента</span>
-      <select name="tap_tool_type">
-        <option value="">Все</option>
-        {% for key, label in tap_tool_types %}
-          {% if key in tap_filter_options.tool_types %}
-          <option value="{{ key }}" {% if filters.tap_tool_type == key %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
-        {% endfor %}
-      </select>
-    </label>
     <label class="field"><span>Длина общая, мм</span>
       <select name="tap_overall_length_mm">
         <option value="">Все</option>
@@ -798,14 +876,6 @@
       </select>
     </label>
     {% elif filters.category == "center_drill" %}
-    <label class="field"><span>Диаметр, мм</span>
-      <select name="center_diameter_mm">
-        <option value="">Все</option>
-        {% for v in center_drill_filter_options.diameters %}
-        <option value="{{ v }}" {% if filters.center_diameter_mm == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
     <label class="field"><span>Длина, мм</span>
       <select name="center_overall_length_mm">
         <option value="">Все</option>
@@ -825,16 +895,6 @@
       </select>
     </label>
     {% elif filters.category == "countersink" %}
-    <label class="field"><span>Тип зенкера</span>
-      <select name="countersink_type">
-        <option value="">Все</option>
-        {% for key, label in countersink_types %}
-          {% if key in countersink_filter_options.types %}
-          <option value="{{ key }}" {% if filters.countersink_type == key %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
-        {% endfor %}
-      </select>
-    </label>
     <label class="field"><span>Диаметр, мм</span>
       <select name="countersink_diameter_mm">
         <option value="">Все</option>
@@ -869,23 +929,7 @@
         {% endfor %}
       </select>
     </label>
-    <label class="field"><span>Размер</span>
-      <select name="countersink_size_label">
-        <option value="">Все</option>
-        {% for v in countersink_filter_options.sizes %}
-        <option value="{{ v }}" {% if filters.countersink_size_label == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
     {% elif filters.category == "drill" %}
-    <label class="field"><span>Диаметр, мм</span>
-      <select name="drill_diameter_mm">
-        <option value="">Все</option>
-        {% for v in drill_filter_options.diameters %}
-        <option value="{{ v }}" {% if filters.drill_diameter_mm == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
     <label class="field"><span>Длина, мм</span>
       <select name="drill_overall_length_mm">
         <option value="">Все</option>
@@ -912,24 +956,6 @@
     </label>
     {% elif filters.category == "insert" %}
     {% with tips=insert_column_tooltips %}
-    <label class="field"><span title="{{ tips.iso }}">Маркировка ISO</span>
-      <select name="ins_iso" title="{{ tips.iso }}">
-        <option value="">Все</option>
-        {% for v in insert_filter_options.isos %}
-        <option value="{{ v }}" {% if filters.ins_iso == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.shape }}">Форма</span>
-      <select name="ins_shape" title="{{ tips.shape }}">
-        <option value="">Все</option>
-        {% for key, label in insert_shapes %}
-          {% if key in insert_filter_options.shapes %}
-          <option value="{{ key }}" {% if filters.ins_shape == key %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
-        {% endfor %}
-      </select>
-    </label>
     <label class="field"><span title="{{ tips.relief }}">Задний угол</span>
       <select name="ins_relief" title="{{ tips.relief }}">
         <option value="">Все</option>
@@ -998,22 +1024,6 @@
     </label>
     {% endwith %}
     {% elif filters.category == "collet" %}
-    <label class="field"><span>Тип цанги</span>
-      <select name="collet_type">
-        <option value="">Все</option>
-        {% for key, label in collet_types %}
-        <option value="{{ key }}" {% if filters.collet_type == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span>Размер ER</span>
-      <select name="collet_er_size">
-        <option value="">Все</option>
-        {% for key, label in er_collet_sizes %}
-        <option value="{{ key }}" {% if filters.collet_er_size == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
     <label class="field"><span>Диапазон зажима</span>
       <select name="collet_clamp_range">
         <option value="">Все</option>
@@ -1956,7 +1966,7 @@
       <div class="defect-cal-wrap" id="defect-add-date-wrap">
         <input type="hidden" name="defect_date" id="defect-add-date-val" value="{{ today }}">
         <button type="button" class="defect-cal-trigger" id="defect-add-cal-trigger" aria-expanded="false" aria-controls="defect-add-cal-popup" aria-haspopup="dialog">
-          <i class="fi fi-rr-calendar ui-icon defect-cal-trigger-icon" aria-hidden="true"></i>
+          {% biota_icon "action.calendar" "ui-icon defect-cal-trigger-icon" %}
           <span id="defect-add-cal-trigger-text">{{ today }}</span>
         </button>
         <div class="defect-cal-popup" id="defect-add-cal-popup" hidden role="dialog" aria-label="Выбор даты записи">
@@ -2091,7 +2101,7 @@
       <span>Дата</span>
       <div class="defect-cal-wrap">
         <button type="button" class="defect-cal-trigger" id="defect-cal-trigger" aria-expanded="false" aria-controls="defect-cal-popup" aria-haspopup="dialog">
-          <i class="fi fi-rr-calendar ui-icon defect-cal-trigger-icon" aria-hidden="true"></i>
+          {% biota_icon "action.calendar" "ui-icon defect-cal-trigger-icon" %}
           <span id="defect-cal-trigger-text">{% if defect_filters.date_from %}{% if defect_filters.date_from == defect_filters.date_to %}{{ defect_filters.date_from }}{% else %}{{ defect_filters.date_from }} — {{ defect_filters.date_to }}{% endif %}{% else %}Все даты{% endif %}</span>
         </button>
         <div class="defect-cal-popup" id="defect-cal-popup" hidden role="dialog" aria-label="Выбор даты">
@@ -2189,7 +2199,7 @@
             title="Включить редактирование строки"
             aria-label="Включить редактирование строки"
             style="padding:4px 10px;font-size:14px;line-height:1;"
-          >🔒</button>
+          >{% biota_icon "ui.lock" "defects-row-lock-icon" %}</button>
           <form method="post" style="margin-top:6px;" onsubmit="return confirm('Удалить эту запись учёта брака?');">
             {% csrf_token %}
             <input type="hidden" name="panel" value="defects">

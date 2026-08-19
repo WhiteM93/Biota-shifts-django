@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static biota_icons %}
 
 {% block extra_styles %}
 <link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
@@ -37,34 +37,39 @@
 
   <nav class="cabinet-quick-grid" aria-label="Быстрые действия">
     <a class="cabinet-quick-card cabinet-quick-card--django" href="/admin/">
-      <span class="cabinet-quick-card__icon" aria-hidden="true">⚙</span>
+      <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "cabinet.django_admin" %}</span>
       <span class="cabinet-quick-card__title">Django Admin</span>
       <p class="cabinet-quick-card__desc">Модели, миграции, служебные записи в БД</p>
     </a>
     <a class="cabinet-quick-card cabinet-quick-card--schedules" href="{% url 'schedule_backups' %}">
-      <span class="cabinet-quick-card__icon" aria-hidden="true">📅</span>
+      <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "cabinet.schedule_backups" %}</span>
       <span class="cabinet-quick-card__title">Резервные копии графиков</span>
       <p class="cabinet-quick-card__desc">Excel-файлы смен, скачать и восстановить</p>
     </a>
     <a class="cabinet-quick-card cabinet-quick-card--inventory" href="{% url 'inventory_backups' %}">
-      <span class="cabinet-quick-card__icon" aria-hidden="true">📦</span>
+      <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "cabinet.inventory_backups" %}</span>
       <span class="cabinet-quick-card__title">Резервные копии склада</span>
       <p class="cabinet-quick-card__desc">JSON: позиции, движения, закупки</p>
     </a>
     <a class="cabinet-quick-card cabinet-quick-card--regulations" href="{% url 'regulations_backups' %}">
-      <span class="cabinet-quick-card__icon" aria-hidden="true">📋</span>
+      <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "cabinet.regulations_backups" %}</span>
       <span class="cabinet-quick-card__title">Резервные копии регламентов</span>
       <p class="cabinet-quick-card__desc">JSON: перерывы и ползунки по сменам</p>
     </a>
     <a class="cabinet-quick-card" href="{% url 'perf_diagnostics' %}">
-      <span class="cabinet-quick-card__icon" aria-hidden="true">⏱</span>
+      <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "cabinet.perf_diagnostics" %}</span>
       <span class="cabinet-quick-card__title">Медленные загрузки</span>
       <p class="cabinet-quick-card__desc">Журнал: сеть, сервер или тяжёлые файлы</p>
     </a>
     <a class="cabinet-quick-card cabinet-quick-card--notifications" href="{% url 'cabinet_notifications' %}">
-      <span class="cabinet-quick-card__icon" aria-hidden="true">🔔</span>
+      <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "cabinet.notifications" %}</span>
       <span class="cabinet-quick-card__title">Уведомления</span>
       <p class="cabinet-quick-card__desc">Сводки СКУД в Telegram, чёрный список</p>
+    </a>
+    <a class="cabinet-quick-card cabinet-quick-card--icons" href="{% url 'cabinet_icons' %}">
+      <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "cabinet.icons" %}</span>
+      <span class="cabinet-quick-card__title">Иконки сайта</span>
+      <p class="cabinet-quick-card__desc">Все иконки: просмотр и единые замены</p>
     </a>
   </nav>
 

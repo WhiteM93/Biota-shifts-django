@@ -1905,7 +1905,7 @@
     if (!photo) {
       var empty = document.createElement("div");
       empty.className = "vw-photo-empty";
-      empty.innerHTML = '<i class="fi fi-rr-picture ui-icon" aria-hidden="true"></i><span>Фото не загружено</span>';
+      empty.innerHTML = (window.BiotaIcons ? window.BiotaIcons.html("action.picture", "ui-icon") : '<i class="fi fi-rr-picture ui-icon" aria-hidden="true"></i>') + '<span>Фото не загружено</span>';
       photosEl.appendChild(empty);
       return;
     }

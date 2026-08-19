@@ -271,9 +271,7 @@
     min-width: 30px !important;
     height: 30px !important;
     padding: 0 !important;
-    font-size: 18px !important;
-    font-weight: 700;
-    line-height: 1 !important;
+    line-height: 0 !important;
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
@@ -282,6 +280,14 @@
       transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
       box-shadow 0.24s ease,
       filter 0.18s ease;
+  }
+  .machines-toolbar-icon-btn .machines-toolbar-icon,
+  .machines-toolbar-icon-btn svg.biota-icon--hgi,
+  .machines-toolbar-icon-btn img.biota-icon--svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+    color: inherit;
   }
   .machines-toolbar-icon-btn:hover {
     transform: translateY(-1px) rotate(6deg) scale(1.04);
@@ -716,11 +722,39 @@
     border: none;
     background: transparent;
     color: #f87171;
-    font-size: 18px;
-    line-height: 1;
+    line-height: 0;
     cursor: pointer;
     padding: 2px 6px;
     border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .machines-tools-row-del .machines-tools-row-del__icon,
+  .machines-tools-row-del svg.biota-icon--hgi,
+  .machines-tools-row-del img.biota-icon--svg {
+    display: block;
+    width: 14px;
+    height: 14px;
+    color: inherit;
+  }
+  .machines-modal-close-btn,
+  .machines-history-panel__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    padding: 4px 8px !important;
+  }
+  .machines-modal-close-icon,
+  .machines-modal-close-btn svg.biota-icon--hgi,
+  .machines-modal-close-btn img.biota-icon--svg,
+  .machines-history-panel__close svg.biota-icon--hgi,
+  .machines-history-panel__close img.biota-icon--svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+    color: inherit;
   }
   .machines-tools-row-del:hover {
     background: rgba(248, 113, 113, 0.14);

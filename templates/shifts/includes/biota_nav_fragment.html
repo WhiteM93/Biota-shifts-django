@@ -1,3 +1,4 @@
+{% load biota_icons %}
 {% if biota_username and biota_can_edit %}
 <form method="post" action="{% url 'refresh_cache' %}" class="nav-refresh-form">
   {% csrf_token %}
@@ -6,7 +7,7 @@
 {% endif %}
 {% if biota_nav.home %}
 <a href="{% url 'home' %}" class="nav-home-link nav-home-link--icon-only {% if request.resolver_match.url_name == 'home' %}active{% endif %}" title="Главная" aria-label="Главная">
-    {% include "shifts/includes/nav_home_icon.html" %}
+    {% biota_icon "nav.home" %}
   </a>
 {% endif %}
 {% if biota_nav.graph and biota_nav.regulations %}
@@ -44,7 +45,7 @@
 {% endif %}
 {% if biota_nav.inventory %}
 <a href="{% url 'inventory' %}" class="nav-inventory-link nav-inventory-link--icon-only {% if request.resolver_match.url_name == 'inventory' and request.GET.panel != 'defects' and request.GET.panel != 'payroll' and request.GET.panel != 'employees' %}active{% endif %}" title="Склад" aria-label="Склад">
-  {% include "shifts/includes/nav_inventory_icon.html" %}
+  {% biota_icon "nav.inventory" %}
 </a>
 {% endif %}
 {% if biota_nav.visual_warehouse %}
@@ -76,22 +77,17 @@
 <span class="nav-spacer"></span>
 {% if biota_username %}
 <a href="{% url 'cabinet' %}" class="nav-user nav-ctl {% if request.resolver_match.url_name == 'cabinet' %}active{% endif %}" title="Кабинет: {{ biota_username }}" aria-label="Кабинет: {{ biota_username }}">
-  {% include "shifts/includes/nav_user_icon.html" %}
+  {% biota_icon "nav.user" %}
 </a>
 {% endif %}
 {% if biota_nav.forms %}
 <a href="{% url 'forms' %}" class="nav-icon-btn nav-ctl {% if request.resolver_match.url_name == 'forms' %}active{% endif %}" title="Формы" aria-label="Формы">
-  {% include "shifts/includes/nav_forms_icon.html" %}
+  {% biota_icon "nav.forms" %}
 </a>
 {% endif %}
 {% if biota_nav.calculator %}
 <a href="{% url 'calculator' %}" class="nav-icon-btn nav-ctl {% if request.resolver_match.url_name == 'calculator' %}active{% endif %}" title="Калькулятор" aria-label="Калькулятор">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-    <rect x="4" y="2" width="16" height="20" rx="2"/>
-    <line x1="8" y1="7" x2="16" y2="7"/>
-    <line x1="8" y1="12" x2="9" y2="12"/><line x1="12" y1="12" x2="13" y2="12"/><line x1="16" y1="12" x2="17" y2="12"/>
-    <line x1="8" y1="16" x2="9" y2="16"/><line x1="12" y1="16" x2="13" y2="16"/><line x1="16" y1="16" x2="17" y2="16"/>
-  </svg>
+  {% biota_icon "nav.calculator" %}
 </a>
 {% endif %}
 <div class="nav-theme-wrap">

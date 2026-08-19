@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static biota_icons %}
 
 {% block extra_styles %}
 <link rel="stylesheet" href="{% static 'shifts/css/visual_warehouse.css' %}?v={{ static_asset_version }}">
@@ -199,7 +199,7 @@
             <div class="vw-photo-upload js-vw-photo-upload">
               <input type="file" class="js-vw-photo-file" hidden accept="image/jpeg,image/png,image/webp,image/gif">
               <button type="button" class="vw-btn-secondary vw-photo-pick js-vw-photo-pick">
-                <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+                {% biota_icon "action.upload" "ui-icon" %}
                 <span class="js-vw-photo-pick-label">Загрузить фото</span>
               </button>
               <span class="vw-photo-pick-name js-vw-photo-pick-name"></span>

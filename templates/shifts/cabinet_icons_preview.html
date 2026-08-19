@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% load static biota_icons %}
+
+
+
+{% block extra_styles %}
+<link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
+
+<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+
+{% endblock %}
+
+
+
+{% block content %}
+
+<div class="cabinet-subpage cabinet-icons-preview-page">
+
+  <a class="cabinet-subpage__back" href="{% url 'cabinet_icons' %}">← Иконки сайта</a>
+
+
+
+  <header class="cabinet-hero">
+
+    <p class="cabinet-hero__eyebrow">Hugeicons → сайт</p>
+
+    <h1>Новые иконки (превью)</h1>
+
+    <p class="cabinet-section__lead cabinet-icons-page__lead">
+
+      Сравнение «сейчас» и «Hugeicons Stroke Rounded». Пресет: {{ hugeicons_preset_count }} иконок.
+
+      SVG-кандидатов из Figma: {{ candidates_count }} из {{ total_icons }}.
+
+    </p>
+
+  </header>
+
+
+
+  {% include "shifts/includes/cabinet_icons_preset_toggle.html" %}
+
+
+
+  <section class="cabinet-section cabinet-figma-guide">
+
+    <div class="cabinet-section__head">
+
+      <h2>Hugeicons в Figma</h2>
+
+    </div>
+
+    <ol class="cabinet-figma-steps">
+
+      <li>Установите плагин
+
+        <a href="https://www.figma.com/community/plugin/1209922740177393208/hugeicons-icon-library-4000-free-icons" target="_blank" rel="noopener">Hugeicons Icon Library</a>
+
+        и откройте набор
+
+        <a href="https://www.figma.com/community/file/1336391869817535178/4-000-free-icons-open-source-figma-icon-library" target="_blank" rel="noopener">4000+ free icons</a>.
+
+      </li>
+
+      <li>Стиль: <strong>Stroke Rounded</strong>, размер 24×24.</li>
+
+      <li>Создайте страницу <strong>Biota — новые иконки</strong>, сетка 12 колонок, ячейка 64×64.</li>
+
+      <li>Для каждой строки ниже найдите иконку по slug (например <code>upload-01</code>), подпишите слоем <code>ключ</code>.</li>
+
+      <li>Если нужны свои правки — экспорт SVG в <code>static/icons/candidates/</code> (имя = ключ).</li>
+
+      <li>Быстрый старт без Figma: кнопка «Применить набор Hugeicons» (локальные SVG, без CDN).</li>
+
+    </ol>
+
+  </section>
+
+
+
+  <section class="cabinet-section">
+
+    <div class="cabinet-section__head">
+
+      <h2>Инвентарь для Figma</h2>
+
+      <p class="cabinet-section__lead">Ключ · Hugeicons slug · ссылка · имя SVG при экспорте</p>
+
+    </div>
+
+    <div class="cabinet-figma-inventory">
+
+      {% regroup figma_rows by group as figma_groups %}
+
+      {% for group in figma_groups %}
+
+      <h3 class="cabinet-figma-group-title">{{ group.grouper }}</h3>
+
+      <table class="cabinet-figma-table">
+
+        <thead>
+
+          <tr><th>Ключ</th><th>Название</th><th>Hugeicons slug</th><th>Файл SVG</th></tr>
+
+        </thead>
+
+        <tbody>
+
+          {% for row in group.list %}
+
+          <tr>
+
+            <td><code>{{ row.key }}</code></td>
+
+            <td>{{ row.label }}</td>
+
+            <td>
+
+              {% if row.hugeicons_url %}
+
+              <a href="{{ row.hugeicons_url }}" target="_blank" rel="noopener"><code>{{ row.figma_hint }}</code></a>
+
+              {% else %}
+
+              <code>{{ row.figma_hint }}</code>
+
+              {% endif %}
+
+            </td>
+
+            <td><code>{{ row.key }}.svg</code></td>
+
+          </tr>
+
+          {% endfor %}
+
+        </tbody>
+
+      </table>
+
+      {% endfor %}
+
+    </div>
+
+  </section>
+
+
+
+  <section class="cabinet-section">
+
+    <div class="cabinet-section__head">
+
+      <h2>Сравнение</h2>
+
+      <p class="cabinet-section__lead">Слева — сейчас, по центру — Hugeicons, справа — SVG из Figma (если загружен)</p>
+
+    </div>
+
+
+
+    <form method="post" class="cabinet-icons-preview-form">
+
+      {% csrf_token %}
+
+      <div class="cabinet-icons-preview-actions">
+
+        <button type="submit" class="btn" name="action" value="apply"
+
+                {% if not candidates_count %}disabled{% endif %}
+
+                onclick="return confirm('Заменить иконки SVG-кандидатами из Figma?');">
+
+          Применить {{ candidates_count }} SVG-кандидатов
+
+        </button>
+
+      </div>
+
+
+
+      {% regroup preview_rows by group as grouped_preview %}
+
+      {% for group in grouped_preview %}
+
+      <h3 class="cabinet-figma-group-title">{{ group.grouper }}</h3>
+
+      <div class="cabinet-icons-compare-grid cabinet-icons-compare-grid--triple">
+
+        {% for row in group.list %}
+
+        <article class="cabinet-icon-compare{% if row.has_candidate %} has-candidate{% endif %}">
+
+          <header class="cabinet-icon-compare__head">
+
+            <strong>{{ row.label }}</strong>
+
+            <code>{{ row.key }}</code>
+
+          </header>
+
+          <div class="cabinet-icon-compare__cols">
+
+            <div class="cabinet-icon-compare__col">
+
+              <span class="cabinet-icon-compare__label">Сейчас</span>
+
+              <div class="cabinet-icon-compare__box">{% biota_icon row.key %}</div>
+
+            </div>
+
+            <div class="cabinet-icon-compare__col cabinet-icon-compare__col--hugeicons">
+
+              <span class="cabinet-icon-compare__label">Hugeicons</span>
+
+              <div class="cabinet-icon-compare__box">
+
+                {% if row.hugeicons_html %}
+
+                {{ row.hugeicons_html|safe }}
+
+                <span class="cabinet-icon-compare__slug"><code>{{ row.hugeicons_slug }}</code></span>
+
+                {% else %}
+
+                <span class="cabinet-icon-compare__empty">—</span>
+
+                {% endif %}
+
+              </div>
+
+            </div>
+
+            <div class="cabinet-icon-compare__col">
+
+              <span class="cabinet-icon-compare__label">Figma SVG</span>
+
+              <div class="cabinet-icon-compare__box">
+
+                {% if row.has_candidate %}
+
+                <img class="biota-icon biota-icon--svg" src="{{ row.candidate_url }}" alt="">
+
+                {% else %}
+
+                <span class="cabinet-icon-compare__empty">нет SVG</span>
+
+                {% endif %}
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </article>
+
+        {% endfor %}
+
+      </div>
+
+      {% endfor %}
+
+    </form>
+
+  </section>
+
+</div>
+
+{% endblock %}
+

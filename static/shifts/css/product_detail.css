@@ -3736,6 +3736,14 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     cursor: pointer;
     line-height: 0;
   }
+  .setup-tool-note-eye svg,
+  .setup-tool-note-eye .biota-icon--hgi {
+    display: block;
+    width: 16px;
+    height: 16px;
+    color: inherit;
+    flex-shrink: 0;
+  }
   .setup-tool-note-eye:hover,
   .setup-tool-note-eye:focus-visible {
     color: var(--bio-body-fg, #f3f4f6);
@@ -3941,6 +3949,14 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   }
   .setup-load-machine-icon {
     display: block;
+    width: 18px;
+    height: 18px;
+    color: inherit;
+  }
+  .product-pdf-export-btn__icon svg.setup-load-machine-icon,
+  .product-pdf-export-btn__icon svg.setup-load-machine-icon.biota-icon--hgi {
+    width: 18px;
+    height: 18px;
   }
   .setup-tools-compare-modal[hidden] {
     display: none !important;
@@ -5610,4 +5626,66 @@ html[data-theme="dawn"] .setup-program-preview-modal-dialog {
 .setup-program-preview-code .gcode-search-current mark.gcode-search-mark {
   background: rgba(250, 204, 21, 0.85);
   color: #0f172a;
+}
+
+/* Hugeicons (inline SVG) на странице наладки */
+svg.biota-icon--hgi,
+img.biota-icon--hgi {
+  display: block;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.ui-icon.biota-icon--hgi,
+svg.ui-icon.biota-icon--hgi {
+  width: 1em;
+  height: 1em;
+}
+
+.setup-program-preview-btn svg.ui-icon.biota-icon--hgi,
+.product-drawing-preview-btn svg.ui-icon.biota-icon--hgi,
+.product-download-row .js-product-asset-replace svg.ui-icon.biota-icon--hgi {
+  width: 14px;
+  height: 14px;
+}
+
+.setup-spec-col-bindings svg.ui-icon.biota-icon--hgi,
+.setup-spec-box-controls svg.ui-icon.biota-icon--hgi {
+  width: 15px;
+  height: 15px;
+}
+
+.product-pdf-export-btn__icon svg.biota-icon--hgi {
+  width: 18px;
+  height: 18px;
+}
+
+.setup-tool-note-eye svg.setup-tool-note-eye-icon.biota-icon--hgi {
+  width: 16px;
+  height: 16px;
+}
+
+.btn.product-btn-edit-mode--icon-only svg.qe-icon.biota-icon--hgi {
+  width: 20px;
+  height: 20px;
+  color: inherit;
+}
+
+.btn.product-btn-edit-mode[aria-pressed="true"] svg.qe-icon--save.biota-icon--hgi .qe-icon__check,
+.btn.product-btn-edit-mode[aria-pressed="true"] svg.qe-icon--save .qe-icon__check {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: qe-check-draw 0.55s ease forwards;
+}
+
+.btn-inv-delete svg.btn-inv-delete__icon.biota-icon--hgi {
+  width: 14px;
+  height: 14px;
+}
+
+.setup-spec-box-controls .btn-inv-delete svg.btn-inv-delete__icon.biota-icon--hgi,
+.setup-program-file-item-side .btn-inv-delete svg.btn-inv-delete__icon.biota-icon--hgi,
+.product-drawing-file-actions .btn-inv-delete svg.btn-inv-delete__icon.biota-icon--hgi {
+  width: 12px;
+  height: 12px;
 }

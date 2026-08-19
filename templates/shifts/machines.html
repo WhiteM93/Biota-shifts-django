@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static biota_icons %}
 
 {% block content %}
 <div
@@ -45,7 +45,7 @@
             aria-label="Добавить строку станка"
             title="Добавить строку"
           >
-            +
+            {% biota_icon "action.plus" "machines-toolbar-icon" %}
           </button>
           {% endif %}
         </div>
@@ -175,7 +175,7 @@
           aria-label="Добавить строку плана"
           title="Добавить строку"
         >
-          +
+          {% biota_icon "action.plus" "machines-toolbar-icon" %}
         </button>
         {% endif %}
       </div>
@@ -265,7 +265,7 @@
       <header class="machines-history-panel__head">
         <h2 id="machines-history-title" class="machines-history-panel__title">История изменений</h2>
         <button type="button" class="btn btn-ghost machines-history-panel__close js-machines-history-close" aria-label="Закрыть">
-          ×
+          {% biota_icon "ui.close" "machines-modal-close-icon" %}
         </button>
       </header>
       <p class="muted machines-history-panel__hint">Кто и что менял на этой странице. Записи хранятся только в этом браузере.</p>
@@ -363,7 +363,7 @@
             Очистить магазин
           </button>
           {% endif %}
-          <button type="button" class="btn btn-ghost" data-close-machines-tools="1" aria-label="Закрыть">×</button>
+          <button type="button" class="btn btn-ghost machines-modal-close-btn" data-close-machines-tools="1" aria-label="Закрыть">{% biota_icon "ui.close" "machines-modal-close-icon" %}</button>
         </div>
       </div>
       <p class="muted machines-tools-modal-meta" id="machines-tools-modal-meta"></p>

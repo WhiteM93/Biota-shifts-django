@@ -1,4 +1,38 @@
 /* Biota: глобальные темы (ночь по умолчанию, рассвет — html[data-theme="dawn"]) */
+@import url("https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css");
+@import url("https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css");
+
+.biota-icon--emoji,
+.biota-icon--text {
+  display: inline-block;
+  line-height: 1;
+}
+
+.biota-icon--svg.biota-icon--hgi {
+  width: 1.25em;
+  height: 1.25em;
+  object-fit: contain;
+}
+
+.product-pdf-export-btn .biota-icon--hgi {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-inv-delete .biota-icon--hgi {
+  width: 14px;
+  height: 14px;
+}
+
+.cabinet-quick-card__icon .biota-icon {
+  font-size: 1.75rem;
+}
+
+.biota-icon--svg {
+  width: 1.25em;
+  height: 1.25em;
+  object-fit: contain;
+}
 
 html {
   color-scheme: dark;
@@ -11,6 +45,8 @@ html {
   --bio-nav-link-hover-fg: #fff;
   --bio-nav-link-hover-bg: #253150;
   --bio-nav-link-hover-border: #3a4a72;
+  --bio-nav-icon-size: 22px;
+  --bio-nav-logo-size: 28px;
   --bio-nav-active-fg: #ffffff;
   --bio-nav-active-bg1: #4f6190;
   --bio-nav-active-bg2: #3b4b72;
@@ -176,6 +212,8 @@ html[data-theme="dawn"] {
   --bio-nav-link-hover-fg: #134e4a;
   --bio-nav-link-hover-bg: #f5f0e8;
   --bio-nav-link-hover-border: #d6c9b8;
+  --bio-nav-icon-size: 22px;
+  --bio-nav-logo-size: 28px;
   --bio-nav-active-fg: #fff;
   --bio-nav-active-bg1: #14b8a6;
   --bio-nav-active-bg2: #0d9488;
@@ -1082,23 +1120,30 @@ html[data-theme="dawn"] .nav-machines-icon-glow {
 }
 
 .nav .nav-ctl svg,
+.nav .nav-ctl img.biota-icon,
+.nav .nav-ctl svg.biota-icon,
 .nav a[class*="--icon-only"] svg,
-.nav-dropdown > summary[class*="--icon-only"] svg {
+.nav a[class*="--icon-only"] img.biota-icon,
+.nav a[class*="--icon-only"] svg.biota-icon,
+.nav-dropdown > summary[class*="--icon-only"] svg,
+.nav-dropdown > summary[class*="--icon-only"] img.biota-icon,
+.nav-dropdown > summary[class*="--icon-only"] svg.biota-icon {
   display: block;
-  width: 24px;
-  height: 24px;
+  width: var(--bio-nav-icon-size);
+  height: var(--bio-nav-icon-size);
   flex-shrink: 0;
+  object-fit: contain;
 }
 
 .nav .nav-ctl .m-logo {
-  width: 32px;
-  height: 32px;
+  width: var(--bio-nav-logo-size);
+  height: var(--bio-nav-logo-size);
 }
 
 .nav a[class*="--icon-only"] [class$="__icon"],
 .nav-dropdown > summary[class*="--icon-only"] [class$="__icon"] {
-  width: 28px;
-  height: 28px;
+  width: var(--bio-nav-icon-size);
+  height: var(--bio-nav-icon-size);
 }
 
 .nav a[class*="--icon-only"] [class*="-icon-glow"],
@@ -2014,17 +2059,28 @@ html[data-theme="dawn"] .chk {
   }
 
   .nav .nav-ctl svg,
+  .nav .nav-ctl img.biota-icon,
+  .nav .nav-ctl svg.biota-icon,
   .nav a[class*="--icon-only"] svg,
+  .nav a[class*="--icon-only"] img.biota-icon,
+  .nav a[class*="--icon-only"] svg.biota-icon,
   .nav-dropdown > summary[class*="--icon-only"] svg,
+  .nav-dropdown > summary[class*="--icon-only"] img.biota-icon,
+  .nav-dropdown > summary[class*="--icon-only"] svg.biota-icon,
   .nav .nav-ctl .m-logo {
-    width: 30px;
-    height: 30px;
+    width: var(--bio-nav-icon-size);
+    height: var(--bio-nav-icon-size);
+  }
+
+  .nav .nav-ctl .m-logo {
+    width: var(--bio-nav-logo-size);
+    height: var(--bio-nav-logo-size);
   }
 
   .nav a[class*="--icon-only"] [class$="__icon"],
   .nav-dropdown > summary[class*="--icon-only"] [class$="__icon"] {
-    width: 28px;
-    height: 28px;
+    width: var(--bio-nav-icon-size);
+    height: var(--bio-nav-icon-size);
   }
 
   .nav .nav-spacer {

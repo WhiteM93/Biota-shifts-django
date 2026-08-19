@@ -23,6 +23,19 @@ def biota_session(request):
         perf_diagnostics = False
         perf_diag_ttfb_ms = 2500
         perf_diag_load_ms = 5000
+    try:
+        from biota_shifts.icon_settings import get_icon_preset
+        from biota_shifts.icons import icons_json_for_template
+
+        icons_json = icons_json_for_template()
+        icon_preset = get_icon_preset()
+    except Exception:
+        icons_json = "{}"
+        icon_preset = "default"
+    icon_ctx = {
+        "icon_preset": icon_preset,
+        "icon_preset_is_hugeicons": icon_preset == "hugeicons",
+    }
     u = (request.session.get("biota_username") or "").strip()
     if not u:
         return {
@@ -37,6 +50,8 @@ def biota_session(request):
             "perf_diagnostics": perf_diagnostics,
             "perf_diag_ttfb_ms": perf_diag_ttfb_ms,
             "perf_diag_load_ms": perf_diag_load_ms,
+            "biota_icons_json": icons_json,
+            **icon_ctx,
         }
     nav = nav_permissions_for_user(u)
     adn = (request.session.get("admin_display_name") or "").strip()
@@ -54,6 +69,10 @@ def biota_session(request):
     payload["perf_diagnostics"] = perf_diagnostics
     payload["perf_diag_ttfb_ms"] = perf_diag_ttfb_ms
     payload["perf_diag_load_ms"] = perf_diag_load_ms
-    if is_admin and adn:
-        return {"biota_username": adn, **payload}
-    return {"biota_username": u, **payload}
+    display = adn if (is_admin and adn) else u
+    return {
+        "biota_username": display,
+        **payload,
+        "biota_icons_json": icons_json,
+        **icon_ctx,
+    }

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static biota_icons %}
 
 {% block content %}
 <link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v={{ static_asset_version }}">
@@ -27,7 +27,7 @@
       </label>
       </div>
       {% if biota_can_edit %}
-      <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-setup-inline-delete-btn js-phased-delete" id="setup-inline-delete-setup-btn" data-step="0" hidden title="Удалить выбранную установку" aria-label="Удалить выбранную установку">{% include "shifts/includes/biota_delete_icon.html" %}</button>
+      <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-setup-inline-delete-btn js-phased-delete" id="setup-inline-delete-setup-btn" data-step="0" hidden title="Удалить выбранную установку" aria-label="Удалить выбранную установку">{% biota_icon "action.delete" "btn-inv-delete__icon" %}</button>
       {% endif %}
       {% elif biota_can_edit %}
       <form method="post" action="{{ product_self_url }}" style="display:inline;">
@@ -60,19 +60,21 @@
         title="Загрузить инструмент в станок"
       >
         <span class="product-pdf-export-btn__icon" aria-hidden="true">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" class="setup-load-machine-icon" focusable="false">
-            <path fill="currentColor" d="M4 6h2v12H4V6zm3 2h2v8H7V8zm3-2h2v12h-2V6zm3 3h2v6h-2V9zm3-1h2v8h-2V8zm3-2h2v12h-2V6z"/>
-          </svg>
+          {% biota_icon "setup.load_to_machine" "setup-load-machine-icon" %}
         </span>
       </button>
       <a href="#" class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only" id="setup-export-specs-btn" target="_blank" rel="noopener" hidden aria-label="PDF параметры" title="PDF параметры">
-        {% include "shifts/includes/pdf_export_specs_icon.html" %}
+        <span class="product-pdf-export-btn__icon" aria-hidden="true">{% biota_icon "pdf.export_specs" "pdf-export-icon" %}</span>
       </a>
       <a href="#" class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only" id="setup-export-photos-btn" target="_blank" rel="noopener" hidden aria-label="PDF фото 3×5" title="PDF фото 3×5">
-        {% include "shifts/includes/pdf_export_photos_icon.html" %}
+        <span class="product-pdf-export-btn__icon" aria-hidden="true">{% biota_icon "pdf.export_photos" "pdf-export-icon pdf-export-icon--photos" %}</span>
       </a>
       <button type="button" class="btn product-btn-edit-mode product-btn-edit-mode--icon-only" id="setup-inline-edit-btn" aria-pressed="false" aria-label="Быстрое редактирование" title="Быстрое редактирование">
-        {% include "shifts/includes/quick_edit_btn_icon.html" %}
+        <span class="product-btn-edit-mode__icon" aria-hidden="true">
+          <span class="qe-icon-glow"></span>
+          {% biota_icon "action.quick_edit" "qe-icon qe-icon--edit" %}
+          {% biota_icon "action.quick_edit_save" "qe-icon qe-icon--save" %}
+        </span>
       </button>
       {% endif %}
     </div>
@@ -107,24 +109,24 @@
                 <div class="setup-spec-stack">
                 {% if biota_can_edit %}
                 <div class="setup-spec-actions" hidden>
-                  <button type="button" class="btn btn-ghost js-setup-spec-add" title="Добавить блок" aria-label="Добавить блок"><i class="fi fi-br-plus ui-icon" aria-hidden="true"></i></button>
+                  <button type="button" class="btn btn-ghost js-setup-spec-add" title="Добавить блок" aria-label="Добавить блок">{% biota_icon "action.plus" "ui-icon" %}</button>
                 </div>
                 {% endif %}
                 <div class="setup-spec-box">
                 <div class="setup-spec-box-controls" hidden>
-                  <button type="button" class="btn btn-ghost js-setup-spec-copy setup-spec-copy-btn" title="Копировать блок" aria-label="Копировать блок"><i class="fi fi-rr-copy ui-icon" aria-hidden="true"></i></button>
-                  <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 js-setup-spec-remove setup-spec-remove-btn js-phased-delete" data-step="0" title="Удалить блок" aria-label="Удалить блок">{% include "shifts/includes/biota_delete_icon.html" %}</button>
+                  <button type="button" class="btn btn-ghost js-setup-spec-copy setup-spec-copy-btn" title="Копировать блок" aria-label="Копировать блок">{% biota_icon "action.copy" "ui-icon" %}</button>
+                  <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 js-setup-spec-remove setup-spec-remove-btn js-phased-delete" data-step="0" title="Удалить блок" aria-label="Удалить блок">{% biota_icon "action.delete" "btn-inv-delete__icon" %}</button>
                 </div>
                 <div class="setup-spec-col setup-spec-col-bindings">
                   <div class="setup-row-photo setup-row-photo-binding">
                     <span class="setup-binding-photo-rail">
                       {% if setup.binding_x_photo %}
                       <a href="{{ setup.binding_x_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_x_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка X" aria-label="Открыть фото привязки X">
-                        <i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>
+                        {% biota_icon "action.camera" "ui-icon" %}
                       </a>
                       {% endif %}
                       {% if biota_can_edit %}
-                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_x_photo" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки X" aria-label="Загрузить или заменить фото привязки X" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_x_photo" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки X" aria-label="Загрузить или заменить фото привязки X" hidden>{% biota_icon "action.add_document" "ui-icon" %}</button>
                       {% endif %}
                     </span>
                     <span class="muted">X:</span> <span data-field-text="binding_x">{{ setup.binding_x|default:"—" }}</span>
@@ -136,11 +138,11 @@
                     <span class="setup-binding-photo-rail">
                       {% if setup.binding_y_photo %}
                       <a href="{{ setup.binding_y_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_y_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка Y" aria-label="Открыть фото привязки Y">
-                        <i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>
+                        {% biota_icon "action.camera" "ui-icon" %}
                       </a>
                       {% endif %}
                       {% if biota_can_edit %}
-                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_y_photo" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки Y" aria-label="Загрузить или заменить фото привязки Y" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_y_photo" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки Y" aria-label="Загрузить или заменить фото привязки Y" hidden>{% biota_icon "action.add_document" "ui-icon" %}</button>
                       {% endif %}
                     </span>
                     <span class="muted">Y:</span> <span data-field-text="binding_y">{{ setup.binding_y|default:"—" }}</span>
@@ -152,11 +154,11 @@
                     <span class="setup-binding-photo-rail">
                       {% if setup.binding_z_photo %}
                       <a href="{{ setup.binding_z_photo.url }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ setup.binding_z_photo.url }}" data-photo-caption="{{ setup.name|escape }} — Привязка Z" aria-label="Открыть фото привязки Z">
-                        <i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>
+                        {% biota_icon "action.camera" "ui-icon" %}
                       </a>
                       {% endif %}
                       {% if biota_can_edit %}
-                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_z_photo" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки Z" aria-label="Загрузить или заменить фото привязки Z" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_z_photo" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки Z" aria-label="Загрузить или заменить фото привязки Z" hidden>{% biota_icon "action.add_document" "ui-icon" %}</button>
                       {% endif %}
                     </span>
                     <span class="muted">Z:</span> <span data-field-text="binding_z">{{ setup.binding_z|default:"—" }}</span>
@@ -189,19 +191,19 @@
                 {% for eb in setup.binding_extra_blocks_tpl %}
                 <div class="setup-spec-box setup-spec-box-extra" data-extra-block-index="{{ forloop.counter0 }}">
                 <div class="setup-spec-box-controls" hidden>
-                  <button type="button" class="btn btn-ghost js-setup-spec-copy setup-spec-copy-btn" title="Копировать блок" aria-label="Копировать блок"><i class="fi fi-rr-copy ui-icon" aria-hidden="true"></i></button>
-                  <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 js-setup-spec-remove setup-spec-remove-btn js-phased-delete" data-step="0" title="Удалить блок" aria-label="Удалить блок">{% include "shifts/includes/biota_delete_icon.html" %}</button>
+                  <button type="button" class="btn btn-ghost js-setup-spec-copy setup-spec-copy-btn" title="Копировать блок" aria-label="Копировать блок">{% biota_icon "action.copy" "ui-icon" %}</button>
+                  <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 js-setup-spec-remove setup-spec-remove-btn js-phased-delete" data-step="0" title="Удалить блок" aria-label="Удалить блок">{% biota_icon "action.delete" "btn-inv-delete__icon" %}</button>
                 </div>
                 <div class="setup-spec-col setup-spec-col-bindings">
                   <div class="setup-row-photo setup-row-photo-binding">
                     <span class="setup-binding-photo-rail">
                       {% if eb.binding_x_photo %}
                       <a href="{{ eb.binding_x_photo }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ eb.binding_x_photo }}" data-photo-caption="{{ setup.name|escape }} — Привязка X (доп.)" aria-label="Открыть фото привязки X">
-                        <i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>
+                        {% biota_icon "action.camera" "ui-icon" %}
                       </a>
                       {% endif %}
                       {% if biota_can_edit %}
-                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_x_photo" data-extra-block-index="{{ forloop.counter0 }}" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки X" aria-label="Загрузить или заменить фото привязки X" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_x_photo" data-extra-block-index="{{ forloop.counter0 }}" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки X" aria-label="Загрузить или заменить фото привязки X" hidden>{% biota_icon "action.add_document" "ui-icon" %}</button>
                       {% endif %}
                     </span>
                     <span class="muted">X:</span> <span data-field-text="binding_x">{% if eb.binding_x %}{{ eb.binding_x }}{% else %}—{% endif %}</span>
@@ -213,11 +215,11 @@
                     <span class="setup-binding-photo-rail">
                       {% if eb.binding_y_photo %}
                       <a href="{{ eb.binding_y_photo }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ eb.binding_y_photo }}" data-photo-caption="{{ setup.name|escape }} — Привязка Y (доп.)" aria-label="Открыть фото привязки Y">
-                        <i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>
+                        {% biota_icon "action.camera" "ui-icon" %}
                       </a>
                       {% endif %}
                       {% if biota_can_edit %}
-                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_y_photo" data-extra-block-index="{{ forloop.counter0 }}" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки Y" aria-label="Загрузить или заменить фото привязки Y" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_y_photo" data-extra-block-index="{{ forloop.counter0 }}" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки Y" aria-label="Загрузить или заменить фото привязки Y" hidden>{% biota_icon "action.add_document" "ui-icon" %}</button>
                       {% endif %}
                     </span>
                     <span class="muted">Y:</span> <span data-field-text="binding_y">{% if eb.binding_y %}{{ eb.binding_y }}{% else %}—{% endif %}</span>
@@ -229,11 +231,11 @@
                     <span class="setup-binding-photo-rail">
                       {% if eb.binding_z_photo %}
                       <a href="{{ eb.binding_z_photo }}" class="binding-photo-link setup-photo-open" data-photo-url="{{ eb.binding_z_photo }}" data-photo-caption="{{ setup.name|escape }} — Привязка Z (доп.)" aria-label="Открыть фото привязки Z">
-                        <i class="fi fi-rr-camera ui-icon" aria-hidden="true"></i>
+                        {% biota_icon "action.camera" "ui-icon" %}
                       </a>
                       {% endif %}
                       {% if biota_can_edit %}
-                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_z_photo" data-extra-block-index="{{ forloop.counter0 }}" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки Z" aria-label="Загрузить или заменить фото привязки Z" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+                      <button type="button" class="btn btn-ghost setup-binding-photo-btn" data-photo-field="binding_z_photo" data-extra-block-index="{{ forloop.counter0 }}" data-setup-id="{{ setup.pk }}" title="Загрузить или заменить фото привязки Z" aria-label="Загрузить или заменить фото привязки Z" hidden>{% biota_icon "action.add_document" "ui-icon" %}</button>
                       {% endif %}
                     </span>
                     <span class="muted">Z:</span> <span data-field-text="binding_z">{% if eb.binding_z %}{{ eb.binding_z }}{% else %}—{% endif %}</span>
@@ -351,7 +353,7 @@
                           title="Удалить строку"
                           aria-label="Удалить строку инструмента"
                         >
-                          {% include "shifts/includes/biota_delete_icon.html" %}
+                          {% biota_icon "action.delete" "btn-inv-delete__icon" %}
                         </button>
                       </div>
                     </td>
@@ -382,7 +384,7 @@
                     <td data-tool-col="note" class="setup-tool-note-cell{% if not row.note %} is-note-empty{% endif %}">
                       <div class="setup-tool-note-wrap" data-note-value="{{ row.note|default:''|escape }}">
                         <button type="button" class="setup-tool-note-eye js-setup-tool-note-eye{% if row.note %} has-note{% endif %}" title="Примечание" aria-label="{% if row.note %}Примечание: {{ row.note|truncatechars:80 }}{% else %}Примечание{% endif %}">
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8a3 3 0 100 6 3 3 0 000-6z"/></svg>
+                          {% biota_icon "setup.tool_note_view" "setup-tool-note-eye-icon" %}
                         </button>
                       </div>
                     </td>
@@ -413,7 +415,7 @@
             {% if biota_can_edit %}
             <div class="setup-photo-inline-controls" hidden>
               <button type="button" class="btn btn-ghost js-setup-photo-save-caption" title="Сохранить подпись">Сохранить</button>
-              <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 js-setup-photo-delete js-phased-delete" data-step="0" title="Удалить блок" aria-label="Удалить блок">{% include "shifts/includes/biota_delete_icon.html" %}</button>
+              <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 js-setup-photo-delete js-phased-delete" data-step="0" title="Удалить блок" aria-label="Удалить блок">{% biota_icon "action.delete" "btn-inv-delete__icon" %}</button>
             </div>
             {% endif %}
           </figure>
@@ -546,6 +548,7 @@
 
 
 <script type="application/json" id="pd-piece-norms">{{ piece_norms_json|default:"{}"|safe }}</script>
+<template id="setup-tool-note-eye-icon-tpl">{% biota_icon "setup.tool_note_view" "setup-tool-note-eye-icon" %}</template>
 <script type="application/json" id="pd-options">{
   "product_id": {{ product.pk }},
   "product_name": "{{ product.name|default:''|escapejs }}",

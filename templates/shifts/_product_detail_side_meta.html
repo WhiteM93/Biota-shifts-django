@@ -1,3 +1,4 @@
+{% load biota_icons %}
 <div class="product-downloads" id="product-downloads-block">
   {% if product.cad_model %}
   <div class="product-download-row" data-product-asset-row="cad_model">
@@ -5,7 +6,7 @@
     {% if biota_can_edit %}
     <div class="product-download-row-actions">
       <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Заменить 3D-модель" aria-label="Заменить 3D-модель">
-        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+        {% biota_icon "action.upload" "ui-icon" %}
       </button>
     </div>
     <input type="file" class="js-product-asset-file-input" data-field-name="cad_model" accept=".stl,.stp,.step" hidden />
@@ -16,7 +17,7 @@
     <span class="muted product-download-placeholder">3D-модель не загружена</span>
     <div class="product-download-row-actions">
       <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Загрузить 3D-модель" aria-label="Загрузить 3D-модель">
-        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+        {% biota_icon "action.upload" "ui-icon" %}
       </button>
     </div>
     <input type="file" class="js-product-asset-file-input" data-field-name="cad_model" accept=".stl,.stp,.step" hidden />
@@ -29,7 +30,7 @@
     {% if biota_can_edit %}
     <div class="product-download-row-actions">
       <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Заменить STL" aria-label="Заменить STL">
-        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+        {% biota_icon "action.upload" "ui-icon" %}
       </button>
     </div>
     <input type="file" class="js-product-asset-file-input" data-field-name="preview_stl" accept=".stl" hidden />
@@ -40,7 +41,7 @@
     <span class="muted product-download-placeholder">STL для предпросмотра не загружен</span>
     <div class="product-download-row-actions">
       <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Загрузить STL" aria-label="Загрузить STL">
-        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+        {% biota_icon "action.upload" "ui-icon" %}
       </button>
     </div>
     <input type="file" class="js-product-asset-file-input" data-field-name="preview_stl" accept=".stl" hidden />
@@ -53,7 +54,7 @@
     {% if biota_can_edit %}
     <div class="product-download-row-actions">
       <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Заменить STP/STEP" aria-label="Заменить STP/STEP">
-        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+        {% biota_icon "action.upload" "ui-icon" %}
       </button>
     </div>
     <input type="file" class="js-product-asset-file-input" data-field-name="cad_step_model" accept=".stp,.step" hidden />
@@ -64,7 +65,7 @@
     <span class="muted product-download-placeholder">STP/STEP не загружен</span>
     <div class="product-download-row-actions">
       <button type="button" class="btn btn-ghost product-download-preview-btn js-product-asset-replace" title="Загрузить STP/STEP" aria-label="Загрузить STP/STEP">
-        <i class="fi fi-rr-upload ui-icon" aria-hidden="true"></i>
+        {% biota_icon "action.upload" "ui-icon" %}
       </button>
     </div>
     <input type="file" class="js-product-asset-file-input" data-field-name="cad_step_model" accept=".stp,.step" hidden />
@@ -79,10 +80,10 @@
           <a href="{{ df.file.url }}" download class="btn product-btn-secondary product-side-drawing-download" title="{{ df.download_title }}">{{ df.display_name }}</a>
           <div class="product-drawing-file-actions">
             <a href="{{ df.file.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost product-drawing-preview-btn" title="Открыть в новой вкладке" aria-label="Открыть {{ df.display_name }}">
-              <i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>
+              {% biota_icon "action.search" "ui-icon" %}
             </a>
             {% if biota_can_edit %}
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-drawing-delete-btn js-product-drawing-file-delete js-phased-delete" data-step="0" data-drawing-file-id="{{ df.pk }}" title="Удалить чертёж" aria-label="Удалить чертёж">{% include "shifts/includes/biota_delete_icon.html" %}</button>
+            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-drawing-delete-btn js-product-drawing-file-delete js-phased-delete" data-step="0" data-drawing-file-id="{{ df.pk }}" title="Удалить чертёж" aria-label="Удалить чертёж">{% biota_icon "action.delete" "btn-inv-delete__icon" %}</button>
             {% endif %}
           </div>
         </li>
@@ -91,7 +92,7 @@
       <p class="muted product-drawing-tab-empty-msg"{% if product.has_any_drawing %} hidden{% endif %}>Чертежи не загружены</p>
       {% if biota_can_edit %}
       <span class="product-drawing-upload-wrap setup-program-upload-wrap">
-        <button type="button" class="btn btn-ghost product-drawing-upload-btn setup-program-upload-btn" title="Добавить чертёж PDF" aria-label="Добавить чертёж PDF" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+        <button type="button" class="btn btn-ghost product-drawing-upload-btn setup-program-upload-btn" title="Добавить чертёж PDF" aria-label="Добавить чертёж PDF" hidden>{% biota_icon "action.add_document" "ui-icon" %}</button>
         <input type="file" class="product-drawing-upload-input" accept=".pdf,application/pdf" hidden />
       </span>
       {% endif %}
@@ -105,7 +106,7 @@
     <li class="product-osnastka-item" data-link-id="{{ link.pk }}" data-osnastka-id="{{ link.osnastka_id }}">
       <a href="{% url 'osnastka_detail' link.osnastka_id %}" class="btn product-btn-secondary product-osnastka-link">{{ link.osnastka.name }}</a>
       {% if biota_can_edit %}
-      <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-osnastka-remove js-product-osnastka-remove" data-link-id="{{ link.pk }}" title="Убрать оснастку" aria-label="Убрать оснастку" hidden>{% include "shifts/includes/biota_delete_icon.html" %}</button>
+      <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-osnastka-remove js-product-osnastka-remove" data-link-id="{{ link.pk }}" title="Убрать оснастку" aria-label="Убрать оснастку" hidden>{% biota_icon "action.delete" "btn-inv-delete__icon" %}</button>
       {% endif %}
     </li>
     {% endfor %}
@@ -124,7 +125,7 @@
       <ul class="product-osnastka-suggest js-product-osnastka-suggest" id="product-osnastka-suggest" role="listbox" hidden></ul>
     </div>
     <button type="button" class="btn btn-ghost product-osnastka-add-btn js-product-osnastka-add" title="Добавить оснастку" aria-label="Добавить оснастку">
-      <i class="fi fi-rr-add ui-icon" aria-hidden="true"></i>
+      {% biota_icon "action.add" "ui-icon" %}
     </button>
   </div>
   {% endif %}
@@ -148,10 +149,10 @@
               title="Предпросмотр G/M кода"
               aria-label="Предпросмотр {{ pf.display_name }}"
             >
-              <i class="fi fi-rr-search ui-icon" aria-hidden="true"></i>
+              {% biota_icon "action.search" "ui-icon" %}
             </button>
             {% if biota_can_edit %}
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 setup-program-file-delete js-setup-program-file-delete js-phased-delete" data-step="0" data-program-file-id="{{ pf.pk }}" data-setup-id="{{ setup.pk }}" title="Удалить файл" aria-label="Удалить файл программы">{% include "shifts/includes/biota_delete_icon.html" %}</button>
+            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 setup-program-file-delete js-setup-program-file-delete js-phased-delete" data-step="0" data-program-file-id="{{ pf.pk }}" data-setup-id="{{ setup.pk }}" title="Удалить файл" aria-label="Удалить файл программы">{% biota_icon "action.delete" "btn-inv-delete__icon" %}</button>
             {% endif %}
           </div>
         </li>
@@ -160,7 +161,7 @@
       <p class="muted setup-program-tab-empty-msg"{% if setup.has_any_program %} hidden{% endif %}>Программы не загружены</p>
       {% if biota_can_edit %}
       <span class="setup-program-upload-wrap">
-        <button type="button" class="btn btn-ghost setup-program-upload-btn" data-setup-id="{{ setup.pk }}" title="Добавить файл программы" aria-label="Добавить файл программы" hidden><i class="fi fi-rr-add-document ui-icon" aria-hidden="true"></i></button>
+        <button type="button" class="btn btn-ghost setup-program-upload-btn" data-setup-id="{{ setup.pk }}" title="Добавить файл программы" aria-label="Добавить файл программы" hidden>{% biota_icon "action.add_document" "ui-icon" %}</button>
         <input type="file" class="setup-program-upload-input" data-setup-program-input="{{ setup.pk }}" hidden />
       </span>
       {% endif %}

@@ -2473,3 +2473,19 @@
     background: rgba(99,179,237,.15);
   }
 
+.defects-row-edit-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.defects-row-edit-toggle .defects-row-lock-icon,
+.defects-row-edit-toggle svg.defects-row-lock-icon,
+.defects-row-edit-toggle img.defects-row-lock-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  color: inherit;
+}
+
