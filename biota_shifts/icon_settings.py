@@ -10,6 +10,7 @@ from biota_shifts.icon_registry import DEFAULT_ICON_REGISTRY, ICON_KINDS
 
 ICON_SETTINGS_PATH = Path(APP_DIR) / ".biota_icon_settings.json"
 ICON_PRESETS = ("default", "hugeicons")
+DEFAULT_ICON_PRESET = "hugeicons"
 
 
 def _safe_key(key: str) -> str:
@@ -40,19 +41,19 @@ def _clean_overrides(overrides: dict | None) -> dict[str, dict]:
 
 
 def _normalize_preset(value: str | None) -> str:
-    preset = (value or "default").strip()
-    return preset if preset in ICON_PRESETS else "default"
+    preset = (value or DEFAULT_ICON_PRESET).strip()
+    return preset if preset in ICON_PRESETS else DEFAULT_ICON_PRESET
 
 
 def load_icon_settings() -> dict:
     if not ICON_SETTINGS_PATH.exists():
-        return {"preset": "default", "overrides": {}}
+        return {"preset": DEFAULT_ICON_PRESET, "overrides": {}}
     try:
         raw = json.loads(ICON_SETTINGS_PATH.read_text(encoding="utf-8-sig"))
         if not isinstance(raw, dict):
-            return {"preset": "default", "overrides": {}}
+            return {"preset": DEFAULT_ICON_PRESET, "overrides": {}}
     except (OSError, TypeError, ValueError, json.JSONDecodeError):
-        return {"preset": "default", "overrides": {}}
+        return {"preset": DEFAULT_ICON_PRESET, "overrides": {}}
     return {
         "preset": _normalize_preset(raw.get("preset")),
         "overrides": _clean_overrides(raw.get("overrides")),

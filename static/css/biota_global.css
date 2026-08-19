@@ -1357,7 +1357,7 @@ html[data-theme="dawn"] .nav-dropdown-menu a:hover {
   box-shadow: var(--bio-nav-refresh-shadow);
   cursor: pointer;
   font-size: 16px;
-  line-height: 1;
+  line-height: 0;
   transition:
     filter 0.2s ease,
     transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
@@ -1389,6 +1389,15 @@ html[data-theme="dawn"] .nav .nav-refresh-btn:hover {
   box-shadow: 0 4px 12px rgba(210, 76, 76, 0.45);
   animation: bio-nav-spin 0.9s linear infinite;
   pointer-events: none;
+}
+
+.nav .nav-refresh-btn .nav-refresh-icon,
+.nav .nav-refresh-btn svg.biota-icon--hgi,
+.nav .nav-refresh-btn img.biota-icon--svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  color: inherit;
 }
 
 @keyframes bio-nav-spin {

@@ -2,7 +2,7 @@
 {% if biota_username and biota_can_edit %}
 <form method="post" action="{% url 'refresh_cache' %}" class="nav-refresh-form">
   {% csrf_token %}
-  <button class="nav-refresh-btn" type="submit" title="Обновить кэш данных из БД" aria-label="Обновить кэш данных из БД">↻</button>
+  <button class="nav-refresh-btn" type="submit" title="Обновить кэш данных из БД" aria-label="Обновить кэш данных из БД">{% biota_icon "ui.refresh" "nav-refresh-icon" %}</button>
 </form>
 {% endif %}
 {% if biota_nav.home %}
