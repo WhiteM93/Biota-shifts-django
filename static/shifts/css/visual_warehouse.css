@@ -1094,31 +1094,37 @@ html[data-theme="dawn"] .vw-control { background: #f5f5f5; }
   z-index: 0;
   flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.js-vw-dlg-contents .js-vw-audit-pane {
+  overflow: hidden;
 }
 
 .js-vw-dlg-contents.is-audit .js-vw-start-audit {
   display: none !important;
 }
 
-.vw-contents-view {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+.js-vw-dlg-contents .js-vw-view-pane.vw-contents-view {
+  overflow: hidden;
   padding: 12px 14px 16px;
+  gap: 0;
 }
 
 .vw-contents-layout {
   display: grid;
   grid-template-columns: minmax(200px, 0.85fr) minmax(0, 1.25fr);
   gap: 14px 16px;
-  align-items: start;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .vw-contents-media {
   position: sticky;
   top: 0;
+  align-self: start;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1130,6 +1136,13 @@ html[data-theme="dawn"] .vw-control { background: #f5f5f5; }
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+  padding-bottom: 8px;
 }
 
 .vw-section-head {
@@ -1985,10 +1998,19 @@ html[data-theme="dawn"] .vw-photo-current {
   .vw-contents-layout {
     grid-template-columns: 1fr;
     gap: 12px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .vw-contents-media {
     position: static;
+  }
+
+  .vw-contents-main {
+    overflow: visible;
+    padding-right: 0;
+    padding-bottom: 12px;
   }
 
   .vw-contents-head-row {
@@ -1998,10 +2020,6 @@ html[data-theme="dawn"] .vw-photo-current {
 
   .vw-contents-stats {
     padding: 0 12px 10px;
-  }
-
-  .vw-contents-view {
-    padding: 10px 12px 16px;
   }
 
   .vw-contents-toolbar {

@@ -720,8 +720,9 @@
   <input type="hidden" name="panel" value="stock">
   <h2 class="inv-stock-filter__title">Фильтр</h2>
   <div class="inv-filter-list">
-    <label class="field"><span>Тип инструмента</span>
-      <select name="category">
+    <label class="field inv-stock-filter__category">
+      <span>Тип инструмента</span>
+      <select name="category" class="js-stock-filter-category">
         <option value="" {% if not filters.category %}selected{% endif %}>Все</option>
         <option value="end_mill" {% if filters.category == "end_mill" %}selected{% endif %}>Фрезы</option>
         <option value="body_tool" {% if filters.category == "body_tool" %}selected{% endif %}>Корпусной инструмент</option>
@@ -780,7 +781,7 @@
       </select>
     </label>
     {% elif filters.category == "tap" %}
-    <label class="field"><span>Тип инструмента</span>
+    <label class="field"><span>Тип метчика</span>
       <select name="tap_tool_type">
         <option value="">Все</option>
         {% for key, label in tap_tool_types %}
@@ -1249,7 +1250,7 @@
   </div>
 
       <div class="inv-filter-actions">
-        <button type="submit" class="btn btn-sm">Применить</button>
+        <button type="submit" class="btn btn-sm js-stock-filter-apply">Применить</button>
         <a class="btn btn-sm btn-ghost" href="{% url 'inventory' %}?panel=stock">Сбросить</a>
       </div>
     </form>

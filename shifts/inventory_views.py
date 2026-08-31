@@ -802,6 +802,255 @@ _STOCK_DECIMAL_PARAM_KEYS = frozenset(
 _STOCK_INT_PARAM_KEYS = frozenset({"mill_flutes_count", "countersink_flutes_count", "bt_teeth_count"})
 
 
+def _resolve_stock_tool_material(params: dict) -> str:
+    tm_param = (params.get("tool_material") or "").strip()
+    tm_custom = ((params.get("tool_material_custom") or "").strip())[:80]
+    if tm_param == TOOL_MATERIAL_FILTER_OTHER:
+        return tm_custom[:80]
+    return tm_param[:80]
+
+
+def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: frozenset | None = None):
+    """Apply stock sidebar filters; `exclude` skips keys (leave-one-out for option lists)."""
+    ex = exclude or frozenset()
+
+    def g(key: str) -> str:
+        if key in ex:
+            return ""
+        return (params.get(key) or "").strip()
+
+    if category == "end_mill":
+        diameter_mm_raw = g("diameter_mm")
+        if diameter_mm_raw:
+            diameter_mm = _to_decimal(diameter_mm_raw, Decimal("0"))
+            if diameter_mm > 0:
+                qs = qs.filter(end_mill_spec__diameter_mm=diameter_mm)
+        mill_overall_length_raw = g("mill_overall_length_mm")
+        if mill_overall_length_raw:
+            mill_overall_length = _to_decimal(mill_overall_length_raw, Decimal("0"))
+            if mill_overall_length > 0:
+                qs = qs.filter(end_mill_spec__overall_length_mm=mill_overall_length)
+        mill_cutting_length_raw = g("mill_cutting_length_mm")
+        if mill_cutting_length_raw:
+            mill_cutting_length = _to_decimal(mill_cutting_length_raw, Decimal("0"))
+            if mill_cutting_length > 0:
+                qs = qs.filter(end_mill_spec__cutting_length_mm=mill_cutting_length)
+        mill_flutes_count_raw = g("mill_flutes_count")
+        if mill_flutes_count_raw:
+            mill_flutes_count = _to_int(mill_flutes_count_raw, 0)
+            if mill_flutes_count > 0:
+                qs = qs.filter(end_mill_spec__flutes_count=mill_flutes_count)
+        mill_corner_radius_raw = g("mill_corner_radius_mm")
+        if mill_corner_radius_raw:
+            mill_corner_radius = _to_decimal(mill_corner_radius_raw, Decimal("-1"))
+            if mill_corner_radius >= 0:
+                qs = qs.filter(end_mill_spec__corner_radius_mm=mill_corner_radius)
+        mill_type_raw = g("mill_type")
+        if mill_type_raw:
+            qs = qs.filter(end_mill_spec__mill_type=mill_type_raw)
+    elif category == "body_tool":
+        body_family_raw = g("body_family")
+        if body_family_raw:
+            qs = qs.filter(body_tool_spec__family=body_family_raw)
+        body_cutter_raw = g("body_cutter")
+        if body_cutter_raw:
+            qs = qs.filter(body_tool_spec__cutter_type=body_cutter_raw)
+        bt_diameter_raw = g("bt_diameter_mm")
+        if bt_diameter_raw:
+            bt_diameter = _to_decimal(bt_diameter_raw, Decimal("0"))
+            if bt_diameter > 0:
+                qs = qs.filter(body_tool_spec__diameter_mm=bt_diameter)
+        bt_overall_length_raw = g("bt_overall_length_mm")
+        if bt_overall_length_raw:
+            bt_overall_length = _to_decimal(bt_overall_length_raw, Decimal("0"))
+            if bt_overall_length > 0:
+                qs = qs.filter(body_tool_spec__overall_length_mm=bt_overall_length)
+        bt_cutting_length_raw = g("bt_cutting_length_mm")
+        if bt_cutting_length_raw:
+            bt_cutting_length = _to_decimal(bt_cutting_length_raw, Decimal("0"))
+            if bt_cutting_length > 0:
+                qs = qs.filter(body_tool_spec__cutting_length_mm=bt_cutting_length)
+        bt_teeth_count_raw = g("bt_teeth_count")
+        if bt_teeth_count_raw:
+            bt_teeth_count = _to_int(bt_teeth_count_raw, 0)
+            if bt_teeth_count > 0:
+                qs = qs.filter(body_tool_spec__teeth_count=bt_teeth_count)
+        bt_coupling_raw = g("bt_coupling")
+        if bt_coupling_raw:
+            qs = qs.filter(body_tool_spec__coupling=bt_coupling_raw)
+        bt_insert_family_raw = g("bt_insert_family")
+        if bt_insert_family_raw:
+            qs = qs.filter(body_tool_spec__insert_family__iexact=bt_insert_family_raw)
+    elif category == "tap":
+        tap_size = g("tap_size")
+        if tap_size:
+            qs = qs.filter(tap_spec__size_label__iexact=tap_size)
+        tap_pitch_raw = g("tap_pitch")
+        if tap_pitch_raw:
+            tap_pitch = _to_decimal(tap_pitch_raw, Decimal("0"))
+            if tap_pitch > 0:
+                qs = qs.filter(tap_spec__pitch_mm=tap_pitch)
+        tap_thread_standard = g("tap_thread_standard")
+        if tap_thread_standard:
+            qs = qs.filter(tap_spec__thread_standard=tap_thread_standard)
+        tap_hole_type = g("tap_hole_type")
+        if tap_hole_type:
+            qs = qs.filter(tap_spec__hole_type=tap_hole_type)
+        tap_tool_type = g("tap_tool_type")
+        if tap_tool_type:
+            qs = qs.filter(tap_spec__tap_type=tap_tool_type)
+        tap_overall_length_raw = g("tap_overall_length_mm")
+        if tap_overall_length_raw:
+            tap_overall_length = _to_decimal(tap_overall_length_raw, Decimal("0"))
+            if tap_overall_length > 0:
+                qs = qs.filter(tap_spec__overall_length_mm=tap_overall_length)
+        tap_cutting_length_raw = g("tap_cutting_length_mm")
+        if tap_cutting_length_raw:
+            tap_cutting_length = _to_decimal(tap_cutting_length_raw, Decimal("0"))
+            if tap_cutting_length > 0:
+                qs = qs.filter(tap_spec__cutting_length_mm=tap_cutting_length)
+    elif category == "center_drill":
+        center_diameter_raw = g("center_diameter_mm")
+        if center_diameter_raw:
+            center_diameter = _to_decimal(center_diameter_raw, Decimal("0"))
+            if center_diameter > 0:
+                qs = qs.filter(center_drill_spec__diameter_mm=center_diameter)
+        center_overall_length_raw = g("center_overall_length_mm")
+        if center_overall_length_raw:
+            center_overall_length = _to_decimal(center_overall_length_raw, Decimal("0"))
+            if center_overall_length > 0:
+                qs = qs.filter(center_drill_spec__overall_length_mm=center_overall_length)
+        center_angle_raw = g("center_angle_deg")
+        if center_angle_raw:
+            qs = qs.filter(center_drill_spec__angle_deg=center_angle_raw)
+    elif category == "countersink":
+        countersink_type_raw = g("countersink_type")
+        if countersink_type_raw:
+            qs = qs.filter(countersink_spec__countersink_type=countersink_type_raw)
+        countersink_diameter_raw = g("countersink_diameter_mm")
+        if countersink_diameter_raw:
+            countersink_diameter = _to_decimal(countersink_diameter_raw, Decimal("0"))
+            if countersink_diameter > 0:
+                qs = qs.filter(countersink_spec__diameter_mm=countersink_diameter)
+        countersink_angle_raw = g("countersink_angle_deg")
+        if countersink_angle_raw:
+            qs = qs.filter(countersink_spec__angle_deg=countersink_angle_raw)
+        countersink_length_raw = g("countersink_overall_length_mm")
+        if countersink_length_raw:
+            countersink_length = _to_decimal(countersink_length_raw, Decimal("0"))
+            if countersink_length > 0:
+                qs = qs.filter(countersink_spec__overall_length_mm=countersink_length)
+        countersink_flutes_raw = g("countersink_flutes_count")
+        if countersink_flutes_raw:
+            countersink_flutes = _to_int(countersink_flutes_raw, 0)
+            if countersink_flutes > 0:
+                qs = qs.filter(countersink_spec__flutes_count=countersink_flutes)
+        countersink_size_raw = g("countersink_size_label")
+        if countersink_size_raw:
+            qs = qs.filter(countersink_spec__size_label__iexact=countersink_size_raw)
+    elif category == "drill":
+        drill_diameter_raw = g("drill_diameter_mm")
+        if drill_diameter_raw:
+            drill_diameter = _to_decimal(drill_diameter_raw, Decimal("0"))
+            if drill_diameter > 0:
+                qs = qs.filter(drill_spec__diameter_mm=drill_diameter)
+        drill_overall_length_raw = g("drill_overall_length_mm")
+        if drill_overall_length_raw:
+            drill_overall_length = _to_decimal(drill_overall_length_raw, Decimal("0"))
+            if drill_overall_length > 0:
+                qs = qs.filter(drill_spec__overall_length_mm=drill_overall_length)
+        drill_cutting_length_raw = g("drill_cutting_length_mm")
+        if drill_cutting_length_raw:
+            drill_cutting_length = _to_decimal(drill_cutting_length_raw, Decimal("0"))
+            if drill_cutting_length > 0:
+                qs = qs.filter(drill_spec__cutting_length_mm=drill_cutting_length)
+        drill_angle_raw = g("drill_angle_deg")
+        if drill_angle_raw:
+            drill_angle = _to_decimal(drill_angle_raw, Decimal("0"))
+            if drill_angle > 0:
+                qs = qs.filter(drill_spec__angle_deg=drill_angle)
+    elif category == "insert":
+        ins_shape_raw = g("ins_shape")
+        if ins_shape_raw:
+            qs = qs.filter(insert_spec__insert_shape=ins_shape_raw)
+        ins_relief_raw = g("ins_relief")
+        if ins_relief_raw:
+            qs = qs.filter(insert_spec__relief_angle=ins_relief_raw)
+        ins_tolerance_raw = g("ins_tolerance")
+        if ins_tolerance_raw:
+            qs = qs.filter(insert_spec__tolerance_class=ins_tolerance_raw)
+        ins_edge_code_raw = g("ins_edge_code")
+        if ins_edge_code_raw:
+            qs = qs.filter(insert_spec__cutting_edge_length_code=ins_edge_code_raw)
+        ins_thickness_code_raw = g("ins_thickness_code")
+        if ins_thickness_code_raw:
+            qs = qs.filter(insert_spec__thickness_code=ins_thickness_code_raw)
+        ins_nose_code_raw = g("ins_nose_code")
+        if ins_nose_code_raw:
+            qs = qs.filter(insert_spec__nose_radius_code=ins_nose_code_raw)
+        ins_family_raw = g("ins_family")
+        if ins_family_raw:
+            qs = qs.filter(insert_spec__milling_family=ins_family_raw)
+        ins_grade_raw = g("ins_grade")
+        if ins_grade_raw:
+            qs = qs.filter(insert_spec__chipbreaker_grade__iexact=ins_grade_raw)
+        ins_iso_raw = g("ins_iso")
+        if ins_iso_raw:
+            qs = qs.filter(insert_spec__iso_designation__iexact=ins_iso_raw)
+    elif category == "collet":
+        collet_type_raw = g("collet_type")
+        if collet_type_raw:
+            qs = qs.filter(collet_spec__collet_type=collet_type_raw)
+        collet_er_size_raw = g("collet_er_size")
+        if collet_er_size_raw:
+            qs = qs.filter(collet_spec__er_size=collet_er_size_raw)
+        collet_clamp_range_raw = g("collet_clamp_range")
+        if collet_clamp_range_raw:
+            qs = qs.filter(collet_spec__clamp_range=collet_clamp_range_raw)
+        collet_inner_diameter_raw = g("collet_inner_diameter")
+        collet_square_size_raw = g("collet_square_size")
+        if collet_inner_diameter_raw:
+            qs = qs.filter(collet_spec__inner_diameter=collet_inner_diameter_raw)
+        elif collet_square_size_raw:
+            qs = qs.filter(collet_spec__inner_diameter=normalize_collet_er_g_inner_diameter(collet_square_size_raw))
+        collet_thread_standard_raw = g("collet_thread_standard")
+        if collet_thread_standard_raw:
+            qs = qs.filter(collet_spec__thread_standard=collet_thread_standard_raw)
+        collet_threading_use_raw = g("collet_threading_use")
+        if collet_threading_use_raw:
+            qs = qs.filter(collet_spec__threading_use=collet_threading_use_raw)
+        collet_threading_series_raw = g("collet_threading_series")
+        if collet_threading_series_raw:
+            qs = qs.filter(collet_spec__threading_series=collet_threading_series_raw)
+
+    if category != "collet" and "tool_material" not in ex and "tool_material_custom" not in ex:
+        tool_material = _resolve_stock_tool_material(params)
+        if tool_material:
+            qs = qs.filter(tool_material=tool_material)
+    if category != "collet" and "coating_type" not in ex:
+        coating_type = g("coating_type")
+        if coating_type:
+            qs = qs.filter(coating_type=coating_type)
+    if category != "collet" and "work_material" not in ex:
+        work_material = g("work_material")
+        if work_material:
+            wm = work_material.strip()
+            qs = qs.filter(
+                Q(work_material=wm)
+                | Q(work_material__startswith=f"{wm},")
+                | Q(work_material__endswith=f",{wm}")
+                | Q(work_material__contains=f",{wm},")
+            )
+    if "arrival_supplier" not in ex:
+        arrival_supplier = g("arrival_supplier")
+        if arrival_supplier:
+            qs = qs.filter(
+                movements__movement_type="restock",
+                movements__comment__icontains=arrival_supplier,
+            ).distinct()
+    return qs
+
+
 def _prune_stock_prefs_params(category: str, params: dict[str, str]) -> dict[str, str]:
     allow = _STOCK_GLOBAL_KEYS | _STOCK_KEYS_BY_CATEGORY.get(category, frozenset())
     return {k: (params.get(k) or "").strip() for k in _STOCK_FILTER_PARAM_KEYS if k in allow}
@@ -2619,6 +2868,10 @@ def inventory_view(request):
     if filter_category:
         qs = qs.filter(category=filter_category)
 
+    stock_req = _prune_stock_prefs_params(filter_category, stock_req)
+    stock_req["category"] = filter_category
+    stock_req["show_all"] = "1" if show_all else "0"
+
     diameter_mm_raw = _sq("diameter_mm")
     mill_overall_length_raw = _sq("mill_overall_length_mm")
     mill_cutting_length_raw = _sq("mill_cutting_length_mm")
@@ -2683,176 +2936,7 @@ def inventory_view(request):
     coating_type = _sq("coating_type")
     work_material = _sq("work_material")
 
-    if filter_category and filter_category == "end_mill":
-        if diameter_mm_raw:
-            diameter_mm = _to_decimal(diameter_mm_raw, Decimal("0"))
-            if diameter_mm > 0:
-                qs = qs.filter(end_mill_spec__diameter_mm=diameter_mm)
-        if mill_overall_length_raw:
-            mill_overall_length = _to_decimal(mill_overall_length_raw, Decimal("0"))
-            if mill_overall_length > 0:
-                qs = qs.filter(end_mill_spec__overall_length_mm=mill_overall_length)
-        if mill_cutting_length_raw:
-            mill_cutting_length = _to_decimal(mill_cutting_length_raw, Decimal("0"))
-            if mill_cutting_length > 0:
-                qs = qs.filter(end_mill_spec__cutting_length_mm=mill_cutting_length)
-        if mill_flutes_count_raw:
-            mill_flutes_count = _to_int(mill_flutes_count_raw, 0)
-            if mill_flutes_count > 0:
-                qs = qs.filter(end_mill_spec__flutes_count=mill_flutes_count)
-        if mill_corner_radius_raw:
-            mill_corner_radius = _to_decimal(mill_corner_radius_raw, Decimal("-1"))
-            if mill_corner_radius >= 0:
-                qs = qs.filter(end_mill_spec__corner_radius_mm=mill_corner_radius)
-        if mill_type_raw:
-            qs = qs.filter(end_mill_spec__mill_type=mill_type_raw)
-    elif filter_category == "body_tool":
-        if body_family_raw:
-            qs = qs.filter(body_tool_spec__family=body_family_raw)
-        if body_cutter_raw:
-            qs = qs.filter(body_tool_spec__cutter_type=body_cutter_raw)
-        if bt_diameter_raw:
-            bt_diameter = _to_decimal(bt_diameter_raw, Decimal("0"))
-            if bt_diameter > 0:
-                qs = qs.filter(body_tool_spec__diameter_mm=bt_diameter)
-        if bt_overall_length_raw:
-            bt_overall_length = _to_decimal(bt_overall_length_raw, Decimal("0"))
-            if bt_overall_length > 0:
-                qs = qs.filter(body_tool_spec__overall_length_mm=bt_overall_length)
-        if bt_cutting_length_raw:
-            bt_cutting_length = _to_decimal(bt_cutting_length_raw, Decimal("0"))
-            if bt_cutting_length > 0:
-                qs = qs.filter(body_tool_spec__cutting_length_mm=bt_cutting_length)
-        if bt_teeth_count_raw:
-            bt_teeth_count = _to_int(bt_teeth_count_raw, 0)
-            if bt_teeth_count > 0:
-                qs = qs.filter(body_tool_spec__teeth_count=bt_teeth_count)
-        if bt_coupling_raw:
-            qs = qs.filter(body_tool_spec__coupling=bt_coupling_raw)
-        if bt_insert_family_raw:
-            qs = qs.filter(body_tool_spec__insert_family__iexact=bt_insert_family_raw)
-    elif filter_category == "tap":
-        if tap_size:
-            qs = qs.filter(tap_spec__size_label__iexact=tap_size)
-        if tap_pitch_raw:
-            tap_pitch = _to_decimal(tap_pitch_raw, Decimal("0"))
-            if tap_pitch > 0:
-                qs = qs.filter(tap_spec__pitch_mm=tap_pitch)
-        if tap_thread_standard:
-            qs = qs.filter(tap_spec__thread_standard=tap_thread_standard)
-        if tap_hole_type:
-            qs = qs.filter(tap_spec__hole_type=tap_hole_type)
-        if tap_tool_type:
-            qs = qs.filter(tap_spec__tap_type=tap_tool_type)
-        if tap_overall_length_raw:
-            tap_overall_length = _to_decimal(tap_overall_length_raw, Decimal("0"))
-            if tap_overall_length > 0:
-                qs = qs.filter(tap_spec__overall_length_mm=tap_overall_length)
-        if tap_cutting_length_raw:
-            tap_cutting_length = _to_decimal(tap_cutting_length_raw, Decimal("0"))
-            if tap_cutting_length > 0:
-                qs = qs.filter(tap_spec__cutting_length_mm=tap_cutting_length)
-    elif filter_category == "center_drill":
-        if center_diameter_raw:
-            center_diameter = _to_decimal(center_diameter_raw, Decimal("0"))
-            if center_diameter > 0:
-                qs = qs.filter(center_drill_spec__diameter_mm=center_diameter)
-        if center_overall_length_raw:
-            center_overall_length = _to_decimal(center_overall_length_raw, Decimal("0"))
-            if center_overall_length > 0:
-                qs = qs.filter(center_drill_spec__overall_length_mm=center_overall_length)
-        if center_angle_raw:
-            qs = qs.filter(center_drill_spec__angle_deg=center_angle_raw)
-    elif filter_category == "countersink":
-        if countersink_type_raw:
-            qs = qs.filter(countersink_spec__countersink_type=countersink_type_raw)
-        if countersink_diameter_raw:
-            countersink_diameter = _to_decimal(countersink_diameter_raw, Decimal("0"))
-            if countersink_diameter > 0:
-                qs = qs.filter(countersink_spec__diameter_mm=countersink_diameter)
-        if countersink_angle_raw:
-            qs = qs.filter(countersink_spec__angle_deg=countersink_angle_raw)
-        if countersink_length_raw:
-            countersink_length = _to_decimal(countersink_length_raw, Decimal("0"))
-            if countersink_length > 0:
-                qs = qs.filter(countersink_spec__overall_length_mm=countersink_length)
-        if countersink_flutes_raw:
-            countersink_flutes = _to_int(countersink_flutes_raw, 0)
-            if countersink_flutes > 0:
-                qs = qs.filter(countersink_spec__flutes_count=countersink_flutes)
-        if countersink_size_raw:
-            qs = qs.filter(countersink_spec__size_label__iexact=countersink_size_raw)
-    elif filter_category == "drill":
-        if drill_diameter_raw:
-            drill_diameter = _to_decimal(drill_diameter_raw, Decimal("0"))
-            if drill_diameter > 0:
-                qs = qs.filter(drill_spec__diameter_mm=drill_diameter)
-        if drill_overall_length_raw:
-            drill_overall_length = _to_decimal(drill_overall_length_raw, Decimal("0"))
-            if drill_overall_length > 0:
-                qs = qs.filter(drill_spec__overall_length_mm=drill_overall_length)
-        if drill_cutting_length_raw:
-            drill_cutting_length = _to_decimal(drill_cutting_length_raw, Decimal("0"))
-            if drill_cutting_length > 0:
-                qs = qs.filter(drill_spec__cutting_length_mm=drill_cutting_length)
-        if drill_angle_raw:
-            drill_angle = _to_decimal(drill_angle_raw, Decimal("0"))
-            if drill_angle > 0:
-                qs = qs.filter(drill_spec__angle_deg=drill_angle)
-    elif filter_category == "insert":
-        if ins_shape_raw:
-            qs = qs.filter(insert_spec__insert_shape=ins_shape_raw)
-        if ins_relief_raw:
-            qs = qs.filter(insert_spec__relief_angle=ins_relief_raw)
-        if ins_tolerance_raw:
-            qs = qs.filter(insert_spec__tolerance_class=ins_tolerance_raw)
-        if ins_edge_code_raw:
-            qs = qs.filter(insert_spec__cutting_edge_length_code=ins_edge_code_raw)
-        if ins_thickness_code_raw:
-            qs = qs.filter(insert_spec__thickness_code=ins_thickness_code_raw)
-        if ins_nose_code_raw:
-            qs = qs.filter(insert_spec__nose_radius_code=ins_nose_code_raw)
-        if ins_family_raw:
-            qs = qs.filter(insert_spec__milling_family=ins_family_raw)
-        if ins_grade_raw:
-            qs = qs.filter(insert_spec__chipbreaker_grade__iexact=ins_grade_raw)
-        if ins_iso_raw:
-            qs = qs.filter(insert_spec__iso_designation__iexact=ins_iso_raw)
-    elif filter_category == "collet":
-        if collet_type_raw:
-            qs = qs.filter(collet_spec__collet_type=collet_type_raw)
-        if collet_er_size_raw:
-            qs = qs.filter(collet_spec__er_size=collet_er_size_raw)
-        if collet_clamp_range_raw:
-            qs = qs.filter(collet_spec__clamp_range=collet_clamp_range_raw)
-        if collet_inner_diameter_raw:
-            qs = qs.filter(collet_spec__inner_diameter=collet_inner_diameter_raw)
-        elif collet_square_size_raw:
-            qs = qs.filter(collet_spec__inner_diameter=normalize_collet_er_g_inner_diameter(collet_square_size_raw))
-        if collet_thread_standard_raw:
-            qs = qs.filter(collet_spec__thread_standard=collet_thread_standard_raw)
-        if collet_threading_use_raw:
-            qs = qs.filter(collet_spec__threading_use=collet_threading_use_raw)
-        if collet_threading_series_raw:
-            qs = qs.filter(collet_spec__threading_series=collet_threading_series_raw)
-
-    if tool_material and filter_category != "collet":
-        qs = qs.filter(tool_material=tool_material)
-    if coating_type and filter_category != "collet":
-        qs = qs.filter(coating_type=coating_type)
-    if work_material and filter_category != "collet":
-        wm = work_material.strip()
-        qs = qs.filter(
-            Q(work_material=wm)
-            | Q(work_material__startswith=f"{wm},")
-            | Q(work_material__endswith=f",{wm}")
-            | Q(work_material__contains=f",{wm},")
-        )
-    if arrival_supplier:
-        qs = qs.filter(
-            movements__movement_type="restock",
-            movements__comment__icontains=arrival_supplier,
-        ).distinct()
+    qs = _apply_stock_detail_filters(qs, category=filter_category, params=stock_req)
 
     stock_category_total = 0
     stock_filtered_count = 0
@@ -2865,115 +2949,147 @@ def inventory_view(request):
         stock_category_total = stock_category_qs.count()
         stock_filtered_count = qs.count()
 
-    option_source_qs = ToolItem.objects.filter(is_deleted=False)
+    option_base = ToolItem.objects.filter(is_deleted=False)
     if not show_all:
-        option_source_qs = option_source_qs.filter(quantity__gt=0)
+        option_base = option_base.filter(quantity__gt=0)
+
+    def _opt_qs(for_cat: str, *exclude_keys: str):
+        oq = option_base.filter(category=for_cat)
+        if filter_category and filter_category != for_cat:
+            return oq
+        return _apply_stock_detail_filters(
+            oq,
+            category=filter_category or "",
+            params=stock_req,
+            exclude=frozenset(exclude_keys),
+        )
+
+    option_source_qs = option_base
     if filter_category:
-        option_source_qs = option_source_qs.filter(category=filter_category)
+        option_source_qs = _opt_qs(filter_category)
 
     end_mill_diameters = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="end_mill"), "end_mill_spec__diameter_mm")
+        _distinct_numeric_values(_opt_qs("end_mill", "diameter_mm"), "end_mill_spec__diameter_mm")
     )
     end_mill_overall_lengths = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="end_mill"), "end_mill_spec__overall_length_mm")
+        _distinct_numeric_values(_opt_qs("end_mill", "mill_overall_length_mm"), "end_mill_spec__overall_length_mm")
     )
     end_mill_cutting_lengths = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="end_mill"), "end_mill_spec__cutting_length_mm")
+        _distinct_numeric_values(_opt_qs("end_mill", "mill_cutting_length_mm"), "end_mill_spec__cutting_length_mm")
     )
     end_mill_flutes = _sorted_unique_int_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="end_mill"), "end_mill_spec__flutes_count")
+        _distinct_numeric_values(_opt_qs("end_mill", "mill_flutes_count"), "end_mill_spec__flutes_count")
     )
     end_mill_corner_radii = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="end_mill"), "end_mill_spec__corner_radius_mm")
+        _distinct_numeric_values(_opt_qs("end_mill", "mill_corner_radius_mm"), "end_mill_spec__corner_radius_mm")
     )
-    end_mill_types = _distinct_text_values(option_source_qs.filter(category="end_mill"), "end_mill_spec__mill_type")
+    end_mill_types = _distinct_text_values(_opt_qs("end_mill", "mill_type"), "end_mill_spec__mill_type")
 
     body_tool_families_db = _distinct_text_values(
-        option_source_qs.filter(category="body_tool"), "body_tool_spec__family"
+        _opt_qs("body_tool", "body_family"), "body_tool_spec__family"
     )
     body_tool_cutters_db = _distinct_text_values(
-        option_source_qs.filter(category="body_tool"), "body_tool_spec__cutter_type"
+        _opt_qs("body_tool", "body_cutter"), "body_tool_spec__cutter_type"
     )
     body_tool_diameters = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="body_tool"), "body_tool_spec__diameter_mm")
+        _distinct_numeric_values(_opt_qs("body_tool", "bt_diameter_mm"), "body_tool_spec__diameter_mm")
     )
     body_tool_overall_lengths = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="body_tool"), "body_tool_spec__overall_length_mm")
+        _distinct_numeric_values(_opt_qs("body_tool", "bt_overall_length_mm"), "body_tool_spec__overall_length_mm")
     )
     body_tool_cutting_lengths = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="body_tool"), "body_tool_spec__cutting_length_mm")
+        _distinct_numeric_values(_opt_qs("body_tool", "bt_cutting_length_mm"), "body_tool_spec__cutting_length_mm")
     )
     body_tool_teeth = _sorted_unique_int_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="body_tool"), "body_tool_spec__teeth_count")
+        _distinct_numeric_values(_opt_qs("body_tool", "bt_teeth_count"), "body_tool_spec__teeth_count")
     )
     body_tool_couplings_db = _distinct_text_values(
-        option_source_qs.filter(category="body_tool"), "body_tool_spec__coupling"
+        _opt_qs("body_tool", "bt_coupling"), "body_tool_spec__coupling"
     )
     body_tool_insert_families = _distinct_text_values(
-        option_source_qs.filter(category="body_tool"), "body_tool_spec__insert_family"
+        _opt_qs("body_tool", "bt_insert_family"), "body_tool_spec__insert_family"
     )
 
-    tap_sizes = _distinct_text_values(option_source_qs.filter(category="tap"), "tap_spec__size_label")
+    tap_sizes = _distinct_text_values(_opt_qs("tap", "tap_size"), "tap_spec__size_label")
     tap_pitches = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="tap"), "tap_spec__pitch_mm")
+        _distinct_numeric_values(_opt_qs("tap", "tap_pitch"), "tap_spec__pitch_mm")
     )
     tap_overall_lengths = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="tap"), "tap_spec__overall_length_mm")
+        _distinct_numeric_values(_opt_qs("tap", "tap_overall_length_mm"), "tap_spec__overall_length_mm")
     )
     tap_cutting_lengths = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="tap"), "tap_spec__cutting_length_mm")
+        _distinct_numeric_values(_opt_qs("tap", "tap_cutting_length_mm"), "tap_spec__cutting_length_mm")
     )
-    tap_thread_standards = _distinct_text_values(option_source_qs.filter(category="tap"), "tap_spec__thread_standard")
-    tap_hole_types = _distinct_text_values(option_source_qs.filter(category="tap"), "tap_spec__hole_type")
-    tap_tool_types = _distinct_text_values(option_source_qs.filter(category="tap"), "tap_spec__tap_type")
+    tap_thread_standards = _distinct_text_values(_opt_qs("tap", "tap_thread_standard"), "tap_spec__thread_standard")
+    tap_hole_types = _distinct_text_values(_opt_qs("tap", "tap_hole_type"), "tap_spec__hole_type")
+    tap_tool_types = _distinct_text_values(_opt_qs("tap", "tap_tool_type"), "tap_spec__tap_type")
     center_diameters = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="center_drill"), "center_drill_spec__diameter_mm")
+        _distinct_numeric_values(_opt_qs("center_drill", "center_diameter_mm"), "center_drill_spec__diameter_mm")
     )
     center_overall_lengths = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="center_drill"), "center_drill_spec__overall_length_mm")
+        _distinct_numeric_values(
+            _opt_qs("center_drill", "center_overall_length_mm"), "center_drill_spec__overall_length_mm"
+        )
     )
-    center_angles = _distinct_text_values(option_source_qs.filter(category="center_drill"), "center_drill_spec__angle_deg")
-    countersink_types = _distinct_text_values(option_source_qs.filter(category="countersink"), "countersink_spec__countersink_type")
+    center_angles = _distinct_text_values(
+        _opt_qs("center_drill", "center_angle_deg"), "center_drill_spec__angle_deg"
+    )
+    countersink_types = _distinct_text_values(
+        _opt_qs("countersink", "countersink_type"), "countersink_spec__countersink_type"
+    )
     countersink_diameters = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="countersink"), "countersink_spec__diameter_mm")
+        _distinct_numeric_values(_opt_qs("countersink", "countersink_diameter_mm"), "countersink_spec__diameter_mm")
     )
-    countersink_angles = _distinct_text_values(option_source_qs.filter(category="countersink"), "countersink_spec__angle_deg")
+    countersink_angles = _distinct_text_values(
+        _opt_qs("countersink", "countersink_angle_deg"), "countersink_spec__angle_deg"
+    )
     countersink_lengths = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="countersink"), "countersink_spec__overall_length_mm")
+        _distinct_numeric_values(
+            _opt_qs("countersink", "countersink_overall_length_mm"), "countersink_spec__overall_length_mm"
+        )
     )
     countersink_flutes = _sorted_unique_int_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="countersink"), "countersink_spec__flutes_count")
+        _distinct_numeric_values(_opt_qs("countersink", "countersink_flutes_count"), "countersink_spec__flutes_count")
     )
-    countersink_sizes = _distinct_text_values(option_source_qs.filter(category="countersink"), "countersink_spec__size_label")
+    countersink_sizes = _distinct_text_values(
+        _opt_qs("countersink", "countersink_size_label"), "countersink_spec__size_label"
+    )
     drill_diameters = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="drill"), "drill_spec__diameter_mm")
+        _distinct_numeric_values(_opt_qs("drill", "drill_diameter_mm"), "drill_spec__diameter_mm")
     )
     drill_overall_lengths = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="drill"), "drill_spec__overall_length_mm")
+        _distinct_numeric_values(_opt_qs("drill", "drill_overall_length_mm"), "drill_spec__overall_length_mm")
     )
     drill_cutting_lengths = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="drill"), "drill_spec__cutting_length_mm")
+        _distinct_numeric_values(_opt_qs("drill", "drill_cutting_length_mm"), "drill_spec__cutting_length_mm")
     )
     drill_angles = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(option_source_qs.filter(category="drill"), "drill_spec__angle_deg")
+        _distinct_numeric_values(_opt_qs("drill", "drill_angle_deg"), "drill_spec__angle_deg")
     )
-    insert_shapes = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__insert_shape")
-    insert_reliefs = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__relief_angle")
-    insert_tolerances = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__tolerance_class")
+    insert_shapes = _distinct_text_values(_opt_qs("insert", "ins_shape"), "insert_spec__insert_shape")
+    insert_reliefs = _distinct_text_values(_opt_qs("insert", "ins_relief"), "insert_spec__relief_angle")
+    insert_tolerances = _distinct_text_values(_opt_qs("insert", "ins_tolerance"), "insert_spec__tolerance_class")
     insert_edge_codes = _distinct_text_values(
-        option_source_qs.filter(category="insert"), "insert_spec__cutting_edge_length_code"
+        _opt_qs("insert", "ins_edge_code"), "insert_spec__cutting_edge_length_code"
     )
-    insert_thickness_codes = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__thickness_code")
-    insert_nose_codes = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__nose_radius_code")
-    insert_families = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__milling_family")
+    insert_thickness_codes = _distinct_text_values(
+        _opt_qs("insert", "ins_thickness_code"), "insert_spec__thickness_code"
+    )
+    insert_nose_codes = _distinct_text_values(_opt_qs("insert", "ins_nose_code"), "insert_spec__nose_radius_code")
+    insert_families = _distinct_text_values(_opt_qs("insert", "ins_family"), "insert_spec__milling_family")
     insert_grades_db = _distinct_text_values(
-        option_source_qs.filter(category="insert"), "insert_spec__chipbreaker_grade"
+        _opt_qs("insert", "ins_grade"), "insert_spec__chipbreaker_grade"
     )
     insert_grades = merge_insert_chipbreaker_grades(insert_grades_db)
-    insert_isos = _distinct_text_values(option_source_qs.filter(category="insert"), "insert_spec__iso_designation")
+    insert_isos = _distinct_text_values(_opt_qs("insert", "ins_iso"), "insert_spec__iso_designation")
 
     tool_material_extra_options = _tool_material_extra_options(
-        tools_qs=option_source_qs,
+        tools_qs=_apply_stock_detail_filters(
+            option_source_qs if filter_category else option_base,
+            category=filter_category,
+            params=stock_req,
+            exclude=frozenset({"tool_material", "tool_material_custom"}),
+        ),
         extra_candidate=tool_material,
     )
     extras_set = set(tool_material_extra_options)

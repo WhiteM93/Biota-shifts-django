@@ -41,14 +41,82 @@ var INV = (function () {
   if (!form) return;
   var sel = form.querySelector(".js-stock-filter-tool-material");
   var inp = form.querySelector(".js-stock-filter-tool-material-custom");
-  if (!sel || !inp) return;
-  function sync(fromUserChange) {
-    var isOther = sel.value === INV.tool_material_filter_other;
-    inp.style.display = isOther ? "block" : "none";
-    if (!isOther && fromUserChange) inp.value = "";
+  if (sel && inp) {
+    function sync(fromUserChange) {
+      var isOther = sel.value === INV.tool_material_filter_other;
+      inp.style.display = isOther ? "block" : "none";
+      if (!isOther && fromUserChange) inp.value = "";
+    }
+    sel.addEventListener("change", function () { sync(true); });
+    sync(false);
   }
-  sel.addEventListener("change", function () { sync(true); });
-  sync(false);
+
+  var submitting = false;
+  var keepOnCategoryChange = {
+    panel: true,
+    category: true,
+    show_all: true
+  };
+
+  function submitLive() {
+    if (submitting) return;
+    submitting = true;
+    form.classList.add("is-live-filtering");
+    if (typeof form.requestSubmit === "function") form.requestSubmit();
+    else form.submit();
+  }
+
+  function clearDisabledOrEmpty() {
+    Array.prototype.forEach.call(form.elements, function (el) {
+      if (!el.name || el.disabled) return;
+      if (el.type === "radio" || el.type === "checkbox") {
+        if (!el.checked) el.disabled = true;
+        return;
+      }
+      if ((el.tagName === "SELECT" || el.tagName === "INPUT") && !String(el.value || "").trim()) {
+        el.disabled = true;
+      }
+    });
+  }
+
+  form.addEventListener("submit", function () {
+    clearDisabledOrEmpty();
+  });
+
+  var catSel = form.querySelector(".js-stock-filter-category");
+  if (catSel) {
+    catSel.addEventListener("change", function () {
+      Array.prototype.forEach.call(form.elements, function (el) {
+        if (!el.name || keepOnCategoryChange[el.name]) return;
+        if (el.type === "radio" || el.type === "checkbox") {
+          el.checked = (el.value === "");
+          return;
+        }
+        if (el.tagName === "SELECT" || el.tagName === "INPUT") {
+          el.value = "";
+        }
+      });
+      submitLive();
+    });
+  }
+
+  form.addEventListener("change", function (e) {
+    var t = e.target;
+    if (!t || !t.name) return;
+    if (t.classList && t.classList.contains("js-stock-filter-category")) return;
+    if (t.name === "tool_material_custom") return;
+    if (t.name === "tool_material" && t.value === (INV.tool_material_filter_other || "")) return;
+    submitLive();
+  });
+
+  if (inp) {
+    inp.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submitLive();
+      }
+    });
+  }
 })();
 
 (function () {

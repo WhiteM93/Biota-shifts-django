@@ -610,6 +610,31 @@
   margin: 0;
 }
 
+.inv-stock-filter__category {
+  padding: 6px 7px;
+  margin: 0 0 4px !important;
+  border: 1px solid var(--bio-heading-accent, #1a7a6d);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--bio-heading-accent, #1a7a6d) 9%, var(--bio-surface-panel, #fff));
+  grid-template-columns: 96px minmax(0, 1fr) !important;
+}
+
+.inv-stock-filter__category > span:first-child {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: var(--bio-heading-accent, #1a7a6d) !important;
+}
+
+.inv-stock-filter__category select {
+  font-weight: 600;
+  border-color: color-mix(in srgb, var(--bio-heading-accent, #1a7a6d) 45%, #c5d0ce);
+}
+
+.inv-stock-filter.is-live-filtering {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
 .inv-filter-list > .field > span:first-child {
   font-size: 10px;
   font-weight: 600;
