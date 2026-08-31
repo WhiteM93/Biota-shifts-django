@@ -66,23 +66,6 @@ var INV = (function () {
     else form.submit();
   }
 
-  function clearDisabledOrEmpty() {
-    Array.prototype.forEach.call(form.elements, function (el) {
-      if (!el.name || el.disabled) return;
-      if (el.type === "radio" || el.type === "checkbox") {
-        if (!el.checked) el.disabled = true;
-        return;
-      }
-      if ((el.tagName === "SELECT" || el.tagName === "INPUT") && !String(el.value || "").trim()) {
-        el.disabled = true;
-      }
-    });
-  }
-
-  form.addEventListener("submit", function () {
-    clearDisabledOrEmpty();
-  });
-
   var catSel = form.querySelector(".js-stock-filter-category");
   if (catSel) {
     catSel.addEventListener("change", function () {
@@ -97,24 +80,6 @@ var INV = (function () {
         }
       });
       submitLive();
-    });
-  }
-
-  form.addEventListener("change", function (e) {
-    var t = e.target;
-    if (!t || !t.name) return;
-    if (t.classList && t.classList.contains("js-stock-filter-category")) return;
-    if (t.name === "tool_material_custom") return;
-    if (t.name === "tool_material" && t.value === (INV.tool_material_filter_other || "")) return;
-    submitLive();
-  });
-
-  if (inp) {
-    inp.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        submitLive();
-      }
     });
   }
 })();

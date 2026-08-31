@@ -689,6 +689,19 @@ def _merge_inventory_stock_query(username: str, request_get, *, use_saved: bool)
     for k in _STOCK_FILTER_PARAM_KEYS:
         if k in request_get:
             merged[k] = (request_get.get(k) or "").strip()
+    # Форма фильтра всегда шлёт show_all: отсутствующий ключ = сброс («Все»), а не старое значение из prefs.
+    if use_saved and "show_all" in request_get:
+        cat_raw = (request_get.get("category") if "category" in request_get else merged.get("category") or "").strip()
+        if cat_raw in ("", "all"):
+            cat = ""
+        elif cat_raw in _INVENTORY_CATEGORIES:
+            cat = cat_raw
+        else:
+            cat = ""
+        allow = _STOCK_GLOBAL_KEYS | _STOCK_KEYS_BY_CATEGORY.get(cat, frozenset())
+        for k in allow:
+            if k not in request_get:
+                merged[k] = ""
     return merged
 
 
