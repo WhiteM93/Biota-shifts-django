@@ -1,10 +1,12 @@
 """Личный кабинет: профиль и пароль (пользователи), имя и права (админ) — логика как в Streamlit."""
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 import shutil
 
 from django.contrib import messages
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from django.http import HttpResponse
 
@@ -88,7 +90,7 @@ def cabinet_view(request):
                     for k in NAV_KEYS:
                         if not nav_map.get(k, True):
                             continue
-                        if k in ("products", "machines") or k in NAV_KEYS_NO_DEPT_FILTER:
+                        if k in NAV_KEYS_NO_DEPT_FILTER:
                             continue
                         picked = [d for d in request.POST.getlist(f"priv_nav_dep__{k}") if d in allowed_dep_set]
                         nav_dep_filters[k] = picked
@@ -123,7 +125,9 @@ def cabinet_view(request):
                         )
                 else:
                     messages.error(request, err)
-                return redirect("cabinet")
+                return redirect(
+                    f"{reverse('cabinet')}?priv_user={quote(target)}&priv_saved=1#cabinet-privileges"
+                )
             if action == "admin_approve_registration":
                 target = (request.POST.get("approve_login") or "").strip()
                 ok, err = _approve_registration(target)
@@ -224,11 +228,7 @@ def cabinet_view(request):
             sel_deps = [d for d in (_ndf.get(k) or []) if d in dep_opts]
             if ctx["priv_selected"] and k == "payroll" and k not in raw_ndf:
                 sel_deps = [d for d in (_ndf.get("defects") or []) if d in dep_opts]
-            has_dept_picker = bool(
-                dep_opts
-                and k not in ("products", "machines")
-                and k not in NAV_KEYS_NO_DEPT_FILTER
-            )
+            has_dept_picker = bool(dep_opts and k not in NAV_KEYS_NO_DEPT_FILTER)
             extra_toggle = None
             if k == "inventory":
                 extra_toggle = {

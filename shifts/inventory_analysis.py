@@ -20,6 +20,14 @@ GROUP_FIELD_PATHS: dict[str, dict[str, str]] = {
         "flutes_count": "end_mill_spec__flutes_count",
         "corner_radius_mm": "end_mill_spec__corner_radius_mm",
     },
+    "body_tool": {
+        "diameter_mm": "body_tool_spec__diameter_mm",
+        "family": "body_tool_spec__family",
+        "cutter_type": "body_tool_spec__cutter_type",
+        "teeth_count": "body_tool_spec__teeth_count",
+        "coupling": "body_tool_spec__coupling",
+        "insert_family": "body_tool_spec__insert_family",
+    },
     "tap": {
         "size_label": "tap_spec__size_label",
         "thread_standard": "tap_spec__thread_standard",
@@ -66,6 +74,16 @@ GROUP_FIELD_LABELS["end_mill"].update(
         "corner_radius_mm": "Радиус, мм",
     }
 )
+GROUP_FIELD_LABELS["body_tool"].update(
+    {
+        "diameter_mm": "Диаметр, мм",
+        "family": "Семейство",
+        "cutter_type": "Тип",
+        "teeth_count": "Z",
+        "coupling": "Крепление",
+        "insert_family": "Тип пластины",
+    }
+)
 GROUP_FIELD_LABELS["tap"].update(
     {
         "size_label": "Размер резьбы",
@@ -104,6 +122,7 @@ GROUP_FIELD_LABELS["collet"].update(
 
 DEFAULT_GROUP_FIELD: dict[str, str] = {
     "end_mill": "diameter_mm",
+    "body_tool": "diameter_mm",
     "tap": "size_label",
     "center_drill": "diameter_mm",
     "countersink": "diameter_mm",
@@ -119,6 +138,14 @@ STOCK_FILTER_PARAMS: dict[str, dict[str, str]] = {
         "mill_type": "mill_type",
         "flutes_count": "mill_flutes_count",
         "corner_radius_mm": "mill_corner_radius_mm",
+    },
+    "body_tool": {
+        "diameter_mm": "bt_diameter_mm",
+        "family": "body_family",
+        "cutter_type": "body_cutter",
+        "teeth_count": "bt_teeth_count",
+        "coupling": "bt_coupling",
+        "insert_family": "bt_insert_family",
     },
     "tap": {
         "size_label": "tap_size",
@@ -154,10 +181,16 @@ STOCK_FILTER_PARAMS: dict[str, dict[str, str]] = {
 }
 
 try:
+    from shifts.body_tool_constants import BODY_TOOL_COUPLINGS, BODY_TOOL_FAMILIES, INDEXABLE_MILL_CUTTER_TYPES
+    from shifts.insert_constants import MILLING_INSERT_FAMILIES
     from shifts.models import END_MILL_TYPES, COUNTERSINK_TYPES, COLLET_TYPES, THREAD_STANDARDS, TAP_TOOL_TYPES
 
     CHOICE_LABELS: dict[str, dict[str, str]] = {
         "mill_type": dict(END_MILL_TYPES),
+        "family": dict(BODY_TOOL_FAMILIES),
+        "cutter_type": dict(INDEXABLE_MILL_CUTTER_TYPES),
+        "coupling": {k: lab for k, lab in BODY_TOOL_COUPLINGS if k},
+        "insert_family": {k: lab for k, lab in MILLING_INSERT_FAMILIES if k},
         "countersink_type": dict(COUNTERSINK_TYPES),
         "collet_type": dict(COLLET_TYPES),
         "thread_standard": dict(THREAD_STANDARDS),
@@ -264,7 +297,7 @@ def _parse_group_filter_value(raw: str, field_key: str) -> Any | None:
     text = (raw or "").strip()
     if not text or text == "—":
         return None
-    if field_key in ("flutes_count",):
+    if field_key in ("flutes_count", "teeth_count"):
         try:
             return int(text)
         except ValueError:

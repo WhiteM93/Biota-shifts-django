@@ -556,8 +556,18 @@ def _filter_employees_for_user(full_df: pd.DataFrame, username: str) -> pd.DataF
 
 
 # Разделы меню Django (кроме личного кабинета): права в JSON users.*.nav
-# Разделы без привязки к отделам в кабинете (всегда полный справочник / фильтр на странице).
-NAV_KEYS_NO_DEPT_FILTER = ("graph", "regulations")
+# Разделы без привязки к отделам в кабинете (склад/станки/изделия не фильтруются по цехам).
+NAV_KEYS_NO_DEPT_FILTER = (
+    "graph",
+    "regulations",
+    "inventory",
+    "visual_warehouse",
+    "products",
+    "machines",
+    "calculator",
+    "forms",
+    "home",
+)
 
 NAV_KEYS = (
     "home",
@@ -744,8 +754,6 @@ def employees_df_for_nav(username: str | None, nav_key: str, employees_df: pd.Da
     rec = _resolve_registered_user(u)
     if rec is None:
         return employees_df.iloc[0:0].copy()
-    if nk in ("products", "machines"):
-        return employees_df
     base = employees_df
     if nk == "employees":
         # access_scope "none" у новых регистраций — иначе _filter_employees_for_user даёт пустой df

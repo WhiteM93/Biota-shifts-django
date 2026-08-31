@@ -105,3 +105,41 @@ class VisualWarehouseMatchingTests(TestCase):
             d_to=Decimal("1"),
         )
         self.assertTrue(qs.filter(pk=bare.pk).exists())
+
+    def test_exclude_rule_removes_matched_tools(self):
+        VisualContainerItem.objects.create(
+            container=self.cont,
+            title="Все Ø1",
+            tool_category="end_mill",
+            diameter_from_mm=Decimal("1"),
+            diameter_to_mm=Decimal("1"),
+            rule_kind=VisualContainerItem.RULE_INCLUDE,
+        )
+        VisualContainerItem.objects.create(
+            container=self.cont,
+            title="Без сферических",
+            tool_category="end_mill",
+            mill_type="ball",
+            rule_kind=VisualContainerItem.RULE_EXCLUDE,
+        )
+        tools = _matching_tools_for_container(self.cont)
+        ids = {t["id"] for t in tools}
+        self.assertEqual(ids, {self.ok.pk})
+
+    def test_exclude_specific_tool_item(self):
+        VisualContainerItem.objects.create(
+            container=self.cont,
+            title="Все Ø1",
+            tool_category="end_mill",
+            diameter_from_mm=Decimal("1"),
+            diameter_to_mm=Decimal("1"),
+        )
+        VisualContainerItem.objects.create(
+            container=self.cont,
+            title="Исключить одну",
+            tool_item=self.ball,
+            rule_kind=VisualContainerItem.RULE_EXCLUDE,
+        )
+        tools = _matching_tools_for_container(self.cont)
+        ids = {t["id"] for t in tools}
+        self.assertEqual(ids, {self.ok.pk})

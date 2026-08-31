@@ -135,7 +135,7 @@
     </div>
   </section>
 
-  <section class="cabinet-section" id="cabinet-privileges">
+  <section class="cabinet-section cabinet-section--priv" id="cabinet-privileges">
     <div class="cabinet-section__head">
       <h2>Права доступа</h2>
     </div>
@@ -143,73 +143,96 @@
       {% if not priv_users %}
       <p class="muted">Нет пользователей.</p>
       {% else %}
-      <form method="post" action="" id="cab-priv-form" class="cab-priv">
+      <form method="post" action="" id="cab-priv-form" class="cab-priv" data-priv-saved="{% if request.GET.priv_saved == '1' %}1{% else %}0{% endif %}">
         {% csrf_token %}
         <input type="hidden" name="action" value="admin_privileges">
-        <input type="hidden" name="priv_user" value="{{ priv_selected }}">
+        <input type="hidden" name="priv_user" id="cab-priv-user-value" value="{{ priv_selected }}">
         <input type="hidden" name="priv_inventory_stock_manage" value="0">
         <input type="hidden" name="priv_machines_quick_edit" value="0">
 
-        <div class="cab-priv__toolbar">
-          <label class="cab-priv__field">
-            <span class="cab-priv__lbl">Пользователь</span>
-            <select class="cab-priv__sel" id="cab-priv-user-jump" data-base-url="">
-              {% for u in priv_users %}
-              <option value="{{ u }}" {% if u == priv_selected %}selected{% endif %}>{{ u }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label class="cab-priv__field">
-            <span class="cab-priv__lbl">Роль</span>
-            <select class="cab-priv__sel" name="priv_role">
-              {% for r in priv_role_choices %}
-              <option value="{{ r }}" {% if r == priv_role %}selected{% endif %}>
-                {% if r == "executor" %}Исполнитель{% else %}Руководитель{% endif %}
-              </option>
-              {% endfor %}
-            </select>
-          </label>
-          <div class="cab-priv__actions">
-            <button type="submit" class="btn">Сохранить</button>
-            {% if priv_selected %}
-            <button type="submit" class="btn btn-danger" form="cab-priv-delete-form"
-              onclick="return confirm('Удалить «{{ priv_selected }}»?');">Удалить</button>
-            {% endif %}
-          </div>
-        </div>
+        <aside class="cab-priv__rail" aria-label="Пользователи">
+          <div class="cab-priv__rail-head">Аккаунты</div>
+          <nav class="cab-priv__users" id="cab-priv-user-jump">
+            {% for u in priv_users %}
+            <a
+              class="cab-priv__user{% if u == priv_selected %} is-active{% endif %}"
+              href="?priv_user={{ u|urlencode }}#cabinet-privileges"
+              data-user="{{ u }}"
+            >{{ u }}</a>
+            {% endfor %}
+          </nav>
+        </aside>
 
-        <div class="cab-priv__sections" role="group" aria-label="Разделы меню">
-          {% for row in priv_nav_rows %}
-          <div class="cab-priv__item{% if not row.on %} is-off{% endif %}" data-nav-key="{{ row.key }}">
-            <label class="cab-priv__row">
-              <input type="checkbox" name="priv_nav" value="{{ row.key }}" {% if row.on %}checked{% endif %}>
-              <span class="cab-priv__name">{{ row.label }}</span>
-            </label>
-            {% if row.extra_toggle %}
-            <label class="cab-priv__sub">
-              <input type="checkbox" name="{{ row.extra_toggle.field }}" value="1" {% if row.extra_toggle.on %}checked{% endif %}>
-              <span>{{ row.extra_toggle.label }}</span>
-            </label>
-            {% endif %}
-            {% if row.has_dept_picker %}
-            <details class="cab-priv__deps">
-              <summary>Отделы <span class="cab-priv__dep-n" data-dep-count>{{ row.dep_count }}/{{ dep_opts|length }}</span></summary>
-              <p class="cab-priv__dep-tools">
-                <button type="button" class="cab-priv__link js-cab-dep-all">Все</button>
-                <button type="button" class="cab-priv__link js-cab-dep-none">Сброс</button>
-              </p>
-              <div class="cab-priv__dep-chips">
-                {% for d in dep_opts %}
-                <label class="chk cab-priv__chip">
-                  <input type="checkbox" name="priv_nav_dep__{{ row.key }}" value="{{ d }}" {% if d in row.dep_selected %}checked{% endif %}>
-                  {{ d }}
-                </label>
-                {% endfor %}
+        <div class="cab-priv__stage">
+          <header class="cab-priv__bar">
+            <h3 class="cab-priv__who-name">{{ priv_selected }}</h3>
+            <div class="cab-priv__role" role="group" aria-label="Роль">
+              {% for r in priv_role_choices %}
+              <label class="cab-priv__role-opt">
+                <input type="radio" name="priv_role" value="{{ r }}" {% if r == priv_role %}checked{% endif %} data-priv-watch>
+                <span>{% if r == "executor" %}Исполнитель{% else %}Руководитель{% endif %}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <div class="cab-priv__actions">
+              <span class="cab-priv__status js-cab-priv-status" aria-live="polite"></span>
+              <button type="submit" class="btn cab-priv__save js-cab-priv-save" disabled>Сохранить</button>
+              {% if priv_selected %}
+              <button type="submit" class="btn btn-danger cab-priv__delete" form="cab-priv-delete-form"
+                onclick="return confirm('Удалить «{{ priv_selected }}»?');">Удалить</button>
+              {% endif %}
+            </div>
+          </header>
+
+          <p class="cab-priv__hint js-cab-priv-hint" hidden></p>
+
+          <div class="cab-priv__list" role="group" aria-label="Разделы меню">
+            {% for row in priv_nav_rows %}
+            <div class="cab-priv__line{% if not row.on %} is-off{% endif %}" data-nav-key="{{ row.key }}" data-priv-card>
+              <label class="cab-priv__switch" title="Доступ к разделу">
+                <input type="checkbox" name="priv_nav" value="{{ row.key }}" {% if row.on %}checked{% endif %} data-priv-watch>
+                <span class="cab-priv__switch-ui" aria-hidden="true"></span>
+              </label>
+
+              <div class="cab-priv__line-main">
+                <div class="cab-priv__line-title">
+                  <span class="cab-priv__name">{{ row.label }}</span>
+                  <span class="cab-priv__badge js-cab-priv-badge" hidden>изменено</span>
+                </div>
+                <div class="cab-priv__line-extras">
+                  {% if row.extra_toggle %}
+                  <label class="cab-priv__perm">
+                    <input type="checkbox" name="{{ row.extra_toggle.field }}" value="1" {% if row.extra_toggle.on %}checked{% endif %} data-priv-watch>
+                    <span>{{ row.extra_toggle.label }}</span>
+                  </label>
+                  {% endif %}
+                  {% if row.has_dept_picker %}
+                  <button type="button" class="cab-priv__dept-btn js-cab-dep-toggle" aria-expanded="false">
+                    Отделы <span data-dep-count>{{ row.dep_count }}/{{ dep_opts|length }}</span>
+                  </button>
+                  {% endif %}
+                </div>
               </div>
-            </details>
-            {% endif %}
+
+              {% if row.has_dept_picker %}
+              <div class="cab-priv__dept-panel" hidden>
+                <div class="cab-priv__dept-tools">
+                  <button type="button" class="cab-priv__link js-cab-dep-all">Все</button>
+                  <button type="button" class="cab-priv__link js-cab-dep-none">Сброс</button>
+                </div>
+                <div class="cab-priv__dep-chips">
+                  {% for d in dep_opts %}
+                  <label class="chk cab-priv__chip">
+                    <input type="checkbox" name="priv_nav_dep__{{ row.key }}" value="{{ d }}" {% if d in row.dep_selected %}checked{% endif %} data-priv-watch>
+                    {{ d }}
+                  </label>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
           </div>
-          {% endfor %}
         </div>
       </form>
 
@@ -298,20 +321,24 @@
   </script>
   <script>
     (function () {
-      var userSel = document.getElementById("cab-priv-user-jump");
-      if (userSel) {
-        userSel.addEventListener("change", function () {
-          var u = encodeURIComponent(userSel.value || "");
-          var q = window.location.search.replace(/^\?/, "").split("&").filter(function (p) {
-            return p && p.indexOf("priv_user=") !== 0;
-          });
-          q.unshift("priv_user=" + u);
-          window.location.href = window.location.pathname + "?" + q.join("&") + "#cabinet-privileges";
-        });
+      var form = document.getElementById("cab-priv-form");
+      if (!form) return;
+
+      var saveBtn = form.querySelector(".js-cab-priv-save");
+      var statusEl = form.querySelector(".js-cab-priv-status");
+      var hintEl = form.querySelector(".js-cab-priv-hint");
+      var baseline = "";
+      var baselineByCard = {};
+
+      function roleValue() {
+        var checked = form.querySelector('input[name="priv_role"]:checked');
+        return checked ? checked.value : "";
       }
+
       function deptBoxes(item) {
         return item.querySelectorAll('input[type="checkbox"][name^="priv_nav_dep__"]');
       }
+
       function syncDepCount(item) {
         var el = item.querySelector("[data-dep-count]");
         if (!el) return;
@@ -320,32 +347,158 @@
         boxes.forEach(function (cb) { if (cb.checked) n += 1; });
         el.textContent = n + "/" + boxes.length;
       }
+
       function syncItem(item) {
         var nav = item.querySelector('input[name="priv_nav"]');
         var on = nav && nav.checked;
         item.classList.toggle("is-off", !on);
-        var deps = item.querySelector(".cab-priv__deps");
-        if (deps) deps.hidden = !on;
+        var panel = item.querySelector(".cab-priv__dept-panel");
+        var btn = item.querySelector(".js-cab-dep-toggle");
+        if (!on) {
+          if (panel) panel.hidden = true;
+          if (btn) btn.setAttribute("aria-expanded", "false");
+        }
         syncDepCount(item);
       }
-      document.querySelectorAll("#cabinet-privileges .cab-priv__item").forEach(function (item) {
+
+      function cardSignature(item) {
+        var parts = [];
+        var nav = item.querySelector('input[name="priv_nav"]');
+        parts.push("nav:" + (nav && nav.checked ? "1" : "0"));
+        item.querySelectorAll(".cab-priv__perm input[type='checkbox']").forEach(function (cb) {
+          parts.push((cb.name || "") + ":" + (cb.checked ? "1" : "0"));
+        });
+        var deps = [];
+        deptBoxes(item).forEach(function (cb) {
+          if (cb.checked) deps.push(cb.value);
+        });
+        deps.sort();
+        parts.push("deps:" + deps.join("|"));
+        return parts.join(";");
+      }
+
+      function formSignature() {
+        var parts = ["role:" + roleValue()];
+        form.querySelectorAll("[data-priv-card]").forEach(function (card) {
+          parts.push((card.getAttribute("data-nav-key") || "") + "=" + cardSignature(card));
+        });
+        return parts.join("||");
+      }
+
+      function setStatus(text, kind) {
+        if (!statusEl) return;
+        statusEl.textContent = text || "";
+        statusEl.className = "cab-priv__status js-cab-priv-status" + (kind ? " is-" + kind : "");
+      }
+
+      function refreshDirty() {
+        var dirtyCount = 0;
+        var roleDirty = baseline && (("role:" + roleValue()) !== baseline.split("||")[0]);
+        form.querySelectorAll("[data-priv-card]").forEach(function (card) {
+          var key = card.getAttribute("data-nav-key") || "";
+          var now = cardSignature(card);
+          var dirty = baselineByCard[key] !== undefined && baselineByCard[key] !== now;
+          card.classList.toggle("is-dirty", dirty);
+          var badge = card.querySelector(".js-cab-priv-badge");
+          if (badge) badge.hidden = !dirty;
+          if (dirty) dirtyCount += 1;
+        });
+        form.querySelectorAll(".cab-priv__role-opt").forEach(function (opt) {
+          opt.classList.toggle("is-dirty-control", !!roleDirty);
+        });
+        var anyDirty = dirtyCount > 0 || !!roleDirty;
+        form.classList.toggle("is-dirty", anyDirty);
+        if (saveBtn) saveBtn.disabled = !anyDirty;
+        if (hintEl) {
+          if (anyDirty) {
+            hintEl.hidden = false;
+            hintEl.textContent = "Не сохранено" + (dirtyCount ? " · " + dirtyCount : "");
+          } else {
+            hintEl.hidden = true;
+            hintEl.textContent = "";
+          }
+        }
+        if (anyDirty) setStatus("Не сохранено", "warn");
+        else if (!form.classList.contains("is-just-saved")) setStatus("", "");
+      }
+
+      function captureBaseline() {
+        baselineByCard = {};
+        form.querySelectorAll("[data-priv-card]").forEach(function (card) {
+          baselineByCard[card.getAttribute("data-nav-key") || ""] = cardSignature(card);
+        });
+        baseline = formSignature();
+        form.classList.remove("is-dirty");
+        refreshDirty();
+      }
+
+      form.querySelectorAll("[data-priv-card]").forEach(function (item) {
         syncItem(item);
         var nav = item.querySelector('input[name="priv_nav"]');
-        if (nav) nav.addEventListener("change", function () { syncItem(item); });
-        deptBoxes(item).forEach(function (cb) {
-          cb.addEventListener("change", function () { syncDepCount(item); });
+        if (nav) nav.addEventListener("change", function () { syncItem(item); refreshDirty(); });
+        item.querySelectorAll("[data-priv-watch]").forEach(function (el) {
+          el.addEventListener("change", refreshDirty);
         });
       });
-      document.addEventListener("click", function (event) {
+      form.querySelectorAll('input[name="priv_role"]').forEach(function (el) {
+        el.addEventListener("change", refreshDirty);
+      });
+
+      form.addEventListener("click", function (event) {
+        var toggle = event.target.closest(".js-cab-dep-toggle");
+        if (toggle) {
+          var line = toggle.closest("[data-priv-card]");
+          var panel = line && line.querySelector(".cab-priv__dept-panel");
+          var nav = line && line.querySelector('input[name="priv_nav"]');
+          if (!panel || !nav || !nav.checked) return;
+          var open = panel.hidden;
+          panel.hidden = !open;
+          toggle.setAttribute("aria-expanded", open ? "true" : "false");
+          return;
+        }
         var allBtn = event.target.closest(".js-cab-dep-all");
         var noneBtn = event.target.closest(".js-cab-dep-none");
         var btn = allBtn || noneBtn;
         if (!btn) return;
-        var item = btn.closest(".cab-priv__item");
+        var item = btn.closest("[data-priv-card]");
         if (!item) return;
         deptBoxes(item).forEach(function (cb) { cb.checked = Boolean(allBtn); });
         syncDepCount(item);
+        refreshDirty();
       });
+
+      form.addEventListener("submit", function () {
+        if (saveBtn) {
+          saveBtn.disabled = true;
+          saveBtn.classList.add("is-saving");
+          saveBtn.textContent = "Сохранение…";
+        }
+        setStatus("Сохраняем…", "busy");
+      });
+
+      captureBaseline();
+
+      if (form.getAttribute("data-priv-saved") === "1") {
+        form.classList.add("is-just-saved");
+        setStatus("Сохранено", "ok");
+        form.querySelectorAll("[data-priv-card]").forEach(function (card) {
+          card.classList.add("is-saved-flash");
+        });
+        window.setTimeout(function () {
+          form.classList.remove("is-just-saved");
+          form.querySelectorAll(".is-saved-flash").forEach(function (el) {
+            el.classList.remove("is-saved-flash");
+          });
+          setStatus("", "");
+        }, 1600);
+        if (window.history && window.history.replaceState) {
+          var q = window.location.search.replace(/^\?/, "").split("&").filter(function (p) {
+            return p && p.indexOf("priv_saved=") !== 0;
+          });
+          var next = window.location.pathname + (q.length ? "?" + q.join("&") : "") + "#cabinet-privileges";
+          window.history.replaceState({}, "", next);
+        }
+      }
     })();
   </script>
 {% else %}

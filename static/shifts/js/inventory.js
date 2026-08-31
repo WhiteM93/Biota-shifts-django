@@ -1444,6 +1444,7 @@ var INV = (function () {
   var arrivalDiamRequiredByCategory = {
     drill: { key: "dr_diameter_mm", label: "диаметр D (мм) для сверла" },
     end_mill: { key: "em_diameter_mm", label: "диаметр D (мм) для фрезы" },
+    body_tool: { key: "bt_diameter_mm", label: "диаметр D (мм) для корпусного инструмента" },
     center_drill: { key: "cd_diameter_mm", label: "диаметр D (мм) для центровки" },
     countersink: { key: "cs_diameter_mm", label: "диаметр D (мм) для зенкера" },
   };
@@ -1515,6 +1516,16 @@ var INV = (function () {
         issues = issues.concat(validateInsertRow(tr, i + 1));
         return;
       }
+      if (cat === "body_tool") {
+        var cutEl = tr.querySelector('[data-k="body_cutter"]');
+        if (!cutEl || !(cutEl.value || "").trim()) {
+          if (cutEl) cutEl.classList.add("is-invalid");
+          issues.push({
+            msg: "Строка " + (i + 1) + ": укажите тип корпусной фрезы.",
+            el: cutEl,
+          });
+        }
+      }
       var spec = arrivalDiamRequiredByCategory[cat];
       if (!spec) return;
       var el = tr.querySelector('[data-k="' + spec.key + '"]');
@@ -1528,6 +1539,7 @@ var INV = (function () {
 
   var arrivalGroupTitles = {
     end_mill: "Фрезы",
+    body_tool: "Корпусной инструмент",
     tap: "Резьбовой инструмент",
     center_drill: "Центровки",
     countersink: "Зенкера",
@@ -1854,6 +1866,7 @@ var INV = (function () {
 
   var arrivalGroupHeadHtml = {
     end_mill: '<tr><th>Тип фрезы</th><th class="short-col">D</th><th class="short-col">R</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    body_tool: '<tr><th>Семейство</th><th>Тип</th><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th>Крепление</th><th>Тип пластины</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     tap: '<tr><th class="tap-size-col">Размер</th><th class="tap-std-col">Стандарт</th><th class="tap-step-col">Шаг</th><th class="tap-tpi-col">TPI</th><th class="tap-l-col">L</th><th class="tap-lc-col">Lc</th><th class="tap-hole-col">Тип</th><th>Тип инструмента</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     center_drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="angle-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     countersink: '<tr><th>Тип</th><th class="short-col">D</th><th class="angle-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
@@ -1954,6 +1967,20 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_overall_length_mm"></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="em_cutting_length_mm"></td>');
       cells.push('<td class="short-col"><input type="number" data-k="em_flutes_count"></td>');
+      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
+      cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
+      cells.push('<td class="co-cell"></td>');
+      cells.push('<td class="wm-cell"></td>');
+      cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+    } else if (cat === "body_tool") {
+      cells.push('<td><select data-k="body_family">' + buildOptionsHtml(INV.body_tool_families || []) + '</select></td>');
+      cells.push('<td><select data-k="body_cutter" required>' + buildOptionsHtml(INV.indexable_mill_cutter_types || []) + '</select></td>');
+      cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
+      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_overall_length_mm"></td>');
+      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_cutting_length_mm"></td>');
+      cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count"></td>');
+      cells.push('<td><select data-k="bt_coupling">' + buildOptionsHtml(INV.body_tool_couplings || []) + '</select></td>');
+      cells.push('<td><select data-k="bt_insert_family">' + buildOptionsHtml(INV.milling_insert_families || []) + '</select></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
@@ -2193,6 +2220,50 @@ var INV = (function () {
 
   var millTypeLabels = {};
   (INV.end_mill_types || []).forEach(function (x) { millTypeLabels[x.value] = x.label; });
+  var bodyFamilyLabels = {};
+  (INV.body_tool_families || []).forEach(function (x) { bodyFamilyLabels[x.value] = x.label; });
+  var bodyCutterLabels = {};
+  (INV.indexable_mill_cutter_types || []).forEach(function (x) { bodyCutterLabels[x.value] = x.label; });
+  var bodyCouplingLabels = { "": "—" };
+  (INV.body_tool_couplings || []).forEach(function (x) { bodyCouplingLabels[x.value] = x.label; });
+
+  var threadStandardLabels = {};
+  (INV.thread_standards || []).forEach(function (x) { threadStandardLabels[x.value] = x.label; });
+  var tapHoleTypeLabels = {};
+  (INV.tap_hole_types || []).forEach(function (x) { tapHoleTypeLabels[x.value] = x.label; });
+  var tapToolTypeLabels = {};
+  (INV.tap_tool_types || []).forEach(function (x) { tapToolTypeLabels[x.value] = x.label; });
+  var centerDrillAngleLabels = {};
+  (INV.center_drill_angles || []).forEach(function (x) { centerDrillAngleLabels[x.value] = x.label; });
+  var countersinkTypeLabels = {};
+  (INV.countersink_types || []).forEach(function (x) { countersinkTypeLabels[x.value] = x.label; });
+  var countersinkAngleLabels = {};
+  (INV.countersink_angles || []).forEach(function (x) { countersinkAngleLabels[x.value] = x.label; });
+  var insertShapeLabels = {};
+  (INV.insert_shapes || []).forEach(function (x) { insertShapeLabels[x.value] = x.label; });
+  var insertEdgeLabels = {};
+  (INV.insert_edge_length_codes || []).forEach(function (x) { insertEdgeLabels[x.value] = x.label; });
+  var insertThicknessLabels = {};
+  (INV.insert_thickness_codes || []).forEach(function (x) { insertThicknessLabels[x.value] = x.label; });
+  var insertNoseLabels = {};
+  (INV.insert_nose_radius_codes || []).forEach(function (x) { insertNoseLabels[x.value] = x.label; });
+  var insertFamilyLabels = {};
+  (INV.milling_insert_families || []).forEach(function (x) { insertFamilyLabels[x.value] = x.label; });
+  var colletTypeLabels = {};
+  (INV.collet_types || []).forEach(function (x) { colletTypeLabels[x.value] = x.label; });
+  var erSizeLabels = {};
+  (INV.er_collet_sizes || []).forEach(function (x) { erSizeLabels[x.value] = x.label; });
+  var erClampLabels = {};
+  (INV.er_clamp_ranges || []).forEach(function (x) { erClampLabels[x.value] = x.label; });
+  var erGInnerLabels = {};
+  (INV.collet_er_g_inner_diameters || []).forEach(function (x) { erGInnerLabels[x.value] = x.label; });
+  var colletThreadStdLabels = {};
+  (INV.collet_thread_standards || []).forEach(function (x) { colletThreadStdLabels[x.value] = x.label; });
+  var colletThreadingSeriesLabels = {};
+  (INV.collet_threading_series || []).forEach(function (x) { colletThreadingSeriesLabels[x.value] = x.label; });
+  var colletThreadingUseLabels = {};
+  (INV.collet_threading_use || []).forEach(function (x) { colletThreadingUseLabels[x.value] = x.label; });
+  var aaLabels = { "0": "-", "1": "AA" };
 
   var toolMaterialLabels = { "": "Неизвестно" };
   (INV.tool_material_types || []).forEach(function (x) { toolMaterialLabels[x.value] = x.label; });
@@ -2226,8 +2297,31 @@ var INV = (function () {
 
   function formatCell(field, value) {
     var v = (value || "").trim();
-    if (!v) return "-";
+    if (!v && field !== "high_precision_aa") return "-";
     if (field === "mill_type") return millTypeLabels[v] || v;
+    if (field === "body_family") return bodyFamilyLabels[v] || v;
+    if (field === "body_cutter") return bodyCutterLabels[v] || v;
+    if (field === "bt_coupling") return bodyCouplingLabels[v] || v || "—";
+    if (field === "bt_insert_family") return (insertFamilyLabels[v] || v || "-").toString().toUpperCase();
+    if (field === "thread_standard") return threadStandardLabels[v] || v;
+    if (field === "hole_type") return tapHoleTypeLabels[v] || v;
+    if (field === "tap_type") return tapToolTypeLabels[v] || v;
+    if (field === "cd_angle_deg") return centerDrillAngleLabels[v] || v;
+    if (field === "cs_type") return countersinkTypeLabels[v] || v;
+    if (field === "cs_angle_deg") return countersinkAngleLabels[v] || v;
+    if (field === "ins_shape") return insertShapeLabels[v] || v;
+    if (field === "ins_edge_code") return insertEdgeLabels[v] || v;
+    if (field === "ins_thickness_code") return insertThicknessLabels[v] || v;
+    if (field === "ins_nose_code") return insertNoseLabels[v] || v;
+    if (field === "ins_family") return (insertFamilyLabels[v] || v || "-").toString().toUpperCase();
+    if (field === "collet_type") return colletTypeLabels[v] || v;
+    if (field === "er_size") return erSizeLabels[v] || v || "-";
+    if (field === "clamp_range") return erClampLabels[v] || v || "-";
+    if (field === "inner_diameter") return erGInnerLabels[v] || v || "-";
+    if (field === "threading_use") return colletThreadingUseLabels[v] || v || "-";
+    if (field === "threading_series") return colletThreadingSeriesLabels[v] || v || "-";
+    if (field === "collet_thread_standard") return colletThreadStdLabels[v] || v || "-";
+    if (field === "high_precision_aa") return aaLabels[v] || (v === "1" ? "AA" : "-");
     if (field === "tool_material") return toolMaterialLabels[v] || escapeHtml(v);
     if (field === "coating_type") {
       var ct = coatingFullTitles[v] || coatingLabels[v] || v;
@@ -2244,33 +2338,90 @@ var INV = (function () {
     if (field === "work_material") {
       var codes = parseCsvCodes(v);
       if (!codes.length) return "-";
-      return codes
-        .map(function (code) {
-          var cls = "wm-" + code.toLowerCase();
-          var wmLbl = workMaterialLabels[code] || "";
-          return (
-            '<span class="wm-badge ' +
-            cls +
-            '" title="' +
-            escapeHtml(wmLbl) +
-            '">' +
-            escapeHtml(code) +
-            "</span>"
-          );
-        })
-        .join(" ");
+      return (
+        '<div class="inv-stock-wm-squares">' +
+        codes
+          .map(function (code) {
+            var cls = "wm-" + code.toLowerCase();
+            var wmLbl = workMaterialLabels[code] || "";
+            return (
+              '<span class="wm-square ' +
+              cls +
+              '" title="' +
+              escapeHtml(wmLbl) +
+              '">' +
+              escapeHtml(code) +
+              "</span>"
+            );
+          })
+          .join("") +
+        "</div>"
+      );
     }
     if (field === "em_diameter_mm") return "Ø" + v.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
+    if (field === "bt_diameter_mm") return "Ø" + v.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
     if (field === "quantity") return "<strong>" + escapeHtml(v) + "</strong>";
     return escapeHtml(v.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1"));
   }
 
   function buildSelect(field, current) {
     var options = [];
-    if (field === "mill_type") {
-      options = Object.keys(millTypeLabels).map(function (k) {
-        return { value: k, label: millTypeLabels[k], title: millTypeLabels[k] };
+    function fromMap(map) {
+      return Object.keys(map).map(function (k) {
+        return { value: k, label: map[k], title: map[k] };
       });
+    }
+    if (field === "mill_type") {
+      options = fromMap(millTypeLabels);
+    } else if (field === "body_family") {
+      options = fromMap(bodyFamilyLabels);
+    } else if (field === "body_cutter") {
+      options = fromMap(bodyCutterLabels);
+    } else if (field === "bt_coupling") {
+      options = fromMap(bodyCouplingLabels);
+    } else if (field === "bt_insert_family") {
+      options = fromMap(insertFamilyLabels);
+    } else if (field === "thread_standard") {
+      options = fromMap(threadStandardLabels);
+    } else if (field === "hole_type") {
+      options = fromMap(tapHoleTypeLabels);
+    } else if (field === "tap_type") {
+      options = fromMap(tapToolTypeLabels);
+    } else if (field === "cd_angle_deg") {
+      options = fromMap(centerDrillAngleLabels);
+    } else if (field === "cs_type") {
+      options = fromMap(countersinkTypeLabels);
+    } else if (field === "cs_angle_deg") {
+      options = fromMap(countersinkAngleLabels);
+    } else if (field === "ins_shape") {
+      options = fromMap(insertShapeLabels);
+    } else if (field === "ins_edge_code") {
+      options = fromMap(insertEdgeLabels);
+    } else if (field === "ins_thickness_code") {
+      options = fromMap(insertThicknessLabels);
+    } else if (field === "ins_nose_code") {
+      options = fromMap(insertNoseLabels);
+    } else if (field === "ins_family") {
+      options = fromMap(insertFamilyLabels);
+    } else if (field === "collet_type") {
+      options = fromMap(colletTypeLabels);
+    } else if (field === "er_size") {
+      options = fromMap(erSizeLabels);
+    } else if (field === "clamp_range") {
+      options = fromMap(erClampLabels);
+    } else if (field === "inner_diameter") {
+      options = fromMap(erGInnerLabels);
+    } else if (field === "threading_use") {
+      options = fromMap(colletThreadingUseLabels);
+    } else if (field === "threading_series") {
+      options = fromMap(colletThreadingSeriesLabels);
+    } else if (field === "collet_thread_standard") {
+      options = fromMap(colletThreadStdLabels);
+    } else if (field === "high_precision_aa") {
+      options = [
+        { value: "0", label: "-", title: "" },
+        { value: "1", label: "AA", title: "AA" }
+      ];
     } else if (field === "tool_material") {
       options = [{ value: "", label: "Неизвестно", title: "" }].concat(
         Object.keys(toolMaterialLabels).filter(function (k) { return k; }).map(function (k) {
@@ -2474,9 +2625,9 @@ var INV = (function () {
     }
     var editor = (type === "select") ? buildSelect(field, current) : document.createElement("input");
     if (type !== "select") {
-      editor.type = "number";
+      editor.type = type === "text" ? "text" : "number";
       editor.className = "stock-inline-editor";
-      editor.step = type === "int" ? "1" : "0.01";
+      if (type !== "text") editor.step = type === "int" ? "1" : "0.01";
       editor.value = current;
       editor.title = "Enter - сохранить, Esc - отменить";
     }

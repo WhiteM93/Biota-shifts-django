@@ -26,6 +26,15 @@ from .auth_utils import (
     inventory_route_nav_access_required,
     write_permission_required,
 )
+from .body_tool_constants import (
+    BODY_TOOL_COUPLINGS,
+    BODY_TOOL_FAMILIES,
+    INDEXABLE_MILL_CUTTER_TYPES,
+    build_body_tool_display_name,
+    normalize_body_tool_coupling,
+    normalize_body_tool_family,
+    normalize_indexable_mill_cutter,
+)
 from .collet_constants import (
     COLLET_THREAD_STANDARDS,
     COLLET_THREADING_SERIES,
@@ -71,6 +80,7 @@ from .models import (
     CountersinkSpec,
     DrillSpec,
     END_MILL_TYPES,
+    BodyToolSpec,
     CenterDrillSpec,
     EndMillSpec,
     ColletSpec,
@@ -100,7 +110,9 @@ from .models import (
 TOOL_MATERIAL_FILTER_OTHER = "__other__"
 PURCHASE_STORE_FILTER_OTHER = "__purchase_store_other__"
 _TOOL_MATERIAL_STD_KEYS = frozenset(k for k, _ in TOOL_MATERIAL_TYPES)
-_INVENTORY_CATEGORIES = frozenset({"end_mill", "tap", "center_drill", "countersink", "drill", "insert", "collet"})
+_INVENTORY_CATEGORIES = frozenset(
+    {"end_mill", "body_tool", "tap", "center_drill", "countersink", "drill", "insert", "collet"}
+)
 _HISTORY_MOVEMENT_TYPES = frozenset({"issue", "restock", "writeoff"})
 
 
@@ -167,6 +179,12 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
                 errs.append(f"Строка {idx}: укажите серию (TC820, GT12…).")
             if not normalize_collet_thread_standard(row.get("collet_thread_standard")):
                 errs.append(f"Строка {idx}: укажите стандарт резьбы (DIN371, ISO…).")
+        return errs
+    if category == "body_tool":
+        if not (row.get("body_cutter") or "").strip():
+            errs.append(f"Строка {idx}: укажите тип корпусной фрезы.")
+        if _to_decimal_or_none(row.get("bt_diameter_mm")) is None:
+            errs.append(f"Строка {idx}: укажите диаметр D (мм) для корпусного инструмента.")
         return errs
     if category == "insert":
         shape = (row.get("ins_shape") or "").strip()
@@ -638,6 +656,14 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "tool_material_custom",
         "coating_type",
         "work_material",
+        "body_family",
+        "body_cutter",
+        "bt_diameter_mm",
+        "bt_overall_length_mm",
+        "bt_cutting_length_mm",
+        "bt_teeth_count",
+        "bt_coupling",
+        "bt_insert_family",
     }
 )
 
@@ -738,6 +764,18 @@ _STOCK_KEYS_BY_CATEGORY = {
             "collet_threading_series",
         }
     ),
+    "body_tool": frozenset(
+        {
+            "body_family",
+            "body_cutter",
+            "bt_diameter_mm",
+            "bt_overall_length_mm",
+            "bt_cutting_length_mm",
+            "bt_teeth_count",
+            "bt_coupling",
+            "bt_insert_family",
+        }
+    ),
 }
 _STOCK_DECIMAL_PARAM_KEYS = frozenset(
     {
@@ -756,9 +794,12 @@ _STOCK_DECIMAL_PARAM_KEYS = frozenset(
         "drill_overall_length_mm",
         "drill_cutting_length_mm",
         "drill_angle_deg",
+        "bt_diameter_mm",
+        "bt_overall_length_mm",
+        "bt_cutting_length_mm",
     }
 )
-_STOCK_INT_PARAM_KEYS = frozenset({"mill_flutes_count", "countersink_flutes_count"})
+_STOCK_INT_PARAM_KEYS = frozenset({"mill_flutes_count", "countersink_flutes_count", "bt_teeth_count"})
 
 
 def _prune_stock_prefs_params(category: str, params: dict[str, str]) -> dict[str, str]:
@@ -1333,6 +1374,7 @@ def inventory_view(request):
         tool = (
             ToolItem.objects.select_related(
                 "end_mill_spec",
+                "body_tool_spec",
                 "tap_spec",
                 "center_drill_spec",
                 "countersink_spec",
@@ -1360,6 +1402,26 @@ def inventory_view(request):
             tool.end_mill_spec.cutting_length_mm = _to_decimal_or_none(request.POST.get("em_cutting_length_mm"))
             tool.end_mill_spec.flutes_count = _to_int_or_none(request.POST.get("em_flutes_count"))
             tool.end_mill_spec.save()
+        elif tool.category == "body_tool" and tool.body_tool_spec:
+            bt = tool.body_tool_spec
+            bt.family = normalize_body_tool_family(request.POST.get("body_family"))
+            bt.cutter_type = normalize_indexable_mill_cutter(request.POST.get("body_cutter"))
+            bt.diameter_mm = _to_decimal_or_none(request.POST.get("bt_diameter_mm"))
+            bt.overall_length_mm = _to_decimal_or_none(request.POST.get("bt_overall_length_mm"))
+            bt.cutting_length_mm = _to_decimal_or_none(request.POST.get("bt_cutting_length_mm"))
+            bt.teeth_count = _to_int_or_none(request.POST.get("bt_teeth_count"))
+            bt.coupling = normalize_body_tool_coupling(request.POST.get("bt_coupling"))
+            bt.insert_family = normalize_milling_family(request.POST.get("bt_insert_family"))
+            bt.size_label = ""
+            bt.insert_compat = ""
+            bt.save()
+            tool.name = build_body_tool_display_name(
+                family=bt.family,
+                cutter_type=bt.cutter_type,
+                diameter_mm=bt.diameter_mm,
+                teeth_count=bt.teeth_count,
+                insert_family=bt.insert_family,
+            )
         elif tool.category == "tap" and tool.tap_spec:
             tool.tap_spec.thread_standard = (request.POST.get("thread_standard") or "metric").strip()
             tool.tap_spec.size_label = (request.POST.get("size_label") or "").strip()
@@ -1420,55 +1482,248 @@ def inventory_view(request):
         tool_id = _to_int(request.POST.get("tool_id"), 0)
         field = (request.POST.get("field") or "").strip()
         value_raw = (request.POST.get("value") or "").strip()
-        tool = ToolItem.objects.select_related("end_mill_spec").filter(id=tool_id, is_deleted=False).first()
+        tool = (
+            ToolItem.objects.select_related(
+                "end_mill_spec",
+                "body_tool_spec",
+                "tap_spec",
+                "center_drill_spec",
+                "countersink_spec",
+                "drill_spec",
+                "insert_spec",
+                "collet_spec",
+            )
+            .filter(id=tool_id, is_deleted=False)
+            .first()
+        )
         if not tool:
             return JsonResponse({"ok": False, "error": "Позиция не найдена."}, status=404)
-        if tool.category != "end_mill" or not tool.end_mill_spec:
-            return JsonResponse({"ok": False, "error": "Inline-редактирование пока доступно для фрез."}, status=400)
 
-        if field == "mill_type":
-            tool.end_mill_spec.mill_type = value_raw or "end"
-            tool.end_mill_spec.save(update_fields=["mill_type"])
-        elif field == "em_diameter_mm":
-            tool.end_mill_spec.diameter_mm = _to_decimal_or_none(value_raw)
-            tool.end_mill_spec.save(update_fields=["diameter_mm"])
-        elif field == "em_corner_radius_mm":
-            tool.end_mill_spec.corner_radius_mm = _to_decimal_or_none(value_raw)
-            tool.end_mill_spec.save(update_fields=["corner_radius_mm"])
-        elif field == "em_overall_length_mm":
-            tool.end_mill_spec.overall_length_mm = _to_decimal_or_none(value_raw)
-            tool.end_mill_spec.save(update_fields=["overall_length_mm"])
-        elif field == "em_cutting_length_mm":
-            tool.end_mill_spec.cutting_length_mm = _to_decimal_or_none(value_raw)
-            tool.end_mill_spec.save(update_fields=["cutting_length_mm"])
-        elif field == "em_flutes_count":
-            tool.end_mill_spec.flutes_count = _to_int_or_none(value_raw)
-            tool.end_mill_spec.save(update_fields=["flutes_count"])
-        elif field == "main_diameter_mm":
+        common_ok = False
+        if field == "main_diameter_mm":
             tool.main_diameter_mm = _to_decimal_or_none(value_raw)
             tool.save(update_fields=["main_diameter_mm", "updated_at"])
+            common_ok = True
         elif field == "tool_material":
             tool.tool_material = (value_raw or "")[:80]
             _register_tool_material_extra(tool.tool_material)
             tool.save(update_fields=["tool_material", "updated_at"])
+            common_ok = True
         elif field == "coating_type":
             tool.coating_type = value_raw or "none"
             tool.save(update_fields=["coating_type", "updated_at"])
+            common_ok = True
         elif field == "work_material":
             tool.work_material = normalize_work_material_codes(value_raw)
             tool.save(update_fields=["work_material", "updated_at"])
+            common_ok = True
         elif field == "quantity":
             tool.quantity = max(0, _to_int(value_raw, tool.quantity))
             tool.save(update_fields=["quantity", "updated_at"])
-        else:
-            return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+            common_ok = True
+
+        if not common_ok:
+            cat = tool.category
+            if cat == "end_mill" and tool.end_mill_spec:
+                em = tool.end_mill_spec
+                if field == "mill_type":
+                    em.mill_type = value_raw or "end"
+                    em.save(update_fields=["mill_type"])
+                elif field == "em_diameter_mm":
+                    em.diameter_mm = _to_decimal_or_none(value_raw)
+                    em.save(update_fields=["diameter_mm"])
+                elif field == "em_corner_radius_mm":
+                    em.corner_radius_mm = _to_decimal_or_none(value_raw)
+                    em.save(update_fields=["corner_radius_mm"])
+                elif field == "em_overall_length_mm":
+                    em.overall_length_mm = _to_decimal_or_none(value_raw)
+                    em.save(update_fields=["overall_length_mm"])
+                elif field == "em_cutting_length_mm":
+                    em.cutting_length_mm = _to_decimal_or_none(value_raw)
+                    em.save(update_fields=["cutting_length_mm"])
+                elif field == "em_flutes_count":
+                    em.flutes_count = _to_int_or_none(value_raw)
+                    em.save(update_fields=["flutes_count"])
+                else:
+                    return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+            elif cat == "body_tool" and tool.body_tool_spec:
+                bt = tool.body_tool_spec
+                if field == "body_family":
+                    bt.family = normalize_body_tool_family(value_raw)
+                    bt.save(update_fields=["family"])
+                elif field == "body_cutter":
+                    bt.cutter_type = normalize_indexable_mill_cutter(value_raw)
+                    bt.save(update_fields=["cutter_type"])
+                elif field == "bt_diameter_mm":
+                    bt.diameter_mm = _to_decimal_or_none(value_raw)
+                    bt.save(update_fields=["diameter_mm"])
+                elif field == "bt_overall_length_mm":
+                    bt.overall_length_mm = _to_decimal_or_none(value_raw)
+                    bt.save(update_fields=["overall_length_mm"])
+                elif field == "bt_cutting_length_mm":
+                    bt.cutting_length_mm = _to_decimal_or_none(value_raw)
+                    bt.save(update_fields=["cutting_length_mm"])
+                elif field == "bt_teeth_count":
+                    bt.teeth_count = _to_int_or_none(value_raw)
+                    bt.save(update_fields=["teeth_count"])
+                elif field == "bt_coupling":
+                    bt.coupling = normalize_body_tool_coupling(value_raw)
+                    bt.save(update_fields=["coupling"])
+                elif field == "bt_insert_family":
+                    bt.insert_family = normalize_milling_family(value_raw)
+                    bt.save(update_fields=["insert_family"])
+                else:
+                    return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+                tool.name = build_body_tool_display_name(
+                    family=bt.family,
+                    cutter_type=bt.cutter_type,
+                    diameter_mm=bt.diameter_mm,
+                    teeth_count=bt.teeth_count,
+                    insert_family=bt.insert_family,
+                )
+                tool.save(update_fields=["name", "updated_at"])
+            elif cat == "tap" and tool.tap_spec:
+                tp = tool.tap_spec
+                if field == "size_label":
+                    tp.size_label = (value_raw or "")[:40]
+                    tp.save(update_fields=["size_label"])
+                elif field == "thread_standard":
+                    tp.thread_standard = value_raw or "metric"
+                    tp.save(update_fields=["thread_standard"])
+                elif field == "tap_pitch_mm":
+                    tp.pitch_mm = _to_decimal_or_none(value_raw)
+                    tp.save(update_fields=["pitch_mm"])
+                elif field == "tap_tpi":
+                    tp.tpi = _to_int_or_none(value_raw)
+                    tp.save(update_fields=["tpi"])
+                elif field == "hole_type":
+                    tp.hole_type = value_raw or "any"
+                    tp.save(update_fields=["hole_type"])
+                elif field == "tap_type":
+                    tp.tap_type = value_raw or "cutting"
+                    tp.save(update_fields=["tap_type"])
+                elif field == "tap_overall_length_mm":
+                    tp.overall_length_mm = _to_decimal_or_none(value_raw)
+                    tp.save(update_fields=["overall_length_mm"])
+                elif field == "tap_cutting_length_mm":
+                    tp.cutting_length_mm = _to_decimal_or_none(value_raw)
+                    tp.save(update_fields=["cutting_length_mm"])
+                else:
+                    return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+            elif cat == "center_drill" and tool.center_drill_spec:
+                cd = tool.center_drill_spec
+                if field == "cd_diameter_mm":
+                    cd.diameter_mm = _to_decimal_or_none(value_raw)
+                    cd.save(update_fields=["diameter_mm"])
+                elif field == "cd_overall_length_mm":
+                    cd.overall_length_mm = _to_decimal_or_none(value_raw)
+                    cd.save(update_fields=["overall_length_mm"])
+                elif field == "cd_angle_deg":
+                    cd.angle_deg = value_raw or "60"
+                    cd.save(update_fields=["angle_deg"])
+                else:
+                    return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+            elif cat == "countersink" and tool.countersink_spec:
+                cs = tool.countersink_spec
+                if field == "cs_type":
+                    cs.countersink_type = value_raw or "machine"
+                    cs.save(update_fields=["countersink_type"])
+                elif field == "cs_diameter_mm":
+                    cs.diameter_mm = _to_decimal_or_none(value_raw)
+                    cs.save(update_fields=["diameter_mm"])
+                elif field == "cs_angle_deg":
+                    cs.angle_deg = value_raw or "90"
+                    cs.save(update_fields=["angle_deg"])
+                elif field == "cs_overall_length_mm":
+                    cs.overall_length_mm = _to_decimal_or_none(value_raw)
+                    cs.save(update_fields=["overall_length_mm"])
+                elif field == "cs_flutes_count":
+                    cs.flutes_count = _to_int_or_none(value_raw)
+                    cs.save(update_fields=["flutes_count"])
+                elif field == "cs_size_label":
+                    cs.size_label = (value_raw or "")[:40]
+                    cs.save(update_fields=["size_label"])
+                else:
+                    return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+            elif cat == "drill" and tool.drill_spec:
+                dr = tool.drill_spec
+                if field == "dr_diameter_mm":
+                    dr.diameter_mm = _to_decimal_or_none(value_raw)
+                    dr.save(update_fields=["diameter_mm"])
+                elif field == "dr_overall_length_mm":
+                    dr.overall_length_mm = _to_decimal_or_none(value_raw)
+                    dr.save(update_fields=["overall_length_mm"])
+                elif field == "dr_cutting_length_mm":
+                    dr.cutting_length_mm = _to_decimal_or_none(value_raw)
+                    dr.save(update_fields=["cutting_length_mm"])
+                elif field == "dr_angle_deg":
+                    dr.angle_deg = _to_decimal_or_none(value_raw)
+                    dr.save(update_fields=["angle_deg"])
+                else:
+                    return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+            elif cat == "insert" and tool.insert_spec:
+                ins = tool.insert_spec
+                if field == "ins_family":
+                    ins.milling_family = normalize_milling_family(value_raw) or ins.milling_family
+                    ins.save(update_fields=["milling_family"])
+                    tool.name = build_insert_display_name(ins.iso_designation, ins.milling_family, ins.chipbreaker_grade)
+                    tool.save(update_fields=["name", "updated_at"])
+                elif field == "ins_shape":
+                    ins.insert_shape = (value_raw or ins.insert_shape or "C")[:1]
+                    ins.save(update_fields=["insert_shape"])
+                elif field == "ins_edge_code":
+                    ins.cutting_edge_length_code = (value_raw or "")[:2]
+                    ins.save(update_fields=["cutting_edge_length_code"])
+                elif field == "ins_thickness_code":
+                    ins.thickness_code = (value_raw or "")[:2]
+                    ins.save(update_fields=["thickness_code"])
+                elif field == "ins_nose_code":
+                    ins.nose_radius_code = (value_raw or "")[:2]
+                    ins.save(update_fields=["nose_radius_code"])
+                elif field == "ins_grade":
+                    ins.chipbreaker_grade = (value_raw or "")[:40]
+                    ins.save(update_fields=["chipbreaker_grade"])
+                    tool.name = build_insert_display_name(ins.iso_designation, ins.milling_family, ins.chipbreaker_grade)
+                    tool.save(update_fields=["name", "updated_at"])
+                else:
+                    return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+            elif cat == "collet" and tool.collet_spec:
+                cl = tool.collet_spec
+                if field == "collet_type":
+                    cl.collet_type = value_raw or cl.collet_type
+                    cl.save(update_fields=["collet_type"])
+                elif field == "er_size":
+                    cl.er_size = value_raw or ""
+                    cl.save(update_fields=["er_size"])
+                elif field == "clamp_range":
+                    cl.clamp_range = value_raw or ""
+                    cl.save(update_fields=["clamp_range"])
+                elif field == "inner_diameter":
+                    cl.inner_diameter = value_raw or ""
+                    cl.save(update_fields=["inner_diameter"])
+                elif field == "threading_use":
+                    cl.threading_use = value_raw or ""
+                    cl.save(update_fields=["threading_use"])
+                elif field == "threading_series":
+                    cl.threading_series = value_raw or ""
+                    cl.save(update_fields=["threading_series"])
+                elif field == "collet_thread_standard":
+                    cl.thread_standard = value_raw or ""
+                    cl.save(update_fields=["thread_standard"])
+                elif field == "high_precision_aa":
+                    cl.high_precision_aa = value_raw in {"1", "true", "True", "AA", "aa", "yes"}
+                    cl.save(update_fields=["high_precision_aa"])
+                else:
+                    return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+            else:
+                return JsonResponse({"ok": False, "error": "Поле не поддерживается для этой категории."}, status=400)
 
         _log_inventory_stock_event(
             actor=username,
             event_type=InventoryStockEvent.EVENT_TOOL_EDIT,
             tool=tool,
             summary=f"Быстрое редактирование ячейки «{field}»: {tool.name} (id {tool.id})",
-            details={"tool_id": tool.id, "field": field, "value": value_raw[:200]},
+            details={"tool_id": tool.id, "field": field, "value": value_raw[:200], "category": tool.category},
         )
         return JsonResponse({"ok": True})
 
@@ -1864,6 +2119,61 @@ def inventory_view(request):
                             overall_length_mm=overall_length_mm,
                             cutting_length_mm=cutting_length_mm,
                             flutes_count=flutes_count,
+                        )
+                elif category == "body_tool":
+                    family = normalize_body_tool_family(row.get("body_family"))
+                    cutter_type = normalize_indexable_mill_cutter(row.get("body_cutter"))
+                    diameter_mm = _to_decimal_or_none(row.get("bt_diameter_mm"))
+                    overall_length_mm = _to_decimal_or_none(row.get("bt_overall_length_mm"))
+                    cutting_length_mm = _to_decimal_or_none(row.get("bt_cutting_length_mm"))
+                    teeth_count = _to_int_or_none(row.get("bt_teeth_count"))
+                    coupling = normalize_body_tool_coupling(row.get("bt_coupling"))
+                    insert_family = normalize_milling_family(row.get("bt_insert_family"))
+                    tool = (
+                        ToolItem.objects.select_for_update()
+                        .filter(
+                            category="body_tool",
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
+                            body_tool_spec__family=family,
+                            body_tool_spec__cutter_type=cutter_type,
+                            body_tool_spec__diameter_mm=diameter_mm,
+                            body_tool_spec__teeth_count=teeth_count,
+                            body_tool_spec__insert_family=insert_family,
+                        )
+                        .first()
+                    )
+                    if tool:
+                        tool.quantity += quantity
+                        tool.save(update_fields=["quantity", "updated_at"])
+                    else:
+                        tool = ToolItem.objects.create(
+                            category="body_tool",
+                            name=build_body_tool_display_name(
+                                family=family,
+                                cutter_type=cutter_type,
+                                diameter_mm=diameter_mm,
+                                teeth_count=teeth_count,
+                                insert_family=insert_family,
+                            ),
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
+                            quantity=quantity,
+                        )
+                        BodyToolSpec.objects.create(
+                            tool=tool,
+                            family=family,
+                            cutter_type=cutter_type,
+                            diameter_mm=diameter_mm,
+                            overall_length_mm=overall_length_mm,
+                            cutting_length_mm=cutting_length_mm,
+                            teeth_count=teeth_count,
+                            coupling=coupling,
+                            insert_family=insert_family,
                         )
                 elif category == "tap":
                     thread_standard = (row.get("thread_standard") or "metric").strip()
@@ -2353,6 +2663,14 @@ def inventory_view(request):
     collet_thread_standard_raw = _sq("collet_thread_standard")
     collet_threading_use_raw = _sq("collet_threading_use")
     collet_threading_series_raw = _sq("collet_threading_series")
+    body_family_raw = _sq("body_family")
+    body_cutter_raw = _sq("body_cutter")
+    bt_diameter_raw = _sq("bt_diameter_mm")
+    bt_overall_length_raw = _sq("bt_overall_length_mm")
+    bt_cutting_length_raw = _sq("bt_cutting_length_mm")
+    bt_teeth_count_raw = _sq("bt_teeth_count")
+    bt_coupling_raw = _sq("bt_coupling")
+    bt_insert_family_raw = _sq("bt_insert_family")
     arrival_supplier = _sq("arrival_supplier")
 
     tm_param = _sq("tool_material")
@@ -2388,6 +2706,31 @@ def inventory_view(request):
                 qs = qs.filter(end_mill_spec__corner_radius_mm=mill_corner_radius)
         if mill_type_raw:
             qs = qs.filter(end_mill_spec__mill_type=mill_type_raw)
+    elif filter_category == "body_tool":
+        if body_family_raw:
+            qs = qs.filter(body_tool_spec__family=body_family_raw)
+        if body_cutter_raw:
+            qs = qs.filter(body_tool_spec__cutter_type=body_cutter_raw)
+        if bt_diameter_raw:
+            bt_diameter = _to_decimal(bt_diameter_raw, Decimal("0"))
+            if bt_diameter > 0:
+                qs = qs.filter(body_tool_spec__diameter_mm=bt_diameter)
+        if bt_overall_length_raw:
+            bt_overall_length = _to_decimal(bt_overall_length_raw, Decimal("0"))
+            if bt_overall_length > 0:
+                qs = qs.filter(body_tool_spec__overall_length_mm=bt_overall_length)
+        if bt_cutting_length_raw:
+            bt_cutting_length = _to_decimal(bt_cutting_length_raw, Decimal("0"))
+            if bt_cutting_length > 0:
+                qs = qs.filter(body_tool_spec__cutting_length_mm=bt_cutting_length)
+        if bt_teeth_count_raw:
+            bt_teeth_count = _to_int(bt_teeth_count_raw, 0)
+            if bt_teeth_count > 0:
+                qs = qs.filter(body_tool_spec__teeth_count=bt_teeth_count)
+        if bt_coupling_raw:
+            qs = qs.filter(body_tool_spec__coupling=bt_coupling_raw)
+        if bt_insert_family_raw:
+            qs = qs.filter(body_tool_spec__insert_family__iexact=bt_insert_family_raw)
     elif filter_category == "tap":
         if tap_size:
             qs = qs.filter(tap_spec__size_label__iexact=tap_size)
@@ -2545,6 +2888,31 @@ def inventory_view(request):
     )
     end_mill_types = _distinct_text_values(option_source_qs.filter(category="end_mill"), "end_mill_spec__mill_type")
 
+    body_tool_families_db = _distinct_text_values(
+        option_source_qs.filter(category="body_tool"), "body_tool_spec__family"
+    )
+    body_tool_cutters_db = _distinct_text_values(
+        option_source_qs.filter(category="body_tool"), "body_tool_spec__cutter_type"
+    )
+    body_tool_diameters = _sorted_unique_decimal_strings(
+        _distinct_numeric_values(option_source_qs.filter(category="body_tool"), "body_tool_spec__diameter_mm")
+    )
+    body_tool_overall_lengths = _sorted_unique_decimal_strings(
+        _distinct_numeric_values(option_source_qs.filter(category="body_tool"), "body_tool_spec__overall_length_mm")
+    )
+    body_tool_cutting_lengths = _sorted_unique_decimal_strings(
+        _distinct_numeric_values(option_source_qs.filter(category="body_tool"), "body_tool_spec__cutting_length_mm")
+    )
+    body_tool_teeth = _sorted_unique_int_strings(
+        _distinct_numeric_values(option_source_qs.filter(category="body_tool"), "body_tool_spec__teeth_count")
+    )
+    body_tool_couplings_db = _distinct_text_values(
+        option_source_qs.filter(category="body_tool"), "body_tool_spec__coupling"
+    )
+    body_tool_insert_families = _distinct_text_values(
+        option_source_qs.filter(category="body_tool"), "body_tool_spec__insert_family"
+    )
+
     tap_sizes = _distinct_text_values(option_source_qs.filter(category="tap"), "tap_spec__size_label")
     tap_pitches = _sorted_unique_decimal_strings(
         _distinct_numeric_values(option_source_qs.filter(category="tap"), "tap_spec__pitch_mm")
@@ -2633,6 +3001,7 @@ def inventory_view(request):
         .select_related(
             "tool",
             "tool__end_mill_spec",
+            "tool__body_tool_spec",
             "tool__tap_spec",
             "tool__center_drill_spec",
             "tool__countersink_spec",
@@ -2774,6 +3143,7 @@ def inventory_view(request):
         StockMovement.objects.select_related(
             "tool",
             "tool__end_mill_spec",
+            "tool__body_tool_spec",
             "tool__tap_spec",
             "tool__center_drill_spec",
             "tool__countersink_spec",
@@ -2824,6 +3194,7 @@ def inventory_view(request):
     ctx = {
         "tool_items": qs.select_related(
             "end_mill_spec",
+            "body_tool_spec",
             "tap_spec",
             "center_drill_spec",
             "countersink_spec",
@@ -2881,6 +3252,14 @@ def inventory_view(request):
             "collet_thread_standard": collet_thread_standard_raw,
             "collet_threading_use": collet_threading_use_raw,
             "collet_threading_series": collet_threading_series_raw,
+            "body_family": body_family_raw,
+            "body_cutter": body_cutter_raw,
+            "bt_diameter_mm": _norm_stock_decimal_str(bt_diameter_raw),
+            "bt_overall_length_mm": _norm_stock_decimal_str(bt_overall_length_raw),
+            "bt_cutting_length_mm": _norm_stock_decimal_str(bt_cutting_length_raw),
+            "bt_teeth_count": _norm_stock_int_filter_str(bt_teeth_count_raw),
+            "bt_coupling": bt_coupling_raw,
+            "bt_insert_family": bt_insert_family_raw,
             "tool_material": tool_material,
             "tool_material_custom": tm_custom_input,
             "tool_material_select": tool_material_select,
@@ -2904,6 +3283,19 @@ def inventory_view(request):
             "types": end_mill_types,
         },
         "end_mill_types": END_MILL_TYPES,
+        "body_tool_filter_options": {
+            "families": body_tool_families_db,
+            "cutters": body_tool_cutters_db,
+            "diameters": body_tool_diameters,
+            "overall_lengths": body_tool_overall_lengths,
+            "cutting_lengths": body_tool_cutting_lengths,
+            "teeth": body_tool_teeth,
+            "couplings": body_tool_couplings_db,
+            "insert_families": body_tool_insert_families,
+        },
+        "body_tool_families": BODY_TOOL_FAMILIES,
+        "indexable_mill_cutter_types": INDEXABLE_MILL_CUTTER_TYPES,
+        "body_tool_couplings": BODY_TOOL_COUPLINGS,
         "tap_filter_options": {
             "sizes": tap_sizes,
             "pitches": tap_pitches,
@@ -2981,6 +3373,7 @@ def inventory_view(request):
         "today": date.today().isoformat(),
         "movement_tool_options": ToolItem.objects.select_related(
             "end_mill_spec",
+            "body_tool_spec",
             "tap_spec",
             "center_drill_spec",
             "countersink_spec",

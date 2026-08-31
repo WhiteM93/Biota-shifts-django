@@ -11,6 +11,7 @@ from django.db import connection, transaction
 from django.utils import timezone
 
 from shifts.models import (
+    BodyToolSpec,
     CenterDrillSpec,
     CountersinkSpec,
     DrillSpec,
@@ -58,6 +59,7 @@ def export_inventory_payload() -> dict[str, Any]:
         "exported_at": timezone.now().isoformat(),
         "tool_items": [_model_to_row(o) for o in ToolItem.objects.order_by("id")],
         "end_mill_specs": [_model_to_row(o) for o in EndMillSpec.objects.order_by("id")],
+        "body_tool_specs": [_model_to_row(o) for o in BodyToolSpec.objects.order_by("id")],
         "tap_specs": [_model_to_row(o) for o in TapSpec.objects.order_by("id")],
         "center_drill_specs": [_model_to_row(o) for o in CenterDrillSpec.objects.order_by("id")],
         "countersink_specs": [_model_to_row(o) for o in CountersinkSpec.objects.order_by("id")],
@@ -153,6 +155,7 @@ def _clear_inventory_tables() -> None:
     InventoryStockEvent.objects.all().delete()
     StockMovement.objects.all().delete()
     EndMillSpec.objects.all().delete()
+    BodyToolSpec.objects.all().delete()
     TapSpec.objects.all().delete()
     CenterDrillSpec.objects.all().delete()
     CountersinkSpec.objects.all().delete()
@@ -175,6 +178,7 @@ def _reset_sequences() -> None:
     seq_models = (
         ToolItem,
         EndMillSpec,
+        BodyToolSpec,
         TapSpec,
         CenterDrillSpec,
         CountersinkSpec,
@@ -203,6 +207,7 @@ def restore_inventory_from_payload(payload: dict[str, Any]) -> dict[str, int]:
 
     _bulk_create(ToolItem, data["tool_items"])
     _bulk_create(EndMillSpec, data["end_mill_specs"])
+    _bulk_create(BodyToolSpec, data.get("body_tool_specs") or [])
     _bulk_create(TapSpec, data["tap_specs"])
     _bulk_create(CenterDrillSpec, data["center_drill_specs"])
     _bulk_create(CountersinkSpec, data["countersink_specs"])

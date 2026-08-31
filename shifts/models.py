@@ -152,6 +152,11 @@ from .collet_constants import (
     COLLET_TYPES,
     COLLET_TYPE_TOOLTIPS,
 )
+from .body_tool_constants import (
+    BODY_TOOL_COUPLINGS,
+    BODY_TOOL_FAMILIES,
+    INDEXABLE_MILL_CUTTER_TYPES,
+)
 from .insert_constants import (
     INSERT_MACHINING_APPLICATIONS,
     normalize_insert_machining_apps,
@@ -187,6 +192,7 @@ class ToolItem(models.Model):
             ("drill", "Сверла"),
             ("insert", "Пластинки"),
             ("collet", "Цанги"),
+            ("body_tool", "Корпусной инструмент"),
         ],
         verbose_name="Категория",
     )
@@ -383,6 +389,22 @@ class ToolItem(models.Model):
                 (str(cl) if cl else "—"),
                 f"ост {self.quantity}",
             ]
+        elif cat == "body_tool":
+            bt = getattr(self, "body_tool_spec", None)
+            segs = [
+                self.get_category_display(),
+                (bt.get_family_display() if bt else "—"),
+                (bt.get_cutter_type_display() if bt else "—"),
+                f"Ø{fmt_mm(bt.diameter_mm)}" if bt and bt.diameter_mm is not None else "D —",
+                f"Z {bt.teeth_count if bt and bt.teeth_count is not None else '—'}",
+                f"L {fmt_mm(bt.overall_length_mm) if bt and bt.overall_length_mm is not None else '—'}",
+                ((bt.insert_family or "—") if bt else "—"),
+                f"Dосн {main_d()}",
+                coating_txt(),
+                work_mat_txt(),
+                f"ост {self.quantity}",
+                self.name,
+            ]
         else:
             segs = [self.get_category_display(), self.name, f"ост {self.quantity}"]
 
@@ -520,6 +542,25 @@ class ToolItem(models.Model):
             )
             if cl:
                 specs_parts.append(str(cl))
+        elif cat == "body_tool":
+            bt = getattr(self, "body_tool_spec", None)
+            if bt:
+                tool_type = (
+                    f"{self.get_category_display()} · {bt.get_cutter_type_display()}"
+                )
+                if bt.diameter_mm is not None:
+                    specs_parts.append(f"D={fmt_mm(bt.diameter_mm)} мм")
+                if bt.teeth_count is not None:
+                    specs_parts.append(f"Z={bt.teeth_count}")
+                if bt.overall_length_mm is not None:
+                    specs_parts.append(f"L={fmt_mm(bt.overall_length_mm)} мм")
+                if bt.cutting_length_mm is not None:
+                    specs_parts.append(f"Lc={fmt_mm(bt.cutting_length_mm)} мм")
+                if (bt.insert_family or "").strip():
+                    specs_parts.append(bt.insert_family.strip().upper())
+                specs_parts.append(f"Dосн={main_d()}")
+            else:
+                tool_type = self.get_category_display()
         else:
             tool_type = self.get_category_display()
             specs_parts = [self.name] if (self.name or "").strip() else []
@@ -581,6 +622,9 @@ class ToolItem(models.Model):
             "collet_type": "",
             "er_size": "",
             "clamp_range": "",
+            "body_family": "",
+            "body_cutter": "",
+            "teeth": "",
         }
         cat = self.category
         if cat == "end_mill":
@@ -639,6 +683,16 @@ class ToolItem(models.Model):
                 out["er_size"] = (cl.er_size or "").strip()
                 out["clamp_range"] = (cl.clamp_range or "").strip()
                 out["size_label"] = (cl.size_label or "").strip()
+        elif cat == "body_tool":
+            bt = getattr(self, "body_tool_spec", None)
+            if bt:
+                out["body_family"] = (bt.family or "").strip()
+                out["body_cutter"] = (bt.cutter_type or "").strip()
+                out["diameter"] = fmt_num(bt.diameter_mm)
+                out["length"] = fmt_num(bt.overall_length_mm)
+                out["cutting_length"] = fmt_num(bt.cutting_length_mm)
+                out["teeth"] = str(bt.teeth_count) if bt.teeth_count is not None else ""
+                out["ins_family"] = (bt.insert_family or "").strip()
         return out
 
 
@@ -952,6 +1006,91 @@ class ColletSpec(models.Model):
         self.threading_series = normalize_collet_threading_series(self.threading_series)
         self.thread_size_label = (self.thread_size_label or "").strip()[:32]
         self.size_label = (self.size_label or "").strip()[:64]
+        super().save(*args, **kwargs)
+
+
+class BodyToolSpec(models.Model):
+    """Корпусной (сборный) инструмент — фрезы со сменными пластинами и др."""
+
+    tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="body_tool_spec")
+    family = models.CharField(
+        max_length=24,
+        choices=BODY_TOOL_FAMILIES,
+        default="indexable_mill",
+        verbose_name="Семейство",
+    )
+    cutter_type = models.CharField(
+        max_length=20,
+        choices=INDEXABLE_MILL_CUTTER_TYPES,
+        default="face",
+        verbose_name="Тип фрезы",
+    )
+    diameter_mm = models.DecimalField(
+        max_digits=7, decimal_places=2, null=True, blank=True, verbose_name="Диаметр резания, мм"
+    )
+    overall_length_mm = models.DecimalField(
+        max_digits=7, decimal_places=2, null=True, blank=True, verbose_name="Общая длина, мм"
+    )
+    cutting_length_mm = models.DecimalField(
+        max_digits=7, decimal_places=2, null=True, blank=True, verbose_name="Глубина / ширина резания, мм"
+    )
+    teeth_count = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name="Число зубьев / пластин"
+    )
+    coupling = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        choices=BODY_TOOL_COUPLINGS,
+        verbose_name="Крепление",
+    )
+    approach_angle_deg = models.DecimalField(
+        max_digits=5, decimal_places=1, null=True, blank=True, verbose_name="Угол подхода, °"
+    )
+    insert_family = models.CharField(
+        max_length=24,
+        blank=True,
+        default="",
+        choices=MILLING_INSERT_FAMILIES,
+        verbose_name="Тип пластины",
+        help_text="Семейство СМП под корпус (APKT, SEKT…)",
+    )
+    size_label = models.CharField(
+        max_length=64, blank=True, default="", verbose_name="Артикул / обозначение"
+    )
+    insert_compat = models.CharField(
+        max_length=80, blank=True, default="", verbose_name="Совместимые пластины"
+    )
+
+    class Meta:
+        verbose_name = "Параметры корпусного инструмента"
+        verbose_name_plural = "Параметры корпусного инструмента"
+
+    def __str__(self):
+        from shifts.body_tool_constants import build_body_tool_display_name
+
+        return build_body_tool_display_name(
+            family=self.family,
+            cutter_type=self.cutter_type,
+            diameter_mm=self.diameter_mm,
+            teeth_count=self.teeth_count,
+            insert_family=self.insert_family,
+        )
+
+    def save(self, *args, **kwargs):
+        from shifts.body_tool_constants import (
+            normalize_body_tool_coupling,
+            normalize_body_tool_family,
+            normalize_indexable_mill_cutter,
+        )
+        from shifts.insert_constants import normalize_milling_family
+
+        self.family = normalize_body_tool_family(self.family)
+        self.cutter_type = normalize_indexable_mill_cutter(self.cutter_type)
+        self.coupling = normalize_body_tool_coupling(self.coupling)
+        self.insert_family = normalize_milling_family(self.insert_family)
+        self.size_label = (self.size_label or "").strip()[:64]
+        self.insert_compat = (self.insert_compat or "").strip()[:80]
         super().save(*args, **kwargs)
 
 
@@ -2785,6 +2924,13 @@ class VisualContainerAuditLine(models.Model):
 class VisualContainerItem(models.Model):
     """Содержимое контейнера: тип инструмента / описание."""
 
+    RULE_INCLUDE = "include"
+    RULE_EXCLUDE = "exclude"
+    RULE_KIND_CHOICES = (
+        (RULE_INCLUDE, "Учитывать"),
+        (RULE_EXCLUDE, "Исключить"),
+    )
+
     TOOL_CATEGORY_CHOICES = (
         ("", "—"),
         ("end_mill", "Фрезы"),
@@ -2794,6 +2940,7 @@ class VisualContainerItem(models.Model):
         ("drill", "Сверла"),
         ("insert", "Пластинки"),
         ("collet", "Цанги"),
+        ("body_tool", "Корпусной инструмент"),
     )
 
     container = models.ForeignKey(
@@ -2803,6 +2950,13 @@ class VisualContainerItem(models.Model):
         verbose_name="Контейнер",
     )
     title = models.CharField(max_length=200, verbose_name="Что лежит")
+    rule_kind = models.CharField(
+        max_length=16,
+        choices=RULE_KIND_CHOICES,
+        default=RULE_INCLUDE,
+        verbose_name="Режим правила",
+        help_text="Учитывать — что должно быть в ячейке; исключить — чего там быть не должно.",
+    )
     tool_category = models.CharField(
         max_length=20,
         blank=True,
@@ -2844,6 +2998,13 @@ class VisualContainerItem(models.Model):
         default="",
         choices=[("", "Все типы")] + list(COLLET_TYPES),
         verbose_name="Тип цанги",
+    )
+    body_cutter_type = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        choices=[("", "Все типы")] + list(INDEXABLE_MILL_CUTTER_TYPES),
+        verbose_name="Тип корпусной фрезы",
     )
     size_label = models.CharField(
         max_length=32,
