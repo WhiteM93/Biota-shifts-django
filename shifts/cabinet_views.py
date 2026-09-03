@@ -29,9 +29,13 @@ from biota_shifts.auth import (
     _distinct_area_tokens,
     _is_admin,
     _load_users_store,
+    _compose_display_name,
+    _person_name_parts,
     _resolve_registered_user,
     _set_user_privileges,
+    _update_registered_names,
     _update_registered_profile,
+    account_label_for_username,
     nav_permissions_for_user,
     user_role_for_username,
 )
@@ -136,6 +140,22 @@ def cabinet_view(request):
                 else:
                     messages.error(request, err)
                 return redirect("cabinet")
+            if action == "admin_user_names":
+                target = (request.POST.get("names_login") or "").strip()
+                first = (request.POST.get("first_name") or "").strip()
+                last = (request.POST.get("last_name") or "").strip()
+                ok, err = _update_registered_names(target, first, last)
+                if ok:
+                    label = account_label_for_username(target)
+                    messages.success(
+                        request,
+                        f"Имя сохранено: {label}" if label != target else f"Имя для «{target}» очищено.",
+                    )
+                else:
+                    messages.error(request, err)
+                return redirect(
+                    f"{reverse('cabinet')}?priv_user={quote(target)}#cabinet-privileges"
+                )
             if action == "admin_delete_user":
                 target = (request.POST.get("delete_login") or "").strip()
                 ok, err = _delete_registered_user(target)
@@ -146,13 +166,16 @@ def cabinet_view(request):
                 return redirect("cabinet")
         else:
             if action == "profile":
-                dn = request.POST.get("display_name") or ""
+                first = (request.POST.get("first_name") or "").strip()
+                last = (request.POST.get("last_name") or "").strip()
                 em = request.POST.get("email") or ""
                 key = _canonical_store_username(user)
                 if not key:
                     messages.error(request, "Профиль не найден.")
                 else:
-                    ok, err = _update_registered_profile(key, dn, em)
+                    ok, err = _update_registered_profile(
+                        key, email=em, first_name=first, last_name=last
+                    )
                     if ok:
                         messages.success(request, "Профиль сохранён.")
                     else:
@@ -190,6 +213,7 @@ def cabinet_view(request):
                     "email": (v.get("email") or "").strip(),
                     "email_verified": not (v.get("email") or "").strip()
                     or bool(v.get("email_verified", True)),
+                    "label": account_label_for_username(k),
                 }
                 for k, v in priv_store.items()
                 if not v.get("approved", True)
@@ -197,7 +221,22 @@ def cabinet_view(request):
             key=lambda x: str(x["login"]).lower(),
         )
         ctx["admin_display_name"] = (request.session.get("admin_display_name") or "").strip()
-        ctx["priv_users"] = sorted(priv_store.keys())
+        priv_user_rows = []
+        for login in sorted(priv_store.keys(), key=lambda s: str(s).casefold()):
+            rec = priv_store.get(login) or {}
+            first, last = _person_name_parts(rec)
+            label = _compose_display_name(first, last) or ""
+            priv_user_rows.append(
+                {
+                    "login": login,
+                    "first_name": first,
+                    "last_name": last,
+                    "label": label,
+                    "title": f"{label} ({login})" if label else login,
+                }
+            )
+        ctx["priv_user_rows"] = priv_user_rows
+        ctx["priv_users"] = [r["login"] for r in priv_user_rows]
         dep_opts = sorted(employees_full["department_name"].unique().tolist()) if not employees_full.empty else []
         dep_opts = apply_department_order(dep_opts, load_department_order())
         pos_opts = sorted(employees_full["position_name"].unique().tolist()) if not employees_full.empty else []
@@ -211,6 +250,10 @@ def cabinet_view(request):
             sel = ctx["priv_users"][0]
         ctx["priv_selected"] = sel if sel in priv_store else (ctx["priv_users"][0] if ctx["priv_users"] else "")
         pr = priv_store.get(ctx["priv_selected"], {}) if ctx["priv_selected"] else {}
+        priv_first, priv_last = _person_name_parts(pr)
+        ctx["priv_first_name"] = priv_first
+        ctx["priv_last_name"] = priv_last
+        ctx["priv_selected_label"] = _compose_display_name(priv_first, priv_last)
         _pn = nav_permissions_for_user(ctx["priv_selected"]) if ctx["priv_selected"] else {k: True for k in NAV_KEYS}
         ctx["priv_role"] = user_role_for_username(ctx["priv_selected"]) if ctx["priv_selected"] else USER_ROLE_MANAGER
         ctx["priv_role_choices"] = USER_ROLE_CHOICES
@@ -262,7 +305,10 @@ def cabinet_view(request):
         ctx["profile_access"] = _access_scope_description(rec)
         role = user_role_for_username(user)
         ctx["profile_role"] = "исполнитель" if role == USER_ROLE_EXECUTOR else "руководитель"
-        ctx["profile_display_name"] = (rec.get("display_name") or "").strip()
+        profile_first, profile_last = _person_name_parts(rec)
+        ctx["profile_first_name"] = profile_first
+        ctx["profile_last_name"] = profile_last
+        ctx["profile_display_name"] = account_label_for_username(user) if rec else ""
         ctx["profile_email"] = (rec.get("email") or "").strip()
         ctx["profile_email_verified"] = not (rec.get("email") or "").strip() or bool(
             rec.get("email_verified", True)

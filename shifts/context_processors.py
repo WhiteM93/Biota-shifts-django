@@ -1,6 +1,7 @@
 from biota_shifts.auth import (
     NAV_KEYS,
     _is_admin,
+    account_label_for_username,
     machines_quick_edit_for_user,
     nav_permissions_for_user,
     user_is_executor,
@@ -8,7 +9,7 @@ from biota_shifts.auth import (
 
 
 def biota_session(request):
-    """В шапке: для admin — «имя для отображения» из сессии, если задано (как в Streamlit)."""
+    """В шапке: имя/фамилия аккаунта, если заданы; для admin — имя из сессии."""
     try:
         from django.conf import settings
 
@@ -69,7 +70,13 @@ def biota_session(request):
     payload["perf_diagnostics"] = perf_diagnostics
     payload["perf_diag_ttfb_ms"] = perf_diag_ttfb_ms
     payload["perf_diag_load_ms"] = perf_diag_load_ms
-    display = adn if (is_admin and adn) else u
+    if is_admin and adn:
+        display = adn
+    else:
+        try:
+            display = account_label_for_username(u) or u
+        except Exception:
+            display = u
     return {
         "biota_username": display,
         **payload,

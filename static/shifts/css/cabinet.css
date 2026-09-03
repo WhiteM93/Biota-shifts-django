@@ -507,7 +507,9 @@ a.cabinet-quick-card:hover {
 }
 
 #cabinet-privileges .cab-priv__user {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
   padding: 5px 8px;
   border-radius: 5px;
   text-decoration: none;
@@ -517,6 +519,23 @@ a.cabinet-quick-card:hover {
   line-height: 1.3;
   border-left: 2px solid transparent;
   transition: background 0.12s ease, color 0.12s ease;
+}
+
+#cabinet-privileges .cab-priv__user-name {
+  font-weight: 650;
+}
+
+#cabinet-privileges .cab-priv__user-login {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.72;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+#cabinet-privileges .cab-priv__user-login--only {
+  opacity: 1;
+  font-family: inherit;
+  font-size: 12px;
 }
 
 #cabinet-privileges .cab-priv__user:hover {
@@ -534,6 +553,51 @@ a.cabinet-quick-card:hover {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+#cabinet-privileges .cab-priv__who {
+  min-width: 0;
+}
+
+#cabinet-privileges .cab-priv__who-login {
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+
+#cabinet-privileges .cab-priv__names {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--bio-filter-border, rgba(120, 130, 160, 0.28));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bio-surface-panel, transparent) 88%, transparent);
+}
+
+#cabinet-privileges .cab-priv__names-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+}
+
+#cabinet-privileges .cab-priv__names-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 9rem;
+  flex: 1 1 10rem;
+  margin: 0;
+  font-size: 11px;
+  color: var(--bio-muted);
+}
+
+#cabinet-privileges .cab-priv__names-field input {
+  font-size: 13px;
+  color: var(--bio-body-fg);
+}
+
+#cabinet-privileges .cab-priv__names-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
 }
 
 #cabinet-privileges .cab-priv__bar {

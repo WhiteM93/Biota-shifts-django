@@ -2493,8 +2493,14 @@ function saveSetupToolNoteEditor() {
       }
       var planSection = meta.querySelector(".product-drawing-plan-section");
       if (planSection) planSection.classList.toggle("is-plan-readonly", !enabled);
+      meta.querySelectorAll("[data-plan-cascade-form]").forEach(function (form) {
+        form.classList.toggle("is-plan-readonly", !enabled);
+      });
       meta.querySelectorAll("[data-plan-cascade-form] select, [data-plan-cascade-form] input").forEach(function (el) {
-        el.disabled = !enabled;
+        if (el.tagName === "INPUT") el.readOnly = !enabled;
+        el.disabled = false;
+        el.tabIndex = enabled ? 0 : -1;
+        el.setAttribute("aria-disabled", enabled ? "false" : "true");
       });
     }
 
@@ -2735,6 +2741,136 @@ function saveSetupToolNoteEditor() {
     forEachPlanCascadeForm(function (formContainer) {
       ensurePlanCascadeManager(formContainer);
     });
+    initPlanMaterialSuggest();
+
+    function initPlanMaterialSuggest() {
+      var meta = productDetailMetaEl();
+      if (!meta) return;
+      meta.querySelectorAll("[data-plan-material-combo]").forEach(function (combo) {
+        if (combo.getAttribute("data-bound") === "1") return;
+        combo.setAttribute("data-bound", "1");
+        var input = combo.querySelector(".plan-cascade-material");
+        var list = combo.querySelector(".plan-material-suggest");
+        if (!input || !list) return;
+
+        var suggestions = String(input.getAttribute("data-material-suggestions") || "")
+          .split("||")
+          .map(function (s) {
+            return String(s || "").trim();
+          })
+          .filter(Boolean);
+
+        function hide() {
+          list.hidden = true;
+          list.innerHTML = "";
+          combo.classList.remove("is-open");
+          input.setAttribute("aria-expanded", "false");
+        }
+
+        function pick(value) {
+          input.value = value;
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          hide();
+          input.focus();
+        }
+
+        function render(query) {
+          var q = String(query || "").trim().toLowerCase();
+          var items = suggestions.filter(function (s) {
+            if (!q) return true;
+            return s.toLowerCase().indexOf(q) !== -1;
+          }).slice(0, 12);
+
+          list.innerHTML = "";
+          if (!items.length) {
+            var empty = document.createElement("li");
+            empty.className = "plan-material-suggest-empty";
+            empty.textContent = suggestions.length ? "Нет совпадений" : "Нет сохранённых материалов";
+            list.appendChild(empty);
+          } else {
+            items.forEach(function (s, idx) {
+              var li = document.createElement("li");
+              li.className = "plan-material-suggest-item";
+              li.setAttribute("role", "option");
+              li.setAttribute("data-value", s);
+              if (idx === 0) li.classList.add("is-active");
+              li.textContent = s;
+              list.appendChild(li);
+            });
+          }
+          list.hidden = false;
+          combo.classList.add("is-open");
+          input.setAttribute("aria-expanded", "true");
+        }
+
+        function activeItem() {
+          return list.querySelector(".plan-material-suggest-item.is-active");
+        }
+
+        function moveActive(delta) {
+          var opts = Array.prototype.slice.call(list.querySelectorAll(".plan-material-suggest-item"));
+          if (!opts.length) return;
+          var cur = opts.findIndex(function (el) {
+            return el.classList.contains("is-active");
+          });
+          opts.forEach(function (el) {
+            el.classList.remove("is-active");
+          });
+          var next = cur < 0 ? 0 : (cur + delta + opts.length) % opts.length;
+          opts[next].classList.add("is-active");
+          opts[next].scrollIntoView({ block: "nearest" });
+        }
+
+        input.addEventListener("focus", function () {
+          if (!document.body.classList.contains("setup-inline-edit-enabled")) return;
+          render(input.value);
+        });
+        input.addEventListener("input", function () {
+          if (!document.body.classList.contains("setup-inline-edit-enabled")) return;
+          render(input.value);
+        });
+        input.addEventListener("keydown", function (e) {
+          if (list.hidden) {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              render(input.value);
+            }
+            return;
+          }
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            moveActive(1);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            moveActive(-1);
+          } else if (e.key === "Enter") {
+            var a = activeItem();
+            if (a) {
+              e.preventDefault();
+              pick(a.getAttribute("data-value") || a.textContent || "");
+            }
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            hide();
+          }
+        });
+        list.addEventListener("mousedown", function (e) {
+          var item = e.target && e.target.closest ? e.target.closest(".plan-material-suggest-item") : null;
+          if (!item) return;
+          e.preventDefault();
+          pick(item.getAttribute("data-value") || item.textContent || "");
+        });
+        document.addEventListener("mousedown", function (e) {
+          if (!combo.classList.contains("is-open")) return;
+          if (combo.contains(e.target)) return;
+          hide();
+        });
+        window.addEventListener("setup-inline-edit-mode", function (ev) {
+          if (!(ev && ev.detail && ev.detail.enabled)) hide();
+        });
+      });
+    }
 
     root.addEventListener(
       "paste",

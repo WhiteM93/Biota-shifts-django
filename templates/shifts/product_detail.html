@@ -3,6 +3,122 @@
 
 {% block content %}
 <link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v={{ static_asset_version }}">
+<style id="pd-meta-view-fix">
+  /* Непрозрачный фон только у inner — иначе квадратный aside даёт «уголки» снаружи radius */
+  #product-detail-meta {
+    background: transparent !important;
+    background-image: none !important;
+  }
+  #product-detail-meta .product-detail-meta-inner {
+    background: #101520 !important;
+    background-image: none !important;
+    isolation: isolate;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--bio-filter-border, #2a3550) 80%, transparent) !important;
+    border-radius: 14px !important;
+    box-shadow: none !important;
+  }
+  html[data-theme="dawn"] #product-detail-meta .product-detail-meta-inner {
+    background: #ffffff !important;
+    background-image: none !important;
+    border-color: rgba(40, 32, 24, 0.1) !important;
+  }
+  #product-detail-meta .product-detail-meta-plan,
+  #product-detail-meta .product-detail-description-block,
+  #product-detail-meta .product-detail-meta-norms,
+  #product-detail-meta .plan-unified-specs-card,
+  #product-detail-meta .plan-cascade-form-container,
+  #product-detail-meta .plan-cascade-form-container .form-field,
+  #product-detail-meta .plan-cascade-control {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+  }
+  #product-detail-meta .plan-cascade-form-container .form-field {
+    border-bottom: none !important;
+    padding: 8px 0 !important;
+    gap: 4px 18px !important;
+  }
+  #product-detail-meta .plan-cascade-value {
+    display: none;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--bio-body-fg, #eaf0ff);
+    line-height: 1.35;
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+  body:not(.setup-inline-edit-enabled) #product-detail-meta .plan-cascade-value {
+    display: block !important;
+  }
+  body:not(.setup-inline-edit-enabled) #product-detail-meta .plan-cascade-form-container select,
+  body:not(.setup-inline-edit-enabled) #product-detail-meta .plan-cascade-form-container input {
+    display: none !important;
+  }
+  body:not(.setup-inline-edit-enabled) #product-detail-meta .plan-material-combo {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled #product-detail-meta .plan-cascade-value {
+    display: none !important;
+  }
+  body.setup-inline-edit-enabled #product-detail-meta .plan-cascade-form-container select,
+  body.setup-inline-edit-enabled #product-detail-meta .plan-cascade-form-container input {
+    display: inline-block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  html[data-theme="dawn"] body.setup-inline-edit-enabled #product-detail-meta .plan-cascade-form-container select,
+  html[data-theme="dawn"] body.setup-inline-edit-enabled #product-detail-meta .plan-cascade-form-container input {
+    color-scheme: light;
+  }
+  body.setup-inline-edit-enabled #product-detail-meta .product-detail-name.is-inline-edit {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--bio-input-focus-border, #7c8cff) 45%, transparent);
+    background: color-mix(in srgb, var(--bio-input-focus-border, #7c8cff) 12%, transparent);
+    box-shadow: none;
+  }
+</style>
+<script>
+(function () {
+  function syncPlanValues(root) {
+    if (!root) return;
+    root.querySelectorAll(".plan-cascade-control, .form-field[data-field]").forEach(function (wrap) {
+      var controlWrap = wrap.classList.contains("plan-cascade-control") ? wrap : wrap.querySelector(".plan-cascade-control");
+      var field = controlWrap || wrap;
+      var select = field.querySelector("select[data-field]");
+      var input = field.querySelector("input[data-field]");
+      if (!select && !input) return;
+      var valueEl = field.querySelector("[data-plan-value]");
+      if (!valueEl) {
+        valueEl = document.createElement("span");
+        valueEl.className = "plan-cascade-value";
+        valueEl.setAttribute("data-plan-value", "");
+        if (controlWrap) controlWrap.insertBefore(valueEl, controlWrap.firstChild);
+        else field.appendChild(valueEl);
+      }
+      var text = "—";
+      if (select) {
+        var opt = select.options[select.selectedIndex];
+        text = select.value && opt ? String(opt.text || "").trim() || "—" : "—";
+      } else if (input) {
+        text = String(input.value || "").trim() || "—";
+      }
+      valueEl.textContent = text;
+    });
+  }
+  function boot() {
+    var meta = document.getElementById("product-detail-meta");
+    if (!meta) return;
+    syncPlanValues(meta);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+  window.addEventListener("setup-inline-edit-mode", function () { boot(); });
+})();
+</script>
 <div class="product-detail-grid{% if tab_default == 'drawing' %} has-meta-column{% endif %}"{% if setups %} data-product-has-setups="1"{% endif %}>
   <div class="product-detail-main">
 
@@ -461,11 +577,11 @@
 
   <aside class="product-detail-meta" id="product-detail-meta" aria-label="Параметры и описание изделия"{% if tab_default != 'drawing' %} hidden{% endif %}>
     <div class="product-detail-meta-inner">
-      <div class="product-detail-header product-detail-meta-header">
+      <header class="product-detail-header product-detail-meta-header">
         <div class="product-detail-header-name">
           <span class="product-detail-name" data-field-text="product_name" spellcheck="false">{{ product.name }}</span>
         </div>
-      </div>
+      </header>
       <div class="product-detail-meta-split">
         <section class="product-detail-meta-plan" aria-label="Параметры изделия">
           <h3 class="product-detail-meta-section-title">Параметры</h3>

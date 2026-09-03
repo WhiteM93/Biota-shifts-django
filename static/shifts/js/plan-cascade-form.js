@@ -40,6 +40,7 @@ class PlanCascadeFormManager {
     this.attachEventListeners();
     this.syncStateFromDOM();
     this.updateFieldVisibility();
+    this.syncValueLabels();
     this._onInlineEditMode = this._onInlineEditMode.bind(this);
     window.addEventListener("setup-inline-edit-mode", this._onInlineEditMode);
     this.setFormEnabled(document.body.classList.contains("setup-inline-edit-enabled"));
@@ -47,11 +48,35 @@ class PlanCascadeFormManager {
 
   /**
    * Включить/выключить поля (только в режиме «Быстрое редактирование»).
+   * Не ставим disabled — у браузера ломается внешний вид селектов/инпутов.
    */
   setFormEnabled(enabled) {
     this.container.classList.toggle("is-plan-readonly", !enabled);
     this.container.querySelectorAll("select, input").forEach(function (el) {
-      el.disabled = !enabled;
+      if (el.tagName === "INPUT") {
+        el.readOnly = !enabled;
+      }
+      el.tabIndex = enabled ? 0 : -1;
+      el.setAttribute("aria-disabled", enabled ? "false" : "true");
+    });
+    this.syncValueLabels();
+  }
+
+  syncValueLabels() {
+    this.container.querySelectorAll(".plan-cascade-control").forEach(function (wrap) {
+      var valueEl = wrap.querySelector("[data-plan-value]");
+      if (!valueEl) return;
+      var select = wrap.querySelector("select[data-field]");
+      var input = wrap.querySelector("input[data-field]");
+      var text = "—";
+      if (select) {
+        var opt = select.options[select.selectedIndex];
+        text = opt && String(opt.text || "").trim() ? opt.text.trim() : "—";
+        if (!select.value) text = "—";
+      } else if (input) {
+        text = String(input.value || "").trim() || "—";
+      }
+      valueEl.textContent = text;
     });
   }
 
@@ -111,20 +136,32 @@ class PlanCascadeFormManager {
     // Слушатели для select элементов
     Object.entries(this.selectElements).forEach(([fieldName, select]) => {
       select.addEventListener('change', (e) => {
+        if (this.container.classList.contains("is-plan-readonly")) return;
         this.setState(fieldName, e.target.value);
+        this.syncValueLabels();
+      });
+      select.addEventListener("mousedown", (e) => {
+        if (this.container.classList.contains("is-plan-readonly")) e.preventDefault();
+      });
+      select.addEventListener("keydown", (e) => {
+        if (this.container.classList.contains("is-plan-readonly")) e.preventDefault();
       });
     });
 
     // Слушатели для input элементов
     Object.entries(this.inputElements).forEach(([fieldName, input]) => {
       input.addEventListener('change', (e) => {
+        if (this.container.classList.contains("is-plan-readonly")) return;
         this.setState(fieldName, e.target.value);
+        this.syncValueLabels();
       });
 
       // Для текстовых inputs также обновлять при вводе (для валидации)
       if (input.type === 'text' || input.type === 'number') {
         input.addEventListener('input', (e) => {
+          if (this.container.classList.contains("is-plan-readonly")) return;
           this.state[fieldName] = e.target.value;
+          this.syncValueLabels();
         });
       }
     });

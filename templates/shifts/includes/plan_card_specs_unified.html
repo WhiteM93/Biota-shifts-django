@@ -13,80 +13,102 @@
   5. ПКИ (тип): материал + размер
 {% endcomment %}
 
-<div class="plan-unified-specs-card filter-panel product-drawing-plan-section">
+<div class="plan-unified-specs-card product-drawing-plan-section{% if not biota_can_edit %} is-plan-readonly{% endif %}">
   <div class="plan-unified-specs-grid">
     <div class="plan-unified-specs-grid__left">
       {% if plan_specs_variant == "product" %}
 
       <!-- Каскадная форма для редактирования -->
       {% if biota_can_edit %}
-      <div class="plan-cascade-form-container" data-plan-cascade-form>
+      <div class="plan-cascade-form-container is-plan-readonly" data-plan-cascade-form>
 
         <!-- Поле 1: Тип изделия (всегда видимо) -->
         <div class="form-field form-field--always-visible" data-field="product_type">
           <label class="form-label muted">Тип изделия</label>
-          <select class="plan-cascade-product-type" data-field="product_type" autocomplete="off" aria-label="Тип позиции в плане">
-            <option value="">— выберите —</option>
-            <option value="made" {% if plan_product_type == 'made' %}selected{% endif %}>Деталь</option>
-            <option value="assembly" {% if plan_product_type == 'assembly' %}selected{% endif %}>Сборка</option>
-            <option value="pki" {% if plan_product_type == 'pki' %}selected{% endif %}>ПКИ</option>
-          </select>
+          <div class="plan-cascade-control">
+            <span class="plan-cascade-value" data-plan-value>
+              {% if plan_product_type == 'made' %}Деталь{% elif plan_product_type == 'assembly' %}Сборка{% elif plan_product_type == 'pki' %}ПКИ{% else %}—{% endif %}
+            </span>
+            <select class="plan-cascade-product-type" data-field="product_type" autocomplete="off" aria-label="Тип позиции в плане">
+              <option value="">— выберите —</option>
+              <option value="made" {% if plan_product_type == 'made' %}selected{% endif %}>Деталь</option>
+              <option value="assembly" {% if plan_product_type == 'assembly' %}selected{% endif %}>Сборка</option>
+              <option value="pki" {% if plan_product_type == 'pki' %}selected{% endif %}>ПКИ</option>
+            </select>
+          </div>
         </div>
 
         <!-- Поле 2: Вид заготовки (видно если Тип изделия = "made") -->
         <div class="form-field form-field--cascade" data-field="workpiece_type" data-show-when="product_type=made">
           <label class="form-label muted">Вид заготовки</label>
-          <select class="plan-cascade-workpiece-type" data-field="workpiece_type" autocomplete="off" aria-label="Вид заготовки">
-            <option value="">— выберите —</option>
-            {% for val, label in plan_workpiece_type_choices %}
-            <option value="{{ val }}" {% if plan_workpiece_type_value == val %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
+          <div class="plan-cascade-control">
+            <span class="plan-cascade-value" data-plan-value>{% if plan_workpiece_type_value %}{% for val, label in plan_workpiece_type_choices %}{% if plan_workpiece_type_value == val %}{{ label }}{% endif %}{% endfor %}{% else %}—{% endif %}</span>
+            <select class="plan-cascade-workpiece-type" data-field="workpiece_type" autocomplete="off" aria-label="Вид заготовки">
+              <option value="">— выберите —</option>
+              {% for val, label in plan_workpiece_type_choices %}
+              <option value="{{ val }}" {% if plan_workpiece_type_value == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
 
         <!-- Поле 3: Толщина листа (видно если product_type=made AND workpiece_type=laser) -->
         <div class="form-field form-field--cascade" data-field="laser_thickness" data-show-when="product_type=made&workpiece_type=laser">
           <label class="form-label muted">Толщина листа (мм)</label>
-          <input type="number" class="plan-cascade-laser-thickness" data-field="laser_thickness"
-                 value="{{ plan_laser_sheet_thickness_value|default:'' }}"
-                 placeholder="мм" min="0" max="500" step="0.1"
-                 inputmode="decimal" autocomplete="off" aria-label="Толщина листа, мм">
+          <div class="plan-cascade-control">
+            <span class="plan-cascade-value" data-plan-value>{% if plan_laser_sheet_thickness_value %}{{ plan_laser_sheet_thickness_value }}{% else %}—{% endif %}</span>
+            <input type="number" class="plan-cascade-laser-thickness" data-field="laser_thickness"
+                   value="{{ plan_laser_sheet_thickness_value|default:'' }}"
+                   placeholder="мм" min="0" max="500" step="0.1"
+                   inputmode="decimal" autocomplete="off" aria-label="Толщина листа, мм">
+          </div>
         </div>
 
-        <!-- Поле 4: Материал (видно для made с выбранным видом заготовки и для pki) -->
+        <!-- Поле 4: Материал -->
         <div class="form-field form-field--cascade" data-field="material" data-show-when="product_type=made&workpiece_type=laser|product_type=made&workpiece_type=preparatory|product_type=made&workpiece_type=pki|product_type=pki|product_type=assembly">
           <label class="form-label muted">Материал</label>
-          <input type="text" class="plan-cascade-material" data-field="material"
-                 value="{{ plan_material_value|default:'' }}"
-                 maxlength="240" list="plan-cascade-material-datalist"
-                 placeholder="Начните вводить или выберите..."
-                 autocomplete="off" aria-label="Материал заготовки">
-          <datalist id="plan-cascade-material-datalist">
-            {% for m in plan_material_suggestions %}
-            <option value="{{ m }}">{{ m }}</option>
-            {% endfor %}
-          </datalist>
+          <div class="plan-cascade-control">
+            <span class="plan-cascade-value" data-plan-value>{% if plan_material_value %}{{ plan_material_value }}{% else %}—{% endif %}</span>
+            <div class="plan-material-combo" data-plan-material-combo>
+              <input type="text" class="plan-cascade-material" data-field="material"
+                     value="{{ plan_material_value|default:'' }}"
+                     maxlength="240"
+                     placeholder="Начните вводить или выберите..."
+                     autocomplete="off" aria-label="Материал заготовки" aria-autocomplete="list"
+                     aria-expanded="false" aria-controls="plan-material-suggest-list"
+                     data-material-suggestions="{% for m in plan_material_suggestions %}{{ m|escape }}{% if not forloop.last %}||{% endif %}{% endfor %}">
+              <ul class="plan-material-suggest" id="plan-material-suggest-list" role="listbox" hidden></ul>
+            </div>
+          </div>
         </div>
 
-        <!-- Поле 5: Размер заготовки (видно если нужен размер) -->
+        <!-- Поле 5: Размер заготовки -->
         <div class="form-field form-field--cascade" data-field="workpiece_size" data-show-when="product_type=made&workpiece_type=preparatory|product_type=made&workpiece_type=pki|product_type=pki|product_type=assembly">
           <label class="form-label muted">Размер заготовки</label>
-          <input type="text" class="plan-cascade-workpiece-size" data-field="workpiece_size"
-                 value="{{ plan_workpiece_size_value|default:'' }}"
-                 maxlength="100"
-                 placeholder="например: 10x10x10"
-                 autocomplete="off" aria-label="Размер заготовки">
+          <div class="plan-cascade-control">
+            <span class="plan-cascade-value" data-plan-value>{% if plan_workpiece_size_value %}{{ plan_workpiece_size_value }}{% else %}—{% endif %}</span>
+            <input type="text" class="plan-cascade-workpiece-size" data-field="workpiece_size"
+                   value="{{ plan_workpiece_size_value|default:'' }}"
+                   maxlength="100"
+                   placeholder="например: 10x10x10"
+                   autocomplete="off" aria-label="Размер заготовки">
+          </div>
         </div>
 
-        <!-- Поле 6: Тип заготовки (видно если product_type=made AND workpiece_type=preparatory) -->
+        <!-- Поле 6: Тип заготовки -->
         <div class="form-field form-field--cascade" data-field="workpiece_type_enum" data-show-when="product_type=made&workpiece_type=preparatory">
           <label class="form-label muted">Тип заготовки</label>
-          <select class="plan-cascade-type-enum" data-field="workpiece_type_enum" autocomplete="off" aria-label="Тип заготовки">
-            <option value="">— выберите —</option>
-            <option value="plate" {% if plan_workpiece_type_enum_value == 'plate' %}selected{% endif %}>Плита</option>
-            <option value="circle" {% if plan_workpiece_type_enum_value == 'circle' %}selected{% endif %}>Круг</option>
-            <option value="rod" {% if plan_workpiece_type_enum_value == 'rod' %}selected{% endif %}>Пруток</option>
-          </select>
+          <div class="plan-cascade-control">
+            <span class="plan-cascade-value" data-plan-value>
+              {% if plan_workpiece_type_enum_value == 'plate' %}Плита{% elif plan_workpiece_type_enum_value == 'circle' %}Круг{% elif plan_workpiece_type_enum_value == 'rod' %}Пруток{% else %}—{% endif %}
+            </span>
+            <select class="plan-cascade-type-enum" data-field="workpiece_type_enum" autocomplete="off" aria-label="Тип заготовки">
+              <option value="">— выберите —</option>
+              <option value="plate" {% if plan_workpiece_type_enum_value == 'plate' %}selected{% endif %}>Плита</option>
+              <option value="circle" {% if plan_workpiece_type_enum_value == 'circle' %}selected{% endif %}>Круг</option>
+              <option value="rod" {% if plan_workpiece_type_enum_value == 'rod' %}selected{% endif %}>Пруток</option>
+            </select>
+          </div>
         </div>
 
       </div>

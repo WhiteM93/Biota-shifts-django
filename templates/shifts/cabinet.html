@@ -104,6 +104,9 @@
         <li class="pending-reg-item">
           <span class="pending-reg-item__who">
             <code>{{ item.login }}</code>
+            {% if item.label and item.label != item.login %}
+            <span class="pending-reg-item__name">{{ item.label }}</span>
+            {% endif %}
             {% if item.email %}<span class="muted pending-reg-item__email">{{ item.email }}</span>{% endif %}
             {% if item.email and not item.email_verified %}
             <span class="pending-reg-badge pending-reg-badge--warn">email не подтверждён</span>
@@ -153,19 +156,34 @@
         <aside class="cab-priv__rail" aria-label="Пользователи">
           <div class="cab-priv__rail-head">Аккаунты</div>
           <nav class="cab-priv__users" id="cab-priv-user-jump">
-            {% for u in priv_users %}
+            {% for row in priv_user_rows %}
             <a
-              class="cab-priv__user{% if u == priv_selected %} is-active{% endif %}"
-              href="?priv_user={{ u|urlencode }}#cabinet-privileges"
-              data-user="{{ u }}"
-            >{{ u }}</a>
+              class="cab-priv__user{% if row.login == priv_selected %} is-active{% endif %}"
+              href="?priv_user={{ row.login|urlencode }}#cabinet-privileges"
+              data-user="{{ row.login }}"
+              title="{{ row.title }}"
+            >
+              {% if row.label %}
+              <span class="cab-priv__user-name">{{ row.label }}</span>
+              <span class="cab-priv__user-login">{{ row.login }}</span>
+              {% else %}
+              <span class="cab-priv__user-login cab-priv__user-login--only">{{ row.login }}</span>
+              {% endif %}
+            </a>
             {% endfor %}
           </nav>
         </aside>
 
         <div class="cab-priv__stage">
           <header class="cab-priv__bar">
-            <h3 class="cab-priv__who-name">{{ priv_selected }}</h3>
+            <div class="cab-priv__who">
+              <h3 class="cab-priv__who-name">
+                {% if priv_selected_label %}{{ priv_selected_label }}{% else %}{{ priv_selected }}{% endif %}
+              </h3>
+              {% if priv_selected_label %}
+              <p class="cab-priv__who-login muted">Логин: <code>{{ priv_selected }}</code></p>
+              {% endif %}
+            </div>
             <div class="cab-priv__role" role="group" aria-label="Роль">
               {% for r in priv_role_choices %}
               <label class="cab-priv__role-opt">
@@ -183,6 +201,23 @@
               {% endif %}
             </div>
           </header>
+
+          {% if priv_selected %}
+          <div class="cab-priv__names" aria-label="Имя и фамилия аккаунта">
+            <div class="cab-priv__names-form">
+              <label class="cab-priv__names-field">
+                <span>Имя</span>
+                <input type="text" name="first_name" form="cab-priv-names-form" value="{{ priv_first_name }}" maxlength="100" autocomplete="given-name">
+              </label>
+              <label class="cab-priv__names-field">
+                <span>Фамилия</span>
+                <input type="text" name="last_name" form="cab-priv-names-form" value="{{ priv_last_name }}" maxlength="100" autocomplete="family-name">
+              </label>
+              <button type="submit" class="btn btn-sm" form="cab-priv-names-form">Сохранить имя</button>
+            </div>
+            <p class="cab-priv__names-hint muted">Чтобы отличать аккаунты в списке слева. Логин для входа не меняется.</p>
+          </div>
+          {% endif %}
 
           <p class="cab-priv__hint js-cab-priv-hint" hidden></p>
 
@@ -237,6 +272,11 @@
       </form>
 
       {% if priv_selected %}
+      <form method="post" action="" id="cab-priv-names-form" hidden>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="admin_user_names">
+        <input type="hidden" name="names_login" value="{{ priv_selected }}">
+      </form>
       <form method="post" action="" id="cab-priv-delete-form" hidden>
         {% csrf_token %}
         <input type="hidden" name="action" value="admin_delete_user">
@@ -529,8 +569,11 @@
           {% csrf_token %}
           <input type="hidden" name="action" value="profile">
           <div class="cabinet-form-row">
-            <label>Отображаемое имя
-              <input type="text" name="display_name" value="{{ profile_display_name }}" maxlength="200">
+            <label>Имя
+              <input type="text" name="first_name" value="{{ profile_first_name }}" maxlength="100" autocomplete="given-name">
+            </label>
+            <label>Фамилия
+              <input type="text" name="last_name" value="{{ profile_last_name }}" maxlength="100" autocomplete="family-name">
             </label>
             <label>Email
               <input type="email" name="email" value="{{ profile_email }}" maxlength="200">

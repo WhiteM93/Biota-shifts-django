@@ -157,7 +157,37 @@ def _history_panel_redirect(request):
     ht = (request.GET.get("history_movement_type") or request.POST.get("history_movement_type") or "").strip()
     if ht in _HISTORY_MOVEMENT_TYPES:
         params["history_movement_type"] = ht
+    he = (request.GET.get("history_employee") or request.POST.get("history_employee") or "").strip()
+    if he:
+        params["history_employee"] = he[:120]
     return redirect(f"{request.path}?{urlencode(params)}")
+
+
+def _open_issue_movements_qs():
+    """Выдачи с остатком к возврату/списанию (remaining_qty > 0)."""
+    return (
+        StockMovement.objects.filter(movement_type="issue", is_reverted=False)
+        .select_related(
+            "tool",
+            "tool__end_mill_spec",
+            "tool__body_tool_spec",
+            "tool__tap_spec",
+            "tool__center_drill_spec",
+            "tool__countersink_spec",
+            "tool__drill_spec",
+            "tool__insert_spec",
+            "tool__collet_spec",
+        )
+        .annotate(
+            processed_qty=Coalesce(
+                Sum("issue_outcomes__quantity"),
+                Value(0, output_field=IntegerField()),
+            )
+        )
+        .annotate(remaining_qty=F("quantity") - F("processed_qty"))
+        .filter(remaining_qty__gt=0)
+        .order_by("-movement_date", "-id")
+    )
 
 
 _ARRIVAL_REQUIRED_DIAMETER: dict[str, tuple[str, str]] = {
@@ -1572,10 +1602,14 @@ def inventory_view(request):
     employee_options = []
     employee_department_map = {}
     employee_table_rows: list[dict] = []
-    if panel == "defects" or action in {"create_defect_record", "update_defect_record"}:
+    if panel in {"defects", "history", "issue"} or action in {"create_defect_record", "update_defect_record"}:
         try:
             cfg = biota_db.db_config()
-            employees_df = employees_df_for_nav(username, "defects", biota_db.load_employees(cfg))
+            if panel == "defects" or action in {"create_defect_record", "update_defect_record"}:
+                emp_nav_key = "defects"
+            else:
+                emp_nav_key = "inventory"
+            employees_df = employees_df_for_nav(username, emp_nav_key, biota_db.load_employees(cfg))
             if not employees_df.empty:
                 prepared: list[tuple[str, str, str, str]] = []
                 base_counts: dict[str, int] = {}
@@ -3508,29 +3542,49 @@ def inventory_view(request):
 
     stock_tool_material_extra_json = json.dumps(tool_material_extra_options)
 
-    issue_candidates = list(
+    issue_candidates = list(_open_issue_movements_qs()[:200])
+    history_open_count_by_key: dict[str, int] = {}
+    history_name_by_key: dict[str, str] = {}
+    for raw_name in (
+        _open_issue_movements_qs()
+        .exclude(employee_name="")
+        .values_list("employee_name", flat=True)
+    ):
+        name = (raw_name or "").strip()
+        if not name:
+            continue
+        key = name.casefold()
+        history_name_by_key.setdefault(key, name)
+        history_open_count_by_key[key] = history_open_count_by_key.get(key, 0) + 1
+    for raw_name in (
         StockMovement.objects.filter(movement_type="issue")
-        .select_related(
-            "tool",
-            "tool__end_mill_spec",
-            "tool__body_tool_spec",
-            "tool__tap_spec",
-            "tool__center_drill_spec",
-            "tool__countersink_spec",
-            "tool__drill_spec",
-            "tool__insert_spec",
-            "tool__collet_spec",
-        )
-        .annotate(
-            processed_qty=Coalesce(
-                Sum("issue_outcomes__quantity"),
-                Value(0, output_field=IntegerField()),
-            )
-        )
-        .annotate(remaining_qty=F("quantity") - F("processed_qty"))
-        .filter(remaining_qty__gt=0)
-        .order_by("-movement_date", "-id")[:200]
+        .exclude(employee_name="")
+        .values_list("employee_name", flat=True)
+        .distinct()
+    ):
+        name = (raw_name or "").strip()
+        if not name:
+            continue
+        key = name.casefold()
+        history_name_by_key.setdefault(key, name)
+    for opt in employee_options:
+        name = (opt or "").strip()
+        if not name:
+            continue
+        key = name.casefold()
+        history_name_by_key.setdefault(key, name)
+    history_employee_options = sorted(
+        [
+            {
+                "name": name,
+                "open_count": history_open_count_by_key.get(key, 0),
+            }
+            for key, name in history_name_by_key.items()
+        ],
+        key=lambda row: (-int(row["open_count"]), str(row["name"]).casefold()),
     )
+    history_open_employee_options = [row["name"] for row in history_employee_options if row["open_count"] > 0]
+    history_employee_option_names = [row["name"] for row in history_employee_options]
     purchase_status = (request.GET.get("purchase_status") or "").strip()
     purchase_store = (request.GET.get("purchase_store") or "").strip()
     purchase_date_from = (request.GET.get("purchase_date_from") or "").strip()
@@ -3650,6 +3704,19 @@ def inventory_view(request):
     history_movement_type = (request.GET.get("history_movement_type") or "").strip()
     if history_movement_type not in _HISTORY_MOVEMENT_TYPES:
         history_movement_type = ""
+    history_employee = (request.GET.get("history_employee") or "").strip()[:120]
+    if history_employee and history_employee not in history_employee_option_names:
+        match = next(
+            (n for n in history_employee_option_names if n.casefold() == history_employee.casefold()),
+            "",
+        )
+        history_employee = match or history_employee
+
+    history_open_issues: list[StockMovement] = []
+    if history_employee:
+        history_open_issues = list(
+            _open_issue_movements_qs().filter(employee_name__iexact=history_employee)[:300]
+        )
 
     mv_qs = (
         StockMovement.objects.select_related(
@@ -3668,9 +3735,11 @@ def inventory_view(request):
     )
     if history_movement_type:
         mv_qs = mv_qs.filter(movement_type=history_movement_type)
+    if history_employee:
+        mv_qs = mv_qs.filter(employee_name__iexact=history_employee)
     mv_hist = list(mv_qs[:120])
     ev_hist: list[InventoryStockEvent] = []
-    if not history_movement_type:
+    if not history_movement_type and not history_employee:
         ev_hist = list(
             InventoryStockEvent.objects.select_related("tool", "stock_movement").order_by("-created_at")[:80]
         )
@@ -3794,12 +3863,16 @@ def inventory_view(request):
             "work_material": work_material,
             "show_all": show_all,
             "history_movement_type": history_movement_type,
+            "history_employee": history_employee,
         },
         "history_movement_types": [
             ("restock", "Пополнение"),
             ("writeoff", "Списание"),
             ("issue", "Выдача"),
         ],
+        "history_open_employee_options": history_open_employee_options,
+        "history_employee_options": history_employee_options,
+        "history_open_issues": history_open_issues,
         "end_mill_filter_options": {
             "diameters": end_mill_diameters,
             "overall_lengths": end_mill_overall_lengths,

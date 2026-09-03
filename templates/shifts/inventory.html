@@ -2016,12 +2016,142 @@
       </div>
     </label>
     <label class="field"><span>Количество</span><input type="number" name="quantity" min="1" required></label>
-    <label class="field"><span>Сотрудник (для выдачи)</span><input type="text" name="employee_name" placeholder="ФИО"></label>
+    <label class="field" style="position:relative;">
+      <span>Сотрудник (для выдачи)</span>
+      <input
+        type="text"
+        name="employee_name"
+        id="issue-employee-search"
+        class="defect-emp-search"
+        placeholder="Поиск по ФИО или введите как есть…"
+        autocomplete="off"
+        aria-autocomplete="list"
+        aria-controls="issue-employee-list"
+      >
+      <div id="issue-employee-list" class="defect-emp-list" hidden role="listbox">
+        {% for employee in employee_options %}
+        <div class="defect-emp-item" role="option" data-value="{{ employee }}">{{ employee }}</div>
+        {% endfor %}
+        <div class="defect-emp-item defect-emp-item--custom" id="issue-employee-custom" role="option" hidden data-custom="1">
+          Использовать как есть: <strong data-custom-label></strong>
+        </div>
+        {% if not employee_options %}
+        <div class="defect-emp-empty muted">Справочник пуст — введите ФИО вручную.</div>
+        {% endif %}
+      </div>
+    </label>
     <label class="field"><span>Дата</span><input type="date" name="movement_date" value="{{ today }}" required></label>
     <label class="field"><span>Комментарий</span><input type="text" name="comment"></label>
     <div class="filter-actions"><button type="submit" class="btn">Сохранить операцию</button></div>
   </form>
 </div>
+<script>
+(function () {
+  var empSearch = document.getElementById("issue-employee-search");
+  var empList = document.getElementById("issue-employee-list");
+  var customItem = document.getElementById("issue-employee-custom");
+  if (!empSearch || !empList) return;
+
+  var empItems = Array.prototype.slice.call(empList.querySelectorAll(".defect-emp-item:not(.defect-emp-item--custom)"));
+  var activeIdx = -1;
+
+  function showList() { empList.hidden = false; }
+  function hideList() { empList.hidden = true; activeIdx = -1; }
+
+  function exactMatch(q) {
+    var lower = (q || "").toLowerCase().trim();
+    if (!lower) return null;
+    for (var i = 0; i < empItems.length; i++) {
+      if ((empItems[i].getAttribute("data-value") || "").toLowerCase() === lower) return empItems[i];
+    }
+    return null;
+  }
+
+  function filterItems(q) {
+    var lower = (q || "").toLowerCase().trim();
+    var visible = [];
+    empItems.forEach(function (item) {
+      var match = !lower || (item.getAttribute("data-value") || "").toLowerCase().indexOf(lower) !== -1;
+      item.hidden = !match;
+      if (match) visible.push(item);
+    });
+    if (customItem) {
+      var customLabel = customItem.querySelector("[data-custom-label]");
+      var showCustom = !!lower && !exactMatch(lower);
+      customItem.hidden = !showCustom;
+      if (showCustom) {
+        if (customLabel) customLabel.textContent = q.trim();
+        customItem.setAttribute("data-value", q.trim());
+        visible.push(customItem);
+      }
+    }
+    return visible;
+  }
+
+  function setActive(items, idx) {
+    empItems.forEach(function (it) { it.classList.remove("is-active"); });
+    if (customItem) customItem.classList.remove("is-active");
+    if (items[idx]) {
+      items[idx].classList.add("is-active");
+      items[idx].scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function selectItem(value) {
+    empSearch.value = value || "";
+    hideList();
+  }
+
+  empSearch.addEventListener("focus", function () {
+    var vis = filterItems(empSearch.value);
+    if (vis.length || empItems.length) showList();
+  });
+
+  empSearch.addEventListener("input", function () {
+    var vis = filterItems(empSearch.value);
+    activeIdx = -1;
+    if (vis.length) showList(); else hideList();
+  });
+
+  empSearch.addEventListener("keydown", function (e) {
+    var vis = filterItems(empSearch.value).filter(function (it) { return !it.hidden; });
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (empList.hidden) showList();
+      if (!vis.length) return;
+      activeIdx = (activeIdx + 1) % vis.length;
+      setActive(vis, activeIdx);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!vis.length) return;
+      activeIdx = activeIdx <= 0 ? vis.length - 1 : activeIdx - 1;
+      setActive(vis, activeIdx);
+    } else if (e.key === "Enter") {
+      if (!empList.hidden && activeIdx >= 0 && vis[activeIdx]) {
+        e.preventDefault();
+        selectItem(vis[activeIdx].getAttribute("data-value") || empSearch.value.trim());
+      } else {
+        hideList();
+      }
+    } else if (e.key === "Escape") {
+      hideList();
+    }
+  });
+
+  empList.addEventListener("mousedown", function (e) {
+    var item = e.target.closest(".defect-emp-item");
+    if (!item || item.classList.contains("defect-emp-empty")) return;
+    e.preventDefault();
+    selectItem(item.getAttribute("data-value") || empSearch.value.trim());
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest("#issue-employee-search") && !e.target.closest("#issue-employee-list")) {
+      hideList();
+    }
+  });
+})();
+</script>
 {% else %}
 <p class="muted">Режим исполнителя: только просмотр и скачивание.</p>
 {% endif %}
@@ -2903,11 +3033,194 @@
       {% endfor %}
     </select>
   </label>
-  {% if filters.history_movement_type %}
+  <div class="field inv-history-filter__employee" style="position:relative;">
+    <span>Сотрудник (не вернул)</span>
+    <input type="hidden" name="history_employee" id="history-employee-value" value="{{ filters.history_employee }}">
+    <input
+      type="text"
+      id="history-employee-search"
+      class="inv-history-emp-search"
+      value="{{ filters.history_employee }}"
+      placeholder="{% if history_employee_options %}Начните вводить ФИО…{% else %}Нет сотрудников в списке{% endif %}"
+      autocomplete="off"
+      {% if not history_employee_options %}disabled{% endif %}
+      aria-label="Сотрудник с невозвращённым инструментом"
+      aria-autocomplete="list"
+      aria-controls="history-employee-list"
+    >
+    <div id="history-employee-list" class="inv-history-emp-list" hidden role="listbox">
+      {% for row in history_employee_options %}
+      <button
+        type="button"
+        class="inv-history-emp-item{% if row.open_count %} is-open{% endif %}"
+        role="option"
+        data-value="{{ row.name }}"
+        data-open="{{ row.open_count }}"
+      >
+        <span class="inv-history-emp-item__name">{{ row.name }}</span>
+        {% if row.open_count %}
+        <span class="inv-history-emp-item__open">не возвращено: {{ row.open_count }}</span>
+        {% endif %}
+      </button>
+      {% empty %}
+      <div class="inv-history-emp-empty muted">Справочник пуст — проверьте права/подключение к Biota.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% if filters.history_movement_type or filters.history_employee %}
   <a class="btn btn-sm btn-ghost inv-history-filter__reset" href="{% url 'inventory' %}?panel=history">Сбросить</a>
   {% endif %}
 </form>
+{% if not history_employee_options %}
+<p class="muted inv-history-emp-hint">Список сотрудников пуст. Выдачи без ФИО или без справочника Biota здесь не отобразятся.</p>
+{% elif not history_open_employee_options %}
+<p class="muted inv-history-emp-hint">Сейчас нет открытых выдач с ФИО — можно выбрать любого сотрудника из справочника и проверить.</p>
+{% endif %}
+
+<script>
+(function () {
+  var form = document.getElementById("inventory-history-filter-form");
+  var search = document.getElementById("history-employee-search");
+  var valueInput = document.getElementById("history-employee-value");
+  var list = document.getElementById("history-employee-list");
+  if (!form || !search || !valueInput || !list) return;
+
+  var items = Array.prototype.slice.call(list.querySelectorAll(".inv-history-emp-item"));
+  var activeIdx = -1;
+
+  function showList() { list.hidden = false; }
+  function hideList() { list.hidden = true; activeIdx = -1; }
+
+  function visibleItems() {
+    return items.filter(function (it) { return !it.hidden; });
+  }
+
+  function filterItems(q) {
+    var lower = (q || "").toLowerCase().trim();
+    var visible = [];
+    items.forEach(function (item) {
+      var name = (item.getAttribute("data-value") || "").toLowerCase();
+      var match = !lower || name.indexOf(lower) !== -1;
+      item.hidden = !match;
+      if (match) visible.push(item);
+    });
+    return visible;
+  }
+
+  function setActive(vis, idx) {
+    items.forEach(function (it) { it.classList.remove("is-active"); });
+    if (vis[idx]) {
+      vis[idx].classList.add("is-active");
+      vis[idx].scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function submitEmployee(name) {
+    valueInput.value = name || "";
+    search.value = name || "";
+    hideList();
+    if (form.dataset.submitting === "1") return;
+    form.dataset.submitting = "1";
+    form.submit();
+  }
+
+  search.addEventListener("focus", function () {
+    filterItems(search.value);
+    if (items.length) showList();
+  });
+
+  search.addEventListener("input", function () {
+    if ((search.value || "").trim() !== (valueInput.value || "").trim()) {
+      valueInput.value = "";
+    }
+    var vis = filterItems(search.value);
+    activeIdx = -1;
+    if (vis.length) showList(); else hideList();
+  });
+
+  search.addEventListener("keydown", function (e) {
+    var vis = visibleItems();
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (list.hidden) { filterItems(search.value); showList(); vis = visibleItems(); }
+      if (!vis.length) return;
+      activeIdx = (activeIdx + 1) % vis.length;
+      setActive(vis, activeIdx);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!vis.length) return;
+      activeIdx = activeIdx <= 0 ? vis.length - 1 : activeIdx - 1;
+      setActive(vis, activeIdx);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeIdx >= 0 && vis[activeIdx]) {
+        submitEmployee(vis[activeIdx].getAttribute("data-value") || "");
+      } else if ((search.value || "").trim()) {
+        var exact = vis.find(function (it) {
+          return (it.getAttribute("data-value") || "").toLowerCase() === search.value.trim().toLowerCase();
+        });
+        submitEmployee(exact ? (exact.getAttribute("data-value") || "") : search.value.trim());
+      }
+    } else if (e.key === "Escape") {
+      hideList();
+    }
+  });
+
+  list.addEventListener("mousedown", function (e) {
+    var item = e.target.closest(".inv-history-emp-item");
+    if (!item) return;
+    e.preventDefault();
+    submitEmployee(item.getAttribute("data-value") || "");
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest(".inv-history-filter__employee")) hideList();
+  });
+})();
+</script>
+
+{% if filters.history_employee %}
+<section class="inv-history-open-block" aria-label="Невозвращённый инструмент">
+  <div class="inv-history-open-block__head">
+    <h3 class="inv-history-open-block__title">Не возвращено: {{ filters.history_employee }}</h3>
+    <p class="inv-history-open-block__meta muted">
+      {% if history_open_issues %}
+      Позиций: {{ history_open_issues|length }}
+      {% else %}
+      Открытых выдач нет
+      {% endif %}
+    </p>
+  </div>
+  {% if history_open_issues %}
+  <ul class="inv-history-list inv-history-list--open">
+    {% for iss in history_open_issues %}
+    <li class="inv-history-card inv-history-card--movement inv-history-card--issue inv-history-card--open">
+      <div class="inv-history-card__head">
+        <span class="inv-history-badge">Не возвращено</span>
+        <time class="inv-history-card__when" datetime="{{ iss.created_at|date:'c' }}">{{ iss.movement_date|date:"d.m.Y" }}</time>
+      </div>
+      <p class="inv-history-card__title">{{ iss.tool.name }}{% if iss.tool.is_deleted %} <span class="muted">(удалено)</span>{% endif %}</p>
+      <p class="inv-history-card__sub">{{ iss.tool.get_category_display }}</p>
+      <div class="inv-history-facts">
+        <span class="inv-history-qty"><strong>{{ iss.remaining_qty }}</strong> из {{ iss.quantity }} шт.</span>
+        {% if iss.created_by_account %}<span class="inv-history-fact"><span class="inv-history-fact__label">Выдал</span> {{ iss.created_by_account }}</span>{% endif %}
+      </div>
+      {% if iss.comment %}
+      <p class="inv-history-card__note">{{ iss.comment|linebreaksbr }}</p>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted inv-history-open-block__empty">У этого сотрудника нет невозвращённого инструмента.</p>
+  {% endif %}
+</section>
+{% endif %}
+
 <div class="inv-history-wrap">
+  {% if filters.history_employee %}
+  <h3 class="inv-history-section-title">История операций: {{ filters.history_employee }}</h3>
+  {% endif %}
   <ul class="inv-history-list">
       {% for row in inventory_history %}
       {% if row.kind == "movement" %}
@@ -2937,6 +3250,7 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="rollback_stock_movement">
             {% if filters.history_movement_type %}<input type="hidden" name="history_movement_type" value="{{ filters.history_movement_type }}">{% endif %}
+            {% if filters.history_employee %}<input type="hidden" name="history_employee" value="{{ filters.history_employee }}">{% endif %}
             <input type="hidden" name="movement_id" value="{{ m.id }}">
             <button type="submit" class="btn btn-sm">Откатить</button>
           </form>
@@ -3049,7 +3363,7 @@
       {% endwith %}
       {% endif %}
       {% empty %}
-      <li class="inv-history-card inv-history-card--empty muted">{% if filters.history_movement_type %}Нет записей по выбранному типу операции.{% else %}Пока нет записей в истории.{% endif %}</li>
+      <li class="inv-history-card inv-history-card--empty muted">{% if filters.history_employee %}Нет операций по этому сотруднику в ленте истории.{% elif filters.history_movement_type %}Нет записей по выбранному типу операции.{% else %}Пока нет записей в истории.{% endif %}</li>
       {% endfor %}
   </ul>
 </div>

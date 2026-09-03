@@ -333,6 +333,8 @@ def _register_user(
         "email_verified": not bool(email_norm),
         "role": USER_ROLE_MANAGER,
         "display_name": "",
+        "first_name": "",
+        "last_name": "",
         "email": email_norm,
         "access_scope": "none",
         "allowed_department": "",
@@ -389,9 +391,70 @@ def _delete_registered_user(username: str) -> tuple[bool, str]:
     return True, ""
 
 
-def _update_registered_profile(username: str, display_name: str, email: str) -> tuple[bool, str]:
+def _person_name_parts(rec: dict | None) -> tuple[str, str]:
+    """Имя и фамилия из записи; fallback на display_name (старые профили)."""
+    data = rec or {}
+    first = str(data.get("first_name") or "").strip()
+    last = str(data.get("last_name") or "").strip()
+    if first or last:
+        return first[:100], last[:100]
+    display = str(data.get("display_name") or "").strip()
+    if not display:
+        return "", ""
+    parts = display.split(None, 1)
+    first = (parts[0] if parts else "")[:100]
+    last = (parts[1] if len(parts) > 1 else "")[:100]
+    return first, last
+
+
+def _compose_display_name(first_name: str, last_name: str) -> str:
+    return " ".join(p for p in ((first_name or "").strip(), (last_name or "").strip()) if p)[:200]
+
+
+def _apply_person_names(rec: dict, first_name: str, last_name: str) -> None:
+    first = (first_name or "").strip()[:100]
+    last = (last_name or "").strip()[:100]
+    rec["first_name"] = first
+    rec["last_name"] = last
+    rec["display_name"] = _compose_display_name(first, last)
+
+
+def account_label_for_username(username: str) -> str:
+    """Подпись аккаунта: «Имя Фамилия» или логин."""
+    u = (username or "").strip()
+    if not u:
+        return ""
+    if _is_admin(u):
+        return u
+    rec = _resolve_registered_user(u) or {}
+    label = _compose_display_name(*_person_name_parts(rec))
+    return label or u
+
+
+def _update_registered_names(username: str, first_name: str, last_name: str) -> tuple[bool, str]:
+    """Админ / профиль: сохранить имя и фамилию аккаунта."""
     store = _load_users_store()
-    if username not in store:
+    key = _store_key_for_username(username, store)
+    if not key:
+        return False, "Пользователь не найден"
+    rec = store[key]
+    _apply_person_names(rec, first_name, last_name)
+    store[key] = rec
+    _save_users_store(store)
+    return True, ""
+
+
+def _update_registered_profile(
+    username: str,
+    display_name: str = "",
+    email: str = "",
+    *,
+    first_name: str | None = None,
+    last_name: str | None = None,
+) -> tuple[bool, str]:
+    store = _load_users_store()
+    key = _store_key_for_username(username, store)
+    if not key:
         return False, "Профиль не найден"
     em_raw = (email or "").strip()
     email_norm = ""
@@ -400,11 +463,25 @@ def _update_registered_profile(username: str, display_name: str, email: str) -> 
         if not ok_em:
             return False, em_or_err
         email_norm = em_or_err
-        taken = _find_username_by_email(email_norm, exclude_username=username)
+        taken = _find_username_by_email(email_norm, exclude_username=key)
         if taken:
             return False, "Этот email уже используется другой учётной записью."
-    rec = store[username]
-    rec["display_name"] = display_name.strip()[:200]
+    rec = store[key]
+    if first_name is not None or last_name is not None:
+        _apply_person_names(
+            rec,
+            first_name if first_name is not None else str(rec.get("first_name") or ""),
+            last_name if last_name is not None else str(rec.get("last_name") or ""),
+        )
+    else:
+        # Совместимость со Streamlit: одно поле «отображаемое имя»
+        dn = (display_name or "").strip()
+        parts = dn.split(None, 1) if dn else []
+        _apply_person_names(
+            rec,
+            parts[0] if parts else "",
+            parts[1] if len(parts) > 1 else "",
+        )
     prev_email = _normalize_email(rec.get("email") or "")
     rec["email"] = email_norm
     if email_norm != prev_email:
@@ -412,7 +489,7 @@ def _update_registered_profile(username: str, display_name: str, email: str) -> 
         rec["email_verify_token_hash"] = ""
         rec["email_verify_expires_at"] = ""
         rec.pop("email_verified_at", None)
-    store[username] = rec
+    store[key] = rec
     _save_users_store(store)
     return True, ""
 
@@ -879,8 +956,7 @@ def _cabinet_display_name(username: str) -> str:
         if st is not None:
             return st.session_state.get("admin_display_name", "").strip() or username
         return username
-    rec = _resolve_registered_user(username) or {}
-    return (rec.get("display_name") or "").strip() or username
+    return account_label_for_username(username)
 
 
 def _render_personal_cabinet_page(employees_full: pd.DataFrame) -> None:
