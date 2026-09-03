@@ -46,6 +46,11 @@ urlpatterns = [
         name="payroll_settlement",
     ),
     path("inventory/", inventory_views.inventory_view, name="inventory"),
+    path(
+        "inventory/history/open.pdf",
+        inventory_views.inventory_history_open_pdf,
+        name="inventory_history_open_pdf",
+    ),
     path("machines/", machines_views.machines_view, name="machines"),
     path("calculator/", views.calculator_view, name="calculator"),
     path("forms/", forms_views.forms_view, name="forms"),

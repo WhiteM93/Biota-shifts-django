@@ -945,3 +945,148 @@ def build_regulations_list_pdf(
     buffer.seek(0)
     return buffer.getvalue()
 
+
+def build_inventory_open_issues_pdf(
+    *,
+    employee_name: str,
+    rows: list[dict],
+    generated_at=None,
+) -> bytes:
+    """PDF: невозвращённый инструмент сотрудника (инструмент, дата, кто выдал)."""
+    from datetime import datetime
+
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    from biota_shifts.constants import MSK
+
+    font_name, ttf_path = _resolve_pdf_cyrillic_font()
+    if ttf_path is not None:
+        pdfmetrics.registerFont(TTFont("ArialUnicode", str(ttf_path)))
+        font_name = "ArialUnicode"
+
+    when = generated_at or datetime.now(MSK)
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=12 * mm,
+        rightMargin=12 * mm,
+        topMargin=10 * mm,
+        bottomMargin=10 * mm,
+    )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "InvOpenTitle",
+        parent=styles["Title"],
+        fontName=font_name,
+        fontSize=14,
+        leading=18,
+        spaceAfter=2 * mm,
+    )
+    sub_style = ParagraphStyle(
+        "InvOpenSub",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=10,
+        leading=13,
+        textColor=colors.HexColor("#444444"),
+    )
+    cell_style = ParagraphStyle(
+        "InvOpenCell",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=8,
+        leading=11,
+    )
+    head_style = ParagraphStyle(
+        "InvOpenHead",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=8,
+        leading=11,
+    )
+
+    story = [
+        Paragraph(f"Невозвращённый инструмент: {employee_name}", title_style),
+        Paragraph(
+            f"Сформировано: {when.strftime('%d.%m.%Y %H:%M')} · позиций: {len(rows)}",
+            sub_style,
+        ),
+        Spacer(1, 4 * mm),
+    ]
+
+    def _p(text: str, style=cell_style) -> Paragraph:
+        safe = (text or "—").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        return Paragraph(safe.replace("\n", "<br/>"), style)
+
+    table_data = [
+        [
+            _p("№", head_style),
+            _p("Инструмент", head_style),
+            _p("Тип", head_style),
+            _p("Ост.", head_style),
+            _p("Выдано", head_style),
+            _p("Дата", head_style),
+            _p("Кто выдал", head_style),
+        ]
+    ]
+    for i, row in enumerate(rows, start=1):
+        tool_line = str(row.get("tool_name") or "—")
+        comment = str(row.get("comment") or "").strip()
+        if comment:
+            tool_line = f"{tool_line}\n{comment}"
+        table_data.append(
+            [
+                _p(str(i)),
+                _p(tool_line),
+                _p(str(row.get("category") or "—")),
+                _p(str(row.get("remaining_qty") or "")),
+                _p(str(row.get("issued_qty") or "")),
+                _p(str(row.get("issue_date") or "—")),
+                _p(str(row.get("issued_by") or "—")),
+            ]
+        )
+
+    if len(rows) == 0:
+        table_data.append(
+            [
+                _p(""),
+                _p("Открытых выдач нет"),
+                _p(""),
+                _p(""),
+                _p(""),
+                _p(""),
+                _p(""),
+            ]
+        )
+
+    col_widths = [10 * mm, 58 * mm, 28 * mm, 14 * mm, 16 * mm, 22 * mm, 38 * mm]
+    table = Table(table_data, repeatRows=1, colWidths=col_widths)
+    table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), font_name),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#D9E1F2")),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#111111")),
+                ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                ("ALIGN", (3, 0), (5, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#AAAAAA")),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+            ]
+        )
+    )
+    story.append(table)
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+

@@ -9,14 +9,21 @@ from django.db import transaction
 from django.db.models import F, IntegerField, Sum, Value
 from django.db.models.functions import Coalesce
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods
 from django.utils import timezone
 
 from biota_shifts import db as biota_db
-from biota_shifts.auth import _is_admin, employees_df_for_nav, inventory_stock_manage_for_user, nav_permissions_for_user
+from biota_shifts import export as biota_export
+from biota_shifts.auth import (
+    _is_admin,
+    account_label_for_username,
+    employees_df_for_nav,
+    inventory_stock_manage_for_user,
+    nav_permissions_for_user,
+)
 from biota_shifts.constants import MONTH_NAMES_RU
 from biota_shifts.emp_codes import normalize_emp_code
 from biota_shifts.schedule import employee_label_row
@@ -4041,3 +4048,57 @@ def inventory_view(request):
     if panel == "analysis":
         ctx.update(analysis_context(request, username))
     return render(request, "shifts/inventory.html", ctx)
+
+
+def _safe_inventory_pdf_filename_part(value: str) -> str:
+    raw = (value or "").strip().replace(" ", "_")
+    cleaned = re.sub(r"[^\w\-а-яА-ЯёЁ]+", "", raw, flags=re.UNICODE)
+    return (cleaned or "employee")[:80]
+
+
+@biota_login_required
+@inventory_route_nav_access_required
+@require_GET
+def inventory_history_open_pdf(request):
+    """PDF по невозвращённому инструменту выбранного сотрудника."""
+    employee_name = (request.GET.get("history_employee") or "").strip()[:120]
+    if not employee_name:
+        return HttpResponse("Укажите сотрудника.", status=400)
+
+    issues = list(
+        _open_issue_movements_qs().filter(employee_name__iexact=employee_name)[:500]
+    )
+    rows = []
+    for iss in issues:
+        issuer_raw = (iss.created_by_account or "").strip()
+        try:
+            issuer = account_label_for_username(issuer_raw) if issuer_raw else ""
+        except Exception:
+            issuer = issuer_raw
+        tool = iss.tool
+        rows.append(
+            {
+                "tool_name": (tool.name if tool else "") or "—",
+                "category": tool.get_category_display() if tool else "—",
+                "remaining_qty": int(getattr(iss, "remaining_qty", 0) or 0),
+                "issued_qty": int(iss.quantity or 0),
+                "issue_date": iss.movement_date.strftime("%d.%m.%Y") if iss.movement_date else "—",
+                "issued_by": issuer or issuer_raw or "—",
+                "comment": (iss.comment or "").strip(),
+            }
+        )
+
+    try:
+        data = biota_export.build_inventory_open_issues_pdf(
+            employee_name=employee_name,
+            rows=rows,
+        )
+    except Exception as exc:
+        return HttpResponse(f"PDF недоступен: {exc}", status=500)
+
+    name_part = _safe_inventory_pdf_filename_part(employee_name)
+    stamp = timezone.localtime(timezone.now()).strftime("%Y%m%d_%H%M")
+    filename = f"nevozvrat_{name_part}_{stamp}.pdf"
+    resp = HttpResponse(data, content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp

@@ -383,6 +383,7 @@
     wrap.className = "vw-cabinet";
     wrap.dataset.cabinetId = String(cab.id);
     wrap.dataset.kind = cabinetKindOf(cab);
+    wrap.style.setProperty("--vw-cols", String(Math.max(1, parseInt(cab.columns, 10) || 1)));
 
     var name = document.createElement("h2");
     name.className = "vw-cabinet-name";
@@ -901,7 +902,7 @@
     if (stackRow) setVisible(stackRow, !hideStack);
     if (stackHint) {
       if (contKind === "organizer") {
-        stackHint.textContent = "Органайзер занимает одно место на полке; ярусы и разделители — внутри него.";
+        stackHint.textContent = "Органайзер может занимать несколько мест по ширине — так подписи ячеек читаются нормально.";
         setVisible(stackHint, true);
       } else if (isChild) {
         stackHint.textContent = "Подпись ячейки (например «M2 СК»). Ярус и место — внутри органайзера.";
@@ -919,7 +920,17 @@
     }
     contForm.querySelector(".js-vw-cont-column").value = String(cont ? cont.column : col || 1);
     var spanSel = contForm.querySelector(".js-vw-cont-colspan");
-    var spanVal = String(cont ? (cont.col_span || 1) : 1);
+    var preferredSpan = 1;
+    if (contKind === "organizer") {
+      var innerCols = cont
+        ? Math.max(1, parseInt(cont.inner_columns, 10) || 1)
+        : Math.max(1, parseInt((contForm.querySelector(".js-vw-cont-inner-cols") || {}).value, 10) || 2);
+      preferredSpan = Math.max(cont ? (cont.col_span || 1) : 2, Math.min(innerCols, 3));
+      if (!cont) preferredSpan = Math.max(2, Math.min(innerCols, 3));
+    } else if (cont) {
+      preferredSpan = cont.col_span || 1;
+    }
+    var spanVal = String(preferredSpan);
     if (spanSel && spanSel.tagName === "SELECT") {
       if (![].some.call(spanSel.options, function (o) { return o.value === spanVal; })) {
         var opt = document.createElement("option");
@@ -928,7 +939,7 @@
         spanSel.appendChild(opt);
       }
       spanSel.value = spanVal;
-      spanSel.disabled = isChild || contKind === "organizer";
+      spanSel.disabled = isChild;
     }
     var notesEl = contForm.querySelector(".js-vw-cont-notes");
     if (notesEl) notesEl.value = cont ? (cont.notes || "") : "";
@@ -1014,7 +1025,21 @@
       var stackRow = contForm.querySelector(".js-vw-cont-stack-row");
       if (stackRow) setVisible(stackRow, !hideStack);
       var spanSel = contForm.querySelector(".js-vw-cont-colspan");
-      if (spanSel) spanSel.disabled = kind === "organizer";
+      if (spanSel) {
+        spanSel.disabled = false;
+        if (kind === "organizer") {
+          var colsEl = contForm.querySelector(".js-vw-cont-inner-cols");
+          var innerCols = Math.max(1, parseInt(colsEl && colsEl.value, 10) || 2);
+          var prefer = String(Math.max(2, Math.min(innerCols, 3)));
+          if (![].some.call(spanSel.options, function (o) { return o.value === prefer; })) {
+            var opt = document.createElement("option");
+            opt.value = prefer;
+            opt.textContent = prefer + " места";
+            spanSel.appendChild(opt);
+          }
+          if (parseInt(spanSel.value, 10) < 2) spanSel.value = prefer;
+        }
+      }
     });
   }
 

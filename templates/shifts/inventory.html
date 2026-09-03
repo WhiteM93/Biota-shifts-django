@@ -3182,14 +3182,22 @@
 {% if filters.history_employee %}
 <section class="inv-history-open-block" aria-label="Невозвращённый инструмент">
   <div class="inv-history-open-block__head">
-    <h3 class="inv-history-open-block__title">Не возвращено: {{ filters.history_employee }}</h3>
-    <p class="inv-history-open-block__meta muted">
-      {% if history_open_issues %}
-      Позиций: {{ history_open_issues|length }}
-      {% else %}
-      Открытых выдач нет
-      {% endif %}
-    </p>
+    <div class="inv-history-open-block__head-main">
+      <h3 class="inv-history-open-block__title">Не возвращено: {{ filters.history_employee }}</h3>
+      <p class="inv-history-open-block__meta muted">
+        {% if history_open_issues %}
+        Позиций: {{ history_open_issues|length }}
+        {% else %}
+        Открытых выдач нет
+        {% endif %}
+      </p>
+    </div>
+    {% if history_open_issues %}
+    <a
+      class="btn btn-sm inv-history-open-pdf"
+      href="{% url 'inventory_history_open_pdf' %}?history_employee={{ filters.history_employee|urlencode }}"
+    >Скачать PDF</a>
+    {% endif %}
   </div>
   {% if history_open_issues %}
   <ul class="inv-history-list inv-history-list--open">

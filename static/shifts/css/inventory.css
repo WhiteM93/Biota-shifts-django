@@ -162,10 +162,21 @@ html[data-theme="dawn"] .inv-history-open-block {
 .inv-history-open-block__head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 6px 14px;
+  gap: 8px 14px;
   margin-bottom: 10px;
+}
+
+.inv-history-open-block__head-main {
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.inv-history-open-pdf {
+  flex: 0 0 auto;
+  align-self: center;
+  white-space: nowrap;
 }
 
 .inv-history-open-block__title {
@@ -175,7 +186,7 @@ html[data-theme="dawn"] .inv-history-open-block {
 }
 
 .inv-history-open-block__meta {
-  margin: 0;
+  margin: 4px 0 0;
   font-size: 12px;
 }
 

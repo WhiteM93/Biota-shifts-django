@@ -192,7 +192,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # Увеличивайте после правок CSS/JS, чтобы браузер и nginx не отдавали старые файлы.
-STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "233").strip() or "233"
+STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "235").strip() or "235"
 
 # Оптимизации производительности (пакет A): по умолчанию выключены. См. PERFORMANCE_NOTES.md и .env.example.
 _perf = load_perf_settings()

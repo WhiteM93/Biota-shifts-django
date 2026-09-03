@@ -140,15 +140,16 @@ html[data-theme="dawn"] .vw-floor {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  width: min(420px, 96vw);
+  /* Ширина растёт с числом колонок — органайзеры 2×N не сжимаются в «М…» */
+  width: min(max(420px, calc(var(--vw-cols, 4) * 96px + 48px)), 98vw);
 }
 
 .vw-cabinet[data-kind="rack"] {
-  width: min(380px, 96vw);
+  width: min(max(380px, calc(var(--vw-cols, 4) * 90px + 28px)), 98vw);
 }
 
 .vw-cabinet[data-kind="drawer_chest"] {
-  width: min(400px, 96vw);
+  width: min(max(400px, calc(var(--vw-cols, 4) * 94px + 36px)), 98vw);
 }
 
 .vw-cabinet-name {
@@ -301,7 +302,7 @@ html[data-theme="dawn"] .vw-floor {
   gap: 3px;
   width: 100%;
   max-width: 100%;
-  min-width: 0;
+  min-width: 112px;
   padding: 4px;
   border: 1px solid #3a4046;
   border-radius: 4px;
@@ -399,10 +400,10 @@ html[data-theme="dawn"] .vw-floor {
 }
 
 .vw-organizer-tier-cells .vw-bin-text {
-  font-size: 8px;
-  white-space: nowrap;
+  font-size: 9px;
+  white-space: pre;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
 }
 
 .vw-organizer-tier-cells .vw-bin-audit {
@@ -1944,7 +1945,11 @@ html[data-theme="dawn"] .vw-photo-current {
 
 @media (max-width: 720px) {
   .vw-page { padding: 8px 0 24px; }
-  .vw-cabinet { width: 100%; max-width: 420px; margin: 0 auto; }
+  .vw-cabinet {
+    width: 100%;
+    max-width: min(96vw, max(420px, calc(var(--vw-cols, 4) * 96px + 48px)));
+    margin: 0 auto;
+  }
   .vw-control { font-size: 16px; }
 
   .vw-modal--form {
