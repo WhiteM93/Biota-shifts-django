@@ -164,7 +164,7 @@ html[data-theme="dawn"] .vw-floor {
   position: relative;
   width: 100%;
   display: grid;
-  grid-template-columns: 22px 1fr 22px;
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
   background: linear-gradient(180deg, var(--cab-metal-light), var(--cab-metal) 30%, var(--cab-metal-dark));
   border-radius: 4px 4px 2px 2px;
   box-shadow:
@@ -172,16 +172,17 @@ html[data-theme="dawn"] .vw-floor {
     inset 0 1px 0 rgba(255, 255, 255, 0.35);
   padding: 12px 0 10px;
   border: 1px solid #7a8088;
+  overflow: hidden;
 }
 
 .vw-cabinet[data-kind="rack"] .vw-cab-frame {
-  grid-template-columns: 10px 1fr 10px;
+  grid-template-columns: 10px minmax(0, 1fr) 10px;
   padding: 8px 0 8px;
   background: linear-gradient(180deg, #c5c9ce, #9ea4ab 45%, #7f858c);
 }
 
 .vw-cabinet[data-kind="drawer_chest"] .vw-cab-frame {
-  grid-template-columns: 14px 1fr 14px;
+  grid-template-columns: 14px minmax(0, 1fr) 14px;
   padding: 10px 0 12px;
   background: linear-gradient(180deg, #b8bec6, #8e959e 40%, #6d747c);
   border-radius: 3px;
@@ -220,6 +221,8 @@ html[data-theme="dawn"] .vw-floor {
   flex-direction: column;
   gap: 0;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.28), transparent 12%, transparent 88%, rgba(0, 0, 0, 0.28)),
     linear-gradient(180deg, var(--cab-interior-deep), var(--cab-interior));
@@ -252,8 +255,11 @@ html[data-theme="dawn"] .vw-floor {
   flex-direction: column;
   flex: 0 0 auto;
   min-height: 88px;
+  min-width: 0;
+  max-width: 100%;
   position: relative;
   margin-bottom: 4px;
+  overflow: hidden;
 }
 
 .vw-bay-head {
@@ -277,8 +283,11 @@ html[data-theme="dawn"] .vw-floor {
   padding: 8px 2px 6px;
   min-height: 72px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   grid-auto-flow: row dense;
+  overflow: hidden;
 }
 
 .vw-pile {
@@ -302,7 +311,7 @@ html[data-theme="dawn"] .vw-floor {
   gap: 3px;
   width: 100%;
   max-width: 100%;
-  min-width: 112px;
+  min-width: 0;
   padding: 4px;
   border: 1px solid #3a4046;
   border-radius: 4px;
