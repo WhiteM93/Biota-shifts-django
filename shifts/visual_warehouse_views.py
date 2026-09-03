@@ -15,14 +15,30 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
-from .body_tool_constants import INDEXABLE_MILL_CUTTER_TYPES
-from .collet_constants import COLLET_TYPES, COLLET_TYPE_VALUES
+from .body_tool_constants import (
+    BODY_TOOL_FAMILIES,
+    BODY_TOOL_SHANK_TYPES,
+    BODY_TOOL_SHANK_VALUES,
+    INDEXABLE_MILL_CUTTER_TYPES,
+    MODULAR_HEAD_THREADS,
+    MODULAR_HEAD_THREAD_VALUES,
+    normalize_body_tool_family,
+    normalize_body_tool_shank,
+    normalize_modular_head_thread,
+)
+from .collet_constants import COLLET_TYPES, COLLET_TYPE_VALUES, ER_COLLET_SIZES, ER_COLLET_SIZE_VALUES, normalize_er_collet_size
+from .insert_constants import INSERT_SHAPES, INSERT_SHAPE_VALUES, MILLING_INSERT_FAMILIES, normalize_milling_family
 from .models import (
+    CENTER_DRILL_ANGLES,
     COATING_TYPE_TOOLTIPS,
+    COUNTERSINK_ANGLES,
     COUNTERSINK_TYPES,
     END_MILL_TYPES,
     TAP_HOLE_TYPES,
     TAP_TOOL_TYPES,
+    THREAD_KINDS,
+    THREAD_KIND_VALUES,
+    THREAD_STANDARDS,
     BodyToolSpec,
     CenterDrillSpec,
     CountersinkSpec,
@@ -38,6 +54,7 @@ from .models import (
     VisualContainerAuditLine,
     VisualContainerItem,
     VisualContainerPhoto,
+    normalize_thread_kind,
 )
 
 MAX_CABINETS = 40
@@ -56,6 +73,14 @@ _VALID_TAP_HOLE_TYPES = {c for c, _ in TAP_HOLE_TYPES}
 _VALID_COUNTERSINK_TYPES = {c for c, _ in COUNTERSINK_TYPES}
 _VALID_COLLET_TYPES = set(COLLET_TYPE_VALUES)
 _VALID_BODY_CUTTER_TYPES = {c for c, _ in INDEXABLE_MILL_CUTTER_TYPES}
+_VALID_THREAD_KINDS = set(THREAD_KIND_VALUES)
+_VALID_THREAD_STANDARDS = {c for c, _ in THREAD_STANDARDS}
+_VALID_BODY_FAMILIES = {c for c, _ in BODY_TOOL_FAMILIES if c}
+_VALID_SHANK_TYPES = set(BODY_TOOL_SHANK_VALUES)
+_VALID_MOUNT_THREADS = set(MODULAR_HEAD_THREAD_VALUES)
+_VALID_INSERT_SHAPES = set(INSERT_SHAPE_VALUES)
+_VALID_INSERT_FAMILIES = {c for c, _ in MILLING_INSERT_FAMILIES if c}
+_VALID_ER_SIZES = set(ER_COLLET_SIZE_VALUES)
 _DIAMETER_FIELD_BY_CATEGORY = {
     "end_mill": "end_mill_spec__diameter_mm",
     "body_tool": "body_tool_spec__diameter_mm",
@@ -132,11 +157,29 @@ def _serialize_item(item: VisualContainerItem, stock_qty: int | None = None) -> 
         "tool_category": item.tool_category or "",
         "mill_type": (getattr(item, "mill_type", None) or ""),
         "body_cutter_type": (getattr(item, "body_cutter_type", None) or ""),
+        "body_family": (getattr(item, "body_family", None) or ""),
+        "brand": (getattr(item, "brand", None) or ""),
+        "shank_type": (getattr(item, "shank_type", None) or ""),
+        "mount_thread": (getattr(item, "mount_thread", None) or ""),
+        "teeth_count": getattr(item, "teeth_count", None),
+        "coolant_filter": (getattr(item, "coolant_filter", None) or ""),
         "tap_type": (getattr(item, "tap_type", None) or ""),
         "hole_type": (getattr(item, "hole_type", None) or ""),
+        "thread_kind": (getattr(item, "thread_kind", None) or ""),
+        "thread_standard": (getattr(item, "thread_standard", None) or ""),
+        "pitch_mm": float(item.pitch_mm) if getattr(item, "pitch_mm", None) is not None else None,
         "countersink_type": (getattr(item, "countersink_type", None) or ""),
         "collet_type": (getattr(item, "collet_type", None) or ""),
+        "collet_er_size": (getattr(item, "collet_er_size", None) or ""),
         "size_label": (getattr(item, "size_label", None) or ""),
+        "insert_compat": (getattr(item, "insert_compat", None) or ""),
+        "insert_family": (getattr(item, "insert_family", None) or ""),
+        "insert_shape": (getattr(item, "insert_shape", None) or ""),
+        "flutes_count": getattr(item, "flutes_count", None),
+        "corner_radius_mm": (
+            float(item.corner_radius_mm) if getattr(item, "corner_radius_mm", None) is not None else None
+        ),
+        "angle_deg": (getattr(item, "angle_deg", None) or ""),
         "diameter_from_mm": float(item.diameter_from_mm) if item.diameter_from_mm is not None else None,
         "diameter_to_mm": float(item.diameter_to_mm) if item.diameter_to_mm is not None else None,
         "tool_item_id": item.tool_item_id,
@@ -144,6 +187,38 @@ def _serialize_item(item: VisualContainerItem, stock_qty: int | None = None) -> 
         "notes": item.notes or "",
         "sort_order": item.sort_order,
         "stock_qty": stock_qty,
+    }
+
+
+def _item_filter_kwargs(item: VisualContainerItem) -> dict:
+    """Параметры фильтра из правила контейнера (пустые = не учитывать)."""
+    return {
+        "category": item.tool_category or "",
+        "d_from": item.diameter_from_mm,
+        "d_to": item.diameter_to_mm,
+        "mill_type": getattr(item, "mill_type", None) or "",
+        "body_cutter_type": getattr(item, "body_cutter_type", None) or "",
+        "body_family": getattr(item, "body_family", None) or "",
+        "brand": getattr(item, "brand", None) or "",
+        "shank_type": getattr(item, "shank_type", None) or "",
+        "mount_thread": getattr(item, "mount_thread", None) or "",
+        "teeth_count": getattr(item, "teeth_count", None),
+        "coolant_filter": getattr(item, "coolant_filter", None) or "",
+        "tap_type": getattr(item, "tap_type", None) or "",
+        "hole_type": getattr(item, "hole_type", None) or "",
+        "thread_kind": getattr(item, "thread_kind", None) or "",
+        "thread_standard": getattr(item, "thread_standard", None) or "",
+        "pitch_mm": getattr(item, "pitch_mm", None),
+        "countersink_type": getattr(item, "countersink_type", None) or "",
+        "collet_type": getattr(item, "collet_type", None) or "",
+        "collet_er_size": getattr(item, "collet_er_size", None) or "",
+        "size_label": getattr(item, "size_label", None) or "",
+        "insert_compat": getattr(item, "insert_compat", None) or "",
+        "insert_family": getattr(item, "insert_family", None) or "",
+        "insert_shape": getattr(item, "insert_shape", None) or "",
+        "flutes_count": getattr(item, "flutes_count", None),
+        "corner_radius_mm": getattr(item, "corner_radius_mm", None),
+        "angle_deg": getattr(item, "angle_deg", None) or "",
     }
 
 
@@ -172,18 +247,7 @@ def _stock_qty_for_item(item: VisualContainerItem) -> int | None:
         return int(item.tool_item.quantity or 0)
     if not item.tool_category:
         return None
-    qs = _tool_qs_for_filter(
-        category=item.tool_category,
-        d_from=item.diameter_from_mm,
-        d_to=item.diameter_to_mm,
-        mill_type=getattr(item, "mill_type", None) or "",
-        body_cutter_type=getattr(item, "body_cutter_type", None) or "",
-        tap_type=getattr(item, "tap_type", None) or "",
-        hole_type=getattr(item, "hole_type", None) or "",
-        countersink_type=getattr(item, "countersink_type", None) or "",
-        collet_type=getattr(item, "collet_type", None) or "",
-        size_label=getattr(item, "size_label", None) or "",
-    )
+    qs = _tool_qs_for_filter(**_item_filter_kwargs(item))
     total = qs.aggregate(s=Sum("quantity"))["s"]
     return int(total or 0)
 
@@ -354,11 +418,27 @@ def _tool_qs_for_filter(
     d_to=None,
     mill_type: str = "",
     body_cutter_type: str = "",
+    body_family: str = "",
+    brand: str = "",
+    shank_type: str = "",
+    mount_thread: str = "",
+    teeth_count=None,
+    coolant_filter: str = "",
     tap_type: str = "",
     hole_type: str = "",
+    thread_kind: str = "",
+    thread_standard: str = "",
+    pitch_mm=None,
     countersink_type: str = "",
     collet_type: str = "",
+    collet_er_size: str = "",
     size_label: str = "",
+    insert_compat: str = "",
+    insert_family: str = "",
+    insert_shape: str = "",
+    flutes_count=None,
+    corner_radius_mm=None,
+    angle_deg: str = "",
 ):
     if tool_item_id:
         return ToolItem.objects.filter(pk=tool_item_id, is_deleted=False).select_related(
@@ -385,32 +465,87 @@ def _tool_qs_for_filter(
     )
     diam_field = _DIAMETER_FIELD_BY_CATEGORY.get(category)
     if diam_field and (d_from is not None or d_to is not None):
-        # Режущий Ø из спецификации; если пусто — запасной main_diameter_mm
         qs = qs.annotate(_match_diameter=Coalesce(F(diam_field), F("main_diameter_mm")))
         if d_from is not None:
             qs = qs.filter(_match_diameter__gte=d_from)
         if d_to is not None:
             qs = qs.filter(_match_diameter__lte=d_to)
     elif category == "tap":
-        # У метчиков режущий Ø обычно в main_diameter / размере — оставляем запасной фильтр
         if d_from is not None:
             qs = qs.filter(main_diameter_mm__gte=d_from)
         if d_to is not None:
             qs = qs.filter(main_diameter_mm__lte=d_to)
-    if category == "end_mill" and mill_type:
-        qs = qs.filter(end_mill_spec__mill_type=mill_type)
-    if category == "body_tool" and body_cutter_type:
-        qs = qs.filter(body_tool_spec__cutter_type=body_cutter_type)
-    if category == "tap" and tap_type:
-        qs = qs.filter(tap_spec__tap_type=tap_type)
-    if category == "tap" and hole_type:
-        qs = qs.filter(tap_spec__hole_type=hole_type)
-    if category == "tap" and size_label:
-        qs = qs.filter(tap_spec__size_label__icontains=size_label.strip())
-    if category == "countersink" and countersink_type:
-        qs = qs.filter(countersink_spec__countersink_type=countersink_type)
-    if category == "collet" and collet_type:
-        qs = qs.filter(collet_spec__collet_type=collet_type)
+
+    if category == "end_mill":
+        if mill_type:
+            qs = qs.filter(end_mill_spec__mill_type=mill_type)
+        if flutes_count is not None:
+            qs = qs.filter(end_mill_spec__flutes_count=flutes_count)
+        if corner_radius_mm is not None:
+            qs = qs.filter(end_mill_spec__corner_radius_mm=corner_radius_mm)
+
+    if category == "body_tool":
+        if body_cutter_type:
+            qs = qs.filter(body_tool_spec__cutter_type=body_cutter_type)
+        if body_family:
+            qs = qs.filter(body_tool_spec__family=normalize_body_tool_family(body_family))
+        if brand:
+            qs = qs.filter(body_tool_spec__brand__iexact=brand.strip())
+        if shank_type:
+            qs = qs.filter(body_tool_spec__shank_type=normalize_body_tool_shank(shank_type))
+        if mount_thread:
+            qs = qs.filter(body_tool_spec__mount_thread=normalize_modular_head_thread(mount_thread))
+        if teeth_count is not None:
+            qs = qs.filter(body_tool_spec__teeth_count=teeth_count)
+        if coolant_filter in ("0", "1"):
+            qs = qs.filter(body_tool_spec__coolant_through=(coolant_filter == "1"))
+        if insert_compat:
+            qs = qs.filter(body_tool_spec__insert_compat__icontains=insert_compat.strip())
+
+    if category == "tap":
+        if tap_type:
+            qs = qs.filter(tap_spec__tap_type=tap_type)
+        if hole_type:
+            qs = qs.filter(tap_spec__hole_type=hole_type)
+        if thread_kind:
+            qs = qs.filter(tap_spec__thread_kind=normalize_thread_kind(thread_kind))
+        if thread_standard:
+            qs = qs.filter(tap_spec__thread_standard=thread_standard)
+        if pitch_mm is not None:
+            qs = qs.filter(tap_spec__pitch_mm=pitch_mm)
+        if size_label:
+            qs = qs.filter(tap_spec__size_label__icontains=size_label.strip())
+
+    if category == "countersink":
+        if countersink_type:
+            qs = qs.filter(countersink_spec__countersink_type=countersink_type)
+        if size_label:
+            qs = qs.filter(countersink_spec__size_label__iexact=size_label.strip())
+        if angle_deg:
+            qs = qs.filter(countersink_spec__angle_deg=str(angle_deg).strip())
+        if flutes_count is not None:
+            qs = qs.filter(countersink_spec__flutes_count=flutes_count)
+
+    if category == "collet":
+        if collet_type:
+            qs = qs.filter(collet_spec__collet_type=collet_type)
+        if collet_er_size:
+            qs = qs.filter(collet_spec__er_size=normalize_er_collet_size(collet_er_size))
+
+    if category == "insert":
+        if insert_family:
+            qs = qs.filter(insert_spec__milling_family=normalize_milling_family(insert_family))
+        if insert_shape:
+            qs = qs.filter(insert_spec__insert_shape=insert_shape)
+
+    if category == "center_drill" and angle_deg:
+        qs = qs.filter(center_drill_spec__angle_deg=str(angle_deg).strip())
+    if category == "drill" and angle_deg:
+        try:
+            qs = qs.filter(drill_spec__angle_deg=Decimal(str(angle_deg)))
+        except (InvalidOperation, TypeError, ValueError):
+            pass
+
     return qs
 
 
@@ -423,18 +558,7 @@ def _qs_for_item_rule(item: VisualContainerItem):
         return _tool_qs_for_filter(tool_item_id=item.tool_item_id)
     if not item.tool_category:
         return ToolItem.objects.none()
-    return _tool_qs_for_filter(
-        category=item.tool_category,
-        d_from=item.diameter_from_mm,
-        d_to=item.diameter_to_mm,
-        mill_type=getattr(item, "mill_type", None) or "",
-        body_cutter_type=getattr(item, "body_cutter_type", None) or "",
-        tap_type=getattr(item, "tap_type", None) or "",
-        hole_type=getattr(item, "hole_type", None) or "",
-        countersink_type=getattr(item, "countersink_type", None) or "",
-        collet_type=getattr(item, "collet_type", None) or "",
-        size_label=getattr(item, "size_label", None) or "",
-    )
+    return _tool_qs_for_filter(**_item_filter_kwargs(item))
 
 
 def _matching_tools_for_container(c: VisualContainer, items: list[VisualContainerItem] | None = None) -> list[dict]:
@@ -517,10 +641,19 @@ def _normalize_container_kind(raw) -> str:
 
 
 def _default_organizer_cell_label(tier: int, col: int, cols: int) -> str:
+    """Короткие подписи — длинные «Ярус N …» обрезаются в мини-ячейках."""
     if cols == 2:
         side = "СК" if col == 1 else "ГЛ"
-        return f"Ярус {tier} {side}"
-    return f"Ярус {tier} · {col}"
+        return f"{tier}{side}"
+    return f"{tier}.{col}"
+
+
+def _legacy_organizer_cell_labels(tier: int, col: int, cols: int) -> set[str]:
+    labels = {f"Ярус {tier} · {col}", f"Ярус {tier}.{col}", f"{tier} · {col}"}
+    if cols == 2:
+        side = "СК" if col == 1 else "ГЛ"
+        labels.add(f"Ярус {tier} {side}")
+    return labels
 
 
 def _serialize_photo(photo: VisualContainerPhoto) -> dict:
@@ -696,12 +829,18 @@ def _ensure_organizer_children(org: VisualContainer) -> None:
             )
     if to_create:
         VisualContainer.objects.bulk_create(to_create)
-    # Удаляем лишние пустые ячейки за пределами сетки
+    # Удаляем лишние пустые ячейки за пределами сетки;
+    # у существующих авто-подписей «Ярус …» ставим короткие, чтобы не раздувать ячейку.
     for (t, c), ch in existing.items():
         if t > tiers or c > cols:
             if ch.items.exists():
                 continue
             ch.delete()
+            continue
+        new_lab = _default_organizer_cell_label(t, c, cols)
+        if (ch.label or "").strip() in _legacy_organizer_cell_labels(t, c, cols) and ch.label != new_lab:
+            ch.label = new_lab
+            ch.save(update_fields=["label", "updated_at"])
 
 
 def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> dict:
@@ -715,6 +854,9 @@ def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> d
         "sort_order": cab.sort_order,
     }
     if with_containers:
+        # Подтянуть сетку органайзеров и укоротить старые подписи «Ярус …»
+        for org in cab.containers.filter(kind=VisualContainer.KIND_ORGANIZER, parent__isnull=True):
+            _ensure_organizer_children(org)
         all_conts = list(cab.containers.all())
         children_by_parent: dict[int, list[VisualContainer]] = {}
         tops: list[VisualContainer] = []
@@ -723,7 +865,7 @@ def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> d
                 children_by_parent.setdefault(c.parent_id, []).append(c)
             else:
                 tops.append(c)
-        flat_containers = list(all_conts)
+        flat_containers = list(tops)
         for kids in children_by_parent.values():
             flat_containers.extend(kids)
         _attach_photo_summaries(flat_containers)
@@ -778,10 +920,22 @@ def visual_warehouse_view(request):
             ],
             "end_mill_types": [{"value": v, "label": lab} for v, lab in END_MILL_TYPES],
             "indexable_mill_cutter_types": [{"value": v, "label": lab} for v, lab in INDEXABLE_MILL_CUTTER_TYPES],
+            "body_tool_families": [{"value": v, "label": lab} for v, lab in BODY_TOOL_FAMILIES if v],
+            "body_tool_shank_types": [{"value": v, "label": lab} for v, lab in BODY_TOOL_SHANK_TYPES if v],
+            "modular_head_threads": [{"value": v, "label": lab} for v, lab in MODULAR_HEAD_THREADS if v],
             "tap_types": [{"value": v, "label": lab} for v, lab in TAP_TOOL_TYPES],
             "tap_hole_types": [{"value": v, "label": lab} for v, lab in TAP_HOLE_TYPES],
+            "thread_kinds": [{"value": v, "label": lab} for v, lab in THREAD_KINDS],
+            "thread_standards": [{"value": v, "label": lab} for v, lab in THREAD_STANDARDS],
             "countersink_types": [{"value": v, "label": lab} for v, lab in COUNTERSINK_TYPES],
+            "countersink_angles": [{"value": v, "label": lab} for v, lab in COUNTERSINK_ANGLES],
+            "center_drill_angles": [{"value": v, "label": lab} for v, lab in CENTER_DRILL_ANGLES],
             "collet_types": [{"value": v, "label": lab} for v, lab in COLLET_TYPES],
+            "er_collet_sizes": [{"value": v, "label": lab} for v, lab in ER_COLLET_SIZES],
+            "insert_shapes": [{"value": v, "label": lab} for v, lab in INSERT_SHAPES],
+            "milling_insert_families": [
+                {"value": v, "label": lab} for v, lab in MILLING_INSERT_FAMILIES if v
+            ],
         },
     )
 
@@ -1073,6 +1227,137 @@ def _container_delete(request, cont: VisualContainer):
     return JsonResponse({"ok": True})
 
 
+def _parse_item_filters(body: dict, category: str) -> tuple[dict | None, str | None]:
+    """Разобрать опциональные фильтры правила. Пустые поля = «не учитывать»."""
+    mill_type = str(body.get("mill_type") or "").strip()
+    if mill_type and mill_type not in _VALID_MILL_TYPES:
+        return None, "Некорректный тип фрезы"
+    body_cutter_type = str(body.get("body_cutter_type") or "").strip()
+    if body_cutter_type and body_cutter_type not in _VALID_BODY_CUTTER_TYPES:
+        return None, "Некорректный тип корпусной фрезы"
+    body_family = str(body.get("body_family") or "").strip()
+    if body_family and body_family not in _VALID_BODY_FAMILIES:
+        return None, "Некорректное семейство корпусного"
+    brand = str(body.get("brand") or "").strip()[:80]
+    shank_type = normalize_body_tool_shank(body.get("shank_type"))
+    if str(body.get("shank_type") or "").strip() and not shank_type:
+        return None, "Некорректный тип хвостовика"
+    mount_thread = normalize_modular_head_thread(body.get("mount_thread"))
+    if str(body.get("mount_thread") or "").strip() and not mount_thread:
+        return None, "Некорректная резьба крепления"
+    teeth_count = _to_int_or_none(body.get("teeth_count"))
+    coolant_filter = str(body.get("coolant_filter") or "").strip()
+    if coolant_filter and coolant_filter not in ("0", "1"):
+        return None, "Некорректный фильтр СОЖ"
+    tap_type = str(body.get("tap_type") or "").strip()
+    if tap_type and tap_type not in _VALID_TAP_TYPES:
+        return None, "Некорректный тип резьбового инструмента"
+    hole_type = str(body.get("hole_type") or "").strip()
+    if hole_type and hole_type not in _VALID_TAP_HOLE_TYPES:
+        return None, "Некорректный тип отверстия"
+    thread_kind = str(body.get("thread_kind") or "").strip()
+    if thread_kind and thread_kind not in _VALID_THREAD_KINDS:
+        return None, "Некорректный тип резьбы"
+    thread_standard = str(body.get("thread_standard") or "").strip()
+    if thread_standard and thread_standard not in _VALID_THREAD_STANDARDS:
+        return None, "Некорректный стандарт резьбы"
+    pitch_mm = _dec(body.get("pitch_mm"))
+    countersink_type = str(body.get("countersink_type") or "").strip()
+    if countersink_type and countersink_type not in _VALID_COUNTERSINK_TYPES:
+        return None, "Некорректный тип зенкера"
+    collet_type = str(body.get("collet_type") or "").strip()
+    if collet_type and collet_type not in _VALID_COLLET_TYPES:
+        return None, "Некорректный тип цанги"
+    collet_er_size = normalize_er_collet_size(body.get("collet_er_size"))
+    if str(body.get("collet_er_size") or "").strip() and not collet_er_size:
+        return None, "Некорректный размер ER"
+    size_label = str(body.get("size_label") or "").strip()[:32]
+    insert_compat = str(body.get("insert_compat") or "").strip()[:80]
+    insert_family = normalize_milling_family(body.get("insert_family"))
+    insert_shape = str(body.get("insert_shape") or "").strip().upper()
+    if insert_shape and insert_shape not in _VALID_INSERT_SHAPES:
+        return None, "Некорректная форма пластины"
+    flutes_count = _to_int_or_none(body.get("flutes_count"))
+    corner_radius_mm = _dec(body.get("corner_radius_mm"))
+    angle_deg = str(body.get("angle_deg") or "").strip()[:16]
+    d_from = _dec(body.get("diameter_from_mm"))
+    d_to = _dec(body.get("diameter_to_mm"))
+
+    # Сбрасываем поля, не относящиеся к выбранной категории
+    if category != "end_mill":
+        mill_type = ""
+        corner_radius_mm = None
+    if category != "body_tool":
+        body_cutter_type = ""
+        body_family = ""
+        brand = ""
+        shank_type = ""
+        mount_thread = ""
+        teeth_count = None
+        coolant_filter = ""
+        insert_compat = ""
+    if category != "tap":
+        tap_type = ""
+        hole_type = ""
+        thread_kind = ""
+        thread_standard = ""
+        pitch_mm = None
+    if category not in ("tap", "countersink"):
+        size_label = ""
+    if category != "countersink":
+        countersink_type = ""
+    if category != "collet":
+        collet_type = ""
+        collet_er_size = ""
+    if category != "insert":
+        insert_family = ""
+        insert_shape = ""
+    if category not in ("end_mill", "countersink"):
+        flutes_count = None
+    if category not in ("drill", "center_drill", "countersink"):
+        angle_deg = ""
+    if category not in ("end_mill", "body_tool", "drill", "center_drill", "countersink", "tap"):
+        d_from = None
+        d_to = None
+
+    return {
+        "mill_type": mill_type,
+        "body_cutter_type": body_cutter_type,
+        "body_family": body_family,
+        "brand": brand,
+        "shank_type": shank_type,
+        "mount_thread": mount_thread,
+        "teeth_count": teeth_count,
+        "coolant_filter": coolant_filter,
+        "tap_type": tap_type,
+        "hole_type": hole_type,
+        "thread_kind": thread_kind,
+        "thread_standard": thread_standard,
+        "pitch_mm": pitch_mm,
+        "countersink_type": countersink_type,
+        "collet_type": collet_type,
+        "collet_er_size": collet_er_size,
+        "size_label": size_label,
+        "insert_compat": insert_compat,
+        "insert_family": insert_family,
+        "insert_shape": insert_shape,
+        "flutes_count": flutes_count,
+        "corner_radius_mm": corner_radius_mm,
+        "angle_deg": angle_deg,
+        "diameter_from_mm": d_from,
+        "diameter_to_mm": d_to,
+    }, None
+
+
+def _to_int_or_none(raw):
+    if raw is None or raw == "":
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 @biota_login_required
 @nav_permission_required("visual_warehouse")
 @write_permission_required
@@ -1088,41 +1373,9 @@ def visual_warehouse_api_item_upsert(request):
     category = str(body.get("tool_category") or "").strip()
     if category and category not in _VALID_CATEGORIES:
         return _err("Некорректная категория")
-    mill_type = str(body.get("mill_type") or "").strip()
-    if mill_type and mill_type not in _VALID_MILL_TYPES:
-        return _err("Некорректный тип фрезы")
-    if category != "end_mill":
-        mill_type = ""
-    body_cutter_type = str(body.get("body_cutter_type") or "").strip()
-    if body_cutter_type and body_cutter_type not in _VALID_BODY_CUTTER_TYPES:
-        return _err("Некорректный тип корпусной фрезы")
-    if category != "body_tool":
-        body_cutter_type = ""
-    tap_type = str(body.get("tap_type") or "").strip()
-    if tap_type and tap_type not in _VALID_TAP_TYPES:
-        return _err("Некорректный тип резьбового инструмента")
-    if category != "tap":
-        tap_type = ""
-    hole_type = str(body.get("hole_type") or "").strip()
-    if hole_type and hole_type not in _VALID_TAP_HOLE_TYPES:
-        return _err("Некорректный тип отверстия")
-    if category != "tap":
-        hole_type = ""
-    countersink_type = str(body.get("countersink_type") or "").strip()
-    if countersink_type and countersink_type not in _VALID_COUNTERSINK_TYPES:
-        return _err("Некорректный тип зенкера")
-    if category != "countersink":
-        countersink_type = ""
-    collet_type = str(body.get("collet_type") or "").strip()
-    if collet_type and collet_type not in _VALID_COLLET_TYPES:
-        return _err("Некорректный тип цанги")
-    if category != "collet":
-        collet_type = ""
-    size_label = str(body.get("size_label") or "").strip()[:32]
-    if category != "tap":
-        size_label = ""
-    d_from = _dec(body.get("diameter_from_mm"))
-    d_to = _dec(body.get("diameter_to_mm"))
+    filters, ferr = _parse_item_filters(body, category)
+    if ferr:
+        return _err(ferr)
     quantity_note = str(body.get("quantity_note") or "").strip()[:80]
     notes = str(body.get("notes") or "").strip()[:300]
     rule_kind = str(body.get("rule_kind") or VisualContainerItem.RULE_INCLUDE).strip().lower()
@@ -1154,15 +1407,8 @@ def visual_warehouse_api_item_upsert(request):
         item.title = title
         item.rule_kind = rule_kind
         item.tool_category = category
-        item.mill_type = mill_type
-        item.body_cutter_type = body_cutter_type
-        item.tap_type = tap_type
-        item.hole_type = hole_type
-        item.countersink_type = countersink_type
-        item.collet_type = collet_type
-        item.size_label = size_label
-        item.diameter_from_mm = d_from
-        item.diameter_to_mm = d_to
+        for k, v in filters.items():
+            setattr(item, k, v)
         item.quantity_note = quantity_note
         item.notes = notes
         item.tool_item = tool_item
@@ -1175,19 +1421,11 @@ def visual_warehouse_api_item_upsert(request):
             title=title,
             rule_kind=rule_kind,
             tool_category=category,
-            mill_type=mill_type,
-            body_cutter_type=body_cutter_type,
-            tap_type=tap_type,
-            hole_type=hole_type,
-            countersink_type=countersink_type,
-            collet_type=collet_type,
-            size_label=size_label,
-            diameter_from_mm=d_from,
-            diameter_to_mm=d_to,
             quantity_note=quantity_note,
             notes=notes,
             tool_item=tool_item,
             sort_order=cont.items.count(),
+            **filters,
         )
     item = VisualContainerItem.objects.select_related("tool_item").get(pk=item.pk)
     return JsonResponse({"ok": True, "item": _serialize_item(item, _stock_qty_for_item(item))})

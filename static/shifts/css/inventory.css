@@ -572,7 +572,7 @@
   border-radius: 8px;
   background: var(--bio-surface-panel);
   box-shadow: var(--bio-filter-shadow);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .inv-stock-sidebar {
@@ -701,7 +701,8 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .inv-page--stock .inv-stock-grid.data-grid {
@@ -737,6 +738,30 @@
   vertical-align: middle;
   line-height: 1.2;
   hyphens: auto;
+}
+
+.inv-page--stock .inv-stock-table-wrap .inv-stock-grid.data-grid th.hint-cell {
+  position: relative;
+  overflow: visible;
+  cursor: help;
+}
+
+.inv-page--stock .inv-stock-table-wrap .inv-stock-grid.data-grid th.hint-cell:hover::before {
+  content: attr(data-hint);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 6px);
+  transform: translateX(-50%);
+  background: var(--bio-input-bg);
+  color: var(--bio-body-fg);
+  border: 1px solid var(--bio-input-border);
+  border-radius: 3px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 80;
+  pointer-events: none;
 }
 
 .inv-page--stock .inv-stock-grid td.diameter-col {

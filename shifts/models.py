@@ -25,6 +25,32 @@ THREAD_STANDARDS = [
     ("other", "Другое"),
 ]
 
+THREAD_KINDS = [
+    ("standard", "Стандарт"),
+    ("non_standard", "Не стандарт"),
+]
+THREAD_KIND_VALUES = frozenset(k for k, _ in THREAD_KINDS)
+THREAD_KIND_LABELS = dict(THREAD_KINDS)
+
+
+def normalize_thread_kind(raw) -> str:
+    v = str(raw or "").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "std": "standard",
+        "стандарт": "standard",
+        "standart": "standard",
+        "nonstandard": "non_standard",
+        "non_std": "non_standard",
+        "custom": "non_standard",
+        "не_стандарт": "non_standard",
+        "нестандарт": "non_standard",
+    }
+    v = aliases.get(v, v)
+    if v in THREAD_KIND_VALUES:
+        return v
+    return "standard"
+
+
 TAP_HOLE_TYPES = [
     ("through", "Сквозное"),
     ("blind", "Глухое"),
@@ -158,6 +184,7 @@ from .body_tool_constants import (
     BODY_TOOL_SHANK_TYPES,
     HIGH_SPEED_BODY_STYLES,
     INDEXABLE_MILL_CUTTER_TYPES,
+    MODULAR_HEAD_THREADS,
 )
 from .insert_constants import (
     INSERT_MACHINING_APPLICATIONS,
@@ -309,6 +336,7 @@ class ToolItem(models.Model):
             segs = [
                 self.get_category_display(),
                 tp.size_label if tp and tp.size_label else "—",
+                tp.get_thread_kind_display() if tp else "—",
                 tp.get_thread_standard_display() if tp else "—",
                 f"шаг {fmt_mm(tp.pitch_mm) if tp and tp.pitch_mm is not None else '—'}",
                 f"TPI {tp.tpi if tp and tp.tpi is not None else '—'}",
@@ -519,6 +547,7 @@ class ToolItem(models.Model):
             else:
                 tool_type = self.get_category_display()
             if tp:
+                specs_parts.append(tp.get_thread_kind_display())
                 specs_parts.append(tp.get_thread_standard_display())
                 if tp.pitch_mm is not None:
                     specs_parts.append(f"шаг={fmt_mm(tp.pitch_mm)} мм")
@@ -629,6 +658,10 @@ class ToolItem(models.Model):
                     specs_parts.append(f"H={fmt_mm(bt.cutting_length_mm)} мм")
                 specs_parts.append("СОЖ" if bt.coolant_through else "без СОЖ")
                 ins_bits = []
+                if bt.cutter_type in ("ball", "modular_head") and (bt.insert_compat or "").strip():
+                    specs_parts.append(bt.insert_compat.strip())
+                if bt.cutter_type == "modular_head" and (bt.mount_thread or "").strip():
+                    specs_parts.append(bt.get_mount_thread_display())
                 if (bt.insert_family or "").strip():
                     ins_bits.append(bt.insert_family.strip().upper())
                 if (bt.insert_size or "").strip():
@@ -725,6 +758,7 @@ class ToolItem(models.Model):
                 out["tap_size"] = (tp.size_label or "").strip()
                 out["tap_pitch"] = fmt_num(tp.pitch_mm)
                 out["tap_thread"] = (tp.thread_standard or "").strip()
+                out["tap_thread_kind"] = (tp.thread_kind or "").strip()
                 out["tap_hole"] = (tp.hole_type or "").strip()
                 out["length"] = fmt_num(tp.overall_length_mm)
                 out["cutting_length"] = fmt_num(tp.cutting_length_mm)
@@ -803,6 +837,12 @@ class EndMillSpec(models.Model):
 class TapSpec(models.Model):
     tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="tap_spec")
     thread_standard = models.CharField(max_length=20, choices=THREAD_STANDARDS, default="metric")
+    thread_kind = models.CharField(
+        max_length=16,
+        choices=THREAD_KINDS,
+        default="standard",
+        verbose_name="Тип резьбы",
+    )
     size_label = models.CharField(max_length=32, verbose_name="Размер (M2, 1/4-20 и т.д.)")
     pitch_mm = models.DecimalField(max_digits=6, decimal_places=3, verbose_name="Шаг резьбы, мм", null=True, blank=True)
     tpi = models.PositiveSmallIntegerField(verbose_name="TPI (для дюймовых)", null=True, blank=True)
@@ -817,6 +857,10 @@ class TapSpec(models.Model):
 
     def __str__(self):
         return f"{self.size_label} ({self.get_thread_standard_display()})"
+
+    def save(self, *args, **kwargs):
+        self.thread_kind = normalize_thread_kind(self.thread_kind)
+        super().save(*args, **kwargs)
 
 
 class CenterDrillSpec(models.Model):
@@ -1207,6 +1251,13 @@ class BodyToolSpec(models.Model):
     insert_compat = models.CharField(
         max_length=80, blank=True, default="", verbose_name="Совместимые пластины"
     )
+    mount_thread = models.CharField(
+        max_length=8,
+        blank=True,
+        default="",
+        choices=MODULAR_HEAD_THREADS,
+        verbose_name="Резьба крепления",
+    )
 
     class Meta:
         verbose_name = "Параметры корпусного инструмента"
@@ -1234,6 +1285,7 @@ class BodyToolSpec(models.Model):
             normalize_high_speed_body_style,
             normalize_indexable_mill_cutter,
             normalize_insert_size,
+            normalize_modular_head_thread,
         )
         from shifts.insert_constants import normalize_milling_family
 
@@ -1242,11 +1294,14 @@ class BodyToolSpec(models.Model):
         self.coupling = normalize_body_tool_coupling(self.coupling)
         self.shank_type = normalize_body_tool_shank(self.shank_type)
         self.hs_body_style = normalize_high_speed_body_style(self.hs_body_style)
+        self.mount_thread = normalize_modular_head_thread(self.mount_thread)
         derived = coupling_from_shank(self.shank_type)
         if derived:
             self.coupling = derived
         elif self.cutter_type == "end" and not self.coupling:
             self.coupling = "shank"
+        elif self.cutter_type == "modular_head":
+            self.coupling = "modular"
         if self.variable_angle:
             self.approach_angle_deg = None
         self.insert_family = normalize_milling_family(self.insert_family)
@@ -2254,6 +2309,20 @@ class ProductSetup(models.Model):
     )
     sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
     in_work = models.BooleanField(default=False, verbose_name="В работе")
+    READINESS_NOT_READY = "not_ready"
+    READINESS_READY = "ready"
+    READINESS_WORKED = "worked"
+    READINESS_STATUS_CHOICES = (
+        (READINESS_NOT_READY, "Наладка не готова"),
+        (READINESS_READY, "Наладка готова"),
+        (READINESS_WORKED, "Наладка отработана"),
+    )
+    readiness_status = models.CharField(
+        max_length=16,
+        choices=READINESS_STATUS_CHOICES,
+        default=READINESS_NOT_READY,
+        verbose_name="Статус наладки",
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
 
@@ -3169,12 +3238,109 @@ class VisualContainerItem(models.Model):
         choices=[("", "Все типы")] + list(INDEXABLE_MILL_CUTTER_TYPES),
         verbose_name="Тип корпусной фрезы",
     )
+    thread_kind = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        choices=[("", "Все")] + list(THREAD_KINDS),
+        verbose_name="Тип резьбы",
+        help_text="Стандарт / не стандарт — для резьбового инструмента",
+    )
+    insert_compat = models.CharField(
+        max_length=80,
+        blank=True,
+        default="",
+        verbose_name="Подходящие пластины",
+        help_text="Фильтр по совместимым пластинам корпусного инструмента",
+    )
     size_label = models.CharField(
         max_length=32,
         blank=True,
         default="",
         verbose_name="Размер (метчик)",
         help_text="Например M6 — фильтр по размеру на складе",
+    )
+    thread_standard = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        choices=[("", "Все")] + list(THREAD_STANDARDS),
+        verbose_name="Стандарт резьбы",
+    )
+    pitch_mm = models.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        verbose_name="Шаг резьбы, мм",
+    )
+    body_family = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        choices=[("", "Все")] + list(BODY_TOOL_FAMILIES),
+        verbose_name="Семейство корпусного",
+    )
+    brand = models.CharField(max_length=80, blank=True, default="", verbose_name="Бренд")
+    shank_type = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        choices=BODY_TOOL_SHANK_TYPES,
+        verbose_name="Хвостовик",
+    )
+    mount_thread = models.CharField(
+        max_length=8,
+        blank=True,
+        default="",
+        choices=MODULAR_HEAD_THREADS,
+        verbose_name="Резьба крепления",
+    )
+    teeth_count = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name="Число зубьев Z"
+    )
+    coolant_filter = models.CharField(
+        max_length=1,
+        blank=True,
+        default="",
+        choices=[("", "Все"), ("1", "Есть"), ("0", "Нет")],
+        verbose_name="Каналы СОЖ",
+    )
+    flutes_count = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name="Кромки / зубья"
+    )
+    corner_radius_mm = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Радиус, мм",
+    )
+    insert_family = models.CharField(
+        max_length=24,
+        blank=True,
+        default="",
+        choices=[("", "Все")] + [(k, lab) for k, lab in MILLING_INSERT_FAMILIES if k],
+        verbose_name="Семейство пластины",
+    )
+    insert_shape = models.CharField(
+        max_length=8,
+        blank=True,
+        default="",
+        choices=[("", "Все")] + list(INSERT_SHAPES),
+        verbose_name="Форма пластины",
+    )
+    collet_er_size = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        verbose_name="Размер ER",
+    )
+    angle_deg = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        verbose_name="Угол, °",
     )
     diameter_from_mm = models.DecimalField(
         max_digits=6,

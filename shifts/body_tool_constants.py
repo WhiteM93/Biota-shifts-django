@@ -52,6 +52,8 @@ FACE_MILL_ANGLES = [
 
 BODY_TOOL_SHANK_TYPES = [
     ("", "—"),
+    ("mt3", "МТ3"),
+    ("mt4", "МТ4"),
     ("weldon", "Weldon"),
     ("bore", "Отверстие (насадная)"),
     ("cylindrical", "Цилиндрический"),
@@ -60,12 +62,29 @@ BODY_TOOL_SHANK_TYPES = [
 BODY_TOOL_SHANK_VALUES = frozenset(k for k, _ in BODY_TOOL_SHANK_TYPES if k)
 BODY_TOOL_SHANK_LABELS = {k: lab for k, lab in BODY_TOOL_SHANK_TYPES if k}
 
-# Для концевых — без насадного отверстия; для фасочных — все три;
-# для высокоскоростных — отверстие или цилиндр.
+# Для концевых — без насадного отверстия и Морзе; для фасочных — все;
+# для высокоскоростных — отверстие или цилиндр;
+# для сферических — Морзе / Weldon / цилиндр.
 END_MILL_SHANK_TYPES = [x for x in BODY_TOOL_SHANK_TYPES if x[0] in ("", "weldon", "cylindrical")]
 CHAMFER_MILL_SHANK_TYPES = list(BODY_TOOL_SHANK_TYPES)
 HIGH_SPEED_SHANK_TYPES = [x for x in BODY_TOOL_SHANK_TYPES if x[0] in ("", "bore", "cylindrical")]
 ROUND_INSERT_SHANK_TYPES = list(BODY_TOOL_SHANK_TYPES)
+BALL_MILL_SHANK_TYPES = [
+    x for x in BODY_TOOL_SHANK_TYPES if x[0] in ("", "mt3", "mt4", "weldon", "cylindrical")
+]
+
+# Резьба крепления фрезерных головок с пластинами
+MODULAR_HEAD_THREADS = [
+    ("", "—"),
+    ("M6", "М6"),
+    ("M8", "М8"),
+    ("M10", "М10"),
+    ("M12", "М12"),
+    ("M16", "М16"),
+    ("M20", "М20"),
+]
+MODULAR_HEAD_THREAD_VALUES = frozenset(k for k, _ in MODULAR_HEAD_THREADS if k)
+MODULAR_HEAD_THREAD_LABELS = {k: lab for k, lab in MODULAR_HEAD_THREADS if k}
 
 # Тип корпуса: насадная / концевая (высокоскоростные, с круглыми пластинами и т.п.)
 HIGH_SPEED_BODY_STYLES = [
@@ -153,6 +172,18 @@ def normalize_body_tool_shank(raw) -> str:
         "otverstie": "bore",
         "отверстие": "bore",
         "насадная": "bore",
+        "mt_3": "mt3",
+        "morse3": "mt3",
+        "morse_3": "mt3",
+        "морзе3": "mt3",
+        "морзе_3": "mt3",
+        "мт3": "mt3",
+        "mt_4": "mt4",
+        "morse4": "mt4",
+        "morse_4": "mt4",
+        "морзе4": "mt4",
+        "морзе_4": "mt4",
+        "мт4": "mt4",
     }
     v = aliases.get(v, v)
     if v in BODY_TOOL_SHANK_VALUES:
@@ -165,7 +196,7 @@ def coupling_from_shank(shank_type: str) -> str:
     st = normalize_body_tool_shank(shank_type)
     if st == "bore":
         return "bore"
-    if st in ("weldon", "cylindrical"):
+    if st in ("weldon", "cylindrical", "mt3", "mt4"):
         return "shank"
     return ""
 
@@ -183,6 +214,24 @@ def normalize_high_speed_body_style(raw) -> str:
     }
     v = aliases.get(v, v)
     if v in HIGH_SPEED_BODY_STYLE_VALUES:
+        return v
+    return ""
+
+
+def normalize_modular_head_thread(raw) -> str:
+    v = str(raw or "").strip().upper().replace(" ", "").replace("М", "M")
+    if v.startswith("M") and v[1:].isdigit():
+        v = f"M{v[1:]}"
+    aliases = {
+        "6": "M6",
+        "8": "M8",
+        "10": "M10",
+        "12": "M12",
+        "16": "M16",
+        "20": "M20",
+    }
+    v = aliases.get(v, v)
+    if v in MODULAR_HEAD_THREAD_VALUES:
         return v
     return ""
 

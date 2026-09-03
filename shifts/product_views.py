@@ -1987,9 +1987,31 @@ def product_detail_view(request, pk: int):
                             "tab_slug": f"setup-{s.pk}",
                             "name": (s.name or "").strip() or "без названия",
                             "in_work": s.in_work,
+                            "readiness_status": s.readiness_status,
                         }
                         for s in setups
                     ],
+                }
+            )
+
+        if action == "inline_set_setup_readiness":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            status_raw = (request.POST.get("readiness_status") or "").strip()
+            valid = {c[0] for c in ProductSetup.READINESS_STATUS_CHOICES}
+            if status_raw not in valid:
+                return JsonResponse({"ok": False, "error": "Некорректный статус наладки."}, status=400)
+            setup.readiness_status = status_raw
+            setup.save(update_fields=["readiness_status", "updated_at"])
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "setup_id": setup.pk,
+                    "readiness_status": setup.readiness_status,
+                    "readiness_label": setup.get_readiness_status_display(),
                 }
             )
 

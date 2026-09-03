@@ -118,6 +118,10 @@
     blind: "Глухое",
     any: "Универсальное",
   };
+  var THREAD_KIND_LABELS = {
+    standard: "Стандарт",
+    non_standard: "Не стандарт",
+  };
   var COUNTERSINK_TYPE_LABELS = {
     hand: "Ручной",
     machine: "Машинный",
@@ -1185,49 +1189,79 @@
     });
   }
 
+  function val(sel) {
+    var el = itemForm && itemForm.querySelector(sel);
+    return el ? (el.value || "").trim() : "";
+  }
+  function setVal(sel, v) {
+    var el = itemForm && itemForm.querySelector(sel);
+    if (el) el.value = v == null ? "" : String(v);
+  }
+
   function saveItem() {
     if (!openContainerId || !itemForm) return;
-    var title = (itemForm.querySelector(".js-vw-item-title").value || "").trim();
+    var title = val(".js-vw-item-title");
     if (!title) {
       alert("Укажите, что лежит");
       return;
     }
-    var ruleKindEl = itemForm.querySelector(".js-vw-item-rule-kind");
-    var ruleKind = ruleKindEl ? ruleKindEl.value : "include";
-    var category = itemForm.querySelector(".js-vw-item-category").value;
+    var ruleKind = val(".js-vw-item-rule-kind") || "include";
+    var category = val(".js-vw-item-category");
     if (ruleKind === "exclude" && !category) {
       alert("Для исключения выберите категорию (или исключите конкретный инструмент из списка выше).");
       return;
     }
-    var subtypeEl = itemForm.querySelector(".js-vw-item-subtype");
-    var sizeEl = itemForm.querySelector(".js-vw-item-size");
-    var holeEl = itemForm.querySelector(".js-vw-item-hole-type");
-    var subtype = subtypeEl ? subtypeEl.value : "";
     var body = {
       container_id: openContainerId,
       title: title,
       rule_kind: ruleKind,
       tool_category: category,
-      mill_type: category === "end_mill" ? subtype : "",
-      body_cutter_type: category === "body_tool" ? subtype : "",
-      tap_type: category === "tap" ? subtype : "",
-      hole_type: category === "tap" && holeEl ? holeEl.value : "",
-      countersink_type: category === "countersink" ? subtype : "",
-      collet_type: category === "collet" ? subtype : "",
-      size_label: category === "tap" && sizeEl ? (sizeEl.value || "").trim() : "",
+      mill_type: category === "end_mill" ? val(".js-vw-f-mill_type") : "",
+      flutes_count: category === "end_mill" ? val(".js-vw-f-flutes") : (category === "countersink" ? val(".js-vw-f-cs_flutes") : ""),
+      corner_radius_mm: category === "end_mill" ? val(".js-vw-f-corner-r") : "",
+      body_cutter_type: category === "body_tool" ? val(".js-vw-f-body_cutter") : "",
+      body_family: category === "body_tool" ? val(".js-vw-f-body_family") : "",
+      brand: category === "body_tool" ? val(".js-vw-f-brand") : "",
+      shank_type: category === "body_tool" ? val(".js-vw-f-shank") : "",
+      mount_thread: category === "body_tool" ? val(".js-vw-f-mount_thread") : "",
+      teeth_count: category === "body_tool" ? val(".js-vw-f-teeth") : "",
+      coolant_filter: category === "body_tool" ? val(".js-vw-f-coolant") : "",
+      insert_compat: category === "body_tool" ? val(".js-vw-f-insert_compat") : "",
+      tap_type: category === "tap" ? val(".js-vw-f-tap_type") : "",
+      thread_kind: category === "tap" ? val(".js-vw-f-thread_kind") : "",
+      thread_standard: category === "tap" ? val(".js-vw-f-thread_standard") : "",
+      hole_type: category === "tap" ? val(".js-vw-f-hole_type") : "",
+      size_label: category === "tap" ? val(".js-vw-f-size") : (category === "countersink" ? val(".js-vw-f-cs_size") : ""),
+      pitch_mm: category === "tap" ? val(".js-vw-f-pitch") : "",
+      insert_family: category === "insert" ? val(".js-vw-f-ins_family") : "",
+      insert_shape: category === "insert" ? val(".js-vw-f-ins_shape") : "",
+      collet_type: category === "collet" ? val(".js-vw-f-collet_type") : "",
+      collet_er_size: category === "collet" ? val(".js-vw-f-er_size") : "",
+      countersink_type: category === "countersink" ? val(".js-vw-f-countersink_type") : "",
+      angle_deg:
+        category === "countersink"
+          ? val(".js-vw-f-cs_angle")
+          : category === "center_drill"
+            ? val(".js-vw-f-cd_angle")
+            : category === "drill"
+              ? val(".js-vw-f-drill_angle")
+              : "",
       diameter_from_mm: itemForm.querySelector(".js-vw-item-dfrom").value,
       diameter_to_mm: itemForm.querySelector(".js-vw-item-dto").value,
-      quantity_note: itemForm.querySelector(".js-vw-item-qty").value,
+      quantity_note: val(".js-vw-item-qty"),
     };
     fetchJson(apiItemUpsert, { method: "POST", body: body })
       .then(function () {
-        itemForm.querySelector(".js-vw-item-title").value = "";
-        itemForm.querySelector(".js-vw-item-dfrom").value = "";
-        itemForm.querySelector(".js-vw-item-dto").value = "";
-        itemForm.querySelector(".js-vw-item-qty").value = "";
-        if (subtypeEl) subtypeEl.value = "";
-        if (sizeEl) sizeEl.value = "";
-        if (holeEl) holeEl.value = "";
+        itemForm.querySelectorAll("input.vw-control, select.vw-control").forEach(function (el) {
+          if (el.classList.contains("js-vw-item-rule-kind")) return;
+          if (el.classList.contains("js-vw-item-category")) {
+            el.value = "";
+            return;
+          }
+          if (el.tagName === "SELECT") el.selectedIndex = 0;
+          else el.value = "";
+        });
+        syncItemFilterFields();
         return openContents(openContainerId);
       })
       .then(function () { return loadCabinets(); })
@@ -1246,60 +1280,30 @@
     if (titleLabel) titleLabel.textContent = isExclude ? "Что исключить" : "Что лежит";
     if (saveBtn) saveBtn.textContent = isExclude ? "Исключить" : "Добавить";
     if (titleInput) {
-      titleInput.placeholder = isExclude ? "Напр. раскатники / M8" : "Фреза Ø0.8";
+      titleInput.placeholder = isExclude ? "Напр. раскатники / M8" : "Режущие нестандарт / Головки APKT";
     }
   }
 
   function syncItemFilterFields() {
     if (!itemForm) return;
     var catEl = itemForm.querySelector(".js-vw-item-category");
-    var subtypeRow = itemForm.querySelector(".js-vw-item-subtype-row");
-    var subtypeLabel = itemForm.querySelector(".js-vw-item-subtype-label");
-    var subtypeSel = itemForm.querySelector(".js-vw-item-subtype");
-    var sizeRow = itemForm.querySelector(".js-vw-item-size-row");
-    var holeRow = itemForm.querySelector(".js-vw-item-hole-row");
     var diamRow = itemForm.querySelector(".js-vw-item-diam-row");
     if (!catEl) return;
     var cat = catEl.value;
-    var cfg = SUBTYPE_OPTIONS[cat];
-    var showSubtype = !!cfg;
-    var showSize = cat === "tap";
-    var showHole = cat === "tap";
-    var showDiam = cat === "end_mill" || cat === "body_tool" || cat === "drill" || cat === "center_drill" || cat === "countersink" || cat === "";
-    if (subtypeRow) setVisible(subtypeRow, showSubtype);
-    if (sizeRow) setVisible(sizeRow, showSize);
-    if (holeRow) setVisible(holeRow, showHole);
-    if (diamRow) setVisible(diamRow, showDiam || !cat);
-    if (subtypeSel) {
-      var prev = subtypeSel.value;
-      subtypeSel.innerHTML = "";
-      var allOpt = document.createElement("option");
-      allOpt.value = "";
-      allOpt.textContent = "Все типы";
-      subtypeSel.appendChild(allOpt);
-      if (cfg && Array.isArray(cfg.options)) {
-        if (subtypeLabel) subtypeLabel.textContent = cfg.label || "Тип";
-        cfg.options.forEach(function (opt) {
-          var o = document.createElement("option");
-          o.value = opt.value;
-          o.textContent = opt.label;
-          subtypeSel.appendChild(o);
-        });
-      }
-      if (prev && Array.prototype.some.call(subtypeSel.options, function (o) { return o.value === prev; })) {
-        subtypeSel.value = prev;
-      } else {
-        subtypeSel.value = "";
-      }
-      if (!showSubtype) subtypeSel.value = "";
-    }
-    if (!showSize) {
-      var sizeEl = itemForm.querySelector(".js-vw-item-size");
-      if (sizeEl) sizeEl.value = "";
-    }
-    if (!showHole) {
-      var holeEl = itemForm.querySelector(".js-vw-item-hole-type");
-      if (holeEl) holeEl.value = "";
+    itemForm.querySelectorAll(".js-vw-item-panel").forEach(function (panel) {
+      setVisible(panel, panel.getAttribute("data-cat") === cat);
+    });
+    var showDiam =
+      cat === "end_mill" ||
+      cat === "body_tool" ||
+      cat === "drill" ||
+      cat === "center_drill" ||
+      cat === "countersink" ||
+      cat === "tap";
+    if (diamRow) setVisible(diamRow, showDiam);
+    if (!showDiam) {
+      setVal(".js-vw-item-dfrom", "");
+      setVal(".js-vw-item-dto", "");
     }
     syncItemRuleKindUi();
   }
@@ -2090,6 +2094,8 @@
       if (it.tool_category === "end_mill" && it.mill_type) {
         parts.push(MILL_TYPE_LABELS[it.mill_type] || it.mill_type);
       }
+      if (it.tool_category === "end_mill" && it.flutes_count != null) parts.push("Z" + it.flutes_count);
+      if (it.tool_category === "end_mill" && it.corner_radius_mm != null) parts.push("R" + it.corner_radius_mm);
       if (it.tool_category === "body_tool" && it.body_cutter_type) {
         var btLab = (SUBTYPE_OPTIONS.body_tool && SUBTYPE_OPTIONS.body_tool.options || []).reduce(function (acc, o) {
           acc[o.value] = o.label;
@@ -2097,18 +2103,36 @@
         }, {});
         parts.push(btLab[it.body_cutter_type] || it.body_cutter_type);
       }
+      if (it.tool_category === "body_tool" && it.brand) parts.push(it.brand);
+      if (it.tool_category === "body_tool" && it.shank_type) parts.push(it.shank_type);
+      if (it.tool_category === "body_tool" && it.mount_thread) parts.push(it.mount_thread);
+      if (it.tool_category === "body_tool" && it.teeth_count != null) parts.push("Z" + it.teeth_count);
+      if (it.tool_category === "body_tool" && it.coolant_filter === "1") parts.push("СОЖ");
+      if (it.tool_category === "body_tool" && it.coolant_filter === "0") parts.push("без СОЖ");
+      if (it.tool_category === "body_tool" && it.insert_compat) {
+        parts.push("пластины: " + it.insert_compat);
+      }
       if (it.tool_category === "tap" && it.tap_type) {
         parts.push(TAP_TYPE_LABELS[it.tap_type] || it.tap_type);
       }
+      if (it.tool_category === "tap" && it.thread_kind) {
+        parts.push(THREAD_KIND_LABELS[it.thread_kind] || it.thread_kind);
+      }
+      if (it.tool_category === "tap" && it.thread_standard) parts.push(it.thread_standard);
       if (it.tool_category === "tap" && it.hole_type) {
         parts.push(HOLE_TYPE_LABELS[it.hole_type] || it.hole_type);
       }
-      if (it.tool_category === "countersink" && it.countersink_type) {
-        parts.push(COUNTERSINK_TYPE_LABELS[it.countersink_type] || it.countersink_type);
-      }
+      if (it.tool_category === "tap" && it.pitch_mm != null) parts.push("шаг " + it.pitch_mm);
+      if (it.tool_category === "insert" && it.insert_family) parts.push(it.insert_family);
+      if (it.tool_category === "insert" && it.insert_shape) parts.push(it.insert_shape);
       if (it.tool_category === "collet" && it.collet_type) {
         parts.push(it.collet_type.toUpperCase());
       }
+      if (it.tool_category === "collet" && it.collet_er_size) parts.push(it.collet_er_size);
+      if (it.tool_category === "countersink" && it.countersink_type) {
+        parts.push(COUNTERSINK_TYPE_LABELS[it.countersink_type] || it.countersink_type);
+      }
+      if (it.angle_deg) parts.push(it.angle_deg + "°");
       if (it.size_label) parts.push(it.size_label);
       if (it.diameter_from_mm != null || it.diameter_to_mm != null) {
         parts.push("Ø " + (it.diameter_from_mm != null ? it.diameter_from_mm : "?") + "–" + (it.diameter_to_mm != null ? it.diameter_to_mm : "?"));

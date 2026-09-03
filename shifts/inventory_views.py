@@ -30,6 +30,7 @@ from .body_tool_constants import (
     BODY_TOOL_COUPLINGS,
     BODY_TOOL_FAMILIES,
     BODY_TOOL_SHANK_TYPES,
+    BALL_MILL_SHANK_TYPES,
     CHAMFER_MILL_SHANK_TYPES,
     END_MILL_SHANK_TYPES,
     FACE_MILL_ANGLES,
@@ -38,6 +39,7 @@ from .body_tool_constants import (
     HIGH_SPEED_SHANK_TYPES,
     INDEXABLE_MILL_CUTTER_TYPES,
     INSERT_SIZE_OTHER,
+    MODULAR_HEAD_THREADS,
     ROUND_INSERT_SHANK_TYPES,
     build_body_tool_display_name,
     coupling_from_shank,
@@ -47,6 +49,7 @@ from .body_tool_constants import (
     normalize_high_speed_body_style,
     normalize_indexable_mill_cutter,
     normalize_insert_size,
+    normalize_modular_head_thread,
     parse_angle_or_variable,
 )
 from .collet_constants import (
@@ -113,10 +116,12 @@ from .models import (
     EmployeePayrollMonthStatus,
     TAP_HOLE_TYPES,
     TAP_TOOL_TYPES,
+    THREAD_KINDS,
     THREAD_STANDARDS,
     TOOL_MATERIAL_TYPES,
     WORK_MATERIAL_TYPES,
     PURCHASE_STATUSES,
+    normalize_thread_kind,
     normalize_work_material_codes,
     work_material_display_text,
 )
@@ -636,6 +641,7 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "tap_size",
         "tap_pitch",
         "tap_thread_standard",
+        "tap_thread_kind",
         "tap_hole_type",
         "tap_tool_type",
         "tap_overall_length_mm",
@@ -693,6 +699,8 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "bt_hs_body_style",
         "bt_has_purpose",
         "bt_corner_radius_mm",
+        "bt_insert_compat",
+        "bt_mount_thread",
     }
 )
 
@@ -760,6 +768,7 @@ _STOCK_KEYS_BY_CATEGORY = {
             "tap_size",
             "tap_pitch",
             "tap_thread_standard",
+            "tap_thread_kind",
             "tap_hole_type",
             "tap_tool_type",
             "tap_overall_length_mm",
@@ -826,6 +835,8 @@ _STOCK_KEYS_BY_CATEGORY = {
             "bt_hs_body_style",
             "bt_has_purpose",
             "bt_corner_radius_mm",
+            "bt_insert_compat",
+            "bt_mount_thread",
         }
     ),
 }
@@ -980,6 +991,12 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
             bt_radius = _to_decimal(bt_radius_raw, Decimal("-1"))
             if bt_radius >= 0:
                 qs = qs.filter(body_tool_spec__corner_radius_mm=bt_radius)
+        bt_compat_raw = g("bt_insert_compat")
+        if bt_compat_raw:
+            qs = qs.filter(body_tool_spec__insert_compat__icontains=bt_compat_raw)
+        bt_thread_raw = g("bt_mount_thread")
+        if bt_thread_raw:
+            qs = qs.filter(body_tool_spec__mount_thread=normalize_modular_head_thread(bt_thread_raw))
     elif category == "tap":
         tap_size = g("tap_size")
         if tap_size:
@@ -992,6 +1009,9 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         tap_thread_standard = g("tap_thread_standard")
         if tap_thread_standard:
             qs = qs.filter(tap_spec__thread_standard=tap_thread_standard)
+        tap_thread_kind = g("tap_thread_kind")
+        if tap_thread_kind:
+            qs = qs.filter(tap_spec__thread_kind=normalize_thread_kind(tap_thread_kind))
         tap_hole_type = g("tap_hole_type")
         if tap_hole_type:
             qs = qs.filter(tap_spec__hole_type=tap_hole_type)
@@ -1122,15 +1142,15 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         if collet_threading_series_raw:
             qs = qs.filter(collet_spec__threading_series=collet_threading_series_raw)
 
-    if category != "collet" and "tool_material" not in ex and "tool_material_custom" not in ex:
+    if category not in ("collet", "body_tool") and "tool_material" not in ex and "tool_material_custom" not in ex:
         tool_material = _resolve_stock_tool_material(params)
         if tool_material:
             qs = qs.filter(tool_material=tool_material)
-    if category != "collet" and "coating_type" not in ex:
+    if category not in ("collet", "body_tool") and "coating_type" not in ex:
         coating_type = g("coating_type")
         if coating_type:
             qs = qs.filter(coating_type=coating_type)
-    if category != "collet" and "work_material" not in ex:
+    if category not in ("collet", "body_tool") and "work_material" not in ex:
         work_material = g("work_material")
         if work_material:
             wm = work_material.strip()
@@ -1657,6 +1677,7 @@ def inventory_view(request):
 
     if action == "add_tap":
         thread_standard = (request.POST.get("thread_standard") or "metric").strip()
+        thread_kind = normalize_thread_kind(request.POST.get("thread_kind"))
         size_label = (request.POST.get("size_label") or "").strip()
         pitch_mm = _to_decimal(request.POST.get("pitch_mm"), Decimal("0"))
         tpi = _to_int(request.POST.get("tpi"), 0) or None
@@ -1685,6 +1706,7 @@ def inventory_view(request):
             TapSpec.objects.create(
                 tool=tool,
                 thread_standard=thread_standard,
+                thread_kind=thread_kind,
                 size_label=size_label,
                 pitch_mm=pitch_mm if pitch_mm > 0 else None,
                 tpi=tpi,
@@ -1835,11 +1857,40 @@ def inventory_view(request):
             if derived:
                 bt.coupling = derived
             bt.size_label = ""
-            bt.insert_compat = ""
+            if bt.cutter_type == "ball":
+                bt.insert_compat = (request.POST.get("bt_insert_compat") or "").strip()[:80]
+                bt.mount_thread = ""
+                bt.insert_family = ""
+                bt.insert_size = ""
+                bt.approach_angle_deg = None
+                bt.variable_angle = False
+                bt.ap_max_mm = None
+                bt.hs_body_style = ""
+                bt.has_purpose = False
+                bt.corner_radius_mm = None
+            elif bt.cutter_type == "modular_head":
+                bt.insert_compat = (request.POST.get("bt_insert_compat") or "").strip()[:80]
+                bt.mount_thread = normalize_modular_head_thread(request.POST.get("bt_mount_thread"))
+                bt.coupling = "modular"
+                bt.shank_type = ""
+                bt.insert_family = ""
+                bt.insert_size = ""
+                bt.overall_length_mm = None
+                bt.cutting_length_mm = None
+                bt.approach_angle_deg = None
+                bt.variable_angle = False
+                bt.ap_max_mm = None
+                bt.hs_body_style = ""
+                bt.has_purpose = False
+                bt.corner_radius_mm = None
+            else:
+                bt.insert_compat = ""
+                bt.mount_thread = ""
             bt.save()
             tool.name = _body_tool_name_from_spec(bt)
         elif tool.category == "tap" and tool.tap_spec:
             tool.tap_spec.thread_standard = (request.POST.get("thread_standard") or "metric").strip()
+            tool.tap_spec.thread_kind = normalize_thread_kind(request.POST.get("thread_kind"))
             tool.tap_spec.size_label = (request.POST.get("size_label") or "").strip()
             tool.tap_spec.pitch_mm = _to_decimal_or_none(request.POST.get("tap_pitch_mm"))
             tool.tap_spec.tpi = _to_int_or_none(request.POST.get("tap_tpi"))
@@ -2040,6 +2091,13 @@ def inventory_view(request):
                 elif field == "bt_corner_radius_mm":
                     bt.corner_radius_mm = _to_decimal_or_none(value_raw)
                     bt.save(update_fields=["corner_radius_mm"])
+                elif field == "bt_insert_compat":
+                    bt.insert_compat = (value_raw or "").strip()[:80]
+                    bt.save(update_fields=["insert_compat"])
+                elif field == "bt_mount_thread":
+                    bt.mount_thread = normalize_modular_head_thread(value_raw)
+                    bt.coupling = "modular"
+                    bt.save(update_fields=["mount_thread", "coupling"])
                 else:
                     return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
                 tool.name = _body_tool_name_from_spec(bt)
@@ -2052,6 +2110,9 @@ def inventory_view(request):
                 elif field == "thread_standard":
                     tp.thread_standard = value_raw or "metric"
                     tp.save(update_fields=["thread_standard"])
+                elif field == "thread_kind":
+                    tp.thread_kind = normalize_thread_kind(value_raw)
+                    tp.save(update_fields=["thread_kind"])
                 elif field == "tap_pitch_mm":
                     tp.pitch_mm = _to_decimal_or_none(value_raw)
                     tp.save(update_fields=["pitch_mm"])
@@ -2430,6 +2491,7 @@ def inventory_view(request):
                     )
             else:
                 thread_standard = (request.POST.get("thread_standard") or "metric").strip()
+                thread_kind = normalize_thread_kind(request.POST.get("thread_kind"))
                 size_label = (request.POST.get("size_label") or "").strip() or "Размер неизвестен"
                 pitch_mm = _to_decimal_or_none(request.POST.get("tap_pitch_mm"))
                 tpi = _to_int_or_none(request.POST.get("tap_tpi"))
@@ -2446,6 +2508,7 @@ def inventory_view(request):
                         work_material=work_material,
                         main_diameter_mm=main_diameter_mm,
                         tap_spec__thread_standard=thread_standard,
+                        tap_spec__thread_kind=thread_kind,
                         tap_spec__size_label=size_label,
                         tap_spec__pitch_mm=pitch_mm,
                         tap_spec__tpi=tpi,
@@ -2472,6 +2535,7 @@ def inventory_view(request):
                     TapSpec.objects.create(
                         tool=tool,
                         thread_standard=thread_standard,
+                        thread_kind=thread_kind,
                         size_label=size_label,
                         pitch_mm=pitch_mm,
                         tpi=tpi,
@@ -2599,20 +2663,53 @@ def inventory_view(request):
                     hs_body_style = normalize_high_speed_body_style(row.get("bt_hs_body_style"))
                     has_purpose = _to_bool(row.get("bt_has_purpose"))
                     corner_radius_mm = _to_decimal_or_none(row.get("bt_corner_radius_mm"))
-                    ang_val, ang_var = parse_angle_or_variable(row.get("bt_angle_deg"))
-                    if ang_var:
-                        variable_angle = True
+                    insert_compat = (row.get("bt_insert_compat") or "").strip()[:80]
+                    mount_thread = normalize_modular_head_thread(row.get("bt_mount_thread"))
+                    if cutter_type == "ball":
+                        insert_family = ""
+                        insert_size = ""
                         approach_angle_deg = None
+                        variable_angle = False
+                        ap_max_mm = None
+                        hs_body_style = ""
+                        has_purpose = False
+                        corner_radius_mm = None
+                        mount_thread = ""
+                    elif cutter_type == "modular_head":
+                        insert_family = ""
+                        insert_size = ""
+                        overall_length_mm = None
+                        cutting_length_mm = None
+                        approach_angle_deg = None
+                        variable_angle = False
+                        ap_max_mm = None
+                        hs_body_style = ""
+                        has_purpose = False
+                        corner_radius_mm = None
+                        shank_type = ""
+                        coupling = "modular"
                     else:
-                        variable_angle = _to_bool(row.get("bt_variable_angle"))
-                        approach_angle_deg = _to_decimal_or_none(ang_val if ang_val is not None else row.get("bt_angle_deg"))
-                        if variable_angle:
+                        insert_compat = ""
+                        mount_thread = ""
+                    ang_val, ang_var = parse_angle_or_variable(row.get("bt_angle_deg"))
+                    if cutter_type not in ("ball", "modular_head"):
+                        if ang_var:
+                            variable_angle = True
                             approach_angle_deg = None
+                        else:
+                            variable_angle = _to_bool(row.get("bt_variable_angle"))
+                            approach_angle_deg = _to_decimal_or_none(
+                                ang_val if ang_val is not None else row.get("bt_angle_deg")
+                            )
+                            if variable_angle:
+                                approach_angle_deg = None
                     derived = coupling_from_shank(shank_type)
                     if derived:
                         coupling = derived
                     elif cutter_type == "end" and not coupling:
                         coupling = "shank"
+                    elif cutter_type == "modular_head":
+                        coupling = "modular"
                     tool = (
                         ToolItem.objects.select_for_update()
                         .filter(
@@ -2627,7 +2724,9 @@ def inventory_view(request):
                             body_tool_spec__teeth_count=teeth_count,
                             body_tool_spec__insert_family=insert_family,
                             body_tool_spec__insert_size=insert_size,
+                            body_tool_spec__insert_compat=insert_compat,
                             body_tool_spec__mount_diameter_mm=mount_diameter_mm,
+                            body_tool_spec__mount_thread=mount_thread,
                             body_tool_spec__coolant_through=coolant_through,
                             body_tool_spec__ap_max_mm=ap_max_mm,
                             body_tool_spec__approach_angle_deg=approach_angle_deg,
@@ -2651,7 +2750,7 @@ def inventory_view(request):
                                 cutter_type=cutter_type,
                                 diameter_mm=diameter_mm,
                                 teeth_count=teeth_count,
-                                insert_family=insert_family,
+                                insert_family=insert_family or insert_compat,
                                 insert_size=insert_size,
                                 brand=brand,
                             ),
@@ -2672,7 +2771,9 @@ def inventory_view(request):
                             coupling=coupling,
                             insert_family=insert_family,
                             insert_size=insert_size,
+                            insert_compat=insert_compat,
                             mount_diameter_mm=mount_diameter_mm,
+                            mount_thread=mount_thread,
                             coolant_through=coolant_through,
                             ap_max_mm=ap_max_mm,
                             approach_angle_deg=approach_angle_deg,
@@ -2685,6 +2786,7 @@ def inventory_view(request):
                         )
                 elif category == "tap":
                     thread_standard = (row.get("thread_standard") or "metric").strip()
+                    thread_kind = normalize_thread_kind(row.get("thread_kind"))
                     size_label = (row.get("size_label") or "").strip() or "Размер неизвестен"
                     pitch_mm = _to_decimal_or_none(row.get("tap_pitch_mm"))
                     tpi = _to_int_or_none(row.get("tap_tpi"))
@@ -2701,6 +2803,7 @@ def inventory_view(request):
                             work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             tap_spec__thread_standard=thread_standard,
+                            tap_spec__thread_kind=thread_kind,
                             tap_spec__size_label=size_label,
                             tap_spec__pitch_mm=pitch_mm,
                             tap_spec__tpi=tpi,
@@ -2727,6 +2830,7 @@ def inventory_view(request):
                         TapSpec.objects.create(
                             tool=tool,
                             thread_standard=thread_standard,
+                            thread_kind=thread_kind,
                             size_label=size_label,
                             pitch_mm=pitch_mm,
                             tpi=tpi,
@@ -3137,6 +3241,7 @@ def inventory_view(request):
     tap_size = _sq("tap_size")
     tap_pitch_raw = _sq("tap_pitch")
     tap_thread_standard = _sq("tap_thread_standard")
+    tap_thread_kind = _sq("tap_thread_kind")
     tap_hole_type = _sq("tap_hole_type")
     tap_tool_type = _sq("tap_tool_type")
     tap_overall_length_raw = _sq("tap_overall_length_mm")
@@ -3190,6 +3295,8 @@ def inventory_view(request):
     bt_hs_style_raw = _sq("bt_hs_body_style")
     bt_purpose_raw = _sq("bt_has_purpose")
     bt_corner_radius_raw = _sq("bt_corner_radius_mm")
+    bt_insert_compat_raw = _sq("bt_insert_compat")
+    bt_mount_thread_raw = _sq("bt_mount_thread")
 
     tm_param = _sq("tool_material")
     tm_custom_param = (_sq("tool_material_custom") or "")[:80]
@@ -3291,6 +3398,12 @@ def inventory_view(request):
     body_tool_radii = _sorted_unique_decimal_strings(
         _distinct_numeric_values(_opt_qs("body_tool", "bt_corner_radius_mm"), "body_tool_spec__corner_radius_mm")
     )
+    body_tool_insert_compats = _distinct_text_values(
+        _opt_qs("body_tool", "bt_insert_compat"), "body_tool_spec__insert_compat"
+    )
+    body_tool_mount_threads = _distinct_text_values(
+        _opt_qs("body_tool", "bt_mount_thread"), "body_tool_spec__mount_thread"
+    )
 
     tap_sizes = _distinct_text_values(_opt_qs("tap", "tap_size"), "tap_spec__size_label")
     tap_pitches = _sorted_unique_decimal_strings(
@@ -3303,6 +3416,7 @@ def inventory_view(request):
         _distinct_numeric_values(_opt_qs("tap", "tap_cutting_length_mm"), "tap_spec__cutting_length_mm")
     )
     tap_thread_standards = _distinct_text_values(_opt_qs("tap", "tap_thread_standard"), "tap_spec__thread_standard")
+    tap_thread_kinds = _distinct_text_values(_opt_qs("tap", "tap_thread_kind"), "tap_spec__thread_kind")
     tap_hole_types = _distinct_text_values(_opt_qs("tap", "tap_hole_type"), "tap_spec__hole_type")
     tap_tool_types = _distinct_text_values(_opt_qs("tap", "tap_tool_type"), "tap_spec__tap_type")
     center_diameters = _sorted_unique_decimal_strings(
@@ -3603,6 +3717,7 @@ def inventory_view(request):
         "movements": mv_hist[:50],
         "inventory_history": inventory_history,
         "thread_standards": THREAD_STANDARDS,
+        "thread_kinds": THREAD_KINDS,
         "tap_hole_types": TAP_HOLE_TYPES,
         "tap_tool_types": TAP_TOOL_TYPES,
         "filters": {
@@ -3616,6 +3731,7 @@ def inventory_view(request):
             "tap_size": tap_size,
             "tap_pitch": _norm_stock_decimal_str(tap_pitch_raw),
             "tap_thread_standard": tap_thread_standard,
+            "tap_thread_kind": tap_thread_kind,
             "tap_hole_type": tap_hole_type,
             "tap_tool_type": tap_tool_type,
             "tap_overall_length_mm": _norm_stock_decimal_str(tap_overall_length_raw),
@@ -3669,6 +3785,8 @@ def inventory_view(request):
             "bt_hs_body_style": bt_hs_style_raw,
             "bt_has_purpose": bt_purpose_raw,
             "bt_corner_radius_mm": _norm_stock_decimal_str(bt_corner_radius_raw),
+            "bt_insert_compat": bt_insert_compat_raw,
+            "bt_mount_thread": bt_mount_thread_raw,
             "tool_material": tool_material,
             "tool_material_custom": tm_custom_input,
             "tool_material_select": tool_material_select,
@@ -3707,6 +3825,8 @@ def inventory_view(request):
             "brands": body_tool_brands,
             "shanks": body_tool_shanks,
             "radii": body_tool_radii,
+            "insert_compats": body_tool_insert_compats,
+            "mount_threads": body_tool_mount_threads,
         },
         "body_tool_families": BODY_TOOL_FAMILIES,
         "indexable_mill_cutter_types": INDEXABLE_MILL_CUTTER_TYPES,
@@ -3716,6 +3836,8 @@ def inventory_view(request):
         "chamfer_mill_shank_types": CHAMFER_MILL_SHANK_TYPES,
         "high_speed_shank_types": HIGH_SPEED_SHANK_TYPES,
         "round_insert_shank_types": ROUND_INSERT_SHANK_TYPES,
+        "ball_mill_shank_types": BALL_MILL_SHANK_TYPES,
+        "modular_head_threads": MODULAR_HEAD_THREADS,
         "high_speed_body_styles": HIGH_SPEED_BODY_STYLES,
         "high_speed_angle_options": HIGH_SPEED_ANGLE_OPTIONS,
         "face_mill_angles": FACE_MILL_ANGLES,
@@ -3725,6 +3847,7 @@ def inventory_view(request):
             "overall_lengths": tap_overall_lengths,
             "cutting_lengths": tap_cutting_lengths,
             "thread_standards": tap_thread_standards,
+            "thread_kinds": tap_thread_kinds,
             "hole_types": tap_hole_types,
             "tool_types": tap_tool_types,
         },

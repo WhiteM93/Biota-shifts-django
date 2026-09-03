@@ -5,7 +5,9 @@ from decimal import Decimal
 from django.test import TestCase
 
 from shifts.models import (
+    BodyToolSpec,
     EndMillSpec,
+    TapSpec,
     ToolItem,
     VisualCabinet,
     VisualContainer,
@@ -143,3 +145,49 @@ class VisualWarehouseMatchingTests(TestCase):
         tools = _matching_tools_for_container(self.cont)
         ids = {t["id"] for t in tools}
         self.assertEqual(ids, {self.ok.pk})
+
+    def test_tap_thread_kind_filter(self):
+        std = ToolItem.objects.create(category="tap", name="Метчик стандарт", quantity=2)
+        TapSpec.objects.create(
+            tool=std,
+            size_label="M6",
+            tap_type="cutting",
+            thread_kind="standard",
+        )
+        custom = ToolItem.objects.create(category="tap", name="Метчик нестандарт", quantity=1)
+        TapSpec.objects.create(
+            tool=custom,
+            size_label="M6",
+            tap_type="cutting",
+            thread_kind="non_standard",
+        )
+        qs = _tool_qs_for_filter(
+            category="tap",
+            tap_type="cutting",
+            thread_kind="non_standard",
+        )
+        self.assertTrue(qs.filter(pk=custom.pk).exists())
+        self.assertFalse(qs.filter(pk=std.pk).exists())
+
+    def test_body_tool_insert_compat_filter(self):
+        head = ToolItem.objects.create(category="body_tool", name="Головка APKT", quantity=1)
+        BodyToolSpec.objects.create(
+            tool=head,
+            cutter_type="modular_head",
+            diameter_mm=Decimal("32"),
+            insert_compat="APKT",
+        )
+        other = ToolItem.objects.create(category="body_tool", name="Головка RD", quantity=1)
+        BodyToolSpec.objects.create(
+            tool=other,
+            cutter_type="modular_head",
+            diameter_mm=Decimal("32"),
+            insert_compat="RDMT",
+        )
+        qs = _tool_qs_for_filter(
+            category="body_tool",
+            body_cutter_type="modular_head",
+            insert_compat="APKT",
+        )
+        self.assertTrue(qs.filter(pk=head.pk).exists())
+        self.assertFalse(qs.filter(pk=other.pk).exists())

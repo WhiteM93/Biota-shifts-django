@@ -21,7 +21,7 @@
         <select id="setup-tab-select" data-setup-order-ids="{% for setup in setups %}{{ setup.pk }}{% if not forloop.last %},{% endif %}{% endfor %}">
           <option value="drawing" {% if tab_default == 'drawing' %}selected{% endif %}>Изделие</option>
           {% for setup in setups %}
-          <option value="{{ setup.tab_slug }}" data-setup-option-for="{{ setup.tab_slug }}" data-setup-in-work="{% if setup.in_work %}1{% else %}0{% endif %}" {% if tab_default == setup.tab_slug %}selected{% endif %}>{% if setup.in_work %}● {% endif %}{% if setup.name %}{{ setup.name }}{% else %}без названия{% endif %}</option>
+          <option value="{{ setup.tab_slug }}" data-setup-option-for="{{ setup.tab_slug }}" data-setup-in-work="{% if setup.in_work %}1{% else %}0{% endif %}" data-setup-readiness="{{ setup.readiness_status }}" {% if tab_default == setup.tab_slug %}selected{% endif %}>{% if setup.in_work %}● {% endif %}{% if setup.name %}{{ setup.name }}{% else %}без названия{% endif %}</option>
           {% endfor %}
         </select>
       </label>
@@ -78,10 +78,35 @@
       </button>
       {% endif %}
     </div>
+    {% if setups %}
+    <div
+      class="product-setup-status-bar"
+      id="setup-status-bar"
+      data-setup-id=""
+      data-status="not_ready"
+      hidden
+      aria-label="Статус наладки"
+    >
+      <div class="product-setup-status-bar__track" role="group" aria-label="Выбор статуса наладки">
+        <button type="button" class="product-setup-status-bar__opt" data-status="not_ready" aria-pressed="false" disabled>
+          <span class="product-setup-status-bar__dot" aria-hidden="true"></span>
+          <span class="product-setup-status-bar__text">Наладка не готова</span>
+        </button>
+        <button type="button" class="product-setup-status-bar__opt" data-status="ready" aria-pressed="false" disabled>
+          <span class="product-setup-status-bar__dot" aria-hidden="true"></span>
+          <span class="product-setup-status-bar__text">Наладка готова</span>
+        </button>
+        <button type="button" class="product-setup-status-bar__opt" data-status="worked" aria-pressed="false" disabled>
+          <span class="product-setup-status-bar__dot" aria-hidden="true"></span>
+          <span class="product-setup-status-bar__text">Наладка отработана</span>
+        </button>
+      </div>
+    </div>
+    {% endif %}
     <div class="product-tab-panels">
       <section class="product-tab-panel product-tab-panel--drawing-placeholder" id="panel-drawing" data-panel="drawing" data-inline-edit-mode="0" role="tabpanel" aria-label="Изделие" {% if tab_default != 'drawing' %}hidden{% endif %}></section>
       {% for setup in setups %}
-      <section class="product-tab-panel" id="panel-setup-{{ setup.pk }}" data-panel="{{ setup.tab_slug }}" data-inline-edit-mode="0" role="tabpanel" aria-labelledby="tab-setup-{{ setup.pk }}" {% if tab_default != setup.tab_slug %}hidden{% endif %}>
+      <section class="product-tab-panel" id="panel-setup-{{ setup.pk }}" data-panel="{{ setup.tab_slug }}" data-setup-id="{{ setup.pk }}" data-readiness-status="{{ setup.readiness_status }}" data-inline-edit-mode="0" role="tabpanel" aria-labelledby="tab-setup-{{ setup.pk }}" {% if tab_default != setup.tab_slug %}hidden{% endif %}>
         <div class="product-setup-specs">
           <div class="product-setup-left-col">
             <div class="product-setup-panel-title">

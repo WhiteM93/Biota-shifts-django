@@ -1988,8 +1988,10 @@ var INV = (function () {
     body_tool_high_speed: '<tr><th>Бренд</th><th>Хвостовик</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">Z</th><th>Тип</th><th>Назначение</th><th>Формфактор</th><th>Размер</th><th>Угол</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     body_tool_round_insert: '<tr><th>Бренд</th><th>Хвостовик</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">L</th><th class="short-col">Z</th><th>Тип</th><th class="short-col">R</th><th>СОЖ</th><th>Формфактор</th><th>Размер</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     body_tool_disc: '<tr><th>Бренд</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">Z</th><th class="short-col">H</th><th>Формфактор</th><th>Размер</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    body_tool_ball: '<tr><th>Бренд</th><th>Хвостовик</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">L</th><th class="short-col">Z</th><th>СОЖ</th><th>Подходящие пластины</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    body_tool_modular_head: '<tr><th>Бренд</th><th class="short-col">ØD</th><th class="short-col">d</th><th>Резьба</th><th class="short-col">Z</th><th>СОЖ</th><th>Подходящие пластины</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     body_tool_generic: '<tr><th>Тип</th><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th>Крепление</th><th>Тип пластины</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    tap: '<tr><th class="tap-size-col">Размер</th><th class="tap-std-col">Стандарт</th><th class="tap-step-col">Шаг</th><th class="tap-tpi-col">TPI</th><th class="tap-l-col">L</th><th class="tap-lc-col">Lc</th><th class="tap-hole-col">Тип</th><th>Тип инструмента</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    tap: '<tr><th class="tap-size-col">Размер</th><th>Тип резьбы</th><th class="tap-std-col">Стандарт</th><th class="tap-step-col">Шаг</th><th class="tap-tpi-col">TPI</th><th class="tap-l-col">L</th><th class="tap-lc-col">Lc</th><th class="tap-hole-col">Тип</th><th>Тип инструмента</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     center_drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="angle-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     countersink: '<tr><th>Тип</th><th class="short-col">D</th><th class="angle-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
@@ -2037,7 +2039,11 @@ var INV = (function () {
                   ? arrivalGroupHeadHtml.body_tool_round_insert
                   : bodyCutterKey === "disc"
                     ? arrivalGroupHeadHtml.body_tool_disc
-                    : arrivalGroupHeadHtml.body_tool_generic;
+                    : bodyCutterKey === "ball"
+                      ? arrivalGroupHeadHtml.body_tool_ball
+                      : bodyCutterKey === "modular_head"
+                        ? arrivalGroupHeadHtml.body_tool_modular_head
+                        : arrivalGroupHeadHtml.body_tool_generic;
     } else {
       headHtml = arrivalGroupHeadHtml[groupKey] || arrivalGroupHeadHtml.drill;
     }
@@ -2218,6 +2224,31 @@ var INV = (function () {
         cells.push('<td class="co-cell"></td>');
         cells.push('<td class="wm-cell"></td>');
         cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      } else if (bodyCutter === "ball") {
+        cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
+        cells.push('<td><select data-k="bt_shank_type">' + buildOptionsHtml(INV.ball_mill_shank_types || INV.body_tool_shank_types || []) + '</select></td>');
+        cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_overall_length_mm" placeholder="L"></td>');
+        cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
+        cells.push('<td><select data-k="bt_coolant"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
+        cells.push('<td><input type="text" data-k="bt_insert_compat" maxlength="80" placeholder="RD.. / RP.."></td>');
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      } else if (bodyCutter === "modular_head") {
+        cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
+        cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
+        cells.push('<td><select data-k="bt_mount_thread">' + buildOptionsHtml(INV.modular_head_threads || []) + '</select></td>');
+        cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
+        cells.push('<td><select data-k="bt_coolant"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
+        cells.push('<td><input type="text" data-k="bt_insert_compat" maxlength="80" placeholder="APKT / RCKT…"></td>');
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else {
         cells.push('<td><select data-k="body_cutter" required>' + buildOptionsHtml(INV.indexable_mill_cutter_types || []) + '</select></td>');
         cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
@@ -2234,6 +2265,7 @@ var INV = (function () {
       }
     } else if (cat === "tap") {
       cells.push('<td class="tap-size-col"><input type="text" data-k="size_label" placeholder="M2"></td>');
+      cells.push('<td><select data-k="thread_kind">' + buildOptionsHtml(INV.thread_kinds || []) + '</select></td>');
       cells.push('<td class="tap-std-col"><select data-k="thread_standard">' + buildTapStandardOptionsHtml(INV.thread_standards || []) + '</select></td>');
       cells.push('<td class="tap-step-col"><input type="number" step="0.001" data-k="tap_pitch_mm"></td>');
       cells.push('<td class="tap-tpi-col"><input type="number" data-k="tap_tpi"></td>');
@@ -2497,9 +2529,13 @@ var INV = (function () {
   (INV.high_speed_body_styles || []).forEach(function (x) { hsBodyStyleLabels[x.value] = x.label; });
   var hsAngleLabels = {};
   (INV.high_speed_angle_options || []).forEach(function (x) { hsAngleLabels[x.value] = x.label; });
+  var modularThreadLabels = { "": "—" };
+  (INV.modular_head_threads || []).forEach(function (x) { modularThreadLabels[x.value] = x.label; });
 
   var threadStandardLabels = {};
   (INV.thread_standards || []).forEach(function (x) { threadStandardLabels[x.value] = x.label; });
+  var threadKindLabels = {};
+  (INV.thread_kinds || []).forEach(function (x) { threadKindLabels[x.value] = x.label; });
   var tapHoleTypeLabels = {};
   (INV.tap_hole_types || []).forEach(function (x) { tapHoleTypeLabels[x.value] = x.label; });
   var tapToolTypeLabels = {};
@@ -2585,7 +2621,10 @@ var INV = (function () {
       return v ? (hsAngleLabels[v] || (String(v).replace(/\.0+$/, "") + "°")) : "-";
     }
     if (field === "bt_brand") return v || "-";
+    if (field === "bt_insert_compat") return v || "-";
+    if (field === "bt_mount_thread") return modularThreadLabels[v] || v || "—";
     if (field === "thread_standard") return threadStandardLabels[v] || v;
+    if (field === "thread_kind") return threadKindLabels[v] || v || "—";
     if (field === "hole_type") return tapHoleTypeLabels[v] || v;
     if (field === "tap_type") return tapToolTypeLabels[v] || v;
     if (field === "cd_angle_deg") return centerDrillAngleLabels[v] || v;
@@ -2663,6 +2702,8 @@ var INV = (function () {
       options = fromMap(bodyCouplingLabels);
     } else if (field === "bt_shank_type") {
       options = fromMap(bodyShankLabels);
+    } else if (field === "bt_mount_thread") {
+      options = fromMap(modularThreadLabels);
     } else if (field === "bt_insert_family") {
       options = fromMap(insertFamilyLabels);
     } else if (field === "bt_coolant") {
@@ -2694,6 +2735,8 @@ var INV = (function () {
       }
     } else if (field === "thread_standard") {
       options = fromMap(threadStandardLabels);
+    } else if (field === "thread_kind") {
+      options = fromMap(threadKindLabels);
     } else if (field === "hole_type") {
       options = fromMap(tapHoleTypeLabels);
     } else if (field === "tap_type") {

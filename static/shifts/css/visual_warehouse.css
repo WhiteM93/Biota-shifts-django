@@ -280,6 +280,37 @@ html[data-theme="dawn"] .vw-floor {
   grid-auto-flow: row dense;
 }
 
+.vw-pile {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  min-height: 72px;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+
+/* Органайзер внутри шкафа: мини-тумба с ярусами и разделителями */
+.vw-organizer {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid #3a4046;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #8a929a, #5c646c 55%, #4a5158);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
 .vw-bay-ledge {
   height: 12px;
   flex-shrink: 0;
@@ -302,20 +333,6 @@ html[data-theme="dawn"] .vw-floor {
   background: rgba(0, 0, 0, 0.25);
 }
 
-/* Органайзер внутри шкафа: мини-тумба с ярусами и разделителями */
-.vw-organizer {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  width: 100%;
-  min-width: 0;
-  padding: 4px;
-  border: 1px solid #3a4046;
-  border-radius: 4px;
-  background: linear-gradient(180deg, #8a929a, #5c646c 55%, #4a5158);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
 .vw-organizer-title {
   font-size: 10px;
   font-weight: 700;
@@ -325,6 +342,8 @@ html[data-theme="dawn"] .vw-floor {
   line-height: 1.2;
   white-space: pre;
   overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .vw-organizer-tier {
@@ -335,6 +354,7 @@ html[data-theme="dawn"] .vw-floor {
   border-radius: 2px;
   overflow: hidden;
   background: #6a727a;
+  min-width: 0;
 }
 
 .vw-organizer-tier-handle {
@@ -356,24 +376,33 @@ html[data-theme="dawn"] .vw-floor {
   display: grid;
   gap: 0;
   min-height: 36px;
+  min-width: 0;
 }
 
 .vw-organizer-tier-cells .vw-drawer-cell-slot {
   min-height: 36px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .vw-organizer-tier-cells .vw-drawer-cell {
   min-height: 34px;
+  min-width: 0;
   padding: 3px 2px 2px;
+  overflow: hidden;
 }
 
 .vw-organizer-tier-cells .vw-bin-label {
   min-height: 18px;
   padding: 1px 2px;
+  min-width: 0;
 }
 
 .vw-organizer-tier-cells .vw-bin-text {
   font-size: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .vw-organizer-tier-cells .vw-bin-audit {
@@ -392,18 +421,6 @@ html[data-theme="dawn"] .vw-floor {
 }
 .vw-organizer-edit:hover {
   background: rgba(0, 0, 0, 0.4);
-}
-
-.vw-pile {
-  display: flex;
-  flex-direction: column-reverse;
-  align-items: stretch;
-  gap: 4px;
-  min-width: 0;
-  width: 100%;
-  height: 100%;
-  min-height: 72px;
-  justify-content: flex-end;
 }
 
 /* Многоярусный ящик с разделителями */

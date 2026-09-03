@@ -6253,6 +6253,146 @@ function saveSetupToolNoteEditor() {
         });
     });
 
+    (function initSetupReadinessStatusBar() {
+      var bar = document.getElementById("setup-status-bar");
+      if (!bar) return;
+      var VALID = { not_ready: 1, ready: 1, worked: 1 };
+
+      function currentTab() {
+        var sel = document.getElementById("setup-tab-select");
+        if (sel && sel.value) return sel.value;
+        return root.getAttribute("data-current-tab") || "";
+      }
+
+      function setupIdFromTab(tabName) {
+        var m = /^setup-(\d+)$/.exec(tabName || "");
+        return m ? m[1] : "";
+      }
+
+      function panelForSetup(setupId) {
+        return document.getElementById("panel-setup-" + setupId);
+      }
+
+      function optionForSetup(setupId) {
+        return document.querySelector('#setup-tab-select option[value="setup-' + setupId + '"]');
+      }
+
+      function readStatus(setupId) {
+        var panel = panelForSetup(setupId);
+        var fromPanel = panel ? (panel.getAttribute("data-readiness-status") || "") : "";
+        if (VALID[fromPanel]) return fromPanel;
+        var opt = optionForSetup(setupId);
+        var fromOpt = opt ? (opt.getAttribute("data-setup-readiness") || "") : "";
+        return VALID[fromOpt] ? fromOpt : "not_ready";
+      }
+
+      function writeStatusLocal(setupId, status) {
+        var panel = panelForSetup(setupId);
+        if (panel) panel.setAttribute("data-readiness-status", status);
+        var opt = optionForSetup(setupId);
+        if (opt) opt.setAttribute("data-setup-readiness", status);
+      }
+
+      function applyBarUi(setupId, status, editMode) {
+        var st = VALID[status] ? status : "not_ready";
+        bar.setAttribute("data-setup-id", setupId || "");
+        bar.setAttribute("data-status", st);
+        bar.querySelectorAll(".product-setup-status-bar__opt").forEach(function (btn) {
+          var on = btn.getAttribute("data-status") === st;
+          btn.classList.toggle("is-active", on);
+          btn.setAttribute("aria-pressed", on ? "true" : "false");
+          btn.disabled = !editMode;
+        });
+      }
+
+      function syncFromTab(tabName) {
+        var setupId = setupIdFromTab(tabName);
+        if (!setupId) {
+          bar.setAttribute("hidden", "hidden");
+          bar.setAttribute("data-setup-id", "");
+          return;
+        }
+        bar.removeAttribute("hidden");
+        applyBarUi(setupId, readStatus(setupId), document.body.classList.contains("setup-inline-edit-enabled"));
+      }
+
+      bar.addEventListener("click", function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest(".product-setup-status-bar__opt") : null;
+        if (!btn || btn.disabled || !document.body.classList.contains("setup-inline-edit-enabled")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var setupId = bar.getAttribute("data-setup-id") || "";
+        var next = btn.getAttribute("data-status") || "";
+        if (!setupId || !VALID[next]) return;
+        if (readStatus(setupId) === next) return;
+
+        var prev = readStatus(setupId);
+        writeStatusLocal(setupId, next);
+        applyBarUi(setupId, next, true);
+        bar.classList.add("is-busy");
+        bar.querySelectorAll(".product-setup-status-bar__opt").forEach(function (b) {
+          b.disabled = true;
+        });
+
+        var fd = new FormData();
+        fd.append("action", "inline_set_setup_readiness");
+        fd.append("setup_id", setupId);
+        fd.append("readiness_status", next);
+        var csrf = getCookie("csrftoken");
+        if (csrf) fd.append("csrfmiddlewaretoken", csrf);
+
+        fetch(window.location.href, {
+          method: "POST",
+          body: fd,
+          headers: { "X-CSRFToken": csrf, "X-Requested-With": "XMLHttpRequest" },
+          credentials: "same-origin",
+        })
+          .then(function (res) {
+            return res.text().then(function (text) {
+              var data = null;
+              try {
+                data = JSON.parse(text);
+              } catch (parseErr) {
+                throw new Error(
+                  res.ok
+                    ? "Некорректный ответ сервера."
+                    : "Ошибка сервера (" + res.status + "). Обновите страницу."
+                );
+              }
+              if (!res.ok || !data.ok) {
+                throw new Error((data && data.error) || "Не удалось сохранить статус.");
+              }
+              return data;
+            });
+          })
+          .then(function (data) {
+            var saved = VALID[data.readiness_status] ? data.readiness_status : next;
+            writeStatusLocal(setupId, saved);
+            applyBarUi(setupId, saved, true);
+          })
+          .catch(function (err) {
+            writeStatusLocal(setupId, prev);
+            applyBarUi(setupId, prev, true);
+            alert(err && err.message ? err.message : "Ошибка сети при смене статуса наладки.");
+          })
+          .finally(function () {
+            bar.classList.remove("is-busy");
+            var editOn = document.body.classList.contains("setup-inline-edit-enabled");
+            bar.querySelectorAll(".product-setup-status-bar__opt").forEach(function (b) {
+              b.disabled = !editOn;
+            });
+          });
+      });
+
+      document.addEventListener("biota:setup-tab-changed", function (ev) {
+        syncFromTab((ev && ev.detail && ev.detail.tab) || currentTab());
+      });
+      window.addEventListener("setup-inline-edit-mode", function () {
+        syncFromTab(currentTab());
+      });
+      syncFromTab(currentTab());
+    })();
+
     initProductOsnastkaCombo();
   })();
   (function () {
