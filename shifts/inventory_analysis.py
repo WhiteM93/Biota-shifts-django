@@ -27,6 +27,19 @@ GROUP_FIELD_PATHS: dict[str, dict[str, str]] = {
         "teeth_count": "body_tool_spec__teeth_count",
         "coupling": "body_tool_spec__coupling",
         "insert_family": "body_tool_spec__insert_family",
+        "insert_size": "body_tool_spec__insert_size",
+        "mount_diameter_mm": "body_tool_spec__mount_diameter_mm",
+        "cutting_length_mm": "body_tool_spec__cutting_length_mm",
+        "overall_length_mm": "body_tool_spec__overall_length_mm",
+        "shank_type": "body_tool_spec__shank_type",
+        "variable_angle": "body_tool_spec__variable_angle",
+        "hs_body_style": "body_tool_spec__hs_body_style",
+        "has_purpose": "body_tool_spec__has_purpose",
+        "corner_radius_mm": "body_tool_spec__corner_radius_mm",
+        "cutting_length_mm": "body_tool_spec__cutting_length_mm",
+        "ap_max_mm": "body_tool_spec__ap_max_mm",
+        "approach_angle_deg": "body_tool_spec__approach_angle_deg",
+        "brand": "body_tool_spec__brand",
     },
     "tap": {
         "size_label": "tap_spec__size_label",
@@ -81,7 +94,19 @@ GROUP_FIELD_LABELS["body_tool"].update(
         "cutter_type": "Тип",
         "teeth_count": "Z",
         "coupling": "Крепление",
-        "insert_family": "Тип пластины",
+        "insert_family": "Формфактор пластины",
+        "insert_size": "Размер пластины",
+        "mount_diameter_mm": "d посадки, мм",
+        "overall_length_mm": "L, мм",
+        "shank_type": "Хвостовик",
+        "variable_angle": "Перем. угол",
+        "hs_body_style": "Насадная/концевая",
+        "has_purpose": "Назначение",
+        "corner_radius_mm": "Радиус, мм",
+        "cutting_length_mm": "H (ширина паза), мм",
+        "ap_max_mm": "ap, мм",
+        "approach_angle_deg": "Угол, °",
+        "brand": "Бренд",
     }
 )
 GROUP_FIELD_LABELS["tap"].update(
@@ -122,7 +147,7 @@ GROUP_FIELD_LABELS["collet"].update(
 
 DEFAULT_GROUP_FIELD: dict[str, str] = {
     "end_mill": "diameter_mm",
-    "body_tool": "diameter_mm",
+    "body_tool": "family",
     "tap": "size_label",
     "center_drill": "diameter_mm",
     "countersink": "diameter_mm",
@@ -146,6 +171,18 @@ STOCK_FILTER_PARAMS: dict[str, dict[str, str]] = {
         "teeth_count": "bt_teeth_count",
         "coupling": "bt_coupling",
         "insert_family": "bt_insert_family",
+        "insert_size": "bt_insert_size",
+        "mount_diameter_mm": "bt_mount_diameter_mm",
+        "overall_length_mm": "bt_overall_length_mm",
+        "shank_type": "bt_shank_type",
+        "variable_angle": "bt_variable_angle",
+        "hs_body_style": "bt_hs_body_style",
+        "has_purpose": "bt_has_purpose",
+        "corner_radius_mm": "bt_corner_radius_mm",
+        "cutting_length_mm": "bt_cutting_length_mm",
+        "ap_max_mm": "bt_ap_max_mm",
+        "approach_angle_deg": "bt_angle_deg",
+        "brand": "bt_brand",
     },
     "tap": {
         "size_label": "tap_size",
@@ -181,7 +218,13 @@ STOCK_FILTER_PARAMS: dict[str, dict[str, str]] = {
 }
 
 try:
-    from shifts.body_tool_constants import BODY_TOOL_COUPLINGS, BODY_TOOL_FAMILIES, INDEXABLE_MILL_CUTTER_TYPES
+    from shifts.body_tool_constants import (
+        BODY_TOOL_COUPLINGS,
+        BODY_TOOL_FAMILIES,
+        BODY_TOOL_SHANK_TYPES,
+        HIGH_SPEED_BODY_STYLES,
+        INDEXABLE_MILL_CUTTER_TYPES,
+    )
     from shifts.insert_constants import MILLING_INSERT_FAMILIES
     from shifts.models import END_MILL_TYPES, COUNTERSINK_TYPES, COLLET_TYPES, THREAD_STANDARDS, TAP_TOOL_TYPES
 
@@ -190,6 +233,10 @@ try:
         "family": dict(BODY_TOOL_FAMILIES),
         "cutter_type": dict(INDEXABLE_MILL_CUTTER_TYPES),
         "coupling": {k: lab for k, lab in BODY_TOOL_COUPLINGS if k},
+        "shank_type": {k: lab for k, lab in BODY_TOOL_SHANK_TYPES if k},
+        "variable_angle": {"True": "Да", "False": "Нет", "1": "Да", "0": "Нет", True: "Да", False: "Нет"},
+        "has_purpose": {"True": "Есть", "False": "Нет", "1": "Есть", "0": "Нет", True: "Есть", False: "Нет"},
+        "hs_body_style": {k: lab for k, lab in HIGH_SPEED_BODY_STYLES if k},
         "insert_family": {k: lab for k, lab in MILLING_INSERT_FAMILIES if k},
         "countersink_type": dict(COUNTERSINK_TYPES),
         "collet_type": dict(COLLET_TYPES),

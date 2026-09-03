@@ -30,7 +30,7 @@ class InventoryNotifyFormatTests(SimpleTestCase):
         m.created_at = kwargs.get("created_at", datetime(2026, 6, 18, 14, 35, tzinfo=MSK))
         m.created_by_account = kwargs.get("created_by_account", "maxim")
         m.employee_name = kwargs.get("employee_name", "")
-        m.comment = kwargs.get("comment", "Приход (ООО МВ)")
+        m.comment = kwargs.get("comment", "Приход инструмента")
         m.parent_issue_id = kwargs.get("parent_issue_id")
         m.get_movement_type_display = lambda: "Пополнение"
         return m
@@ -41,7 +41,7 @@ class InventoryNotifyFormatTests(SimpleTestCase):
         self.assertIn("Сверло D7.5", text)
         self.assertIn("4 шт.", text)
         self.assertIn("maxim", text)
-        self.assertIn("Приход (ООО МВ)", text)
+        self.assertIn("Приход инструмента", text)
 
     def test_format_issue_outcome_return(self):
         m = self._movement(

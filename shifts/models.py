@@ -155,6 +155,8 @@ from .collet_constants import (
 from .body_tool_constants import (
     BODY_TOOL_COUPLINGS,
     BODY_TOOL_FAMILIES,
+    BODY_TOOL_SHANK_TYPES,
+    HIGH_SPEED_BODY_STYLES,
     INDEXABLE_MILL_CUTTER_TYPES,
 )
 from .insert_constants import (
@@ -397,9 +399,58 @@ class ToolItem(models.Model):
                 (bt.get_cutter_type_display() if bt else "—"),
                 f"Ø{fmt_mm(bt.diameter_mm)}" if bt and bt.diameter_mm is not None else "D —",
                 f"Z {bt.teeth_count if bt and bt.teeth_count is not None else '—'}",
-                f"L {fmt_mm(bt.overall_length_mm) if bt and bt.overall_length_mm is not None else '—'}",
-                ((bt.insert_family or "—") if bt else "—"),
-                f"Dосн {main_d()}",
+                f"d {fmt_mm(bt.mount_diameter_mm) if bt and bt.mount_diameter_mm is not None else '—'}",
+                (
+                    bt.get_shank_type_display()
+                    if bt and (bt.shank_type or "").strip()
+                    else ("—" if bt and bt.cutter_type in ("end", "chamfer", "high_speed", "round_insert") else "")
+                ),
+                (f"L {fmt_mm(bt.overall_length_mm)}" if bt and bt.overall_length_mm is not None else ""),
+                (
+                    ("перем. угол" if bt.variable_angle else "фикс. угол")
+                    if bt and bt.cutter_type == "chamfer"
+                    else ""
+                ),
+                (
+                    bt.get_hs_body_style_display()
+                    if bt and bt.cutter_type in ("high_speed", "round_insert") and (bt.hs_body_style or "").strip()
+                    else ("—" if bt and bt.cutter_type in ("high_speed", "round_insert") else "")
+                ),
+                (
+                    ("назначение" if bt.has_purpose else "без назначения")
+                    if bt and bt.cutter_type == "high_speed"
+                    else ""
+                ),
+                (
+                    ("перем. угол" if bt.variable_angle else (f"{fmt_mm(bt.approach_angle_deg)}°" if bt.approach_angle_deg is not None else "угол —"))
+                    if bt and bt.cutter_type == "high_speed"
+                    else ""
+                ),
+                (
+                    f"R {fmt_mm(bt.corner_radius_mm)}"
+                    if bt and bt.cutter_type == "round_insert" and bt.corner_radius_mm is not None
+                    else ""
+                ),
+                (
+                    f"H {fmt_mm(bt.cutting_length_mm)}"
+                    if bt and bt.cutter_type == "disc" and bt.cutting_length_mm is not None
+                    else ""
+                ),
+                (("СОЖ" if bt.coolant_through else "без СОЖ") if bt else "—"),
+                (
+                    " ".join(
+                        x
+                        for x in [
+                            (bt.insert_family or "").strip().upper() if bt else "",
+                            (bt.insert_size or "").strip() if bt else "",
+                        ]
+                        if x
+                    )
+                    or "—"
+                ),
+                f"ap {fmt_mm(bt.ap_max_mm) if bt and bt.ap_max_mm is not None else '—'}",
+                f"{fmt_mm(bt.approach_angle_deg)}°" if bt and bt.approach_angle_deg is not None else "угол —",
+                ((bt.brand or "—") if bt else "—"),
                 coating_txt(),
                 work_mat_txt(),
                 f"ост {self.quantity}",
@@ -408,7 +459,7 @@ class ToolItem(models.Model):
         else:
             segs = [self.get_category_display(), self.name, f"ост {self.quantity}"]
 
-        return " · ".join(segs)
+        return " · ".join(s for s in segs if s)
 
     def issue_combo_card(self) -> dict:
         """Поля для карточки в выпадающем списке выдачи: тип, размеры, материал, покрытие, МО, кол-во."""
@@ -545,22 +596,53 @@ class ToolItem(models.Model):
         elif cat == "body_tool":
             bt = getattr(self, "body_tool_spec", None)
             if bt:
-                tool_type = (
-                    f"{self.get_category_display()} · {bt.get_cutter_type_display()}"
-                )
+                from shifts.body_tool_constants import BODY_TOOL_FAMILY_LABELS
+
+                fam = BODY_TOOL_FAMILY_LABELS.get(bt.family, "Фрезы со сменными пластинами")
+                tool_type = f"{fam} · {bt.get_cutter_type_display()}"
                 if bt.diameter_mm is not None:
-                    specs_parts.append(f"D={fmt_mm(bt.diameter_mm)} мм")
+                    specs_parts.append(f"ØD={fmt_mm(bt.diameter_mm)} мм")
                 if bt.teeth_count is not None:
                     specs_parts.append(f"Z={bt.teeth_count}")
+                if bt.mount_diameter_mm is not None:
+                    specs_parts.append(f"d={fmt_mm(bt.mount_diameter_mm)} мм")
+                if (bt.shank_type or "").strip():
+                    specs_parts.append(bt.get_shank_type_display())
                 if bt.overall_length_mm is not None:
                     specs_parts.append(f"L={fmt_mm(bt.overall_length_mm)} мм")
-                if bt.cutting_length_mm is not None:
-                    specs_parts.append(f"Lc={fmt_mm(bt.cutting_length_mm)} мм")
+                if bt.cutter_type == "chamfer":
+                    specs_parts.append("перем. угол" if bt.variable_angle else "фикс. угол")
+                if bt.cutter_type == "high_speed":
+                    if (bt.hs_body_style or "").strip():
+                        specs_parts.append(bt.get_hs_body_style_display())
+                    specs_parts.append("назначение" if bt.has_purpose else "без назначения")
+                    if bt.variable_angle:
+                        specs_parts.append("перем. угол")
+                    elif bt.approach_angle_deg is not None:
+                        specs_parts.append(f"{fmt_mm(bt.approach_angle_deg)}°")
+                if bt.cutter_type == "round_insert":
+                    if (bt.hs_body_style or "").strip():
+                        specs_parts.append(bt.get_hs_body_style_display())
+                    if bt.corner_radius_mm is not None:
+                        specs_parts.append(f"R={fmt_mm(bt.corner_radius_mm)} мм")
+                if bt.cutter_type == "disc" and bt.cutting_length_mm is not None:
+                    specs_parts.append(f"H={fmt_mm(bt.cutting_length_mm)} мм")
+                specs_parts.append("СОЖ" if bt.coolant_through else "без СОЖ")
+                ins_bits = []
                 if (bt.insert_family or "").strip():
-                    specs_parts.append(bt.insert_family.strip().upper())
-                specs_parts.append(f"Dосн={main_d()}")
+                    ins_bits.append(bt.insert_family.strip().upper())
+                if (bt.insert_size or "").strip():
+                    ins_bits.append(bt.insert_size.strip())
+                if ins_bits:
+                    specs_parts.append(" ".join(ins_bits))
+                if bt.ap_max_mm is not None:
+                    specs_parts.append(f"ap={fmt_mm(bt.ap_max_mm)} мм")
+                if bt.approach_angle_deg is not None:
+                    specs_parts.append(f"{fmt_mm(bt.approach_angle_deg)}°")
+                if (bt.brand or "").strip():
+                    specs_parts.append(bt.brand.strip())
             else:
-                tool_type = self.get_category_display()
+                tool_type = "Фрезы со сменными пластинами"
         else:
             tool_type = self.get_category_display()
             specs_parts = [self.name] if (self.name or "").strip() else []
@@ -693,6 +775,11 @@ class ToolItem(models.Model):
                 out["cutting_length"] = fmt_num(bt.cutting_length_mm)
                 out["teeth"] = str(bt.teeth_count) if bt.teeth_count is not None else ""
                 out["ins_family"] = (bt.insert_family or "").strip()
+                out["size_label"] = (bt.insert_size or "").strip()
+                out["angle"] = fmt_num(bt.approach_angle_deg)
+                out["shank_type"] = (bt.shank_type or "").strip()
+                out["length"] = fmt_num(bt.mount_diameter_mm)
+                out["cutting_length"] = fmt_num(bt.ap_max_mm)
         return out
 
 
@@ -1051,9 +1138,68 @@ class BodyToolSpec(models.Model):
         max_length=24,
         blank=True,
         default="",
-        choices=MILLING_INSERT_FAMILIES,
-        verbose_name="Тип пластины",
+        verbose_name="Формфактор пластины",
         help_text="Семейство СМП под корпус (APKT, SEKT…)",
+    )
+    insert_size = models.CharField(
+        max_length=24,
+        blank=True,
+        default="",
+        verbose_name="Размер пластины",
+        help_text="Размер / код пластины (1604, 12…)",
+    )
+    mount_diameter_mm = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="d хвостовика / посадки, мм",
+    )
+    coolant_through = models.BooleanField(
+        default=False,
+        verbose_name="Каналы для СОЖ",
+    )
+    ap_max_mm = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Максимальная глубина резания ap, мм",
+    )
+    brand = models.CharField(
+        max_length=80,
+        blank=True,
+        default="",
+        verbose_name="Бренд",
+    )
+    shank_type = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        choices=BODY_TOOL_SHANK_TYPES,
+        verbose_name="Тип хвостовика",
+    )
+    variable_angle = models.BooleanField(
+        default=False,
+        verbose_name="С переменным углом",
+    )
+    hs_body_style = models.CharField(
+        max_length=12,
+        blank=True,
+        default="",
+        choices=HIGH_SPEED_BODY_STYLES,
+        verbose_name="Тип фрезы (насадная/концевая)",
+    )
+    has_purpose = models.BooleanField(
+        default=False,
+        verbose_name="Назначение фрезы",
+    )
+    corner_radius_mm = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Радиус, мм",
     )
     size_label = models.CharField(
         max_length=64, blank=True, default="", verbose_name="Артикул / обозначение"
@@ -1075,20 +1221,37 @@ class BodyToolSpec(models.Model):
             diameter_mm=self.diameter_mm,
             teeth_count=self.teeth_count,
             insert_family=self.insert_family,
+            insert_size=self.insert_size,
+            brand=self.brand,
         )
 
     def save(self, *args, **kwargs):
         from shifts.body_tool_constants import (
+            coupling_from_shank,
             normalize_body_tool_coupling,
             normalize_body_tool_family,
+            normalize_body_tool_shank,
+            normalize_high_speed_body_style,
             normalize_indexable_mill_cutter,
+            normalize_insert_size,
         )
         from shifts.insert_constants import normalize_milling_family
 
         self.family = normalize_body_tool_family(self.family)
         self.cutter_type = normalize_indexable_mill_cutter(self.cutter_type)
         self.coupling = normalize_body_tool_coupling(self.coupling)
+        self.shank_type = normalize_body_tool_shank(self.shank_type)
+        self.hs_body_style = normalize_high_speed_body_style(self.hs_body_style)
+        derived = coupling_from_shank(self.shank_type)
+        if derived:
+            self.coupling = derived
+        elif self.cutter_type == "end" and not self.coupling:
+            self.coupling = "shank"
+        if self.variable_angle:
+            self.approach_angle_deg = None
         self.insert_family = normalize_milling_family(self.insert_family)
+        self.insert_size = normalize_insert_size(self.insert_size)
+        self.brand = (self.brand or "").strip()[:80]
         self.size_label = (self.size_label or "").strip()[:64]
         self.insert_compat = (self.insert_compat or "").strip()[:80]
         super().save(*args, **kwargs)

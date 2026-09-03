@@ -29,11 +29,25 @@ from .auth_utils import (
 from .body_tool_constants import (
     BODY_TOOL_COUPLINGS,
     BODY_TOOL_FAMILIES,
+    BODY_TOOL_SHANK_TYPES,
+    CHAMFER_MILL_SHANK_TYPES,
+    END_MILL_SHANK_TYPES,
+    FACE_MILL_ANGLES,
+    HIGH_SPEED_ANGLE_OPTIONS,
+    HIGH_SPEED_BODY_STYLES,
+    HIGH_SPEED_SHANK_TYPES,
     INDEXABLE_MILL_CUTTER_TYPES,
+    INSERT_SIZE_OTHER,
+    ROUND_INSERT_SHANK_TYPES,
     build_body_tool_display_name,
+    coupling_from_shank,
     normalize_body_tool_coupling,
     normalize_body_tool_family,
+    normalize_body_tool_shank,
+    normalize_high_speed_body_style,
     normalize_indexable_mill_cutter,
+    normalize_insert_size,
+    parse_angle_or_variable,
 )
 from .collet_constants import (
     COLLET_THREAD_STANDARDS,
@@ -604,6 +618,11 @@ def _to_int_or_none(val: str):
     return parsed if parsed >= 0 else None
 
 
+def _to_bool(val) -> bool:
+    v = str(val or "").strip().lower()
+    return v in ("1", "true", "yes", "on", "есть")
+
+
 _STOCK_FILTER_PARAM_KEYS = frozenset(
     {
         "show_all",
@@ -651,7 +670,6 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "collet_thread_standard",
         "collet_threading_use",
         "collet_threading_series",
-        "arrival_supplier",
         "tool_material",
         "tool_material_custom",
         "coating_type",
@@ -664,6 +682,17 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "bt_teeth_count",
         "bt_coupling",
         "bt_insert_family",
+        "bt_insert_size",
+        "bt_mount_diameter_mm",
+        "bt_coolant",
+        "bt_ap_max_mm",
+        "bt_angle_deg",
+        "bt_brand",
+        "bt_shank_type",
+        "bt_variable_angle",
+        "bt_hs_body_style",
+        "bt_has_purpose",
+        "bt_corner_radius_mm",
     }
 )
 
@@ -709,7 +738,6 @@ _STOCK_GLOBAL_KEYS = frozenset(
     {
         "show_all",
         "category",
-        "arrival_supplier",
         "tool_material",
         "tool_material_custom",
         "coating_type",
@@ -787,6 +815,17 @@ _STOCK_KEYS_BY_CATEGORY = {
             "bt_teeth_count",
             "bt_coupling",
             "bt_insert_family",
+            "bt_insert_size",
+            "bt_mount_diameter_mm",
+            "bt_coolant",
+            "bt_ap_max_mm",
+            "bt_angle_deg",
+            "bt_brand",
+            "bt_shank_type",
+            "bt_variable_angle",
+            "bt_hs_body_style",
+            "bt_has_purpose",
+            "bt_corner_radius_mm",
         }
     ),
 }
@@ -810,6 +849,10 @@ _STOCK_DECIMAL_PARAM_KEYS = frozenset(
         "bt_diameter_mm",
         "bt_overall_length_mm",
         "bt_cutting_length_mm",
+        "bt_mount_diameter_mm",
+        "bt_ap_max_mm",
+        "bt_angle_deg",
+        "bt_corner_radius_mm",
     }
 )
 _STOCK_INT_PARAM_KEYS = frozenset({"mill_flutes_count", "countersink_flutes_count", "bt_teeth_count"})
@@ -894,6 +937,49 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         bt_insert_family_raw = g("bt_insert_family")
         if bt_insert_family_raw:
             qs = qs.filter(body_tool_spec__insert_family__iexact=bt_insert_family_raw)
+        bt_insert_size_raw = g("bt_insert_size")
+        if bt_insert_size_raw:
+            qs = qs.filter(body_tool_spec__insert_size__iexact=bt_insert_size_raw)
+        bt_mount_raw = g("bt_mount_diameter_mm")
+        if bt_mount_raw:
+            bt_mount = _to_decimal(bt_mount_raw, Decimal("0"))
+            if bt_mount > 0:
+                qs = qs.filter(body_tool_spec__mount_diameter_mm=bt_mount)
+        bt_coolant_raw = g("bt_coolant")
+        if bt_coolant_raw in ("0", "1"):
+            qs = qs.filter(body_tool_spec__coolant_through=(bt_coolant_raw == "1"))
+        bt_ap_raw = g("bt_ap_max_mm")
+        if bt_ap_raw:
+            bt_ap = _to_decimal(bt_ap_raw, Decimal("0"))
+            if bt_ap > 0:
+                qs = qs.filter(body_tool_spec__ap_max_mm=bt_ap)
+        bt_angle_raw = g("bt_angle_deg")
+        if bt_angle_raw == "variable":
+            qs = qs.filter(body_tool_spec__variable_angle=True)
+        elif bt_angle_raw:
+            bt_angle = _to_decimal(bt_angle_raw, Decimal("-1"))
+            if bt_angle >= 0:
+                qs = qs.filter(body_tool_spec__approach_angle_deg=bt_angle, body_tool_spec__variable_angle=False)
+        bt_brand_raw = g("bt_brand")
+        if bt_brand_raw:
+            qs = qs.filter(body_tool_spec__brand__iexact=bt_brand_raw)
+        bt_shank_raw = g("bt_shank_type")
+        if bt_shank_raw:
+            qs = qs.filter(body_tool_spec__shank_type=normalize_body_tool_shank(bt_shank_raw))
+        bt_variable_raw = g("bt_variable_angle")
+        if bt_variable_raw in ("0", "1"):
+            qs = qs.filter(body_tool_spec__variable_angle=(bt_variable_raw == "1"))
+        bt_hs_style_raw = g("bt_hs_body_style")
+        if bt_hs_style_raw:
+            qs = qs.filter(body_tool_spec__hs_body_style=normalize_high_speed_body_style(bt_hs_style_raw))
+        bt_purpose_raw = g("bt_has_purpose")
+        if bt_purpose_raw in ("0", "1"):
+            qs = qs.filter(body_tool_spec__has_purpose=(bt_purpose_raw == "1"))
+        bt_radius_raw = g("bt_corner_radius_mm")
+        if bt_radius_raw:
+            bt_radius = _to_decimal(bt_radius_raw, Decimal("-1"))
+            if bt_radius >= 0:
+                qs = qs.filter(body_tool_spec__corner_radius_mm=bt_radius)
     elif category == "tap":
         tap_size = g("tap_size")
         if tap_size:
@@ -1054,13 +1140,6 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
                 | Q(work_material__endswith=f",{wm}")
                 | Q(work_material__contains=f",{wm},")
             )
-    if "arrival_supplier" not in ex:
-        arrival_supplier = g("arrival_supplier")
-        if arrival_supplier:
-            qs = qs.filter(
-                movements__movement_type="restock",
-                movements__comment__icontains=arrival_supplier,
-            ).distinct()
     return qs
 
 
@@ -1181,6 +1260,65 @@ def _milling_family_from_request(data) -> str:
     if sel == INSERT_FAMILY_OTHER:
         return normalize_milling_family(data.get("ins_family_custom") or "")
     return normalize_milling_family(sel)
+
+
+def _body_insert_family_from_row(data) -> str:
+    sel = (data.get("bt_insert_family") or data.get("ins_family") or "").strip()
+    if sel == INSERT_FAMILY_OTHER:
+        return normalize_milling_family(data.get("bt_insert_family_custom") or data.get("ins_family_custom") or "")
+    return normalize_milling_family(sel)
+
+
+def _body_insert_size_from_row(data) -> str:
+    sel = (data.get("bt_insert_size") or "").strip()
+    if sel == INSERT_SIZE_OTHER:
+        return normalize_insert_size(data.get("bt_insert_size_custom") or "")
+    return normalize_insert_size(sel)
+
+
+def _body_tool_name_from_spec(bt) -> str:
+    return build_body_tool_display_name(
+        family=bt.family,
+        cutter_type=bt.cutter_type,
+        diameter_mm=bt.diameter_mm,
+        teeth_count=bt.teeth_count,
+        insert_family=bt.insert_family,
+        insert_size=bt.insert_size,
+        brand=bt.brand,
+    )
+
+
+def _merged_milling_insert_families():
+    known = []
+    seen = set()
+    extra_vals = set()
+    try:
+        extra_vals.update(
+            BodyToolSpec.objects.exclude(insert_family="")
+            .values_list("insert_family", flat=True)
+            .distinct()
+        )
+        extra_vals.update(
+            InsertSpec.objects.exclude(milling_family="")
+            .values_list("milling_family", flat=True)
+            .distinct()
+        )
+    except Exception:
+        extra_vals = set()
+    catalog = {k for k, _ in MILLING_INSERT_FAMILIES if k}
+    extras = sorted(v.strip().upper() for v in extra_vals if v and str(v).strip().upper() not in catalog)
+    for key, label in MILLING_INSERT_FAMILIES:
+        if key == INSERT_FAMILY_OTHER:
+            for extra in extras:
+                if extra not in seen:
+                    known.append((extra, extra))
+                    seen.add(extra)
+        if key in seen:
+            continue
+        known.append((key, label))
+        if key:
+            seen.add(key)
+    return known
 
 
 def _insert_spec_fields_from_mapping(data: dict) -> dict:
@@ -1673,17 +1811,33 @@ def inventory_view(request):
             bt.cutting_length_mm = _to_decimal_or_none(request.POST.get("bt_cutting_length_mm"))
             bt.teeth_count = _to_int_or_none(request.POST.get("bt_teeth_count"))
             bt.coupling = normalize_body_tool_coupling(request.POST.get("bt_coupling"))
-            bt.insert_family = normalize_milling_family(request.POST.get("bt_insert_family"))
+            bt.insert_family = _body_insert_family_from_row(request.POST)
+            bt.insert_size = _body_insert_size_from_row(request.POST)
+            bt.mount_diameter_mm = _to_decimal_or_none(request.POST.get("bt_mount_diameter_mm"))
+            bt.coolant_through = _to_bool(request.POST.get("bt_coolant"))
+            bt.ap_max_mm = _to_decimal_or_none(request.POST.get("bt_ap_max_mm"))
+            bt.brand = (request.POST.get("bt_brand") or "").strip()[:80]
+            bt.shank_type = normalize_body_tool_shank(request.POST.get("bt_shank_type"))
+            bt.hs_body_style = normalize_high_speed_body_style(request.POST.get("bt_hs_body_style"))
+            bt.has_purpose = _to_bool(request.POST.get("bt_has_purpose"))
+            bt.corner_radius_mm = _to_decimal_or_none(request.POST.get("bt_corner_radius_mm"))
+            angle_raw = (request.POST.get("bt_angle_deg") or "").strip()
+            ang_val, ang_var = parse_angle_or_variable(angle_raw)
+            if ang_var:
+                bt.variable_angle = True
+                bt.approach_angle_deg = None
+            else:
+                bt.variable_angle = _to_bool(request.POST.get("bt_variable_angle"))
+                bt.approach_angle_deg = _to_decimal_or_none(ang_val if ang_val is not None else angle_raw)
+                if bt.variable_angle:
+                    bt.approach_angle_deg = None
+            derived = coupling_from_shank(bt.shank_type)
+            if derived:
+                bt.coupling = derived
             bt.size_label = ""
             bt.insert_compat = ""
             bt.save()
-            tool.name = build_body_tool_display_name(
-                family=bt.family,
-                cutter_type=bt.cutter_type,
-                diameter_mm=bt.diameter_mm,
-                teeth_count=bt.teeth_count,
-                insert_family=bt.insert_family,
-            )
+            tool.name = _body_tool_name_from_spec(bt)
         elif tool.category == "tap" and tool.tap_spec:
             tool.tap_spec.thread_standard = (request.POST.get("thread_standard") or "metric").strip()
             tool.tap_spec.size_label = (request.POST.get("size_label") or "").strip()
@@ -1834,15 +1988,61 @@ def inventory_view(request):
                 elif field == "bt_insert_family":
                     bt.insert_family = normalize_milling_family(value_raw)
                     bt.save(update_fields=["insert_family"])
+                elif field == "bt_insert_size":
+                    bt.insert_size = normalize_insert_size(value_raw)
+                    bt.save(update_fields=["insert_size"])
+                elif field == "bt_mount_diameter_mm":
+                    bt.mount_diameter_mm = _to_decimal_or_none(value_raw)
+                    bt.save(update_fields=["mount_diameter_mm"])
+                elif field == "bt_coolant":
+                    bt.coolant_through = _to_bool(value_raw)
+                    bt.save(update_fields=["coolant_through"])
+                elif field == "bt_ap_max_mm":
+                    bt.ap_max_mm = _to_decimal_or_none(value_raw)
+                    bt.save(update_fields=["ap_max_mm"])
+                elif field == "bt_angle_deg":
+                    ang_val, ang_var = parse_angle_or_variable(value_raw)
+                    if ang_var:
+                        bt.variable_angle = True
+                        bt.approach_angle_deg = None
+                        bt.save(update_fields=["approach_angle_deg", "variable_angle"])
+                    else:
+                        bt.approach_angle_deg = _to_decimal_or_none(ang_val if ang_val is not None else value_raw)
+                        if bt.cutter_type == "high_speed":
+                            bt.variable_angle = False
+                            bt.save(update_fields=["approach_angle_deg", "variable_angle"])
+                        else:
+                            bt.save(update_fields=["approach_angle_deg"])
+                elif field == "bt_brand":
+                    bt.brand = (value_raw or "").strip()[:80]
+                    bt.save(update_fields=["brand"])
+                elif field == "bt_shank_type":
+                    bt.shank_type = normalize_body_tool_shank(value_raw)
+                    derived = coupling_from_shank(bt.shank_type)
+                    if derived:
+                        bt.coupling = derived
+                        bt.save(update_fields=["shank_type", "coupling"])
+                    else:
+                        bt.save(update_fields=["shank_type"])
+                elif field == "bt_variable_angle":
+                    bt.variable_angle = _to_bool(value_raw)
+                    if bt.variable_angle:
+                        bt.approach_angle_deg = None
+                        bt.save(update_fields=["variable_angle", "approach_angle_deg"])
+                    else:
+                        bt.save(update_fields=["variable_angle"])
+                elif field == "bt_hs_body_style":
+                    bt.hs_body_style = normalize_high_speed_body_style(value_raw)
+                    bt.save(update_fields=["hs_body_style"])
+                elif field == "bt_has_purpose":
+                    bt.has_purpose = _to_bool(value_raw)
+                    bt.save(update_fields=["has_purpose"])
+                elif field == "bt_corner_radius_mm":
+                    bt.corner_radius_mm = _to_decimal_or_none(value_raw)
+                    bt.save(update_fields=["corner_radius_mm"])
                 else:
                     return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
-                tool.name = build_body_tool_display_name(
-                    family=bt.family,
-                    cutter_type=bt.cutter_type,
-                    diameter_mm=bt.diameter_mm,
-                    teeth_count=bt.teeth_count,
-                    insert_family=bt.insert_family,
-                )
+                tool.name = _body_tool_name_from_spec(bt)
                 tool.save(update_fields=["name", "updated_at"])
             elif cat == "tap" and tool.tap_spec:
                 tp = tool.tap_spec
@@ -2323,7 +2523,6 @@ def inventory_view(request):
                 quantity = _to_int(row.get("quantity"), 0)
                 movement_date_raw = (row.get("movement_date") or "").strip()
                 comment = (row.get("comment") or "").strip()
-                supplier_name = (row.get("supplier_name") or "").strip()
                 tool_material = (row.get("tool_material") or "").strip()
                 _register_tool_material_extra(tool_material)
                 coating_type = (row.get("coating_type") or "none").strip()
@@ -2390,7 +2589,30 @@ def inventory_view(request):
                     cutting_length_mm = _to_decimal_or_none(row.get("bt_cutting_length_mm"))
                     teeth_count = _to_int_or_none(row.get("bt_teeth_count"))
                     coupling = normalize_body_tool_coupling(row.get("bt_coupling"))
-                    insert_family = normalize_milling_family(row.get("bt_insert_family"))
+                    insert_family = _body_insert_family_from_row(row)
+                    insert_size = _body_insert_size_from_row(row)
+                    mount_diameter_mm = _to_decimal_or_none(row.get("bt_mount_diameter_mm"))
+                    coolant_through = _to_bool(row.get("bt_coolant"))
+                    ap_max_mm = _to_decimal_or_none(row.get("bt_ap_max_mm"))
+                    brand = (row.get("bt_brand") or "").strip()[:80]
+                    shank_type = normalize_body_tool_shank(row.get("bt_shank_type"))
+                    hs_body_style = normalize_high_speed_body_style(row.get("bt_hs_body_style"))
+                    has_purpose = _to_bool(row.get("bt_has_purpose"))
+                    corner_radius_mm = _to_decimal_or_none(row.get("bt_corner_radius_mm"))
+                    ang_val, ang_var = parse_angle_or_variable(row.get("bt_angle_deg"))
+                    if ang_var:
+                        variable_angle = True
+                        approach_angle_deg = None
+                    else:
+                        variable_angle = _to_bool(row.get("bt_variable_angle"))
+                        approach_angle_deg = _to_decimal_or_none(ang_val if ang_val is not None else row.get("bt_angle_deg"))
+                        if variable_angle:
+                            approach_angle_deg = None
+                    derived = coupling_from_shank(shank_type)
+                    if derived:
+                        coupling = derived
+                    elif cutter_type == "end" and not coupling:
+                        coupling = "shank"
                     tool = (
                         ToolItem.objects.select_for_update()
                         .filter(
@@ -2398,12 +2620,23 @@ def inventory_view(request):
                             tool_material=tool_material,
                             coating_type=coating_type,
                             work_material=work_material,
-                            main_diameter_mm=main_diameter_mm,
                             body_tool_spec__family=family,
                             body_tool_spec__cutter_type=cutter_type,
                             body_tool_spec__diameter_mm=diameter_mm,
+                            body_tool_spec__overall_length_mm=overall_length_mm,
                             body_tool_spec__teeth_count=teeth_count,
                             body_tool_spec__insert_family=insert_family,
+                            body_tool_spec__insert_size=insert_size,
+                            body_tool_spec__mount_diameter_mm=mount_diameter_mm,
+                            body_tool_spec__coolant_through=coolant_through,
+                            body_tool_spec__ap_max_mm=ap_max_mm,
+                            body_tool_spec__approach_angle_deg=approach_angle_deg,
+                            body_tool_spec__brand=brand,
+                            body_tool_spec__shank_type=shank_type,
+                            body_tool_spec__variable_angle=variable_angle,
+                            body_tool_spec__hs_body_style=hs_body_style,
+                            body_tool_spec__has_purpose=has_purpose,
+                            body_tool_spec__corner_radius_mm=corner_radius_mm,
                         )
                         .first()
                     )
@@ -2419,11 +2652,13 @@ def inventory_view(request):
                                 diameter_mm=diameter_mm,
                                 teeth_count=teeth_count,
                                 insert_family=insert_family,
+                                insert_size=insert_size,
+                                brand=brand,
                             ),
                             tool_material=tool_material,
                             coating_type=coating_type,
                             work_material=work_material,
-                            main_diameter_mm=main_diameter_mm,
+                            main_diameter_mm=mount_diameter_mm,
                             quantity=quantity,
                         )
                         BodyToolSpec.objects.create(
@@ -2436,6 +2671,17 @@ def inventory_view(request):
                             teeth_count=teeth_count,
                             coupling=coupling,
                             insert_family=insert_family,
+                            insert_size=insert_size,
+                            mount_diameter_mm=mount_diameter_mm,
+                            coolant_through=coolant_through,
+                            ap_max_mm=ap_max_mm,
+                            approach_angle_deg=approach_angle_deg,
+                            brand=brand,
+                            shank_type=shank_type,
+                            variable_angle=variable_angle,
+                            hs_body_style=hs_body_style,
+                            has_purpose=has_purpose,
+                            corner_radius_mm=corner_radius_mm,
                         )
                 elif category == "tap":
                     thread_standard = (row.get("thread_standard") or "metric").strip()
@@ -2647,11 +2893,7 @@ def inventory_view(request):
                     tool=tool,
                     quantity=quantity,
                     movement_date=movement_date,
-                    comment=comment or (
-                        f"Приход инструмента ({supplier_name})"
-                        if supplier_name
-                        else "Приход инструмента"
-                    ),
+                    comment=comment or "Приход инструмента",
                     created_by_account=username,
                 )
                 created_count += 1
@@ -2937,7 +3179,17 @@ def inventory_view(request):
     bt_teeth_count_raw = _sq("bt_teeth_count")
     bt_coupling_raw = _sq("bt_coupling")
     bt_insert_family_raw = _sq("bt_insert_family")
-    arrival_supplier = _sq("arrival_supplier")
+    bt_insert_size_raw = _sq("bt_insert_size")
+    bt_mount_diameter_raw = _sq("bt_mount_diameter_mm")
+    bt_coolant_raw = _sq("bt_coolant")
+    bt_ap_max_raw = _sq("bt_ap_max_mm")
+    bt_angle_raw = _sq("bt_angle_deg")
+    bt_brand_raw = _sq("bt_brand")
+    bt_shank_raw = _sq("bt_shank_type")
+    bt_variable_raw = _sq("bt_variable_angle")
+    bt_hs_style_raw = _sq("bt_hs_body_style")
+    bt_purpose_raw = _sq("bt_has_purpose")
+    bt_corner_radius_raw = _sq("bt_corner_radius_mm")
 
     tm_param = _sq("tool_material")
     tm_custom_param = (_sq("tool_material_custom") or "")[:80]
@@ -3021,6 +3273,23 @@ def inventory_view(request):
     )
     body_tool_insert_families = _distinct_text_values(
         _opt_qs("body_tool", "bt_insert_family"), "body_tool_spec__insert_family"
+    )
+    body_tool_insert_sizes = _distinct_text_values(
+        _opt_qs("body_tool", "bt_insert_size"), "body_tool_spec__insert_size"
+    )
+    body_tool_mount_diameters = _sorted_unique_decimal_strings(
+        _distinct_numeric_values(_opt_qs("body_tool", "bt_mount_diameter_mm"), "body_tool_spec__mount_diameter_mm")
+    )
+    body_tool_ap_max = _sorted_unique_decimal_strings(
+        _distinct_numeric_values(_opt_qs("body_tool", "bt_ap_max_mm"), "body_tool_spec__ap_max_mm")
+    )
+    body_tool_angles = _sorted_unique_decimal_strings(
+        _distinct_numeric_values(_opt_qs("body_tool", "bt_angle_deg"), "body_tool_spec__approach_angle_deg")
+    )
+    body_tool_brands = _distinct_text_values(_opt_qs("body_tool", "bt_brand"), "body_tool_spec__brand")
+    body_tool_shanks = _distinct_text_values(_opt_qs("body_tool", "bt_shank_type"), "body_tool_spec__shank_type")
+    body_tool_radii = _sorted_unique_decimal_strings(
+        _distinct_numeric_values(_opt_qs("body_tool", "bt_corner_radius_mm"), "body_tool_spec__corner_radius_mm")
     )
 
     tap_sizes = _distinct_text_values(_opt_qs("tap", "tap_size"), "tap_spec__size_label")
@@ -3389,12 +3658,22 @@ def inventory_view(request):
             "bt_teeth_count": _norm_stock_int_filter_str(bt_teeth_count_raw),
             "bt_coupling": bt_coupling_raw,
             "bt_insert_family": bt_insert_family_raw,
+            "bt_insert_size": bt_insert_size_raw,
+            "bt_mount_diameter_mm": _norm_stock_decimal_str(bt_mount_diameter_raw),
+            "bt_coolant": bt_coolant_raw,
+            "bt_ap_max_mm": _norm_stock_decimal_str(bt_ap_max_raw),
+            "bt_angle_deg": bt_angle_raw if bt_angle_raw == "variable" else _norm_stock_decimal_str(bt_angle_raw),
+            "bt_brand": bt_brand_raw,
+            "bt_shank_type": bt_shank_raw,
+            "bt_variable_angle": bt_variable_raw,
+            "bt_hs_body_style": bt_hs_style_raw,
+            "bt_has_purpose": bt_purpose_raw,
+            "bt_corner_radius_mm": _norm_stock_decimal_str(bt_corner_radius_raw),
             "tool_material": tool_material,
             "tool_material_custom": tm_custom_input,
             "tool_material_select": tool_material_select,
             "coating_type": coating_type,
             "work_material": work_material,
-            "arrival_supplier": arrival_supplier,
             "show_all": show_all,
             "history_movement_type": history_movement_type,
         },
@@ -3421,10 +3700,25 @@ def inventory_view(request):
             "teeth": body_tool_teeth,
             "couplings": body_tool_couplings_db,
             "insert_families": body_tool_insert_families,
+            "insert_sizes": body_tool_insert_sizes,
+            "mount_diameters": body_tool_mount_diameters,
+            "ap_max": body_tool_ap_max,
+            "angles": body_tool_angles,
+            "brands": body_tool_brands,
+            "shanks": body_tool_shanks,
+            "radii": body_tool_radii,
         },
         "body_tool_families": BODY_TOOL_FAMILIES,
         "indexable_mill_cutter_types": INDEXABLE_MILL_CUTTER_TYPES,
         "body_tool_couplings": BODY_TOOL_COUPLINGS,
+        "body_tool_shank_types": BODY_TOOL_SHANK_TYPES,
+        "end_mill_shank_types": END_MILL_SHANK_TYPES,
+        "chamfer_mill_shank_types": CHAMFER_MILL_SHANK_TYPES,
+        "high_speed_shank_types": HIGH_SPEED_SHANK_TYPES,
+        "round_insert_shank_types": ROUND_INSERT_SHANK_TYPES,
+        "high_speed_body_styles": HIGH_SPEED_BODY_STYLES,
+        "high_speed_angle_options": HIGH_SPEED_ANGLE_OPTIONS,
+        "face_mill_angles": FACE_MILL_ANGLES,
         "tap_filter_options": {
             "sizes": tap_sizes,
             "pitches": tap_pitches,
@@ -3474,8 +3768,9 @@ def inventory_view(request):
         "insert_thickness_codes": INSERT_THICKNESS_CODES,
         "insert_nose_radius_codes": INSERT_NOSE_RADIUS_CODES,
         "insert_machining_applications": INSERT_MACHINING_APPLICATIONS,
-        "milling_insert_families": MILLING_INSERT_FAMILIES,
+        "milling_insert_families": _merged_milling_insert_families(),
         "insert_family_other": INSERT_FAMILY_OTHER,
+        "insert_size_other": INSERT_SIZE_OTHER,
         "insert_grade_other": INSERT_GRADE_OTHER,
         "insert_chipbreaker_grades": insert_grades,
         "insert_column_tooltips": INSERT_COLUMN_TOOLTIPS,

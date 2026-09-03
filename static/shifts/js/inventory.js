@@ -951,14 +951,18 @@ var INV = (function () {
   var categorySelect = document.getElementById("arrival-bulk-category");
   var colletTypeSelect = document.getElementById("arrival-collet-type");
   var colletTypeWrap = document.getElementById("arrival-collet-type-wrap");
+  var bodyFamilySelect = document.getElementById("arrival-body-family");
+  var bodyFamilyWrap = document.getElementById("arrival-body-family-wrap");
+  var bodyCutterSelect = document.getElementById("arrival-body-cutter");
+  var bodyCutterWrap = document.getElementById("arrival-body-cutter-wrap");
   var colletGroupPrefix = "collet_";
+  var bodyGroupPrefix = "body_tool_";
   var arrivalDateInput = document.getElementById("arrival-bulk-date");
-  var supplierSelect = document.getElementById("arrival-bulk-supplier");
   var addBtn = document.getElementById("arrival-bulk-add-row");
   var groupsWrap = document.getElementById("arrival-bulk-groups");
   var form = document.getElementById("arrival-bulk-form");
   var rowsJsonInput = document.getElementById("arrival-bulk-rows-json");
-  if (!categorySelect || !arrivalDateInput || !supplierSelect || !addBtn || !groupsWrap || !form || !rowsJsonInput) return;
+  if (!categorySelect || !arrivalDateInput || !addBtn || !groupsWrap || !form || !rowsJsonInput) return;
 
   function biotaCssToken(name) {
     return (getComputedStyle(document.documentElement).getPropertyValue(name) || "").trim();
@@ -966,6 +970,7 @@ var INV = (function () {
 
   var toolMaterialFilterOther = INV.tool_material_filter_other;
   var insertFamilyOther = INV.insert_family_other || "OTHER";
+  var insertSizeOther = INV.insert_size_other || "OTHER";
   function normalizeInsertFamilyValue(v) {
     return (v || "").trim().toUpperCase();
   }
@@ -1167,8 +1172,8 @@ var INV = (function () {
 
   function wireInsertFamilyCell(cell) {
     var wrap = cell.querySelector(".js-arrival-field-combo");
-    var sel = cell.querySelector('select[data-k="ins_family"]');
-    var cin = cell.querySelector('[data-k="ins_family_custom"]');
+    var sel = cell.querySelector('select[data-k="ins_family"], select[data-k="bt_insert_family"]');
+    var cin = cell.querySelector('[data-k="ins_family_custom"], [data-k="bt_insert_family_custom"]');
     if (wrap && sel) arrivalComboBindUi(wrap, sel);
     if (!sel || !cin) return;
     function syncCustom() {
@@ -1188,6 +1193,59 @@ var INV = (function () {
       }
     });
     syncCustom();
+  }
+
+  function buildBodyInsertFamilyCellHtml() {
+    var opts = buildOptionsHtml(INV.milling_insert_families || []);
+    return (
+      '<div class="arrival-field-combo js-arrival-field-combo">' +
+      '<select data-k="bt_insert_family" class="arrival-field-combo-native" tabindex="-1" aria-hidden="true">' +
+      opts +
+      "</select>" +
+      '<button type="button" class="arrival-field-combo-btn js-arrival-combo-btn" aria-haspopup="listbox" aria-expanded="false">' +
+      '<span class="arrival-field-combo-text js-arrival-combo-text">— не указано —</span>' +
+      '<span class="arrival-field-combo-chevron" aria-hidden="true"></span>' +
+      "</button>" +
+      '<div class="arrival-field-combo-panel js-arrival-combo-panel" hidden role="listbox"></div>' +
+      "</div>" +
+      '<input type="text" class="ins-family-custom" data-k="bt_insert_family_custom" maxlength="24" ' +
+      'placeholder="APKT" style="display:none;margin-top:4px;max-width:100%;text-transform:uppercase">'
+    );
+  }
+
+  function buildBodyInsertSizeCellHtml() {
+    var sizeOpts = (INV.insert_edge_length_codes || []).map(function (x) {
+      return { value: x.value, label: x.value || x.label };
+    });
+    sizeOpts.push({ value: insertSizeOther, label: "Другое" });
+    return (
+      '<select data-k="bt_insert_size">' +
+      buildOptionsHtml([{ value: "", label: "—" }].concat(sizeOpts)) +
+      "</select>" +
+      '<input type="text" class="bt-insert-size-custom" data-k="bt_insert_size_custom" maxlength="24" ' +
+      'placeholder="1604" style="display:none;margin-top:4px;max-width:100%;text-transform:uppercase">'
+    );
+  }
+
+  function wireBodyInsertSizeCell(cell) {
+    var sel = cell.querySelector('select[data-k="bt_insert_size"]');
+    var cin = cell.querySelector('[data-k="bt_insert_size_custom"]');
+    if (!sel || !cin) return;
+    function syncCustom() {
+      var isOther = sel.value === insertSizeOther;
+      cin.style.display = isOther ? "block" : "none";
+      if (!isOther) cin.value = "";
+    }
+    sel.addEventListener("change", syncCustom);
+    cin.addEventListener("input", function () {
+      cin.value = (cin.value || "").toUpperCase().replace(/\s+/g, "");
+    });
+    syncCustom();
+  }
+
+  function bodyCutterLabel(key) {
+    var found = (INV.indexable_mill_cutter_types || []).filter(function (x) { return x.value === key; })[0];
+    return (found && found.label) || key;
   }
   var arrivalCsrfEl = form.querySelector('input[name="csrfmiddlewaretoken"]');
   var arrivalCsrfToken = arrivalCsrfEl ? arrivalCsrfEl.value : "";
@@ -1551,7 +1609,8 @@ var INV = (function () {
       }
       if (cat === "body_tool") {
         var cutEl = tr.querySelector('[data-k="body_cutter"]');
-        if (!cutEl || !(cutEl.value || "").trim()) {
+        var cutterVal = ((cutEl && cutEl.value) || tr.getAttribute("data-body-cutter") || "").trim();
+        if (!cutterVal) {
           if (cutEl) cutEl.classList.add("is-invalid");
           issues.push({
             msg: "Строка " + (i + 1) + ": укажите тип корпусной фрезы.",
@@ -1572,7 +1631,6 @@ var INV = (function () {
 
   var arrivalGroupTitles = {
     end_mill: "Фрезы",
-    body_tool: "Корпусной инструмент",
     tap: "Резьбовой инструмент",
     center_drill: "Центровки",
     countersink: "Зенкера",
@@ -1580,6 +1638,13 @@ var INV = (function () {
     insert: "Пластинки",
     collet: "Цанги",
   };
+
+  (INV.body_tool_families || []).forEach(function (f) {
+    (INV.indexable_mill_cutter_types || []).forEach(function (c) {
+      arrivalGroupTitles[bodyGroupPrefix + f.value + "__" + c.value] =
+        "Корпусной инструмент · " + f.label + " · " + c.label;
+    });
+  });
 
   (INV.collet_types || []).forEach(function (o) {
     arrivalGroupTitles[colletGroupPrefix + o.value] = "Цанги — " + o.label;
@@ -1609,6 +1674,24 @@ var INV = (function () {
   function toggleColletTypeWrap() {
     if (!colletTypeWrap) return;
     colletTypeWrap.hidden = (categorySelect.value || "") !== "collet";
+  }
+
+  function toggleBodyFamilyWrap() {
+    if (!bodyFamilyWrap) return;
+    var isBody = (categorySelect.value || "") === "body_tool";
+    bodyFamilyWrap.hidden = !isBody;
+    if (bodyCutterWrap) bodyCutterWrap.hidden = !isBody;
+    if (isBody && bodyFamilySelect && !bodyFamilySelect.value && bodyFamilySelect.options.length) {
+      bodyFamilySelect.selectedIndex = 0;
+    }
+    if (isBody && bodyCutterSelect && !bodyCutterSelect.value && bodyCutterSelect.options.length) {
+      bodyCutterSelect.selectedIndex = 0;
+    }
+  }
+
+  function toggleArrivalCategoryExtras() {
+    toggleColletTypeWrap();
+    toggleBodyFamilyWrap();
   }
 
   function buildColletCells(colletType) {
@@ -1899,7 +1982,13 @@ var INV = (function () {
 
   var arrivalGroupHeadHtml = {
     end_mill: '<tr><th>Тип фрезы</th><th class="short-col">D</th><th class="short-col">R</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    body_tool: '<tr><th>Семейство</th><th>Тип</th><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th>Крепление</th><th>Тип пластины</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    body_tool: '<tr><th class="short-col">ØD</th><th class="short-col">Z</th><th class="short-col">d посадки</th><th>СОЖ</th><th>Формфактор</th><th>Размер</th><th class="short-col">ap</th><th class="short-col">Угол</th><th>Бренд</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    body_tool_end: '<tr><th>Бренд</th><th>Хвостовик</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">L</th><th class="short-col">Z</th><th>Формфактор</th><th>Размер</th><th>СОЖ</th><th class="short-col">Угол</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    body_tool_chamfer: '<tr><th>Бренд</th><th>Хвостовик</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">Z</th><th>Перем. угол</th><th>СОЖ</th><th>Формфактор</th><th>Размер</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    body_tool_high_speed: '<tr><th>Бренд</th><th>Хвостовик</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">Z</th><th>Тип</th><th>Назначение</th><th>Формфактор</th><th>Размер</th><th>Угол</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    body_tool_round_insert: '<tr><th>Бренд</th><th>Хвостовик</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">L</th><th class="short-col">Z</th><th>Тип</th><th class="short-col">R</th><th>СОЖ</th><th>Формфактор</th><th>Размер</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    body_tool_disc: '<tr><th>Бренд</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">Z</th><th class="short-col">H</th><th>Формфактор</th><th>Размер</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    body_tool_generic: '<tr><th>Тип</th><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th>Крепление</th><th>Тип пластины</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     tap: '<tr><th class="tap-size-col">Размер</th><th class="tap-std-col">Стандарт</th><th class="tap-step-col">Шаг</th><th class="tap-tpi-col">TPI</th><th class="tap-l-col">L</th><th class="tap-lc-col">Lc</th><th class="tap-hole-col">Тип</th><th>Тип инструмента</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     center_drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="angle-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     countersink: '<tr><th>Тип</th><th class="short-col">D</th><th class="angle-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
@@ -1932,6 +2021,23 @@ var INV = (function () {
     if (groupKey.indexOf(colletGroupPrefix) === 0) {
       var sub = groupKey.slice(colletGroupPrefix.length);
       headHtml = colletArrivalHeadHtml[sub] || colletArrivalHeadHtml._default;
+    } else if (groupKey.indexOf(bodyGroupPrefix) === 0) {
+      var bodyRest = groupKey.slice(bodyGroupPrefix.length);
+      var bodyCutterKey = (bodyRest.split("__")[1] || "");
+      headHtml =
+        bodyCutterKey === "face"
+          ? arrivalGroupHeadHtml.body_tool
+          : bodyCutterKey === "end"
+            ? arrivalGroupHeadHtml.body_tool_end
+            : bodyCutterKey === "chamfer"
+              ? arrivalGroupHeadHtml.body_tool_chamfer
+              : bodyCutterKey === "high_speed"
+                ? arrivalGroupHeadHtml.body_tool_high_speed
+                : bodyCutterKey === "round_insert"
+                  ? arrivalGroupHeadHtml.body_tool_round_insert
+                  : bodyCutterKey === "disc"
+                    ? arrivalGroupHeadHtml.body_tool_disc
+                    : arrivalGroupHeadHtml.body_tool_generic;
     } else {
       headHtml = arrivalGroupHeadHtml[groupKey] || arrivalGroupHeadHtml.drill;
     }
@@ -1974,6 +2080,8 @@ var INV = (function () {
     }
     var groupKey = cat;
     var colletType = "";
+    var bodyFamily = "";
+    var bodyCutter = "";
     if (cat === "collet") {
       colletType = (colletTypeSelect && colletTypeSelect.value) || "";
       colletType = colletType.trim();
@@ -1983,6 +2091,22 @@ var INV = (function () {
         return;
       }
       groupKey = colletGroupPrefix + colletType;
+    } else if (cat === "body_tool") {
+      bodyFamily = (bodyFamilySelect && bodyFamilySelect.value) || "";
+      bodyFamily = bodyFamily.trim();
+      if (!bodyFamily) {
+        showArrivalBulkError("Сначала выберите семейство корпусного инструмента.");
+        if (bodyFamilySelect) bodyFamilySelect.focus();
+        return;
+      }
+      bodyCutter = (bodyCutterSelect && bodyCutterSelect.value) || "";
+      bodyCutter = bodyCutter.trim();
+      if (!bodyCutter) {
+        showArrivalBulkError("Сначала выберите тип фрезы.");
+        if (bodyCutterSelect) bodyCutterSelect.focus();
+        return;
+      }
+      groupKey = bodyGroupPrefix + bodyFamily + "__" + bodyCutter;
     }
     if (!arrivalGroupTitles[groupKey]) return;
     var group = ensureGroup(groupKey);
@@ -1992,6 +2116,8 @@ var INV = (function () {
     tr.setAttribute("data-arrival-row", "1");
     tr.setAttribute("data-category", cat);
     if (colletType) tr.setAttribute("data-collet-type", colletType);
+    if (bodyFamily) tr.setAttribute("data-body-family", bodyFamily);
+    if (bodyCutter) tr.setAttribute("data-body-cutter", bodyCutter);
     var cells = [];
     if (cat === "end_mill") {
       cells.push('<td><select data-k="mill_type">' + buildOptionsHtml(INV.end_mill_types || []) + '</select></td>');
@@ -2006,19 +2132,106 @@ var INV = (function () {
       cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "body_tool") {
-      cells.push('<td><select data-k="body_family">' + buildOptionsHtml(INV.body_tool_families || []) + '</select></td>');
-      cells.push('<td><select data-k="body_cutter" required>' + buildOptionsHtml(INV.indexable_mill_cutter_types || []) + '</select></td>');
-      cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
-      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_overall_length_mm"></td>');
-      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_cutting_length_mm"></td>');
-      cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count"></td>');
-      cells.push('<td><select data-k="bt_coupling">' + buildOptionsHtml(INV.body_tool_couplings || []) + '</select></td>');
-      cells.push('<td><select data-k="bt_insert_family">' + buildOptionsHtml(INV.milling_insert_families || []) + '</select></td>');
-      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
-      cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
-      cells.push('<td class="co-cell"></td>');
-      cells.push('<td class="wm-cell"></td>');
-      cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      if (bodyCutter === "face") {
+        cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
+        cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
+        cells.push('<td><select data-k="bt_coolant"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
+        cells.push('<td class="ins-family-cell">' + buildBodyInsertFamilyCellHtml() + "</td>");
+        cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_ap_max_mm" placeholder="ap"></td>');
+        cells.push('<td class="short-col"><select data-k="bt_angle_deg">' + buildOptionsHtml([{ value: "", label: "—" }].concat(INV.face_mill_angles || [])) + '</select></td>');
+        cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      } else if (bodyCutter === "end") {
+        cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
+        cells.push('<td><select data-k="bt_shank_type">' + buildOptionsHtml(INV.end_mill_shank_types || INV.body_tool_shank_types || []) + '</select></td>');
+        cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_overall_length_mm" placeholder="L"></td>');
+        cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
+        cells.push('<td class="ins-family-cell">' + buildBodyInsertFamilyCellHtml() + "</td>");
+        cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
+        cells.push('<td><select data-k="bt_coolant"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
+        cells.push('<td class="short-col"><select data-k="bt_angle_deg">' + buildOptionsHtml([{ value: "", label: "—" }].concat(INV.face_mill_angles || [])) + '</select></td>');
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      } else if (bodyCutter === "chamfer") {
+        cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
+        cells.push('<td><select data-k="bt_shank_type">' + buildOptionsHtml(INV.chamfer_mill_shank_types || INV.body_tool_shank_types || []) + '</select></td>');
+        cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
+        cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
+        cells.push('<td><select data-k="bt_variable_angle"><option value="0">Нет</option><option value="1">Да</option></select></td>');
+        cells.push('<td><select data-k="bt_coolant"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
+        cells.push('<td class="ins-family-cell">' + buildBodyInsertFamilyCellHtml() + "</td>");
+        cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      } else if (bodyCutter === "high_speed") {
+        cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
+        cells.push('<td><select data-k="bt_shank_type">' + buildOptionsHtml(INV.high_speed_shank_types || INV.body_tool_shank_types || []) + '</select></td>');
+        cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
+        cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
+        cells.push('<td><select data-k="bt_hs_body_style">' + buildOptionsHtml(INV.high_speed_body_styles || []) + '</select></td>');
+        cells.push('<td><select data-k="bt_has_purpose"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
+        cells.push('<td class="ins-family-cell">' + buildBodyInsertFamilyCellHtml() + "</td>");
+        cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
+        cells.push('<td class="short-col"><select data-k="bt_angle_deg">' + buildOptionsHtml(INV.high_speed_angle_options || [{ value: "", label: "—" }].concat(INV.face_mill_angles || []).concat([{ value: "variable", label: "Переменный" }])) + '</select></td>');
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      } else if (bodyCutter === "round_insert") {
+        cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
+        cells.push('<td><select data-k="bt_shank_type">' + buildOptionsHtml(INV.round_insert_shank_types || INV.body_tool_shank_types || []) + '</select></td>');
+        cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_overall_length_mm" placeholder="L"></td>');
+        cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
+        cells.push('<td><select data-k="bt_hs_body_style">' + buildOptionsHtml(INV.high_speed_body_styles || []) + '</select></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_corner_radius_mm" placeholder="R"></td>');
+        cells.push('<td><select data-k="bt_coolant"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
+        cells.push('<td class="ins-family-cell">' + buildBodyInsertFamilyCellHtml() + "</td>");
+        cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      } else if (bodyCutter === "disc") {
+        cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
+        cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
+        cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_cutting_length_mm" placeholder="H"></td>');
+        cells.push('<td class="ins-family-cell">' + buildBodyInsertFamilyCellHtml() + "</td>");
+        cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      } else {
+        cells.push('<td><select data-k="body_cutter" required>' + buildOptionsHtml(INV.indexable_mill_cutter_types || []) + '</select></td>');
+        cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_overall_length_mm"></td>');
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_cutting_length_mm"></td>');
+        cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count"></td>');
+        cells.push('<td><select data-k="bt_coupling">' + buildOptionsHtml(INV.body_tool_couplings || []) + '</select></td>');
+        cells.push('<td class="ins-family-cell">' + buildBodyInsertFamilyCellHtml() + "</td>");
+        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
+        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
+        cells.push('<td class="co-cell"></td>');
+        cells.push('<td class="wm-cell"></td>');
+        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+      }
     } else if (cat === "tap") {
       cells.push('<td class="tap-size-col"><input type="text" data-k="size_label" placeholder="M2"></td>');
       cells.push('<td class="tap-std-col"><select data-k="thread_standard">' + buildTapStandardOptionsHtml(INV.thread_standards || []) + '</select></td>');
@@ -2085,6 +2298,8 @@ var INV = (function () {
     }
     var insFamilyCell = tr.querySelector(".ins-family-cell");
     if (insFamilyCell) wireInsertFamilyCell(insFamilyCell);
+    var insSizeCell = tr.querySelector(".bt-insert-size-cell");
+    if (insSizeCell) wireBodyInsertSizeCell(insSizeCell);
     wireInsertMachiningAppPicker(tr);
     var tmCell = tr.querySelector(".tm-cell-tool-material");
     var tmOpts = cat === "insert" ? buildArrivalInsertAlloyMaterialOptions() : toolMaterialOptions;
@@ -2126,9 +2341,9 @@ var INV = (function () {
   addBtn.addEventListener("click", addRow);
   categorySelect.addEventListener("change", function () {
     clearArrivalBulkErrors();
-    toggleColletTypeWrap();
+    toggleArrivalCategoryExtras();
   });
-  toggleColletTypeWrap();
+  toggleArrivalCategoryExtras();
 
   var arrivalBlock = document.getElementById("arrival-block");
   if (arrivalBlock) {
@@ -2163,9 +2378,13 @@ var INV = (function () {
       var row = { category: tr.getAttribute("data-category") || "" };
       var colletTypeAttr = tr.getAttribute("data-collet-type");
       if (colletTypeAttr) row.collet_type = colletTypeAttr;
+      var bodyFamilyAttr = tr.getAttribute("data-body-family");
+      if (bodyFamilyAttr) row.body_family = bodyFamilyAttr;
+      var bodyCutterAttr = tr.getAttribute("data-body-cutter");
+      if (bodyCutterAttr) row.body_cutter = bodyCutterAttr;
       tr.querySelectorAll("[data-k]").forEach(function (el) {
         var k = el.getAttribute("data-k");
-        if (k === "tool_material_custom" || k === "ins_family_custom") return;
+        if (k === "tool_material_custom" || k === "ins_family_custom" || k === "bt_insert_family_custom" || k === "bt_insert_size_custom") return;
         if (el.type === "checkbox") {
           row[k] = el.checked ? "1" : "";
           return;
@@ -2180,12 +2399,25 @@ var INV = (function () {
           } else {
             row.ins_family = normalizeInsertFamilyValue(el.value || "");
           }
+        } else if (k === "bt_insert_family") {
+          if ((el.value || "") === insertFamilyOther) {
+            var bfin = tr.querySelector('[data-k="bt_insert_family_custom"]');
+            row.bt_insert_family = normalizeInsertFamilyValue(bfin && bfin.value || "");
+          } else {
+            row.bt_insert_family = normalizeInsertFamilyValue(el.value || "");
+          }
+        } else if (k === "bt_insert_size") {
+          if ((el.value || "") === insertSizeOther) {
+            var szin = tr.querySelector('[data-k="bt_insert_size_custom"]');
+            row.bt_insert_size = ((szin && szin.value) || "").trim().toUpperCase();
+          } else {
+            row.bt_insert_size = (el.value || "").trim();
+          }
         } else {
           row[k] = (el.value || "").trim();
         }
       });
       row.movement_date = (arrivalDateInput.value || "").trim();
-      row.supplier_name = (supplierSelect.value || "").trim();
       resolveInsertArrivalRowMaterials(row);
       rows.push(row);
     });
@@ -2259,6 +2491,12 @@ var INV = (function () {
   (INV.indexable_mill_cutter_types || []).forEach(function (x) { bodyCutterLabels[x.value] = x.label; });
   var bodyCouplingLabels = { "": "—" };
   (INV.body_tool_couplings || []).forEach(function (x) { bodyCouplingLabels[x.value] = x.label; });
+  var bodyShankLabels = { "": "—" };
+  (INV.body_tool_shank_types || []).forEach(function (x) { bodyShankLabels[x.value] = x.label; });
+  var hsBodyStyleLabels = { "": "—" };
+  (INV.high_speed_body_styles || []).forEach(function (x) { hsBodyStyleLabels[x.value] = x.label; });
+  var hsAngleLabels = {};
+  (INV.high_speed_angle_options || []).forEach(function (x) { hsAngleLabels[x.value] = x.label; });
 
   var threadStandardLabels = {};
   (INV.thread_standards || []).forEach(function (x) { threadStandardLabels[x.value] = x.label; });
@@ -2335,7 +2573,18 @@ var INV = (function () {
     if (field === "body_family") return bodyFamilyLabels[v] || v;
     if (field === "body_cutter") return bodyCutterLabels[v] || v;
     if (field === "bt_coupling") return bodyCouplingLabels[v] || v || "—";
+    if (field === "bt_shank_type") return bodyShankLabels[v] || v || "—";
     if (field === "bt_insert_family") return (insertFamilyLabels[v] || v || "-").toString().toUpperCase();
+    if (field === "bt_insert_size") return v || "-";
+    if (field === "bt_coolant") return v === "1" ? "Есть" : "Нет";
+    if (field === "bt_variable_angle") return v === "1" ? "Да" : "Нет";
+    if (field === "bt_has_purpose") return v === "1" ? "Есть" : "Нет";
+    if (field === "bt_hs_body_style") return hsBodyStyleLabels[v] || v || "—";
+    if (field === "bt_angle_deg") {
+      if (v === "variable") return "Переменный";
+      return v ? (hsAngleLabels[v] || (String(v).replace(/\.0+$/, "") + "°")) : "-";
+    }
+    if (field === "bt_brand") return v || "-";
     if (field === "thread_standard") return threadStandardLabels[v] || v;
     if (field === "hole_type") return tapHoleTypeLabels[v] || v;
     if (field === "tap_type") return tapToolTypeLabels[v] || v;
@@ -2412,8 +2661,37 @@ var INV = (function () {
       options = fromMap(bodyCutterLabels);
     } else if (field === "bt_coupling") {
       options = fromMap(bodyCouplingLabels);
+    } else if (field === "bt_shank_type") {
+      options = fromMap(bodyShankLabels);
     } else if (field === "bt_insert_family") {
       options = fromMap(insertFamilyLabels);
+    } else if (field === "bt_coolant") {
+      options = [
+        { value: "0", label: "Нет", title: "Нет" },
+        { value: "1", label: "Есть", title: "Есть" }
+      ];
+    } else if (field === "bt_variable_angle") {
+      options = [
+        { value: "0", label: "Нет", title: "Нет" },
+        { value: "1", label: "Да", title: "Да" }
+      ];
+    } else if (field === "bt_has_purpose") {
+      options = [
+        { value: "0", label: "Нет", title: "Нет" },
+        { value: "1", label: "Есть", title: "Есть" }
+      ];
+    } else if (field === "bt_hs_body_style") {
+      options = fromMap(hsBodyStyleLabels);
+    } else if (field === "bt_angle_deg") {
+      var angleSrc = (INV.high_speed_angle_options && INV.high_speed_angle_options.length)
+        ? INV.high_speed_angle_options
+        : [{ value: "", label: "—" }].concat(INV.face_mill_angles || []);
+      options = angleSrc.map(function (x) {
+        return { value: x.value, label: x.label, title: x.label };
+      });
+      if (current && !options.some(function (o) { return o.value === current; })) {
+        options.push({ value: current, label: current === "variable" ? "Переменный" : (current + "°"), title: current });
+      }
     } else if (field === "thread_standard") {
       options = fromMap(threadStandardLabels);
     } else if (field === "hole_type") {
