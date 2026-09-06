@@ -1422,10 +1422,25 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   .setup-binding-photo-rail .setup-binding-photo-btn {
     margin-left: 0;
   }
-  /* Блок привязок: "Привяка:" длиннее */
-  .setup-spec-col-bindings > div:nth-child(4) > .muted {
-    flex-basis: 68px;
-    min-width: 68px;
+  /* Блок привязок: подпись «Привязка:» не должна ломаться на «:» со следующей строки */
+  .setup-spec-col-bindings > .setup-row-gcode > .muted {
+    flex: 0 0 auto;
+    flex-basis: auto;
+    min-width: 4.6em;
+    max-width: none;
+    white-space: nowrap;
+    line-height: 1.2;
+  }
+  .setup-spec-col-bindings .setup-row-gcode {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding-right: 26px;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
   }
   /* Блок шапки: "Тип/Материал/Размер/Программа" длиннее */
   .setup-spec-col-meta > div > .muted {
@@ -1450,49 +1465,87 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     display: flex;
     align-items: center;
     justify-content: flex-start;
+    gap: 0;
     overflow: hidden;
+  }
+  /* Режим правки: select + P — один «чип», как у X/Y/Z */
+  .setup-spec-stack.is-inline-edit .setup-spec-col-bindings .setup-gcode-value:has(.js-inline-gcode-system:not([hidden])) {
+    border: 1px dashed var(--bio-input-focus-border, rgba(180, 200, 230, 0.55));
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--bio-input-focus-border, #8ab4f8) 10%, transparent);
+    padding: 0 6px;
+    min-height: 28px;
+    box-sizing: border-box;
+    overflow: visible;
   }
   /* Вложен в .setup-gcode-value, не прямой потомок div.setup-spec-col — отдельный селектор */
   /* :not([hidden]) — иначе display:inline-flex перебивает UA [hidden] и блок P остаётся видимым */
   .setup-spec-col-bindings .setup-gcode-p-wrap:not([hidden]) {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: 0;
     flex-shrink: 0;
     font-size: 12px;
+    margin-left: 1px;
   }
   .setup-spec-col-bindings .setup-gcode-p-wrap:not([hidden]) .js-inline-gcode-p {
-    min-width: 1.25em;
+    min-width: 1.1em;
     max-width: 2.5em;
-    text-align: center;
-    padding: 1px 4px;
+    text-align: left;
+    padding: 0 1px;
     line-height: 1.2;
-    border-radius: 3px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    outline: none;
+    box-shadow: none;
+    caret-color: var(--bio-body-fg, #e8e8e8);
+  }
+  .setup-spec-col-bindings .setup-gcode-p-wrap:not([hidden]) .js-inline-gcode-p.is-inline-edit {
+    border: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 1px;
+    min-width: 1.1em;
+  }
+  .setup-spec-col-bindings .setup-gcode-p-wrap:not([hidden]) .js-inline-gcode-p.is-inline-edit:focus {
+    background: color-mix(in srgb, var(--bio-input-focus-border, #8ab4f8) 22%, transparent) !important;
+    border-radius: 2px;
+    outline: none !important;
   }
   .setup-spec-col-bindings .js-inline-gcode-system {
-    width: 88px;
-    max-width: 88px;
-    min-width: 88px;
-    height: 32px;
-    min-height: 32px;
-    text-align: center;
-    text-align-last: center;
+    width: auto !important;
+    max-width: none !important;
+    min-width: 3.2em;
+    height: 26px;
+    min-height: 26px;
+    text-align: left;
+    text-align-last: left;
     font-size: 12px;
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
-    background-image: none;
-    padding: 0 6px;
+    background: transparent !important;
+    background-image: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    padding: 0 2px 0 0 !important;
     box-sizing: border-box;
-    margin: 1px 0 0 6px;
+    margin: 0 !important;
+    flex: 0 0 auto;
     flex-shrink: 0;
-    line-height: 28px;
+    line-height: 26px;
+    color: inherit;
   }
-  .setup-spec-col-bindings .setup-row-gcode {
-    gap: 4px;
-    padding-right: 26px;
-    max-width: 100%;
-    min-width: 0;
+  .setup-spec-col-bindings .js-inline-gcode-system:focus {
+    outline: none;
+    box-shadow: none;
+  }
+  /* Когда выбран G54.1 P — select чуть шире под подпись */
+  .setup-spec-col-bindings .js-inline-gcode-system[data-g54p="1"] {
+    min-width: 4.6em;
   }
   .setup-spec-col-bindings .js-inline-gcode-system::-ms-expand {
     display: none;

@@ -2359,6 +2359,8 @@ function saveSetupToolNoteEditor() {
       if (!pWrap) return;
       var show = sel.value === "__G54_1_P__";
       pWrap.hidden = !show;
+      if (show) sel.setAttribute("data-g54p", "1");
+      else sel.removeAttribute("data-g54p");
       var pSpan = wrap ? wrap.querySelector(".js-inline-gcode-p") : null;
       var inlineOn = document.body.classList.contains("setup-inline-edit-enabled");
       if (!pSpan || !inlineOn) return;
