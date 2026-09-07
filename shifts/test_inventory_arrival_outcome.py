@@ -4,7 +4,9 @@ from __future__ import annotations
 import json
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
+import pandas as pd
 from django.contrib.messages import get_messages
 from django.db.models import Sum
 from django.test import Client, TestCase
@@ -33,6 +35,22 @@ class InventoryFlowClientMixin:
         session.save()
         self.today = date.today().isoformat()
         self.inv_url = reverse("inventory")
+        # СКУД в тестах: фиксированный сотрудник («Тестов Т.» — как в POST форм).
+        self._emp_patcher = patch(
+            "shifts.inventory_views.employees_df_for_nav",
+            return_value=pd.DataFrame(
+                [
+                    {
+                        "last_name": "Тестов",
+                        "first_name": "Т.",
+                        "emp_code": "T-TEST",
+                        "department_name": "Тест",
+                    }
+                ]
+            ),
+        )
+        self._emp_patcher.start()
+        self.addCleanup(self._emp_patcher.stop)
 
     def _messages(self, response) -> list[str]:
         return [str(m) for m in get_messages(response.wsgi_request)]

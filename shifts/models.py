@@ -210,19 +210,50 @@ from .insert_constants import (
 )
 
 
+# Ключи категорий склада (не менять без data-migration ToolItem).
+TOOL_ITEM_CATEGORY_CHOICES = [
+    ("end_mill", "Фрезы"),
+    ("tap", "Резьбовой инструмент"),
+    ("center_drill", "Центровки"),
+    ("countersink", "Зенкера"),
+    ("drill", "Сверла"),
+    ("insert", "Пластинки"),
+    ("collet", "Цанги"),
+    ("body_tool", "Корпусной инструмент"),
+]
+
+# Только UI / справочник «Типы склада». В БД ToolItem.category остаётся плоским ключом.
+STOCK_CATEGORY_GROUPS = [
+    (
+        "cutting",
+        "Режущий инструмент",
+        ("end_mill", "tap", "center_drill", "countersink", "drill", "insert"),
+    ),
+    (
+        "tooling",
+        "Оснастка",
+        ("collet", "body_tool"),
+    ),
+]
+
+
+def stock_category_labels() -> dict[str, str]:
+    return dict(TOOL_ITEM_CATEGORY_CHOICES)
+
+
+def stock_category_grouped_choices() -> list[tuple[str, str, list[tuple[str, str]]]]:
+    labels = stock_category_labels()
+    groups: list[tuple[str, str, list[tuple[str, str]]]] = []
+    for code, title, keys in STOCK_CATEGORY_GROUPS:
+        items = [(k, labels[k]) for k in keys if k in labels]
+        groups.append((code, title, items))
+    return groups
+
+
 class ToolItem(models.Model):
     category = models.CharField(
         max_length=20,
-        choices=[
-            ("end_mill", "Фрезы"),
-            ("tap", "Резьбовой инструмент"),
-            ("center_drill", "Центровки"),
-            ("countersink", "Зенкера"),
-            ("drill", "Сверла"),
-            ("insert", "Пластинки"),
-            ("collet", "Цанги"),
-            ("body_tool", "Корпусной инструмент"),
-        ],
+        choices=TOOL_ITEM_CATEGORY_CHOICES,
         verbose_name="Категория",
     )
     name = models.CharField(max_length=180, verbose_name="Наименование")
@@ -3165,14 +3196,7 @@ class VisualContainerItem(models.Model):
 
     TOOL_CATEGORY_CHOICES = (
         ("", "—"),
-        ("end_mill", "Фрезы"),
-        ("tap", "Резьбовой инструмент"),
-        ("center_drill", "Центровки"),
-        ("countersink", "Зенкера"),
-        ("drill", "Сверла"),
-        ("insert", "Пластинки"),
-        ("collet", "Цанги"),
-        ("body_tool", "Корпусной инструмент"),
+        *TOOL_ITEM_CATEGORY_CHOICES,
     )
 
     container = models.ForeignKey(
@@ -3405,3 +3429,116 @@ class VisualContainerPhoto(models.Model):
 
     def __str__(self) -> str:
         return f"Фото {self.container_id} @ {self.photo_date}"
+
+
+STOCK_TOOL_FIELD_KINDS = [
+    ("text", "Текст"),
+    ("number", "Число"),
+    ("select", "Список"),
+    ("bool", "Да / нет"),
+]
+
+
+class StockToolType(models.Model):
+    """Настраиваемый тип инструмента склада (отдельно от жёстких категорий ToolItem)."""
+
+    name = models.CharField(max_length=120, verbose_name="Название")
+    code = models.SlugField(max_length=64, unique=True, verbose_name="Код")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("sort_order", "name", "id")
+        verbose_name = "Тип склада"
+        verbose_name_plural = "Типы склада"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class StockToolSubtype(models.Model):
+    """Подтип внутри типа склада."""
+
+    tool_type = models.ForeignKey(
+        StockToolType,
+        on_delete=models.CASCADE,
+        related_name="subtypes",
+        verbose_name="Тип",
+    )
+    name = models.CharField(max_length=120, verbose_name="Название")
+    code = models.SlugField(max_length=64, verbose_name="Код")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("sort_order", "name", "id")
+        verbose_name = "Подтип склада"
+        verbose_name_plural = "Подтипы склада"
+        constraints = [
+            models.UniqueConstraint(fields=("tool_type", "code"), name="uniq_stock_tool_subtype_code"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.tool_type.name} / {self.name}"
+
+
+class StockToolField(models.Model):
+    """Характеристика, которую нужно указывать для типа или подтипа."""
+
+    tool_type = models.ForeignKey(
+        StockToolType,
+        on_delete=models.CASCADE,
+        related_name="fields",
+        verbose_name="Тип",
+    )
+    subtype = models.ForeignKey(
+        StockToolSubtype,
+        on_delete=models.CASCADE,
+        related_name="fields",
+        null=True,
+        blank=True,
+        verbose_name="Подтип",
+        help_text="Пусто = общая характеристика типа (для всех подтипов)",
+    )
+    key = models.SlugField(max_length=64, verbose_name="Код поля")
+    label = models.CharField(max_length=120, verbose_name="Подпись")
+    field_kind = models.CharField(
+        max_length=16,
+        choices=STOCK_TOOL_FIELD_KINDS,
+        default="text",
+        verbose_name="Вид поля",
+    )
+    choices = models.JSONField(default=list, blank=True, verbose_name="Варианты списка")
+    required = models.BooleanField(default=False, verbose_name="Обязательное")
+    unit = models.CharField(max_length=24, blank=True, default="", verbose_name="Ед. изм.")
+    help_text = models.CharField(max_length=200, blank=True, default="", verbose_name="Подсказка")
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Характеристика типа склада"
+        verbose_name_plural = "Характеристики типов склада"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("tool_type", "key"),
+                condition=models.Q(subtype__isnull=True),
+                name="uniq_stock_tool_field_type_key",
+            ),
+            models.UniqueConstraint(
+                fields=("subtype", "key"),
+                condition=models.Q(subtype__isnull=False),
+                name="uniq_stock_tool_field_subtype_key",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        scope = self.subtype.name if self.subtype_id else self.tool_type.name
+        return f"{scope}: {self.label}"

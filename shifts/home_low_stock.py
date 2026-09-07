@@ -5,7 +5,11 @@ from dataclasses import dataclass
 
 from django.http import QueryDict
 
-from shifts.models import ToolItem, UserHomeLowStockPrefs
+from shifts.models import (
+    ToolItem,
+    UserHomeLowStockPrefs,
+    stock_category_grouped_choices,
+)
 
 TOOL_CATEGORY_ALL = "all"
 
@@ -126,6 +130,7 @@ def fetch_low_stock_items(prefs: HomeLowStockPrefs) -> list[ToolItem]:
 
 def apply_home_low_stock_context(ctx: dict, *, username: str | None, query: QueryDict, can_inventory: bool) -> None:
     ctx["low_stock_category_choices"] = TOOL_CATEGORY_CHOICES
+    ctx["stock_category_groups"] = stock_category_grouped_choices()
     if not can_inventory:
         ctx["low_stock_items"] = []
         ctx["low_stock_prefs"] = HomeLowStockPrefs(category="", max_qty=_DEFAULT_MAX_QTY)

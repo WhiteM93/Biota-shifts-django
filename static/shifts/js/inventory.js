@@ -3026,7 +3026,19 @@ var INV = (function () {
     row.addEventListener("click", function (evt) {
       if (evt.target.closest("input, button, select, textarea, form, label")) return;
       var issueId = row.getAttribute("data-issue-id");
-      if (issueSelect) issueSelect.value = issueId;
+      if (issueSelect) {
+        issueSelect.value = issueId;
+        issueSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      var emp = row.getAttribute("data-employee-name") || "";
+      if (typeof window.__setOutcomeEmployee === "function") {
+        window.__setOutcomeEmployee(emp);
+      } else {
+        var empValue = document.getElementById("outcome-employee-value");
+        var empSearch = document.getElementById("outcome-employee-search");
+        if (empValue) empValue.value = emp;
+        if (empSearch) empSearch.value = emp;
+      }
       var firstInput = row.querySelector('input[name="returned_qty"]');
       if (firstInput) firstInput.focus();
     });

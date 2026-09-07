@@ -11,6 +11,7 @@ from . import discipline_views
 from . import hours_views
 from . import employee_payroll_views
 from . import inventory_views
+from . import inventory_types_views
 from . import payroll_views
 from . import product_views
 from . import skud_views
@@ -50,6 +51,42 @@ urlpatterns = [
         "inventory/history/open.pdf",
         inventory_views.inventory_history_open_pdf,
         name="inventory_history_open_pdf",
+    ),
+    path("inventory/types/", inventory_types_views.inventory_types_view, name="inventory_types"),
+    path(
+        "inventory/types/api/types/",
+        inventory_types_views.inventory_types_api_types,
+        name="inventory_types_api_types",
+    ),
+    path(
+        "inventory/types/api/types/<int:pk>/",
+        inventory_types_views.inventory_types_api_type_detail,
+        name="inventory_types_api_type_detail",
+    ),
+    path(
+        "inventory/types/api/types/<int:pk>/move/",
+        inventory_types_views.inventory_types_api_type_move,
+        name="inventory_types_api_type_move",
+    ),
+    path(
+        "inventory/types/api/subtypes/",
+        inventory_types_views.inventory_types_api_subtype_upsert,
+        name="inventory_types_api_subtype_upsert",
+    ),
+    path(
+        "inventory/types/api/subtypes/<int:pk>/",
+        inventory_types_views.inventory_types_api_subtype_delete,
+        name="inventory_types_api_subtype_delete",
+    ),
+    path(
+        "inventory/types/api/fields/",
+        inventory_types_views.inventory_types_api_field_upsert,
+        name="inventory_types_api_field_upsert",
+    ),
+    path(
+        "inventory/types/api/fields/<int:pk>/",
+        inventory_types_views.inventory_types_api_field_delete,
+        name="inventory_types_api_field_delete",
     ),
     path("machines/", machines_views.machines_view, name="machines"),
     path("calculator/", views.calculator_view, name="calculator"),

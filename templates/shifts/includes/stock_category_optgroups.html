@@ -1,0 +1,7 @@
+{% for _group_code, group_label, items in stock_category_groups %}
+<optgroup label="{{ group_label }}">
+  {% for key, label in items %}
+  <option value="{{ key }}"{% if selected_category == key %} selected{% endif %}>{{ label }}</option>
+  {% endfor %}
+</optgroup>
+{% endfor %}

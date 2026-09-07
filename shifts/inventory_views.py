@@ -130,6 +130,7 @@ from .models import (
     PURCHASE_STATUSES,
     normalize_thread_kind,
     normalize_work_material_codes,
+    stock_category_grouped_choices,
     work_material_display_text,
 )
 
@@ -170,6 +171,35 @@ def _history_panel_redirect(request):
     return redirect(f"{request.path}?{urlencode(params)}")
 
 
+def _match_skud_employee(name: str, options: list[str]) -> str:
+    """Возвращает каноническую подпись из списка СКУД или пустую строку."""
+    raw = (name or "").strip()
+    if not raw or not options:
+        return ""
+    if raw in options:
+        return raw
+    lower = raw.casefold()
+    for opt in options:
+        if opt.casefold() == lower:
+            return opt
+    return ""
+
+
+def _issue_outcome_redirect(request, **extra: str):
+    """После операции остаёмся на «Списание и возврат» с тем же фильтром сотрудника."""
+    params: dict[str, str] = {"panel": "issue_outcome"}
+    emp = (
+        extra.get("outcome_employee")
+        or request.POST.get("outcome_employee")
+        or request.GET.get("outcome_employee")
+        or request.POST.get("employee_name")
+        or ""
+    ).strip()
+    if emp:
+        params["outcome_employee"] = emp[:120]
+    return redirect(f"{request.path}?{urlencode(params)}#issue-outcome-block")
+
+
 def _open_issue_movements_qs():
     """Выдачи с остатком к возврату/списанию (remaining_qty > 0)."""
     return (
@@ -193,7 +223,7 @@ def _open_issue_movements_qs():
         )
         .annotate(remaining_qty=F("quantity") - F("processed_qty"))
         .filter(remaining_qty__gt=0)
-        .order_by("-movement_date", "-id")
+        .order_by("employee_name", "-movement_date", "-id")
     )
 
 
@@ -1609,7 +1639,12 @@ def inventory_view(request):
     employee_options = []
     employee_department_map = {}
     employee_table_rows: list[dict] = []
-    if panel in {"defects", "history", "issue"} or action in {"create_defect_record", "update_defect_record"}:
+    if panel in {"defects", "history", "issue", "issue_outcome"} or action in {
+        "create_defect_record",
+        "update_defect_record",
+        "move_stock",
+        "process_issue_outcome",
+    }:
         try:
             cfg = biota_db.db_config()
             if panel == "defects" or action in {"create_defect_record", "update_defect_record"}:
@@ -1770,20 +1805,32 @@ def inventory_view(request):
             movement_date = date.fromisoformat(movement_date_raw)
         except ValueError:
             messages.error(request, "Введите корректную дату движения.")
-            return redirect("inventory")
+            return redirect(f"{request.path}?panel=issue" if movement_type == "issue" else "inventory")
         if movement_type not in {"issue", "restock", "writeoff"} or tool_id <= 0 or qty <= 0:
             messages.error(request, "Проверьте тип операции, инструмент и количество.")
-            return redirect("inventory")
+            return redirect(f"{request.path}?panel=issue" if movement_type == "issue" else "inventory")
         if movement_type == "writeoff" and not comment:
             messages.error(request, "Для списания обязательно укажите причину в комментарии.")
             return redirect("inventory")
+        if movement_type == "issue":
+            if not employee_name:
+                messages.error(request, "Укажите сотрудника для выдачи.")
+                return redirect(f"{request.path}?panel=issue")
+            if employee_options:
+                matched = _match_skud_employee(employee_name, employee_options)
+                if not matched:
+                    messages.error(request, "Выберите сотрудника из списка СКУД.")
+                    return redirect(f"{request.path}?panel=issue")
+                employee_name = matched
+            else:
+                messages.warning(request, "Справочник СКУД недоступен — ФИО сохранено как введено.")
 
         with transaction.atomic():
             tool = ToolItem.objects.select_for_update().get(id=tool_id)
             if movement_type in {"issue", "writeoff"}:
                 if tool.quantity < qty:
                     messages.error(request, f"Недостаточно остатков: доступно {tool.quantity}.")
-                    return redirect("inventory")
+                    return redirect(f"{request.path}?panel=issue" if movement_type == "issue" else "inventory")
                 tool.quantity -= qty
             else:
                 tool.quantity += qty
@@ -1798,7 +1845,7 @@ def inventory_view(request):
                 created_by_account=username,
             )
         messages.success(request, "Движение склада сохранено.")
-        return redirect("inventory")
+        return redirect(f"{request.path}?panel=issue" if movement_type == "issue" else "inventory")
 
     if action == "delete_tool_item":
         if not can_manage_stock:
@@ -2314,15 +2361,21 @@ def inventory_view(request):
         employee_name = (request.POST.get("employee_name") or "").strip()
         if issue_id <= 0 or (returned_qty <= 0 and writeoff_qty <= 0):
             messages.error(request, "Выберите выдачу и укажите количество на возврат/списание.")
-            return redirect("inventory")
+            return _issue_outcome_redirect(request)
         if not comment:
             messages.error(request, "Комментарий обязателен: укажите причину списания/возврата.")
-            return redirect("inventory")
+            return _issue_outcome_redirect(request)
+        if employee_name and employee_options:
+            matched = _match_skud_employee(employee_name, employee_options)
+            if not matched:
+                messages.error(request, "Выберите сотрудника из списка СКУД.")
+                return _issue_outcome_redirect(request)
+            employee_name = matched
         try:
             movement_date = date.fromisoformat(movement_date_raw)
         except ValueError:
             messages.error(request, "Введите корректную дату операции.")
-            return redirect("inventory")
+            return _issue_outcome_redirect(request)
 
         with transaction.atomic():
             issue = StockMovement.objects.select_for_update().select_related("tool").filter(
@@ -2330,7 +2383,7 @@ def inventory_view(request):
             ).first()
             if not issue:
                 messages.error(request, "Исходная выдача не найдена.")
-                return redirect("inventory")
+                return _issue_outcome_redirect(request)
 
             processed = (
                 StockMovement.objects.filter(parent_issue=issue, movement_type__in=["restock", "writeoff"])
@@ -2341,7 +2394,7 @@ def inventory_view(request):
             requested = returned_qty + writeoff_qty
             if requested > remaining:
                 messages.error(request, f"По этой выдаче осталось обработать только {remaining} шт.")
-                return redirect("inventory")
+                return _issue_outcome_redirect(request)
 
             if returned_qty > 0:
                 issue.tool.quantity += returned_qty
@@ -2368,7 +2421,7 @@ def inventory_view(request):
                     created_by_account=username,
                 )
         messages.success(request, "Операция по выданному инструменту сохранена.")
-        return redirect("inventory")
+        return _issue_outcome_redirect(request)
 
     if action == "link_audit_surplus_return":
         tool_id = _to_int(request.POST.get("tool_id"), 0)
@@ -3549,7 +3602,49 @@ def inventory_view(request):
 
     stock_tool_material_extra_json = json.dumps(tool_material_extra_options)
 
-    issue_candidates = list(_open_issue_movements_qs()[:200])
+    outcome_employee = (request.GET.get("outcome_employee") or "").strip()[:120]
+    if outcome_employee and employee_options:
+        matched_outcome = _match_skud_employee(outcome_employee, employee_options)
+        if matched_outcome:
+            outcome_employee = matched_outcome
+    open_issues_qs = _open_issue_movements_qs()
+    if outcome_employee:
+        open_issues_qs = open_issues_qs.filter(employee_name__iexact=outcome_employee)
+        issue_candidates = list(open_issues_qs[:500])
+    else:
+        issue_candidates = list(open_issues_qs[:300])
+
+    outcome_employee_options: list[dict] = []
+    outcome_open_by_key: dict[str, int] = {}
+    outcome_name_by_key: dict[str, str] = {}
+    for raw_name in (
+        _open_issue_movements_qs()
+        .exclude(employee_name="")
+        .values_list("employee_name", flat=True)
+    ):
+        name = (raw_name or "").strip()
+        if not name:
+            continue
+        key = name.casefold()
+        outcome_name_by_key.setdefault(key, name)
+        outcome_open_by_key[key] = outcome_open_by_key.get(key, 0) + 1
+    for opt in employee_options:
+        name = (opt or "").strip()
+        if not name:
+            continue
+        key = name.casefold()
+        outcome_name_by_key.setdefault(key, name)
+    outcome_employee_options = sorted(
+        [
+            {
+                "name": name,
+                "open_count": outcome_open_by_key.get(key, 0),
+            }
+            for key, name in outcome_name_by_key.items()
+        ],
+        key=lambda row: (-int(row["open_count"]), str(row["name"]).casefold()),
+    )
+
     history_open_count_by_key: dict[str, int] = {}
     history_name_by_key: dict[str, str] = {}
     for raw_name in (
@@ -3592,6 +3687,10 @@ def inventory_view(request):
     )
     history_open_employee_options = [row["name"] for row in history_employee_options if row["open_count"] > 0]
     history_employee_option_names = [row["name"] for row in history_employee_options]
+    history_employee_open_rows = [row for row in history_employee_options if row["open_count"] > 0]
+    history_employee_rest_rows = [row for row in history_employee_options if not row["open_count"]]
+    outcome_employee_open_rows = [row for row in outcome_employee_options if row["open_count"] > 0]
+    outcome_employee_rest_rows = [row for row in outcome_employee_options if not row["open_count"]]
     purchase_status = (request.GET.get("purchase_status") or "").strip()
     purchase_store = (request.GET.get("purchase_store") or "").strip()
     purchase_date_from = (request.GET.get("purchase_date_from") or "").strip()
@@ -3871,6 +3970,7 @@ def inventory_view(request):
             "show_all": show_all,
             "history_movement_type": history_movement_type,
             "history_employee": history_employee,
+            "outcome_employee": outcome_employee,
         },
         "history_movement_types": [
             ("restock", "Пополнение"),
@@ -3879,6 +3979,11 @@ def inventory_view(request):
         ],
         "history_open_employee_options": history_open_employee_options,
         "history_employee_options": history_employee_options,
+        "history_employee_open_rows": history_employee_open_rows,
+        "history_employee_rest_rows": history_employee_rest_rows,
+        "outcome_employee_options": outcome_employee_options,
+        "outcome_employee_open_rows": outcome_employee_open_rows,
+        "outcome_employee_rest_rows": outcome_employee_rest_rows,
         "history_open_issues": history_open_issues,
         "end_mill_filter_options": {
             "diameters": end_mill_diameters,
@@ -4025,6 +4130,7 @@ def inventory_view(request):
         "can_rollback_stock": is_admin_user,
         "stock_filtered_count": stock_filtered_count,
         "stock_category_total": stock_category_total,
+        "stock_category_groups": stock_category_grouped_choices(),
         "panel": panel,
         "employee_options": employee_options,
         "defect_records": defects_qs[:300],

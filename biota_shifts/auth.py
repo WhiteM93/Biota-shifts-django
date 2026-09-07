@@ -638,6 +638,7 @@ NAV_KEYS_NO_DEPT_FILTER = (
     "graph",
     "regulations",
     "inventory",
+    "inventory_types",
     "visual_warehouse",
     "products",
     "machines",
@@ -652,6 +653,7 @@ NAV_KEYS = (
     "hours",
     "skud",
     "inventory",
+    "inventory_types",
     "defects",
     "payroll",
     "employees",
@@ -671,6 +673,7 @@ NAV_LABELS_RU = {
     "hours": "Часы по дням",
     "skud": "СКУД",
     "inventory": "Склад",
+    "inventory_types": "Типы склада",
     "defects": "Учёт брака",
     "payroll": "Расчёт ЗП",
     "employees": "Сотрудники",
@@ -687,6 +690,7 @@ NAV_LABELS_SHORT = {
     "hours": "Часы",
     "skud": "СКУД",
     "inventory": "Склад",
+    "inventory_types": "Типы склада",
     "defects": "Брак",
     "payroll": "Зарплата",
     "employees": "Сотрудники",
@@ -734,6 +738,8 @@ def nav_permissions_for_user(username: str | None) -> dict[str, bool]:
     if not isinstance(nav, dict):
         return defaults.copy()
     out = defaults.copy()
+    # Новый раздел — только по явной выдаче в кабинете (пока ключа нет в store).
+    out["inventory_types"] = False
     for k in NAV_KEYS:
         if k in nav:
             out[k] = bool(nav[k])

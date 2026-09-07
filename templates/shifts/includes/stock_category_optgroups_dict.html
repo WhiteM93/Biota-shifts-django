@@ -1,0 +1,7 @@
+{% for group in tool_category_groups %}
+<optgroup label="{{ group.label }}">
+  {% for cat in group.items %}
+  <option value="{{ cat.value }}"{% if selected_category == cat.value %} selected{% endif %}>{{ cat.label }}</option>
+  {% endfor %}
+</optgroup>
+{% endfor %}

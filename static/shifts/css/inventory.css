@@ -54,6 +54,20 @@
   position: relative;
 }
 
+.inv-outcome-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.inv-outcome-filter__employee {
+  min-width: 14rem;
+  flex: 1 1 18rem;
+  position: relative;
+}
+
 .inv-history-emp-search {
   width: 100%;
   min-width: 12rem;
@@ -68,6 +82,7 @@
   top: calc(100% + 4px);
   z-index: 40;
   max-height: 280px;
+  overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid var(--bio-filter-border, #3a4666);
   border-radius: 8px;
@@ -85,11 +100,13 @@ html[data-theme="dawn"] .inv-history-emp-list {
 
 .inv-history-emp-item {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 4px 10px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin: 0;
   padding: 8px 10px;
   border: 0;
@@ -99,6 +116,7 @@ html[data-theme="dawn"] .inv-history-emp-list {
   font: inherit;
   text-align: left;
   cursor: pointer;
+  box-sizing: border-box;
 }
 
 .inv-history-emp-item:hover,
@@ -109,16 +127,73 @@ html[data-theme="dawn"] .inv-history-emp-list {
 .inv-history-emp-item__name {
   font-size: 13px;
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .inv-history-emp-item__open {
   font-size: 11px;
   color: var(--bio-body-muted, #9ca3af);
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .inv-history-emp-item.is-open .inv-history-emp-item__open {
   color: #d97706;
   font-weight: 650;
+}
+
+.inv-history-emp-rest {
+  margin: 4px 0 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+html[data-theme="dawn"] .inv-history-emp-rest {
+  border-top-color: rgba(0, 0, 0, 0.12);
+}
+
+.inv-history-emp-rest__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  list-style: none;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bio-body-muted, #6b7280);
+  user-select: none;
+}
+
+.inv-history-emp-rest__summary::-webkit-details-marker {
+  display: none;
+}
+
+.inv-history-emp-rest__summary::before {
+  content: "▸";
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.inv-history-emp-rest[open] > .inv-history-emp-rest__summary::before {
+  content: "▾";
+}
+
+.inv-history-emp-rest__count {
+  margin-left: auto;
+  font-weight: 500;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.inv-history-emp-rest__body {
+  padding: 0 0 4px;
 }
 
 .inv-history-emp-empty,

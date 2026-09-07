@@ -1112,14 +1112,7 @@
       <span>Тип инструмента</span>
       <select name="category" class="js-stock-filter-category">
         <option value="" {% if not filters.category %}selected{% endif %}>Все</option>
-        <option value="end_mill" {% if filters.category == "end_mill" %}selected{% endif %}>Фрезы</option>
-        <option value="body_tool" {% if filters.category == "body_tool" %}selected{% endif %}>Корпусной инструмент</option>
-        <option value="tap" {% if filters.category == "tap" %}selected{% endif %}>Резьбовой инструмент</option>
-        <option value="center_drill" {% if filters.category == "center_drill" %}selected{% endif %}>Центровки</option>
-        <option value="countersink" {% if filters.category == "countersink" %}selected{% endif %}>Зенкера</option>
-        <option value="drill" {% if filters.category == "drill" %}selected{% endif %}>Сверла</option>
-        <option value="insert" {% if filters.category == "insert" %}selected{% endif %}>Пластинки</option>
-        <option value="collet" {% if filters.category == "collet" %}selected{% endif %}>Цанги</option>
+        {% include "shifts/includes/stock_category_optgroups.html" with selected_category=filters.category %}
       </select>
     </label>
     {% if filters.category == "end_mill" %}
@@ -1794,13 +1787,7 @@
     <label class="field"><span>Тип инструмента</span>
       <select class="js-tool-category" data-target-select="issue-tool-select">
         <option value="">Все</option>
-        <option value="end_mill">Фрезы</option>
-        <option value="tap">Резьбовой инструмент</option>
-        <option value="center_drill">Центровки</option>
-        <option value="countersink">Зенкера</option>
-        <option value="drill">Сверла</option>
-        <option value="insert">Пластинки</option>
-        <option value="collet">Цанги</option>
+        {% include "shifts/includes/stock_category_optgroups.html" with selected_category="" %}
       </select>
     </label>
     <label class="field"><span>Поиск инструмента</span>
@@ -2017,42 +2004,41 @@
     </label>
     <label class="field"><span>Количество</span><input type="number" name="quantity" min="1" required></label>
     <label class="field" style="position:relative;">
-      <span>Сотрудник (для выдачи)</span>
+      <span>Сотрудник (СКУД)</span>
+      <input type="hidden" name="employee_name" id="issue-employee-value" required>
       <input
         type="text"
-        name="employee_name"
         id="issue-employee-search"
         class="defect-emp-search"
-        placeholder="Поиск по ФИО или введите как есть…"
+        placeholder="{% if employee_options %}Начните вводить ФИО…{% else %}Справочник СКУД недоступен{% endif %}"
         autocomplete="off"
         aria-autocomplete="list"
         aria-controls="issue-employee-list"
+        {% if not employee_options %}disabled{% endif %}
       >
       <div id="issue-employee-list" class="defect-emp-list" hidden role="listbox">
         {% for employee in employee_options %}
         <div class="defect-emp-item" role="option" data-value="{{ employee }}">{{ employee }}</div>
         {% endfor %}
-        <div class="defect-emp-item defect-emp-item--custom" id="issue-employee-custom" role="option" hidden data-custom="1">
-          Использовать как есть: <strong data-custom-label></strong>
-        </div>
         {% if not employee_options %}
-        <div class="defect-emp-empty muted">Справочник пуст — введите ФИО вручную.</div>
+        <div class="defect-emp-empty muted">Справочник СКУД пуст — выдача недоступна.</div>
         {% endif %}
       </div>
     </label>
     <label class="field"><span>Дата</span><input type="date" name="movement_date" value="{{ today }}" required></label>
     <label class="field"><span>Комментарий</span><input type="text" name="comment"></label>
-    <div class="filter-actions"><button type="submit" class="btn">Сохранить операцию</button></div>
+    <div class="filter-actions"><button type="submit" class="btn"{% if not employee_options %} disabled title="Нет сотрудников СКУД"{% endif %}>Сохранить операцию</button></div>
   </form>
 </div>
 <script>
 (function () {
   var empSearch = document.getElementById("issue-employee-search");
+  var empValue = document.getElementById("issue-employee-value");
   var empList = document.getElementById("issue-employee-list");
-  var customItem = document.getElementById("issue-employee-custom");
-  if (!empSearch || !empList) return;
+  var form = empSearch && empSearch.closest("form");
+  if (!empSearch || !empList || !empValue) return;
 
-  var empItems = Array.prototype.slice.call(empList.querySelectorAll(".defect-emp-item:not(.defect-emp-item--custom)"));
+  var empItems = Array.prototype.slice.call(empList.querySelectorAll(".defect-emp-item"));
   var activeIdx = -1;
 
   function showList() { empList.hidden = false; }
@@ -2075,22 +2061,11 @@
       item.hidden = !match;
       if (match) visible.push(item);
     });
-    if (customItem) {
-      var customLabel = customItem.querySelector("[data-custom-label]");
-      var showCustom = !!lower && !exactMatch(lower);
-      customItem.hidden = !showCustom;
-      if (showCustom) {
-        if (customLabel) customLabel.textContent = q.trim();
-        customItem.setAttribute("data-value", q.trim());
-        visible.push(customItem);
-      }
-    }
     return visible;
   }
 
   function setActive(items, idx) {
     empItems.forEach(function (it) { it.classList.remove("is-active"); });
-    if (customItem) customItem.classList.remove("is-active");
     if (items[idx]) {
       items[idx].classList.add("is-active");
       items[idx].scrollIntoView({ block: "nearest" });
@@ -2098,7 +2073,9 @@
   }
 
   function selectItem(value) {
-    empSearch.value = value || "";
+    var v = value || "";
+    empSearch.value = v;
+    empValue.value = v;
     hideList();
   }
 
@@ -2108,6 +2085,7 @@
   });
 
   empSearch.addEventListener("input", function () {
+    empValue.value = "";
     var vis = filterItems(empSearch.value);
     activeIdx = -1;
     if (vis.length) showList(); else hideList();
@@ -2129,9 +2107,15 @@
     } else if (e.key === "Enter") {
       if (!empList.hidden && activeIdx >= 0 && vis[activeIdx]) {
         e.preventDefault();
-        selectItem(vis[activeIdx].getAttribute("data-value") || empSearch.value.trim());
+        selectItem(vis[activeIdx].getAttribute("data-value") || "");
       } else {
-        hideList();
+        var hit = exactMatch(empSearch.value);
+        if (hit) {
+          e.preventDefault();
+          selectItem(hit.getAttribute("data-value") || "");
+        } else {
+          hideList();
+        }
       }
     } else if (e.key === "Escape") {
       hideList();
@@ -2142,7 +2126,7 @@
     var item = e.target.closest(".defect-emp-item");
     if (!item || item.classList.contains("defect-emp-empty")) return;
     e.preventDefault();
-    selectItem(item.getAttribute("data-value") || empSearch.value.trim());
+    selectItem(item.getAttribute("data-value") || "");
   });
 
   document.addEventListener("click", function (e) {
@@ -2150,6 +2134,18 @@
       hideList();
     }
   });
+
+  if (form) {
+    form.addEventListener("submit", function (e) {
+      if (!empValue.value.trim()) {
+        e.preventDefault();
+        alert("Выберите сотрудника из списка СКУД.");
+        empSearch.focus();
+        showList();
+        filterItems(empSearch.value);
+      }
+    });
+  }
 })();
 </script>
 {% else %}
@@ -2200,14 +2196,7 @@
           <div class="inv-arrival-select-wrap">
             <select class="inv-arrival-sel js-arrival-bulk-category" id="arrival-bulk-category">
               <option value="">Выбрать...</option>
-              <option value="end_mill">Фрезы</option>
-              <option value="body_tool">Корпусной инструмент</option>
-              <option value="tap">Резьбовой инструмент</option>
-              <option value="center_drill">Центровки</option>
-              <option value="countersink">Зенкера</option>
-              <option value="drill">Сверла</option>
-              <option value="insert">Пластинки</option>
-              <option value="collet">Цанги</option>
+              {% include "shifts/includes/stock_category_optgroups.html" with selected_category="" %}
             </select>
           </div>
         </div>
@@ -2297,8 +2286,69 @@
 
   <div class="inv-outcome-hint-card">
     <div class="inv-outcome-hint-label">Как заполнить</div>
-    <p class="inv-outcome-hint-text">Выберите выдачу, укажите <strong>возврат</strong> на склад и/или <strong>списание</strong>, добавьте комментарий. Сумма не должна превышать остаток по выдаче. Ниже — быстрое оформление прямо из таблицы.</p>
+    <p class="inv-outcome-hint-text">Выберите сотрудника из СКУД, чтобы увидеть все его активные выдачи. Укажите <strong>возврат</strong> на склад и/или <strong>списание</strong>, добавьте комментарий. Сумма не должна превышать остаток по выдаче.</p>
   </div>
+
+  <form method="get" class="inv-outcome-filter auto-submit-form" id="inventory-outcome-filter-form">
+    <input type="hidden" name="panel" value="issue_outcome">
+    <div class="field inv-outcome-filter__employee" style="position:relative;">
+      <span class="inv-outcome-label">Сотрудник (фильтр списка)</span>
+      <input type="hidden" name="outcome_employee" id="outcome-filter-employee-value" value="{{ filters.outcome_employee }}">
+      <input
+        type="text"
+        id="outcome-filter-employee-search"
+        class="inv-outcome-inp inv-history-emp-search"
+        value="{{ filters.outcome_employee }}"
+        placeholder="{% if outcome_employee_options %}Начните вводить ФИО…{% else %}Нет сотрудников{% endif %}"
+        autocomplete="off"
+        aria-autocomplete="list"
+        aria-controls="outcome-filter-employee-list"
+        {% if not outcome_employee_options %}disabled{% endif %}
+      >
+      <div id="outcome-filter-employee-list" class="inv-history-emp-list" hidden role="listbox">
+        {% for row in outcome_employee_open_rows %}
+        <div
+          class="inv-history-emp-item is-open"
+          role="option"
+          data-value="{{ row.name }}"
+        >
+          <span class="inv-history-emp-item__name">{{ row.name }}</span>
+          <span class="inv-history-emp-item__open">открыто: {{ row.open_count }}</span>
+        </div>
+        {% endfor %}
+        {% if outcome_employee_rest_rows %}
+        <details class="inv-history-emp-rest js-emp-rest-group">
+          <summary class="inv-history-emp-rest__summary">
+            Остальное
+            <span class="inv-history-emp-rest__count">{{ outcome_employee_rest_rows|length }}</span>
+          </summary>
+          <div class="inv-history-emp-rest__body">
+            {% for row in outcome_employee_rest_rows %}
+            <div
+              class="inv-history-emp-item"
+              role="option"
+              data-value="{{ row.name }}"
+            >
+              <span class="inv-history-emp-item__name">{{ row.name }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </details>
+        {% endif %}
+        {% if not outcome_employee_options %}
+        <div class="inv-history-emp-empty muted">Справочник пуст.</div>
+        {% endif %}
+      </div>
+    </div>
+    {% if filters.outcome_employee %}
+    <a class="btn btn-sm btn-ghost" href="{% url 'inventory' %}?panel=issue_outcome">Сбросить</a>
+    {% endif %}
+  </form>
+  {% if filters.outcome_employee %}
+  <p class="muted inv-outcome-list-hint">Показаны активные выдачи: <strong>{{ filters.outcome_employee }}</strong> ({{ issue_candidates|length }}).</p>
+  {% else %}
+  <p class="muted inv-outcome-list-hint">Список отсортирован по ФИО. Выберите сотрудника выше, чтобы увидеть все его выдачи.</p>
+  {% endif %}
 
   <section class="inv-outcome-glass-card">
     <div class="inv-outcome-card-header">
@@ -2307,9 +2357,15 @@
       </svg>
       Оформление операции
     </div>
-    <form method="post" class="inv-outcome-form">
+    <form
+      method="post"
+      class="inv-outcome-form"
+      id="outcome-main-form"
+      action="{% url 'inventory' %}?panel=issue_outcome{% if filters.outcome_employee %}&outcome_employee={{ filters.outcome_employee|urlencode }}{% endif %}#issue-outcome-block"
+    >
       {% csrf_token %}
       <input type="hidden" name="action" value="process_issue_outcome">
+      <input type="hidden" name="outcome_employee" id="outcome-main-filter-employee" value="{{ filters.outcome_employee }}">
       <div class="inv-outcome-form-grid">
         <div class="inv-outcome-field">
           <label class="inv-outcome-label" for="issue-search-input">Поиск</label>
@@ -2334,6 +2390,7 @@
                 data-issue-wm="{{ iss.tool.work_material|default:''|escape }}"
                 data-issue-wm-title="{% if iss.tool.work_material %}{{ iss.tool.get_work_material_display|escape }}{% endif %}"
                 data-issue-extra="кому: {{ iss.employee_name|default:'-'|escape }} · {{ iss.movement_date|date:'d.m.Y' }} · выдано {{ iss.quantity }} · ост. {{ iss.remaining_qty }}"
+                data-employee-name="{{ iss.employee_name|default:''|escape }}"
               >{{ iss.tool.issue_select_label }}</option>
               {% endwith %}
               {% endfor %}
@@ -2360,9 +2417,28 @@
           <label class="inv-outcome-label" for="outcome-writeoff-qty">Списание, шт</label>
           <input type="number" class="inv-outcome-inp inv-outcome-inp--writeoff" id="outcome-writeoff-qty" name="writeoff_qty" min="0" value="0">
         </div>
-        <div class="inv-outcome-field">
-          <label class="inv-outcome-label" for="outcome-employee">Сотрудник</label>
-          <input type="text" class="inv-outcome-inp" id="outcome-employee" name="employee_name" placeholder="ФИО">
+        <div class="inv-outcome-field" style="position:relative;">
+          <label class="inv-outcome-label" for="outcome-employee-search">Сотрудник (СКУД)</label>
+          <input type="hidden" name="employee_name" id="outcome-employee-value" value="{{ filters.outcome_employee }}">
+          <input
+            type="text"
+            class="inv-outcome-inp"
+            id="outcome-employee-search"
+            value="{{ filters.outcome_employee }}"
+            placeholder="{% if employee_options %}Начните вводить ФИО…{% else %}СКУД недоступен{% endif %}"
+            autocomplete="off"
+            aria-autocomplete="list"
+            aria-controls="outcome-employee-list"
+            {% if not employee_options %}disabled{% endif %}
+          >
+          <div id="outcome-employee-list" class="defect-emp-list" hidden role="listbox">
+            {% for employee in employee_options %}
+            <div class="defect-emp-item" role="option" data-value="{{ employee }}">{{ employee }}</div>
+            {% endfor %}
+            {% if not employee_options %}
+            <div class="defect-emp-empty muted">Справочник СКУД пуст.</div>
+            {% endif %}
+          </div>
         </div>
         <div class="inv-outcome-field">
           <label class="inv-outcome-label" for="outcome-date">Дата</label>
@@ -2396,7 +2472,7 @@
     <div class="inv-outcome-list-wrap">
       <ul class="inv-outcome-list">
         {% for iss in issue_candidates %}
-        <li class="inv-outcome-card issue-candidate-row" data-issue-id="{{ iss.id }}">
+        <li class="inv-outcome-card issue-candidate-row" data-issue-id="{{ iss.id }}" data-employee-name="{{ iss.employee_name|default:'' }}">
           <div class="inv-outcome-card__head">
             <span class="inv-outcome-badge">Выдача #{{ iss.id }}</span>
             <time class="inv-outcome-card__when" datetime="{{ iss.movement_date|date:'Y-m-d' }}">{{ iss.movement_date|date:"d.m.Y" }}</time>
@@ -2452,11 +2528,17 @@
             <span class="inv-outcome-qty"><span class="inv-outcome-fact__label">Выдано</span> <strong>{{ iss.quantity }}</strong> шт.</span>
             <span class="inv-outcome-qty inv-outcome-qty--remain"><span class="inv-outcome-fact__label">Осталось</span> <strong>{{ iss.remaining_qty }}</strong> шт.</span>
           </div>
-          <form method="post" class="issue-inline-form inv-outcome-card__form" id="outcome-form-{{ iss.id }}">
+          <form
+            method="post"
+            class="issue-inline-form inv-outcome-card__form"
+            id="outcome-form-{{ iss.id }}"
+            action="{% url 'inventory' %}?panel=issue_outcome{% if filters.outcome_employee %}&outcome_employee={{ filters.outcome_employee|urlencode }}{% endif %}#issue-outcome-block"
+          >
             {% csrf_token %}
             <input type="hidden" name="action" value="process_issue_outcome">
             <input type="hidden" name="issue_id" value="{{ iss.id }}">
             <input type="hidden" name="employee_name" value="{{ iss.employee_name|default:'' }}">
+            <input type="hidden" name="outcome_employee" value="{{ filters.outcome_employee|default:iss.employee_name }}">
             <div class="inv-outcome-card__fields">
               <label class="inv-outcome-field-mini inv-outcome-field-mini--return">
                 <span class="inv-outcome-field-mini__label">Возв.</span>
@@ -2487,6 +2569,186 @@
     </div>
   </section>
 </div>
+<script>
+(function () {
+  // Фильтр списка по сотруднику
+  var form = document.getElementById("inventory-outcome-filter-form");
+  var search = document.getElementById("outcome-filter-employee-search");
+  var valueInput = document.getElementById("outcome-filter-employee-value");
+  var list = document.getElementById("outcome-filter-employee-list");
+  if (form && search && valueInput && list) {
+    var items = Array.prototype.slice.call(list.querySelectorAll(".inv-history-emp-item"));
+    var activeIdx = -1;
+    function showList() { list.hidden = false; }
+    function hideList() { list.hidden = true; activeIdx = -1; }
+    function filterItems(q) {
+      var lower = (q || "").toLowerCase().trim();
+      var visible = [];
+      var restMatch = false;
+      items.forEach(function (item) {
+        var match = !lower || (item.getAttribute("data-value") || "").toLowerCase().indexOf(lower) !== -1;
+        item.hidden = !match;
+        if (match) {
+          visible.push(item);
+          if (item.closest(".js-emp-rest-group")) restMatch = true;
+        }
+      });
+      var rest = list.querySelector(".js-emp-rest-group");
+      if (rest) {
+        var anyRestVisible = Array.prototype.some.call(
+          rest.querySelectorAll(".inv-history-emp-item"),
+          function (it) { return !it.hidden; }
+        );
+        rest.hidden = !anyRestVisible;
+        if (lower && restMatch) rest.open = true;
+      }
+      return visible;
+    }
+    function setActive(vis, idx) {
+      items.forEach(function (it) { it.classList.remove("is-active"); });
+      if (vis[idx]) {
+        vis[idx].classList.add("is-active");
+        vis[idx].scrollIntoView({ block: "nearest" });
+      }
+    }
+    function selectAndSubmit(value) {
+      valueInput.value = value || "";
+      search.value = value || "";
+      hideList();
+      form.submit();
+    }
+    search.addEventListener("focus", function () {
+      var vis = filterItems(search.value);
+      if (vis.length || items.length) showList();
+    });
+    search.addEventListener("input", function () {
+      valueInput.value = "";
+      var vis = filterItems(search.value);
+      activeIdx = -1;
+      if (vis.length) showList(); else hideList();
+    });
+    search.addEventListener("keydown", function (e) {
+      var vis = filterItems(search.value).filter(function (it) { return !it.hidden; });
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (list.hidden) showList();
+        if (!vis.length) return;
+        activeIdx = (activeIdx + 1) % vis.length;
+        setActive(vis, activeIdx);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (!vis.length) return;
+        activeIdx = activeIdx <= 0 ? vis.length - 1 : activeIdx - 1;
+        setActive(vis, activeIdx);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (!list.hidden && activeIdx >= 0 && vis[activeIdx]) {
+          selectAndSubmit(vis[activeIdx].getAttribute("data-value") || "");
+        } else if (vis.length === 1) {
+          selectAndSubmit(vis[0].getAttribute("data-value") || "");
+        }
+      } else if (e.key === "Escape") {
+        hideList();
+      }
+    });
+    list.addEventListener("mousedown", function (e) {
+      if (e.target.closest("summary")) return;
+      var item = e.target.closest(".inv-history-emp-item");
+      if (!item) return;
+      e.preventDefault();
+      selectAndSubmit(item.getAttribute("data-value") || "");
+    });
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest(".inv-outcome-filter__employee")) hideList();
+    });
+  }
+
+  // Выбор сотрудника СКУД в форме операции
+  var empSearch = document.getElementById("outcome-employee-search");
+  var empValue = document.getElementById("outcome-employee-value");
+  var empList = document.getElementById("outcome-employee-list");
+  if (empSearch && empValue && empList) {
+    var empItems = Array.prototype.slice.call(empList.querySelectorAll(".defect-emp-item"));
+    var empActive = -1;
+    function empShow() { empList.hidden = false; }
+    function empHide() { empList.hidden = true; empActive = -1; }
+    function empFilter(q) {
+      var lower = (q || "").toLowerCase().trim();
+      var visible = [];
+      empItems.forEach(function (item) {
+        var match = !lower || (item.getAttribute("data-value") || "").toLowerCase().indexOf(lower) !== -1;
+        item.hidden = !match;
+        if (match) visible.push(item);
+      });
+      return visible;
+    }
+    function empSelect(value) {
+      empSearch.value = value || "";
+      empValue.value = value || "";
+      var filterHidden = document.getElementById("outcome-main-filter-employee");
+      if (filterHidden && value) filterHidden.value = value;
+      empHide();
+    }
+    empSearch.addEventListener("focus", function () {
+      var vis = empFilter(empSearch.value);
+      if (vis.length || empItems.length) empShow();
+    });
+    empSearch.addEventListener("input", function () {
+      empValue.value = "";
+      var vis = empFilter(empSearch.value);
+      empActive = -1;
+      if (vis.length) empShow(); else empHide();
+    });
+    empSearch.addEventListener("keydown", function (e) {
+      var vis = empFilter(empSearch.value).filter(function (it) { return !it.hidden; });
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (empList.hidden) empShow();
+        if (!vis.length) return;
+        empActive = (empActive + 1) % vis.length;
+        empItems.forEach(function (it) { it.classList.remove("is-active"); });
+        if (vis[empActive]) vis[empActive].classList.add("is-active");
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (!vis.length) return;
+        empActive = empActive <= 0 ? vis.length - 1 : empActive - 1;
+        empItems.forEach(function (it) { it.classList.remove("is-active"); });
+        if (vis[empActive]) vis[empActive].classList.add("is-active");
+      } else if (e.key === "Enter") {
+        if (!empList.hidden && empActive >= 0 && vis[empActive]) {
+          e.preventDefault();
+          empSelect(vis[empActive].getAttribute("data-value") || "");
+        }
+      } else if (e.key === "Escape") {
+        empHide();
+      }
+    });
+    empList.addEventListener("mousedown", function (e) {
+      var item = e.target.closest(".defect-emp-item");
+      if (!item || item.classList.contains("defect-emp-empty")) return;
+      e.preventDefault();
+      empSelect(item.getAttribute("data-value") || "");
+    });
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest("#outcome-employee-search") && !e.target.closest("#outcome-employee-list")) {
+        empHide();
+      }
+    });
+    window.__setOutcomeEmployee = empSelect;
+  }
+
+  var mainForm = document.getElementById("outcome-main-form");
+  if (mainForm) {
+    mainForm.addEventListener("submit", function () {
+      var filterHidden = document.getElementById("outcome-main-filter-employee");
+      var empValue = document.getElementById("outcome-employee-value");
+      if (filterHidden && empValue && empValue.value && !filterHidden.value) {
+        filterHidden.value = empValue.value;
+      }
+    });
+  }
+})();
+</script>
 {% else %}
 <p class="muted">Режим исполнителя: только просмотр и скачивание.</p>
 {% endif %}
@@ -3049,22 +3311,42 @@
       aria-controls="history-employee-list"
     >
     <div id="history-employee-list" class="inv-history-emp-list" hidden role="listbox">
-      {% for row in history_employee_options %}
+      {% for row in history_employee_open_rows %}
       <button
         type="button"
-        class="inv-history-emp-item{% if row.open_count %} is-open{% endif %}"
+        class="inv-history-emp-item is-open"
         role="option"
         data-value="{{ row.name }}"
         data-open="{{ row.open_count }}"
       >
         <span class="inv-history-emp-item__name">{{ row.name }}</span>
-        {% if row.open_count %}
         <span class="inv-history-emp-item__open">не возвращено: {{ row.open_count }}</span>
-        {% endif %}
       </button>
-      {% empty %}
-      <div class="inv-history-emp-empty muted">Справочник пуст — проверьте права/подключение к Biota.</div>
       {% endfor %}
+      {% if history_employee_rest_rows %}
+      <details class="inv-history-emp-rest js-emp-rest-group">
+        <summary class="inv-history-emp-rest__summary">
+          Остальное
+          <span class="inv-history-emp-rest__count">{{ history_employee_rest_rows|length }}</span>
+        </summary>
+        <div class="inv-history-emp-rest__body">
+          {% for row in history_employee_rest_rows %}
+          <button
+            type="button"
+            class="inv-history-emp-item"
+            role="option"
+            data-value="{{ row.name }}"
+            data-open="0"
+          >
+            <span class="inv-history-emp-item__name">{{ row.name }}</span>
+          </button>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+      {% if not history_employee_options %}
+      <div class="inv-history-emp-empty muted">Справочник пуст — проверьте права/подключение к Biota.</div>
+      {% endif %}
     </div>
   </div>
   {% if filters.history_movement_type or filters.history_employee %}
@@ -3098,12 +3380,25 @@
   function filterItems(q) {
     var lower = (q || "").toLowerCase().trim();
     var visible = [];
+    var restMatch = false;
     items.forEach(function (item) {
       var name = (item.getAttribute("data-value") || "").toLowerCase();
       var match = !lower || name.indexOf(lower) !== -1;
       item.hidden = !match;
-      if (match) visible.push(item);
+      if (match) {
+        visible.push(item);
+        if (item.closest(".js-emp-rest-group")) restMatch = true;
+      }
     });
+    var rest = list.querySelector(".js-emp-rest-group");
+    if (rest) {
+      var anyRestVisible = Array.prototype.some.call(
+        rest.querySelectorAll(".inv-history-emp-item"),
+        function (it) { return !it.hidden; }
+      );
+      rest.hidden = !anyRestVisible;
+      if (lower && restMatch) rest.open = true;
+    }
     return visible;
   }
 
@@ -3167,6 +3462,7 @@
   });
 
   list.addEventListener("mousedown", function (e) {
+    if (e.target.closest("summary")) return;
     var item = e.target.closest(".inv-history-emp-item");
     if (!item) return;
     e.preventDefault();

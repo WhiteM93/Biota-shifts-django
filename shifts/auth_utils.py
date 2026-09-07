@@ -49,6 +49,8 @@ def _nav_key_for_url_name(url_name: str) -> str | None:
         return "skud"
     if n == "inventory":
         return "inventory"
+    if n == "inventory_types" or n.startswith("inventory_types_api"):
+        return "inventory_types"
     if n == "employee_payroll_detail":
         return "employees"
     if n == "payroll_settlement":
@@ -110,6 +112,7 @@ def post_login_redirect(username: str | None, next_path: str | None = None) -> s
         "hours",
         "skud",
         "inventory",
+        "inventory_types",
         "defects",
         "payroll",
         "employees",

@@ -263,9 +263,7 @@
                 <span class="vw-row-label">Категория склада</span>
                 <select class="vw-control js-vw-item-category">
                   <option value="">— выберите —</option>
-                  {% for cat in tool_categories %}
-                  <option value="{{ cat.value }}">{{ cat.label }}</option>
-                  {% endfor %}
+                  {% include "shifts/includes/stock_category_optgroups_dict.html" with selected_category="" %}
                 </select>
               </label>
 
@@ -531,9 +529,7 @@
               <label class="vw-row">
                 <span class="vw-row-label">Категория</span>
                 <select class="vw-control js-vw-audit-new-category">
-                  {% for cat in tool_categories %}
-                  <option value="{{ cat.value }}">{{ cat.label }}</option>
-                  {% endfor %}
+                  {% include "shifts/includes/stock_category_optgroups_dict.html" with selected_category="" %}
                 </select>
               </label>
               <label class="vw-row js-vw-audit-new-mill-row" hidden>

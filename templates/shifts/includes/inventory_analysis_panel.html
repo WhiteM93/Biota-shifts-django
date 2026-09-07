@@ -44,9 +44,7 @@
           <span class="calc-label">Тип инструмента</span>
           <span class="calc-sel-wrap">
             <select name="analysis_category" class="calc-sel">
-              {% for key, label in analysis_categories %}
-              <option value="{{ key }}" {% if key == analysis_category %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
+              {% include "shifts/includes/stock_category_optgroups.html" with selected_category=analysis_category %}
             </select>
           </span>
         </label>
@@ -151,9 +149,7 @@
       </label>
       <label class="field"><span>Тип</span>
         <select name="watch_category">
-          {% for key, label in analysis_categories %}
-          <option value="{{ key }}" {% if key == analysis_category %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
+          {% include "shifts/includes/stock_category_optgroups.html" with selected_category=analysis_category %}
         </select>
       </label>
       <label class="field"><span>Группировать по</span>

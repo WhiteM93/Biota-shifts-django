@@ -251,6 +251,12 @@ def category_choices() -> list[tuple[str, str]]:
     return list(ToolItem._meta.get_field("category").choices)
 
 
+def category_grouped_choices() -> list[tuple[str, str, list[tuple[str, str]]]]:
+    from shifts.models import stock_category_grouped_choices
+
+    return stock_category_grouped_choices()
+
+
 def group_field_choices(category: str) -> list[tuple[str, str]]:
     paths = GROUP_FIELD_PATHS.get(category, {})
     labels = GROUP_FIELD_LABELS.get(category, {})
@@ -423,6 +429,7 @@ def analysis_context(request, username: str) -> dict:
         "analysis_rows": summary_rows,
         "analysis_group_fields": group_field_choices(category),
         "analysis_categories": category_choices(),
+        "stock_category_groups": category_grouped_choices(),
         "analysis_watch_rows": watch_rows,
         "analysis_watch_alerts": alerts,
         "analysis_watch_templates": templates,

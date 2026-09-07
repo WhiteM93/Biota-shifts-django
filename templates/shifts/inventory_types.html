@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/inventory_types.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
+{% block content %}
+<div
+  class="st-page{% if not biota_can_edit %} is-readonly{% endif %}"
+  data-api-types="{% url 'inventory_types_api_types' %}"
+  data-api-type-tpl="{% url 'inventory_types_api_type_detail' 0 %}"
+  data-api-type-move-tpl="{% url 'inventory_types_api_type_move' 0 %}"
+  data-api-subtypes="{% url 'inventory_types_api_subtype_upsert' %}"
+  data-api-subtype-del-tpl="{% url 'inventory_types_api_subtype_delete' 0 %}"
+  data-api-fields="{% url 'inventory_types_api_field_upsert' %}"
+  data-api-field-del-tpl="{% url 'inventory_types_api_field_delete' 0 %}"
+  data-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}"
+>
+  <header class="st-topbar">
+    <div class="st-topbar-text">
+      <h1 class="st-title">Типы склада</h1>
+      <p class="st-subtitle">Вложенный список: тип → общие поля и подтипы → характеристики. Кнопка «В…» у типа делает его подтипом другого типа.</p>
+    </div>
+    <div class="st-topbar-actions">
+      <button type="button" class="st-btn-secondary js-st-expand-all">Развернуть всё</button>
+      <button type="button" class="st-btn-secondary js-st-collapse-all">Свернуть всё</button>
+      {% if biota_can_edit %}
+      <button type="button" class="st-btn-primary js-st-new-type">+ Тип</button>
+      {% endif %}
+    </div>
+  </header>
+
+  <div class="st-tree-panel">
+    <p class="st-empty js-st-types-empty muted" hidden>Пока нет типов. Создайте первый.</p>
+    <ul class="st-tree js-st-tree" role="tree" aria-label="Типы склада"></ul>
+  </div>
+</div>
+
+{% if biota_can_edit %}
+<dialog class="st-dialog js-st-dlg-type">
+  <form method="dialog" class="st-dialog-card js-st-type-form">
+    <h2 class="st-dialog-title js-st-type-form-title">Новый тип</h2>
+    <input type="hidden" class="js-st-type-id" value="">
+    <label class="st-row">
+      <span class="st-row-label">Название</span>
+      <input type="text" class="st-control js-st-type-name" maxlength="120" required autocomplete="off" placeholder="Резьбовой инструмент">
+    </label>
+    <label class="st-row">
+      <span class="st-row-label">Код</span>
+      <input type="text" class="st-control js-st-type-code" maxlength="64" autocomplete="off" placeholder="tap (можно оставить пустым)">
+    </label>
+    <label class="st-row">
+      <span class="st-row-label">Примечание</span>
+      <input type="text" class="st-control js-st-type-notes" maxlength="300" autocomplete="off">
+    </label>
+    <label class="st-row st-row--check">
+      <input type="checkbox" class="js-st-type-active" checked>
+      <span>Активен</span>
+    </label>
+    <div class="st-dialog-actions">
+      <button type="button" class="st-btn-secondary js-st-dlg-cancel">Отмена</button>
+      <button type="submit" class="st-btn-primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="st-dialog js-st-dlg-subtype">
+  <form method="dialog" class="st-dialog-card js-st-subtype-form">
+    <h2 class="st-dialog-title js-st-subtype-form-title">Новый подтип</h2>
+    <input type="hidden" class="js-st-subtype-id" value="">
+    <input type="hidden" class="js-st-subtype-type-id" value="">
+    <label class="st-row">
+      <span class="st-row-label">Название</span>
+      <input type="text" class="st-control js-st-subtype-name" maxlength="120" required autocomplete="off" placeholder="Режущий метчик">
+    </label>
+    <label class="st-row">
+      <span class="st-row-label">Код</span>
+      <input type="text" class="st-control js-st-subtype-code" maxlength="64" autocomplete="off" placeholder="cutting">
+    </label>
+    <label class="st-row">
+      <span class="st-row-label">Примечание</span>
+      <input type="text" class="st-control js-st-subtype-notes" maxlength="300" autocomplete="off">
+    </label>
+    <label class="st-row st-row--check">
+      <input type="checkbox" class="js-st-subtype-active" checked>
+      <span>Активен</span>
+    </label>
+    <div class="st-dialog-actions">
+      <button type="button" class="st-btn-secondary js-st-dlg-cancel">Отмена</button>
+      <button type="submit" class="st-btn-primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="st-dialog js-st-dlg-move">
+  <form method="dialog" class="st-dialog-card js-st-move-form">
+    <h2 class="st-dialog-title">Переместить тип</h2>
+    <p class="st-move-hint muted js-st-move-hint">Тип станет подтипом выбранного родителя. Бывшие подтипы превратятся в характеристику «Вид».</p>
+    <input type="hidden" class="js-st-move-source-id" value="">
+    <label class="st-row">
+      <span class="st-row-label">Куда</span>
+      <select class="st-control js-st-move-target" required></select>
+    </label>
+    <div class="st-dialog-actions">
+      <button type="button" class="st-btn-secondary js-st-dlg-cancel">Отмена</button>
+      <button type="submit" class="st-btn-primary">Переместить</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="st-dialog js-st-dlg-field">
+  <form method="dialog" class="st-dialog-card js-st-field-form">
+    <h2 class="st-dialog-title js-st-field-form-title">Характеристика</h2>
+    <input type="hidden" class="js-st-field-id" value="">
+    <input type="hidden" class="js-st-field-type-id" value="">
+    <input type="hidden" class="js-st-field-subtype-id" value="">
+    <label class="st-row">
+      <span class="st-row-label">Подпись</span>
+      <input type="text" class="st-control js-st-field-label" maxlength="120" required autocomplete="off" placeholder="Диаметр, мм">
+    </label>
+    <label class="st-row">
+      <span class="st-row-label">Код поля</span>
+      <input type="text" class="st-control js-st-field-key" maxlength="64" autocomplete="off" placeholder="diameter-mm">
+    </label>
+    <label class="st-row">
+      <span class="st-row-label">Вид</span>
+      <select class="st-control js-st-field-kind">
+        {% for k in field_kinds %}
+        <option value="{{ k.value }}">{{ k.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="st-row js-st-field-choices-row" hidden>
+      <span class="st-row-label">Варианты списка</span>
+      <textarea class="st-control js-st-field-choices" rows="4" placeholder="По одному в строке"></textarea>
+    </label>
+    <label class="st-row">
+      <span class="st-row-label">Ед. изм.</span>
+      <input type="text" class="st-control js-st-field-unit" maxlength="24" autocomplete="off" placeholder="мм">
+    </label>
+    <label class="st-row">
+      <span class="st-row-label">Подсказка</span>
+      <input type="text" class="st-control js-st-field-help" maxlength="200" autocomplete="off">
+    </label>
+    <label class="st-row st-row--check">
+      <input type="checkbox" class="js-st-field-required">
+      <span>Обязательное</span>
+    </label>
+    <div class="st-dialog-actions">
+      <button type="button" class="st-btn-secondary js-st-dlg-cancel">Отмена</button>
+      <button type="submit" class="st-btn-primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+{{ field_kinds_json|json_script:"st-field-kinds" }}
+<script src="{% static 'shifts/js/inventory_types.js' %}?v={{ static_asset_version }}"></script>
+{% endblock %}

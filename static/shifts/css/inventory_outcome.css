@@ -135,6 +135,8 @@ html[data-theme="dawn"] .inv-outcome-page {
 
 /* ── Карточки ── */
 .inv-outcome-glass-card {
+  position: relative;
+  z-index: 1;
   margin-bottom: 16px;
   padding: 20px;
   border-radius: 16px;
@@ -143,11 +145,22 @@ html[data-theme="dawn"] .inv-outcome-page {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   transition: box-shadow 0.25s, border-color 0.25s;
+  overflow: visible;
 }
 
 .inv-outcome-glass-card:hover {
   border-color: rgba(var(--io-rgb), 0.2);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+/* Пока открыт комбо «Выданная позиция» — карточка формы выше списка,
+   иначе backdrop-filter у «Активные выдачи» размывает выпадашку. */
+.inv-outcome-glass-card:has(.issue-tool-combo.is-open) {
+  z-index: 40;
+}
+
+.inv-outcome-list-card {
+  z-index: 1;
 }
 
 .inv-outcome-card-header {
@@ -294,9 +307,16 @@ html[data-theme="dawn"] .inv-outcome-page {
   font-size: 14px;
 }
 
+.inv-outcome-page .issue-tool-combo.is-open {
+  z-index: 50;
+}
+
 .inv-outcome-page .issue-tool-combo-panel {
+  z-index: 51;
   border-radius: 10px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  max-height: min(260px, 38vh);
+  background: var(--bio-input-bg, #fff);
 }
 
 /* ── Активные выдачи (карточки, как история) ── */

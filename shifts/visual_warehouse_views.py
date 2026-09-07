@@ -55,6 +55,7 @@ from .models import (
     VisualContainerItem,
     VisualContainerPhoto,
     normalize_thread_kind,
+    stock_category_grouped_choices,
 )
 
 MAX_CABINETS = 40
@@ -917,6 +918,14 @@ def visual_warehouse_view(request):
                 {"value": v, "label": lab}
                 for v, lab in VisualContainerItem.TOOL_CATEGORY_CHOICES
                 if v
+            ],
+            "tool_category_groups": [
+                {
+                    "code": code,
+                    "label": title,
+                    "items": [{"value": k, "label": lab} for k, lab in items],
+                }
+                for code, title, items in stock_category_grouped_choices()
             ],
             "end_mill_types": [{"value": v, "label": lab} for v, lab in END_MILL_TYPES],
             "indexable_mill_cutter_types": [{"value": v, "label": lab} for v, lab in INDEXABLE_MILL_CUTTER_TYPES],

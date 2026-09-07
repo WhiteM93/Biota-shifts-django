@@ -48,6 +48,9 @@
   {% biota_icon "nav.inventory" %}
 </a>
 {% endif %}
+{% if biota_nav.inventory_types %}
+<a href="{% url 'inventory_types' %}" class="{% if request.resolver_match.url_name == 'inventory_types' %}active{% endif %}" title="Типы склада">Типы склада</a>
+{% endif %}
 {% if biota_nav.visual_warehouse %}
 <a href="{% url 'visual_warehouse' %}" class="{% if request.resolver_match.url_name == 'visual_warehouse' or request.resolver_match.url_name == 'visual_warehouse_api_cabinets' or request.resolver_match.url_name == 'visual_warehouse_api_cabinet_detail' or request.resolver_match.url_name == 'visual_warehouse_api_container_upsert' or request.resolver_match.url_name == 'visual_warehouse_api_container_detail' or request.resolver_match.url_name == 'visual_warehouse_api_item_upsert' or request.resolver_match.url_name == 'visual_warehouse_api_item_delete' %}active{% endif %}" title="Визуальный склад">Виз. склад</a>
 {% endif %}
