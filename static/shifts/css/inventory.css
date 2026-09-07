@@ -795,7 +795,7 @@ html[data-theme="dawn"] .inv-history-open-block {
   border-radius: 8px;
   background: var(--bio-surface-panel);
   box-shadow: var(--bio-filter-shadow);
-  overflow: visible;
+  overflow: hidden;
 }
 
 .inv-stock-sidebar {
@@ -990,6 +990,59 @@ html[data-theme="dawn"] .inv-history-open-block {
 .inv-page--stock .inv-stock-grid td.diameter-col {
   font-size: 1em;
   font-weight: 700;
+}
+
+.inv-page--stock .inv-stock-grid th.address-col,
+.inv-page--stock .inv-stock-grid td.address-col {
+  width: 5.2rem;
+  min-width: 4.8rem;
+  max-width: 6.5rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.inv-addr-popover {
+  position: fixed;
+  z-index: 12000;
+  width: min(300px, calc(100vw - 16px));
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--bio-filter-border, #3a4558);
+  background: var(--bio-surface-panel, #1a2230);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inv-addr-popover__row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+
+.inv-addr-popover__row label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bio-field-label, #9bb0d8);
+}
+
+.inv-addr-popover__row select {
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+.inv-addr-popover__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 2px;
 }
 
 .inv-page--stock .inv-stock-grid td.inv-stock-wm-cell {

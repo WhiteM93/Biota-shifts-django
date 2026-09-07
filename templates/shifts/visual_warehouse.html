@@ -51,6 +51,11 @@
       <div class="vw-form-scroll">
         <input type="hidden" class="js-vw-cab-id" value="">
         <label class="vw-row">
+          <span class="vw-row-label">Буква</span>
+          <input type="text" class="vw-control js-vw-cab-code" maxlength="8" autocomplete="off" placeholder="A или А">
+        </label>
+        <p class="vw-hint-inline">Буква латиницей или кириллицей; входит в адрес как A-01-02</p>
+        <label class="vw-row">
           <span class="vw-row-label">Тип</span>
           <select class="vw-control js-vw-cab-kind">
             <option value="cabinet">Шкаф</option>
@@ -72,7 +77,7 @@
             <input type="number" class="vw-control js-vw-cab-columns" min="1" max="12" value="4">
           </label>
         </div>
-        <p class="vw-hint-inline js-vw-cab-kind-hint">Шкаф — с дверцами. Стеллаж — открытый. Тумба — ящики с ячейками.</p>
+        <p class="vw-hint-inline js-vw-cab-kind-hint">Шкаф — с дверцами. Стеллаж — открытый. Тумба — ящики с ячейками. Полки нумеруются снизу вверх: 01… Адрес: буква-полка-место.</p>
         <label class="vw-row">
           <span class="vw-row-label">Примечание</span>
           <input type="text" class="vw-control js-vw-cab-notes" maxlength="300" autocomplete="off">
@@ -131,6 +136,14 @@
             <textarea class="vw-control js-vw-cont-label" maxlength="120" rows="2" autocomplete="off" placeholder="Фрезы 0–1"></textarea>
           </label>
           <p class="vw-hint-inline">Enter — новая строка. Без Enter — одна строка, шрифт подгонится.</p>
+          <label class="vw-row">
+            <span class="vw-row-label">Адрес</span>
+            <div class="vw-address-row">
+              <input type="text" class="vw-control js-vw-cont-address" maxlength="32" autocomplete="off" placeholder="A-01-02">
+              <button type="button" class="vw-btn-ghost js-vw-cont-address-suggest" title="Подставить буква+полка+место">Авто</button>
+            </div>
+          </label>
+          <p class="vw-hint-inline js-vw-cont-address-hint">Формат: буква-полка-место (например A-01-02). Полка снизу вверх (01 — нижняя), место слева направо.</p>
           <div class="vw-row">
             <span class="vw-row-label">Цвет</span>
             <div class="vw-color-row">

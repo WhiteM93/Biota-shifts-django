@@ -230,6 +230,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table inv-stock-grid--all">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable">Категория</th>
         <th class="sortable">Наименование</th>
         <th class="sortable">Материал инструмента</th>
@@ -242,6 +243,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.get_category_display }}">{{ t.get_category_display }}</td>
         <td data-sort="{{ t.name }}">{{ t.name }}</td>
         <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
@@ -266,7 +268,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}7{% else %}6{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}8{% else %}7{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -274,6 +276,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable">Тип фрезы</th>
         <th class="sortable">D, мм</th>
         <th class="sortable hint-cell" data-hint="Радиус инструмента">R, мм</th>
@@ -291,6 +294,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.end_mill_spec.get_mill_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="mill_type" data-type="select" data-value="{{ t.end_mill_spec.mill_type|default:'' }}"{% endif %}>{{ t.end_mill_spec.get_mill_type_display|default:"-" }}</td>
         <td data-sort="{{ t.end_mill_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="em_diameter_mm" data-type="number" data-value="{{ t.end_mill_spec.diameter_mm|default:'' }}"{% endif %}>
           {% if t.end_mill_spec.diameter_mm %}Ø{{ t.end_mill_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}
@@ -322,7 +326,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}12{% else %}11{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}13{% else %}12{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -331,6 +335,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable hint-cell" data-hint="Группа корпусного инструмента (фрезы со сменными пластинами и т.п.)">Семейство</th>
         <th class="sortable hint-cell" data-hint="Тип фрезы со сменными пластинами">Тип</th>
         <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
@@ -351,6 +356,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_family_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_family" data-type="select" data-value="{{ t.body_tool_spec.family|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_family_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
@@ -381,7 +387,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}15{% else %}14{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}16{% else %}15{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -389,6 +395,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable hint-cell" data-hint="Группа корпусного инструмента (фрезы со сменными пластинами и т.п.)">Семейство</th>
         <th class="sortable hint-cell" data-hint="Тип фрезы со сменными пластинами">Тип</th>
         <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
@@ -408,6 +415,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_family_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_family" data-type="select" data-value="{{ t.body_tool_spec.family|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_family_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
@@ -437,7 +445,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}14{% else %}13{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}15{% else %}14{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -445,6 +453,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable hint-cell" data-hint="Группа корпусного инструмента (фрезы со сменными пластинами и т.п.)">Семейство</th>
         <th class="sortable hint-cell" data-hint="Тип фрезы со сменными пластинами">Тип</th>
         <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
@@ -465,6 +474,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_family_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_family" data-type="select" data-value="{{ t.body_tool_spec.family|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_family_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
@@ -495,7 +505,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}15{% else %}14{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}16{% else %}15{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -503,6 +513,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable hint-cell" data-hint="Группа корпусного инструмента (фрезы со сменными пластинами и т.п.)">Семейство</th>
         <th class="sortable hint-cell" data-hint="Тип фрезы со сменными пластинами">Тип</th>
         <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
@@ -524,6 +535,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_family_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_family" data-type="select" data-value="{{ t.body_tool_spec.family|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_family_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
@@ -555,7 +567,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}16{% else %}15{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}17{% else %}16{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -563,6 +575,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable hint-cell" data-hint="Группа корпусного инструмента (фрезы со сменными пластинами и т.п.)">Семейство</th>
         <th class="sortable hint-cell" data-hint="Тип фрезы со сменными пластинами">Тип</th>
         <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
@@ -580,6 +593,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_family_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_family" data-type="select" data-value="{{ t.body_tool_spec.family|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_family_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
@@ -607,7 +621,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}12{% else %}11{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}13{% else %}12{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -615,6 +629,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
         <th class="sortable hint-cell" data-hint="Тип хвостовика: МТ3, МТ4, Weldon или цилиндрический">Хвостовик</th>
         <th class="sortable hint-cell" data-hint="Диаметр фрезы">ØD, мм</th>
@@ -631,6 +646,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_shank_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_shank_type" data-type="select" data-value="{{ t.body_tool_spec.shank_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_shank_type_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="bt_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.diameter_mm|default:'' }}"{% endif %}>
@@ -657,7 +673,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}11{% else %}10{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}12{% else %}11{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -665,6 +681,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
         <th class="sortable hint-cell" data-hint="Диаметр фрезы">ØD, мм</th>
         <th class="sortable hint-cell" data-hint="Диаметр хвостовика или посадки">d, мм</th>
@@ -680,6 +697,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="bt_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.diameter_mm|default:'' }}"{% endif %}>
           {% if t.body_tool_spec.diameter_mm %}Ø{{ t.body_tool_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}
@@ -705,7 +723,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}11{% else %}10{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -713,6 +731,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable hint-cell" data-hint="Группа корпусного инструмента (фрезы со сменными пластинами и т.п.)">Семейство</th>
         <th class="sortable hint-cell" data-hint="Тип фрезы со сменными пластинами">Тип</th>
         <th class="sortable hint-cell" data-hint="Диаметр фрезы">ØD, мм</th>
@@ -736,6 +755,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_family_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_family" data-type="select" data-value="{{ t.body_tool_spec.family|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_family_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="bt_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.diameter_mm|default:'' }}"{% endif %}>
@@ -769,7 +789,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}{% if filters.body_cutter == 'face' %}14{% else %}16{% endif %}{% else %}{% if filters.body_cutter == 'face' %}13{% else %}15{% endif %}{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}{% if filters.body_cutter == 'face' %}15{% else %}17{% endif %}{% else %}{% if filters.body_cutter == 'face' %}14{% else %}16{% endif %}{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -778,6 +798,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable">Размер</th>
         <th class="sortable hint-cell" data-hint="Стандартная или нестандартная резьба">Тип резьбы</th>
         <th class="sortable">Стандарт</th>
@@ -798,6 +819,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.tap_spec.size_label|default:'-' }}" class="tap-size-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="size_label" data-type="text" data-value="{{ t.tap_spec.size_label|default:'' }}"{% endif %}>{{ t.tap_spec.size_label|default:"-" }}</td>
         <td data-sort="{{ t.tap_spec.get_thread_kind_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="thread_kind" data-type="select" data-value="{{ t.tap_spec.thread_kind|default:'' }}"{% endif %}>{{ t.tap_spec.get_thread_kind_display|default:"-" }}</td>
         <td data-sort="{{ t.tap_spec.get_thread_standard_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="thread_standard" data-type="select" data-value="{{ t.tap_spec.thread_standard|default:'' }}"{% endif %}>{{ t.tap_spec.get_thread_standard_display|default:"-" }}</td>
@@ -830,7 +852,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}15{% else %}14{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}16{% else %}15{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -838,6 +860,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable">D, мм</th>
         <th class="sortable">L, мм</th>
         <th class="sortable">Угол, °</th>
@@ -852,6 +875,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.center_drill_spec.diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cd_diameter_mm" data-type="number" data-value="{{ t.center_drill_spec.diameter_mm|default:'' }}"{% endif %}>{% if t.center_drill_spec.diameter_mm is not None %}{{ t.center_drill_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.center_drill_spec.overall_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cd_overall_length_mm" data-type="number" data-value="{{ t.center_drill_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.center_drill_spec.overall_length_mm is not None %}{{ t.center_drill_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.center_drill_spec.angle_deg|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cd_angle_deg" data-type="select" data-value="{{ t.center_drill_spec.angle_deg|default:'' }}"{% endif %}>{{ t.center_drill_spec.angle_deg|default:"-" }}</td>
@@ -878,7 +902,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}9{% else %}8{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -886,6 +910,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable">Тип</th>
         <th class="sortable">D, мм</th>
         <th class="sortable">Угол, °</th>
@@ -903,6 +928,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.countersink_spec.get_countersink_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cs_type" data-type="select" data-value="{{ t.countersink_spec.countersink_type|default:'' }}"{% endif %}>{{ t.countersink_spec.get_countersink_type_display|default:"-" }}</td>
         <td data-sort="{{ t.countersink_spec.diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cs_diameter_mm" data-type="number" data-value="{{ t.countersink_spec.diameter_mm|default:'' }}"{% endif %}>{% if t.countersink_spec.diameter_mm is not None %}{{ t.countersink_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.countersink_spec.angle_deg|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cs_angle_deg" data-type="select" data-value="{{ t.countersink_spec.angle_deg|default:'' }}"{% endif %}>{{ t.countersink_spec.angle_deg|default:"-" }}</td>
@@ -932,7 +958,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}12{% else %}11{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}13{% else %}12{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -941,6 +967,7 @@
   <table class="data-grid inv-stock-grid inv-stock-grid--insert js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable" title="{{ tips.family }}">Семейство</th>
         <th class="sortable" title="{{ tips.shape }}">Форма</th>
         <th class="sortable insert-code-col" title="{{ tips.edge_l }}">L</th>
@@ -957,6 +984,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.insert_spec.milling_family|default:'-' }}" title="{{ t.insert_spec.milling_family_cell_title }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_family" data-type="select" data-value="{{ t.insert_spec.milling_family|default:'' }}"{% endif %}>{{ t.insert_spec.milling_family|default:"-"|upper }}</td>
         <td data-sort="{{ t.insert_spec.insert_shape|default:'-' }}" title="{{ t.insert_spec.insert_shape_cell_title }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_shape" data-type="select" data-value="{{ t.insert_spec.insert_shape|default:'' }}"{% endif %}>{{ t.insert_spec.insert_shape|default:"-" }}</td>
         <td class="insert-code-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.insert_spec.cutting_edge_length_code|default:'-' }}" title="{{ t.insert_spec.cutting_edge_length_cell_title }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="ins_edge_code" data-type="select" data-value="{{ t.insert_spec.cutting_edge_length_code|default:'' }}"{% endif %}>{{ t.insert_spec.cutting_edge_length_code|default:"-" }}</td>
@@ -989,7 +1017,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}11{% else %}10{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}12{% else %}11{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -998,6 +1026,7 @@
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable">D, мм</th>
         <th class="sortable">L, мм</th>
         <th class="sortable">Lc, мм</th>
@@ -1013,6 +1042,7 @@
     <tbody>
       {% for t in tool_items %}
       <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.drill_spec.diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="dr_diameter_mm" data-type="number" data-value="{{ t.drill_spec.diameter_mm|default:'' }}"{% endif %}>{% if t.drill_spec.diameter_mm is not None %}{{ t.drill_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.drill_spec.overall_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="dr_overall_length_mm" data-type="number" data-value="{{ t.drill_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.drill_spec.overall_length_mm is not None %}{{ t.drill_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.drill_spec.cutting_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="dr_cutting_length_mm" data-type="number" data-value="{{ t.drill_spec.cutting_length_mm|default:'' }}"{% endif %}>{% if t.drill_spec.cutting_length_mm is not None %}{{ t.drill_spec.cutting_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
@@ -1040,7 +1070,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}11{% else %}10{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -1048,6 +1078,7 @@
   <table class="data-grid inv-stock-grid inv-stock-grid--collet js-sortable-table">
     <thead>
       <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable">Тип</th>
         <th class="sortable">ER</th>
         <th class="sortable">Зажим / Ø внутр.</th>
@@ -1088,7 +1119,7 @@
       </tr>
       {% endwith %}
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}9{% else %}8{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -3722,7 +3753,8 @@
   "collet_er_g_inner_diameters": [{% for key, label in collet_er_g_inner_diameters %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "collet_thread_standards": [{% for key, label in collet_thread_standards %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "collet_threading_series": [{% for key, label in collet_threading_series %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
-  "collet_threading_use": [{% for key, label in collet_threading_use %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
+  "collet_threading_use": [{% for key, label in collet_threading_use %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "warehouse_locations_url": "{% url 'inventory_api_warehouse_locations' %}"
 }</script>
 <script src="{% static 'shifts/js/inventory.js' %}?v={{ static_asset_version }}" defer></script>
 {% endblock %}

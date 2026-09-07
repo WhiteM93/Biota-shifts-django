@@ -287,6 +287,13 @@ class ToolItem(models.Model):
     deleted_by = models.CharField(max_length=120, blank=True, verbose_name="Удалил")
     quantity = models.PositiveIntegerField(default=0, verbose_name="Количество")
     notes = models.CharField(max_length=300, blank=True, verbose_name="Примечание")
+    warehouse_address = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        verbose_name="Адрес",
+        help_text="Зона-полка-место, например A-01-02",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -3020,6 +3027,13 @@ class VisualCabinet(models.Model):
         (KIND_DRAWER_CHEST, "Тумба с ящиками"),
     )
 
+    code = models.CharField(
+        max_length=8,
+        blank=True,
+        default="",
+        verbose_name="Буква / код",
+        help_text="Буква мебели для адреса: A, B, А, Б…",
+    )
     name = models.CharField(max_length=120, verbose_name="Название")
     kind = models.CharField(
         max_length=16,
@@ -3036,12 +3050,13 @@ class VisualCabinet(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
 
     class Meta:
-        ordering = ("sort_order", "name", "id")
+        ordering = ("sort_order", "code", "name", "id")
         verbose_name = "Визуальный шкаф"
         verbose_name_plural = "Визуальные шкафы"
 
     def __str__(self) -> str:
-        return self.name
+        code = (self.code or "").strip()
+        return f"{code} — {self.name}" if code else self.name
 
 
 class VisualContainer(models.Model):
@@ -3078,7 +3093,7 @@ class VisualContainer(models.Model):
         default=KIND_BIN,
         verbose_name="Тип",
     )
-    shelf = models.PositiveSmallIntegerField(verbose_name="Полка (сверху = 1)")
+    shelf = models.PositiveSmallIntegerField(verbose_name="Полка (сверху = 1, отображение снизу вверх)")
     stack = models.PositiveSmallIntegerField(
         default=1,
         verbose_name="Слой на полке (1 = верхний)",
@@ -3096,6 +3111,13 @@ class VisualContainer(models.Model):
     )
     label = models.CharField(max_length=120, verbose_name="Подпись")
     color = models.CharField(max_length=7, blank=True, default="#e74c3c", verbose_name="Цвет этикетки")
+    address = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        verbose_name="Адрес",
+        help_text="Зона-полка-место, например A-01-02",
+    )
     notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
     last_audited_at = models.DateTimeField(null=True, blank=True, verbose_name="Последняя инвентаризация")
     last_audited_by = models.CharField(max_length=120, blank=True, default="", verbose_name="Кто проверял")

@@ -2682,6 +2682,7 @@ var INV = (function () {
     if (field === "em_diameter_mm") return "Ø" + v.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
     if (field === "bt_diameter_mm") return "Ø" + v.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
     if (field === "quantity") return "<strong>" + escapeHtml(v) + "</strong>";
+    if (field === "warehouse_address") return escapeHtml(v || "-");
     return escapeHtml(v.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1"));
   }
 
@@ -2963,6 +2964,201 @@ var INV = (function () {
     }, 0);
   }
 
+  var warehouseLocationsCache = null;
+  var warehouseLocationsPromise = null;
+
+  function loadWarehouseLocations() {
+    if (warehouseLocationsCache) {
+      return Promise.resolve(warehouseLocationsCache);
+    }
+    if (warehouseLocationsPromise) return warehouseLocationsPromise;
+    var url = (INV && INV.warehouse_locations_url) || "/inventory/api/warehouse-locations/";
+    warehouseLocationsPromise = fetch(url, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin",
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || !data.ok) throw new Error((data && data.error) || "Не удалось загрузить адреса");
+        warehouseLocationsCache = {
+          furniture: data.furniture || [],
+          places: data.places || [],
+        };
+        return warehouseLocationsCache;
+      })
+      .catch(function (err) {
+        warehouseLocationsPromise = null;
+        throw err;
+      });
+    return warehouseLocationsPromise;
+  }
+
+  function placeOptionLabel(p) {
+    var bits = [p.place_label || "?"];
+    if (p.label) bits.push(p.label);
+    else bits.push(p.kind_label || "Место");
+    if (p.furniture_name) bits.push(p.furniture_name);
+    else if (p.cabinet_name) bits.push(p.cabinet_name);
+    return bits.join(" · ");
+  }
+
+  function fillSelect(sel, options, selected) {
+    sel.innerHTML = "";
+    options.forEach(function (opt) {
+      var o = document.createElement("option");
+      o.value = opt.value;
+      o.textContent = opt.label;
+      if (String(opt.value) === String(selected)) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+
+  function activateWarehouseAddressCell(cell, current) {
+    if (activeCell === cell) return;
+    if (activeCell) return;
+    activeCell = cell;
+    cell.classList.add("is-editing-address");
+    cell.innerHTML = '<span class="muted">…</span>';
+
+    loadWarehouseLocations()
+      .then(function (catalog) {
+        if (activeCell !== cell) return;
+        var furniture = (catalog.furniture || []).slice().sort(function (a, b) {
+          return (a.sort_order || 0) - (b.sort_order || 0)
+            || String(a.code || "").localeCompare(String(b.code || ""), "ru")
+            || String(a.name || "").localeCompare(String(b.name || ""), "ru");
+        });
+        var places = catalog.places || [];
+
+        var pop = document.createElement("div");
+        pop.className = "inv-addr-popover";
+        pop.innerHTML =
+          '<div class="inv-addr-popover__row"><label>Мебель</label><select class="js-addr-furniture"></select></div>' +
+          '<div class="inv-addr-popover__row"><label>Полка</label><select class="js-addr-shelf"></select></div>' +
+          '<div class="inv-addr-popover__row"><label>Место</label><select class="js-addr-place"></select></div>' +
+          '<div class="inv-addr-popover__actions">' +
+          '<button type="button" class="btn btn-sm btn-ghost js-addr-clear">Очистить</button>' +
+          '<button type="button" class="btn btn-sm btn-ghost js-addr-cancel">Отмена</button>' +
+          '<button type="button" class="btn btn-sm btn-primary js-addr-save">OK</button>' +
+          "</div>";
+        document.body.appendChild(pop);
+
+        var furnitureSel = pop.querySelector(".js-addr-furniture");
+        var shelfSel = pop.querySelector(".js-addr-shelf");
+        var placeSel = pop.querySelector(".js-addr-place");
+
+        var cur = (current || "").trim().toUpperCase();
+        var curPlace = places.find(function (p) { return String(p.address || "").toUpperCase() === cur; }) || null;
+        var initFurniture = curPlace
+          ? String(curPlace.furniture_id || "")
+          : (furniture[0] ? String(furniture[0].id) : "");
+        var initShelf = curPlace ? String(curPlace.shelf_label || "") : "";
+        var initAddr = curPlace ? String(curPlace.address || "") : "";
+
+        function placesFor(furnitureId, shelfLabel) {
+          return places.filter(function (p) {
+            if (furnitureId && String(p.furniture_id) !== String(furnitureId)) return false;
+            if (shelfLabel && String(p.shelf_label) !== String(shelfLabel)) return false;
+            return true;
+          });
+        }
+
+        function syncShelves(keepShelf) {
+          var fid = furnitureSel.value;
+          var shelves = [];
+          var seen = {};
+          placesFor(fid, "").forEach(function (p) {
+            var sl = p.shelf_label;
+            if (!sl || seen[sl]) return;
+            seen[sl] = true;
+            shelves.push({ value: sl, label: sl });
+          });
+          shelves.sort(function (a, b) { return String(a.value).localeCompare(String(b.value)); });
+          var want = keepShelf && seen[keepShelf] ? keepShelf : (shelves[0] ? shelves[0].value : "");
+          fillSelect(shelfSel, shelves.length ? shelves : [{ value: "", label: "—" }], want);
+          syncPlaces(initAddr);
+          initAddr = "";
+        }
+
+        function syncPlaces(keepAddr) {
+          var list = placesFor(furnitureSel.value, shelfSel.value);
+          var opts = list.map(function (p) {
+            return { value: p.address, label: placeOptionLabel(p) };
+          });
+          if (!opts.length) opts = [{ value: "", label: "Нет мест — создайте в визуальном складе" }];
+          var want = keepAddr && list.some(function (p) { return p.address === keepAddr; })
+            ? keepAddr
+            : (opts[0] ? opts[0].value : "");
+          fillSelect(placeSel, opts, want);
+        }
+
+        fillSelect(
+          furnitureSel,
+          furniture.length
+            ? furniture.map(function (f) {
+                var code = (f.code || "?").toString();
+                return { value: String(f.id), label: code + (f.name ? " — " + f.name : "") };
+              })
+            : [{ value: "", label: "Нет мебели" }],
+          initFurniture
+        );
+        syncShelves(initShelf);
+
+        furnitureSel.addEventListener("change", function () { syncShelves(""); });
+        shelfSel.addEventListener("change", function () { syncPlaces(""); });
+
+        function closePop(restore) {
+          if (pop.parentNode) pop.parentNode.removeChild(pop);
+          document.removeEventListener("mousedown", onDocDown, true);
+          document.removeEventListener("keydown", onKey);
+          cell.classList.remove("is-editing-address");
+          if (restore) {
+            cell.innerHTML = formatCell("warehouse_address", current);
+            activeCell = null;
+          }
+        }
+
+        function onDocDown(e) {
+          if (pop.contains(e.target) || cell.contains(e.target)) return;
+          closePop(true);
+        }
+        function onKey(e) {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            closePop(true);
+          }
+        }
+
+        pop.querySelector(".js-addr-cancel").addEventListener("click", function () { closePop(true); });
+        pop.querySelector(".js-addr-clear").addEventListener("click", function () {
+          closePop(false);
+          saveCell(cell, "", null);
+        });
+        pop.querySelector(".js-addr-save").addEventListener("click", function () {
+          var val = (placeSel.value || "").trim().toUpperCase();
+          if (!val) {
+            alert("Выберите место на полке.");
+            return;
+          }
+          closePop(false);
+          saveCell(cell, val, null);
+        });
+
+        var rect = cell.getBoundingClientRect();
+        pop.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 320)) + "px";
+        pop.style.top = Math.min(rect.bottom + 4, window.innerHeight - 220) + "px";
+        document.addEventListener("mousedown", onDocDown, true);
+        document.addEventListener("keydown", onKey);
+        furnitureSel.focus();
+      })
+      .catch(function (err) {
+        cell.classList.remove("is-editing-address");
+        cell.innerHTML = formatCell("warehouse_address", current);
+        activeCell = null;
+        alert(err.message || "Не удалось загрузить адреса склада");
+      });
+  }
+
   function activate(cell) {
     if (activeCell === cell) return;
     if (activeCell) return;
@@ -2975,6 +3171,10 @@ var INV = (function () {
     }
     if (field === "work_material") {
       activateWorkMaterialCell(cell, current);
+      return;
+    }
+    if (field === "warehouse_address" || type === "address") {
+      activateWarehouseAddressCell(cell, current);
       return;
     }
     var editor = (type === "select") ? buildSelect(field, current) : document.createElement("input");

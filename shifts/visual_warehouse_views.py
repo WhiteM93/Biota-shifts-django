@@ -57,6 +57,17 @@ from .models import (
     normalize_thread_kind,
     stock_category_grouped_choices,
 )
+from .visual_warehouse_address import (
+    cabinet_code_of,
+    normalize_address,
+    normalize_furniture_code,
+    next_available_furniture_code,
+    pad2,
+    place_display_num,
+    resolve_container_address,
+    shelf_display_num,
+    suggested_address,
+)
 
 MAX_CABINETS = 40
 MAX_SHELVES = 20
@@ -739,6 +750,10 @@ def _serialize_container(
         "label": c.label,
         "color": color,
         "notes": c.notes or "",
+        "address": resolve_container_address(c, prefer_stored=True),
+        "suggested_address": "",
+        "shelf_label": "",
+        "place_label": place_display_num(c.column),
         "items_count": getattr(c, "items_count", None),
         "last_audited_at": _fmt_dt(getattr(c, "last_audited_at", None)),
         "last_audited_by": (getattr(c, "last_audited_by", None) or ""),
@@ -748,6 +763,15 @@ def _serialize_container(
             else ""
         ),
     }
+    cab = getattr(c, "cabinet", None)
+    if cab is not None:
+        data["shelf_label"] = shelf_display_num(shelves=cab.shelves, shelf_top1=c.shelf)
+        data["suggested_address"] = suggested_address(cab, shelf=c.shelf, column=c.column)
+        if not (getattr(c, "address", None) or "").strip():
+            data["address"] = data["suggested_address"]
+    else:
+        data["shelf_label"] = pad2(c.shelf)
+        data["suggested_address"] = data["address"]
     data.update(_photo_summary_fields(c))
     if data["items_count"] is None:
         data["items_count"] = c.items.count()
@@ -844,9 +868,33 @@ def _ensure_organizer_children(org: VisualContainer) -> None:
             ch.save(update_fields=["label", "updated_at"])
 
 
+def _refresh_container_addresses_for_cabinet(
+    cab: VisualCabinet, *, old_furniture_code: str = ""
+) -> None:
+    """Обновляет адреса контейнеров, если они совпадали со старым авто-адресом."""
+    furniture_code = cabinet_code_of(cab)
+    for cont in cab.containers.filter(parent__isnull=True):
+        suggested_new = suggested_address(
+            cab, shelf=cont.shelf, column=cont.column, furniture_code=furniture_code
+        )
+        stored = normalize_address(cont.address or "")
+        if not stored:
+            cont.address = suggested_new
+            cont.save(update_fields=["address", "updated_at"])
+            continue
+        if old_furniture_code:
+            suggested_old = suggested_address(
+                cab, shelf=cont.shelf, column=cont.column, furniture_code=old_furniture_code
+            )
+            if stored == normalize_address(suggested_old):
+                cont.address = suggested_new
+                cont.save(update_fields=["address", "updated_at"])
+
+
 def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> dict:
     data = {
         "id": cab.id,
+        "code": cabinet_code_of(cab),
         "name": cab.name,
         "kind": _normalize_cabinet_kind(getattr(cab, "kind", None)),
         "shelves": cab.shelves,
@@ -959,12 +1007,19 @@ def visual_warehouse_api_cabinets(request):
             .prefetch_related(
                 Prefetch(
                     "containers",
-                    queryset=VisualContainer.objects.annotate(items_count=Count("items")),
+                    queryset=VisualContainer.objects.select_related("cabinet").annotate(
+                        items_count=Count("items")
+                    ),
                 )
             )
             .all()
         )
-        return JsonResponse({"ok": True, "cabinets": [_serialize_cabinet(c) for c in qs]})
+        return JsonResponse(
+            {
+                "ok": True,
+                "cabinets": [_serialize_cabinet(c) for c in qs],
+            }
+        )
 
     return _cabinets_create(request)
 
@@ -984,14 +1039,23 @@ def _cabinets_create(request):
     shelves = _clamp_int(body.get("shelves"), 4, 1, MAX_SHELVES)
     columns = _clamp_int(body.get("columns"), 3, 1, MAX_COLUMNS)
     notes = str(body.get("notes") or "").strip()[:300]
+    code = normalize_furniture_code(body.get("code"))
+    if not code:
+        code = next_available_furniture_code()
+    elif VisualCabinet.objects.filter(code__iexact=code).exists():
+        return _err("Мебель с таким кодом уже есть")
+    sort_order = _clamp_int(body.get("sort_order"), 0, 0, 9999)
     cab = VisualCabinet.objects.create(
+        code=code,
         name=name,
         kind=kind,
         shelves=shelves,
         columns=columns,
         notes=notes,
+        sort_order=sort_order,
         created_by=_username(request),
     )
+    cab = VisualCabinet.objects.get(pk=cab.pk)
     return JsonResponse({"ok": True, "cabinet": _serialize_cabinet(cab)}, status=201)
 
 
@@ -1003,7 +1067,9 @@ def visual_warehouse_api_cabinet_detail(request, pk: int):
         VisualCabinet.objects.prefetch_related(
             Prefetch(
                 "containers",
-                queryset=VisualContainer.objects.annotate(items_count=Count("items")),
+                queryset=VisualContainer.objects.select_related("cabinet").annotate(
+                    items_count=Count("items")
+                ),
             )
         ),
         pk=pk,
@@ -1022,11 +1088,22 @@ def _cabinet_mutate(request, cab: VisualCabinet):
     body = _json_body(request)
     if body is None:
         return _err("Некорректный JSON")
+    old_furniture_code = cabinet_code_of(cab)
+    code_changed = False
     if "name" in body:
         name = str(body.get("name") or "").strip()[:120]
         if not name:
             return _err("Укажите название")
         cab.name = name
+    if "code" in body:
+        code = normalize_furniture_code(body.get("code"))
+        if not code:
+            return _err("Некорректный код мебели")
+        if VisualCabinet.objects.filter(code__iexact=code).exclude(pk=cab.pk).exists():
+            return _err("Мебель с таким кодом уже есть")
+        if code.upper() != (cab.code or "").strip().upper():
+            code_changed = True
+        cab.code = code
     if "kind" in body:
         new_kind = _normalize_cabinet_kind(body.get("kind"))
         if new_kind != VisualCabinet.KIND_RACK:
@@ -1059,10 +1136,15 @@ def _cabinet_mutate(request, cab: VisualCabinet):
     if "sort_order" in body:
         cab.sort_order = _clamp_int(body.get("sort_order"), cab.sort_order, 0, 9999)
     cab.save()
+    if code_changed or "shelves" in body:
+        cab = VisualCabinet.objects.get(pk=cab.pk)
+        _refresh_container_addresses_for_cabinet(cab, old_furniture_code=old_furniture_code)
     cab = VisualCabinet.objects.prefetch_related(
         Prefetch(
             "containers",
-            queryset=VisualContainer.objects.annotate(items_count=Count("items")),
+            queryset=VisualContainer.objects.select_related("cabinet").annotate(
+                items_count=Count("items")
+            ),
         )
     ).get(pk=cab.pk)
     return JsonResponse({"ok": True, "cabinet": _serialize_cabinet(cab)})
@@ -1095,6 +1177,8 @@ def visual_warehouse_api_container_upsert(request):
     notes = str(body.get("notes") or "").strip()[:300]
     cont_kind = _normalize_container_kind(body.get("kind"))
     cab_kind = _normalize_cabinet_kind(cab.kind)
+    address_raw = body.get("address")
+    address = normalize_address(address_raw) if address_raw is not None else None
     parent_id = body.get("parent_id")
     parent = None
     if parent_id:
@@ -1173,6 +1257,10 @@ def visual_warehouse_api_container_upsert(request):
         cont.label = label
         cont.color = color
         cont.notes = notes
+        if address is not None:
+            cont.address = address
+        elif not (cont.address or "").strip() and not parent:
+            cont.address = suggested_address(cab, shelf=shelf, column=column)
         if cont_kind == VisualContainer.KIND_ORGANIZER:
             cont.inner_tiers = inner_tiers
             cont.inner_columns = inner_columns
@@ -1180,6 +1268,9 @@ def visual_warehouse_api_container_upsert(request):
         if cont_kind == VisualContainer.KIND_ORGANIZER:
             _ensure_organizer_children(cont)
     else:
+        auto_addr = address if address is not None else (
+            "" if parent else suggested_address(cab, shelf=shelf, column=column)
+        )
         cont = VisualContainer.objects.create(
             cabinet=cab,
             parent=parent,
@@ -1194,11 +1285,13 @@ def visual_warehouse_api_container_upsert(request):
             label=label,
             color=color,
             notes=notes,
+            address=auto_addr,
         )
         if cont_kind == VisualContainer.KIND_ORGANIZER:
             _ensure_organizer_children(cont)
     cont = (
-        VisualContainer.objects.annotate(items_count=Count("items"))
+        VisualContainer.objects.select_related("cabinet")
+        .annotate(items_count=Count("items"))
         .prefetch_related(
             Prefetch("items", queryset=VisualContainerItem.objects.select_related("tool_item")),
             "children",
@@ -1206,7 +1299,7 @@ def visual_warehouse_api_container_upsert(request):
         .get(pk=cont.pk)
     )
     # Отдаём актуальный шкаф (columns мог вырасти)
-    cab.refresh_from_db()
+    cab = VisualCabinet.objects.get(pk=cab.pk)
     return JsonResponse({
         "ok": True,
         "container": _serialize_container(cont, with_items=True),

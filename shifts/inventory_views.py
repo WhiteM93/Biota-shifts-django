@@ -2076,6 +2076,10 @@ def inventory_view(request):
             tool.quantity = max(0, _to_int(value_raw, tool.quantity))
             tool.save(update_fields=["quantity", "updated_at"])
             common_ok = True
+        elif field == "warehouse_address":
+            tool.warehouse_address = (value_raw or "").strip().upper().replace(" ", "")[:32]
+            tool.save(update_fields=["warehouse_address", "updated_at"])
+            common_ok = True
 
         if not common_ok:
             cat = tool.category
@@ -4208,3 +4212,18 @@ def inventory_history_open_pdf(request):
     resp = HttpResponse(data, content_type="application/pdf")
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
+
+
+@biota_login_required
+@inventory_route_nav_access_required
+@require_GET
+def inventory_api_warehouse_locations(request):
+    """Мебель / полки / места визуального склада для выбора адреса позиции."""
+    from .visual_warehouse_address import build_location_catalog
+
+    data = build_location_catalog()
+    return JsonResponse({
+        "ok": True,
+        "furniture": data["furniture"],
+        "places": data["places"],
+    })
