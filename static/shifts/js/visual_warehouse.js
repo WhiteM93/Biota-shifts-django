@@ -305,8 +305,8 @@
     }
     if (modeHint) {
       modeHint.textContent = editMode
-        ? "Правка: «+» на полке — новый ящик. Клик по ящику — изменить ячейку. «Готово» — снова только просмотр содержимого."
-        : "Нажмите на ящик, чтобы увидеть список инструментов";
+        ? "Правка: «+» или пустое место — новое содержимое. Клик по ящику/зоне — изменить. «Готово» — просмотр."
+        : "Нажмите на контейнер или зону на полке, чтобы увидеть содержимое";
     }
     if (itemForm) setVisible(itemForm, editMode && canEdit);
     if (rulesBlock) setVisible(rulesBlock, editMode && canEdit);
@@ -512,8 +512,9 @@
     if (cabinetKindOf(cab) === "drawer_chest") {
       return buildDrawerBay(cab, shelf);
     }
+    var isRack = cabinetKindOf(cab) === "rack";
     var bay = document.createElement("div");
-    bay.className = "vw-bay";
+    bay.className = "vw-bay" + (isRack ? " vw-bay--rack" : "");
 
     var head = document.createElement("div");
     head.className = "vw-bay-head";
@@ -545,30 +546,55 @@
 
     var occupied = occupiedMap(cab);
 
-    order.forEach(function (col) {
-      var list = piles[String(col)].slice().sort(function (a, b) {
-        return (a.stack || 1) - (b.stack || 1);
-      });
-      var span = 1;
-      list.forEach(function (cont) {
-        span = Math.max(span, cont.col_span || 1);
-      });
-      span = Math.min(span, cols - col + 1);
+    if (isRack) {
+      // Полная сетка мест: занятые + пустые кликабельные зоны
+      for (var col = 1; col <= cols; col++) {
+        var list = (piles[String(col)] || []).slice().sort(function (a, b) {
+          return (a.stack || 1) - (b.stack || 1);
+        });
+        if (list.length) {
+          var span = 1;
+          list.forEach(function (cont) {
+            span = Math.max(span, cont.col_span || 1);
+          });
+          span = Math.min(span, cols - col + 1);
+          var pile = document.createElement("div");
+          pile.className = "vw-pile";
+          pile.style.gridColumn = col + " / span " + span;
+          list.forEach(function (cont) {
+            pile.appendChild(buildBin(cab, cont));
+          });
+          space.appendChild(pile);
+        } else if (!occupied[shelf + ":1:" + col]) {
+          space.appendChild(buildEmptyShelfCell(cab, shelf, col));
+        }
+      }
+    } else {
+      order.forEach(function (col) {
+        var list = piles[String(col)].slice().sort(function (a, b) {
+          return (a.stack || 1) - (b.stack || 1);
+        });
+        var span = 1;
+        list.forEach(function (cont) {
+          span = Math.max(span, cont.col_span || 1);
+        });
+        span = Math.min(span, cols - col + 1);
 
-      var pile = document.createElement("div");
-      pile.className = "vw-pile";
-      pile.style.gridColumn = col + " / span " + span;
-      list.forEach(function (cont) {
-        pile.appendChild(buildBin(cab, cont));
+        var pile = document.createElement("div");
+        pile.className = "vw-pile";
+        pile.style.gridColumn = col + " / span " + span;
+        list.forEach(function (cont) {
+          pile.appendChild(buildBin(cab, cont));
+        });
+        space.appendChild(pile);
       });
-      space.appendChild(pile);
-    });
 
-    if (!order.length && !editMode) {
-      var empty = document.createElement("div");
-      empty.className = "vw-bay-empty";
-      empty.textContent = "пусто";
-      space.appendChild(empty);
+      if (!order.length && !editMode) {
+        var empty = document.createElement("div");
+        empty.className = "vw-bay-empty";
+        empty.textContent = "пусто";
+        space.appendChild(empty);
+      }
     }
 
     if (editMode) {
@@ -580,27 +606,30 @@
           break;
         }
       }
-      var addBtn = document.createElement("button");
-      addBtn.type = "button";
-      addBtn.className = "vw-bay-add";
-      addBtn.textContent = "+";
-      addBtn.title = freeCol
-        ? ("Поставить ящик на полку " + shelf + ", место " + freeCol)
-        : ("Поставить ящик на полку " + shelf + " (добавить место)");
-      if (freeCol) {
-        addBtn.style.gridColumn = String(freeCol);
-      } else {
-        // полка заполнена — кнопка в конце, расширит сетку
-        addBtn.style.gridColumn = String(cols);
-        addBtn.style.opacity = "0.85";
+      // На стеллаже пустые места уже кликабельны — «+» только если полка заполнена
+      // (чтобы можно было расширить число мест через форму).
+      if (!isRack || freeCol === null) {
+        var addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "vw-bay-add";
+        addBtn.textContent = "+";
+        addBtn.title = freeCol
+          ? ((isRack ? "Добавить на полку " : "Поставить ящик на полку ") + shelf + ", место " + freeCol)
+          : ((isRack ? "Добавить на полку " : "Поставить ящик на полку ") + shelf + " (добавить место)");
+        if (freeCol) {
+          addBtn.style.gridColumn = String(freeCol);
+        } else {
+          addBtn.style.gridColumn = String(cols);
+          addBtn.style.opacity = "0.85";
+        }
+        addBtn.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          var free = findFreeOnShelf(cab, shelf);
+          openContainerForm(cab, null, free.shelf, free.stack, free.column);
+        });
+        space.appendChild(addBtn);
       }
-      addBtn.addEventListener("click", function (ev) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        var free = findFreeOnShelf(cab, shelf);
-        openContainerForm(cab, null, free.shelf, free.stack, free.column);
-      });
-      space.appendChild(addBtn);
     }
 
     bay.appendChild(space);
@@ -611,6 +640,28 @@
     bay.appendChild(ledge);
 
     return bay;
+  }
+
+  function buildEmptyShelfCell(cab, shelf, col) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "vw-shelf-empty";
+    btn.style.gridColumn = String(col);
+    btn.textContent = editMode ? "+" : "—";
+    btn.title = editMode
+      ? ("Добавить на полку " + shelf + ", место " + col)
+      : ("Полка " + shelf + ", место " + col + " — пусто");
+    btn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (editMode && canEdit) {
+        openContainerForm(cab, null, shelf, 1, col);
+      }
+    });
+    if (!editMode || !canEdit) {
+      btn.disabled = true;
+    }
+    return btn;
   }
 
   function contrastText(hex) {
@@ -834,7 +885,7 @@
     if (!kindSel) return selected || "bin";
     var allowed;
     if (isChild) allowed = ["drawer_cell"];
-    else if (cabKind === "rack") allowed = ["bin", "shelf_slot", "organizer"];
+    else if (cabKind === "rack") allowed = ["shelf_slot", "bin", "organizer"];
     else if (cabKind === "drawer_chest") allowed = ["drawer_cell", "bin"];
     else allowed = ["bin", "organizer"];
     [].forEach.call(kindSel.options, function (opt) {
@@ -875,7 +926,7 @@
         : (cont.kind === "organizer"
           ? "organizer"
           : (cont.kind === "drawer_cell" || isChild ? "drawer_cell" : "bin")))
-      : "bin";
+      : (cabKind === "rack" ? "shelf_slot" : (cabKind === "drawer_chest" ? "drawer_cell" : "bin"));
     contForm.querySelector(".js-vw-cont-form-title").textContent = cont
       ? (isChild ? "Ячейка органайзера" : containerKindLabel(contKind))
       : (cabKind === "drawer_chest"

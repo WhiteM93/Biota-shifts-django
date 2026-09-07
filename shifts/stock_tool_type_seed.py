@@ -53,6 +53,16 @@ STOCK_TOOL_TYPE_GROUPS = [
     ),
 ]
 
+# Дополнительные типы склада (без подтипов/полей — наполняются вручную в UI).
+EXTRA_STOCK_TOOL_TYPES = [
+    ("abrasives", "Абразивы", 40),
+    ("ppe", "СИЗ", 50),
+    ("tools", "Инструменты", 60),
+    ("measuring", "Измерительный инструмент", 70),
+    ("fasteners", "Крепеж/Метизы", 80),
+    ("tech-chemistry", "Техническая химия", 90),
+]
+
 
 def _choices(pairs) -> list[str]:
     return [str(lab) for _, lab in pairs if str(lab).strip()]
@@ -495,6 +505,17 @@ def seed_stock_tool_types(*, replace_fields: bool = False) -> dict[str, int]:
     body_stats = restore_body_tool_cutter_catalog(replace_fields=replace_fields)
     stats["body_subtypes"] = body_stats.get("subtypes", 0)
     stats["body_fields"] = body_stats.get("fields", 0)
+    extra = ensure_extra_stock_tool_types()
+    stats["extra_types"] = extra.get("types", 0)
+    return stats
+
+
+def ensure_extra_stock_tool_types() -> dict[str, int]:
+    """Создаёт/обновляет дополнительные типы склада (абразивы, СИЗ и т.п.)."""
+    stats = {"types": 0}
+    for code, name, sort_order in EXTRA_STOCK_TOOL_TYPES:
+        _upsert_type(code=code, name=name, sort_order=sort_order)
+        stats["types"] += 1
     return stats
 
 
