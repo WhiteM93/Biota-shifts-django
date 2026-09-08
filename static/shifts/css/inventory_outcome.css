@@ -200,7 +200,7 @@ html[data-theme="dawn"] .inv-outcome-page {
   border-bottom: 1px solid var(--io-border, rgba(148, 163, 184, 0.28));
 }
 
-.inv-outcome-tool-filters .field {
+.inv-outcome-tool-filters > .field:not(.issue-filter-chips-field):not(.issue-cat-panel) {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -226,6 +226,95 @@ html[data-theme="dawn"] .inv-outcome-page {
   border: 1.5px solid var(--bio-input-border, #c9d1e0);
   background: var(--bio-input-bg, #fff);
   color: var(--bio-input-fg, #1e293b);
+}
+
+.inv-outcome-tool-filters .issue-cat-panel,
+.inv-outcome-tool-filters .issue-filter-chips-field,
+.inv-outcome-tool-filters .issue-filter-hint {
+  grid-column: 1 / -1;
+}
+
+.inv-outcome-tool-filters .issue-cat-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px 16px;
+  align-items: end;
+}
+
+.inv-outcome-tool-filters .issue-cat-panel[hidden],
+.inv-outcome-tool-filters .issue-filter-chips-field[hidden] {
+  display: none !important;
+}
+
+.inv-outcome-tool-filters .issue-filter-chips-field > span {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.inv-outcome-tool-filters .issue-mat-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.inv-outcome-tool-filters .issue-mat-chip {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+  margin: 0;
+}
+
+.inv-outcome-tool-filters .issue-mat-chip input {
+  position: absolute;
+  inset: 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.inv-outcome-tool-filters .issue-mat-chip-face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--bio-input-border, #c9d1e0);
+  background: var(--bio-input-bg, #fff);
+  color: var(--bio-input-fg, #1e293b);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  user-select: none;
+}
+
+.inv-outcome-tool-filters .issue-mat-chip input:checked + .issue-mat-chip-face {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.28);
+  color: #134e4a;
+}
+
+.inv-outcome-tool-filters .coating-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.inv-outcome-tool-filters .issue-filter-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--io-text-muted);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
 }
 
 /* ── Форма ── */
