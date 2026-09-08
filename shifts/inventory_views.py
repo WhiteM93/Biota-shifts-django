@@ -2411,6 +2411,50 @@ def inventory_view(request):
         )
         return JsonResponse({"ok": True})
 
+    if action == "bulk_assign_warehouse_address":
+        if not can_manage_stock:
+            return JsonResponse({"ok": False, "error": "Недостаточно прав."}, status=403)
+        from .visual_warehouse_address import normalize_address
+        from .models import VisualContainer
+
+        raw_ids = request.POST.getlist("tool_ids")
+        if len(raw_ids) == 1 and "," in str(raw_ids[0]):
+            raw_ids = [p.strip() for p in str(raw_ids[0]).split(",") if p.strip()]
+        tool_ids = []
+        seen = set()
+        for raw in raw_ids:
+            tid = _to_int(raw, 0)
+            if tid and tid not in seen:
+                seen.add(tid)
+                tool_ids.append(tid)
+        if not tool_ids:
+            return JsonResponse({"ok": False, "error": "Не выбраны позиции."}, status=400)
+
+        addr = ""
+        container_id = _to_int(request.POST.get("container_id"), 0)
+        if container_id:
+            cont = (
+                VisualContainer.objects.select_related("cabinet", "parent")
+                .filter(pk=container_id)
+                .first()
+            )
+            if not cont:
+                return JsonResponse({"ok": False, "error": "Контейнер не найден."}, status=404)
+            from .visual_warehouse_views import _container_content_address
+
+            addr = normalize_address(_container_content_address(cont) or "")
+        else:
+            addr = normalize_address(request.POST.get("warehouse_address") or "")
+        if not addr:
+            return JsonResponse({"ok": False, "error": "Выберите контейнер (адрес)."}, status=400)
+
+        updated = ToolItem.objects.filter(id__in=tool_ids, is_deleted=False).update(
+            warehouse_address=addr
+        )
+        return JsonResponse(
+            {"ok": True, "updated": int(updated), "warehouse_address": addr}
+        )
+
     if action == "register_tool_material_extra":
         if not can_manage_stock:
             return JsonResponse({"ok": False, "error": "Недостаточно прав."}, status=403)
@@ -3397,7 +3441,17 @@ def inventory_view(request):
             messages.error(request, "Запись не найдена.")
         return redirect(f"{request.path}?panel=defects")
 
-    stock_req = _merge_inventory_stock_query(username, request.GET, use_saved=(panel == "stock"))
+    reset_stock_filters = panel == "stock" and (request.GET.get("reset_filters") or "").strip() == "1"
+    if reset_stock_filters and username:
+        UserInventoryStockFilterPrefs.objects.filter(username=username).delete()
+
+    stock_req = _merge_inventory_stock_query(
+        username,
+        request.GET,
+        use_saved=(panel == "stock" and not reset_stock_filters),
+    )
+    if reset_stock_filters:
+        stock_req = {"category": "", "show_all": "1"}
 
     def _sq(key: str, default: str = "") -> str:
         return (stock_req.get(key) or default).strip()
@@ -3415,7 +3469,7 @@ def inventory_view(request):
         else:
             filter_category = "end_mill"
     else:
-        filter_category = "end_mill"
+        filter_category = "" if reset_stock_filters else "end_mill"
     if filter_category:
         qs = qs.filter(category=filter_category)
 

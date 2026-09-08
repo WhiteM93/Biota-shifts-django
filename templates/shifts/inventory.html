@@ -225,6 +225,22 @@
 {% if panel == "stock" %}
 <div class="inv-stock-layout">
   <div class="inv-stock-main">
+    <header class="inv-stock-toolbar">
+      <span class="inv-stock-footer__count">Показано <strong>{{ stock_filtered_count }}</strong> из {{ stock_category_total }}</span>
+      <span class="inv-stock-footer__actions">
+        {% if can_manage_stock %}
+        <button type="button" class="btn btn-sm btn-ghost js-stock-select-toggle" aria-pressed="false">Выделить</button>
+        <span class="inv-stock-select-bar js-stock-select-bar" hidden>
+          <span class="inv-stock-select-count js-stock-select-count">Выбрано: 0</span>
+          <button type="button" class="btn btn-sm btn-ghost js-stock-select-all">Выбрать все</button>
+          <button type="button" class="btn btn-sm btn-ghost js-stock-select-none">Снять все</button>
+          <button type="button" class="btn btn-sm btn-primary js-stock-select-ok">ОК</button>
+          <button type="button" class="btn btn-sm btn-ghost js-stock-select-cancel">Отмена</button>
+        </span>
+        {% endif %}
+        <button type="button" class="btn btn-sm btn-ghost" id="inv-stock-export-csv">Экспорт CSV</button>
+      </span>
+    </header>
     <div class="table-wrap inv-stock-table-wrap">
   {% if not filters.category %}
   <table class="data-grid inv-stock-grid js-sortable-table inv-stock-grid--all">
@@ -1147,15 +1163,32 @@
   </table>
   {% endif %}
 
-    <footer class="inv-stock-footer">
-      <span class="inv-stock-footer__count">Показано <strong>{{ stock_filtered_count }}</strong> из {{ stock_category_total }}</span>
-      <span class="inv-stock-footer__actions">
-        <button type="button" class="btn btn-sm btn-ghost" id="inv-stock-export-csv">Экспорт CSV</button>
-        <a class="btn btn-sm btn-ghost" href="{% url 'inventory' %}?panel=stock">Сбросить фильтры</a>
-      </span>
-    </footer>
     </div>
   </div>
+  {% if can_manage_stock %}
+  <div class="inv-bulk-addr-modal js-bulk-addr-modal" hidden>
+    <button type="button" class="inv-bulk-addr-modal__backdrop js-bulk-addr-cancel" aria-label="Закрыть"></button>
+    <div class="inv-bulk-addr-modal__card" role="dialog" aria-modal="true" aria-labelledby="inv-bulk-addr-title">
+      <h2 id="inv-bulk-addr-title" class="inv-bulk-addr-modal__title">Куда добавить</h2>
+      <p class="inv-bulk-addr-modal__lead js-bulk-addr-lead">Выбрано позиций: 0</p>
+      <div class="inv-bulk-addr-modal__fields">
+        <label>Мебель
+          <select class="js-bulk-addr-furniture"></select>
+        </label>
+        <label>Полка
+          <select class="js-bulk-addr-shelf"></select>
+        </label>
+        <label>Место / контейнер
+          <select class="js-bulk-addr-place"></select>
+        </label>
+      </div>
+      <div class="inv-bulk-addr-modal__actions">
+        <button type="button" class="btn btn-ghost js-bulk-addr-cancel">Отмена</button>
+        <button type="button" class="btn btn-primary js-bulk-addr-save">ОК</button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
   <aside class="inv-stock-sidebar">
     <form method="get" class="inv-stock-filter" id="inventory-stock-filter-form">
   <input type="hidden" name="panel" value="stock">
@@ -1851,7 +1884,7 @@
 
       <div class="inv-filter-actions">
         <button type="submit" class="btn btn-sm js-stock-filter-apply">Применить</button>
-        <a class="btn btn-sm btn-ghost" href="{% url 'inventory' %}?panel=stock">Сбросить</a>
+        <a class="btn btn-sm btn-ghost" href="{% url 'inventory' %}?panel=stock&amp;reset_filters=1">Сбросить</a>
       </div>
     </form>
   </aside>

@@ -2591,10 +2591,12 @@ var INV = (function () {
 })();
 (function () {
   var editableCells = document.querySelectorAll(".stock-inline-edit");
-  if (!editableCells.length) return;
+  var selectToggle = document.querySelector(".js-stock-select-toggle");
+  if (!editableCells.length && !selectToggle) return;
   var csrfEl = document.querySelector('input[name="csrfmiddlewaretoken"]');
   var csrfToken = csrfEl ? csrfEl.value : "";
   var activeCell = null;
+  var stockSelectMode = false;
 
   var millTypeLabels = {};
   (INV.end_mill_types || []).forEach(function (x) { millTypeLabels[x.value] = x.label; });
@@ -3167,6 +3169,7 @@ var INV = (function () {
   }
 
   function activate(cell) {
+    if (stockSelectMode) return;
     if (activeCell === cell) return;
     if (activeCell) return;
     var field = cell.getAttribute("data-field");
@@ -3220,6 +3223,299 @@ var INV = (function () {
   editableCells.forEach(function (cell) {
     cell.addEventListener("click", function () { activate(cell); });
   });
+
+  var stockPage = document.querySelector(".inv-page--stock");
+  var selectBar = document.querySelector(".js-stock-select-bar");
+  var selectCountEl = document.querySelector(".js-stock-select-count");
+  var selectAllBtn = document.querySelector(".js-stock-select-all");
+  var selectNoneBtn = document.querySelector(".js-stock-select-none");
+  var selectOkBtn = document.querySelector(".js-stock-select-ok");
+  var selectCancelBtn = document.querySelector(".js-stock-select-cancel");
+  var bulkModal = document.querySelector(".js-bulk-addr-modal");
+
+  function stockTables() {
+    return document.querySelectorAll(".inv-stock-main table.inv-stock-grid");
+  }
+
+  function selectedToolIds() {
+    var ids = [];
+    document.querySelectorAll(".js-stock-row-check:checked").forEach(function (cb) {
+      var id = parseInt(cb.value, 10);
+      if (id) ids.push(id);
+    });
+    return ids;
+  }
+
+  function updateSelectCount() {
+    var n = selectedToolIds().length;
+    if (selectCountEl) selectCountEl.textContent = "Выбрано: " + n;
+    if (selectOkBtn) selectOkBtn.disabled = n === 0;
+  }
+
+  function injectSelectColumns() {
+    stockTables().forEach(function (table) {
+      if (table.querySelector(".stock-select-col")) return;
+      var headRow = table.querySelector("thead tr");
+      if (headRow) {
+        var th = document.createElement("th");
+        th.className = "stock-select-col";
+        th.title = "Выделить позиции";
+        th.innerHTML =
+          '<label class="stock-select-all-label" title="Выбрать все на странице">' +
+          '<input type="checkbox" class="js-stock-select-all-table" aria-label="Выбрать все">' +
+          "</label>";
+        headRow.insertBefore(th, headRow.firstChild);
+      }
+      table.querySelectorAll("tbody tr").forEach(function (tr) {
+        var addr = tr.querySelector("td.address-col[data-tool-id]");
+        var toolId = addr ? addr.getAttribute("data-tool-id") : "";
+        if (!toolId) {
+          var any = tr.querySelector("[data-tool-id]");
+          toolId = any ? any.getAttribute("data-tool-id") : "";
+        }
+        var td = document.createElement("td");
+        td.className = "stock-select-col";
+        if (toolId) {
+          td.innerHTML =
+            '<label class="stock-select-row-label">' +
+            '<input type="checkbox" class="js-stock-row-check" value="' +
+            toolId +
+            '" aria-label="Выбрать позицию">' +
+            "</label>";
+        } else {
+          td.innerHTML = "";
+        }
+        tr.insertBefore(td, tr.firstChild);
+      });
+    });
+    document.querySelectorAll(".js-stock-select-all-table").forEach(function (cb) {
+      cb.addEventListener("change", function () {
+        var table = cb.closest("table");
+        if (!table) return;
+        table.querySelectorAll(".js-stock-row-check").forEach(function (rowCb) {
+          rowCb.checked = cb.checked;
+        });
+        updateSelectCount();
+      });
+    });
+    document.querySelectorAll(".js-stock-row-check").forEach(function (cb) {
+      cb.addEventListener("change", updateSelectCount);
+    });
+  }
+
+  function removeSelectColumns() {
+    document.querySelectorAll(".stock-select-col").forEach(function (el) {
+      el.remove();
+    });
+  }
+
+  function setStockSelectMode(on) {
+    stockSelectMode = !!on;
+    if (!stockPage) return;
+    stockPage.classList.toggle("is-select-mode", stockSelectMode);
+    if (selectToggle) {
+      selectToggle.classList.toggle("is-on", stockSelectMode);
+      selectToggle.setAttribute("aria-pressed", stockSelectMode ? "true" : "false");
+      selectToggle.hidden = stockSelectMode;
+    }
+    if (selectBar) selectBar.hidden = !stockSelectMode;
+    if (stockSelectMode) {
+      if (activeCell) {
+        // leave editing without save
+        activeCell = null;
+      }
+      injectSelectColumns();
+      updateSelectCount();
+    } else {
+      removeSelectColumns();
+      closeBulkModal();
+    }
+  }
+
+  function closeBulkModal() {
+    if (bulkModal) bulkModal.hidden = true;
+  }
+
+  function openBulkModal() {
+    var ids = selectedToolIds();
+    if (!ids.length) {
+      alert("Выберите хотя бы одну позицию.");
+      return;
+    }
+    if (!bulkModal) return;
+    var lead = bulkModal.querySelector(".js-bulk-addr-lead");
+    if (lead) lead.textContent = "Выбрано позиций: " + ids.length;
+    bulkModal.hidden = false;
+
+    var furnitureSel = bulkModal.querySelector(".js-bulk-addr-furniture");
+    var shelfSel = bulkModal.querySelector(".js-bulk-addr-shelf");
+    var placeSel = bulkModal.querySelector(".js-bulk-addr-place");
+
+    loadWarehouseLocations()
+      .then(function (catalog) {
+        var furniture = (catalog.furniture || []).slice().sort(function (a, b) {
+          return (a.sort_order || 0) - (b.sort_order || 0)
+            || String(a.code || "").localeCompare(String(b.code || ""), "ru")
+            || String(a.name || "").localeCompare(String(b.name || ""), "ru");
+        });
+        var places = catalog.places || [];
+
+        function placesFor(furnitureId, shelfLabel) {
+          return places.filter(function (p) {
+            if (furnitureId && String(p.furniture_id) !== String(furnitureId)) return false;
+            if (shelfLabel && String(p.shelf_label) !== String(shelfLabel)) return false;
+            return true;
+          });
+        }
+
+        function syncPlaces() {
+          var list = placesFor(furnitureSel.value, shelfSel.value).map(function (p) {
+            return {
+              value: p.address || "",
+              label: placeOptionLabel(p),
+              container_id: p.container_id || "",
+            };
+          });
+          placeSel.innerHTML = "";
+          if (!list.length) {
+            var o = document.createElement("option");
+            o.value = "";
+            o.textContent = "Нет мест";
+            placeSel.appendChild(o);
+            return;
+          }
+          list.forEach(function (opt) {
+            var o = document.createElement("option");
+            o.value = opt.value;
+            o.textContent = opt.label;
+            if (opt.container_id) o.setAttribute("data-container-id", String(opt.container_id));
+            placeSel.appendChild(o);
+          });
+        }
+
+        function syncShelves() {
+          var fid = furnitureSel.value;
+          var shelves = [];
+          var seen = {};
+          placesFor(fid, "").forEach(function (p) {
+            var sl = p.shelf_label;
+            if (!sl || seen[sl]) return;
+            seen[sl] = true;
+            shelves.push({ value: sl, label: sl });
+          });
+          shelves.sort(function (a, b) { return String(a.value).localeCompare(String(b.value)); });
+          fillSelect(shelfSel, shelves.length ? shelves : [{ value: "", label: "—" }], shelves[0] ? shelves[0].value : "");
+          syncPlaces();
+        }
+
+        fillSelect(
+          furnitureSel,
+          furniture.map(function (f) {
+            return {
+              value: String(f.id),
+              label: (f.code ? f.code + " — " : "") + (f.name || "Мебель"),
+            };
+          }),
+          furniture[0] ? String(furniture[0].id) : ""
+        );
+        furnitureSel.onchange = syncShelves;
+        shelfSel.onchange = syncPlaces;
+        syncShelves();
+      })
+      .catch(function (err) {
+        alert(err.message || "Не удалось загрузить адреса");
+        closeBulkModal();
+      });
+  }
+
+  function submitBulkAssign() {
+    var ids = selectedToolIds();
+    if (!ids.length) {
+      alert("Выберите хотя бы одну позицию.");
+      return;
+    }
+    var placeSel = bulkModal && bulkModal.querySelector(".js-bulk-addr-place");
+    var opt = placeSel && placeSel.options[placeSel.selectedIndex];
+    var addr = placeSel ? String(placeSel.value || "").trim() : "";
+    var containerId = opt ? opt.getAttribute("data-container-id") || "" : "";
+    if (!addr && !containerId) {
+      alert("Выберите место / контейнер.");
+      return;
+    }
+    var body = new FormData();
+    body.set("action", "bulk_assign_warehouse_address");
+    body.set("csrfmiddlewaretoken", csrfToken);
+    ids.forEach(function (id) { body.append("tool_ids", String(id)); });
+    if (containerId) body.set("container_id", containerId);
+    if (addr) body.set("warehouse_address", addr);
+
+    var saveBtn = bulkModal && bulkModal.querySelector(".js-bulk-addr-save");
+    if (saveBtn) saveBtn.disabled = true;
+    fetch(window.location.pathname + window.location.search, {
+      method: "POST",
+      body: body,
+      headers: { "X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin",
+    })
+      .then(function (r) { return r.json().then(function (data) { return { okHttp: r.ok, data: data }; }); })
+      .then(function (res) {
+        if (!res.data || !res.data.ok) {
+          throw new Error((res.data && res.data.error) || "Не удалось назначить адрес");
+        }
+        var newAddr = res.data.warehouse_address || addr;
+        ids.forEach(function (id) {
+          document.querySelectorAll('.address-col[data-tool-id="' + id + '"]').forEach(function (cell) {
+            cell.setAttribute("data-value", newAddr);
+            cell.setAttribute("data-sort", newAddr);
+            cell.innerHTML = formatCell("warehouse_address", newAddr);
+          });
+        });
+        closeBulkModal();
+        setStockSelectMode(false);
+        alert("Добавлено в контейнер: " + (res.data.updated || ids.length) + " поз. (" + newAddr + ")");
+      })
+      .catch(function (err) {
+        alert(err.message || "Ошибка");
+      })
+      .finally(function () {
+        if (saveBtn) saveBtn.disabled = false;
+      });
+  }
+
+  if (selectToggle) {
+    selectToggle.addEventListener("click", function () {
+      setStockSelectMode(true);
+    });
+  }
+  if (selectCancelBtn) {
+    selectCancelBtn.addEventListener("click", function () {
+      setStockSelectMode(false);
+    });
+  }
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener("click", function () {
+      document.querySelectorAll(".js-stock-row-check").forEach(function (cb) { cb.checked = true; });
+      document.querySelectorAll(".js-stock-select-all-table").forEach(function (cb) { cb.checked = true; });
+      updateSelectCount();
+    });
+  }
+  if (selectNoneBtn) {
+    selectNoneBtn.addEventListener("click", function () {
+      document.querySelectorAll(".js-stock-row-check").forEach(function (cb) { cb.checked = false; });
+      document.querySelectorAll(".js-stock-select-all-table").forEach(function (cb) { cb.checked = false; });
+      updateSelectCount();
+    });
+  }
+  if (selectOkBtn) {
+    selectOkBtn.addEventListener("click", openBulkModal);
+  }
+  if (bulkModal) {
+    bulkModal.querySelectorAll(".js-bulk-addr-cancel").forEach(function (btn) {
+      btn.addEventListener("click", closeBulkModal);
+    });
+    var bulkSave = bulkModal.querySelector(".js-bulk-addr-save");
+    if (bulkSave) bulkSave.addEventListener("click", submitBulkAssign);
+  }
 })();
 (function () {
   var rows = document.querySelectorAll(".issue-candidate-row");
