@@ -2344,7 +2344,7 @@
       {% csrf_token %}
       <input type="hidden" name="action" value="process_issue_outcome">
       <input type="hidden" name="outcome_employee" id="outcome-main-filter-employee" value="{{ filters.outcome_employee }}">
-      <div class="inv-outcome-tool-filters filter-grid">
+      <div class="inv-outcome-tool-filters">
         <label class="field"><span class="inv-outcome-label">Тип инструмента</span>
           <select class="js-tool-category inv-outcome-inp" data-target-select="issue-id-select">
             <option value="">Все</option>

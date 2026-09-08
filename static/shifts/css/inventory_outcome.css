@@ -252,35 +252,40 @@ html[data-theme="dawn"] .inv-outcome-page {
 }
 
 .inv-outcome-tool-filters .issue-mat-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  align-items: center !important;
 }
 
 .inv-outcome-tool-filters .issue-mat-chip {
-  position: relative;
-  display: inline-flex;
+  position: relative !important;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
   cursor: pointer;
-  margin: 0;
+  margin: 0 !important;
 }
 
 .inv-outcome-tool-filters .issue-mat-chip input {
-  position: absolute;
-  inset: 0;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
-  opacity: 0;
-  pointer-events: none;
+  position: absolute !important;
+  inset: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  appearance: none !important;
 }
 
 .inv-outcome-tool-filters .issue-mat-chip-face {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
   min-height: 28px;
@@ -296,9 +301,9 @@ html[data-theme="dawn"] .inv-outcome-page {
 }
 
 .inv-outcome-tool-filters .issue-mat-chip input:checked + .issue-mat-chip-face {
-  border-color: #0d9488;
+  border-color: #0d9488 !important;
   box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.28);
-  color: #134e4a;
+  color: #134e4a !important;
 }
 
 .inv-outcome-tool-filters .coating-picker {
