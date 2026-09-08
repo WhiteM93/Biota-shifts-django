@@ -1,6 +1,9 @@
 from django import template
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+
 from shifts.insert_constants import INSERT_MACHINING_APPLICATIONS
 from shifts.models import COATING_TYPES, COATING_TYPE_TOOLTIPS
+from shifts.size_label_normalize import normalize_cutting_size_label
 
 register = template.Library()
 
@@ -39,3 +42,41 @@ def insert_machining_tooltip(code):
     """Подсказка для вида обработки пластины (1, 2, 3)."""
     c = (code or "").strip()
     return _MACH_LABELS.get(c, c)
+
+
+@register.filter
+def size_norm(value):
+    """Размер метчика/зенкера: М→M, запятая→точка."""
+    if value in (None, ""):
+        return value
+    return normalize_cutting_size_label(value)
+
+
+@register.filter(is_safe=False)
+def dotformat(value, arg="-2"):
+    """Как floatformat, но всегда с точкой (без русской локали 2,80)."""
+    if value in (None, ""):
+        return ""
+    try:
+        d = Decimal(str(value).strip().replace(",", "."))
+    except (InvalidOperation, ValueError, TypeError, AttributeError):
+        return str(value).replace(",", ".")
+
+    places_raw = str(arg or "-2").strip()
+    try:
+        places = int(places_raw)
+    except ValueError:
+        places = -2
+
+    if places < 0:
+        max_places = abs(places)
+        q = Decimal("1").scaleb(-max_places)
+        d = d.quantize(q, rounding=ROUND_HALF_UP)
+        s = format(d, "f")
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s or "0"
+
+    q = Decimal("1").scaleb(-places) if places else Decimal("1")
+    d = d.quantize(q, rounding=ROUND_HALF_UP)
+    return format(d, f".{places}f") if places else format(d, "f").split(".")[0]

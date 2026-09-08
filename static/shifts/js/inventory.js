@@ -2711,7 +2711,11 @@ var INV = (function () {
   }
 
   function formatCell(field, value) {
-    var v = (value || "").trim();
+    var v = normalizeDecimalComma(value == null ? "" : value);
+    if (field === "size_label" || field === "cs_size_label") {
+      v = v.replace(/\u041c/g, "M").replace(/\u043c/g, "M");
+      return escapeHtml(v || "-");
+    }
     if (!v && field !== "high_precision_aa") return "-";
     if (field === "mill_type") return millTypeLabels[v] || v;
     if (field === "body_family") return bodyFamilyLabels[v] || v;
@@ -3227,6 +3231,9 @@ var INV = (function () {
       var newValue = (editor.value || "").trim();
       if (type === "number" || type === "int") {
         newValue = normalizeDecimalComma(newValue);
+      }
+      if (field === "size_label" || field === "cs_size_label") {
+        newValue = normalizeDecimalComma(newValue).replace(/\u041c/g, "M").replace(/\u043c/g, "M");
       }
       if (!save || cancelled) {
         cell.innerHTML = formatCell(field, current);

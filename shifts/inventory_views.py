@@ -97,7 +97,11 @@ from .insert_constants import (
     normalize_milling_family,
 )
 from .arrival_column_tooltips import ARRIVAL_COLUMN_TOOLTIPS
-from .size_label_normalize import normalize_cutting_size_label, size_label_match_variants
+from .size_label_normalize import (
+    normalize_cutting_size_label,
+    size_label_match_variants,
+    size_label_sort_key,
+)
 from .models import (
     CENTER_DRILL_ANGLES,
     COUNTERSINK_ANGLES,
@@ -865,7 +869,7 @@ def _distinct_text_values(qs, field_name: str):
 
 
 def _distinct_size_labels(qs, field_name: str) -> list[str]:
-    """Уникальные размеры с учётом кириллической/латинской М."""
+    """Уникальные размеры с учётом кириллической/латинской М и запятой/точки."""
     seen: set[str] = set()
     out: list[str] = []
     for raw in _distinct_text_values(qs, field_name):
@@ -877,7 +881,7 @@ def _distinct_size_labels(qs, field_name: str) -> list[str]:
             continue
         seen.add(key)
         out.append(norm)
-    return sorted(out, key=lambda s: (s.casefold(), s))
+    return sorted(out, key=size_label_sort_key)
 
 
 def _size_label_filter_q(field_name: str, raw: str) -> Q:
@@ -2470,7 +2474,7 @@ def inventory_view(request):
             elif cat == "tap" and tool.tap_spec:
                 tp = tool.tap_spec
                 if field == "size_label":
-                    tp.size_label = (value_raw or "")[:40]
+                    tp.size_label = normalize_cutting_size_label(value_raw)[:32]
                     tp.save(update_fields=["size_label"])
                 elif field == "thread_standard":
                     tp.thread_standard = value_raw or "metric"
@@ -2529,7 +2533,7 @@ def inventory_view(request):
                     cs.flutes_count = _to_int_or_none(value_raw)
                     cs.save(update_fields=["flutes_count"])
                 elif field == "cs_size_label":
-                    cs.size_label = (value_raw or "")[:40]
+                    cs.size_label = normalize_cutting_size_label(value_raw)[:32]
                     cs.save(update_fields=["size_label"])
                 else:
                     return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
