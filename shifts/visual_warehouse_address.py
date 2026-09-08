@@ -110,7 +110,11 @@ _KIND_LABELS = {
 
 
 def build_location_catalog() -> dict:
-    """Мебель / полки / места для выбора адреса на складе."""
+    """Мебель / полки / места для выбора адреса на складе.
+
+    В каталог попадают только созданные на визуальном складе места (контейнеры).
+    Пустые ячейки сетки без контейнера не предлагаются — сначала создайте место.
+    """
     furniture = []
     places: list[dict] = []
     seen_addr: set[str] = set()
@@ -130,7 +134,6 @@ def build_location_catalog() -> dict:
                 "sort_order": int(cab.sort_order or 0),
             }
         )
-        occupied: set[tuple[int, int]] = set()
         tops = [c for c in cab.containers.all() if not getattr(c, "parent_id", None)]
         for cont in tops:
             shelf_lab = shelf_display_num(shelves=cab.shelves, shelf_top1=cont.shelf)
@@ -157,36 +160,6 @@ def build_location_catalog() -> dict:
                 }
             )
             seen_addr.add(addr)
-            span = max(1, int(cont.col_span or 1))
-            for col in range(int(cont.column), int(cont.column) + span):
-                occupied.add((int(cont.shelf), col))
-
-        for shelf in range(1, int(cab.shelves) + 1):
-            for col in range(1, int(cab.columns) + 1):
-                if (shelf, col) in occupied:
-                    continue
-                shelf_lab = shelf_display_num(shelves=cab.shelves, shelf_top1=shelf)
-                place_lab = place_display_num(col)
-                addr = suggested_address(cab, shelf=shelf, column=col, furniture_code=fcode)
-                if addr in seen_addr:
-                    continue
-                places.append(
-                    {
-                        "address": addr,
-                        "furniture_id": cab.id,
-                        "furniture_code": fcode,
-                        "furniture_name": cab.name,
-                        "shelf": shelf,
-                        "shelf_label": shelf_lab,
-                        "column": col,
-                        "place_label": place_lab,
-                        "container_id": None,
-                        "label": "",
-                        "kind": "empty",
-                        "kind_label": "Место",
-                    }
-                )
-                seen_addr.add(addr)
 
     places.sort(
         key=lambda p: (

@@ -111,6 +111,8 @@ from .models import (
     InsertSpec,
     InventoryStockEvent,
     InventoryWatchTemplate,
+    REAMER_ACCURACY_CLASSES,
+    ReamerSpec,
     StockMovement,
     TapSpec,
     ToolItem,
@@ -138,7 +140,7 @@ TOOL_MATERIAL_FILTER_OTHER = "__other__"
 PURCHASE_STORE_FILTER_OTHER = "__purchase_store_other__"
 _TOOL_MATERIAL_STD_KEYS = frozenset(k for k, _ in TOOL_MATERIAL_TYPES)
 _INVENTORY_CATEGORIES = frozenset(
-    {"end_mill", "body_tool", "tap", "center_drill", "countersink", "drill", "insert", "collet"}
+    {"end_mill", "body_tool", "tap", "center_drill", "countersink", "drill", "reamer", "insert", "collet"}
 )
 _HISTORY_MOVEMENT_TYPES = frozenset({"issue", "restock", "writeoff"})
 
@@ -212,6 +214,7 @@ def _open_issue_movements_qs():
             "tool__center_drill_spec",
             "tool__countersink_spec",
             "tool__drill_spec",
+            "tool__reamer_spec",
             "tool__insert_spec",
             "tool__collet_spec",
         )
@@ -229,6 +232,7 @@ def _open_issue_movements_qs():
 
 _ARRIVAL_REQUIRED_DIAMETER: dict[str, tuple[str, str]] = {
     "drill": ("dr_diameter_mm", "диаметр D (мм) для сверла"),
+    "reamer": ("rm_diameter_mm", "диаметр D (мм) для развертки"),
     "end_mill": ("em_diameter_mm", "диаметр D (мм) для фрезы"),
     "center_drill": ("cd_diameter_mm", "диаметр D (мм) для центровки"),
     "countersink": ("cs_diameter_mm", "диаметр D (мм) для зенкера"),
@@ -726,6 +730,11 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "drill_overall_length_mm",
         "drill_cutting_length_mm",
         "drill_angle_deg",
+        "reamer_diameter_mm",
+        "reamer_overall_length_mm",
+        "reamer_cutting_length_mm",
+        "reamer_accuracy_class",
+        "reamer_flutes_count",
         "ins_shape",
         "ins_relief",
         "ins_tolerance",
@@ -856,6 +865,15 @@ _STOCK_KEYS_BY_CATEGORY = {
     "drill": frozenset(
         {"drill_diameter_mm", "drill_overall_length_mm", "drill_cutting_length_mm", "drill_angle_deg"}
     ),
+    "reamer": frozenset(
+        {
+            "reamer_diameter_mm",
+            "reamer_overall_length_mm",
+            "reamer_cutting_length_mm",
+            "reamer_accuracy_class",
+            "reamer_flutes_count",
+        }
+    ),
     "insert": frozenset(
         {
             "ins_shape",
@@ -924,6 +942,11 @@ _STOCK_DECIMAL_PARAM_KEYS = frozenset(
         "drill_overall_length_mm",
         "drill_cutting_length_mm",
         "drill_angle_deg",
+        "reamer_diameter_mm",
+        "reamer_overall_length_mm",
+        "reamer_cutting_length_mm",
+        "reamer_accuracy_class",
+        "reamer_flutes_count",
         "bt_diameter_mm",
         "bt_overall_length_mm",
         "bt_cutting_length_mm",
@@ -933,7 +956,7 @@ _STOCK_DECIMAL_PARAM_KEYS = frozenset(
         "bt_corner_radius_mm",
     }
 )
-_STOCK_INT_PARAM_KEYS = frozenset({"mill_flutes_count", "countersink_flutes_count", "bt_teeth_count"})
+_STOCK_INT_PARAM_KEYS = frozenset({"mill_flutes_count", "countersink_flutes_count", "reamer_flutes_count", "bt_teeth_count"})
 
 
 def _resolve_stock_tool_material(params: dict) -> str:
@@ -1155,6 +1178,30 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
             drill_angle = _to_decimal(drill_angle_raw, Decimal("0"))
             if drill_angle > 0:
                 qs = qs.filter(drill_spec__angle_deg=drill_angle)
+    elif category == "reamer":
+        reamer_diameter_raw = g("reamer_diameter_mm")
+        if reamer_diameter_raw:
+            reamer_diameter = _to_decimal(reamer_diameter_raw, Decimal("0"))
+            if reamer_diameter > 0:
+                qs = qs.filter(reamer_spec__diameter_mm=reamer_diameter)
+        reamer_overall_length_raw = g("reamer_overall_length_mm")
+        if reamer_overall_length_raw:
+            reamer_overall_length = _to_decimal(reamer_overall_length_raw, Decimal("0"))
+            if reamer_overall_length > 0:
+                qs = qs.filter(reamer_spec__overall_length_mm=reamer_overall_length)
+        reamer_cutting_length_raw = g("reamer_cutting_length_mm")
+        if reamer_cutting_length_raw:
+            reamer_cutting_length = _to_decimal(reamer_cutting_length_raw, Decimal("0"))
+            if reamer_cutting_length > 0:
+                qs = qs.filter(reamer_spec__cutting_length_mm=reamer_cutting_length)
+        reamer_accuracy_raw = g("reamer_accuracy_class")
+        if reamer_accuracy_raw:
+            qs = qs.filter(reamer_spec__accuracy_class__iexact=reamer_accuracy_raw)
+        reamer_flutes_raw = g("reamer_flutes_count")
+        if reamer_flutes_raw:
+            reamer_flutes = _to_int(reamer_flutes_raw, 0)
+            if reamer_flutes > 0:
+                qs = qs.filter(reamer_spec__flutes_count=reamer_flutes)
     elif category == "insert":
         ins_shape_raw = g("ins_shape")
         if ins_shape_raw:
@@ -1339,6 +1386,16 @@ def _build_drill_name(diameter_mm, overall_length_mm, cutting_length_mm, angle_d
         f"L{_fmt_unknown(overall_length_mm)} / "
         f"Lc{_fmt_unknown(cutting_length_mm)} / "
         f"{_fmt_unknown(angle_deg)}°"
+    )
+
+
+def _build_reamer_name(diameter_mm, overall_length_mm, cutting_length_mm, accuracy_class, flutes_count) -> str:
+    acc = f" / {accuracy_class}" if (accuracy_class or "").strip() else ""
+    z = f" / Z{flutes_count}" if flutes_count is not None else ""
+    return (
+        f"Развертка D{_fmt_unknown(diameter_mm)} / "
+        f"L{_fmt_unknown(overall_length_mm)} / "
+        f"Lc{_fmt_unknown(cutting_length_mm)}{acc}{z}"
     )
 
 
@@ -1889,6 +1946,7 @@ def inventory_view(request):
                 "center_drill_spec",
                 "countersink_spec",
                 "drill_spec",
+                "reamer_spec",
                 "insert_spec",
             )
             .filter(id=tool_id, is_deleted=False)
@@ -2006,6 +2064,20 @@ def inventory_view(request):
             tool.drill_spec.cutting_length_mm = _to_decimal_or_none(request.POST.get("dr_cutting_length_mm"))
             tool.drill_spec.angle_deg = _to_decimal_or_none(request.POST.get("dr_angle_deg"))
             tool.drill_spec.save()
+        elif tool.category == "reamer" and tool.reamer_spec:
+            tool.reamer_spec.diameter_mm = _to_decimal_or_none(request.POST.get("rm_diameter_mm"))
+            tool.reamer_spec.overall_length_mm = _to_decimal_or_none(request.POST.get("rm_overall_length_mm"))
+            tool.reamer_spec.cutting_length_mm = _to_decimal_or_none(request.POST.get("rm_cutting_length_mm"))
+            tool.reamer_spec.accuracy_class = (request.POST.get("rm_accuracy_class") or "").strip()[:24]
+            tool.reamer_spec.flutes_count = _to_int_or_none(request.POST.get("rm_flutes_count"))
+            tool.reamer_spec.save()
+            tool.name = _build_reamer_name(
+                tool.reamer_spec.diameter_mm,
+                tool.reamer_spec.overall_length_mm,
+                tool.reamer_spec.cutting_length_mm,
+                tool.reamer_spec.accuracy_class,
+                tool.reamer_spec.flutes_count,
+            )
         elif tool.category == "insert" and tool.insert_spec:
             ins = tool.insert_spec
             ins.insert_shape = (request.POST.get("ins_shape") or ins.insert_shape or "C").strip()[:1]
@@ -2045,6 +2117,7 @@ def inventory_view(request):
                 "center_drill_spec",
                 "countersink_spec",
                 "drill_spec",
+                "reamer_spec",
                 "insert_spec",
                 "collet_spec",
             )
@@ -2077,7 +2150,9 @@ def inventory_view(request):
             tool.save(update_fields=["quantity", "updated_at"])
             common_ok = True
         elif field == "warehouse_address":
-            tool.warehouse_address = (value_raw or "").strip().upper().replace(" ", "")[:32]
+            from .visual_warehouse_address import normalize_address
+
+            tool.warehouse_address = normalize_address(value_raw or "")
             tool.save(update_fields=["warehouse_address", "updated_at"])
             common_ok = True
 
@@ -2276,6 +2351,33 @@ def inventory_view(request):
                     dr.save(update_fields=["angle_deg"])
                 else:
                     return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+            elif cat == "reamer" and tool.reamer_spec:
+                rm = tool.reamer_spec
+                if field == "rm_diameter_mm":
+                    rm.diameter_mm = _to_decimal_or_none(value_raw)
+                    rm.save(update_fields=["diameter_mm"])
+                elif field == "rm_overall_length_mm":
+                    rm.overall_length_mm = _to_decimal_or_none(value_raw)
+                    rm.save(update_fields=["overall_length_mm"])
+                elif field == "rm_cutting_length_mm":
+                    rm.cutting_length_mm = _to_decimal_or_none(value_raw)
+                    rm.save(update_fields=["cutting_length_mm"])
+                elif field == "rm_accuracy_class":
+                    rm.accuracy_class = (value_raw or "")[:24]
+                    rm.save(update_fields=["accuracy_class"])
+                elif field == "rm_flutes_count":
+                    rm.flutes_count = _to_int_or_none(value_raw)
+                    rm.save(update_fields=["flutes_count"])
+                else:
+                    return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+                tool.name = _build_reamer_name(
+                    rm.diameter_mm,
+                    rm.overall_length_mm,
+                    rm.cutting_length_mm,
+                    rm.accuracy_class,
+                    rm.flutes_count,
+                )
+                tool.save(update_fields=["name", "updated_at"])
             elif cat == "insert" and tool.insert_spec:
                 ins = tool.insert_spec
                 if field == "ins_family":
@@ -3066,6 +3168,51 @@ def inventory_view(request):
                             cutting_length_mm=cutting_length_mm,
                             angle_deg=angle_deg,
                         )
+                elif category == "reamer":
+                    diameter_mm = _to_decimal_or_none(row.get("rm_diameter_mm"))
+                    overall_length_mm = _to_decimal_or_none(row.get("rm_overall_length_mm"))
+                    cutting_length_mm = _to_decimal_or_none(row.get("rm_cutting_length_mm"))
+                    accuracy_class = (row.get("rm_accuracy_class") or "").strip()[:24]
+                    flutes_count = _to_int_or_none(row.get("rm_flutes_count"))
+                    tool = (
+                        ToolItem.objects.select_for_update()
+                        .filter(
+                            category="reamer",
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
+                            reamer_spec__diameter_mm=diameter_mm,
+                            reamer_spec__overall_length_mm=overall_length_mm,
+                            reamer_spec__cutting_length_mm=cutting_length_mm,
+                            reamer_spec__accuracy_class=accuracy_class,
+                            reamer_spec__flutes_count=flutes_count,
+                        )
+                        .first()
+                    )
+                    if tool:
+                        tool.quantity += quantity
+                        tool.save(update_fields=["quantity", "updated_at"])
+                    else:
+                        tool = ToolItem.objects.create(
+                            category="reamer",
+                            name=_build_reamer_name(
+                                diameter_mm, overall_length_mm, cutting_length_mm, accuracy_class, flutes_count
+                            ),
+                            tool_material=tool_material,
+                            coating_type=coating_type,
+                            work_material=work_material,
+                            main_diameter_mm=main_diameter_mm,
+                            quantity=quantity,
+                        )
+                        ReamerSpec.objects.create(
+                            tool=tool,
+                            diameter_mm=diameter_mm,
+                            overall_length_mm=overall_length_mm,
+                            cutting_length_mm=cutting_length_mm,
+                            accuracy_class=accuracy_class,
+                            flutes_count=flutes_count,
+                        )
                 elif category == "insert":
                     spec_fields = _insert_spec_fields_from_mapping(row)
                     tool = _find_insert_tool_match(
@@ -3357,6 +3504,11 @@ def inventory_view(request):
     drill_overall_length_raw = _sq("drill_overall_length_mm")
     drill_cutting_length_raw = _sq("drill_cutting_length_mm")
     drill_angle_raw = _sq("drill_angle_deg")
+    reamer_diameter_raw = _sq("reamer_diameter_mm")
+    reamer_overall_length_raw = _sq("reamer_overall_length_mm")
+    reamer_cutting_length_raw = _sq("reamer_cutting_length_mm")
+    reamer_accuracy_raw = _sq("reamer_accuracy_class")
+    reamer_flutes_raw = _sq("reamer_flutes_count")
     ins_shape_raw = _sq("ins_shape")
     ins_relief_raw = _sq("ins_relief")
     ins_tolerance_raw = _sq("ins_tolerance")
@@ -3559,6 +3711,21 @@ def inventory_view(request):
     )
     drill_angles = _sorted_unique_decimal_strings(
         _distinct_numeric_values(_opt_qs("drill", "drill_angle_deg"), "drill_spec__angle_deg")
+    )
+    reamer_diameters = _sorted_unique_decimal_strings(
+        _distinct_numeric_values(_opt_qs("reamer", "reamer_diameter_mm"), "reamer_spec__diameter_mm")
+    )
+    reamer_overall_lengths = _sorted_unique_decimal_strings(
+        _distinct_numeric_values(_opt_qs("reamer", "reamer_overall_length_mm"), "reamer_spec__overall_length_mm")
+    )
+    reamer_cutting_lengths = _sorted_unique_decimal_strings(
+        _distinct_numeric_values(_opt_qs("reamer", "reamer_cutting_length_mm"), "reamer_spec__cutting_length_mm")
+    )
+    reamer_accuracy_classes_db = _distinct_text_values(
+        _opt_qs("reamer", "reamer_accuracy_class"), "reamer_spec__accuracy_class"
+    )
+    reamer_flutes = _sorted_unique_int_strings(
+        _distinct_numeric_values(_opt_qs("reamer", "reamer_flutes_count"), "reamer_spec__flutes_count")
     )
     insert_shapes = _distinct_text_values(_opt_qs("insert", "ins_shape"), "insert_spec__insert_shape")
     insert_reliefs = _distinct_text_values(_opt_qs("insert", "ins_relief"), "insert_spec__relief_angle")
@@ -3837,6 +4004,7 @@ def inventory_view(request):
             "tool__center_drill_spec",
             "tool__countersink_spec",
             "tool__drill_spec",
+            "tool__reamer_spec",
             "tool__insert_spec",
             "tool__collet_spec",
         )
@@ -3890,6 +4058,7 @@ def inventory_view(request):
             "center_drill_spec",
             "countersink_spec",
             "drill_spec",
+            "reamer_spec",
             "insert_spec",
             "collet_spec",
         ).order_by("category", "name"),
@@ -3928,6 +4097,11 @@ def inventory_view(request):
             "drill_overall_length_mm": _norm_stock_decimal_str(drill_overall_length_raw),
             "drill_cutting_length_mm": _norm_stock_decimal_str(drill_cutting_length_raw),
             "drill_angle_deg": _norm_stock_decimal_str(drill_angle_raw),
+            "reamer_diameter_mm": _norm_stock_decimal_str(reamer_diameter_raw),
+            "reamer_overall_length_mm": _norm_stock_decimal_str(reamer_overall_length_raw),
+            "reamer_cutting_length_mm": _norm_stock_decimal_str(reamer_cutting_length_raw),
+            "reamer_accuracy_class": reamer_accuracy_raw,
+            "reamer_flutes_count": _norm_stock_int_filter_str(reamer_flutes_raw),
             "ins_shape": ins_shape_raw,
             "ins_relief": ins_relief_raw,
             "ins_tolerance": ins_tolerance_raw,
@@ -4062,6 +4236,14 @@ def inventory_view(request):
             "cutting_lengths": drill_cutting_lengths,
             "angles": drill_angles,
         },
+        "reamer_filter_options": {
+            "diameters": reamer_diameters,
+            "overall_lengths": reamer_overall_lengths,
+            "cutting_lengths": reamer_cutting_lengths,
+            "accuracy_classes": reamer_accuracy_classes_db,
+            "flutes": reamer_flutes,
+        },
+        "reamer_accuracy_classes": REAMER_ACCURACY_CLASSES,
         "insert_filter_options": {
             "shapes": insert_shapes,
             "reliefs": insert_reliefs,
@@ -4114,6 +4296,7 @@ def inventory_view(request):
             "center_drill_spec",
             "countersink_spec",
             "drill_spec",
+            "reamer_spec",
             "insert_spec",
             "collet_spec",
         ).filter(is_deleted=False).order_by("category", "name"),

@@ -12,7 +12,6 @@ from shifts.models import (
     VisualCabinet,
     VisualContainer,
     VisualContainerAudit,
-    VisualContainerItem,
 )
 
 
@@ -23,7 +22,7 @@ class VisualWarehouseAuditTests(TestCase):
         session["biota_username"] = "admin"
         session.save()
 
-        self.cab = VisualCabinet.objects.create(name="Шкаф тест", shelves=3, columns=3)
+        self.cab = VisualCabinet.objects.create(code="T", name="Шкаф тест", shelves=3, columns=3)
         self.cont = VisualContainer.objects.create(
             cabinet=self.cab,
             shelf=1,
@@ -31,32 +30,29 @@ class VisualWarehouseAuditTests(TestCase):
             column=1,
             label="Фрезы концевые 0-1",
             color="#3d6b8c",
-        )
-        VisualContainerItem.objects.create(
-            container=self.cont,
-            title="Фрезы 0-1",
-            tool_category="end_mill",
-            diameter_from_mm="0",
-            diameter_to_mm="1",
+            address="T-03-01",
         )
         self.tool_a = ToolItem.objects.create(
             category="end_mill",
             name="Фреза A Ø0.5",
             main_diameter_mm="0.5",
             quantity=10,
+            warehouse_address="T-03-01",
         )
         self.tool_b = ToolItem.objects.create(
             category="end_mill",
             name="Фреза B Ø0.8",
             main_diameter_mm="0.8",
             quantity=5,
+            warehouse_address="T-03-01",
         )
-        # вне диапазона — не должна попасть в ящик
+        # другое место — не должна попасть в ящик
         ToolItem.objects.create(
             category="end_mill",
             name="Фреза C Ø2",
             main_diameter_mm="2",
             quantity=7,
+            warehouse_address="T-01-02",
         )
         self.audits_url = reverse("visual_warehouse_api_container_audits", kwargs={"pk": self.cont.pk})
 
@@ -180,9 +176,7 @@ class VisualWarehouseAuditTests(TestCase):
         self.assertIsNotNone(new_tool)
         self.assertEqual(new_tool.quantity, 3)
         self.assertEqual(new_tool.category, "end_mill")
-        self.assertTrue(
-            VisualContainerItem.objects.filter(container=self.cont, tool_item=new_tool).exists()
-        )
+        self.assertEqual((new_tool.warehouse_address or "").upper(), "T-03-01")
         mv = StockMovement.objects.get(tool=new_tool)
         self.assertEqual(mv.movement_type, "restock")
         self.assertEqual(mv.quantity, 3)
@@ -223,3 +217,9 @@ class VisualWarehouseAuditTests(TestCase):
         tool = ToolItem.objects.get(name="Сверло тестовое Ø5")
         self.assertEqual(tool.quantity, 2)
         self.assertEqual(tool.category, "drill")
+        empty.refresh_from_db()
+        expected_addr = (empty.address or "").strip().upper()
+        if not expected_addr:
+            # авто-адрес стеллажа: полка 2 из 3 сверху → display 02
+            expected_addr = "T-02-01"
+        self.assertEqual((tool.warehouse_address or "").upper(), expected_addr)

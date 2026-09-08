@@ -249,10 +249,11 @@
 
           <div class="vw-contents-main">
             <div class="vw-section-head">
-              <h3 class="vw-props-heading js-vw-tools-heading">Инструменты на складе</h3>
+              <h3 class="vw-props-heading js-vw-tools-heading">Инструменты по адресу</h3>
               <span class="vw-section-count js-vw-tools-count" hidden></span>
             </div>
             <ul class="vw-items js-vw-stock-tools" role="list"></ul>
+            <p class="vw-hint-inline">Состав места задаётся на складе: у позиции выберите мебель / полку / место. Здесь — просмотр и инвентаризация.</p>
             <div class="vw-rules-block js-vw-rules-block" hidden>
               <h3 class="vw-props-heading">Правила содержимого</h3>
               <ul class="vw-items js-vw-items" role="list"></ul>
@@ -501,6 +502,22 @@
                 <label class="vw-row">
                   <span class="vw-row-label">Угол, °</span>
                   <input type="number" class="vw-control js-vw-f-drill_angle" min="0" step="0.1" placeholder="все">
+                </label>
+              </div>
+
+              <div class="js-vw-item-panel" data-cat="reamer" hidden>
+                <label class="vw-row">
+                  <span class="vw-row-label">Квалитет</span>
+                  <select class="vw-control js-vw-f-reamer_accuracy">
+                    <option value="">Все</option>
+                    {% for a in reamer_accuracy_classes %}
+                    <option value="{{ a.value }}">{{ a.label }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label class="vw-row">
+                  <span class="vw-row-label">Z</span>
+                  <input type="number" class="vw-control js-vw-f-reamer_flutes" min="1" step="1" placeholder="все">
                 </label>
               </div>
 

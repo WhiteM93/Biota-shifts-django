@@ -98,6 +98,7 @@
     center_drill: "Центровки",
     countersink: "Зенкера",
     drill: "Сверла",
+    reamer: "Развертки",
     insert: "Пластинки",
     collet: "Цанги",
   };
@@ -325,11 +326,11 @@
     }
     if (modeHint) {
       modeHint.textContent = editMode
-        ? "Правка: «+» или пустое место — новое содержимое. Клик по ящику — изменить. «Готово» — просмотр."
-        : "Нажмите на контейнер, чтобы посмотреть содержимое";
+        ? "Правка: «+» или пустое место — создать место/контейнер. Клик по ящику — изменить. Содержимое задаётся на складе (адрес). «Готово» — просмотр."
+        : "Нажмите на контейнер: список по адресу со склада и инвентаризация";
     }
-    if (itemForm) setVisible(itemForm, editMode && canEdit);
-    if (rulesBlock) setVisible(rulesBlock, editMode && canEdit);
+    if (itemForm) setVisible(itemForm, false);
+    if (rulesBlock) setVisible(rulesBlock, false);
     if (photoUploadWrap) setVisible(photoUploadWrap, editMode && canEdit);
     document.body.classList.toggle("vw-is-edit", editMode);
     syncItemMillTypeRow();
@@ -998,7 +999,7 @@
       ? (isChild ? "Ячейка органайзера" : containerKindLabel(contKind))
       : (cabKind === "drawer_chest"
         ? "Новая ячейка"
-        : (cabKind === "rack" ? "Новое содержимое" : "Новый контейнер"));
+        : (cabKind === "rack" ? "Новое место" : "Новый контейнер"));
     contForm.querySelector(".js-vw-cont-id").value = cont ? String(cont.id) : "";
     contForm.querySelector(".js-vw-cont-cabinet").value = String(cab.id);
     var kindRow = contForm.querySelector(".js-vw-cont-kind-row");
@@ -1422,7 +1423,14 @@
       rule_kind: ruleKind,
       tool_category: category,
       mill_type: category === "end_mill" ? val(".js-vw-f-mill_type") : "",
-      flutes_count: category === "end_mill" ? val(".js-vw-f-flutes") : (category === "countersink" ? val(".js-vw-f-cs_flutes") : ""),
+      flutes_count:
+        category === "end_mill"
+          ? val(".js-vw-f-flutes")
+          : category === "countersink"
+            ? val(".js-vw-f-cs_flutes")
+            : category === "reamer"
+              ? val(".js-vw-f-reamer_flutes")
+              : "",
       corner_radius_mm: category === "end_mill" ? val(".js-vw-f-corner-r") : "",
       body_cutter_type: category === "body_tool" ? val(".js-vw-f-body_cutter") : "",
       body_family: category === "body_tool" ? val(".js-vw-f-body_family") : "",
@@ -1450,7 +1458,9 @@
             ? val(".js-vw-f-cd_angle")
             : category === "drill"
               ? val(".js-vw-f-drill_angle")
-              : "",
+              : category === "reamer"
+                ? val(".js-vw-f-reamer_accuracy")
+                : "",
       diameter_from_mm: itemForm.querySelector(".js-vw-item-dfrom").value,
       diameter_to_mm: itemForm.querySelector(".js-vw-item-dto").value,
       quantity_note: val(".js-vw-item-qty"),
@@ -1502,6 +1512,7 @@
       cat === "end_mill" ||
       cat === "body_tool" ||
       cat === "drill" ||
+      cat === "reamer" ||
       cat === "center_drill" ||
       cat === "countersink" ||
       cat === "tap";
@@ -1645,11 +1656,12 @@
       }
     }
     if (!tools.length) {
+      var addr = (container && container.address) || "";
       stockToolsEl.innerHTML =
-        "<li class='vw-item vw-item--empty'><span class='vw-item-meta'>На складе нет подходящих инструментов. " +
-        (editMode
-          ? "Добавьте правило содержимого ниже (категория и Ø) или уберите лишние исключения."
-          : "В режиме «Редактировать» можно настроить содержимое ящика.") +
+        "<li class='vw-item vw-item--empty'><span class='vw-item-meta'>" +
+        (addr
+          ? ("На адресе " + addr + " пока нет позиций. На складе у инструмента выберите мебель / полку / место.")
+          : "У места нет адреса. Создайте контейнер на визуальном складе, затем назначьте адрес позиции на складе.") +
         "</span></li>";
       return;
     }
@@ -1674,17 +1686,6 @@
       appendToolStockMeta(meta, tool, ["кол-во: " + (tool.quantity != null ? tool.quantity : 0)]);
       left.appendChild(meta);
       top.appendChild(left);
-      if (canEdit && editMode) {
-        var excl = document.createElement("button");
-        excl.type = "button";
-        excl.className = "vw-item-exclude";
-        excl.textContent = "Не здесь";
-        excl.title = "Исключить из этой ячейки";
-        excl.addEventListener("click", function () {
-          excludeStockTool(tool);
-        });
-        top.appendChild(excl);
-      }
       var qty = document.createElement("span");
       qty.className = "vw-item-qty";
       qty.textContent = String(tool.quantity != null ? tool.quantity : 0);
@@ -1852,7 +1853,7 @@
     var cat = auditNewCategory ? auditNewCategory.value : "";
     var isMill = cat === "end_mill";
     var isTap = cat === "tap";
-    var needsDiam = cat === "end_mill" || cat === "drill" || cat === "center_drill" || cat === "countersink";
+    var needsDiam = cat === "end_mill" || cat === "drill" || cat === "reamer" || cat === "center_drill" || cat === "countersink";
     setVisible(auditNewMillRow, isMill);
     setVisible(auditNewTapTypeRow, isTap);
     setVisible(auditNewHoleRow, isTap);
@@ -2010,7 +2011,7 @@
     var flutes = auditNewFlutes ? auditNewFlutes.value : "";
     var note = auditNewNote ? (auditNewNote.value || "").trim() : "";
 
-    var needsDiam = category === "end_mill" || category === "drill" || category === "center_drill" || category === "countersink";
+    var needsDiam = category === "end_mill" || category === "drill" || category === "reamer" || category === "center_drill" || category === "countersink";
     if (needsDiam && (diameter === "" || isNaN(parseFloat(diameter)))) {
       alert("Укажите диаметр");
       return;
@@ -2154,7 +2155,6 @@
     renderPhotos(cont);
     syncPhotoUploadLabel();
     renderStockTools(cont);
-    renderItems(cont);
   }
 
   function openPhotoView(photo) {
@@ -2376,8 +2376,8 @@
     openContainerId = containerId;
     setAuditMode(false);
     if (dlgAudits) closeDialog(dlgAudits);
-    if (itemForm) setVisible(itemForm, editMode && canEdit);
-    if (rulesBlock) setVisible(rulesBlock, editMode && canEdit);
+    if (itemForm) setVisible(itemForm, false);
+    if (rulesBlock) setVisible(rulesBlock, false);
     if (photoUploadWrap) setVisible(photoUploadWrap, editMode && canEdit);
     if (photoMsgEl) photoMsgEl.textContent = "";
     resetPhotoPickUi();

@@ -9,6 +9,7 @@ from shifts.models import (
     COUNTERSINK_ANGLES,
     COUNTERSINK_TYPES,
     END_MILL_TYPES,
+    REAMER_ACCURACY_CLASSES,
     TAP_HOLE_TYPES,
     TAP_TOOL_TYPES,
     THREAD_KINDS,
@@ -43,7 +44,7 @@ STOCK_TOOL_TYPE_GROUPS = [
         "cutting",
         "Режущий инструмент",
         10,
-        ("end-mill", "tap", "center-drill", "countersink", "drill", "insert"),
+        ("end-mill", "tap", "center-drill", "countersink", "drill", "reamer", "insert"),
     ),
     (
         "tooling",
@@ -440,6 +441,31 @@ def seed_stock_tool_types(*, replace_fields: bool = False) -> dict[str, int]:
         ):
             _upsert_field(
                 drill,
+                key=key,
+                label=label,
+                field_kind=kind,
+                choices=choices,
+                required=req,
+                unit=unit,
+                sort_order=order,
+            )
+            stats["fields"] += 1
+
+    # --- Развертки ---
+    reamer = _maybe_type(code="reamer", name="Развертки", sort_order=55, notes="Категория ToolItem: reamer")
+    if reamer:
+        if replace_fields:
+            StockToolField.objects.filter(tool_type=reamer).delete()
+        _common_tool_fields(reamer)
+        for key, label, kind, choices, req, unit, order in (
+            ("diameter-mm", "Диаметр", "number", [], True, "мм", 100),
+            ("overall-length-mm", "Длина", "number", [], False, "мм", 110),
+            ("cutting-length-mm", "Длина реж. части", "number", [], False, "мм", 120),
+            ("accuracy-class", "Класс точности", "select", _choices(REAMER_ACCURACY_CLASSES), False, "", 130),
+            ("flutes-count", "Количество зубьев", "number", [], False, "", 140),
+        ):
+            _upsert_field(
+                reamer,
                 key=key,
                 label=label,
                 field_kind=kind,

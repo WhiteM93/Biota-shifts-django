@@ -18,6 +18,7 @@ from shifts.models import (
     EndMillSpec,
     InventoryStockEvent,
     PurchaseRequest,
+    ReamerSpec,
     StockMovement,
     TapSpec,
     ToolItem,
@@ -64,6 +65,7 @@ def export_inventory_payload() -> dict[str, Any]:
         "center_drill_specs": [_model_to_row(o) for o in CenterDrillSpec.objects.order_by("id")],
         "countersink_specs": [_model_to_row(o) for o in CountersinkSpec.objects.order_by("id")],
         "drill_specs": [_model_to_row(o) for o in DrillSpec.objects.order_by("id")],
+        "reamer_specs": [_model_to_row(o) for o in ReamerSpec.objects.order_by("id")],
         "stock_movements": [_model_to_row(o) for o in StockMovement.objects.order_by("id")],
         "purchase_requests": [_model_to_row(o) for o in PurchaseRequest.objects.order_by("id")],
         "inventory_stock_events": [_model_to_row(o) for o in InventoryStockEvent.objects.order_by("id")],
@@ -87,6 +89,7 @@ def validate_inventory_payload(data: dict[str, Any]) -> dict[str, Any]:
         "center_drill_specs",
         "countersink_specs",
         "drill_specs",
+        "reamer_specs",
         "stock_movements",
         "purchase_requests",
         "inventory_stock_events",
@@ -160,6 +163,7 @@ def _clear_inventory_tables() -> None:
     CenterDrillSpec.objects.all().delete()
     CountersinkSpec.objects.all().delete()
     DrillSpec.objects.all().delete()
+    ReamerSpec.objects.all().delete()
     ToolItem.objects.all().delete()
     PurchaseRequest.objects.all().delete()
 
@@ -183,6 +187,7 @@ def _reset_sequences() -> None:
         CenterDrillSpec,
         CountersinkSpec,
         DrillSpec,
+        ReamerSpec,
         StockMovement,
         PurchaseRequest,
         InventoryStockEvent,
@@ -212,6 +217,7 @@ def restore_inventory_from_payload(payload: dict[str, Any]) -> dict[str, int]:
     _bulk_create(CenterDrillSpec, data["center_drill_specs"])
     _bulk_create(CountersinkSpec, data["countersink_specs"])
     _bulk_create(DrillSpec, data["drill_specs"])
+    _bulk_create(ReamerSpec, data.get("reamer_specs") or [])
     _bulk_create(StockMovement, data["stock_movements"])
     _bulk_create(PurchaseRequest, data["purchase_requests"])
     _bulk_create(InventoryStockEvent, data["inventory_stock_events"])

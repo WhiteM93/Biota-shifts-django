@@ -189,6 +189,45 @@ html[data-theme="dawn"] .inv-outcome-page {
   color: var(--io-text-muted);
 }
 
+/* ── Фильтры выданной позиции ── */
+.inv-outcome-tool-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px 16px;
+  align-items: end;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--io-border, rgba(148, 163, 184, 0.28));
+}
+
+.inv-outcome-tool-filters .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.inv-outcome-tool-filters .field > span,
+.inv-outcome-tool-filters .inv-outcome-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--io-text-muted);
+}
+
+.inv-outcome-tool-filters select.inv-outcome-inp,
+.inv-outcome-tool-filters .js-issue-f {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--bio-input-border, #c9d1e0);
+  background: var(--bio-input-bg, #fff);
+  color: var(--bio-input-fg, #1e293b);
+}
+
 /* ── Форма ── */
 .inv-outcome-form-grid {
   display: grid;

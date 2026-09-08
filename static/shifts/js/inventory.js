@@ -797,9 +797,15 @@ var INV = (function () {
     }
   }
 
-  function filterToolOptions(targetId, opts) {
+  function readRadioFilterIn(root, selector) {
+    if (!root) return "";
+    var el = root.querySelector(selector + ":checked");
+    return el ? String(el.value || "").trim() : "";
+  }
+
+  function filterToolOptions(rootId, targetId, opts) {
     opts = opts || {};
-    var root = document.getElementById("issue-block");
+    var root = document.getElementById(rootId);
     var toolSelect = document.getElementById(targetId);
     if (!root || !toolSelect) return;
 
@@ -822,10 +828,10 @@ var INV = (function () {
     var queryRaw = searchInput ? searchInput.value : "";
     var wantMat = category === "collet"
       ? ""
-      : readRadioFilter('#issue-block .js-tool-filter-material');
+      : readRadioFilterIn(root, ".js-tool-filter-material");
     var wantCoat = category === "collet"
       ? ""
-      : readRadioFilter('#issue-block .js-tool-filter-coating');
+      : readRadioFilterIn(root, ".js-tool-filter-coating");
 
     var placeholder = toolSelect.options[0] || null;
     var items = [];
@@ -884,38 +890,38 @@ var INV = (function () {
     if (wrap) comboUpdateLabel(wrap, toolSelect);
   }
 
-  function bindIssueFilters(targetId) {
-    var root = document.getElementById("issue-block");
+  function bindIssueFilters(rootId, targetId) {
+    var root = document.getElementById(rootId);
     if (!root) return;
     var cat = root.querySelector(".js-tool-category");
     var search = root.querySelector(".js-tool-search");
 
     if (cat) {
       cat.addEventListener("change", function () {
-        filterToolOptions(targetId, { category: cat.value, resetCat: true });
+        filterToolOptions(rootId, targetId, { category: cat.value, resetCat: true });
       });
     }
     if (search) {
       search.addEventListener("input", function () {
-        filterToolOptions(targetId, { skipPanelSync: true });
+        filterToolOptions(rootId, targetId, { skipPanelSync: true });
       });
     }
     root.querySelectorAll("select.js-issue-f").forEach(function (sel) {
       sel.addEventListener("change", function () {
-        filterToolOptions(targetId);
+        filterToolOptions(rootId, targetId);
       });
     });
     root.querySelectorAll(".js-tool-filter-material, .js-tool-filter-coating").forEach(function (el) {
       el.addEventListener("change", function () {
-        filterToolOptions(targetId, { skipPanelSync: true });
+        filterToolOptions(rootId, targetId, { skipPanelSync: true });
       });
     });
 
-    filterToolOptions(targetId, { resetCat: true });
+    filterToolOptions(rootId, targetId, { resetCat: true });
   }
 
   if (document.getElementById("issue-tool-select")) {
-    bindIssueFilters("issue-tool-select");
+    bindIssueFilters("issue-block", "issue-tool-select");
   }
 
   /* Initialize issue panel combo */
@@ -923,28 +929,12 @@ var INV = (function () {
   var issueSel = document.getElementById("issue-tool-select");
   if (issueWrap && issueSel) comboBindUi(issueWrap, issueSel);
 
-  /* Initialize issue-outcome panel combo */
+  /* Initialize issue-outcome panel combo + filters */
   var outcomeWrap = document.querySelector("#issue-outcome-block .js-issue-tool-combo");
   var outcomeSel = document.getElementById("issue-id-select");
   if (outcomeWrap && outcomeSel) {
     comboBindUi(outcomeWrap, outcomeSel);
-    var outcomeSearch = document.getElementById("issue-search-input");
-    if (outcomeSearch) {
-      function filterOutcomeOptions() {
-        var queryRaw = outcomeSearch.value;
-        Array.prototype.forEach.call(outcomeSel.options, function (opt, idx) {
-          if (idx === 0) { opt.hidden = false; return; }
-          opt.hidden = !optionMatchesQuery(opt, queryRaw);
-        });
-        comboEnsurePanel(outcomeWrap, outcomeSel, true);
-        comboSyncVisibility(outcomeWrap, outcomeSel);
-        if (outcomeSel.selectedIndex > 0 && outcomeSel.options[outcomeSel.selectedIndex].hidden) {
-          outcomeSel.selectedIndex = 0;
-        }
-        comboUpdateLabel(outcomeWrap, outcomeSel);
-      }
-      outcomeSearch.addEventListener("input", filterOutcomeOptions);
-    }
+    bindIssueFilters("issue-outcome-block", "issue-id-select");
   }
 })();
 (function () {
@@ -1534,6 +1524,7 @@ var INV = (function () {
 
   var arrivalDiamRequiredByCategory = {
     drill: { key: "dr_diameter_mm", label: "диаметр D (мм) для сверла" },
+    reamer: { key: "rm_diameter_mm", label: "диаметр D (мм) для развертки" },
     end_mill: { key: "em_diameter_mm", label: "диаметр D (мм) для фрезы" },
     body_tool: { key: "bt_diameter_mm", label: "диаметр D (мм) для корпусного инструмента" },
     center_drill: { key: "cd_diameter_mm", label: "диаметр D (мм) для центровки" },
@@ -1635,6 +1626,7 @@ var INV = (function () {
     center_drill: "Центровки",
     countersink: "Зенкера",
     drill: "Сверла",
+    reamer: "Развертки",
     insert: "Пластинки",
     collet: "Цанги",
   };
@@ -1995,6 +1987,7 @@ var INV = (function () {
     center_drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="angle-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     countersink: '<tr><th>Тип</th><th class="short-col">D</th><th class="angle-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    reamer: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Квалитет</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
     insert:
       "<tr>" +
       insertArrivalTh("family", "Семейство") +
@@ -2321,6 +2314,21 @@ var INV = (function () {
       cells.push('<td class="co-cell"></td>');
       cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+    } else if (cat === "reamer") {
+      cells.push(arrivalRequiredDiamCell("rm_diameter_mm"));
+      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="rm_overall_length_mm"></td>');
+      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="rm_cutting_length_mm"></td>');
+      cells.push(
+        '<td class="short-col"><select data-k="rm_accuracy_class"><option value=""></option>' +
+          buildOptionsHtml(INV.reamer_accuracy_classes || []) +
+          "</select></td>"
+      );
+      cells.push('<td class="short-col"><input type="number" data-k="rm_flutes_count"></td>');
+      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
+      cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
+      cells.push('<td class="co-cell"></td>');
+      cells.push('<td class="wm-cell"></td>');
+      cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     }
     cells.push('<td><button type="button" class="btn btn-ghost js-arrival-row-remove">×</button></td>');
     tr.innerHTML = cells.join("");
@@ -2546,6 +2554,8 @@ var INV = (function () {
   (INV.countersink_types || []).forEach(function (x) { countersinkTypeLabels[x.value] = x.label; });
   var countersinkAngleLabels = {};
   (INV.countersink_angles || []).forEach(function (x) { countersinkAngleLabels[x.value] = x.label; });
+  var reamerAccuracyClassLabels = { "": "—" };
+  (INV.reamer_accuracy_classes || []).forEach(function (x) { reamerAccuracyClassLabels[x.value] = x.label; });
   var insertShapeLabels = {};
   (INV.insert_shapes || []).forEach(function (x) { insertShapeLabels[x.value] = x.label; });
   var insertEdgeLabels = {};
@@ -2630,6 +2640,7 @@ var INV = (function () {
     if (field === "cd_angle_deg") return centerDrillAngleLabels[v] || v;
     if (field === "cs_type") return countersinkTypeLabels[v] || v;
     if (field === "cs_angle_deg") return countersinkAngleLabels[v] || v;
+    if (field === "rm_accuracy_class") return reamerAccuracyClassLabels[v] || v || "-";
     if (field === "ins_shape") return insertShapeLabels[v] || v;
     if (field === "ins_edge_code") return insertEdgeLabels[v] || v;
     if (field === "ins_thickness_code") return insertThicknessLabels[v] || v;
@@ -2748,6 +2759,16 @@ var INV = (function () {
       options = fromMap(countersinkTypeLabels);
     } else if (field === "cs_angle_deg") {
       options = fromMap(countersinkAngleLabels);
+    } else if (field === "rm_accuracy_class") {
+      options = [{ value: "", label: "—", title: "" }].concat(
+        (INV.reamer_accuracy_classes || []).map(function (x) {
+          return { value: x.value, label: x.label, title: x.label };
+        })
+      );
+      if (current && !options.some(function (o) { return o.value === current; })) {
+        options.push({ value: current, label: current, title: current });
+        reamerAccuracyClassLabels[current] = current;
+      }
     } else if (field === "ins_shape") {
       options = fromMap(insertShapeLabels);
     } else if (field === "ins_edge_code") {

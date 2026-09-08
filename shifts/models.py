@@ -217,6 +217,7 @@ TOOL_ITEM_CATEGORY_CHOICES = [
     ("center_drill", "Центровки"),
     ("countersink", "Зенкера"),
     ("drill", "Сверла"),
+    ("reamer", "Развертки"),
     ("insert", "Пластинки"),
     ("collet", "Цанги"),
     ("body_tool", "Корпусной инструмент"),
@@ -227,13 +228,30 @@ STOCK_CATEGORY_GROUPS = [
     (
         "cutting",
         "Режущий инструмент",
-        ("end_mill", "tap", "center_drill", "countersink", "drill", "insert"),
+        ("end_mill", "tap", "center_drill", "countersink", "drill", "reamer", "insert"),
     ),
     (
         "tooling",
         "Оснастка",
         ("collet", "body_tool"),
     ),
+]
+
+# Типовые квалитеты / посадки для развёрток (поле допускает и свой текст).
+REAMER_ACCURACY_CLASSES = [
+    ("H7", "H7"),
+    ("H8", "H8"),
+    ("H9", "H9"),
+    ("H10", "H10"),
+    ("H11", "H11"),
+    ("JS6", "JS6"),
+    ("JS7", "JS7"),
+    ("N7", "N7"),
+    ("N8", "N8"),
+    ("N9", "N9"),
+    ("IT7", "IT7"),
+    ("IT8", "IT8"),
+    ("IT9", "IT9"),
 ]
 
 
@@ -427,6 +445,22 @@ class ToolItem(models.Model):
                 f"L {fmt_mm(dr.overall_length_mm) if dr and dr.overall_length_mm is not None else '—'}",
                 f"Lc {fmt_mm(dr.cutting_length_mm) if dr and dr.cutting_length_mm is not None else '—'}",
                 f"∠{fmt_mm(dr.angle_deg) if dr and dr.angle_deg is not None else '—'}°",
+                f"Dосн {main_d()}",
+                self.get_tool_material_display() or "—",
+                coating_txt(),
+                work_mat_txt(),
+                f"ост {self.quantity}",
+                self.name,
+            ]
+        elif cat == "reamer":
+            rm = getattr(self, "reamer_spec", None)
+            segs = [
+                self.get_category_display(),
+                f"D {fmt_mm(rm.diameter_mm) if rm and rm.diameter_mm is not None else '—'}",
+                f"L {fmt_mm(rm.overall_length_mm) if rm and rm.overall_length_mm is not None else '—'}",
+                f"Lc {fmt_mm(rm.cutting_length_mm) if rm and rm.cutting_length_mm is not None else '—'}",
+                (rm.accuracy_class or "—") if rm else "—",
+                f"Z {rm.flutes_count if rm and rm.flutes_count is not None else '—'}",
                 f"Dосн {main_d()}",
                 self.get_tool_material_display() or "—",
                 coating_txt(),
@@ -639,6 +673,21 @@ class ToolItem(models.Model):
                 if dr.angle_deg is not None:
                     specs_parts.append(f"∠={fmt_mm(dr.angle_deg)}°")
                 specs_parts.append(f"Dосн={main_d()}")
+        elif cat == "reamer":
+            rm = getattr(self, "reamer_spec", None)
+            tool_type = self.get_category_display()
+            if rm:
+                if rm.diameter_mm is not None:
+                    specs_parts.append(f"D={fmt_mm(rm.diameter_mm)} мм")
+                if rm.overall_length_mm is not None:
+                    specs_parts.append(f"L={fmt_mm(rm.overall_length_mm)} мм")
+                if rm.cutting_length_mm is not None:
+                    specs_parts.append(f"Lc={fmt_mm(rm.cutting_length_mm)} мм")
+                if (rm.accuracy_class or "").strip():
+                    specs_parts.append(rm.accuracy_class.strip())
+                if rm.flutes_count is not None:
+                    specs_parts.append(f"Z={rm.flutes_count}")
+                specs_parts.append(f"Dосн={main_d()}")
         elif cat == "insert":
             ins = getattr(self, "insert_spec", None)
             tool_type = self.get_category_display()
@@ -775,6 +824,7 @@ class ToolItem(models.Model):
             "collet_type": "",
             "er_size": "",
             "clamp_range": "",
+            "accuracy_class": "",
             "body_family": "",
             "body_cutter": "",
             "teeth": "",
@@ -822,6 +872,14 @@ class ToolItem(models.Model):
                 out["length"] = fmt_num(dr.overall_length_mm)
                 out["cutting_length"] = fmt_num(dr.cutting_length_mm)
                 out["angle"] = fmt_num(dr.angle_deg)
+        elif cat == "reamer":
+            rm = getattr(self, "reamer_spec", None)
+            if rm:
+                out["diameter"] = fmt_num(rm.diameter_mm)
+                out["length"] = fmt_num(rm.overall_length_mm)
+                out["cutting_length"] = fmt_num(rm.cutting_length_mm)
+                out["accuracy_class"] = (rm.accuracy_class or "").strip()
+                out["flutes"] = str(rm.flutes_count) if rm.flutes_count is not None else ""
         elif cat == "insert":
             ins = getattr(self, "insert_spec", None)
             if ins:
@@ -945,6 +1003,32 @@ class DrillSpec(models.Model):
 
     def __str__(self):
         return f"Сверло Ø{self.diameter_mm} / {self.angle_deg}°"
+
+
+class ReamerSpec(models.Model):
+    tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="reamer_spec")
+    diameter_mm = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="Диаметр D, мм", null=True, blank=True)
+    overall_length_mm = models.DecimalField(max_digits=7, decimal_places=2, verbose_name="Длина L, мм", null=True, blank=True)
+    cutting_length_mm = models.DecimalField(
+        max_digits=7, decimal_places=2, verbose_name="Длина реж. части Lc, мм", null=True, blank=True
+    )
+    accuracy_class = models.CharField(
+        max_length=24,
+        blank=True,
+        default="",
+        verbose_name="Класс точности / квалитет",
+        help_text="Например H7, H8, IT8…",
+    )
+    flutes_count = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Количество зубьев Z")
+
+    class Meta:
+        verbose_name = "Параметры развертки"
+        verbose_name_plural = "Параметры разверток"
+
+    def __str__(self):
+        acc = f" {self.accuracy_class}" if (self.accuracy_class or "").strip() else ""
+        z = f" Z{self.flutes_count}" if self.flutes_count is not None else ""
+        return f"Развертка Ø{self.diameter_mm}{acc}{z}"
 
 
 class InsertSpec(models.Model):

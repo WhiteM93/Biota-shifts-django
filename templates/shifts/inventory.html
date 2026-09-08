@@ -1074,6 +1074,60 @@
       {% endfor %}
     </tbody>
   </table>
+  {% elif filters.category == "reamer" %}
+  <table class="data-grid inv-stock-grid js-sortable-table">
+    <thead>
+      <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
+        <th class="sortable">D, мм</th>
+        <th class="sortable">L, мм</th>
+        <th class="sortable">Lc, мм</th>
+        <th class="sortable">Квалитет</th>
+        <th class="sortable">Z</th>
+        <th class="sortable">D осн, мм</th>
+        <th class="sortable">Материал инструмента</th>
+        <th class="sortable">Покрытие</th>
+        <th class="sortable">Материал обработки</th>
+        <th class="sortable">Остаток</th>
+        {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tool_items %}
+      <tr>
+<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
+        <td data-sort="{{ t.reamer_spec.diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="rm_diameter_mm" data-type="number" data-value="{{ t.reamer_spec.diameter_mm|default:'' }}"{% endif %}>{% if t.reamer_spec.diameter_mm is not None %}{{ t.reamer_spec.diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.reamer_spec.overall_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="rm_overall_length_mm" data-type="number" data-value="{{ t.reamer_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.reamer_spec.overall_length_mm is not None %}{{ t.reamer_spec.overall_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.reamer_spec.cutting_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="rm_cutting_length_mm" data-type="number" data-value="{{ t.reamer_spec.cutting_length_mm|default:'' }}"{% endif %}>{% if t.reamer_spec.cutting_length_mm is not None %}{{ t.reamer_spec.cutting_length_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.reamer_spec.accuracy_class|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="rm_accuracy_class" data-type="select" data-value="{{ t.reamer_spec.accuracy_class|default:'' }}"{% endif %}>{{ t.reamer_spec.accuracy_class|default:"-" }}</td>
+        <td data-sort="{{ t.reamer_spec.flutes_count|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="rm_flutes_count" data-type="number" data-value="{{ t.reamer_spec.flutes_count|default:'' }}"{% endif %}>{% if t.reamer_spec.flutes_count is not None %}{{ t.reamer_spec.flutes_count }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.main_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="main_diameter_mm" data-type="number" data-value="{{ t.main_diameter_mm|default:'' }}"{% endif %}>{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|floatformat:"-2" }}{% else %}-{% endif %}</td>
+        <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
+        <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
+          {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
+        </td>
+        <td class="inv-stock-wm-cell{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.work_material|default:'-' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
+          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
+        </td>
+        <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
+        {% if can_manage_stock %}
+        <td class="inv-stock-col-delete">
+          <form method="post" class="inv-stock-delete-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_tool_item">
+            <input type="hidden" name="tool_id" value="{{ t.id }}">
+            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить: 0 из 5" title="Удалить: нажмите 5 раз">
+              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            </button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% empty %}
+      <tr><td colspan="{% if can_manage_stock %}12{% else %}11{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
   {% elif filters.category == "collet" %}
   <table class="data-grid inv-stock-grid inv-stock-grid--collet js-sortable-table">
     <thead>
@@ -1241,6 +1295,15 @@
         <option value="">Все</option>
         {% for v in drill_filter_options.diameters %}
         <option value="{{ v }}" {% if filters.drill_diameter_mm == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "reamer" %}
+    <label class="field"><span>Диаметр, мм</span>
+      <select name="reamer_diameter_mm">
+        <option value="">Все</option>
+        {% for v in reamer_filter_options.diameters %}
+        <option value="{{ v }}" {% if filters.reamer_diameter_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -1642,6 +1705,39 @@
         {% endfor %}
       </select>
     </label>
+    {% elif filters.category == "reamer" %}
+    <label class="field"><span>Длина, мм</span>
+      <select name="reamer_overall_length_mm">
+        <option value="">Все</option>
+        {% for v in reamer_filter_options.overall_lengths %}
+        <option value="{{ v }}" {% if filters.reamer_overall_length_mm == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Длина реж. части, мм</span>
+      <select name="reamer_cutting_length_mm">
+        <option value="">Все</option>
+        {% for v in reamer_filter_options.cutting_lengths %}
+        <option value="{{ v }}" {% if filters.reamer_cutting_length_mm == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Квалитет</span>
+      <select name="reamer_accuracy_class">
+        <option value="">Все</option>
+        {% for v in reamer_filter_options.accuracy_classes %}
+        <option value="{{ v }}" {% if filters.reamer_accuracy_class == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Z</span>
+      <select name="reamer_flutes_count">
+        <option value="">Все</option>
+        {% for v in reamer_filter_options.flutes %}
+        <option value="{{ v }}" {% if filters.reamer_flutes_count == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
     {% elif filters.category == "insert" %}
     {% with tips=insert_column_tooltips %}
     <label class="field"><span title="{{ tips.relief }}">Задний угол</span>
@@ -1825,157 +1921,7 @@
       <input type="text" class="js-tool-search" data-target-select="issue-tool-select" placeholder="Например: 1, 1.0, M6, D1">
     </label>
 
-    <div class="js-issue-cat-panel issue-cat-panel" data-cat="end_mill" hidden>
-      <label class="field"><span>Тип фрезы</span>
-        <select class="js-issue-f" data-fkey="mill_type" data-choice="end_mill_types"></select>
-      </label>
-      <label class="field"><span>Диаметр, мм</span>
-        <select class="js-issue-f" data-fkey="diameter" data-num="1"></select>
-      </label>
-      <label class="field"><span>Радиус, мм</span>
-        <select class="js-issue-f" data-fkey="radius" data-num="1"></select>
-      </label>
-      <label class="field"><span>Длина общая, мм</span>
-        <select class="js-issue-f" data-fkey="length" data-num="1"></select>
-      </label>
-      <label class="field"><span>Длина реж. части, мм</span>
-        <select class="js-issue-f" data-fkey="cutting_length" data-num="1"></select>
-      </label>
-      <label class="field"><span>Кромки</span>
-        <select class="js-issue-f" data-fkey="flutes" data-num="1"></select>
-      </label>
-    </div>
-
-    <div class="js-issue-cat-panel issue-cat-panel" data-cat="tap" hidden>
-      <label class="field"><span>Тип инструмента</span>
-        <select class="js-issue-f" data-fkey="tap_type" data-choice="tap_tool_types" data-subtype="1"></select>
-      </label>
-      <label class="field"><span>Размер</span>
-        <select class="js-issue-f" data-fkey="tap_size"></select>
-      </label>
-      <label class="field"><span>Шаг, мм</span>
-        <select class="js-issue-f" data-fkey="tap_pitch" data-num="1"></select>
-      </label>
-      <label class="field"><span>Стандарт резьбы</span>
-        <select class="js-issue-f" data-fkey="tap_thread" data-choice="thread_standards"></select>
-      </label>
-      <label class="field"><span>Тип отверстия</span>
-        <select class="js-issue-f" data-fkey="tap_hole" data-choice="tap_hole_types"></select>
-      </label>
-      <label class="field"><span>Длина общая, мм</span>
-        <select class="js-issue-f" data-fkey="length" data-num="1"></select>
-      </label>
-      <label class="field"><span>Длина реж. части, мм</span>
-        <select class="js-issue-f" data-fkey="cutting_length" data-num="1"></select>
-      </label>
-    </div>
-
-    <div class="js-issue-cat-panel issue-cat-panel" data-cat="center_drill" hidden>
-      <label class="field"><span>Диаметр, мм</span>
-        <select class="js-issue-f" data-fkey="diameter" data-num="1"></select>
-      </label>
-      <label class="field"><span>Длина, мм</span>
-        <select class="js-issue-f" data-fkey="length" data-num="1"></select>
-      </label>
-      <label class="field"><span>Угол, °</span>
-        <select class="js-issue-f" data-fkey="angle" data-choice="center_drill_angles"></select>
-      </label>
-    </div>
-
-    <div class="js-issue-cat-panel issue-cat-panel" data-cat="countersink" hidden>
-      <label class="field"><span>Тип зенкера</span>
-        <select class="js-issue-f" data-fkey="countersink_type" data-choice="countersink_types" data-subtype="1"></select>
-      </label>
-      <label class="field"><span>Диаметр, мм</span>
-        <select class="js-issue-f" data-fkey="diameter" data-num="1"></select>
-      </label>
-      <label class="field"><span>Угол, °</span>
-        <select class="js-issue-f" data-fkey="angle" data-choice="countersink_angles"></select>
-      </label>
-      <label class="field"><span>Длина, мм</span>
-        <select class="js-issue-f" data-fkey="length" data-num="1"></select>
-      </label>
-      <label class="field"><span>Кромки</span>
-        <select class="js-issue-f" data-fkey="flutes" data-num="1"></select>
-      </label>
-      <label class="field"><span>Размер</span>
-        <select class="js-issue-f" data-fkey="size_label"></select>
-      </label>
-    </div>
-
-    <div class="js-issue-cat-panel issue-cat-panel" data-cat="drill" hidden>
-      <label class="field"><span>Диаметр, мм</span>
-        <select class="js-issue-f" data-fkey="diameter" data-num="1"></select>
-      </label>
-      <label class="field"><span>Длина, мм</span>
-        <select class="js-issue-f" data-fkey="length" data-num="1"></select>
-      </label>
-      <label class="field"><span>Длина реж. части, мм</span>
-        <select class="js-issue-f" data-fkey="cutting_length" data-num="1"></select>
-      </label>
-      <label class="field"><span>Угол, °</span>
-        <select class="js-issue-f" data-fkey="angle" data-num="1"></select>
-      </label>
-    </div>
-
-    <div class="js-issue-cat-panel issue-cat-panel" data-cat="insert" hidden>
-      <label class="field"><span>Семейство</span>
-        <select class="js-issue-f" data-fkey="ins_family" data-choice="milling_insert_families" data-subtype="1"></select>
-      </label>
-      <label class="field"><span>Форма</span>
-        <select class="js-issue-f" data-fkey="ins_shape" data-choice="insert_shapes"></select>
-      </label>
-      <label class="field"><span>ISO</span>
-        <select class="js-issue-f" data-fkey="ins_iso"></select>
-      </label>
-      <label class="field"><span>R, мм</span>
-        <select class="js-issue-f" data-fkey="radius" data-num="1"></select>
-      </label>
-    </div>
-
-    <div class="js-issue-cat-panel issue-cat-panel" data-cat="collet" hidden>
-      <label class="field"><span>Тип цанги</span>
-        <select class="js-issue-f" data-fkey="collet_type" data-choice="collet_types" data-subtype="1"></select>
-      </label>
-      <label class="field"><span>Размер ER</span>
-        <select class="js-issue-f" data-fkey="er_size" data-choice="er_collet_sizes"></select>
-      </label>
-      <label class="field"><span>Диапазон зажима</span>
-        <select class="js-issue-f" data-fkey="clamp_range" data-choice="er_clamp_ranges"></select>
-      </label>
-    </div>
-
-    <div class="field issue-filter-chips-field js-issue-common-filters">
-      <span>Материал инструмента</span>
-      <div class="issue-mat-picker js-tool-filter-material-picker" data-target-select="issue-tool-select" role="radiogroup" aria-label="Материал инструмента">
-        <label class="issue-mat-chip">
-          <input type="radio" name="issue_ui_material" class="js-tool-filter-material" data-target-select="issue-tool-select" value="" checked>
-          <span class="issue-mat-chip-face">Все</span>
-        </label>
-        {% for code, label in tool_material_types %}
-        <label class="issue-mat-chip" data-mat-code="{{ code }}">
-          <input type="radio" name="issue_ui_material" class="js-tool-filter-material" data-target-select="issue-tool-select" value="{{ code }}">
-          <span class="issue-mat-chip-face" title="{{ label }}">{{ label }}</span>
-        </label>
-        {% endfor %}
-      </div>
-    </div>
-    <div class="field issue-filter-chips-field js-issue-common-filters">
-      <span>Покрытие</span>
-      <div class="coating-picker js-tool-filter-coating-picker" data-target-select="issue-tool-select" role="radiogroup" aria-label="Покрытие">
-        <label class="coating-chip">
-          <input type="radio" name="issue_ui_coating" class="js-tool-filter-coating" data-target-select="issue-tool-select" value="" checked>
-          <span class="swatch swatch-all" title="Все"></span>
-        </label>
-        {% for key, label in coating_types %}
-        <label class="coating-chip">
-          <input type="radio" name="issue_ui_coating" class="js-tool-filter-coating" data-target-select="issue-tool-select" value="{{ key }}">
-          <span class="swatch swatch-{{ key }}" title="{{ key|coating_hover_title }}"></span>
-        </label>
-        {% endfor %}
-      </div>
-    </div>
-    <p class="muted issue-filter-hint">Сначала тип, затем подтип (если есть) — размеры подставляются из позиций на складе.</p>
+    {% include "shifts/includes/issue_tool_filters.html" with radio_prefix="issue_ui" target_select_id="issue-tool-select" %}
     <label class="field issue-tool-field"><span>Инструмент</span>
       <div class="issue-tool-combo js-issue-tool-combo">
         <select id="issue-tool-select" name="tool_id" required class="issue-tool-combo-native" tabindex="-1" aria-hidden="true">
@@ -2015,6 +1961,7 @@
             data-f-collet_type="{{ m.collet_type|escape }}"
             data-f-er_size="{{ m.er_size|escape }}"
             data-f-clamp_range="{{ m.clamp_range|escape }}"
+            data-f-accuracy_class="{{ m.accuracy_class|escape }}"
           >{{ t.issue_select_label }}</option>
           {% endwith %}
           {% endfor %}
@@ -2397,18 +2344,26 @@
       {% csrf_token %}
       <input type="hidden" name="action" value="process_issue_outcome">
       <input type="hidden" name="outcome_employee" id="outcome-main-filter-employee" value="{{ filters.outcome_employee }}">
+      <div class="inv-outcome-tool-filters filter-grid">
+        <label class="field"><span class="inv-outcome-label">Тип инструмента</span>
+          <select class="js-tool-category inv-outcome-inp" data-target-select="issue-id-select">
+            <option value="">Все</option>
+            {% include "shifts/includes/stock_category_optgroups.html" with selected_category="" %}
+          </select>
+        </label>
+        <label class="field"><span class="inv-outcome-label" for="issue-search-input">Поиск</span>
+          <input type="text" class="inv-outcome-inp js-tool-search" id="issue-search-input" data-target-select="issue-id-select" placeholder="1, M6, D10…">
+        </label>
+        {% include "shifts/includes/issue_tool_filters.html" with radio_prefix="outcome_ui" target_select_id="issue-id-select" %}
+      </div>
       <div class="inv-outcome-form-grid">
-        <div class="inv-outcome-field">
-          <label class="inv-outcome-label" for="issue-search-input">Поиск</label>
-          <input type="text" class="inv-outcome-inp" id="issue-search-input" placeholder="1, M6, D10…">
-        </div>
         <div class="inv-outcome-field inv-outcome-field--tool issue-tool-field">
           <span class="inv-outcome-label">Выданная позиция</span>
           <div class="issue-tool-combo js-issue-tool-combo">
             <select name="issue_id" id="issue-id-select" required class="issue-tool-combo-native" tabindex="-1" aria-hidden="true">
               <option value="">Выбрать...</option>
               {% for iss in issue_candidates %}
-              {% with card=iss.tool.issue_combo_card coat=iss.tool.coating_type|default:'none' %}
+              {% with card=iss.tool.issue_combo_card coat=iss.tool.coating_type|default:'none' m=iss.tool.issue_filter_metrics %}
               <option
                 value="{{ iss.id }}"
                 data-category="{{ iss.tool.category }}"
@@ -2422,6 +2377,29 @@
                 data-issue-wm-title="{% if iss.tool.work_material %}{{ iss.tool.get_work_material_display|escape }}{% endif %}"
                 data-issue-extra="кому: {{ iss.employee_name|default:'-'|escape }} · {{ iss.movement_date|date:'d.m.Y' }} · выдано {{ iss.quantity }} · ост. {{ iss.remaining_qty }}"
                 data-employee-name="{{ iss.employee_name|default:''|escape }}"
+                data-f-material="{{ m.material|escape }}"
+                data-f-coating="{{ m.coating|escape }}"
+                data-f-mill_type="{{ m.mill_type|escape }}"
+                data-f-diameter="{{ m.diameter }}"
+                data-f-radius="{{ m.radius }}"
+                data-f-length="{{ m.length }}"
+                data-f-cutting_length="{{ m.cutting_length }}"
+                data-f-flutes="{{ m.flutes }}"
+                data-f-tap_type="{{ m.tap_type|escape }}"
+                data-f-tap_size="{{ m.tap_size|escape }}"
+                data-f-tap_pitch="{{ m.tap_pitch }}"
+                data-f-tap_thread="{{ m.tap_thread|escape }}"
+                data-f-tap_hole="{{ m.tap_hole|escape }}"
+                data-f-angle="{{ m.angle|escape }}"
+                data-f-countersink_type="{{ m.countersink_type|escape }}"
+                data-f-size_label="{{ m.size_label|escape }}"
+                data-f-ins_iso="{{ m.ins_iso|escape }}"
+                data-f-ins_shape="{{ m.ins_shape|escape }}"
+                data-f-ins_family="{{ m.ins_family|escape }}"
+                data-f-collet_type="{{ m.collet_type|escape }}"
+                data-f-er_size="{{ m.er_size|escape }}"
+                data-f-clamp_range="{{ m.clamp_range|escape }}"
+                data-f-accuracy_class="{{ m.accuracy_class|escape }}"
               >{{ iss.tool.issue_select_label }}</option>
               {% endwith %}
               {% endfor %}
@@ -2541,6 +2519,12 @@
               · D {{ iss.tool.drill_spec.diameter_mm|default:"-"|floatformat:"-2" }}
               · L {{ iss.tool.drill_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
               · Lc {{ iss.tool.drill_spec.cutting_length_mm|default:"-"|floatformat:"-2" }}
+            {% elif iss.tool.category == "reamer" and iss.tool.reamer_spec %}
+              · Развертка {{ iss.tool.reamer_spec.accuracy_class|default:"-" }}
+              · D {{ iss.tool.reamer_spec.diameter_mm|default:"-"|floatformat:"-2" }}
+              · L {{ iss.tool.reamer_spec.overall_length_mm|default:"-"|floatformat:"-2" }}
+              · Lc {{ iss.tool.reamer_spec.cutting_length_mm|default:"-"|floatformat:"-2" }}
+              · Z {{ iss.tool.reamer_spec.flutes_count|default:"-" }}
             {% endif %}
             · D осн {{ iss.tool.main_diameter_mm|default:"-"|floatformat:"-2" }}
           </p>
@@ -3566,7 +3550,7 @@
           <time class="inv-history-card__when" datetime="{{ m.created_at|date:'c' }}">{{ m.created_at|date:"d.m.Y H:i" }}</time>
         </div>
         <p class="inv-history-card__title">{{ m.tool.name }}{% if m.tool.is_deleted %} <span class="muted">(удалено{% if m.tool.deleted_by %}: {{ m.tool.deleted_by }}{% endif %})</span>{% endif %}</p>
-        <p class="inv-history-card__sub">{{ m.tool.get_category_display }} · {% if m.tool.category == "end_mill" and m.tool.end_mill_spec %}{{ m.tool.end_mill_spec.get_mill_type_display }}{% elif m.tool.category == "tap" and m.tool.tap_spec %}{{ m.tool.tap_spec.get_tap_type_display }}{% elif m.tool.category == "center_drill" and m.tool.center_drill_spec %}Центровка {{ m.tool.center_drill_spec.angle_deg }}°{% elif m.tool.category == "countersink" and m.tool.countersink_spec %}Зенкер {{ m.tool.countersink_spec.get_countersink_type_display }} {{ m.tool.countersink_spec.angle_deg }}°{% elif m.tool.category == "drill" and m.tool.drill_spec %}Сверло {{ m.tool.drill_spec.angle_deg }}°{% else %}—{% endif %}</p>
+        <p class="inv-history-card__sub">{{ m.tool.get_category_display }} · {% if m.tool.category == "end_mill" and m.tool.end_mill_spec %}{{ m.tool.end_mill_spec.get_mill_type_display }}{% elif m.tool.category == "tap" and m.tool.tap_spec %}{{ m.tool.tap_spec.get_tap_type_display }}{% elif m.tool.category == "center_drill" and m.tool.center_drill_spec %}Центровка {{ m.tool.center_drill_spec.angle_deg }}°{% elif m.tool.category == "countersink" and m.tool.countersink_spec %}Зенкер {{ m.tool.countersink_spec.get_countersink_type_display }} {{ m.tool.countersink_spec.angle_deg }}°{% elif m.tool.category == "drill" and m.tool.drill_spec %}Сверло {{ m.tool.drill_spec.angle_deg }}°{% elif m.tool.category == "reamer" and m.tool.reamer_spec %}Развертка {{ m.tool.reamer_spec.accuracy_class|default:"—" }}{% else %}—{% endif %}</p>
         <div class="inv-history-facts">
           <span class="inv-history-qty"><strong>{{ m.quantity }}</strong> шт.</span>
           {% if m.employee_name %}<span class="inv-history-fact"><span class="inv-history-fact__label">Сотрудник</span> {{ m.employee_name }}</span>{% endif %}
@@ -3722,6 +3706,7 @@
   "center_drill_angles": [{% for key, label in center_drill_angles %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "countersink_types": [{% for key, label in countersink_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "countersink_angles": [{% for key, label in countersink_angles %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "reamer_accuracy_classes": [{% for key, label in reamer_accuracy_classes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "insert_shapes": [{% for key, label in insert_shapes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "insert_relief_angles": [{% for key, label in insert_relief_angles %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "insert_tolerance_classes": [{% for key, label in insert_tolerance_classes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],

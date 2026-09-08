@@ -59,6 +59,13 @@ GROUP_FIELD_PATHS: dict[str, dict[str, str]] = {
         "diameter_mm": "drill_spec__diameter_mm",
         "angle_deg": "drill_spec__angle_deg",
     },
+    "reamer": {
+        "diameter_mm": "reamer_spec__diameter_mm",
+        "overall_length_mm": "reamer_spec__overall_length_mm",
+        "cutting_length_mm": "reamer_spec__cutting_length_mm",
+        "accuracy_class": "reamer_spec__accuracy_class",
+        "flutes_count": "reamer_spec__flutes_count",
+    },
     "insert": {
         "insert_shape": "insert_spec__insert_shape",
         "cutting_edge_length_code": "insert_spec__cutting_edge_length_code",
@@ -127,6 +134,15 @@ GROUP_FIELD_LABELS["countersink"].update(
     }
 )
 GROUP_FIELD_LABELS["drill"].update({"diameter_mm": "Диаметр, мм", "angle_deg": "Угол, °"})
+GROUP_FIELD_LABELS["reamer"].update(
+    {
+        "diameter_mm": "Диаметр, мм",
+        "overall_length_mm": "L, мм",
+        "cutting_length_mm": "Lc, мм",
+        "accuracy_class": "Квалитет",
+        "flutes_count": "Z",
+    }
+)
 GROUP_FIELD_LABELS["insert"].update(
     {
         "insert_shape": "Форма",
@@ -152,6 +168,7 @@ DEFAULT_GROUP_FIELD: dict[str, str] = {
     "center_drill": "diameter_mm",
     "countersink": "diameter_mm",
     "drill": "diameter_mm",
+    "reamer": "diameter_mm",
     "insert": "insert_shape",
     "collet": "collet_type",
 }
@@ -202,6 +219,13 @@ STOCK_FILTER_PARAMS: dict[str, dict[str, str]] = {
         "diameter_mm": "drill_diameter_mm",
         "angle_deg": "drill_angle_deg",
     },
+    "reamer": {
+        "diameter_mm": "reamer_diameter_mm",
+        "overall_length_mm": "reamer_overall_length_mm",
+        "cutting_length_mm": "reamer_cutting_length_mm",
+        "accuracy_class": "reamer_accuracy_class",
+        "flutes_count": "reamer_flutes_count",
+    },
     "insert": {
         "insert_shape": "ins_shape",
         "cutting_edge_length_code": "ins_edge_code",
@@ -226,7 +250,7 @@ try:
         INDEXABLE_MILL_CUTTER_TYPES,
     )
     from shifts.insert_constants import MILLING_INSERT_FAMILIES
-    from shifts.models import END_MILL_TYPES, COUNTERSINK_TYPES, COLLET_TYPES, THREAD_STANDARDS, TAP_TOOL_TYPES
+    from shifts.models import END_MILL_TYPES, COUNTERSINK_TYPES, COLLET_TYPES, REAMER_ACCURACY_CLASSES, THREAD_STANDARDS, TAP_TOOL_TYPES
 
     CHOICE_LABELS: dict[str, dict[str, str]] = {
         "mill_type": dict(END_MILL_TYPES),
@@ -242,6 +266,7 @@ try:
         "collet_type": dict(COLLET_TYPES),
         "thread_standard": dict(THREAD_STANDARDS),
         "tap_type": dict(TAP_TOOL_TYPES),
+        "accuracy_class": dict(REAMER_ACCURACY_CLASSES),
     }
 except Exception:
     CHOICE_LABELS = {}

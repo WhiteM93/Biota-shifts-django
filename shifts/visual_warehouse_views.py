@@ -45,6 +45,8 @@ from .models import (
     DrillSpec,
     EndMillSpec,
     InventoryStockEvent,
+    REAMER_ACCURACY_CLASSES,
+    ReamerSpec,
     StockMovement,
     TapSpec,
     ToolItem,
@@ -97,6 +99,7 @@ _DIAMETER_FIELD_BY_CATEGORY = {
     "end_mill": "end_mill_spec__diameter_mm",
     "body_tool": "body_tool_spec__diameter_mm",
     "drill": "drill_spec__diameter_mm",
+    "reamer": "reamer_spec__diameter_mm",
     "center_drill": "center_drill_spec__diameter_mm",
     "countersink": "countersink_spec__diameter_mm",
 }
@@ -245,6 +248,9 @@ def _cutting_diameter_mm(tool: ToolItem):
     if cat == "drill":
         dr = getattr(tool, "drill_spec", None)
         return dr.diameter_mm if dr else None
+    if cat == "reamer":
+        rm = getattr(tool, "reamer_spec", None)
+        return rm.diameter_mm if rm else None
     if cat == "center_drill":
         cd = getattr(tool, "center_drill_spec", None)
         return cd.diameter_mm if cd else None
@@ -274,6 +280,8 @@ def _infer_filter_from_label(label: str) -> dict | None:
         category = "end_mill"
     elif "сверл" in text:
         category = "drill"
+    elif "разверт" in text:
+        category = "reamer"
     elif "центров" in text:
         category = "center_drill"
     elif "зенкер" in text:
@@ -387,6 +395,13 @@ def _serialize_tool(tool: ToolItem) -> dict:
             overall_length_mm = float(dr.overall_length_mm) if dr.overall_length_mm is not None else None
             cutting_length_mm = float(dr.cutting_length_mm) if dr.cutting_length_mm is not None else None
             angle_deg = float(dr.angle_deg) if dr.angle_deg is not None else None
+    elif tool.category == "reamer":
+        rm = getattr(tool, "reamer_spec", None)
+        if rm:
+            overall_length_mm = float(rm.overall_length_mm) if rm.overall_length_mm is not None else None
+            cutting_length_mm = float(rm.cutting_length_mm) if rm.cutting_length_mm is not None else None
+            flutes_count = int(rm.flutes_count) if rm.flutes_count is not None else None
+            angle_deg = (rm.accuracy_class or "").strip() or None
     card = tool.issue_combo_card()
     return {
         "id": tool.id,
@@ -457,6 +472,7 @@ def _tool_qs_for_filter(
             "end_mill_spec",
             "body_tool_spec",
             "drill_spec",
+            "reamer_spec",
             "center_drill_spec",
             "countersink_spec",
             "tap_spec",
@@ -469,6 +485,7 @@ def _tool_qs_for_filter(
         "end_mill_spec",
         "body_tool_spec",
         "drill_spec",
+        "reamer_spec",
         "center_drill_spec",
         "countersink_spec",
         "tap_spec",
@@ -557,6 +574,11 @@ def _tool_qs_for_filter(
             qs = qs.filter(drill_spec__angle_deg=Decimal(str(angle_deg)))
         except (InvalidOperation, TypeError, ValueError):
             pass
+    if category == "reamer":
+        if angle_deg:
+            qs = qs.filter(reamer_spec__accuracy_class__iexact=str(angle_deg).strip())
+        if flutes_count is not None:
+            qs = qs.filter(reamer_spec__flutes_count=flutes_count)
 
     return qs
 
@@ -573,46 +595,39 @@ def _qs_for_item_rule(item: VisualContainerItem):
     return _tool_qs_for_filter(**_item_filter_kwargs(item))
 
 
+def _container_content_address(c: VisualContainer) -> str:
+    """Адрес места для привязки позиций склада (A-01-02)."""
+    addr = normalize_address(resolve_container_address(c, prefer_stored=True))
+    if addr:
+        return addr
+    parent = getattr(c, "parent", None)
+    if parent is not None:
+        return normalize_address(resolve_container_address(parent, prefer_stored=True))
+    return ""
+
+
+def _tools_qs_for_address(addr: str):
+    addr = normalize_address(addr)
+    if not addr:
+        return ToolItem.objects.none()
+    return ToolItem.objects.filter(is_deleted=False, warehouse_address__iexact=addr).select_related(
+        "end_mill_spec",
+        "body_tool_spec",
+        "tap_spec",
+        "center_drill_spec",
+        "countersink_spec",
+        "drill_spec",
+        "reamer_spec",
+        "insert_spec",
+        "collet_spec",
+    )
+
+
 def _matching_tools_for_container(c: VisualContainer, items: list[VisualContainerItem] | None = None) -> list[dict]:
-    """Список реальных позиций склада, попадающих под содержимое ящика."""
-    seen: set[int] = set()
-    out: list[dict] = []
-    rows = items if items is not None else list(c.items.select_related("tool_item").all())
-    include_rows = [item for item in rows if not _item_is_exclude(item)]
-    exclude_rows = [item for item in rows if _item_is_exclude(item)]
-
-    def _add_from_qs(qs):
-        for tool in qs.order_by("category", "name"):
-            if tool.pk in seen:
-                continue
-            seen.add(tool.pk)
-            out.append(_serialize_tool(tool))
-
-    has_rule = False
-    for item in include_rows:
-        if item.tool_item_id or item.tool_category:
-            has_rule = True
-            _add_from_qs(_qs_for_item_rule(item))
-
-    if not has_rule:
-        inferred = _infer_filter_from_label(c.label or "")
-        if inferred:
-            _add_from_qs(
-                _tool_qs_for_filter(
-                    category=inferred["tool_category"],
-                    d_from=inferred["diameter_from_mm"],
-                    d_to=inferred["diameter_to_mm"],
-                )
-            )
-
-    if exclude_rows and out:
-        excluded_ids: set[int] = set()
-        for item in exclude_rows:
-            if item.tool_item_id or item.tool_category:
-                excluded_ids.update(_qs_for_item_rule(item).values_list("pk", flat=True))
-        if excluded_ids:
-            out = [t for t in out if t.get("id") not in excluded_ids]
-            seen = {t["id"] for t in out}
+    """Позиции склада с адресом этого места (содержимое задаётся на складе)."""
+    del items  # правила VisualContainerItem больше не определяют состав
+    addr = _container_content_address(c)
+    out = [_serialize_tool(tool) for tool in _tools_qs_for_address(addr)]
 
     def _sort_key(t: dict):
         diam = t.get("diameter_mm")
@@ -868,6 +883,16 @@ def _ensure_organizer_children(org: VisualContainer) -> None:
             ch.save(update_fields=["label", "updated_at"])
 
 
+def _move_tools_address(old_addr: str, new_addr: str) -> None:
+    old_n = normalize_address(old_addr)
+    new_n = normalize_address(new_addr)
+    if not old_n or not new_n or old_n == new_n:
+        return
+    ToolItem.objects.filter(is_deleted=False, warehouse_address__iexact=old_n).update(
+        warehouse_address=new_n
+    )
+
+
 def _refresh_container_addresses_for_cabinet(
     cab: VisualCabinet, *, old_furniture_code: str = ""
 ) -> None:
@@ -889,6 +914,7 @@ def _refresh_container_addresses_for_cabinet(
             if stored == normalize_address(suggested_old):
                 cont.address = suggested_new
                 cont.save(update_fields=["address", "updated_at"])
+                _move_tools_address(stored, suggested_new)
 
 
 def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> dict:
@@ -987,6 +1013,7 @@ def visual_warehouse_view(request):
             "countersink_types": [{"value": v, "label": lab} for v, lab in COUNTERSINK_TYPES],
             "countersink_angles": [{"value": v, "label": lab} for v, lab in COUNTERSINK_ANGLES],
             "center_drill_angles": [{"value": v, "label": lab} for v, lab in CENTER_DRILL_ANGLES],
+            "reamer_accuracy_classes": [{"value": v, "label": lab} for v, lab in REAMER_ACCURACY_CLASSES],
             "collet_types": [{"value": v, "label": lab} for v, lab in COLLET_TYPES],
             "er_collet_sizes": [{"value": v, "label": lab} for v, lab in ER_COLLET_SIZES],
             "insert_shapes": [{"value": v, "label": lab} for v, lab in INSERT_SHAPES],
@@ -1248,6 +1275,12 @@ def visual_warehouse_api_container_upsert(request):
         cont = get_object_or_404(VisualContainer, pk=cid, cabinet=cab)
         if cont.parent_id and cont_kind == VisualContainer.KIND_ORGANIZER:
             return _err("Нельзя превратить ячейку в органайзер")
+        old_addr = normalize_address(resolve_container_address(cont, cab, prefer_stored=True))
+        old_suggested = (
+            ""
+            if cont.parent_id
+            else normalize_address(suggested_address(cab, shelf=cont.shelf, column=cont.column))
+        )
         cont.kind = cont_kind
         cont.shelf = shelf
         cont.stack = stack
@@ -1259,14 +1292,19 @@ def visual_warehouse_api_container_upsert(request):
         cont.notes = notes
         if address is not None:
             cont.address = address
-        elif not (cont.address or "").strip() and not parent:
-            cont.address = suggested_address(cab, shelf=shelf, column=column)
+        elif not parent:
+            new_suggested = suggested_address(cab, shelf=shelf, column=column)
+            if not (cont.address or "").strip() or old_addr == old_suggested:
+                cont.address = new_suggested
         if cont_kind == VisualContainer.KIND_ORGANIZER:
             cont.inner_tiers = inner_tiers
             cont.inner_columns = inner_columns
         cont.save()
         if cont_kind == VisualContainer.KIND_ORGANIZER:
             _ensure_organizer_children(cont)
+        new_addr = normalize_address(resolve_container_address(cont, cab, prefer_stored=True))
+        if old_addr and new_addr and old_addr != new_addr:
+            _move_tools_address(old_addr, new_addr)
     else:
         auto_addr = address if address is not None else (
             "" if parent else suggested_address(cab, shelf=shelf, column=column)
@@ -1414,11 +1452,11 @@ def _parse_item_filters(body: dict, category: str) -> tuple[dict | None, str | N
     if category != "insert":
         insert_family = ""
         insert_shape = ""
-    if category not in ("end_mill", "countersink"):
+    if category not in ("end_mill", "countersink", "reamer"):
         flutes_count = None
     if category not in ("drill", "center_drill", "countersink"):
         angle_deg = ""
-    if category not in ("end_mill", "body_tool", "drill", "center_drill", "countersink", "tap"):
+    if category not in ("end_mill", "body_tool", "drill", "reamer", "center_drill", "countersink", "tap"):
         d_from = None
         d_to = None
 
@@ -1704,7 +1742,7 @@ def _create_tool_for_audit(data: dict) -> ToolItem:
             size_label=size_label,
         )
 
-    if category in {"end_mill", "drill", "center_drill", "countersink"} and diameter is None:
+    if category in {"end_mill", "drill", "reamer", "center_drill", "countersink"} and diameter is None:
         raise ValueError("Укажите диаметр нового инструмента")
     if category == "tap" and not size_label:
         raise ValueError("Укажите размер метчика (например M6)")
@@ -1726,6 +1764,8 @@ def _create_tool_for_audit(data: dict) -> ToolItem:
         )
     elif category == "drill":
         DrillSpec.objects.create(tool=tool, diameter_mm=diameter)
+    elif category == "reamer":
+        ReamerSpec.objects.create(tool=tool, diameter_mm=diameter)
     elif category == "center_drill":
         CenterDrillSpec.objects.create(tool=tool, diameter_mm=diameter)
     elif category == "countersink":
@@ -1741,18 +1781,15 @@ def _create_tool_for_audit(data: dict) -> ToolItem:
 
 
 def _link_tool_to_container(cont: VisualContainer, tool: ToolItem) -> None:
-    """Привязать найденный инструмент к ящику, чтобы он оставался в списке."""
-    if VisualContainerItem.objects.filter(container=cont, tool_item=tool).exists():
+    """Привязать инструмент к месту через адрес склада (не через правила ящика)."""
+    addr = _container_content_address(cont)
+    if not addr:
+        raise ValueError("У места нет адреса — сначала создайте контейнер на визуальном складе")
+    current = normalize_address(getattr(tool, "warehouse_address", "") or "")
+    if current == addr:
         return
-    if cont.items.count() >= MAX_ITEMS_PER_CONTAINER:
-        raise ValueError(f"В ящике слишком много правил (макс. {MAX_ITEMS_PER_CONTAINER})")
-    VisualContainerItem.objects.create(
-        container=cont,
-        title=(tool.name or "Инструмент")[:200],
-        tool_category=tool.category or "",
-        tool_item=tool,
-        sort_order=900 + cont.items.count(),
-    )
+    tool.warehouse_address = addr
+    tool.save(update_fields=["warehouse_address", "updated_at"])
 
 
 @write_permission_required
