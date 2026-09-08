@@ -527,7 +527,10 @@ html[data-theme="dawn"] .inv-arrival-toolbar .inv-arrival-select-wrap::after {
   }
 }
 
-.inv-arrival-field--collet-type[hidden] {
+.inv-arrival-field[hidden],
+.inv-arrival-field--collet-type[hidden],
+.inv-arrival-field--body-family[hidden],
+.inv-arrival-field--body-cutter[hidden] {
   display: none !important;
 }
 

@@ -18,6 +18,8 @@
   data-api-photos-tpl="{% url 'visual_warehouse_api_container_photos' 0 %}"
   data-api-photo-del-tpl="{% url 'visual_warehouse_api_container_photo_delete' 0 %}"
   data-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}"
+  data-audit-ok-days="{{ vw_audit_ok_days }}"
+  data-audit-warn-days="{{ vw_audit_warn_days }}"
 >
   <header class="vw-topbar">
     <div class="vw-topbar-text">

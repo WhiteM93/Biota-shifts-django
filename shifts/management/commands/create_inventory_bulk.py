@@ -17,14 +17,12 @@ from shifts.models import (
     InsertSpec,
     TapSpec,
     ToolItem,
-    normalize_work_material_codes,
 )
 
 CATEGORIES = ("end_mill", "tap", "center_drill", "countersink", "drill", "insert", "collet")
 END_MILL_TYPES_CYCLE = ("end", "roughing", "ball", "radius", "t_slot")
 COATINGS = ("none", "yellow", "black", "brown", "multicolor", "blue")
 MATERIALS = ("hss", "hss_co", "carbide", "hrc55", "hrc65")
-WORK_MATS = ("P", "M", "K", "N", "P,M", "M,K", "P,K,N", "S", "H", "PW")
 ER_SIZES = ("ER08", "ER11", "ER16", "ER20", "ER25", "ER32", "ER40")
 CLAMP_RANGES = ("1-2", "2-3", "3-4", "4-5", "5-6", "6-7", "7-8", "8-10")
 
@@ -45,7 +43,6 @@ class Command(BaseCommand):
             d = Decimal("3") + Decimal(i)
             coating = COATINGS[(i - 1) % len(COATINGS)]
             material = MATERIALS[(i - 1) % len(MATERIALS)]
-            work = normalize_work_material_codes(WORK_MATS[(i - 1) % len(WORK_MATS)])
             qty = 5 + (i % 15)
 
             n = f"{prefix} фреза #{i:02d}"
@@ -54,7 +51,6 @@ class Command(BaseCommand):
                 name=n,
                 tool_material=material,
                 coating_type=coating,
-                work_material=work,
                 main_diameter_mm=d,
                 quantity=qty,
                 notes="Автотест склада",
@@ -77,7 +73,6 @@ class Command(BaseCommand):
                 name=n,
                 tool_material=material,
                 coating_type=coating,
-                work_material=work,
                 main_diameter_mm=Decimal(m),
                 quantity=qty,
                 notes="Автотест склада",
@@ -100,7 +95,6 @@ class Command(BaseCommand):
                 name=n,
                 tool_material=material,
                 coating_type=coating,
-                work_material=work,
                 main_diameter_mm=d,
                 quantity=qty,
                 notes="Автотест склада",
@@ -119,7 +113,6 @@ class Command(BaseCommand):
                 name=n,
                 tool_material=material,
                 coating_type=coating,
-                work_material=work,
                 main_diameter_mm=d + Decimal("2"),
                 quantity=qty,
                 notes="Автотест склада",
@@ -141,7 +134,6 @@ class Command(BaseCommand):
                 name=n,
                 tool_material=material,
                 coating_type=coating,
-                work_material=work,
                 main_diameter_mm=d,
                 quantity=qty,
                 notes="Автотест склада",
@@ -166,7 +158,6 @@ class Command(BaseCommand):
                 name=n,
                 tool_material=material,
                 coating_type=coating,
-                work_material=work,
                 main_diameter_mm=None,
                 quantity=qty,
                 notes="Автотест склада",
@@ -199,7 +190,6 @@ class Command(BaseCommand):
                 name=n,
                 tool_material="",
                 coating_type="none",
-                work_material="",
                 main_diameter_mm=None,
                 quantity=qty,
                 notes="Автотест склада",

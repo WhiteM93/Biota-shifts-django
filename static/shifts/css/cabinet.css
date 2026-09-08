@@ -1211,6 +1211,10 @@ label.btn-upload input[type="file"] {
   border-color: color-mix(in srgb, #7c6cf0 35%, var(--bio-surface-item-border));
 }
 
+.cabinet-quick-card--vw-audit {
+  border-left: 3px solid #1a7f37;
+}
+
 /* Справочник иконок */
 .cabinet-icons-page__lead {
   margin: 0;

@@ -4,7 +4,6 @@ from django.db.models import Count
 
 from shifts.insert_constants import INSERT_MACHINING_APPLICATION_VALUES
 from shifts.models import (
-    WORK_MATERIAL_CODE_SET,
     CenterDrillSpec,
     CountersinkSpec,
     DrillSpec,
@@ -16,7 +15,7 @@ from shifts.models import (
 
 
 class Command(BaseCommand):
-    help = "Аудит позиций склада: количество по категориям, спеки, мультивыбор WM"
+    help = "Аудит позиций склада: количество по категориям, спеки"
 
     def add_arguments(self, parser):
         parser.add_argument("--prefix", type=str, default="", help="Фильтр по префиксу name")
@@ -61,20 +60,6 @@ class Command(BaseCommand):
             if missing:
                 errors.append(f"{cat}: {missing} позиций без спецификации")
             lines.append(f"  {cat}: {tools.count() - missing}/{tools.count()} со спекой")
-
-        lines.append("\n=== Материал обработки (мультивыбор) ===")
-        multi_wm = 0
-        bad_wm = 0
-        for t in qs.exclude(work_material="").iterator():
-            codes = t.work_material_codes_list()
-            if len(codes) > 1:
-                multi_wm += 1
-            for c in codes:
-                if c not in WORK_MATERIAL_CODE_SET:
-                    bad_wm += 1
-                    errors.append(f"Tool #{t.id} ({t.name}): неверный код WM «{c}»")
-        lines.append(f"  с несколькими группами: {multi_wm}")
-        lines.append(f"  неверных кодов: {bad_wm}")
 
         lines.append("\n=== Пластинки: виды обработки ===")
         ins_qs = qs.filter(category="insert").select_related("insert_spec")

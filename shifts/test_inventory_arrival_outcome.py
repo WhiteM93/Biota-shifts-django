@@ -21,7 +21,6 @@ from shifts.models import (
     InsertSpec,
     StockMovement,
     ToolItem,
-    normalize_work_material_codes,
 )
 
 
@@ -107,7 +106,6 @@ def _drill_row(
     *,
     diameter: str = "8",
     qty: int = 5,
-    work_material: str = "P,M",
     supplier: str = "Тест-поставщик",
 ) -> dict:
     return {
@@ -117,7 +115,6 @@ def _drill_row(
         "supplier_name": supplier,
         "tool_material": "carbide",
         "coating_type": "yellow",
-        "work_material": work_material,
         "dr_diameter_mm": diameter,
         "dr_overall_length_mm": "80",
         "dr_cutting_length_mm": "40",
@@ -125,7 +122,7 @@ def _drill_row(
     }
 
 
-def _insert_row(*, qty: int = 3, machining: str = "1,3", work_material: str = "P,K") -> dict:
+def _insert_row(*, qty: int = 3, machining: str = "1,3") -> dict:
     return {
         "category": "insert",
         "quantity": qty,
@@ -133,7 +130,6 @@ def _insert_row(*, qty: int = 3, machining: str = "1,3", work_material: str = "P
         "supplier_name": "Тест",
         "tool_material": "carbide",
         "coating_type": "none",
-        "work_material": work_material,
         "ins_shape": "C",
         "ins_edge_code": "12",
         "ins_thickness_code": "04",
@@ -151,11 +147,6 @@ class ArrivalBulkValidationTests(TestCase):
         errs = _arrival_bulk_row_validation_errors(row, 1)
         self.assertTrue(any("диаметр" in e.lower() for e in errs))
 
-    def test_requires_work_material_all_categories(self):
-        row = _drill_row(work_material="")
-        errs = _arrival_bulk_row_validation_errors(row, 1)
-        self.assertTrue(any("материала обработки" in e for e in errs))
-
 
 class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
     def test_arrival_panel_loads(self):
@@ -165,21 +156,19 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         self.assertIn("inv-page--arrival", html)
         self.assertIn("arrival-bulk-form", html)
         self.assertIn("arrival-bulk-add-row", html)
-        self.assertIn("work_material_types", html)
 
-    def test_bulk_drill_creates_tool_movement_and_multi_wm(self):
+    def test_bulk_drill_creates_tool_and_movement(self):
         resp = self._post_arrival_bulk([_drill_row(diameter="7.5", qty=4)])
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(any("Оприходовано" in m for m in self._messages(resp)))
 
         tool = ToolItem.objects.get(category="drill", drill_spec__diameter_mm=Decimal("7.5"))
         self.assertEqual(tool.quantity, 4)
-        self.assertEqual(tool.work_material, "P,M")
 
         mv = StockMovement.objects.filter(tool=tool, movement_type="restock").first()
         self.assertIsNotNone(mv)
         self.assertEqual(mv.quantity, 4)
-        self.assertIn("Тест-поставщик", mv.comment)
+        self.assertTrue(mv.comment)
 
     def test_bulk_drill_merges_same_spec(self):
         self._post_arrival_bulk([_drill_row(diameter="9", qty=2)])
@@ -201,13 +190,7 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         self.assertIsNotNone(tool)
         self.assertEqual(tool.quantity, 6)
         self.assertEqual(tool.insert_spec.machining_application, "2,3")
-        self.assertEqual(tool.work_material, "P,K")
 
-    def test_bulk_rejects_missing_work_material(self):
-        row = _drill_row(work_material="")
-        resp = self._post_arrival_bulk([row])
-        self.assertTrue(any("материала обработки" in m for m in self._messages(resp)))
-        self.assertEqual(ToolItem.objects.filter(category="drill", drill_spec__diameter_mm=Decimal("8")).count(), 0)
 
     def test_bulk_rejects_insert_without_machining(self):
         row = _insert_row()
@@ -232,7 +215,6 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
             "supplier_name": "MV",
             "tool_material": "hss",
             "coating_type": "none",
-            "work_material": "P",
             "mill_type": "end",
             "em_diameter_mm": "12",
             "em_overall_length_mm": "100",
@@ -244,7 +226,6 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         tool = ToolItem.objects.filter(category="end_mill", end_mill_spec__diameter_mm=Decimal("12")).first()
         self.assertIsNotNone(tool)
         self.assertEqual(tool.quantity, 2)
-        self.assertEqual(normalize_work_material_codes(tool.work_material), "P")
 
 
 class IssueOutcomePostTests(InventoryFlowClientMixin, TestCase):
@@ -253,7 +234,6 @@ class IssueOutcomePostTests(InventoryFlowClientMixin, TestCase):
             category="drill",
             name="Сверло для возврата",
             tool_material="carbide",
-            work_material="P",
             coating_type="none",
             quantity=stock_qty,
         )

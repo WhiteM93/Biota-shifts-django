@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
+{% block content %}
+<div class="cabinet-subpage">
+  <a class="cabinet-subpage__back" href="{% url 'cabinet' %}">← Кабинет администратора</a>
+
+  <header class="cabinet-hero">
+    <p class="cabinet-hero__eyebrow">Администрирование</p>
+    <h1>Визуальный склад</h1>
+    <p class="cabinet-section__lead" style="margin:0;color:var(--bio-muted);">
+      Сроки актуальности инвентаризации: цвет даты на контейнере.
+    </p>
+  </header>
+
+  <section class="cabinet-section">
+    <div class="cabinet-section__head">
+      <h2>Цвета даты инвентаризации</h2>
+      <p class="cabinet-section__lead">
+        <span style="display:inline-block;padding:1px 6px;border-radius:2px;background:#a9dfbf;color:#111;font-weight:700;">Зелёный фон</span> — актуальна;
+        <span style="display:inline-block;padding:1px 6px;border-radius:2px;background:#f9e79f;color:#111;font-weight:700;">жёлтый</span> — пора планировать;
+        <span style="display:inline-block;padding:1px 6px;border-radius:2px;background:#f5b7b1;color:#111;font-weight:700;">красный</span> — нужно провести (или даты нет). Текст всегда чёрный.
+      </p>
+    </div>
+    <div class="cabinet-section__body">
+      <form method="post" class="cabinet-form">
+        {% csrf_token %}
+        <div class="cabinet-form-row" style="flex-wrap:wrap;gap:16px;align-items:flex-end;">
+          <label>Зелёный до (дней)
+            <input type="number" name="audit_ok_days" min="1" max="3650" value="{{ vw_settings.audit_ok_days }}" required>
+          </label>
+          <label>Жёлтый до (дней)
+            <input type="number" name="audit_warn_days" min="1" max="3650" value="{{ vw_settings.audit_warn_days }}" required>
+          </label>
+          <button type="submit" class="btn">Сохранить</button>
+        </div>
+        <p class="cabinet-section__lead" style="margin-top:12px;">
+          Пример по умолчанию: до {{ vw_settings.audit_ok_days }} дн. — зелёный,
+          до {{ vw_settings.audit_warn_days }} дн. — жёлтый, дальше — красный.
+          Если «зелёный до» больше «жёлтый до», зелёный автоматически ужимается.
+        </p>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

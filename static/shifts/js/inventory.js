@@ -416,12 +416,6 @@ var INV = (function () {
     return "other";
   }
 
-  function combNormWmClass(wm) {
-    var c = String(wm || "").trim().toLowerCase();
-    if (c === "p" || c === "m" || c === "k" || c === "n" || c === "s" || c === "h" || c === "pw") return c;
-    return "";
-  }
-
   function combAppendInlineSpecs(card, opt, material, qty) {
     var row = document.createElement("div");
     row.className = "issue-tool-opt-inline";
@@ -448,26 +442,6 @@ var INV = (function () {
       coatSlot.appendChild(lab);
     }
     row.appendChild(coatSlot);
-
-    var moSlot = document.createElement("span");
-    moSlot.className = "issue-tool-opt-chip-slot";
-    var wm = (opt.getAttribute("data-issue-wm") || "").trim();
-    var wmTitle = (opt.getAttribute("data-issue-wm-title") || "").trim();
-    var wmClass = combNormWmClass(wm);
-    if (!wm) {
-      moSlot.className += " issue-tool-opt-mo-empty";
-      moSlot.textContent = "—";
-    } else if (wmClass) {
-      var wmSpan = document.createElement("span");
-      wmSpan.className = "wm-square wm-" + wmClass;
-      wmSpan.textContent = wm;
-      if (wmTitle) wmSpan.setAttribute("title", wmTitle);
-      moSlot.appendChild(wmSpan);
-    } else {
-      moSlot.textContent = wm;
-      if (wmTitle) moSlot.setAttribute("title", wmTitle);
-    }
-    row.appendChild(moSlot);
 
     var qSpan = document.createElement("span");
     qSpan.className = "issue-tool-opt-qty";
@@ -1393,23 +1367,10 @@ var INV = (function () {
     return sel;
   }
 
-  var wmOptionTitles = { "": "?" };
-  (INV.work_material_types || []).forEach(function (x) { wmOptionTitles[x.value] = x.label; });
-
   var coatingOptionTitles = {};
   (INV.coating_types || []).forEach(function (x) { coatingOptionTitles[x.value] = x.hoverTitle; });
 
   var arrivalRowSeq = 0;
-  var wmSelectTheme = {
-    "": { bg: "#8b949e", color: "#fff" },
-    "P": { bg: "#2f72ff", color: "#fff" },
-    "M": { bg: "#f6b93b", color: "#111" },
-    "K": { bg: "#e25a5a", color: "#fff" },
-    "N": { bg: "#2bb673", color: "#fff" },
-    "S": { bg: "#8f7cff", color: "#fff" },
-    "H": { bg: "#6d6d6d", color: "#fff" },
-    "PW": { bg: "#eef2f7", color: "#1a1d21" }
-  };
   var coatingSelectTheme = {
     "none": { bg: "#aab3c7", color: "#0f172a" },
     "yellow": { bg: "#f6c343", color: "#0f172a" },
@@ -1419,41 +1380,6 @@ var INV = (function () {
     "blue": { bg: "#2877f0", color: "#fff" },
     "other": { bioBg: "--bio-filter-border", color: "#fff" }
   };
-  function applyWmSelectClass(sel) {
-    if (!sel) return;
-    sel.classList.remove("wm-all", "wm-p", "wm-m", "wm-k", "wm-n", "wm-s", "wm-h", "wm-pw");
-    var rawValue = sel.value || "";
-    var value = rawValue.toLowerCase();
-    sel.classList.add(value ? ("wm-" + value) : "wm-all");
-    var theme = wmSelectTheme[rawValue] || wmSelectTheme[""];
-    sel.style.backgroundImage = "none";
-    sel.style.backgroundColor = theme.bg;
-    sel.style.color = theme.color;
-  }
-  function buildColoredWmSelect(selected) {
-    var opts = [
-      { value: "", label: "?", bg: "#8b949e", color: "#ffffff" },
-      { value: "P", label: "P", bg: "#2f72ff", color: "#ffffff" },
-      { value: "M", label: "M", bg: "#f6b93b", color: "#111111" },
-      { value: "K", label: "K", bg: "#e25a5a", color: "#ffffff" },
-      { value: "N", label: "N", bg: "#2bb673", color: "#ffffff" },
-      { value: "S", label: "S", bg: "#8f7cff", color: "#ffffff" },
-      { value: "H", label: "H", bg: "#6d6d6d", color: "#ffffff" },
-      { value: "PW", label: "PW", bg: "#eef2f7", color: "#1a1d21" },
-    ];
-    var sel = buildSelect(opts, selected || "");
-    Array.prototype.forEach.call(sel.options, function (o) {
-      var t = wmOptionTitles[o.value];
-      if (t) o.setAttribute("title", t);
-    });
-    sel.setAttribute("data-k", "work_material");
-    sel.classList.add("arrival-wm-select");
-    applyWmSelectClass(sel);
-    sel.addEventListener("change", function () {
-      applyWmSelectClass(sel);
-    });
-    return sel;
-  }
   function applyCoatingSelectClass(sel) {
     if (!sel) return;
     coatingOptions.forEach(function (opt) {
@@ -1586,14 +1512,6 @@ var INV = (function () {
         issues = issues.concat(validateColletRow(tr, i + 1, tr.getAttribute("data-collet-type")));
         return;
       }
-      var wmEl = tr.querySelector('[data-k="work_material"]');
-      if (!wmEl || !(wmEl.value || "").trim()) {
-        if (wmEl) wmEl.classList.add("is-invalid");
-        issues.push({
-          msg: "Строка " + (i + 1) + ": укажите хотя бы одну группу материала обработки (P, M, K…).",
-          el: wmEl,
-        });
-      }
       if (cat === "insert") {
         issues = issues.concat(validateInsertRow(tr, i + 1));
         return;
@@ -1651,17 +1569,6 @@ var INV = (function () {
   function escapeThTitle(s) {
     return String(s || "").replace(/"/g, "&quot;");
   }
-
-  var colletArrivalHeadHtml = {
-    er: "<tr><th>ER</th><th>Зажим Ø</th><th>AA</th><th class=\"qty-col\">Кол-во</th><th></th></tr>",
-    er_g:
-      "<tr><th>ER</th><th title=\"" +
-      escapeThTitle((INV.collet_type_tooltips && INV.collet_type_tooltips.er_g) || "") +
-      "\">Ø внутр.</th><th class=\"qty-col\">Кол-во</th><th></th></tr>",
-    threading:
-      "<tr><th>Назначение</th><th>Серия</th><th>Стандарт</th><th class=\"qty-col\">Кол-во</th><th></th></tr>",
-    _default: "<tr><th>ER</th><th>Параметры</th><th class=\"qty-col\">Кол-во</th><th></th></tr>",
-  };
 
   function toggleColletTypeWrap() {
     if (!colletTypeWrap) return;
@@ -1800,12 +1707,29 @@ var INV = (function () {
   }
 
   var insertColTips = INV.insert_column_tooltips || {};
+  var arrivalColTips = Object.assign({}, INV.arrival_column_tooltips || {}, insertColTips);
 
   function insertArrivalTh(key, label, cls) {
-    var tip = insertColTips[key];
+    var tip = arrivalColTips[key] || insertColTips[key];
     var c = cls ? ' class="' + cls + '"' : "";
     var ti = tip ? ' title="' + escapeThTitle(tip) + '"' : "";
     return "<th" + c + ti + ">" + label + "</th>";
+  }
+
+  function arrivalTh(tipKey, label, cls) {
+    return insertArrivalTh(tipKey, label, cls);
+  }
+
+  function arrivalHead(cols) {
+    return (
+      "<tr>" +
+      cols
+        .map(function (col) {
+          return arrivalTh(col.key, col.label, col.cls || "");
+        })
+        .join("") +
+      "</tr>"
+    );
   }
 
   function escAttr(s) {
@@ -1901,93 +1825,262 @@ var INV = (function () {
     });
   }
 
-  var arrivalWmMultiTheme = {
-    P: { bg: "#2f72ff", color: "#fff" },
-    M: { bg: "#f6b93b", color: "#111" },
-    K: { bg: "#e25a5a", color: "#fff" },
-    N: { bg: "#2bb673", color: "#fff" },
-    S: { bg: "#8f7cff", color: "#fff" },
-    H: { bg: "#6d6d6d", color: "#fff" },
-    PW: { bg: "#eef2f7", color: "#1a1d21" },
+  var colletArrivalHeadHtml = {
+    er: arrivalHead([
+      { key: "er_size", label: "ER" },
+      { key: "er_range", label: "Зажим Ø" },
+      { key: "er_aa", label: "AA" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    er_g: arrivalHead([
+      { key: "er_size", label: "ER" },
+      {
+        key: "er_g_inner",
+        label: "Ø внутр.",
+      },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    threading: arrivalHead([
+      { key: "thr_use", label: "Назначение" },
+      { key: "thr_series", label: "Серия" },
+      { key: "thr_standard", label: "Стандарт" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    _default: arrivalHead([
+      { key: "er_size", label: "ER" },
+      { key: "er_range", label: "Параметры" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
   };
 
-  function buildArrivalWmMultiPickerHtml(selectedCsv) {
-    var selected = {};
-    parseCsvCodes(selectedCsv || "").forEach(function (v) {
-      selected[v] = true;
-    });
-    var opts = [
-      { value: "P", label: "P" },
-      { value: "M", label: "M" },
-      { value: "K", label: "K" },
-      { value: "N", label: "N" },
-      { value: "S", label: "S" },
-      { value: "H", label: "H" },
-      { value: "PW", label: "PW" },
-    ];
-    var parts = ['<div class="arrival-wm-multi-picker" role="group" aria-label="Материал обработки">'];
-    opts.forEach(function (o) {
-      var active = selected[o.value] ? " is-active" : "";
-      var theme = arrivalWmMultiTheme[o.value] || {};
-      var style =
-        theme.bg ? ' style="background:' + theme.bg + ";color:" + (theme.color || "#fff") + ';"' : "";
-      var title = wmOptionTitles[o.value] || o.label;
-      parts.push(
-        '<button type="button" class="arrival-wm-opt arrival-wm-opt--' +
-          o.value.toLowerCase() +
-          active +
-          '" data-wm="' +
-          escAttr(o.value) +
-          '" title="' +
-          escAttr(title) +
-          '" aria-pressed="' +
-          (selected[o.value] ? "true" : "false") +
-          '"' +
-          style +
-          ">" +
-          escAttr(o.label) +
-          "</button>"
-      );
-    });
-    parts.push(
-      '<input type="hidden" data-k="work_material" value="' + escAttr(parseCsvCodes(selectedCsv).join(",")) + '">'
-    );
-    parts.push("</div>");
-    return parts.join("");
-  }
-
-  function wireArrivalWmMultiPicker(tr) {
-    var picker = tr.querySelector(".arrival-wm-multi-picker");
-    if (!picker) return;
-    var hidden = picker.querySelector('[data-k="work_material"]');
-    if (!hidden) return;
-    picker.querySelectorAll(".arrival-wm-opt").forEach(function (btn) {
-      btn.addEventListener("click", function (ev) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        btn.classList.toggle("is-active");
-        btn.setAttribute("aria-pressed", btn.classList.contains("is-active") ? "true" : "false");
-        syncMultiToggleHidden(picker, ".arrival-wm-opt", hidden, "data-wm");
-      });
-    });
-  }
+  // Prefer specific collet type tip for ER-G inner diameter column
+  (function patchErGTip() {
+    var tip =
+      (INV.collet_type_tooltips && INV.collet_type_tooltips.er_g) ||
+      arrivalColTips.er_g_inner ||
+      "";
+    if (!tip) return;
+    arrivalColTips.er_g_inner = tip;
+    colletArrivalHeadHtml.er_g = arrivalHead([
+      { key: "er_size", label: "ER" },
+      { key: "er_g_inner", label: "Ø внутр." },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]);
+  })();
 
   var arrivalGroupHeadHtml = {
-    end_mill: '<tr><th>Тип фрезы</th><th class="short-col">D</th><th class="short-col">R</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    body_tool: '<tr><th class="short-col">ØD</th><th class="short-col">Z</th><th class="short-col">d посадки</th><th>СОЖ</th><th>Формфактор</th><th>Размер</th><th class="short-col">ap</th><th class="short-col">Угол</th><th>Бренд</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    body_tool_end: '<tr><th>Бренд</th><th>Хвостовик</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">L</th><th class="short-col">Z</th><th>Формфактор</th><th>Размер</th><th>СОЖ</th><th class="short-col">Угол</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    body_tool_chamfer: '<tr><th>Бренд</th><th>Хвостовик</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">Z</th><th>Перем. угол</th><th>СОЖ</th><th>Формфактор</th><th>Размер</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    body_tool_high_speed: '<tr><th>Бренд</th><th>Хвостовик</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">Z</th><th>Тип</th><th>Назначение</th><th>Формфактор</th><th>Размер</th><th>Угол</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    body_tool_round_insert: '<tr><th>Бренд</th><th>Хвостовик</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">L</th><th class="short-col">Z</th><th>Тип</th><th class="short-col">R</th><th>СОЖ</th><th>Формфактор</th><th>Размер</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    body_tool_disc: '<tr><th>Бренд</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">Z</th><th class="short-col">H</th><th>Формфактор</th><th>Размер</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    body_tool_ball: '<tr><th>Бренд</th><th>Хвостовик</th><th class="short-col">ØD</th><th class="short-col">d</th><th class="short-col">L</th><th class="short-col">Z</th><th>СОЖ</th><th>Подходящие пластины</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    body_tool_modular_head: '<tr><th>Бренд</th><th class="short-col">ØD</th><th class="short-col">d</th><th>Резьба</th><th class="short-col">Z</th><th>СОЖ</th><th>Подходящие пластины</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    body_tool_generic: '<tr><th>Тип</th><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Z</th><th>Крепление</th><th>Тип пластины</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    tap: '<tr><th class="tap-size-col">Размер</th><th>Тип резьбы</th><th class="tap-std-col">Стандарт</th><th class="tap-step-col">Шаг</th><th class="tap-tpi-col">TPI</th><th class="tap-l-col">L</th><th class="tap-lc-col">Lc</th><th class="tap-hole-col">Тип</th><th>Тип инструмента</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    center_drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="angle-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    countersink: '<tr><th>Тип</th><th class="short-col">D</th><th class="angle-col">Угол</th><th class="short-col">L</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    drill: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Угол</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
-    reamer: '<tr><th class="short-col">D</th><th class="short-col">L</th><th class="short-col">Lc</th><th class="short-col">Квалитет</th><th class="short-col">Z</th><th class="short-col">D осн</th><th class="stack-words">Материал<br>инструмента</th><th>Покрытие</th><th class="stack-words">Материал<br>обработки</th><th class="qty-col">Кол-во</th><th></th></tr>',
+    end_mill: arrivalHead([
+      { key: "em_type", label: "Тип фрезы" },
+      { key: "D", label: "D", cls: "short-col" },
+      { key: "R", label: "R", cls: "short-col" },
+      { key: "L", label: "L", cls: "short-col" },
+      { key: "Lc", label: "Lc", cls: "short-col" },
+      { key: "Z", label: "Z", cls: "short-col" },
+      { key: "D_shank", label: "D осн", cls: "short-col" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    body_tool: arrivalHead([
+      { key: "OD", label: "ØD", cls: "short-col" },
+      { key: "Z", label: "Z", cls: "short-col" },
+      { key: "d_mount", label: "d посадки", cls: "short-col" },
+      { key: "coolant", label: "СОЖ" },
+      { key: "form_factor", label: "Формфактор" },
+      { key: "insert_size", label: "Размер" },
+      { key: "ap", label: "ap", cls: "short-col" },
+      { key: "angle", label: "Угол", cls: "short-col" },
+      { key: "brand", label: "Бренд" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    body_tool_end: arrivalHead([
+      { key: "brand", label: "Бренд" },
+      { key: "shank", label: "Хвостовик" },
+      { key: "OD", label: "ØD", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col" },
+      { key: "L", label: "L", cls: "short-col" },
+      { key: "Z", label: "Z", cls: "short-col" },
+      { key: "form_factor", label: "Формфактор" },
+      { key: "insert_size", label: "Размер" },
+      { key: "coolant", label: "СОЖ" },
+      { key: "angle", label: "Угол", cls: "short-col" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    body_tool_chamfer: arrivalHead([
+      { key: "brand", label: "Бренд" },
+      { key: "shank", label: "Хвостовик" },
+      { key: "OD", label: "ØD", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col" },
+      { key: "Z", label: "Z", cls: "short-col" },
+      { key: "variable_angle", label: "Перем. угол" },
+      { key: "coolant", label: "СОЖ" },
+      { key: "form_factor", label: "Формфактор" },
+      { key: "insert_size", label: "Размер" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    body_tool_high_speed: arrivalHead([
+      { key: "brand", label: "Бренд" },
+      { key: "shank", label: "Хвостовик" },
+      { key: "OD", label: "ØD", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col" },
+      { key: "Z", label: "Z", cls: "short-col" },
+      { key: "hs_type", label: "Тип" },
+      { key: "hs_purpose", label: "Назначение" },
+      { key: "form_factor", label: "Формфактор" },
+      { key: "insert_size", label: "Размер" },
+      { key: "angle", label: "Угол" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    body_tool_round_insert: arrivalHead([
+      { key: "brand", label: "Бренд" },
+      { key: "shank", label: "Хвостовик" },
+      { key: "OD", label: "ØD", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col" },
+      { key: "L", label: "L", cls: "short-col" },
+      { key: "Z", label: "Z", cls: "short-col" },
+      { key: "bt_type", label: "Тип" },
+      { key: "R", label: "R", cls: "short-col" },
+      { key: "coolant", label: "СОЖ" },
+      { key: "form_factor", label: "Формфактор" },
+      { key: "insert_size", label: "Размер" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    body_tool_disc: arrivalHead([
+      { key: "brand", label: "Бренд" },
+      { key: "OD", label: "ØD", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col" },
+      { key: "Z", label: "Z", cls: "short-col" },
+      { key: "H", label: "H", cls: "short-col" },
+      { key: "form_factor", label: "Формфактор" },
+      { key: "insert_size", label: "Размер" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    body_tool_ball: arrivalHead([
+      { key: "brand", label: "Бренд" },
+      { key: "shank", label: "Хвостовик" },
+      { key: "OD", label: "ØD", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col" },
+      { key: "L", label: "L", cls: "short-col" },
+      { key: "Z", label: "Z", cls: "short-col" },
+      { key: "coolant", label: "СОЖ" },
+      { key: "suitable_inserts", label: "Подходящие пластины" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    body_tool_modular_head: arrivalHead([
+      { key: "brand", label: "Бренд" },
+      { key: "OD", label: "ØD", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col" },
+      { key: "thread", label: "Резьба" },
+      { key: "Z", label: "Z", cls: "short-col" },
+      { key: "coolant", label: "СОЖ" },
+      { key: "suitable_inserts", label: "Подходящие пластины" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    body_tool_generic: arrivalHead([
+      { key: "bt_type", label: "Тип" },
+      { key: "D", label: "D", cls: "short-col" },
+      { key: "L", label: "L", cls: "short-col" },
+      { key: "Lc", label: "Lc", cls: "short-col" },
+      { key: "Z", label: "Z", cls: "short-col" },
+      { key: "bt_mount", label: "Крепление" },
+      { key: "bt_insert_type", label: "Тип пластины" },
+      { key: "D_shank", label: "D осн", cls: "short-col" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    tap: arrivalHead([
+      { key: "tap_size", label: "Размер", cls: "tap-size-col" },
+      { key: "tap_thread_kind", label: "Тип резьбы" },
+      { key: "tap_standard", label: "Стандарт", cls: "tap-std-col" },
+      { key: "tap_pitch", label: "Шаг", cls: "tap-step-col" },
+      { key: "tap_tpi", label: "TPI", cls: "tap-tpi-col" },
+      { key: "L", label: "L", cls: "tap-l-col" },
+      { key: "Lc", label: "Lc", cls: "tap-lc-col" },
+      { key: "tap_hole", label: "Тип", cls: "tap-hole-col" },
+      { key: "tap_tool_type", label: "Тип инструмента" },
+      { key: "D_shank", label: "D осн", cls: "short-col" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    center_drill: arrivalHead([
+      { key: "D", label: "D", cls: "short-col" },
+      { key: "L", label: "L", cls: "short-col" },
+      { key: "cd_angle", label: "Угол", cls: "angle-col" },
+      { key: "D_shank", label: "D осн", cls: "short-col" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    countersink: arrivalHead([
+      { key: "cs_type", label: "Тип" },
+      { key: "D", label: "D", cls: "short-col" },
+      { key: "cs_angle", label: "Угол", cls: "angle-col" },
+      { key: "L", label: "L", cls: "short-col" },
+      { key: "Z", label: "Z", cls: "short-col" },
+      { key: "D_shank", label: "D осн", cls: "short-col" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    drill: arrivalHead([
+      { key: "D", label: "D", cls: "short-col" },
+      { key: "L", label: "L", cls: "short-col" },
+      { key: "Lc", label: "Lc", cls: "short-col" },
+      { key: "dr_angle", label: "Угол", cls: "short-col" },
+      { key: "D_shank", label: "D осн", cls: "short-col" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
+    reamer: arrivalHead([
+      { key: "D", label: "D", cls: "short-col" },
+      { key: "L", label: "L", cls: "short-col" },
+      { key: "Lc", label: "Lc", cls: "short-col" },
+      { key: "rm_accuracy", label: "Квалитет", cls: "short-col" },
+      { key: "Z", label: "Z", cls: "short-col" },
+      { key: "D_shank", label: "D осн", cls: "short-col" },
+      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
+      { key: "coating", label: "Покрытие" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
     insert:
       "<tr>" +
       insertArrivalTh("family", "Семейство") +
@@ -1998,7 +2091,6 @@ var INV = (function () {
       insertArrivalTh("machining_application", "Обр.", "insert-app-col") +
       insertArrivalTh("tool_material", "Сплав", "stack-words tm-col-tool-material") +
       insertArrivalTh("coating", "Покрытие") +
-      insertArrivalTh("work_material", "Материал<br>обработки", "stack-words") +
       insertArrivalTh("quantity", "Кол-во", "qty-col") +
       insertArrivalTh("row_remove", "×") +
       "</tr>",
@@ -2128,7 +2220,6 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
-      cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "body_tool") {
       if (bodyCutter === "face") {
@@ -2143,8 +2234,7 @@ var INV = (function () {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
-        cells.push('<td class="wm-cell"></td>');
-        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+          cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "end") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
         cells.push('<td><select data-k="bt_shank_type">' + buildOptionsHtml(INV.end_mill_shank_types || INV.body_tool_shank_types || []) + '</select></td>');
@@ -2158,8 +2248,7 @@ var INV = (function () {
         cells.push('<td class="short-col"><select data-k="bt_angle_deg">' + buildOptionsHtml([{ value: "", label: "—" }].concat(INV.face_mill_angles || [])) + '</select></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
-        cells.push('<td class="wm-cell"></td>');
-        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+          cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "chamfer") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
         cells.push('<td><select data-k="bt_shank_type">' + buildOptionsHtml(INV.chamfer_mill_shank_types || INV.body_tool_shank_types || []) + '</select></td>');
@@ -2172,8 +2261,7 @@ var INV = (function () {
         cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
-        cells.push('<td class="wm-cell"></td>');
-        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+          cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "high_speed") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
         cells.push('<td><select data-k="bt_shank_type">' + buildOptionsHtml(INV.high_speed_shank_types || INV.body_tool_shank_types || []) + '</select></td>');
@@ -2187,8 +2275,7 @@ var INV = (function () {
         cells.push('<td class="short-col"><select data-k="bt_angle_deg">' + buildOptionsHtml(INV.high_speed_angle_options || [{ value: "", label: "—" }].concat(INV.face_mill_angles || []).concat([{ value: "variable", label: "Переменный" }])) + '</select></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
-        cells.push('<td class="wm-cell"></td>');
-        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+          cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "round_insert") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
         cells.push('<td><select data-k="bt_shank_type">' + buildOptionsHtml(INV.round_insert_shank_types || INV.body_tool_shank_types || []) + '</select></td>');
@@ -2203,8 +2290,7 @@ var INV = (function () {
         cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
-        cells.push('<td class="wm-cell"></td>');
-        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+          cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "disc") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
         cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
@@ -2215,8 +2301,7 @@ var INV = (function () {
         cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
-        cells.push('<td class="wm-cell"></td>');
-        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+          cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "ball") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
         cells.push('<td><select data-k="bt_shank_type">' + buildOptionsHtml(INV.ball_mill_shank_types || INV.body_tool_shank_types || []) + '</select></td>');
@@ -2228,8 +2313,7 @@ var INV = (function () {
         cells.push('<td><input type="text" data-k="bt_insert_compat" maxlength="80" placeholder="RD.. / RP.."></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
-        cells.push('<td class="wm-cell"></td>');
-        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+          cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "modular_head") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
         cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
@@ -2240,8 +2324,7 @@ var INV = (function () {
         cells.push('<td><input type="text" data-k="bt_insert_compat" maxlength="80" placeholder="APKT / RCKT…"></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
-        cells.push('<td class="wm-cell"></td>');
-        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+          cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else {
         cells.push('<td><select data-k="body_cutter" required>' + buildOptionsHtml(INV.indexable_mill_cutter_types || []) + '</select></td>');
         cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
@@ -2253,8 +2336,7 @@ var INV = (function () {
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
-        cells.push('<td class="wm-cell"></td>');
-        cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+          cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       }
     } else if (cat === "tap") {
       cells.push('<td class="tap-size-col"><input type="text" data-k="size_label" placeholder="M2"></td>');
@@ -2269,7 +2351,6 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
-      cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "center_drill") {
       cells.push(arrivalRequiredDiamCell("cd_diameter_mm"));
@@ -2278,7 +2359,6 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
-      cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "countersink") {
       cells.push('<td><select data-k="cs_type">' + buildOptionsHtml(INV.countersink_types || []) + '</select></td>');
@@ -2289,7 +2369,6 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
-      cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "insert") {
       cells.push('<td class="ins-family-cell">' + buildInsertFamilyCellHtml() + "</td>");
@@ -2300,7 +2379,6 @@ var INV = (function () {
       cells.push(buildInsertMachiningAppCellHtml(""));
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
-      cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "collet") {
       cells = buildColletCells(colletType);
@@ -2312,7 +2390,6 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
-      cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "reamer") {
       cells.push(arrivalRequiredDiamCell("rm_diameter_mm"));
@@ -2327,7 +2404,6 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
-      cells.push('<td class="wm-cell"></td>');
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     }
     cells.push('<td><button type="button" class="btn btn-ghost js-arrival-row-remove">×</button></td>');
@@ -2372,9 +2448,6 @@ var INV = (function () {
       }
     });
     tr.querySelector(".co-cell").appendChild(buildColoredCoatingSelect("none"));
-    var wmCell = tr.querySelector(".wm-cell");
-    wmCell.innerHTML = buildArrivalWmMultiPickerHtml("");
-    wireArrivalWmMultiPicker(tr);
     body.appendChild(tr);
   }
 
@@ -2603,9 +2676,6 @@ var INV = (function () {
   var coatingFullTitles = {};
   (INV.coating_types || []).forEach(function (x) { coatingFullTitles[x.value] = x.hoverTitle; });
 
-  var workMaterialLabels = { "": "-" };
-  (INV.work_material_types || []).forEach(function (x) { workMaterialLabels[x.value] = x.label; });
-
   function escapeHtml(s) {
     return String(s || "").replace(/[&<>"']/g, function (c) {
       return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
@@ -2666,29 +2736,6 @@ var INV = (function () {
           "</span>";
       }
       return '<span class="coating-cell">' + inner + "</span>";
-    }
-    if (field === "work_material") {
-      var codes = parseCsvCodes(v);
-      if (!codes.length) return "-";
-      return (
-        '<div class="inv-stock-wm-squares">' +
-        codes
-          .map(function (code) {
-            var cls = "wm-" + code.toLowerCase();
-            var wmLbl = workMaterialLabels[code] || "";
-            return (
-              '<span class="wm-square ' +
-              cls +
-              '" title="' +
-              escapeHtml(wmLbl) +
-              '">' +
-              escapeHtml(code) +
-              "</span>"
-            );
-          })
-          .join("") +
-        "</div>"
-      );
     }
     if (field === "em_diameter_mm") return "Ø" + v.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
     if (field === "bt_diameter_mm") return "Ø" + v.replace(/\.00$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
@@ -2812,12 +2859,6 @@ var INV = (function () {
       options = Object.keys(coatingLabels).map(function (k) {
         return { value: k, label: coatingLabels[k], title: coatingFullTitles[k] || coatingLabels[k] };
       });
-    } else if (field === "work_material") {
-      options = [{ value: "", label: "-", title: "" }].concat(
-        Object.keys(workMaterialLabels).filter(function (k) { return k; }).map(function (k) {
-          return { value: k, label: workMaterialLabels[k], title: workMaterialLabels[k] };
-        })
-      );
     }
     var sel = document.createElement("select");
     sel.className = "stock-inline-editor";
@@ -2928,61 +2969,6 @@ var INV = (function () {
         }
       }, 0);
     });
-  }
-
-  function activateWorkMaterialCell(cell, current) {
-    cell.innerHTML = buildArrivalWmMultiPickerHtml(current);
-    var picker = cell.querySelector(".arrival-wm-multi-picker");
-    var hidden = picker && picker.querySelector('[data-k="work_material"]');
-    if (!picker || !hidden) return;
-    activeCell = cell;
-    picker.querySelectorAll(".arrival-wm-opt").forEach(function (btn) {
-      btn.addEventListener("click", function (ev) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        btn.classList.toggle("is-active");
-        btn.setAttribute("aria-pressed", btn.classList.contains("is-active") ? "true" : "false");
-        syncMultiToggleHidden(picker, ".arrival-wm-opt", hidden, "data-wm");
-      });
-    });
-    var cancelled = false;
-    function revert() {
-      cancelled = true;
-      cell.innerHTML = formatCell("work_material", cell.getAttribute("data-value") || "");
-      activeCell = null;
-    }
-    function commit() {
-      if (cancelled || activeCell !== cell) return;
-      var val = (hidden.value || "").trim();
-      if (!val) {
-        alert("Выберите хотя бы одну группу материала обработки.");
-        return;
-      }
-      saveCell(cell, val, hidden);
-    }
-    cell.addEventListener(
-      "keydown",
-      function (e) {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          revert();
-        }
-        if (e.key === "Enter") {
-          e.preventDefault();
-          commit();
-        }
-      },
-      { once: false }
-    );
-    setTimeout(function () {
-      document.addEventListener(
-        "click",
-        function onDocClick(e) {
-          if (!cell.contains(e.target)) commit();
-        },
-        { once: true }
-      );
-    }, 0);
   }
 
   var warehouseLocationsCache = null;
@@ -3188,10 +3174,6 @@ var INV = (function () {
     var current = cell.getAttribute("data-value") || "";
     if (field === "tool_material" && type === "select") {
       activateToolMaterialCell(cell, current);
-      return;
-    }
-    if (field === "work_material") {
-      activateWorkMaterialCell(cell, current);
       return;
     }
     if (field === "warehouse_address" || type === "address") {

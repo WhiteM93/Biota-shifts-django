@@ -125,44 +125,6 @@ TOOL_MATERIAL_TYPES = [
     ("carbide", "Твердосплав"),
 ]
 
-WORK_MATERIAL_TYPES = [
-    ("P", "P (синий) — углеродистые и легированные стали"),
-    ("M", "M (жёлтый) — нержавеющие стали"),
-    ("K", "K (красный) — чугун"),
-    ("N", "N (зелёный) — цветные металлы"),
-    ("S", "S (коричневый) — жаропрочные сплавы и титан"),
-    ("H", "H (серый) — закалённые стали (45–65 HRC)"),
-    ("PW", "Пластик (белый)"),
-]
-
-WORK_MATERIAL_CODE_ORDER = tuple(k for k, _ in WORK_MATERIAL_TYPES)
-WORK_MATERIAL_CODE_SET = frozenset(WORK_MATERIAL_CODE_ORDER)
-_WORK_MATERIAL_LABELS = dict(WORK_MATERIAL_TYPES)
-
-
-def normalize_work_material_codes(raw) -> str:
-    """Один или несколько кодов ISO: «P», «P,M,K»."""
-    if isinstance(raw, (list, tuple)):
-        parts = [str(x).strip().upper() for x in raw]
-    else:
-        parts = [p.strip().upper() for p in str(raw or "").replace(" ", "").split(",") if p.strip()]
-    seen: set[str] = set()
-    out: list[str] = []
-    for p in parts:
-        if p not in WORK_MATERIAL_CODE_SET or p in seen:
-            continue
-        seen.add(p)
-        out.append(p)
-    out.sort(key=lambda x: WORK_MATERIAL_CODE_ORDER.index(x))
-    return ",".join(out)
-
-
-def work_material_display_text(value: str) -> str:
-    codes = [p.strip() for p in (value or "").split(",") if p.strip()]
-    if not codes:
-        return ""
-    return ", ".join(_WORK_MATERIAL_LABELS.get(c, c) for c in codes)
-
 PURCHASE_STATUSES = [
     ("processing", "В обработке"),
     ("ordered", "Заказано"),
@@ -287,12 +249,6 @@ class ToolItem(models.Model):
         default="none",
         verbose_name="Материал покрытия",
     )
-    work_material = models.CharField(
-        max_length=120,
-        blank=True,
-        choices=WORK_MATERIAL_TYPES,
-        verbose_name="Материал обработки",
-    )
     main_diameter_mm = models.DecimalField(
         max_digits=6,
         decimal_places=2,
@@ -332,15 +288,6 @@ class ToolItem(models.Model):
                 return str(label)
         return v
 
-    def work_material_codes_list(self) -> list[str]:
-        return [p.strip() for p in (self.work_material or "").split(",") if p.strip()]
-
-    def get_work_materials_display(self) -> str:
-        return work_material_display_text(self.work_material)
-
-    def work_material_code_title(self, code: str) -> str:
-        return _WORK_MATERIAL_LABELS.get((code or "").strip().upper(), code or "")
-
     def issue_select_label(self) -> str:
         """Строка для выпадающего списка выдачи: те же параметры, что в строке таблицы склада по категории."""
 
@@ -359,10 +306,6 @@ class ToolItem(models.Model):
             if ct == "none":
                 return "без покрытия"
             return str(self.get_coating_type_display())
-
-        def work_mat_txt() -> str:
-            txt = self.get_work_materials_display()
-            return txt if txt else "—"
 
         def main_d() -> str:
             return fmt_mm(self.main_diameter_mm) if self.main_diameter_mm is not None else "—"
@@ -383,7 +326,6 @@ class ToolItem(models.Model):
                 f"Dосн {main_d()}",
                 self.get_tool_material_display() or "—",
                 coating_txt(),
-                work_mat_txt(),
                 f"ост {self.quantity}",
                 self.name,
             ]
@@ -403,7 +345,6 @@ class ToolItem(models.Model):
                 f"Dосн {main_d()}",
                 self.get_tool_material_display() or "—",
                 coating_txt(),
-                work_mat_txt(),
                 f"ост {self.quantity}",
                 self.name,
             ]
@@ -417,7 +358,6 @@ class ToolItem(models.Model):
                 f"Dосн {main_d()}",
                 self.get_tool_material_display() or "—",
                 coating_txt(),
-                work_mat_txt(),
                 f"ост {self.quantity}",
                 self.name,
             ]
@@ -448,7 +388,6 @@ class ToolItem(models.Model):
                 f"Dосн {main_d()}",
                 self.get_tool_material_display() or "—",
                 coating_txt(),
-                work_mat_txt(),
                 f"ост {self.quantity}",
                 self.name,
             ]
@@ -464,7 +403,6 @@ class ToolItem(models.Model):
                 f"Dосн {main_d()}",
                 self.get_tool_material_display() or "—",
                 coating_txt(),
-                work_mat_txt(),
                 f"ост {self.quantity}",
                 self.name,
             ]
@@ -480,7 +418,6 @@ class ToolItem(models.Model):
                 (ins.get_machining_applications_display() if ins else "—"),
                 (ins.chipbreaker_grade if ins and ins.chipbreaker_grade else "—"),
                 coating_txt(),
-                work_mat_txt(),
                 f"ост {self.quantity}",
             ]
         elif cat == "collet":
@@ -552,7 +489,6 @@ class ToolItem(models.Model):
                 f"{fmt_mm(bt.approach_angle_deg)}°" if bt and bt.approach_angle_deg is not None else "угол —",
                 ((bt.brand or "—") if bt else "—"),
                 coating_txt(),
-                work_mat_txt(),
                 f"ост {self.quantity}",
                 self.name,
             ]
@@ -562,7 +498,7 @@ class ToolItem(models.Model):
         return " · ".join(s for s in segs if s)
 
     def issue_combo_card(self) -> dict:
-        """Поля для карточки в выпадающем списке выдачи: тип, размеры, материал, покрытие, МО, кол-во."""
+        """Поля для карточки в выпадающем списке выдачи: тип, размеры, материал, покрытие, кол-во."""
 
         def fmt_mm(v) -> str:
             if v is None:
@@ -579,12 +515,6 @@ class ToolItem(models.Model):
             if ct == "none":
                 return "без покрытия"
             return str(self.get_coating_type_display())
-
-        def work_mat_display() -> str:
-            wm = (self.work_material or "").strip()
-            if not wm:
-                return "—"
-            return str(self.get_work_material_display())
 
         def main_d() -> str:
             return fmt_mm(self.main_diameter_mm) if self.main_diameter_mm is not None else "—"
@@ -769,7 +699,6 @@ class ToolItem(models.Model):
 
         material = self.get_tool_material_display() or "—"
         coating = coating_display()
-        mo = work_mat_display()
         qty = str(int(self.quantity))
 
         return {
@@ -777,7 +706,6 @@ class ToolItem(models.Model):
             "specs": " · ".join(specs_parts) if specs_parts else "—",
             "material": material,
             "coating": coating,
-            "mo": mo,
             "qty": qty,
         }
 

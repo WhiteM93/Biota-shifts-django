@@ -96,6 +96,7 @@ from .insert_constants import (
     build_insert_display_name,
     normalize_milling_family,
 )
+from .arrival_column_tooltips import ARRIVAL_COLUMN_TOOLTIPS
 from .models import (
     CENTER_DRILL_ANGLES,
     COUNTERSINK_ANGLES,
@@ -128,12 +129,9 @@ from .models import (
     THREAD_KINDS,
     THREAD_STANDARDS,
     TOOL_MATERIAL_TYPES,
-    WORK_MATERIAL_TYPES,
     PURCHASE_STATUSES,
     normalize_thread_kind,
-    normalize_work_material_codes,
     stock_category_grouped_choices,
-    work_material_display_text,
 )
 
 TOOL_MATERIAL_FILTER_OTHER = "__other__"
@@ -242,9 +240,6 @@ _ARRIVAL_REQUIRED_DIAMETER: dict[str, tuple[str, str]] = {
 def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
     category = (row.get("category") or "").strip()
     errs: list[str] = []
-    if category in _INVENTORY_CATEGORIES and category != "collet":
-        if not normalize_work_material_codes(row.get("work_material")):
-            errs.append(f"Строка {idx}: укажите хотя бы одну группу материала обработки (P, M, K…).")
     if category == "collet":
         ct = normalize_collet_type(row.get("collet_type"))
         if not ct:
@@ -755,7 +750,6 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "tool_material",
         "tool_material_custom",
         "coating_type",
-        "work_material",
         "body_family",
         "body_cutter",
         "bt_diameter_mm",
@@ -825,7 +819,6 @@ _STOCK_GLOBAL_KEYS = frozenset(
         "tool_material",
         "tool_material_custom",
         "coating_type",
-        "work_material",
     }
 )
 _STOCK_KEYS_BY_CATEGORY = {
@@ -1264,16 +1257,6 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         coating_type = g("coating_type")
         if coating_type:
             qs = qs.filter(coating_type=coating_type)
-    if category not in ("collet", "body_tool") and "work_material" not in ex:
-        work_material = g("work_material")
-        if work_material:
-            wm = work_material.strip()
-            qs = qs.filter(
-                Q(work_material=wm)
-                | Q(work_material__startswith=f"{wm},")
-                | Q(work_material__endswith=f",{wm}")
-                | Q(work_material__contains=f",{wm},")
-            )
     return qs
 
 
@@ -1352,14 +1335,11 @@ def _fmt_unknown(v, prefix: str = "") -> str:
     return f"{prefix}{v}"
 
 
-def _build_end_mill_name(diameter_mm, flutes_count, tool_material: str, work_material: str) -> str:
+def _build_end_mill_name(diameter_mm, flutes_count, tool_material: str) -> str:
     tool_mat_label = dict(TOOL_MATERIAL_TYPES).get(tool_material, tool_material)
-    work_mat_label = work_material_display_text(work_material) or work_material
     parts = [f"Фреза D{_fmt_unknown(diameter_mm)}", f"{_fmt_unknown(flutes_count)} кром."]
     if tool_mat_label:
         parts.append(tool_mat_label)
-    if work_mat_label:
-        parts.append(f"по {work_mat_label}")
     return " / ".join(parts)
 
 
@@ -1482,14 +1462,13 @@ def _insert_spec_fields_from_mapping(data: dict) -> dict:
     }
 
 
-def _find_insert_tool_match(tool_material, coating_type, work_material, main_diameter_mm, spec_fields: dict):
+def _find_insert_tool_match(tool_material, coating_type, main_diameter_mm, spec_fields: dict):
     return (
         ToolItem.objects.select_for_update()
         .filter(
             category="insert",
             tool_material=tool_material,
             coating_type=coating_type,
-            work_material=work_material,
             main_diameter_mm=main_diameter_mm,
             insert_spec__insert_shape=spec_fields["insert_shape"],
             insert_spec__cutting_edge_length_code=spec_fields["cutting_edge_length_code"],
@@ -1503,7 +1482,7 @@ def _find_insert_tool_match(tool_material, coating_type, work_material, main_dia
     )
 
 
-def _create_insert_tool(quantity, tool_material, coating_type, work_material, main_diameter_mm, spec_fields: dict) -> ToolItem:
+def _create_insert_tool(quantity, tool_material, coating_type, main_diameter_mm, spec_fields: dict) -> ToolItem:
     spec = InsertSpec(**spec_fields)
     spec.sync_derived_fields()
     tool = ToolItem.objects.create(
@@ -1511,7 +1490,6 @@ def _create_insert_tool(quantity, tool_material, coating_type, work_material, ma
         name=build_insert_display_name(spec.iso_designation, spec.milling_family, spec.chipbreaker_grade),
         tool_material=tool_material,
         coating_type=coating_type,
-        work_material=work_material,
         main_diameter_mm=main_diameter_mm,
         quantity=quantity,
     )
@@ -1553,7 +1531,6 @@ def _find_collet_tool_match(spec_fields: dict):
             category="collet",
             tool_material="",
             coating_type="none",
-            work_material="",
             collet_spec__collet_type=spec_fields["collet_type"],
             collet_spec__er_size=spec_fields["er_size"],
             collet_spec__clamp_range=spec_fields["clamp_range"],
@@ -1590,7 +1567,6 @@ def _create_collet_tool(quantity, spec_fields: dict) -> ToolItem:
         name=name,
         tool_material="",
         coating_type="none",
-        work_material="",
         quantity=quantity,
     )
     ColletSpec.objects.create(tool=tool, **spec_fields)
@@ -1783,7 +1759,6 @@ def inventory_view(request):
         quantity = _to_int(request.POST.get("quantity"), 0)
         tool_material = (request.POST.get("tool_material") or "").strip()
         coating_type = (request.POST.get("coating_type") or "none").strip()
-        work_material = normalize_work_material_codes(request.POST.get("work_material"))
         main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
         if diameter_mm <= 0 or overall_length_mm <= 0 or cutting_length_mm <= 0 or flutes_count <= 0 or quantity <= 0:
             messages.error(request, "Для фрезы заполните параметры корректно (числа больше нуля).")
@@ -1791,10 +1766,9 @@ def inventory_view(request):
         with transaction.atomic():
             tool = ToolItem.objects.create(
                 category="end_mill",
-                name=_build_end_mill_name(diameter_mm, flutes_count, tool_material, work_material),
+                name=_build_end_mill_name(diameter_mm, flutes_count, tool_material),
                 tool_material=tool_material,
                 coating_type=coating_type,
-                work_material=work_material,
                 main_diameter_mm=main_diameter_mm,
                 quantity=quantity,
             )
@@ -1821,7 +1795,6 @@ def inventory_view(request):
         quantity = _to_int(request.POST.get("quantity"), 0)
         tool_material = (request.POST.get("tool_material") or "").strip()
         coating_type = (request.POST.get("coating_type") or "none").strip()
-        work_material = normalize_work_material_codes(request.POST.get("work_material"))
         main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
         if not size_label or overall_length_mm <= 0 or cutting_length_mm <= 0 or quantity <= 0:
             messages.error(request, "Для метчика заполните размер, длины и количество.")
@@ -1832,7 +1805,6 @@ def inventory_view(request):
                 name=_build_tap_name(size_label, thread_standard, tap_type, hole_type),
                 tool_material=tool_material,
                 coating_type=coating_type,
-                work_material=work_material,
                 main_diameter_mm=main_diameter_mm,
                 quantity=quantity,
             )
@@ -1958,7 +1930,6 @@ def inventory_view(request):
 
         tool.tool_material = (request.POST.get("tool_material") or "").strip()
         tool.coating_type = (request.POST.get("coating_type") or "none").strip()
-        tool.work_material = normalize_work_material_codes(request.POST.get("work_material"))
         tool.main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
         tool.quantity = max(0, _to_int(request.POST.get("quantity"), tool.quantity))
 
@@ -2140,10 +2111,6 @@ def inventory_view(request):
         elif field == "coating_type":
             tool.coating_type = value_raw or "none"
             tool.save(update_fields=["coating_type", "updated_at"])
-            common_ok = True
-        elif field == "work_material":
-            tool.work_material = normalize_work_material_codes(value_raw)
-            tool.save(update_fields=["work_material", "updated_at"])
             common_ok = True
         elif field == "quantity":
             tool.quantity = max(0, _to_int(value_raw, tool.quantity))
@@ -2631,7 +2598,6 @@ def inventory_view(request):
         tool_material = (request.POST.get("tool_material") or "").strip()
         _register_tool_material_extra(tool_material)
         coating_type = (request.POST.get("coating_type") or "none").strip()
-        work_material = normalize_work_material_codes(request.POST.get("work_material"))
         main_diameter_mm = _to_decimal_or_none(request.POST.get("main_diameter_mm"))
         if category not in {"end_mill", "tap"} or quantity <= 0:
             messages.error(request, "Укажите тип инструмента и количество для прихода.")
@@ -2656,7 +2622,6 @@ def inventory_view(request):
                         category="end_mill",
                         tool_material=tool_material,
                         coating_type=coating_type,
-                        work_material=work_material,
                         main_diameter_mm=main_diameter_mm,
                         end_mill_spec__mill_type=mill_type,
                         end_mill_spec__diameter_mm=diameter_mm,
@@ -2673,10 +2638,9 @@ def inventory_view(request):
                 else:
                     tool = ToolItem.objects.create(
                         category="end_mill",
-                        name=_build_end_mill_name(diameter_mm, flutes_count, tool_material, work_material),
+                        name=_build_end_mill_name(diameter_mm, flutes_count, tool_material),
                         tool_material=tool_material,
                         coating_type=coating_type,
-                        work_material=work_material,
                         main_diameter_mm=main_diameter_mm,
                         quantity=quantity,
                     )
@@ -2705,7 +2669,6 @@ def inventory_view(request):
                         category="tap",
                         tool_material=tool_material,
                         coating_type=coating_type,
-                        work_material=work_material,
                         main_diameter_mm=main_diameter_mm,
                         tap_spec__thread_standard=thread_standard,
                         tap_spec__thread_kind=thread_kind,
@@ -2728,7 +2691,6 @@ def inventory_view(request):
                         name=_build_tap_name(size_label, thread_standard, tap_type, hole_type),
                         tool_material=tool_material,
                         coating_type=coating_type,
-                        work_material=work_material,
                         main_diameter_mm=main_diameter_mm,
                         quantity=quantity,
                     )
@@ -2790,7 +2752,6 @@ def inventory_view(request):
                 tool_material = (row.get("tool_material") or "").strip()
                 _register_tool_material_extra(tool_material)
                 coating_type = (row.get("coating_type") or "none").strip()
-                work_material = normalize_work_material_codes(row.get("work_material"))
                 main_diameter_mm = _to_decimal_or_none(row.get("main_diameter_mm"))
                 if category not in _INVENTORY_CATEGORIES or quantity <= 0:
                     continue
@@ -2812,7 +2773,6 @@ def inventory_view(request):
                             category="end_mill",
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             end_mill_spec__mill_type=mill_type,
                             end_mill_spec__diameter_mm=diameter_mm,
@@ -2829,10 +2789,9 @@ def inventory_view(request):
                     else:
                         tool = ToolItem.objects.create(
                             category="end_mill",
-                            name=_build_end_mill_name(diameter_mm, flutes_count, tool_material, work_material),
+                            name=_build_end_mill_name(diameter_mm, flutes_count, tool_material),
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             quantity=quantity,
                         )
@@ -2916,7 +2875,6 @@ def inventory_view(request):
                             category="body_tool",
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             body_tool_spec__family=family,
                             body_tool_spec__cutter_type=cutter_type,
                             body_tool_spec__diameter_mm=diameter_mm,
@@ -2956,7 +2914,6 @@ def inventory_view(request):
                             ),
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=mount_diameter_mm,
                             quantity=quantity,
                         )
@@ -3000,7 +2957,6 @@ def inventory_view(request):
                             category="tap",
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             tap_spec__thread_standard=thread_standard,
                             tap_spec__thread_kind=thread_kind,
@@ -3023,7 +2979,6 @@ def inventory_view(request):
                             name=_build_tap_name(size_label, thread_standard, tap_type, hole_type),
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             quantity=quantity,
                         )
@@ -3051,7 +3006,6 @@ def inventory_view(request):
                             category="center_drill",
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             center_drill_spec__diameter_mm=diameter_mm,
                             center_drill_spec__overall_length_mm=overall_length_mm,
@@ -3068,7 +3022,6 @@ def inventory_view(request):
                             name=_build_center_drill_name(diameter_mm, angle_deg),
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             quantity=quantity,
                         )
@@ -3095,7 +3048,6 @@ def inventory_view(request):
                             category="countersink",
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             countersink_spec__countersink_type=countersink_type,
                             countersink_spec__diameter_mm=diameter_mm,
@@ -3115,7 +3067,6 @@ def inventory_view(request):
                             name=_build_countersink_name(countersink_type, diameter_mm, angle_deg, size_label),
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             quantity=quantity,
                         )
@@ -3139,7 +3090,6 @@ def inventory_view(request):
                             category="drill",
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             drill_spec__diameter_mm=diameter_mm,
                             drill_spec__overall_length_mm=overall_length_mm,
@@ -3157,7 +3107,6 @@ def inventory_view(request):
                             name=_build_drill_name(diameter_mm, overall_length_mm, cutting_length_mm, angle_deg),
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             quantity=quantity,
                         )
@@ -3180,7 +3129,6 @@ def inventory_view(request):
                             category="reamer",
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             reamer_spec__diameter_mm=diameter_mm,
                             reamer_spec__overall_length_mm=overall_length_mm,
@@ -3201,7 +3149,6 @@ def inventory_view(request):
                             ),
                             tool_material=tool_material,
                             coating_type=coating_type,
-                            work_material=work_material,
                             main_diameter_mm=main_diameter_mm,
                             quantity=quantity,
                         )
@@ -3216,14 +3163,14 @@ def inventory_view(request):
                 elif category == "insert":
                     spec_fields = _insert_spec_fields_from_mapping(row)
                     tool = _find_insert_tool_match(
-                        tool_material, coating_type, work_material, main_diameter_mm, spec_fields
+                        tool_material, coating_type, main_diameter_mm, spec_fields
                     )
                     if tool:
                         tool.quantity += quantity
                         tool.save(update_fields=["quantity", "updated_at"])
                     else:
                         tool = _create_insert_tool(
-                            quantity, tool_material, coating_type, work_material, main_diameter_mm, spec_fields
+                            quantity, tool_material, coating_type, main_diameter_mm, spec_fields
                         )
                 elif category == "collet":
                     spec_fields = _collet_spec_fields_from_row(row)
@@ -3556,7 +3503,6 @@ def inventory_view(request):
         tool_material = tm_param.strip()[:80]
 
     coating_type = _sq("coating_type")
-    work_material = _sq("work_material")
 
     qs = _apply_stock_detail_filters(qs, category=filter_category, params=stock_req)
 
@@ -4144,7 +4090,6 @@ def inventory_view(request):
             "tool_material_custom": tm_custom_input,
             "tool_material_select": tool_material_select,
             "coating_type": coating_type,
-            "work_material": work_material,
             "show_all": show_all,
             "history_movement_type": history_movement_type,
             "history_employee": history_employee,
@@ -4269,6 +4214,8 @@ def inventory_view(request):
         "insert_chipbreaker_grades": insert_grades,
         "insert_column_tooltips": INSERT_COLUMN_TOOLTIPS,
         "insert_column_tooltips_json": json.dumps(INSERT_COLUMN_TOOLTIPS, ensure_ascii=False),
+        "arrival_column_tooltips": ARRIVAL_COLUMN_TOOLTIPS,
+        "arrival_column_tooltips_json": json.dumps(ARRIVAL_COLUMN_TOOLTIPS, ensure_ascii=False),
         "collet_types": COLLET_TYPES,
         "collet_types_ui": [
             {"value": k, "label": lbl, "tip": COLLET_TYPE_TOOLTIPS.get(k, "")}
@@ -4287,7 +4234,6 @@ def inventory_view(request):
         "tool_material_filter_other": TOOL_MATERIAL_FILTER_OTHER,
         "stock_tool_material_extra_json": stock_tool_material_extra_json,
         "coating_types": COATING_TYPES,
-        "work_material_types": WORK_MATERIAL_TYPES,
         "today": date.today().isoformat(),
         "movement_tool_options": ToolItem.objects.select_related(
             "end_mill_spec",

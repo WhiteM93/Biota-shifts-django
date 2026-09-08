@@ -615,36 +615,6 @@ html[data-theme="dawn"] .inv-outcome-card__chips .coating-dot.swatch-none {
   background: linear-gradient(120deg, #f44336 0%, #ff9800 20%, #ffeb3b 35%, #4caf50 52%, #2196f3 70%, #9c27b0 100%);
 }
 
-.inv-outcome-page .inv-outcome-card__chips .wm-badge {
-  cursor: help;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  margin: 0;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
-  color: #fff;
-}
-
-.inv-outcome-page .inv-outcome-card__chips .wm-badge.wm-p { background: #2f72ff; }
-.inv-outcome-page .inv-outcome-card__chips .wm-badge.wm-m { background: #f6b93b; color: #111; }
-.inv-outcome-page .inv-outcome-card__chips .wm-badge.wm-k { background: #e25a5a; }
-.inv-outcome-page .inv-outcome-card__chips .wm-badge.wm-n { background: #2bb673; }
-.inv-outcome-page .inv-outcome-card__chips .wm-badge.wm-s { background: #8f7cff; }
-.inv-outcome-page .inv-outcome-card__chips .wm-badge.wm-h { background: #6d6d6d; }
-.inv-outcome-page .inv-outcome-card__chips .wm-badge.wm-pw {
-  background: #f0f4f8;
-  color: #1a1d21;
-  border-color: #c5cdd6;
-}
-
 .inv-outcome-facts {
   display: flex;
   flex-wrap: wrap;

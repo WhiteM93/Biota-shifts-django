@@ -60,8 +60,7 @@ class Command(BaseCommand):
         # --- ФРЕЗЫ ---
         em1 = ToolItem.objects.create(
             category="end_mill", name="Концевая фреза IZAR",
-            tool_material="carbide", coating_type="black",
-            work_material="P", main_diameter_mm="6.00", quantity=8,
+            tool_material="carbide", coating_type="black", main_diameter_mm="6.00", quantity=8,
             notes="Для черновой обработки стали",
         )
         EndMillSpec.objects.create(
@@ -72,8 +71,7 @@ class Command(BaseCommand):
 
         em2 = ToolItem.objects.create(
             category="end_mill", name="Сферическая фреза Sandvik",
-            tool_material="carbide", coating_type="yellow",
-            work_material="P", main_diameter_mm="8.00", quantity=3,
+            tool_material="carbide", coating_type="yellow", main_diameter_mm="8.00", quantity=3,
         )
         EndMillSpec.objects.create(
             tool=em2, mill_type="ball",
@@ -83,8 +81,7 @@ class Command(BaseCommand):
 
         em3 = ToolItem.objects.create(
             category="end_mill", name="Обдирочная фреза GARANT",
-            tool_material="carbide", coating_type="brown",
-            work_material="P", main_diameter_mm="16.00", quantity=5,
+            tool_material="carbide", coating_type="brown", main_diameter_mm="16.00", quantity=5,
             notes="Черновые проходы, высокая подача",
         )
         EndMillSpec.objects.create(
@@ -95,8 +92,7 @@ class Command(BaseCommand):
 
         em4 = ToolItem.objects.create(
             category="end_mill", name="Радиусная фреза YG-1",
-            tool_material="carbide", coating_type="multicolor",
-            work_material="K", main_diameter_mm="10.00", quantity=2,
+            tool_material="carbide", coating_type="multicolor", main_diameter_mm="10.00", quantity=2,
         )
         EndMillSpec.objects.create(
             tool=em4, mill_type="radius",
@@ -106,8 +102,7 @@ class Command(BaseCommand):
 
         em5 = ToolItem.objects.create(
             category="end_mill", name="Т-образная фреза JBO",
-            tool_material="carbide", coating_type="none",
-            work_material="P", main_diameter_mm="20.00", quantity=1,
+            tool_material="carbide", coating_type="none", main_diameter_mm="20.00", quantity=1,
             notes="Пазы типа «ласточкин хвост»",
         )
         EndMillSpec.objects.create(
@@ -119,8 +114,7 @@ class Command(BaseCommand):
         # --- РЕЗЬБОВОЙ ИНСТРУМЕНТ ---
         tap1 = ToolItem.objects.create(
             category="tap", name="Метчик M6 GÜHRING",
-            tool_material="hss_co", coating_type="yellow",
-            work_material="P", main_diameter_mm="6.00", quantity=10,
+            tool_material="hss_co", coating_type="yellow", main_diameter_mm="6.00", quantity=10,
         )
         TapSpec.objects.create(
             tool=tap1, thread_standard="metric", size_label="M6",
@@ -131,8 +125,7 @@ class Command(BaseCommand):
 
         tap2 = ToolItem.objects.create(
             category="tap", name="Метчик M8×1,25 DORMER",
-            tool_material="hss_co", coating_type="black",
-            work_material="P", main_diameter_mm="8.00", quantity=7,
+            tool_material="hss_co", coating_type="black", main_diameter_mm="8.00", quantity=7,
             notes="Для глухих отверстий",
         )
         TapSpec.objects.create(
@@ -144,8 +137,7 @@ class Command(BaseCommand):
 
         tap3 = ToolItem.objects.create(
             category="tap", name="Резьбофреза M10 Vardex",
-            tool_material="carbide", coating_type="multicolor",
-            work_material="M", main_diameter_mm="10.00", quantity=2,
+            tool_material="carbide", coating_type="multicolor", main_diameter_mm="10.00", quantity=2,
             notes="Нержавейка, одновременное фрезерование и нарезка",
         )
         TapSpec.objects.create(
@@ -158,8 +150,7 @@ class Command(BaseCommand):
         # --- ЦЕНТРОВКИ ---
         cd1 = ToolItem.objects.create(
             category="center_drill", name="Центровочное сверло A2",
-            tool_material="hss", coating_type="none",
-            work_material="P", main_diameter_mm="6.30", quantity=12,
+            tool_material="hss", coating_type="none", main_diameter_mm="6.30", quantity=12,
         )
         CenterDrillSpec.objects.create(
             tool=cd1,
@@ -168,8 +159,7 @@ class Command(BaseCommand):
 
         cd2 = ToolItem.objects.create(
             category="center_drill", name="Центровочное сверло A4",
-            tool_material="hss", coating_type="none",
-            work_material="P", main_diameter_mm="10.00", quantity=6,
+            tool_material="hss", coating_type="none", main_diameter_mm="10.00", quantity=6,
         )
         CenterDrillSpec.objects.create(
             tool=cd2,
@@ -179,8 +169,7 @@ class Command(BaseCommand):
         # --- ЗЕНКЕРА ---
         cs1 = ToolItem.objects.create(
             category="countersink", name="Зенкер машинный DIN 335",
-            tool_material="hss", coating_type="none",
-            work_material="P", main_diameter_mm="12.00", quantity=4,
+            tool_material="hss", coating_type="none", main_diameter_mm="12.00", quantity=4,
         )
         CountersinkSpec.objects.create(
             tool=cs1, countersink_type="machine",
@@ -190,8 +179,7 @@ class Command(BaseCommand):
 
         cs2 = ToolItem.objects.create(
             category="countersink", name="Зенкер ручной 90° HSS",
-            tool_material="hss", coating_type="none",
-            work_material="P", main_diameter_mm="20.00", quantity=2,
+            tool_material="hss", coating_type="none", main_diameter_mm="20.00", quantity=2,
         )
         CountersinkSpec.objects.create(
             tool=cs2, countersink_type="hand",
@@ -202,8 +190,7 @@ class Command(BaseCommand):
         # --- СВЕРЛА ---
         dr1 = ToolItem.objects.create(
             category="drill", name="Сверло HSS-Co Ø4",
-            tool_material="hss_co", coating_type="none",
-            work_material="P", main_diameter_mm="4.00", quantity=20,
+            tool_material="hss_co", coating_type="none", main_diameter_mm="4.00", quantity=20,
         )
         DrillSpec.objects.create(
             tool=dr1,
@@ -213,8 +200,7 @@ class Command(BaseCommand):
 
         dr2 = ToolItem.objects.create(
             category="drill", name="Сверло HSS-Co Ø6,5",
-            tool_material="hss_co", coating_type="none",
-            work_material="P", main_diameter_mm="6.50", quantity=15,
+            tool_material="hss_co", coating_type="none", main_diameter_mm="6.50", quantity=15,
         )
         DrillSpec.objects.create(
             tool=dr2,
@@ -224,8 +210,7 @@ class Command(BaseCommand):
 
         dr3 = ToolItem.objects.create(
             category="drill", name="Сверло твердосплав Ø10",
-            tool_material="carbide", coating_type="yellow",
-            work_material="P", main_diameter_mm="10.00", quantity=5,
+            tool_material="carbide", coating_type="yellow", main_diameter_mm="10.00", quantity=5,
             notes="Для сквозных отверстий под развёртку",
         )
         DrillSpec.objects.create(
@@ -236,8 +221,7 @@ class Command(BaseCommand):
 
         dr4 = ToolItem.objects.create(
             category="drill", name="Сверло HSS Ø3,3 (под M4)",
-            tool_material="hss", coating_type="none",
-            work_material="P", main_diameter_mm="3.30", quantity=30,
+            tool_material="hss", coating_type="none", main_diameter_mm="3.30", quantity=30,
             notes="Предварительное сверление под метчик M4",
         )
         DrillSpec.objects.create(

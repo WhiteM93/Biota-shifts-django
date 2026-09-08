@@ -171,6 +171,11 @@ urlpatterns = [
     path("cabinet/notifications/", cabinet_views.notifications_settings_view, name="cabinet_notifications"),
     path("cabinet/icons/", cabinet_views.icons_settings_view, name="cabinet_icons"),
     path("cabinet/icons/preview/", cabinet_views.icons_preview_view, name="cabinet_icons_preview"),
+    path(
+        "cabinet/visual-warehouse/",
+        cabinet_views.visual_warehouse_settings_view,
+        name="cabinet_visual_warehouse",
+    ),
     path("cabinet/backups/", cabinet_views.schedule_backups_view, name="schedule_backups"),
     path("cabinet/backups/download/<str:filename>/", cabinet_views.schedule_backup_download, name="schedule_backup_download"),
     path("cabinet/inventory-backups/", cabinet_views.inventory_backups_view, name="inventory_backups"),

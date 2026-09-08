@@ -325,7 +325,6 @@ def _serialize_tool(tool: ToolItem) -> dict:
     diam = float(cutting) if cutting is not None else None
     coating = (tool.coating_type or "none").strip() or "none"
     coating_label = "без покрытия" if coating == "none" else str(tool.get_coating_type_display())
-    wm_codes = tool.work_material_codes_list()
     mill_type = ""
     mill_type_label = ""
     subtype = ""
@@ -432,8 +431,6 @@ def _serialize_tool(tool: ToolItem) -> dict:
         "coating_type": coating,
         "coating_label": coating_label,
         "coating_title": COATING_TYPE_TOOLTIPS.get(coating, coating_label),
-        "work_material_codes": wm_codes,
-        "work_material_label": tool.get_work_materials_display() or "",
     }
 
 
@@ -984,10 +981,15 @@ def _serialize_audit(audit: VisualContainerAudit, *, with_lines: bool = True) ->
 @biota_login_required
 @nav_permission_required("visual_warehouse")
 def visual_warehouse_view(request):
+    from biota_shifts.visual_warehouse_settings import load_visual_warehouse_settings
+
+    vw_settings = load_visual_warehouse_settings()
     return render(
         request,
         "shifts/visual_warehouse.html",
         {
+            "vw_audit_ok_days": vw_settings["audit_ok_days"],
+            "vw_audit_warn_days": vw_settings["audit_warn_days"],
             "tool_categories": [
                 {"value": v, "label": lab}
                 for v, lab in VisualContainerItem.TOOL_CATEGORY_CHOICES

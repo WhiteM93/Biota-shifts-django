@@ -12,6 +12,8 @@
   var apiAuditsTpl = root.getAttribute("data-api-audits-tpl") || "";
   var apiPhotosTpl = root.getAttribute("data-api-photos-tpl") || "";
   var apiPhotoDelTpl = root.getAttribute("data-api-photo-del-tpl") || "";
+  var auditOkDays = Math.max(1, parseInt(root.getAttribute("data-audit-ok-days"), 10) || 30);
+  var auditWarnDays = Math.max(auditOkDays, parseInt(root.getAttribute("data-audit-warn-days"), 10) || 90);
 
   var floorEl = root.querySelector(".js-vw-floor");
   var emptyEl = root.querySelector(".js-vw-empty");
@@ -238,6 +240,47 @@
       return p[2] + "." + p[1] + "." + p[0].slice(-2);
     }
     return datePart;
+  }
+
+  function parseAuditDate(cont) {
+    var iso = String((cont && cont.last_audited_at_iso) || "").trim();
+    if (iso) {
+      var d = new Date(iso);
+      if (!isNaN(d.getTime())) return d;
+    }
+    var raw = String((cont && cont.last_audited_at) || "").trim();
+    if (!raw) return null;
+    var datePart = raw.split(" ")[0];
+    var m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(datePart);
+    if (m) {
+      return new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10));
+    }
+    var p = datePart.split("-");
+    if (p.length === 3 && p[0].length === 4) {
+      return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+    }
+    return null;
+  }
+
+  function auditFreshnessClass(cont) {
+    var d = parseAuditDate(cont);
+    if (!d) return "is-overdue";
+    var now = new Date();
+    var start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var days = Math.floor((today - start) / 86400000);
+    if (days < 0) days = 0;
+    if (days <= auditOkDays) return "is-ok";
+    if (days <= auditWarnDays) return "is-warn";
+    return "is-overdue";
+  }
+
+  function auditFreshnessTitle(cls, auditDate) {
+    if (cls === "is-ok") return "Инвентаризация актуальна" + (auditDate ? (" (" + auditDate + ")") : "");
+    if (cls === "is-warn") return "Пора планировать инвентаризацию" + (auditDate ? (" (" + auditDate + ")") : "");
+    return auditDate
+      ? ("Нужно провести инвентаризацию (последняя " + auditDate + ")")
+      : "Инвентаризация не проводилась";
   }
 
   function syncPhotoUploadLabel() {
@@ -859,10 +902,15 @@
     btn.appendChild(labelWrap);
 
     var auditDate = formatBinAuditDate(cont.last_audited_at || "");
+    var freshCls = auditFreshnessClass(cont);
+    var footer = document.createElement("span");
+    footer.className = "vw-bin-footer";
     var stamp = document.createElement("span");
-    stamp.className = "vw-bin-audit" + (auditDate ? "" : " is-empty");
+    stamp.className = "vw-bin-audit " + freshCls + (auditDate ? "" : " is-empty");
     stamp.textContent = auditDate || "—";
-    btn.appendChild(stamp);
+    stamp.title = auditFreshnessTitle(freshCls, auditDate);
+    footer.appendChild(stamp);
+    btn.appendChild(footer);
 
     var titleBase = cont.label || containerKindLabel(cont.kind);
     var placeLab = placeDisplayLabel(cont.column);
@@ -1595,24 +1643,6 @@
     }
     badges.appendChild(coatWrap);
 
-    var codes = tool.work_material_codes || [];
-    if (codes.length) {
-      var wmWrap = document.createElement("span");
-      wmWrap.className = "vw-wm-squares";
-      codes.forEach(function (code) {
-        var sq = document.createElement("span");
-        sq.className = "vw-wm-square wm-" + String(code || "").toLowerCase();
-        sq.textContent = code;
-        sq.title = tool.work_material_label || code;
-        wmWrap.appendChild(sq);
-      });
-      badges.appendChild(wmWrap);
-    } else if (tool.work_material_label) {
-      var wmTxt = document.createElement("span");
-      wmTxt.className = "vw-wm-text";
-      wmTxt.textContent = tool.work_material_label;
-      badges.appendChild(wmTxt);
-    }
 
     metaEl.appendChild(badges);
   }

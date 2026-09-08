@@ -235,7 +235,6 @@
         <th class="sortable">Наименование</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
-        <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
         {% if can_manage_stock %}<th class="inv-stock-col-delete"></th>{% endif %}
       </tr>
@@ -249,9 +248,6 @@
         <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
-        </td>
-        <td class="inv-stock-wm-cell{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
-          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -286,7 +282,6 @@
         <th class="sortable">D осн, мм</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
-        <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
         {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
       </tr>
@@ -307,9 +302,6 @@
         <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
-        </td>
-        <td class="inv-stock-wm-cell{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.work_material|default:'-' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
-          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -811,7 +803,6 @@
         <th class="sortable">D осн, мм</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
-        <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
         {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
       </tr>
@@ -833,9 +824,6 @@
         <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
-        </td>
-        <td class="inv-stock-wm-cell{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.work_material|default:'-' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
-          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -867,7 +855,6 @@
         <th class="sortable">D осн, мм</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
-        <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
         {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
       </tr>
@@ -883,9 +870,6 @@
         <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
-        </td>
-        <td class="inv-stock-wm-cell{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.work_material|default:'-' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
-          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -920,7 +904,6 @@
         <th class="sortable">D осн, мм</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
-        <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
         {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
       </tr>
@@ -939,9 +922,6 @@
         <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
-        </td>
-        <td class="inv-stock-wm-cell{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.work_material|default:'-' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
-          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -976,7 +956,6 @@
         <th class="sortable insert-app-col" title="Вид обработки">Обр.</th>
         <th class="sortable" title="{{ tips.grade }}">Сплав</th>
         <th class="sortable" title="{{ tips.coating }}">Покрытие</th>
-        <th class="sortable" title="{{ tips.work_material }}">Материал обработки</th>
         <th class="sortable" title="{{ tips.stock_qty }}">Остаток</th>
         {% if can_manage_stock %}<th class="inv-stock-col-delete" title="{{ tips.delete }}">Удалить</th>{% endif %}
       </tr>
@@ -998,9 +977,6 @@
         <td data-sort="{{ t.insert_spec.chipbreaker_grade|default:'-' }}" title="{{ t.insert_spec.chipbreaker_grade_cell_title }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_grade" data-type="text" data-value="{{ t.insert_spec.chipbreaker_grade|default:'' }}"{% endif %}>{{ t.insert_spec.chipbreaker_grade|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell" title="{{ ct|coating_hover_title }}"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
-        </td>
-        <td class="inv-stock-wm-cell{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.work_material|default:'-' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
-          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -1034,7 +1010,6 @@
         <th class="sortable">D осн, мм</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
-        <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
         {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
       </tr>
@@ -1051,9 +1026,6 @@
         <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
-        </td>
-        <td class="inv-stock-wm-cell{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.work_material|default:'-' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
-          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -1087,7 +1059,6 @@
         <th class="sortable">D осн, мм</th>
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
-        <th class="sortable">Материал обработки</th>
         <th class="sortable">Остаток</th>
         {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
       </tr>
@@ -1105,9 +1076,6 @@
         <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
-        </td>
-        <td class="inv-stock-wm-cell{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.work_material|default:'-' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="work_material" data-type="select" data-value="{{ t.work_material|default:'' }}"{% endif %}>
-          <div class="inv-stock-wm-squares">{% for wm in t.work_material_codes_list %}<span class="wm-square wm-{{ wm|lower }}" title="{{ wm|work_material_tooltip }}">{{ wm }}</span>{% empty %}-{% endfor %}</div>
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
@@ -1878,20 +1846,6 @@
         {% endfor %}
       </div>
     </div>
-    <div class="field"><span{% if filters.category == "insert" %} title="{{ insert_column_tooltips.work_material }}"{% endif %}>Материал обработки</span>
-      <div class="wm-picker"{% if filters.category == "insert" %} title="{{ insert_column_tooltips.work_material }}"{% endif %}>
-        <label class="wm-chip">
-          <input type="radio" name="work_material" value="" {% if not filters.work_material %}checked{% endif %}>
-          <span class="wm-square wm-all">Все</span>
-        </label>
-        {% for key, label in work_material_types %}
-        <label class="wm-chip">
-          <input type="radio" name="work_material" value="{{ key }}" {% if filters.work_material == key %}checked{% endif %}>
-          <span class="wm-square wm-{{ key|lower }}" title="{{ label }}">{{ key }}</span>
-        </label>
-        {% endfor %}
-      </div>
-    </div>
     {% endif %}
   </div>
 
@@ -1937,8 +1891,6 @@
             data-issue-qty="{{ card.qty|escape }}"
             data-issue-coating-type="{{ coat|escape }}"
             data-issue-coating-title="{{ coat|coating_hover_title|escape }}"
-            data-issue-wm="{{ t.work_material|default:''|escape }}"
-            data-issue-wm-title="{% if t.work_material %}{{ t.get_work_material_display|escape }}{% endif %}"
             data-f-material="{{ m.material|escape }}"
             data-f-coating="{{ m.coating|escape }}"
             data-f-mill_type="{{ m.mill_type|escape }}"
@@ -2373,8 +2325,6 @@
                 data-issue-qty="{{ iss.tool.qty|default:'' }}"
                 data-issue-coating-type="{{ coat|escape }}"
                 data-issue-coating-title="{{ coat|coating_hover_title|escape }}"
-                data-issue-wm="{{ iss.tool.work_material|default:''|escape }}"
-                data-issue-wm-title="{% if iss.tool.work_material %}{{ iss.tool.get_work_material_display|escape }}{% endif %}"
                 data-issue-extra="кому: {{ iss.employee_name|default:'-'|escape }} · {{ iss.movement_date|date:'d.m.Y' }} · выдано {{ iss.quantity }} · ост. {{ iss.remaining_qty }}"
                 data-employee-name="{{ iss.employee_name|default:''|escape }}"
                 data-f-material="{{ m.material|escape }}"
@@ -2535,9 +2485,6 @@
               <span class="coating-dot swatch-{{ ct }}" aria-hidden="true"></span>
             </span>
             {% endwith %}
-            {% for wm in iss.tool.work_material_codes_list %}
-            <span class="wm-badge wm-{{ wm|lower }}" title="Материал обработки: {{ iss.tool.get_work_materials_display }}">{{ wm }}</span>
-            {% endfor %}
           </div>
           <div class="inv-outcome-facts">
             <span class="inv-outcome-qty"><span class="inv-outcome-fact__label">Выдано</span> <strong>{{ iss.quantity }}</strong> шт.</span>
@@ -3694,7 +3641,6 @@
   "purchase_store_filter_other": "{{ purchase_store_filter_other|escapejs }}",
   "tool_material_types": [{% for key, label in tool_material_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "coating_types": [{% for key, label in coating_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}","hoverTitle":"{{ key|coating_hover_title|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
-  "work_material_types": [{% for key, label in work_material_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "end_mill_types": [{% for key, label in end_mill_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "body_tool_families": [{% for key, label in body_tool_families %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "indexable_mill_cutter_types": [{% for key, label in indexable_mill_cutter_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
@@ -3730,6 +3676,7 @@
   "insert_grade_other": "{{ insert_grade_other|escapejs }}",
   "insert_chipbreaker_grades": [{% for g in insert_chipbreaker_grades %}"{{ g|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
   "insert_column_tooltips": {{ insert_column_tooltips_json|safe }},
+  "arrival_column_tooltips": {{ arrival_column_tooltips_json|default:'{}'|safe }},
   "collet_types": [{% for key, label in collet_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "collet_type_tooltips": {{ collet_type_tooltips_json|safe }},
   "collet_type_diagram_urls": {"er": "{% static 'shifts/images/collet-er.png' %}", "er_g": "{% static 'shifts/images/collet-er-g.png' %}", "ers": "{% static 'shifts/images/collet-ers.png' %}", "eoc": "{% static 'shifts/images/collet-eoc.png' %}", "sc": "{% static 'shifts/images/collet-sc.png' %}", "sk": "{% static 'shifts/images/collet-sk.png' %}", "threading": "{% static 'shifts/images/collet-threading.png' %}", "ter": "{% static 'shifts/images/collet-ter.png' %}", "phc_hc": "{% static 'shifts/images/collet-phc-hc.png' %}", "dc": "{% static 'shifts/images/collet-dc.png' %}", "cc": "{% static 'shifts/images/collet-cc.png' %}"},
