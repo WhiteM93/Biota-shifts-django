@@ -7,7 +7,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
-from django.db.models import Count, F, Prefetch, Sum
+from django.db.models import Count, F, Prefetch, Q, Sum
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -28,6 +28,7 @@ from .body_tool_constants import (
 )
 from .collet_constants import COLLET_TYPES, COLLET_TYPE_VALUES, ER_COLLET_SIZES, ER_COLLET_SIZE_VALUES, normalize_er_collet_size
 from .insert_constants import INSERT_SHAPES, INSERT_SHAPE_VALUES, MILLING_INSERT_FAMILIES, normalize_milling_family
+from .size_label_normalize import normalize_cutting_size_label, size_label_match_variants
 from .models import (
     CENTER_DRILL_ANGLES,
     COATING_TYPE_TOOLTIPS,
@@ -155,7 +156,7 @@ def _dec(val):
     if val is None or val == "":
         return None
     try:
-        return Decimal(str(val))
+        return Decimal(str(val).strip().replace(",", "."))
     except (InvalidOperation, TypeError, ValueError):
         return None
 
@@ -540,13 +541,19 @@ def _tool_qs_for_filter(
         if pitch_mm is not None:
             qs = qs.filter(tap_spec__pitch_mm=pitch_mm)
         if size_label:
-            qs = qs.filter(tap_spec__size_label__icontains=size_label.strip())
+            size_q = Q()
+            for variant in size_label_match_variants(size_label):
+                size_q |= Q(tap_spec__size_label__icontains=variant)
+            qs = qs.filter(size_q)
 
     if category == "countersink":
         if countersink_type:
             qs = qs.filter(countersink_spec__countersink_type=countersink_type)
         if size_label:
-            qs = qs.filter(countersink_spec__size_label__iexact=size_label.strip())
+            size_q = Q()
+            for variant in size_label_match_variants(size_label):
+                size_q |= Q(countersink_spec__size_label__iexact=variant)
+            qs = qs.filter(size_q)
         if angle_deg:
             qs = qs.filter(countersink_spec__angle_deg=str(angle_deg).strip())
         if flutes_count is not None:
@@ -1413,7 +1420,7 @@ def _parse_item_filters(body: dict, category: str) -> tuple[dict | None, str | N
     collet_er_size = normalize_er_collet_size(body.get("collet_er_size"))
     if str(body.get("collet_er_size") or "").strip() and not collet_er_size:
         return None, "Некорректный размер ER"
-    size_label = str(body.get("size_label") or "").strip()[:32]
+    size_label = normalize_cutting_size_label(body.get("size_label"))[:32]
     insert_compat = str(body.get("insert_compat") or "").strip()[:80]
     insert_family = normalize_milling_family(body.get("insert_family"))
     insert_shape = str(body.get("insert_shape") or "").strip().upper()
@@ -1730,7 +1737,7 @@ def _create_tool_for_audit(data: dict) -> ToolItem:
         raise ValueError("Некорректный тип отверстия")
     if category != "tap":
         hole_type = ""
-    size_label = str(data.get("size_label") or "").strip()[:32]
+    size_label = normalize_cutting_size_label(data.get("size_label"))[:32]
     flutes = _clamp_int(data.get("flutes_count"), 0, 0, 20) or None
     main_d = _dec(data.get("main_diameter_mm"))
     name = str(data.get("name") or "").strip()[:200]

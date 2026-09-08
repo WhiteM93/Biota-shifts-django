@@ -928,6 +928,31 @@ var INV = (function () {
   var rowsJsonInput = document.getElementById("arrival-bulk-rows-json");
   if (!categorySelect || !arrivalDateInput || !addBtn || !groupsWrap || !form || !rowsJsonInput) return;
 
+  function normalizeDecimalComma(raw) {
+    return String(raw == null ? "" : raw).replace(/,/g, ".");
+  }
+
+  function isArrivalNumericField(el, key) {
+    if (!el) return false;
+    if (el.type === "number") return true;
+    var k = key || el.getAttribute("data-k") || "";
+    return /(_mm|_deg|pitch|quantity|tpi|flutes|diameter|radius|angle|ap_max|teeth)/i.test(k);
+  }
+
+  groupsWrap.addEventListener("input", function (e) {
+    var el = e.target;
+    if (!el || !el.getAttribute || !el.getAttribute("data-k")) return;
+    if (!isArrivalNumericField(el)) return;
+    var raw = el.value || "";
+    if (raw.indexOf(",") === -1) return;
+    var start = el.selectionStart;
+    var end = el.selectionEnd;
+    el.value = normalizeDecimalComma(raw);
+    if (typeof start === "number" && typeof el.setSelectionRange === "function") {
+      try { el.setSelectionRange(start, end); } catch (err) { /* type=number may ignore */ }
+    }
+  });
+
   function biotaCssToken(name) {
     return (getComputedStyle(document.documentElement).getPropertyValue(name) || "").trim();
   }
@@ -2527,7 +2552,8 @@ var INV = (function () {
             row.bt_insert_size = (el.value || "").trim();
           }
         } else {
-          row[k] = (el.value || "").trim();
+          var rawVal = (el.value || "").trim();
+          row[k] = isArrivalNumericField(el, k) ? normalizeDecimalComma(rawVal) : rawVal;
         }
       });
       row.movement_date = (arrivalDateInput.value || "").trim();
@@ -2875,6 +2901,10 @@ var INV = (function () {
     return sel;
   }
 
+  function normalizeDecimalComma(raw) {
+    return String(raw == null ? "" : raw).trim().replace(/,/g, ".");
+  }
+
   function saveCell(cell, value, editor) {
     var toolId = cell.getAttribute("data-tool-id");
     var field = cell.getAttribute("data-field");
@@ -3195,6 +3225,9 @@ var INV = (function () {
     function finish(save) {
       if (!activeCell) return;
       var newValue = (editor.value || "").trim();
+      if (type === "number" || type === "int") {
+        newValue = normalizeDecimalComma(newValue);
+      }
       if (!save || cancelled) {
         cell.innerHTML = formatCell(field, current);
         activeCell = null;
@@ -3213,6 +3246,13 @@ var INV = (function () {
     editor.addEventListener("change", function () {
       if (type === "select") finish(true);
     });
+    if (type === "number" || type === "int") {
+      editor.addEventListener("input", function () {
+        var raw = editor.value || "";
+        if (raw.indexOf(",") === -1) return;
+        editor.value = normalizeDecimalComma(raw);
+      });
+    }
     cell.innerHTML = "";
     cell.appendChild(editor);
     activeCell = cell;

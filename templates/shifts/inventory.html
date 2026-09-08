@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static biota_icons %}
 {% load inventory_tags static %}
+{% load l10n %}
 
 {% block extra_styles %}
 <link rel="stylesheet" href="{% static 'shifts/css/inventory.css' %}?v={{ static_asset_version }}">
@@ -223,6 +224,7 @@
 {% endif %}
 
 {% if panel == "stock" %}
+{% localize off %}
 <div class="inv-stock-layout">
   <div class="inv-stock-main">
     <header class="inv-stock-toolbar">
@@ -1889,6 +1891,7 @@
     </form>
   </aside>
 </div>
+{% endlocalize %}
 {% endif %}
 {% if panel == "issue" %}
 {% if biota_can_edit %}
@@ -3502,7 +3505,7 @@
       <p class="inv-history-card__sub">{{ iss.tool.get_category_display }}</p>
       <div class="inv-history-facts">
         <span class="inv-history-qty"><strong>{{ iss.remaining_qty }}</strong> из {{ iss.quantity }} шт.</span>
-        {% if iss.created_by_account %}<span class="inv-history-fact"><span class="inv-history-fact__label">Выдал</span> {{ iss.created_by_account }}</span>{% endif %}
+        {% if iss.created_by_account %}<span class="inv-history-fact"><span class="inv-history-fact__label">Выдал</span> {{ iss.issuer_label|default:iss.created_by_account }}</span>{% endif %}
       </div>
       {% if iss.comment %}
       <p class="inv-history-card__note">{{ iss.comment|linebreaksbr }}</p>
@@ -3534,11 +3537,11 @@
         <div class="inv-history-facts">
           <span class="inv-history-qty"><strong>{{ m.quantity }}</strong> шт.</span>
           {% if m.employee_name %}<span class="inv-history-fact"><span class="inv-history-fact__label">Сотрудник</span> {{ m.employee_name }}</span>{% endif %}
-          {% if m.created_by_account %}<span class="inv-history-fact"><span class="inv-history-fact__label">Аккаунт</span> {{ m.created_by_account }}</span>{% endif %}
+          {% if m.created_by_account %}<span class="inv-history-fact"><span class="inv-history-fact__label">Аккаунт</span> {{ row.account_label|default:m.created_by_account }}</span>{% endif %}
         </div>
         <p class="inv-history-card__meta-line">Дата операции: {{ m.movement_date|date:"d.m.Y" }}</p>
         {% if m.is_reverted %}
-        <p class="inv-history-card__meta-line inv-history-card__meta-line--warn">Откат{% if m.reverted_at %}: {{ m.reverted_at|date:"d.m.Y H:i" }}{% endif %}{% if m.reverted_by %} · {{ m.reverted_by }}{% endif %}</p>
+        <p class="inv-history-card__meta-line inv-history-card__meta-line--warn">Откат{% if m.reverted_at %}: {{ m.reverted_at|date:"d.m.Y H:i" }}{% endif %}{% if m.reverted_by %} · {{ row.reverted_by_label|default:m.reverted_by }}{% endif %}</p>
         {% endif %}
         {% if m.comment %}
         <p class="inv-history-card__note">{{ m.comment|linebreaksbr }}</p>
@@ -3564,10 +3567,13 @@
           <span class="inv-history-badge">{{ e.get_event_type_display }}</span>
           <time class="inv-history-card__when" datetime="{{ e.created_at|date:'c' }}">{{ e.created_at|date:"d.m.Y H:i" }}</time>
         </div>
-        <p class="inv-history-card__title">{{ e.summary }}</p>
-        {% if e.tool %}<p class="inv-history-card__sub">{{ e.tool.name }}</p>{% endif %}
+        <p class="inv-history-card__title">{{ row.event_title|default:e.summary }}</p>
+        {% if row.event_subtitle %}<p class="inv-history-card__sub">{{ row.event_subtitle }}</p>{% endif %}
         {% if e.actor_username %}
-        <p class="inv-history-card__meta-line"><span class="inv-history-fact__label">Кто</span> {{ e.actor_username }}</p>
+        <p class="inv-history-card__meta-line"><span class="inv-history-fact__label">Кто</span> {{ row.actor_label|default:e.actor_username }}</p>
+        {% endif %}
+        {% if row.event_note %}
+        <p class="inv-history-card__note">{{ row.event_note }}</p>
         {% endif %}
         {% if e.event_type == "container_audit" and row.audit_details %}
           {% with ad=row.audit_details %}
@@ -3655,7 +3661,7 @@
           <p class="inv-history-card__meta-line muted">Расхождений нет</p>
           {% endif %}
           {% endwith %}
-        {% elif e.details %}
+        {% elif row.show_raw_details and e.details %}
         <pre class="inv-history-card__details">{{ e.details }}</pre>
         {% endif %}
       </li>

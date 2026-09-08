@@ -97,6 +97,7 @@ from .insert_constants import (
     normalize_milling_family,
 )
 from .arrival_column_tooltips import ARRIVAL_COLUMN_TOOLTIPS
+from .size_label_normalize import normalize_cutting_size_label, size_label_match_variants
 from .models import (
     CENTER_DRILL_ANGLES,
     COUNTERSINK_ANGLES,
@@ -141,6 +142,26 @@ _INVENTORY_CATEGORIES = frozenset(
     {"end_mill", "body_tool", "tap", "center_drill", "countersink", "drill", "reamer", "insert", "collet"}
 )
 _HISTORY_MOVEMENT_TYPES = frozenset({"issue", "restock", "writeoff"})
+_HISTORY_EVENT_TYPES = frozenset(
+    {
+        InventoryStockEvent.EVENT_TOOL_EDIT,
+        InventoryStockEvent.EVENT_TOOL_DELETE,
+        InventoryStockEvent.EVENT_ROLLBACK,
+        InventoryStockEvent.EVENT_PRIVILEGE,
+        InventoryStockEvent.EVENT_CONTAINER_AUDIT,
+    }
+)
+_HISTORY_FILTER_TYPES = _HISTORY_MOVEMENT_TYPES | _HISTORY_EVENT_TYPES
+_HISTORY_FILTER_CHOICES = [
+    ("restock", "Пополнение"),
+    ("writeoff", "Списание"),
+    ("issue", "Выдача"),
+    (InventoryStockEvent.EVENT_TOOL_EDIT, "Редактирование позиции"),
+    (InventoryStockEvent.EVENT_TOOL_DELETE, "Удаление позиции"),
+    (InventoryStockEvent.EVENT_ROLLBACK, "Откат движения"),
+    (InventoryStockEvent.EVENT_CONTAINER_AUDIT, "Инвентаризация ящика"),
+    (InventoryStockEvent.EVENT_PRIVILEGE, "Право на склад"),
+]
 
 
 def _analysis_panel_redirect(request, **extra: str) -> redirect:
@@ -163,7 +184,7 @@ def _analysis_panel_redirect(request, **extra: str) -> redirect:
 def _history_panel_redirect(request):
     params: dict[str, str] = {"panel": "history"}
     ht = (request.GET.get("history_movement_type") or request.POST.get("history_movement_type") or "").strip()
-    if ht in _HISTORY_MOVEMENT_TYPES:
+    if ht in _HISTORY_FILTER_TYPES:
         params["history_movement_type"] = ht
     he = (request.GET.get("history_employee") or request.POST.get("history_employee") or "").strip()
     if he:
@@ -392,6 +413,190 @@ def _log_inventory_stock_event(
         stock_movement=stock_movement,
         details=details or {},
     )
+
+
+_STOCK_INLINE_FIELD_LABELS = {
+    "warehouse_address": "Адрес",
+    "quantity": "Количество",
+    "main_diameter_mm": "Основной диаметр",
+    "tool_material": "Материал",
+    "coating_type": "Покрытие",
+    "mill_type": "Тип фрезы",
+    "em_diameter_mm": "Диаметр",
+    "em_corner_radius_mm": "Радиус угла",
+    "em_overall_length_mm": "Общая длина",
+    "em_cutting_length_mm": "Длина реж. части",
+    "em_flutes_count": "Число кромок",
+    "body_family": "Семейство",
+    "body_cutter": "Тип фрезы",
+    "bt_diameter_mm": "Диаметр",
+    "bt_overall_length_mm": "Общая длина",
+    "bt_cutting_length_mm": "Длина реж. части",
+    "bt_teeth_count": "Число зубьев",
+    "bt_coupling": "Крепление",
+    "bt_insert_family": "Семейство пластины",
+    "bt_insert_size": "Размер пластины",
+    "bt_mount_diameter_mm": "Диаметр крепления",
+    "bt_coolant": "СОЖ через инструмент",
+    "bt_ap_max_mm": "ap max",
+    "bt_angle_deg": "Угол",
+    "bt_variable_angle": "Переменный угол",
+    "bt_has_purpose": "Назначение",
+    "bt_hs_body_style": "Корпус",
+    "bt_brand": "Бренд",
+    "bt_insert_compat": "Совместимость",
+    "bt_mount_thread": "Резьба крепления",
+    "bt_shank_type": "Хвостовик",
+    "size_label": "Размер",
+    "thread_standard": "Стандарт резьбы",
+    "thread_kind": "Тип резьбы",
+    "tap_pitch_mm": "Шаг",
+    "tap_tpi": "TPI",
+    "hole_type": "Тип отверстия",
+    "tap_type": "Тип метчика",
+    "tap_overall_length_mm": "Общая длина",
+    "tap_cutting_length_mm": "Длина реж. части",
+    "cd_diameter_mm": "Диаметр",
+    "cd_overall_length_mm": "Длина",
+    "cd_angle_deg": "Угол",
+    "cs_type": "Тип зенкера",
+    "cs_diameter_mm": "Диаметр",
+    "cs_angle_deg": "Угол",
+    "cs_overall_length_mm": "Длина",
+    "cs_flutes_count": "Число кромок",
+    "cs_size_label": "Размер",
+    "dr_diameter_mm": "Диаметр",
+    "dr_overall_length_mm": "Общая длина",
+    "dr_cutting_length_mm": "Длина реж. части",
+    "dr_angle_deg": "Угол",
+    "rm_diameter_mm": "Диаметр",
+    "rm_overall_length_mm": "Общая длина",
+    "rm_cutting_length_mm": "Длина реж. части",
+    "rm_accuracy_class": "Класс точности",
+    "rm_flutes_count": "Число кромок",
+    "ins_shape": "Форма",
+    "ins_relief": "Задний угол",
+    "ins_tolerance": "Допуск",
+    "ins_edge_code": "Длина режущей кромки",
+    "ins_thickness_code": "Толщина",
+    "ins_nose_code": "Радиус вершины",
+    "ins_family": "Семейство",
+    "ins_grade": "Сплав",
+    "ins_iso": "ISO",
+    "collet_type": "Тип цанги",
+    "er_size": "Размер ER",
+    "clamp_range": "Диапазон зажима",
+    "inner_diameter": "Внутренний диаметр",
+    "threading_use": "Назначение",
+    "threading_series": "Серия",
+    "collet_thread_standard": "Стандарт резьбы",
+    "high_precision_aa": "Точность AA",
+}
+
+
+def _stock_inline_field_label(field: str) -> str:
+    key = (field or "").strip()
+    return _STOCK_INLINE_FIELD_LABELS.get(key, key or "поле")
+
+
+def _stock_history_value_display(field: str, value) -> str:
+    raw = "" if value is None else str(value).strip()
+    if not raw:
+        return "—"
+    key = (field or "").strip()
+    if key == "coating_type":
+        return dict(COATING_TYPES).get(raw, raw)
+    if key == "mill_type":
+        return dict(END_MILL_TYPES).get(raw, raw)
+    if key == "thread_standard":
+        from .models import THREAD_STANDARDS
+
+        return dict(THREAD_STANDARDS).get(raw, raw)
+    if key == "thread_kind":
+        from .models import THREAD_KINDS
+
+        return dict(THREAD_KINDS).get(raw, raw)
+    if key == "hole_type":
+        from .models import TAP_HOLE_TYPES
+
+        return dict(TAP_HOLE_TYPES).get(raw, raw)
+    if key == "tap_type":
+        from .models import TAP_TOOL_TYPES
+
+        return dict(TAP_TOOL_TYPES).get(raw, raw)
+    if key in {"cd_angle_deg"}:
+        return dict(CENTER_DRILL_ANGLES).get(raw, raw)
+    if key == "cs_type":
+        return dict(COUNTERSINK_TYPES).get(raw, raw)
+    if key == "cs_angle_deg":
+        return dict(COUNTERSINK_ANGLES).get(raw, raw)
+    if key == "rm_accuracy_class":
+        return dict(REAMER_ACCURACY_CLASSES).get(raw, raw)
+    if key in {"bt_coolant", "bt_has_purpose", "high_precision_aa"}:
+        return "Да" if raw in {"1", "true", "True", "yes", "AA", "aa"} else "Нет"
+    if key == "bt_variable_angle":
+        return "Да" if raw in {"1", "true", "True", "yes"} else "Нет"
+    return raw
+
+
+def _history_event_presentation(event: InventoryStockEvent) -> dict:
+    """Человекочитаемое представление события для ленты истории."""
+    details = event.details if isinstance(event.details, dict) else {}
+    tool_name = ""
+    tool_sub = ""
+    if event.tool_id and event.tool:
+        tool_name = (event.tool.name or "").strip()
+        try:
+            tool_sub = event.tool.get_category_display()
+        except Exception:
+            tool_sub = ""
+
+    et = event.event_type
+    title = (event.summary or "").strip()
+    note = ""
+    show_sub = bool(tool_name and tool_name not in title)
+    show_raw = False
+
+    if et == InventoryStockEvent.EVENT_TOOL_EDIT:
+        field = str(details.get("field") or "").strip()
+        if field:
+            label = _stock_inline_field_label(field)
+            value = _stock_history_value_display(field, details.get("value"))
+            title = tool_name or title
+            note = f"{label}: {value}"
+            show_sub = bool(tool_sub)
+        elif "issue_id" in details and "quantity" in details:
+            title = tool_name or title
+            emp = (details.get("employee_name") or "").strip() or "без ФИО"
+            qty = details.get("quantity")
+            note = f"Возврат из инвентаризации · {emp} · {qty} шт."
+            show_sub = bool(tool_sub)
+        else:
+            title = tool_name or title or "Изменение позиции"
+            note = "Обновлена карточка инструмента"
+            show_sub = bool(tool_sub)
+    elif et == InventoryStockEvent.EVENT_TOOL_DELETE:
+        title = tool_name or title or "Позиция удалена"
+        note = "Позиция помечена как удалённая"
+        show_sub = bool(tool_sub)
+    elif et == InventoryStockEvent.EVENT_PRIVILEGE:
+        show_sub = False
+        show_raw = False
+    elif et == InventoryStockEvent.EVENT_ROLLBACK:
+        show_sub = bool(tool_name and tool_name not in title)
+        show_raw = False
+    elif et == InventoryStockEvent.EVENT_CONTAINER_AUDIT:
+        show_sub = False
+        show_raw = False
+    else:
+        show_raw = bool(details)
+
+    return {
+        "title": title,
+        "subtitle": tool_sub if show_sub else "",
+        "note": note,
+        "show_raw_details": show_raw,
+    }
 
 
 def _issue_remaining_qty(issue: StockMovement) -> int:
@@ -657,6 +862,32 @@ def _rollback_stock_movement(movement_id: int, actor: str) -> tuple[bool, str]:
 
 def _distinct_text_values(qs, field_name: str):
     return [v for v in qs.exclude(**{f"{field_name}__isnull": True}).values_list(field_name, flat=True).distinct().order_by(field_name) if v]
+
+
+def _distinct_size_labels(qs, field_name: str) -> list[str]:
+    """Уникальные размеры с учётом кириллической/латинской М."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for raw in _distinct_text_values(qs, field_name):
+        norm = normalize_cutting_size_label(raw)
+        if not norm:
+            continue
+        key = norm.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(norm)
+    return sorted(out, key=lambda s: (s.casefold(), s))
+
+
+def _size_label_filter_q(field_name: str, raw: str) -> Q:
+    variants = size_label_match_variants(raw)
+    if not variants:
+        return Q(**{field_name: ""})
+    q = Q()
+    for variant in variants:
+        q |= Q(**{f"{field_name}__iexact": variant})
+    return q
 
 
 def _distinct_numeric_values(qs, field_name: str):
@@ -1083,7 +1314,7 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
     elif category == "tap":
         tap_size = g("tap_size")
         if tap_size:
-            qs = qs.filter(tap_spec__size_label__iexact=tap_size)
+            qs = qs.filter(_size_label_filter_q("tap_spec__size_label", tap_size))
         tap_pitch_raw = g("tap_pitch")
         if tap_pitch_raw:
             tap_pitch = _to_decimal(tap_pitch_raw, Decimal("0"))
@@ -1149,7 +1380,7 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
                 qs = qs.filter(countersink_spec__flutes_count=countersink_flutes)
         countersink_size_raw = g("countersink_size_label")
         if countersink_size_raw:
-            qs = qs.filter(countersink_spec__size_label__iexact=countersink_size_raw)
+            qs = qs.filter(_size_label_filter_q("countersink_spec__size_label", countersink_size_raw))
     elif category == "drill":
         drill_diameter_raw = g("drill_diameter_mm")
         if drill_diameter_raw:
@@ -1785,7 +2016,7 @@ def inventory_view(request):
     if action == "add_tap":
         thread_standard = (request.POST.get("thread_standard") or "metric").strip()
         thread_kind = normalize_thread_kind(request.POST.get("thread_kind"))
-        size_label = (request.POST.get("size_label") or "").strip()
+        size_label = normalize_cutting_size_label(request.POST.get("size_label"))
         pitch_mm = _to_decimal(request.POST.get("pitch_mm"), Decimal("0"))
         tpi = _to_int(request.POST.get("tpi"), 0) or None
         hole_type = (request.POST.get("hole_type") or "any").strip()
@@ -1899,7 +2130,7 @@ def inventory_view(request):
             actor=username,
             event_type=InventoryStockEvent.EVENT_TOOL_DELETE,
             tool=tool,
-            summary=f"Помечено удаление позиции: {tool.name} (id {tool.id})",
+            summary=f"Удаление: {tool.name}",
             details={"tool_id": tool.id},
         )
         messages.success(request, "Позиция помечена как удаленная администратором.")
@@ -2008,7 +2239,7 @@ def inventory_view(request):
         elif tool.category == "tap" and tool.tap_spec:
             tool.tap_spec.thread_standard = (request.POST.get("thread_standard") or "metric").strip()
             tool.tap_spec.thread_kind = normalize_thread_kind(request.POST.get("thread_kind"))
-            tool.tap_spec.size_label = (request.POST.get("size_label") or "").strip()
+            tool.tap_spec.size_label = normalize_cutting_size_label(request.POST.get("size_label"))
             tool.tap_spec.pitch_mm = _to_decimal_or_none(request.POST.get("tap_pitch_mm"))
             tool.tap_spec.tpi = _to_int_or_none(request.POST.get("tap_tpi"))
             tool.tap_spec.hole_type = (request.POST.get("hole_type") or "any").strip()
@@ -2027,7 +2258,7 @@ def inventory_view(request):
             tool.countersink_spec.angle_deg = (request.POST.get("cs_angle_deg") or "90").strip()
             tool.countersink_spec.overall_length_mm = _to_decimal_or_none(request.POST.get("cs_overall_length_mm"))
             tool.countersink_spec.flutes_count = _to_int_or_none(request.POST.get("cs_flutes_count"))
-            tool.countersink_spec.size_label = (request.POST.get("cs_size_label") or "").strip()
+            tool.countersink_spec.size_label = normalize_cutting_size_label(request.POST.get("cs_size_label"))
             tool.countersink_spec.save()
         elif tool.category == "drill" and tool.drill_spec:
             tool.drill_spec.diameter_mm = _to_decimal_or_none(request.POST.get("dr_diameter_mm"))
@@ -2068,7 +2299,7 @@ def inventory_view(request):
             actor=username,
             event_type=InventoryStockEvent.EVENT_TOOL_EDIT,
             tool=tool,
-            summary=f"Обновление карточки инструмента: {tool.name} (id {tool.id})",
+            summary=f"Обновление: {tool.name}",
             details={"tool_id": tool.id, "category": tool.category},
         )
         messages.success(request, "Данные инструмента обновлены.")
@@ -2402,11 +2633,13 @@ def inventory_view(request):
             else:
                 return JsonResponse({"ok": False, "error": "Поле не поддерживается для этой категории."}, status=400)
 
+        field_label = _stock_inline_field_label(field)
+        value_disp = _stock_history_value_display(field, value_raw)
         _log_inventory_stock_event(
             actor=username,
             event_type=InventoryStockEvent.EVENT_TOOL_EDIT,
             tool=tool,
-            summary=f"Быстрое редактирование ячейки «{field}»: {tool.name} (id {tool.id})",
+            summary=f"{tool.name}: {field_label} → {value_disp}",
             details={"tool_id": tool.id, "field": field, "value": value_raw[:200], "category": tool.category},
         )
         return JsonResponse({"ok": True})
@@ -2700,7 +2933,7 @@ def inventory_view(request):
             else:
                 thread_standard = (request.POST.get("thread_standard") or "metric").strip()
                 thread_kind = normalize_thread_kind(request.POST.get("thread_kind"))
-                size_label = (request.POST.get("size_label") or "").strip() or "Размер неизвестен"
+                size_label = normalize_cutting_size_label(request.POST.get("size_label")) or "Размер неизвестен"
                 pitch_mm = _to_decimal_or_none(request.POST.get("tap_pitch_mm"))
                 tpi = _to_int_or_none(request.POST.get("tap_tpi"))
                 hole_type = (request.POST.get("hole_type") or "any").strip()
@@ -2716,7 +2949,6 @@ def inventory_view(request):
                         main_diameter_mm=main_diameter_mm,
                         tap_spec__thread_standard=thread_standard,
                         tap_spec__thread_kind=thread_kind,
-                        tap_spec__size_label=size_label,
                         tap_spec__pitch_mm=pitch_mm,
                         tap_spec__tpi=tpi,
                         tap_spec__hole_type=hole_type,
@@ -2724,6 +2956,7 @@ def inventory_view(request):
                         tap_spec__overall_length_mm=overall_length_mm,
                         tap_spec__cutting_length_mm=cutting_length_mm,
                     )
+                    .filter(_size_label_filter_q("tap_spec__size_label", size_label))
                     .first()
                 )
                 if tool:
@@ -2988,7 +3221,7 @@ def inventory_view(request):
                 elif category == "tap":
                     thread_standard = (row.get("thread_standard") or "metric").strip()
                     thread_kind = normalize_thread_kind(row.get("thread_kind"))
-                    size_label = (row.get("size_label") or "").strip() or "Размер неизвестен"
+                    size_label = normalize_cutting_size_label(row.get("size_label")) or "Размер неизвестен"
                     pitch_mm = _to_decimal_or_none(row.get("tap_pitch_mm"))
                     tpi = _to_int_or_none(row.get("tap_tpi"))
                     hole_type = (row.get("hole_type") or "any").strip()
@@ -3004,7 +3237,6 @@ def inventory_view(request):
                             main_diameter_mm=main_diameter_mm,
                             tap_spec__thread_standard=thread_standard,
                             tap_spec__thread_kind=thread_kind,
-                            tap_spec__size_label=size_label,
                             tap_spec__pitch_mm=pitch_mm,
                             tap_spec__tpi=tpi,
                             tap_spec__hole_type=hole_type,
@@ -3012,6 +3244,7 @@ def inventory_view(request):
                             tap_spec__overall_length_mm=overall_length_mm,
                             tap_spec__cutting_length_mm=cutting_length_mm,
                         )
+                        .filter(_size_label_filter_q("tap_spec__size_label", size_label))
                         .first()
                     )
                     if tool:
@@ -3085,7 +3318,7 @@ def inventory_view(request):
                         angle_deg = "90"
                     overall_length_mm = _to_decimal_or_none(row.get("cs_overall_length_mm"))
                     flutes_count = _to_int_or_none(row.get("cs_flutes_count"))
-                    size_label = (row.get("cs_size_label") or "").strip()
+                    size_label = normalize_cutting_size_label(row.get("cs_size_label"))
                     tool = (
                         ToolItem.objects.select_for_update()
                         .filter(
@@ -3098,8 +3331,8 @@ def inventory_view(request):
                             countersink_spec__angle_deg=angle_deg,
                             countersink_spec__overall_length_mm=overall_length_mm,
                             countersink_spec__flutes_count=flutes_count,
-                            countersink_spec__size_label=size_label,
                         )
+                        .filter(_size_label_filter_q("countersink_spec__size_label", size_label))
                         .first()
                     )
                     if tool:
@@ -3655,7 +3888,7 @@ def inventory_view(request):
         _opt_qs("body_tool", "bt_mount_thread"), "body_tool_spec__mount_thread"
     )
 
-    tap_sizes = _distinct_text_values(_opt_qs("tap", "tap_size"), "tap_spec__size_label")
+    tap_sizes = _distinct_size_labels(_opt_qs("tap", "tap_size"), "tap_spec__size_label")
     tap_pitches = _sorted_unique_decimal_strings(
         _distinct_numeric_values(_opt_qs("tap", "tap_pitch"), "tap_spec__pitch_mm")
     )
@@ -3697,7 +3930,7 @@ def inventory_view(request):
     countersink_flutes = _sorted_unique_int_strings(
         _distinct_numeric_values(_opt_qs("countersink", "countersink_flutes_count"), "countersink_spec__flutes_count")
     )
-    countersink_sizes = _distinct_text_values(
+    countersink_sizes = _distinct_size_labels(
         _opt_qs("countersink", "countersink_size_label"), "countersink_spec__size_label"
     )
     drill_diameters = _sorted_unique_decimal_strings(
@@ -3979,8 +4212,10 @@ def inventory_view(request):
         _save_inventory_stock_filter_prefs(username, persist, category=filter_category)
 
     history_movement_type = (request.GET.get("history_movement_type") or "").strip()
-    if history_movement_type not in _HISTORY_MOVEMENT_TYPES:
+    if history_movement_type not in _HISTORY_FILTER_TYPES:
         history_movement_type = ""
+    history_filter_is_event = history_movement_type in _HISTORY_EVENT_TYPES
+    history_filter_is_movement = history_movement_type in _HISTORY_MOVEMENT_TYPES
     history_employee = (request.GET.get("history_employee") or "").strip()[:120]
     if history_employee and history_employee not in history_employee_option_names:
         match = next(
@@ -3994,41 +4229,53 @@ def inventory_view(request):
         history_open_issues = list(
             _open_issue_movements_qs().filter(employee_name__iexact=history_employee)[:300]
         )
+        for iss in history_open_issues:
+            issuer_raw = (iss.created_by_account or "").strip()
+            iss.issuer_label = account_label_for_username(issuer_raw) if issuer_raw else ""
 
-    mv_qs = (
-        StockMovement.objects.select_related(
-            "tool",
-            "tool__end_mill_spec",
-            "tool__body_tool_spec",
-            "tool__tap_spec",
-            "tool__center_drill_spec",
-            "tool__countersink_spec",
-            "tool__drill_spec",
-            "tool__reamer_spec",
-            "tool__insert_spec",
-            "tool__collet_spec",
+    mv_hist: list[StockMovement] = []
+    if not history_filter_is_event:
+        mv_qs = (
+            StockMovement.objects.select_related(
+                "tool",
+                "tool__end_mill_spec",
+                "tool__body_tool_spec",
+                "tool__tap_spec",
+                "tool__center_drill_spec",
+                "tool__countersink_spec",
+                "tool__drill_spec",
+                "tool__reamer_spec",
+                "tool__insert_spec",
+                "tool__collet_spec",
+            )
+            .prefetch_related("issue_outcomes")
+            .order_by("-created_at")
         )
-        .prefetch_related("issue_outcomes")
-        .order_by("-created_at")
-    )
-    if history_movement_type:
-        mv_qs = mv_qs.filter(movement_type=history_movement_type)
-    if history_employee:
-        mv_qs = mv_qs.filter(employee_name__iexact=history_employee)
-    mv_hist = list(mv_qs[:120])
+        if history_filter_is_movement:
+            mv_qs = mv_qs.filter(movement_type=history_movement_type)
+        if history_employee:
+            mv_qs = mv_qs.filter(employee_name__iexact=history_employee)
+        mv_hist = list(mv_qs[:120])
+
     ev_hist: list[InventoryStockEvent] = []
-    if not history_movement_type and not history_employee:
-        ev_hist = list(
-            InventoryStockEvent.objects.select_related("tool", "stock_movement").order_by("-created_at")[:80]
-        )
+    # События журнала: при фильтре по типу события — всегда; при «Все» — если нет фильтра по сотруднику
+    if history_filter_is_event or (not history_movement_type and not history_employee):
+        ev_qs = InventoryStockEvent.objects.select_related("tool", "stock_movement").order_by("-created_at")
+        if history_filter_is_event:
+            ev_qs = ev_qs.filter(event_type=history_movement_type)
+        ev_hist = list(ev_qs[:120 if history_filter_is_event else 80])
     timeline: list[dict] = []
     for m in mv_hist:
+        account_raw = (m.created_by_account or "").strip()
+        reverted_raw = (m.reverted_by or "").strip()
         timeline.append(
             {
                 "kind": "movement",
                 "ts": m.created_at,
                 "tid": m.id,
                 "movement": m,
+                "account_label": account_label_for_username(account_raw) if account_raw else "",
+                "reverted_by_label": account_label_for_username(reverted_raw) if reverted_raw else "",
                 "show_rollback": is_admin_user and _can_rollback_stock_movement(m),
             }
         )
@@ -4037,12 +4284,19 @@ def inventory_view(request):
         audit_details = None
         if e.event_type == InventoryStockEvent.EVENT_CONTAINER_AUDIT:
             audit_details = _enrich_container_audit_details(e.details if isinstance(e.details, dict) else {})
+        actor_raw = (e.actor_username or "").strip()
+        presentation = _history_event_presentation(e)
         timeline.append(
             {
                 "kind": "event",
                 "ts": e.created_at,
                 "tid": 10**12 + e.id,
                 "event": event_payload,
+                "actor_label": account_label_for_username(actor_raw) if actor_raw else "",
+                "event_title": presentation["title"],
+                "event_subtitle": presentation["subtitle"],
+                "event_note": presentation["note"],
+                "show_raw_details": presentation["show_raw_details"],
                 "audit_details": audit_details,
                 "show_rollback": False,
             }
@@ -4149,11 +4403,7 @@ def inventory_view(request):
             "history_employee": history_employee,
             "outcome_employee": outcome_employee,
         },
-        "history_movement_types": [
-            ("restock", "Пополнение"),
-            ("writeoff", "Списание"),
-            ("issue", "Выдача"),
-        ],
+        "history_movement_types": _HISTORY_FILTER_CHOICES,
         "history_open_employee_options": history_open_employee_options,
         "history_employee_options": history_employee_options,
         "history_employee_open_rows": history_employee_open_rows,

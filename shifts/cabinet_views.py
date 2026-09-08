@@ -1,4 +1,4 @@
-"""ÐÐ¸ÑÐ½ÑÐ¹ ÐºÐ°Ð±Ð¸Ð½ÐµÑ: Ð¿ÑÐ¾ÑÐ¸Ð»Ñ Ð¸ Ð¿Ð°ÑÐ¾Ð»Ñ (Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ð¸), Ð¸Ð¼Ñ Ð¸ Ð¿ÑÐ°Ð²Ð° (Ð°Ð´Ð¼Ð¸Ð½) â Ð»Ð¾Ð³Ð¸ÐºÐ° ÐºÐ°Ðº Ð² Streamlit."""
+"""Личный кабинет: профиль и пароль (пользователи), имя и права (админ) — логика как в Streamlit."""
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -72,7 +72,7 @@ def cabinet_view(request):
     try:
         employees_full = biota_db.load_employees(cfg)
     except Exception as exc:
-        return render(request, "shifts/error.html", {"title": "ÐÑÐ¸Ð±ÐºÐ° ÐÐ", "message": str(exc)})
+        return render(request, "shifts/error.html", {"title": "Ошибка БД", "message": str(exc)})
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -80,7 +80,7 @@ def cabinet_view(request):
             if action == "admin_display_name":
                 dn = (request.POST.get("admin_display_name") or "").strip()
                 request.session["admin_display_name"] = dn
-                messages.success(request, "ÐÐ¼Ñ Ð´Ð»Ñ Ð¾ÑÐ¾Ð±ÑÐ°Ð¶ÐµÐ½Ð¸Ñ ÑÐ¾ÑÑÐ°Ð½ÐµÐ½Ð¾.")
+                messages.success(request, "Имя для отображения сохранено.")
                 return redirect("cabinet")
             if action == "admin_privileges":
                 target = (request.POST.get("priv_user") or "").strip()
@@ -116,14 +116,14 @@ def cabinet_view(request):
                     machines_quick_edit=mqe_flag,
                 )
                 if ok:
-                    messages.success(request, "ÐÑÐ°Ð²Ð° ÑÐ¾ÑÑÐ°Ð½ÐµÐ½Ñ.")
+                    messages.success(request, "Права сохранены.")
                     if old_inv != inv_flag:
                         InventoryStockEvent.objects.create(
                             actor_username=user,
                             event_type=InventoryStockEvent.EVENT_PRIVILEGE,
                             summary=(
-                                f"Ð£ÑÑÑÐ½Ð°Ñ Ð·Ð°Ð¿Ð¸ÑÑ Â«{target}Â»: Ð¿ÑÐ°Ð²Ð¾ ÑÐµÐ´Ð°ÐºÑÐ¸ÑÐ¾Ð²Ð°Ð½Ð¸Ñ Ð¸ ÑÐ´Ð°Ð»ÐµÐ½Ð¸Ñ Ð½Ð° ÑÐºÐ»Ð°Ð´Ðµ "
-                                f"{'Ð²ÐºÐ»ÑÑÐµÐ½Ð¾' if inv_flag else 'Ð²ÑÐºÐ»ÑÑÐµÐ½Ð¾'}"
+                                f"Учётная запись «{target}»: право редактирования и удаления на складе "
+                                f"{'включено' if inv_flag else 'выключено'}"
                             ),
                             details={"target_user": target, "enabled": inv_flag},
                         )
@@ -136,7 +136,7 @@ def cabinet_view(request):
                 target = (request.POST.get("approve_login") or "").strip()
                 ok, err = _approve_registration(target)
                 if ok:
-                    messages.success(request, f"Ð ÐµÐ³Ð¸ÑÑÑÐ°ÑÐ¸Ñ Ð¿Ð¾Ð´ÑÐ²ÐµÑÐ¶Ð´ÐµÐ½Ð°: {target}")
+                    messages.success(request, f"Регистрация подтверждена: {target}")
                 else:
                     messages.error(request, err)
                 return redirect("cabinet")
@@ -149,7 +149,7 @@ def cabinet_view(request):
                     label = account_label_for_username(target)
                     messages.success(
                         request,
-                        f"ÐÐ¼Ñ ÑÐ¾ÑÑÐ°Ð½ÐµÐ½Ð¾: {label}" if label != target else f"ÐÐ¼Ñ Ð´Ð»Ñ Â«{target}Â» Ð¾ÑÐ¸ÑÐµÐ½Ð¾.",
+                        f"Имя сохранено: {label}" if label != target else f"Имя для «{target}» очищено.",
                     )
                 else:
                     messages.error(request, err)
@@ -160,7 +160,7 @@ def cabinet_view(request):
                 target = (request.POST.get("delete_login") or "").strip()
                 ok, err = _delete_registered_user(target)
                 if ok:
-                    messages.success(request, f"Ð£ÑÑÑÐ½Ð°Ñ Ð·Ð°Ð¿Ð¸ÑÑ ÑÐ´Ð°Ð»ÐµÐ½Ð°: {target}")
+                    messages.success(request, f"Учётная запись удалена: {target}")
                 else:
                     messages.error(request, err)
                 return redirect("cabinet")
@@ -171,13 +171,13 @@ def cabinet_view(request):
                 em = request.POST.get("email") or ""
                 key = _canonical_store_username(user)
                 if not key:
-                    messages.error(request, "ÐÑÐ¾ÑÐ¸Ð»Ñ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½.")
+                    messages.error(request, "Профиль не найден.")
                 else:
                     ok, err = _update_registered_profile(
                         key, email=em, first_name=first, last_name=last
                     )
                     if ok:
-                        messages.success(request, "ÐÑÐ¾ÑÐ¸Ð»Ñ ÑÐ¾ÑÑÐ°Ð½ÑÐ½.")
+                        messages.success(request, "Профиль сохранён.")
                     else:
                         messages.error(request, err)
                 return redirect("cabinet")
@@ -187,13 +187,13 @@ def cabinet_view(request):
                 new2 = request.POST.get("password_new2") or ""
                 key = _canonical_store_username(user)
                 if new_pw != new2:
-                    messages.error(request, "ÐÐ¾Ð²ÑÐµ Ð¿Ð°ÑÐ¾Ð»Ð¸ Ð½Ðµ ÑÐ¾Ð²Ð¿Ð°Ð´Ð°ÑÑ.")
+                    messages.error(request, "Новые пароли не совпадают.")
                 elif not key:
-                    messages.error(request, "ÐÐ¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½.")
+                    messages.error(request, "Пользователь не найден.")
                 else:
                     ok, err = _change_password_registered(key, old_pw, new_pw)
                     if ok:
-                        messages.success(request, "ÐÐ°ÑÐ¾Ð»Ñ Ð¾Ð±Ð½Ð¾Ð²Ð»ÑÐ½.")
+                        messages.success(request, "Пароль обновлён.")
                     else:
                         messages.error(request, err)
                 return redirect("cabinet")
@@ -258,8 +258,8 @@ def cabinet_view(request):
         ctx["priv_role"] = user_role_for_username(ctx["priv_selected"]) if ctx["priv_selected"] else USER_ROLE_MANAGER
         ctx["priv_role_choices"] = USER_ROLE_CHOICES
         ctx["priv_role_labels"] = {
-            USER_ROLE_MANAGER: "Ð ÑÐºÐ¾Ð²Ð¾Ð´Ð¸ÑÐµÐ»Ñ",
-            USER_ROLE_EXECUTOR: "ÐÑÐ¿Ð¾Ð»Ð½Ð¸ÑÐµÐ»Ñ (ÑÐ¾Ð»ÑÐºÐ¾ Ð¿ÑÐ¾ÑÐ¼Ð¾ÑÑ/ÑÐºÐ°ÑÐ¸Ð²Ð°Ð½Ð¸Ðµ)",
+            USER_ROLE_MANAGER: "Руководитель",
+            USER_ROLE_EXECUTOR: "Исполнитель (только просмотр/скачивание)",
         }
         ctx["priv_nav"] = _pn
         _ndf = _nav_department_filters_map(pr) if ctx["priv_selected"] else {}
@@ -276,13 +276,13 @@ def cabinet_view(request):
             if k == "inventory":
                 extra_toggle = {
                     "field": "priv_inventory_stock_manage",
-                    "label": "Ð ÐµÐ´Ð°ÐºÑÐ¸ÑÐ¾Ð²Ð°Ð½Ð¸Ðµ ÑÐºÐ»Ð°Ð´Ð°",
+                    "label": "Редактирование склада",
                     "on": ctx["priv_stock_manage"],
                 }
             elif k == "machines":
                 extra_toggle = {
                     "field": "priv_machines_quick_edit",
-                    "label": "ÐÑÑÑÑÐ¾Ðµ ÑÐµÐ´Ð°ÐºÑÐ¸ÑÐ¾Ð²Ð°Ð½Ð¸Ðµ",
+                    "label": "Быстрое редактирование",
                     "on": ctx["priv_machines_quick_edit"],
                 }
             ctx["priv_nav_rows"].append(
@@ -301,10 +301,10 @@ def cabinet_view(request):
     else:
         rec = _resolve_registered_user(user) or {}
         ctx["profile_login"] = user
-        ctx["profile_created"] = rec.get("created_at") or "â"
+        ctx["profile_created"] = rec.get("created_at") or "—"
         ctx["profile_access"] = _access_scope_description(rec)
         role = user_role_for_username(user)
-        ctx["profile_role"] = "Ð¸ÑÐ¿Ð¾Ð»Ð½Ð¸ÑÐµÐ»Ñ" if role == USER_ROLE_EXECUTOR else "ÑÑÐºÐ¾Ð²Ð¾Ð´Ð¸ÑÐµÐ»Ñ"
+        ctx["profile_role"] = "исполнитель" if role == USER_ROLE_EXECUTOR else "руководитель"
         profile_first, profile_last = _person_name_parts(rec)
         ctx["profile_first_name"] = profile_first
         ctx["profile_last_name"] = profile_last
@@ -321,10 +321,10 @@ def cabinet_view(request):
 @biota_login_required
 @require_http_methods(["GET", "POST"])
 def schedule_backups_view(request):
-    """Ð£Ð¿ÑÐ°Ð²Ð»ÐµÐ½Ð¸Ðµ ÑÐµÐ·ÐµÑÐ²Ð½ÑÐ¼Ð¸ ÐºÐ¾Ð¿Ð¸ÑÐ¼Ð¸ Ð³ÑÐ°ÑÐ¸ÐºÐ¾Ð²."""
-    # ÐÑÐ¾Ð²ÐµÑÑÐµÐ¼, ÑÑÐ¾ Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ Ð°Ð´Ð¼Ð¸Ð½
+    """Управление резервными копиями графиков."""
+    # Проверяем, что пользователь админ
     if not _is_admin(biota_user(request)):
-        messages.error(request, "ÐÐ¾ÑÑÑÐ¿ Ð·Ð°Ð¿ÑÐµÑÐµÐ½")
+        messages.error(request, "Доступ запрещен")
         return redirect("/cabinet/")
 
     backups_dir = SCHEDULE_DIR / "backups"
@@ -333,86 +333,86 @@ def schedule_backups_view(request):
     if request.method == "POST":
         action = request.POST.get("action", "").strip()
 
-        # ÐÐ°Ð³ÑÑÐ·Ð¸ÑÑ ÑÐ°Ð¹Ð» ÑÐµÐ·ÐµÑÐ²Ð½Ð¾Ð¹ ÐºÐ¾Ð¿Ð¸Ð¸
+        # Загрузить файл резервной копии
         if action == "upload":
             uploaded_file = request.FILES.get("backup_file")
             if not uploaded_file:
-                messages.error(request, "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÐ°Ð¹Ð» Ð´Ð»Ñ Ð·Ð°Ð³ÑÑÐ·ÐºÐ¸")
+                messages.error(request, "Выберите файл для загрузки")
                 return redirect("/cabinet/backups/")
 
             if not uploaded_file.name.endswith(".xlsx"):
-                messages.error(request, "Ð¤Ð°Ð¹Ð» Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð±ÑÑÑ Ð² ÑÐ¾ÑÐ¼Ð°ÑÐµ .xlsx")
+                messages.error(request, "Файл должен быть в формате .xlsx")
                 return redirect("/cabinet/backups/")
 
             try:
-                # Ð¡Ð¾ÑÑÐ°Ð½ÑÐµÐ¼ Ð·Ð°Ð³ÑÑÐ¶ÐµÐ½Ð½ÑÐ¹ ÑÐ°Ð¹Ð» Ð² Ð¿Ð°Ð¿ÐºÑ Ð±ÑÐºÐ°Ð¿Ð¾Ð²
+                # Сохраняем загруженный файл в папку бэкапов
                 backup_path = backups_dir / uploaded_file.name
                 with open(backup_path, "wb") as f:
                     for chunk in uploaded_file.chunks():
                         f.write(chunk)
 
-                messages.success(request, f"Ð ÐµÐ·ÐµÑÐ²Ð½Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ Ð·Ð°Ð³ÑÑÐ¶ÐµÐ½Ð°: {uploaded_file.name}")
+                messages.success(request, f"Резервная копия загружена: {uploaded_file.name}")
             except Exception as exc:
-                messages.error(request, f"ÐÑÐ¸Ð±ÐºÐ° Ð¿ÑÐ¸ Ð·Ð°Ð³ÑÑÐ·ÐºÐµ: {exc}")
+                messages.error(request, f"Ошибка при загрузке: {exc}")
 
             return redirect("/cabinet/backups/")
 
-        # Ð¡Ð¾Ð·Ð´Ð°ÑÑ ÑÐµÐ·ÐµÑÐ²Ð½ÑÑ ÐºÐ¾Ð¿Ð¸Ñ Ð²ÑÐµÑ Ð³ÑÐ°ÑÐ¸ÐºÐ¾Ð²
+        # Создать резервную копию всех графиков
         elif action == "backup_all":
             try:
-                # ÐÐ°ÑÐ¾Ð´Ð¸Ð¼ Ð²ÑÐµ ÑÐ°Ð¹Ð»Ñ schedule_*.xlsx Ð² Ð¾ÑÐ½Ð¾Ð²Ð½Ð¾Ð¹ Ð¿Ð°Ð¿ÐºÐµ
+                # Находим все файлы schedule_*.xlsx в основной папке
                 main_dir = SCHEDULE_DIR
                 backup_count = 0
 
                 for schedule_file in main_dir.glob("schedule_*.xlsx"):
                     if schedule_file.is_file():
-                        # Ð¡Ð¾Ð·Ð´Ð°ÐµÐ¼ Ð¸Ð¼Ñ Ð´Ð»Ñ Ð±ÑÐºÐ°Ð¿Ð° Ñ Ð²ÑÐµÐ¼ÐµÐ½Ð½Ð¾Ð¹ Ð¼ÐµÑÐºÐ¾Ð¹
+                        # Создаем имя для бэкапа с временной меткой
                         now = datetime.now().strftime("%Y%m%d_%H%M%S")
                         backup_name = f"{schedule_file.stem}_{now}.xlsx"
                         backup_path = backups_dir / backup_name
 
-                        # ÐÐ¾Ð¿Ð¸ÑÑÐµÐ¼ ÑÐ°Ð¹Ð»
+                        # Копируем файл
                         shutil.copy2(schedule_file, backup_path)
                         backup_count += 1
 
-                messages.success(request, f"Ð¡Ð¾Ð·Ð´Ð°Ð½Ð¾ {backup_count} ÑÐµÐ·ÐµÑÐ²Ð½ÑÑ ÐºÐ¾Ð¿Ð¸Ð¹ Ð³ÑÐ°ÑÐ¸ÐºÐ¾Ð²")
+                messages.success(request, f"Создано {backup_count} резервных копий графиков")
             except Exception as exc:
-                messages.error(request, f"ÐÑÐ¸Ð±ÐºÐ° Ð¿ÑÐ¸ ÑÐ¾Ð·Ð´Ð°Ð½Ð¸Ð¸ ÑÐµÐ·ÐµÑÐ²Ð½ÑÑ ÐºÐ¾Ð¿Ð¸Ð¹: {exc}")
+                messages.error(request, f"Ошибка при создании резервных копий: {exc}")
 
             return redirect("/cabinet/backups/")
 
-        # ÐÐ¾ÑÑÑÐ°Ð½Ð¾Ð²Ð¸ÑÑ Ð¸Ð· ÑÐµÐ·ÐµÑÐ²Ð½Ð¾Ð¹ ÐºÐ¾Ð¿Ð¸Ð¸
+        # Восстановить из резервной копии
         elif action == "restore":
             backup_filename = request.POST.get("backup_filename", "").strip()
             if not backup_filename or ".." in backup_filename:
-                messages.error(request, "ÐÐµÐºÐ¾ÑÑÐµÐºÑÐ½Ð¾Ðµ Ð¸Ð¼Ñ ÑÐ°Ð¹Ð»Ð°")
+                messages.error(request, "Некорректное имя файла")
                 return redirect("/cabinet/backups/")
 
             backup_path = backups_dir / backup_filename
             if not backup_path.exists() or not backup_path.is_file():
-                messages.error(request, "Ð ÐµÐ·ÐµÑÐ²Ð½Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð°")
+                messages.error(request, "Резервная копия не найдена")
                 return redirect("/cabinet/backups/")
 
             try:
-                # ÐÐ·Ð²Ð»ÐµÐºÐ°ÐµÐ¼ Ð¸Ð¼Ñ Ð¸ÑÑÐ¾Ð´Ð½Ð¾Ð³Ð¾ ÑÐ°Ð¹Ð»Ð° (ÑÐ´Ð°Ð»ÑÐµÐ¼ Ð²ÑÐµÐ¼ÐµÐ½Ð½ÑÑ Ð¼ÐµÑÐºÑ)
+                # Извлекаем имя исходного файла (удаляем временную метку)
                 # schedule_2026_05_20260521_101450.xlsx -> schedule_2026_05.xlsx
                 parts = backup_filename.replace(".xlsx", "").split("_")
-                if len(parts) >= 4:  # schedule, year, month, Ð¸ Ð´Ð°ÑÐ°
+                if len(parts) >= 4:  # schedule, year, month, и дата
                     original_name = f"{parts[0]}_{parts[1]}_{parts[2]}.xlsx"
                 else:
                     original_name = backup_filename
 
                 original_path = SCHEDULE_DIR / original_name
 
-                # ÐÐ¾Ð¿Ð¸ÑÑÐµÐ¼ Ð±ÑÐºÐ°Ð¿ Ð¾Ð±ÑÐ°ÑÐ½Ð¾
+                # Копируем бэкап обратно
                 shutil.copy2(backup_path, original_path)
-                messages.success(request, f"ÐÑÐ°ÑÐ¸Ðº Ð²Ð¾ÑÑÑÐ°Ð½Ð¾Ð²Ð»ÐµÐ½ Ð¸Ð· ÑÐµÐ·ÐµÑÐ²Ð½Ð¾Ð¹ ÐºÐ¾Ð¿Ð¸Ð¸: {backup_filename}")
+                messages.success(request, f"График восстановлен из резервной копии: {backup_filename}")
             except Exception as exc:
-                messages.error(request, f"ÐÑÐ¸Ð±ÐºÐ° Ð¿ÑÐ¸ Ð²Ð¾ÑÑÑÐ°Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ð¸: {exc}")
+                messages.error(request, f"Ошибка при восстановлении: {exc}")
 
             return redirect("/cabinet/backups/")
 
-    # ÐÐ¾Ð»ÑÑÐ¸ÑÑ ÑÐ¿Ð¸ÑÐ¾Ðº ÑÐµÐ·ÐµÑÐ²Ð½ÑÑ ÐºÐ¾Ð¿Ð¸Ð¹, Ð¾ÑÑÐ¾ÑÑÐ¸ÑÐ¾Ð²Ð°Ð½Ð½ÑÐ¹ Ð¿Ð¾ Ð´Ð°ÑÐµ (Ð½Ð¾Ð²ÑÐµ ÑÐ²ÐµÑÑÑ)
+    # Получить список резервных копий, отсортированный по дате (новые сверху)
     backups = []
     if backups_dir.exists():
         for backup_file in sorted(backups_dir.glob("schedule_*.xlsx"),
@@ -436,23 +436,23 @@ def schedule_backups_view(request):
 @biota_login_required
 @require_http_methods(["GET"])
 def schedule_backup_download(request, filename: str):
-    """Ð¡ÐºÐ°ÑÐ°ÑÑ ÑÐµÐ·ÐµÑÐ²Ð½ÑÑ ÐºÐ¾Ð¿Ð¸Ñ Ð³ÑÐ°ÑÐ¸ÐºÐ°."""
+    """Скачать резервную копию графика."""
     from biota_shifts.config import SCHEDULE_DIR
 
-    # ÐÑÐ¾Ð²ÐµÑÑÐµÐ¼, ÑÑÐ¾ Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ Ð°Ð´Ð¼Ð¸Ð½
+    # Проверяем, что пользователь админ
     if not _is_admin(biota_user(request)):
-        return HttpResponse("ÐÐ¾ÑÑÑÐ¿ Ð·Ð°Ð¿ÑÐµÑÐµÐ½", status=403)
+        return HttpResponse("Доступ запрещен", status=403)
 
-    # ÐÑÐ¾Ð²ÐµÑÑÐµÐ¼ Ð¸Ð¼Ñ ÑÐ°Ð¹Ð»Ð° (Ð·Ð°ÑÐ¸ÑÐ° Ð¾Ñ directory traversal)
+    # Проверяем имя файла (защита от directory traversal)
     if ".." in filename or "/" in filename or "\\" in filename:
-        return HttpResponse("ÐÐµÐºÐ¾ÑÑÐµÐºÑÐ½Ð¾Ðµ Ð¸Ð¼Ñ ÑÐ°Ð¹Ð»Ð°", status=400)
+        return HttpResponse("Некорректное имя файла", status=400)
 
     backup_path = SCHEDULE_DIR / "backups" / filename
 
     if not backup_path.exists() or not backup_path.is_file():
-        return HttpResponse("Ð¤Ð°Ð¹Ð» Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½", status=404)
+        return HttpResponse("Файл не найден", status=404)
 
-    # ÐÑÐ¿ÑÐ°Ð²Ð»ÑÐµÐ¼ ÑÐ°Ð¹Ð»
+    # Отправляем файл
     with open(backup_path, "rb") as f:
         response = HttpResponse(f.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -462,7 +462,7 @@ def schedule_backup_download(request, filename: str):
 @biota_login_required
 @require_http_methods(["GET", "POST"])
 def inventory_backups_view(request):
-    """Ð£Ð¿ÑÐ°Ð²Ð»ÐµÐ½Ð¸Ðµ ÑÐµÐ·ÐµÑÐ²Ð½ÑÐ¼Ð¸ ÐºÐ¾Ð¿Ð¸ÑÐ¼Ð¸ ÑÐºÐ»Ð°Ð´Ð° (JSON)."""
+    """Управление резервными копиями склада (JSON)."""
     from shifts.inventory_backup import (
         InventoryBackupError,
         backup_filename_now,
@@ -475,7 +475,7 @@ def inventory_backups_view(request):
     )
 
     if not _is_admin(biota_user(request)):
-        messages.error(request, "ÐÐ¾ÑÑÑÐ¿ Ð·Ð°Ð¿ÑÐµÑÐµÐ½")
+        messages.error(request, "Доступ запрещен")
         return redirect("/cabinet/")
 
     backups_dir = INVENTORY_BACKUP_DIR
@@ -486,11 +486,11 @@ def inventory_backups_view(request):
         if action == "upload":
             uploaded_file = request.FILES.get("backup_file")
             if not uploaded_file:
-                messages.error(request, "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÐ°Ð¹Ð» Ð´Ð»Ñ Ð·Ð°Ð³ÑÑÐ·ÐºÐ¸")
+                messages.error(request, "Выберите файл для загрузки")
                 return redirect("/cabinet/inventory-backups/")
 
             if not uploaded_file.name.endswith(".json"):
-                messages.error(request, "Ð¤Ð°Ð¹Ð» Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð±ÑÑÑ Ð² ÑÐ¾ÑÐ¼Ð°ÑÐµ .json")
+                messages.error(request, "Файл должен быть в формате .json")
                 return redirect("/cabinet/inventory-backups/")
 
             try:
@@ -501,11 +501,11 @@ def inventory_backups_view(request):
                     safe_name = backup_filename_now()
                 backup_path = backups_dir / safe_name
                 backup_path.write_bytes(raw)
-                messages.success(request, f"Ð ÐµÐ·ÐµÑÐ²Ð½Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ Ð·Ð°Ð³ÑÑÐ¶ÐµÐ½Ð°: {safe_name}")
+                messages.success(request, f"Резервная копия загружена: {safe_name}")
             except InventoryBackupError as exc:
                 messages.error(request, str(exc))
             except Exception as exc:
-                messages.error(request, f"ÐÑÐ¸Ð±ÐºÐ° Ð¿ÑÐ¸ Ð·Ð°Ð³ÑÑÐ·ÐºÐµ: {exc}")
+                messages.error(request, f"Ошибка при загрузке: {exc}")
 
             return redirect("/cabinet/inventory-backups/")
 
@@ -516,22 +516,22 @@ def inventory_backups_view(request):
                 tools_n = len(payload["tool_items"])
                 messages.success(
                     request,
-                    f"Ð ÐµÐ·ÐµÑÐ²Ð½Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ ÑÐºÐ»Ð°Ð´Ð° ÑÐ¾Ð·Ð´Ð°Ð½Ð°: {path.name} ({tools_n} Ð¿Ð¾Ð·Ð¸ÑÐ¸Ð¹ Ð¸Ð½ÑÑÑÑÐ¼ÐµÐ½ÑÐ°)",
+                    f"Резервная копия склада создана: {path.name} ({tools_n} позиций инструмента)",
                 )
             except Exception as exc:
-                messages.error(request, f"ÐÑÐ¸Ð±ÐºÐ° Ð¿ÑÐ¸ ÑÐ¾Ð·Ð´Ð°Ð½Ð¸Ð¸ ÑÐµÐ·ÐµÑÐ²Ð½Ð¾Ð¹ ÐºÐ¾Ð¿Ð¸Ð¸: {exc}")
+                messages.error(request, f"Ошибка при создании резервной копии: {exc}")
 
             return redirect("/cabinet/inventory-backups/")
 
         if action == "restore":
             backup_filename = request.POST.get("backup_filename", "").strip()
             if not is_safe_backup_filename(backup_filename):
-                messages.error(request, "ÐÐµÐºÐ¾ÑÑÐµÐºÑÐ½Ð¾Ðµ Ð¸Ð¼Ñ ÑÐ°Ð¹Ð»Ð°")
+                messages.error(request, "Некорректное имя файла")
                 return redirect("/cabinet/inventory-backups/")
 
             backup_path = backups_dir / backup_filename
             if not backup_path.exists() or not backup_path.is_file():
-                messages.error(request, "Ð ÐµÐ·ÐµÑÐ²Ð½Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð°")
+                messages.error(request, "Резервная копия не найдена")
                 return redirect("/cabinet/inventory-backups/")
 
             try:
@@ -541,14 +541,14 @@ def inventory_backups_view(request):
                 stats = restore_inventory_from_payload(payload)
                 messages.success(
                     request,
-                    "Ð¡ÐºÐ»Ð°Ð´ Ð²Ð¾ÑÑÑÐ°Ð½Ð¾Ð²Ð»ÐµÐ½ Ð¸Ð· ÑÐµÐ·ÐµÑÐ²Ð½Ð¾Ð¹ ÐºÐ¾Ð¿Ð¸Ð¸: "
-                    f"{stats['tools']} Ð¿Ð¾Ð·Ð¸ÑÐ¸Ð¹, {stats['movements']} Ð´Ð²Ð¸Ð¶ÐµÐ½Ð¸Ð¹, "
-                    f"{stats['purchases']} Ð·Ð°ÑÐ²Ð¾Ðº Ð½Ð° Ð·Ð°ÐºÑÐ¿ÐºÑ.",
+                    "Склад восстановлен из резервной копии: "
+                    f"{stats['tools']} позиций, {stats['movements']} движений, "
+                    f"{stats['purchases']} заявок на закупку.",
                 )
             except InventoryBackupError as exc:
                 messages.error(request, str(exc))
             except Exception as exc:
-                messages.error(request, f"ÐÑÐ¸Ð±ÐºÐ° Ð¿ÑÐ¸ Ð²Ð¾ÑÑÑÐ°Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ð¸: {exc}")
+                messages.error(request, f"Ошибка при восстановлении: {exc}")
 
             return redirect("/cabinet/inventory-backups/")
 
@@ -564,18 +564,18 @@ def inventory_backups_view(request):
 @biota_login_required
 @require_http_methods(["GET"])
 def inventory_backup_download(request, filename: str):
-    """Ð¡ÐºÐ°ÑÐ°ÑÑ ÑÐµÐ·ÐµÑÐ²Ð½ÑÑ ÐºÐ¾Ð¿Ð¸Ñ ÑÐºÐ»Ð°Ð´Ð° Ð½Ð° Ð´Ð¸ÑÐº / ÑÐ»ÐµÑÐºÑ."""
+    """Скачать резервную копию склада на диск / флешку."""
     from shifts.inventory_backup import is_safe_backup_filename
 
     if not _is_admin(biota_user(request)):
-        return HttpResponse("ÐÐ¾ÑÑÑÐ¿ Ð·Ð°Ð¿ÑÐµÑÐµÐ½", status=403)
+        return HttpResponse("Доступ запрещен", status=403)
 
     if not is_safe_backup_filename(filename):
-        return HttpResponse("ÐÐµÐºÐ¾ÑÑÐµÐºÑÐ½Ð¾Ðµ Ð¸Ð¼Ñ ÑÐ°Ð¹Ð»Ð°", status=400)
+        return HttpResponse("Некорректное имя файла", status=400)
 
     backup_path = INVENTORY_BACKUP_DIR / filename
     if not backup_path.exists() or not backup_path.is_file():
-        return HttpResponse("Ð¤Ð°Ð¹Ð» Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½", status=404)
+        return HttpResponse("Файл не найден", status=404)
 
     with open(backup_path, "rb") as f:
         response = HttpResponse(f.read(), content_type="application/json; charset=utf-8")
@@ -586,7 +586,7 @@ def inventory_backup_download(request, filename: str):
 @biota_login_required
 @require_http_methods(["GET", "POST"])
 def regulations_backups_view(request):
-    """Ð£Ð¿ÑÐ°Ð²Ð»ÐµÐ½Ð¸Ðµ ÑÐµÐ·ÐµÑÐ²Ð½ÑÐ¼Ð¸ ÐºÐ¾Ð¿Ð¸ÑÐ¼Ð¸ ÑÐµÐ³Ð»Ð°Ð¼ÐµÐ½ÑÐ¾Ð² (JSON)."""
+    """Управление резервными копиями регламентов (JSON)."""
     from regulations.regulations_backup import (
         RegulationsBackupError,
         backup_filename_now,
@@ -599,7 +599,7 @@ def regulations_backups_view(request):
     )
 
     if not _is_admin(biota_user(request)):
-        messages.error(request, "ÐÐ¾ÑÑÑÐ¿ Ð·Ð°Ð¿ÑÐµÑÐµÐ½")
+        messages.error(request, "Доступ запрещен")
         return redirect("/cabinet/")
 
     backups_dir = REGULATIONS_BACKUP_DIR
@@ -610,11 +610,11 @@ def regulations_backups_view(request):
         if action == "upload":
             uploaded_file = request.FILES.get("backup_file")
             if not uploaded_file:
-                messages.error(request, "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÐ°Ð¹Ð» Ð´Ð»Ñ Ð·Ð°Ð³ÑÑÐ·ÐºÐ¸")
+                messages.error(request, "Выберите файл для загрузки")
                 return redirect("/cabinet/regulations-backups/")
 
             if not uploaded_file.name.endswith(".json"):
-                messages.error(request, "Ð¤Ð°Ð¹Ð» Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð±ÑÑÑ Ð² ÑÐ¾ÑÐ¼Ð°ÑÐµ .json")
+                messages.error(request, "Файл должен быть в формате .json")
                 return redirect("/cabinet/regulations-backups/")
 
             try:
@@ -625,11 +625,11 @@ def regulations_backups_view(request):
                     safe_name = backup_filename_now()
                 backup_path = backups_dir / safe_name
                 backup_path.write_bytes(raw)
-                messages.success(request, f"Ð ÐµÐ·ÐµÑÐ²Ð½Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ Ð·Ð°Ð³ÑÑÐ¶ÐµÐ½Ð°: {safe_name}")
+                messages.success(request, f"Резервная копия загружена: {safe_name}")
             except RegulationsBackupError as exc:
                 messages.error(request, str(exc))
             except Exception as exc:
-                messages.error(request, f"ÐÑÐ¸Ð±ÐºÐ° Ð¿ÑÐ¸ Ð·Ð°Ð³ÑÑÐ·ÐºÐµ: {exc}")
+                messages.error(request, f"Ошибка при загрузке: {exc}")
 
             return redirect("/cabinet/regulations-backups/")
 
@@ -640,22 +640,22 @@ def regulations_backups_view(request):
                 plans_n = len(payload["regulation_plans"])
                 messages.success(
                     request,
-                    f"Ð ÐµÐ·ÐµÑÐ²Ð½Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ ÑÐµÐ³Ð»Ð°Ð¼ÐµÐ½ÑÐ¾Ð² ÑÐ¾Ð·Ð´Ð°Ð½Ð°: {path.name} ({plans_n} Ð·Ð°Ð¿Ð¸ÑÐµÐ¹)",
+                    f"Резервная копия регламентов создана: {path.name} ({plans_n} записей)",
                 )
             except Exception as exc:
-                messages.error(request, f"ÐÑÐ¸Ð±ÐºÐ° Ð¿ÑÐ¸ ÑÐ¾Ð·Ð´Ð°Ð½Ð¸Ð¸ ÑÐµÐ·ÐµÑÐ²Ð½ÑÑ ÐºÐ¾Ð¿Ð¸Ð¹: {exc}")
+                messages.error(request, f"Ошибка при создании резервных копий: {exc}")
 
             return redirect("/cabinet/regulations-backups/")
 
         if action == "restore":
             backup_filename = request.POST.get("backup_filename", "").strip()
             if not is_safe_backup_filename(backup_filename):
-                messages.error(request, "ÐÐµÐºÐ¾ÑÑÐµÐºÑÐ½Ð¾Ðµ Ð¸Ð¼Ñ ÑÐ°Ð¹Ð»Ð°")
+                messages.error(request, "Некорректное имя файла")
                 return redirect("/cabinet/regulations-backups/")
 
             backup_path = backups_dir / backup_filename
             if not backup_path.exists() or not backup_path.is_file():
-                messages.error(request, "Ð ÐµÐ·ÐµÑÐ²Ð½Ð°Ñ ÐºÐ¾Ð¿Ð¸Ñ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð°")
+                messages.error(request, "Резервная копия не найдена")
                 return redirect("/cabinet/regulations-backups/")
 
             try:
@@ -668,12 +668,12 @@ def regulations_backups_view(request):
                 stats = restore_regulations_from_payload(payload)
                 messages.success(
                     request,
-                    f"Ð ÐµÐ³Ð»Ð°Ð¼ÐµÐ½ÑÑ Ð²Ð¾ÑÑÑÐ°Ð½Ð¾Ð²Ð»ÐµÐ½Ñ Ð¸Ð· ÑÐµÐ·ÐµÑÐ²Ð½Ð¾Ð¹ ÐºÐ¾Ð¿Ð¸Ð¸: {stats['plans']} Ð·Ð°Ð¿Ð¸ÑÐµÐ¹.",
+                    f"Регламенты восстановлены из резервной копии: {stats['plans']} записей.",
                 )
             except RegulationsBackupError as exc:
                 messages.error(request, str(exc))
             except Exception as exc:
-                messages.error(request, f"ÐÑÐ¸Ð±ÐºÐ° Ð¿ÑÐ¸ Ð²Ð¾ÑÑÑÐ°Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ð¸: {exc}")
+                messages.error(request, f"Ошибка при восстановлении: {exc}")
 
             return redirect("/cabinet/regulations-backups/")
 
@@ -689,18 +689,18 @@ def regulations_backups_view(request):
 @biota_login_required
 @require_http_methods(["GET"])
 def regulations_backup_download(request, filename: str):
-    """Ð¡ÐºÐ°ÑÐ°ÑÑ ÑÐµÐ·ÐµÑÐ²Ð½ÑÑ ÐºÐ¾Ð¿Ð¸Ñ ÑÐµÐ³Ð»Ð°Ð¼ÐµÐ½ÑÐ¾Ð²."""
+    """Скачать резервную копию регламентов."""
     from regulations.regulations_backup import is_safe_backup_filename
 
     if not _is_admin(biota_user(request)):
-        return HttpResponse("ÐÐ¾ÑÑÑÐ¿ Ð·Ð°Ð¿ÑÐµÑÐµÐ½", status=403)
+        return HttpResponse("Доступ запрещен", status=403)
 
     if not is_safe_backup_filename(filename):
-        return HttpResponse("ÐÐµÐºÐ¾ÑÑÐµÐºÑÐ½Ð¾Ðµ Ð¸Ð¼Ñ ÑÐ°Ð¹Ð»Ð°", status=400)
+        return HttpResponse("Некорректное имя файла", status=400)
 
     backup_path = REGULATIONS_BACKUP_DIR / filename
     if not backup_path.exists() or not backup_path.is_file():
-        return HttpResponse("Ð¤Ð°Ð¹Ð» Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½", status=404)
+        return HttpResponse("Файл не найден", status=404)
 
     with open(backup_path, "rb") as f:
         response = HttpResponse(f.read(), content_type="application/json; charset=utf-8")
@@ -721,17 +721,17 @@ def _notify_cron_line(hm: str, slot: str) -> str:
 @biota_login_required
 @require_http_methods(["GET", "POST"])
 def notifications_settings_view(request):
-    """Ð£Ð²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ñ: ÑÐ²Ð¾Ð´ÐºÐ¸ Ð¡ÐÐ£Ð Ð¿Ð¾ ÑÐ°ÑÐ¿Ð¸ÑÐ°Ð½Ð¸Ñ Ð¸ ÑÑÑÐ½ÑÐ¹ ÑÐ¿Ð¸ÑÐ¾Ðº ÑÐ¾ÑÑÑÐ´Ð½Ð¸ÐºÐ¾Ð²."""
+    """Уведомления: сводки СКУД по расписанию и чёрный список сотрудников."""
     user = biota_user(request)
     if not user or not _is_admin(user):
-        messages.error(request, "ÐÐ¾ÑÑÑÐ¿ Ð·Ð°Ð¿ÑÐµÑÐµÐ½")
+        messages.error(request, "Доступ запрещен")
         return redirect("cabinet")
 
     cfg = biota_db.db_config()
     try:
         employees_full = biota_db.load_employees(cfg)
     except Exception as exc:
-        return render(request, "shifts/error.html", {"title": "ÐÑÐ¸Ð±ÐºÐ° ÐÐ", "message": str(exc)})
+        return render(request, "shifts/error.html", {"title": "Ошибка БД", "message": str(exc)})
 
     from biota_shifts.attendance_summary import (
         SLOT_EVENING,
@@ -767,7 +767,7 @@ def notifications_settings_view(request):
     preview_label = ""
 
     def _delivery_error() -> str:
-        return "ÐÐ°ÑÑÑÐ¾Ð¹ÑÐµ Ð´Ð¾ÑÑÐ°Ð²ÐºÑ: URL ÑÐµÑÐ²ÐµÑÐ° Ð±Ð¾ÑÐ° Ð¸ chat_id (Ð¸Ð»Ð¸ ÑÐ¾ÐºÐµÐ½ Telegram)."
+        return "Настройте доставку: URL сервера бота и chat_id (или токен Telegram)."
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -792,7 +792,7 @@ def notifications_settings_view(request):
             if token_in:
                 save_payload["telegram_bot_token"] = token_in
             settings = save_notification_settings(save_payload)
-            messages.success(request, "ÐÐ°ÑÑÑÐ¾Ð¹ÐºÐ¸ ÑÐ²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ð¹ ÑÐ¾ÑÑÐ°Ð½ÐµÐ½Ñ.")
+            messages.success(request, "Настройки уведомлений сохранены.")
             return redirect("cabinet_notifications")
 
         if action == "test_connection":
@@ -802,25 +802,25 @@ def notifications_settings_view(request):
                 try:
                     n = send_notify_test(settings)
                     if notify_relay_configured(settings):
-                        messages.success(request, "Ð¡Ð²ÑÐ·Ñ Ñ Ð±Ð¾ÑÐ¾Ð¼ OK â Ð¿ÑÐ¾Ð²ÐµÑÑÑÐµ ÑÐµÑÑÐ¾Ð²Ð¾Ðµ ÑÐ¾Ð¾Ð±ÑÐµÐ½Ð¸Ðµ Ð² Telegram.")
+                        messages.success(request, "Связь с ботом OK — проверьте тестовое сообщение в Telegram.")
                     else:
-                        messages.success(request, f"Ð¡Ð¾Ð¾Ð±ÑÐµÐ½Ð¸Ðµ Ð¾ÑÐ¿ÑÐ°Ð²Ð»ÐµÐ½Ð¾ Ð² {n} ÑÐ°Ñ(Ð¾Ð²) Telegram.")
+                        messages.success(request, f"Сообщение отправлено в {n} чат(ов) Telegram.")
                 except Exception as exc:
-                    messages.error(request, f"ÐÑÐ¸Ð±ÐºÐ° ÑÐ²ÑÐ·Ð¸: {exc}")
+                    messages.error(request, f"Ошибка связи: {exc}")
             return redirect("cabinet_notifications")
 
         if action in ("test_attendance_morning", "test_attendance_evening"):
             slot = SLOT_MORNING if action.endswith("morning") else SLOT_EVENING
-            slot_label = "ÑÑÑÐµÐ½Ð½ÑÑ" if slot == SLOT_MORNING else "Ð²ÐµÑÐµÑÐ½ÑÑ"
+            slot_label = "утренняя" if slot == SLOT_MORNING else "вечерняя"
             if not notify_delivery_configured(settings):
                 messages.error(request, _delivery_error())
                 return redirect("cabinet_notifications")
             try:
                 summary = load_attendance_summary_from_db(slot, settings=settings)
                 send_summary_telegram(summary, settings)
-                messages.success(request, f"{slot_label.capitalize()} ÑÐ²Ð¾Ð´ÐºÐ° Ð¡ÐÐ£Ð Ð¾ÑÐ¿ÑÐ°Ð²Ð»ÐµÐ½Ð° Ð² Telegram.")
+                messages.success(request, f"{slot_label.capitalize()} сводка СКУД отправлена в Telegram.")
             except Exception as exc:
-                messages.error(request, f"ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾ÑÐ¿ÑÐ°Ð²Ð¸ÑÑ ÑÐ²Ð¾Ð´ÐºÑ: {exc}")
+                messages.error(request, f"Не удалось отправить сводку: {exc}")
             return redirect("cabinet_notifications")
 
         if action == "test_inventory":
@@ -828,14 +828,14 @@ def notifications_settings_view(request):
                 messages.error(request, _delivery_error())
                 return redirect("cabinet_notifications")
             if not inventory_notify_enabled(settings):
-                messages.error(request, "Ð£Ð²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ñ ÑÐºÐ»Ð°Ð´Ð° Ð²ÑÐºÐ»ÑÑÐµÐ½Ñ â Ð²ÐºÐ»ÑÑÐ¸ÑÐµ Ð³Ð°Ð»Ð¾ÑÐºÑ Ð² Ð½Ð°ÑÑÑÐ¾Ð¹ÐºÐ°Ñ.")
+                messages.error(request, "Уведомления склада выключены — включите галочку в настройках.")
                 return redirect("cabinet_notifications")
             try:
                 actor = user or "admin"
                 send_inventory_notify_test(settings, actor=actor)
-                messages.success(request, "Ð¢ÐµÑÑÐ¾Ð²Ð¾Ðµ ÑÐ²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ðµ ÑÐºÐ»Ð°Ð´Ð° Ð¾ÑÐ¿ÑÐ°Ð²Ð»ÐµÐ½Ð¾ Ð² Telegram.")
+                messages.success(request, "Тестовое уведомление склада отправлено в Telegram.")
             except Exception as exc:
-                messages.error(request, f"ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾ÑÐ¿ÑÐ°Ð²Ð¸ÑÑ: {exc}")
+                messages.error(request, f"Не удалось отправить: {exc}")
             return redirect("cabinet_notifications")
 
         if action in ("preview_morning", "preview_evening"):
@@ -843,9 +843,9 @@ def notifications_settings_view(request):
             try:
                 summary = load_attendance_summary_from_db(slot, settings=settings)
                 preview_text = format_summary_text(summary)
-                preview_label = "Ð£ÑÑÐµÐ½Ð½ÑÑ ÑÐ²Ð¾Ð´ÐºÐ° Ð¡ÐÐ£Ð" if slot == SLOT_MORNING else "ÐÐµÑÐµÑÐ½ÑÑ ÑÐ²Ð¾Ð´ÐºÐ° Ð¡ÐÐ£Ð"
+                preview_label = "Утренняя сводка СКУД" if slot == SLOT_MORNING else "Вечерняя сводка СКУД"
             except Exception as exc:
-                messages.error(request, f"ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ ÑÑÐ¾ÑÐ¼Ð¸ÑÐ¾Ð²Ð°ÑÑ ÑÐ²Ð¾Ð´ÐºÑ: {exc}")
+                messages.error(request, f"Не удалось сформировать сводку: {exc}")
                 return redirect("cabinet_notifications")
 
     blacklist_codes = set(settings.get("blacklist_emp_codes") or [])
@@ -859,7 +859,7 @@ def notifications_settings_view(request):
                 {
                     "emp_code": code,
                     "label": employee_label_row(row),
-                    "department_name": str(row.get("department_name") or "").strip() or "â",
+                    "department_name": str(row.get("department_name") or "").strip() or "—",
                     "blacklisted": code in blacklist_codes,
                 }
             )
@@ -899,12 +899,12 @@ def _handle_icon_preset_action(request, action: str) -> bool:
         apply_hugeicons_preset()
         messages.success(
             request,
-            f"ÐÐ° ÑÐ°Ð¹ÑÐµ Ð²ÐºÐ»ÑÑÐµÐ½Ñ Ð½Ð¾Ð²ÑÐµ Ð¸ÐºÐ¾Ð½ÐºÐ¸ Hugeicons ({preset_count()}). ÐÐ±Ð½Ð¾Ð²Ð¸ÑÐµ ÑÑÑÐ°Ð½Ð¸ÑÑ (Ctrl+F5).",
+            f"На сайте включены новые иконки Hugeicons ({preset_count()}). Обновите страницы (Ctrl+F5).",
         )
         return True
     if action == "preset_default":
         apply_default_icons_preset()
-        messages.success(request, "ÐÐ° ÑÐ°Ð¹ÑÐµ Ð²ÐºÐ»ÑÑÐµÐ½Ñ ÑÑÐ°Ð½Ð´Ð°ÑÑÐ½ÑÐµ Ð¸ÐºÐ¾Ð½ÐºÐ¸. ÐÐ±Ð½Ð¾Ð²Ð¸ÑÐµ ÑÑÑÐ°Ð½Ð¸ÑÑ (Ctrl+F5).")
+        messages.success(request, "На сайте включены стандартные иконки. Обновите страницы (Ctrl+F5).")
         return True
     return False
 
@@ -925,10 +925,10 @@ def _icon_settings_context() -> dict:
 @biota_login_required
 @require_http_methods(["GET", "POST"])
 def icons_settings_view(request):
-    """Ð¡Ð¿ÑÐ°Ð²Ð¾ÑÐ½Ð¸Ðº Ð¸ÐºÐ¾Ð½Ð¾Ðº ÑÐ°Ð¹ÑÐ°: Ð¿ÑÐ¾ÑÐ¼Ð¾ÑÑ Ð¸ Ð³Ð»Ð¾Ð±Ð°Ð»ÑÐ½ÑÐµ Ð¿ÐµÑÐµÐ¾Ð¿ÑÐµÐ´ÐµÐ»ÐµÐ½Ð¸Ñ."""
+    """Справочник иконок сайта: просмотр и глобальные переопределения."""
     user = biota_user(request)
     if not user or not _is_admin(user):
-        messages.error(request, "ÐÐ¾ÑÑÑÐ¿ Ð·Ð°Ð¿ÑÐµÑÐµÐ½")
+        messages.error(request, "Доступ запрещен")
         return redirect("cabinet")
 
     from biota_shifts.icon_registry import DEFAULT_ICON_REGISTRY, ICON_KINDS
@@ -941,7 +941,7 @@ def icons_settings_view(request):
             return redirect("cabinet_icons")
         if action == "reset":
             save_icon_settings({}, preset="default")
-            messages.success(request, "ÐÑÐµ Ð¸ÐºÐ¾Ð½ÐºÐ¸ ÑÐ±ÑÐ¾ÑÐµÐ½Ñ Ðº Ð·Ð½Ð°ÑÐµÐ½Ð¸ÑÐ¼ Ð¿Ð¾ ÑÐ¼Ð¾Ð»ÑÐ°Ð½Ð¸Ñ.")
+            messages.success(request, "Все иконки сброшены к значениям по умолчанию.")
         elif action == "save":
             overrides: dict[str, dict] = {}
             for key in DEFAULT_ICON_REGISTRY:
@@ -951,7 +951,7 @@ def icons_settings_view(request):
                 if kind in ICON_KINDS and value:
                     overrides[key] = {"kind": kind, "value": value}
             save_icon_settings(overrides)
-            messages.success(request, "ÐÐºÐ¾Ð½ÐºÐ¸ ÑÐ¾ÑÑÐ°Ð½ÐµÐ½Ñ. ÐÐ±Ð½Ð¾Ð²Ð¸ÑÐµ ÑÑÑÐ°Ð½Ð¸ÑÑ ÑÐ°Ð¹ÑÐ° (Ctrl+F5).")
+            messages.success(request, "Иконки сохранены. Обновите страницы сайта (Ctrl+F5).")
         return redirect("cabinet_icons")
 
     icon_rows = []
@@ -985,10 +985,10 @@ def icons_settings_view(request):
 @biota_login_required
 @require_http_methods(["GET", "POST"])
 def icons_preview_view(request):
-    """ÐÑÐµÐ²ÑÑ Ð½Ð¾Ð²ÑÑ SVG Ð¸Ð· Figma (ÐºÐ°Ð½Ð´Ð¸Ð´Ð°ÑÑ) ÑÑÐ´Ð¾Ð¼ Ñ ÑÐµÐºÑÑÐ¸Ð¼Ð¸ Ð¸ÐºÐ¾Ð½ÐºÐ°Ð¼Ð¸."""
+    """Превью новых SVG из Figma (кандидаты) рядом с текущими иконками."""
     user = biota_user(request)
     if not user or not _is_admin(user):
-        messages.error(request, "ÐÐ¾ÑÑÑÐ¿ Ð·Ð°Ð¿ÑÐµÑÐµÐ½")
+        messages.error(request, "Доступ запрещен")
         return redirect("cabinet")
 
     from biota_shifts.icon_candidates import (
@@ -1007,10 +1007,10 @@ def icons_preview_view(request):
             if n:
                 messages.success(
                     request,
-                    f"ÐÑÐ¸Ð¼ÐµÐ½ÐµÐ½Ð¾ {n} Ð¸ÐºÐ¾Ð½Ð¾Ðº. ÐÐ±Ð½Ð¾Ð²Ð¸ÑÐµ ÑÑÑÐ°Ð½Ð¸ÑÑ ÑÐ°Ð¹ÑÐ° (Ctrl+F5).",
+                    f"Применено {n} иконок. Обновите страницы сайта (Ctrl+F5).",
                 )
             else:
-                messages.warning(request, "ÐÐµÑ SVG-ÐºÐ°Ð½Ð´Ð¸Ð´Ð°ÑÐ¾Ð² Ð² static/icons/candidates/.")
+                messages.warning(request, "Нет SVG-кандидатов в static/icons/candidates/.")
         return redirect("cabinet_icons_preview")
 
     rows = list_preview_rows()

@@ -883,7 +883,10 @@ class TapSpec(models.Model):
         return f"{self.size_label} ({self.get_thread_standard_display()})"
 
     def save(self, *args, **kwargs):
+        from .size_label_normalize import normalize_cutting_size_label
+
         self.thread_kind = normalize_thread_kind(self.thread_kind)
+        self.size_label = normalize_cutting_size_label(self.size_label)[:32]
         super().save(*args, **kwargs)
 
 
@@ -916,6 +919,12 @@ class CountersinkSpec(models.Model):
 
     def __str__(self):
         return f"Зенкер {self.get_countersink_type_display()} Ø{self.diameter_mm} / {self.angle_deg}°"
+
+    def save(self, *args, **kwargs):
+        from .size_label_normalize import normalize_cutting_size_label
+
+        self.size_label = normalize_cutting_size_label(self.size_label)[:32]
+        super().save(*args, **kwargs)
 
 
 class DrillSpec(models.Model):
