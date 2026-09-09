@@ -263,6 +263,8 @@ _ARRIVAL_REQUIRED_DIAMETER: dict[str, tuple[str, str]] = {
 
 
 def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
+    if _to_int(row.get("existing_tool_id"), 0) > 0:
+        return []
     category = (row.get("category") or "").strip()
     errs: list[str] = []
     if category == "collet":
@@ -297,15 +299,14 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
             errs.append(f"Строка {idx}: укажите диаметр D (мм) для корпусного инструмента.")
         return errs
     if category == "insert":
-        shape = (row.get("ins_shape") or "").strip()
         edge = (row.get("ins_edge_code") or "").strip()
         th = (row.get("ins_thickness_code") or "").strip()
         nr = (row.get("ins_nose_code") or "").strip()
         mach = normalize_insert_machining_apps(
             row.get("ins_machining_app") or row.get("machining_application")
         )
-        if not shape or not edge or not th or not nr:
-            errs.append(f"Строка {idx}: для пластины укажите форму, L (длина), S (толщина) и R (радиус).")
+        if not edge or not th or not nr:
+            errs.append(f"Строка {idx}: для пластины укажите L (длина), S (толщина) и R (радиус).")
         if not mach:
             errs.append(f"Строка {idx}: укажите хотя бы один вид обработки (чистовая / получистовая / черновая).")
         return errs
@@ -315,6 +316,286 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
         if _to_decimal_or_none(row.get(key)) is None:
             errs.append(f"Строка {idx}: укажите {label}.")
     return errs
+
+
+def _arrival_search_ready(row: dict) -> bool:
+    """Есть ли минимум полей, чтобы искать похожие позиции (не всю категорию)."""
+    category = (row.get("category") or "").strip()
+    if category not in _INVENTORY_CATEGORIES:
+        return False
+    if category == "end_mill":
+        return _to_decimal_or_none(row.get("em_diameter_mm")) is not None
+    if category == "body_tool":
+        return bool(
+            (row.get("body_cutter") or "").strip()
+            and _to_decimal_or_none(row.get("bt_diameter_mm")) is not None
+        )
+    if category == "tap":
+        return bool((row.get("size_label") or "").strip())
+    if category == "center_drill":
+        return _to_decimal_or_none(row.get("cd_diameter_mm")) is not None
+    if category == "countersink":
+        return _to_decimal_or_none(row.get("cs_diameter_mm")) is not None
+    if category == "drill":
+        return _to_decimal_or_none(row.get("dr_diameter_mm")) is not None
+    if category == "reamer":
+        return _to_decimal_or_none(row.get("rm_diameter_mm")) is not None
+    if category == "insert":
+        return bool(
+            (row.get("ins_edge_code") or "").strip()
+            or (row.get("ins_thickness_code") or "").strip()
+            or (row.get("ins_nose_code") or "").strip()
+            or _milling_family_from_request(row)
+        )
+    if category == "collet":
+        ct = normalize_collet_type(row.get("collet_type"))
+        if not ct:
+            return False
+        if ct == "er":
+            return bool(
+                normalize_er_collet_size(row.get("collet_er_size"))
+                or normalize_er_clamp_range(row.get("collet_clamp_range"))
+            )
+        if ct == "er_g":
+            return bool(
+                normalize_er_collet_size(row.get("collet_er_size"))
+                or normalize_collet_er_g_inner_diameter(
+                    row.get("collet_inner_diameter") or row.get("collet_square_size")
+                )
+            )
+        if ct == "threading":
+            return bool(
+                normalize_collet_threading_series(row.get("collet_threading_series"))
+                or normalize_collet_thread_standard(row.get("collet_thread_standard"))
+            )
+        return True
+    return False
+
+
+def _serialize_arrival_match(tool: ToolItem) -> dict:
+    coating = (tool.coating_type or "none").strip() or "none"
+    if coating == "none":
+        coating_label = "без покрытия"
+    else:
+        coating_label = str(tool.get_coating_type_display())
+    return {
+        "id": tool.id,
+        "name": tool.name or "",
+        "label": tool.issue_select_label(),
+        "quantity": int(tool.quantity or 0),
+        "warehouse_address": (tool.warehouse_address or "").strip(),
+        "tool_material": tool.get_tool_material_display() or (tool.tool_material or ""),
+        "coating": coating_label,
+        "category": tool.category,
+    }
+
+
+def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
+    """Похожие позиции склада по частично заполненной строке прихода."""
+    if not _arrival_search_ready(row):
+        return []
+    category = (row.get("category") or "").strip()
+    qs = ToolItem.objects.filter(category=category)
+
+    tool_material = (row.get("tool_material") or "").strip()
+    if tool_material:
+        qs = qs.filter(tool_material=tool_material)
+    coating_raw = (row.get("coating_type") or "").strip()
+    # «без покрытия» по умолчанию в форме — не сужаем выдачу на раннем этапе
+    if coating_raw and coating_raw != "none":
+        qs = qs.filter(coating_type=coating_raw)
+    main_d = _to_decimal_or_none(row.get("main_diameter_mm"))
+    if main_d is not None:
+        qs = qs.filter(main_diameter_mm=main_d)
+
+    if category == "end_mill":
+        qs = qs.select_related("end_mill_spec")
+        mill_type = (row.get("mill_type") or "").strip()
+        if mill_type:
+            qs = qs.filter(end_mill_spec__mill_type=mill_type)
+        d = _to_decimal_or_none(row.get("em_diameter_mm"))
+        if d is not None:
+            qs = qs.filter(end_mill_spec__diameter_mm=d)
+        for key, field in (
+            ("em_corner_radius_mm", "end_mill_spec__corner_radius_mm"),
+            ("em_overall_length_mm", "end_mill_spec__overall_length_mm"),
+            ("em_cutting_length_mm", "end_mill_spec__cutting_length_mm"),
+        ):
+            v = _to_decimal_or_none(row.get(key))
+            if v is not None:
+                qs = qs.filter(**{field: v})
+        fl = _to_int_or_none(row.get("em_flutes_count"))
+        if fl is not None:
+            qs = qs.filter(end_mill_spec__flutes_count=fl)
+    elif category == "body_tool":
+        qs = qs.select_related("body_tool_spec")
+        family = normalize_body_tool_family(row.get("body_family"))
+        cutter = normalize_indexable_mill_cutter(row.get("body_cutter"))
+        if family:
+            qs = qs.filter(body_tool_spec__family=family)
+        if cutter:
+            qs = qs.filter(body_tool_spec__cutter_type=cutter)
+        d = _to_decimal_or_none(row.get("bt_diameter_mm"))
+        if d is not None:
+            qs = qs.filter(body_tool_spec__diameter_mm=d)
+        for key, field in (
+            ("bt_overall_length_mm", "body_tool_spec__overall_length_mm"),
+            ("bt_cutting_length_mm", "body_tool_spec__cutting_length_mm"),
+            ("bt_mount_diameter_mm", "body_tool_spec__mount_diameter_mm"),
+            ("bt_ap_max_mm", "body_tool_spec__ap_max_mm"),
+            ("bt_corner_radius_mm", "body_tool_spec__corner_radius_mm"),
+        ):
+            v = _to_decimal_or_none(row.get(key))
+            if v is not None:
+                qs = qs.filter(**{field: v})
+        teeth = _to_int_or_none(row.get("bt_teeth_count"))
+        if teeth is not None:
+            qs = qs.filter(body_tool_spec__teeth_count=teeth)
+        brand = (row.get("bt_brand") or "").strip()[:80]
+        if brand:
+            qs = qs.filter(body_tool_spec__brand__iexact=brand)
+        shank = normalize_body_tool_shank(row.get("bt_shank_type"))
+        if shank:
+            qs = qs.filter(body_tool_spec__shank_type=shank)
+        ins_f = _body_insert_family_from_row(row)
+        if ins_f:
+            qs = qs.filter(body_tool_spec__insert_family=ins_f)
+        ins_s = _body_insert_size_from_row(row)
+        if ins_s:
+            qs = qs.filter(body_tool_spec__insert_size=ins_s)
+        compat = (row.get("bt_insert_compat") or "").strip()[:80]
+        if compat:
+            qs = qs.filter(body_tool_spec__insert_compat__iexact=compat)
+        mount_thread = normalize_modular_head_thread(row.get("bt_mount_thread"))
+        if mount_thread:
+            qs = qs.filter(body_tool_spec__mount_thread=mount_thread)
+        if row.get("bt_coolant") not in (None, ""):
+            qs = qs.filter(body_tool_spec__coolant_through=_to_bool(row.get("bt_coolant")))
+    elif category == "tap":
+        qs = qs.select_related("tap_spec")
+        size = (row.get("size_label") or "").strip()
+        if size:
+            qs = qs.filter(tap_spec__size_label__iexact=size)
+        for key, field in (
+            ("thread_standard", "tap_spec__thread_standard"),
+            ("hole_type", "tap_spec__hole_type"),
+            ("tap_type", "tap_spec__tap_type"),
+        ):
+            v = (row.get(key) or "").strip()
+            if v:
+                qs = qs.filter(**{field: v})
+        kind = (row.get("thread_kind") or "").strip()
+        if kind:
+            qs = qs.filter(tap_spec__thread_kind=kind)
+        pitch = _to_decimal_or_none(row.get("tap_pitch_mm"))
+        if pitch is not None:
+            qs = qs.filter(tap_spec__pitch_mm=pitch)
+        tpi = _to_int_or_none(row.get("tap_tpi"))
+        if tpi is not None:
+            qs = qs.filter(tap_spec__tpi=tpi)
+    elif category == "center_drill":
+        qs = qs.select_related("center_drill_spec")
+        d = _to_decimal_or_none(row.get("cd_diameter_mm"))
+        if d is not None:
+            qs = qs.filter(center_drill_spec__diameter_mm=d)
+        ol = _to_decimal_or_none(row.get("cd_overall_length_mm"))
+        if ol is not None:
+            qs = qs.filter(center_drill_spec__overall_length_mm=ol)
+        ang = (row.get("cd_angle_deg") or "").strip()
+        if ang:
+            qs = qs.filter(center_drill_spec__angle_deg=ang)
+    elif category == "countersink":
+        qs = qs.select_related("countersink_spec")
+        d = _to_decimal_or_none(row.get("cs_diameter_mm"))
+        if d is not None:
+            qs = qs.filter(countersink_spec__diameter_mm=d)
+        cs_type = (row.get("cs_type") or "").strip()
+        if cs_type:
+            qs = qs.filter(countersink_spec__countersink_type=cs_type)
+        ang = (row.get("cs_angle_deg") or "").strip()
+        if ang:
+            qs = qs.filter(countersink_spec__angle_deg=ang)
+        ol = _to_decimal_or_none(row.get("cs_overall_length_mm"))
+        if ol is not None:
+            qs = qs.filter(countersink_spec__overall_length_mm=ol)
+        fl = _to_int_or_none(row.get("cs_flutes_count"))
+        if fl is not None:
+            qs = qs.filter(countersink_spec__flutes_count=fl)
+    elif category == "drill":
+        qs = qs.select_related("drill_spec")
+        d = _to_decimal_or_none(row.get("dr_diameter_mm"))
+        if d is not None:
+            qs = qs.filter(drill_spec__diameter_mm=d)
+        for key, field in (
+            ("dr_overall_length_mm", "drill_spec__overall_length_mm"),
+            ("dr_cutting_length_mm", "drill_spec__cutting_length_mm"),
+            ("dr_angle_deg", "drill_spec__angle_deg"),
+        ):
+            v = _to_decimal_or_none(row.get(key))
+            if v is not None:
+                qs = qs.filter(**{field: v})
+    elif category == "reamer":
+        qs = qs.select_related("reamer_spec")
+        d = _to_decimal_or_none(row.get("rm_diameter_mm"))
+        if d is not None:
+            qs = qs.filter(reamer_spec__diameter_mm=d)
+        for key, field in (
+            ("rm_overall_length_mm", "reamer_spec__overall_length_mm"),
+            ("rm_cutting_length_mm", "reamer_spec__cutting_length_mm"),
+        ):
+            v = _to_decimal_or_none(row.get(key))
+            if v is not None:
+                qs = qs.filter(**{field: v})
+        acc = (row.get("rm_accuracy_class") or "").strip()[:24]
+        if acc:
+            qs = qs.filter(reamer_spec__accuracy_class=acc)
+        fl = _to_int_or_none(row.get("rm_flutes_count"))
+        if fl is not None:
+            qs = qs.filter(reamer_spec__flutes_count=fl)
+    elif category == "insert":
+        qs = qs.select_related("insert_spec")
+        edge = (row.get("ins_edge_code") or "").strip()
+        th = (row.get("ins_thickness_code") or "").strip()
+        nr = (row.get("ins_nose_code") or "").strip()
+        if edge:
+            qs = qs.filter(insert_spec__cutting_edge_length_code=edge)
+        if th:
+            qs = qs.filter(insert_spec__thickness_code=th)
+        if nr:
+            qs = qs.filter(insert_spec__nose_radius_code=nr)
+        family = _milling_family_from_request(row)
+        if family:
+            qs = qs.filter(insert_spec__milling_family=family)
+        mach = normalize_insert_machining_apps(
+            row.get("ins_machining_app") or row.get("machining_application")
+        )
+        if mach:
+            qs = qs.filter(insert_spec__machining_application=mach)
+    elif category == "collet":
+        qs = qs.select_related("collet_spec")
+        fields = _collet_spec_fields_from_row(row)
+        if fields["collet_type"]:
+            qs = qs.filter(collet_spec__collet_type=fields["collet_type"])
+        if fields["er_size"]:
+            qs = qs.filter(collet_spec__er_size=fields["er_size"])
+        if fields["clamp_range"]:
+            qs = qs.filter(collet_spec__clamp_range=fields["clamp_range"])
+        if fields["inner_diameter"]:
+            qs = qs.filter(collet_spec__inner_diameter=fields["inner_diameter"])
+        if fields["thread_standard"]:
+            qs = qs.filter(collet_spec__thread_standard=fields["thread_standard"])
+        if fields["threading_use"]:
+            qs = qs.filter(collet_spec__threading_use=fields["threading_use"])
+        if fields["threading_series"]:
+            qs = qs.filter(collet_spec__threading_series=fields["threading_series"])
+        if fields["size_label"]:
+            qs = qs.filter(collet_spec__size_label__iexact=fields["size_label"])
+        if row.get("collet_high_precision_aa") not in (None, ""):
+            qs = qs.filter(collet_spec__high_precision_aa=fields["high_precision_aa"])
+    else:
+        return []
+
+    return list(qs.order_by("-quantity", "name", "id")[: max(1, min(int(limit), 40))])
 
 
 def _register_tool_material_extra(value: str) -> str | None:
@@ -1705,7 +1986,6 @@ def _find_insert_tool_match(tool_material, coating_type, main_diameter_mm, spec_
             tool_material=tool_material,
             coating_type=coating_type,
             main_diameter_mm=main_diameter_mm,
-            insert_spec__insert_shape=spec_fields["insert_shape"],
             insert_spec__cutting_edge_length_code=spec_fields["cutting_edge_length_code"],
             insert_spec__thickness_code=spec_fields["thickness_code"],
             insert_spec__nose_radius_code=spec_fields["nose_radius_code"],
@@ -3022,6 +3302,8 @@ def inventory_view(request):
             return redirect(f"{request.path}?panel=arrival")
 
         created_count = 0
+        from .visual_warehouse_address import normalize_address
+
         with transaction.atomic():
             for row in rows:
                 if not isinstance(row, dict):
@@ -3040,6 +3322,33 @@ def inventory_view(request):
                     movement_date = date.fromisoformat(movement_date_raw)
                 except ValueError:
                     movement_date = date.today()
+
+                existing_tool_id = _to_int(row.get("existing_tool_id"), 0)
+                if existing_tool_id > 0:
+                    tool = (
+                        ToolItem.objects.select_for_update()
+                        .filter(pk=existing_tool_id, category=category)
+                        .first()
+                    )
+                    if not tool:
+                        continue
+                    tool.quantity += quantity
+                    update_fields = ["quantity", "updated_at"]
+                    addr = normalize_address(row.get("warehouse_address") or "")
+                    if addr and (tool.warehouse_address or "") != addr:
+                        tool.warehouse_address = addr
+                        update_fields.append("warehouse_address")
+                    tool.save(update_fields=update_fields)
+                    StockMovement.objects.create(
+                        movement_type="restock",
+                        tool=tool,
+                        quantity=quantity,
+                        movement_date=movement_date,
+                        comment=comment or "Приход инструмента (существующая позиция)",
+                        created_by_account=username,
+                    )
+                    created_count += 1
+                    continue
 
                 if category == "end_mill":
                     mill_type = (row.get("mill_type") or "end").strip()
@@ -3465,6 +3774,10 @@ def inventory_view(request):
                         tool = _create_collet_tool(quantity, spec_fields)
                 else:
                     continue
+                addr = normalize_address(row.get("warehouse_address") or "")
+                if addr and (tool.warehouse_address or "") != addr:
+                    tool.warehouse_address = addr
+                    tool.save(update_fields=["warehouse_address", "updated_at"])
                 StockMovement.objects.create(
                     movement_type="restock",
                     tool=tool,
@@ -4649,6 +4962,29 @@ def inventory_history_open_pdf(request):
     resp = HttpResponse(data, content_type="application/pdf")
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
+
+
+@biota_login_required
+@inventory_route_nav_access_required
+@require_http_methods(["POST"])
+def inventory_api_arrival_matches(request):
+    """Поиск существующих позиций склада по полям строки прихода."""
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Некорректный JSON"}, status=400)
+    row = payload.get("row") if isinstance(payload, dict) else None
+    if not isinstance(row, dict):
+        return JsonResponse({"ok": False, "error": "Ожидается объект row"}, status=400)
+    limit = _to_int(payload.get("limit"), 20)
+    tools = _arrival_candidate_tools(row, limit=limit)
+    return JsonResponse(
+        {
+            "ok": True,
+            "ready": _arrival_search_ready(row),
+            "matches": [_serialize_arrival_match(t) for t in tools],
+        }
+    )
 
 
 @biota_login_required

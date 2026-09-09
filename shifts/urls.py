@@ -48,6 +48,11 @@ urlpatterns = [
     ),
     path("inventory/", inventory_views.inventory_view, name="inventory"),
     path(
+        "inventory/api/arrival-matches/",
+        inventory_views.inventory_api_arrival_matches,
+        name="inventory_api_arrival_matches",
+    ),
+    path(
         "inventory/api/warehouse-locations/",
         inventory_views.inventory_api_warehouse_locations,
         name="inventory_api_warehouse_locations",

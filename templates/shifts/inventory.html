@@ -3725,7 +3725,8 @@
   "collet_thread_standards": [{% for key, label in collet_thread_standards %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "collet_threading_series": [{% for key, label in collet_threading_series %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "collet_threading_use": [{% for key, label in collet_threading_use %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
-  "warehouse_locations_url": "{% url 'inventory_api_warehouse_locations' %}"
+  "warehouse_locations_url": "{% url 'inventory_api_warehouse_locations' %}",
+  "arrival_matches_url": "{% url 'inventory_api_arrival_matches' %}"
 }</script>
 <script src="{% static 'shifts/js/inventory.js' %}?v={{ static_asset_version }}" defer></script>
 {% endblock %}

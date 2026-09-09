@@ -182,6 +182,41 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
             2,
         )
 
+    def test_bulk_existing_tool_id_adds_quantity(self):
+        self._post_arrival_bulk([_drill_row(diameter="8.2", qty=2)])
+        tool = ToolItem.objects.get(category="drill", drill_spec__diameter_mm=Decimal("8.2"))
+        resp = self._post_arrival_bulk(
+            [
+                {
+                    "category": "drill",
+                    "existing_tool_id": tool.id,
+                    "quantity": 5,
+                    "movement_date": self.today,
+                }
+            ]
+        )
+        self.assertEqual(resp.status_code, 200)
+        tool.refresh_from_db()
+        self.assertEqual(tool.quantity, 7)
+        self.assertEqual(
+            StockMovement.objects.filter(tool=tool, movement_type="restock").count(),
+            2,
+        )
+
+    def test_arrival_matches_api(self):
+        self._post_arrival_bulk([_drill_row(diameter="4.5", qty=1)])
+        url = reverse("inventory_api_arrival_matches")
+        resp = self.client.post(
+            url,
+            data=json.dumps({"row": {"category": "drill", "dr_diameter_mm": "4.5"}, "limit": 10}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("ok"))
+        self.assertTrue(data.get("ready"))
+        self.assertTrue(any(m.get("quantity") == 1 for m in data.get("matches") or []))
+
     def test_bulk_insert_creates_spec_with_machining_apps(self):
         resp = self._post_arrival_bulk([_insert_row(qty=6, machining="2,3")])
         self.assertEqual(resp.status_code, 200)

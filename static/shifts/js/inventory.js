@@ -1484,7 +1484,7 @@ var INV = (function () {
 
   function validateInsertRow(tr, rowIndex) {
     var bad = false;
-    ["ins_shape", "ins_edge_code", "ins_thickness_code", "ins_nose_code", "ins_machining_app"].forEach(function (k) {
+    ["ins_edge_code", "ins_thickness_code", "ins_nose_code", "ins_machining_app"].forEach(function (k) {
         var el = tr.querySelector('[data-k="' + k + '"]');
         if (!el || !(el.value || "").trim()) {
           if (el) el.classList.add("is-invalid");
@@ -1495,7 +1495,7 @@ var INV = (function () {
     return bad
       ? [
           {
-            msg: "Строка " + rowIndex + ": для пластины укажите форму, L, S, R и вид обработки.",
+            msg: "Строка " + rowIndex + ": для пластины укажите L, S, R и вид обработки.",
             el: null,
           },
         ]
@@ -1532,6 +1532,19 @@ var INV = (function () {
   function validateArrivalBulkRows() {
     var issues = [];
     groupsWrap.querySelectorAll("tr[data-arrival-row]").forEach(function (tr, i) {
+      var existingId = ((tr.querySelector('[data-k="existing_tool_id"]') || {}).value || "").trim();
+      if (existingId) {
+        var qtyEl = tr.querySelector('[data-k="quantity"]');
+        var qty = parseInt((qtyEl && qtyEl.value) || "0", 10);
+        if (!qty || qty < 1) {
+          if (qtyEl) qtyEl.classList.add("is-invalid");
+          issues.push({
+            msg: "Строка " + (i + 1) + ": укажите количество для выбранной позиции.",
+            el: qtyEl,
+          });
+        }
+        return;
+      }
       var cat = tr.getAttribute("data-category") || "";
       if (cat === "collet") {
         issues = issues.concat(validateColletRow(tr, i + 1, tr.getAttribute("data-collet-type")));
@@ -1561,6 +1574,235 @@ var INV = (function () {
       }
     });
     return issues;
+  }
+
+  function collectArrivalRowData(tr) {
+    var row = { category: tr.getAttribute("data-category") || "" };
+    var colletTypeAttr = tr.getAttribute("data-collet-type");
+    if (colletTypeAttr) row.collet_type = colletTypeAttr;
+    var bodyFamilyAttr = tr.getAttribute("data-body-family");
+    if (bodyFamilyAttr) row.body_family = bodyFamilyAttr;
+    var bodyCutterAttr = tr.getAttribute("data-body-cutter");
+    if (bodyCutterAttr) row.body_cutter = bodyCutterAttr;
+    tr.querySelectorAll("[data-k]").forEach(function (el) {
+      var k = el.getAttribute("data-k");
+      if (
+        k === "tool_material_custom" ||
+        k === "ins_family_custom" ||
+        k === "bt_insert_family_custom" ||
+        k === "bt_insert_size_custom"
+      ) {
+        return;
+      }
+      if (el.type === "checkbox") {
+        row[k] = el.checked ? "1" : "";
+        return;
+      }
+      if (k === "tool_material" && (el.value || "") === toolMaterialFilterOther) {
+        var cin = tr.querySelector('[data-k="tool_material_custom"]');
+        row.tool_material = ((cin && cin.value) || "").trim();
+      } else if (k === "ins_family") {
+        if ((el.value || "") === insertFamilyOther) {
+          var fin = tr.querySelector('[data-k="ins_family_custom"]');
+          row.ins_family = normalizeInsertFamilyValue((fin && fin.value) || "");
+        } else {
+          row.ins_family = normalizeInsertFamilyValue(el.value || "");
+        }
+      } else if (k === "bt_insert_family") {
+        if ((el.value || "") === insertFamilyOther) {
+          var bfin = tr.querySelector('[data-k="bt_insert_family_custom"]');
+          row.bt_insert_family = normalizeInsertFamilyValue((bfin && bfin.value) || "");
+        } else {
+          row.bt_insert_family = normalizeInsertFamilyValue(el.value || "");
+        }
+      } else if (k === "bt_insert_size") {
+        if ((el.value || "") === insertSizeOther) {
+          var szin = tr.querySelector('[data-k="bt_insert_size_custom"]');
+          row.bt_insert_size = ((szin && szin.value) || "").trim().toUpperCase();
+        } else {
+          row.bt_insert_size = (el.value || "").trim();
+        }
+      } else {
+        var rawVal = (el.value || "").trim();
+        row[k] = isArrivalNumericField(el, k) ? normalizeDecimalComma(rawVal) : rawVal;
+      }
+    });
+    resolveInsertArrivalRowMaterials(row);
+    return row;
+  }
+
+  function arrivalMatchPanel(tr) {
+    var matchTr = tr.nextElementSibling;
+    if (!matchTr || !matchTr.classList.contains("arrival-match-row")) return null;
+    return matchTr.querySelector(".js-arrival-matches");
+  }
+
+  function ensureExistingToolHidden(tr) {
+    var hid = tr.querySelector('[data-k="existing_tool_id"]');
+    if (hid) return hid;
+    hid = document.createElement("input");
+    hid.type = "hidden";
+    hid.setAttribute("data-k", "existing_tool_id");
+    hid.value = "";
+    tr.appendChild(hid);
+    return hid;
+  }
+
+  function clearArrivalExistingPick(tr) {
+    var hid = ensureExistingToolHidden(tr);
+    hid.value = "";
+    tr.classList.remove("is-existing-pick");
+    tr.removeAttribute("data-existing-tool-id");
+    var panel = arrivalMatchPanel(tr);
+    if (panel) {
+      panel.hidden = true;
+      panel.innerHTML = "";
+    }
+    scheduleArrivalMatchSearch(tr);
+  }
+
+  function renderArrivalSelectedMatch(tr, match) {
+    var panel = arrivalMatchPanel(tr);
+    if (!panel) return;
+    panel.hidden = false;
+    panel.innerHTML =
+      '<div class="arrival-matches__selected">' +
+      '<div class="arrival-matches__selected-text">' +
+      "<strong>Выбрано из базы:</strong> " +
+      escAttr(match.label || match.name || "#" + match.id) +
+      ' · на складе <strong>' +
+      escAttr(String(match.quantity != null ? match.quantity : "—")) +
+      "</strong>" +
+      (match.warehouse_address
+        ? " · адрес " + escAttr(match.warehouse_address)
+        : "") +
+      "</div>" +
+      '<button type="button" class="btn btn-sm btn-ghost js-arrival-match-clear">Снять выбор</button>' +
+      "</div>" +
+      '<div class="arrival-matches__hint">Укажите количество в строке выше и сохраните приход — позиция увеличится.</div>';
+  }
+
+  function renderArrivalMatches(tr, matches) {
+    var panel = arrivalMatchPanel(tr);
+    if (!panel) return;
+    if (!matches || !matches.length) {
+      panel.hidden = false;
+      panel.innerHTML =
+        '<div class="arrival-matches__empty">В базе нет похожих позиций — будет создана новая.</div>';
+      return;
+    }
+    var html =
+      '<div class="arrival-matches__head">Найдено в базе: ' +
+      matches.length +
+      ". Можно выбрать и дооприходовать количество:</div>" +
+      '<ul class="arrival-matches__list">';
+    matches.forEach(function (m) {
+      html +=
+        '<li class="arrival-matches__item">' +
+        '<div class="arrival-matches__meta">' +
+        '<div class="arrival-matches__label">' +
+        escAttr(m.label || m.name || "#" + m.id) +
+        "</div>" +
+        '<div class="arrival-matches__sub">' +
+        "на складе: <strong>" +
+        escAttr(String(m.quantity != null ? m.quantity : "—")) +
+        "</strong>" +
+        (m.tool_material ? " · " + escAttr(m.tool_material) : "") +
+        (m.coating ? " · " + escAttr(m.coating) : "") +
+        (m.warehouse_address ? " · " + escAttr(m.warehouse_address) : "") +
+        "</div></div>" +
+        '<button type="button" class="btn btn-sm btn-primary js-arrival-match-pick" data-tool-id="' +
+        escAttr(String(m.id)) +
+        '">Выбрать</button>' +
+        "</li>";
+    });
+    html += "</ul>";
+    panel.hidden = false;
+    panel.innerHTML = html;
+    panel._matchesById = {};
+    matches.forEach(function (m) {
+      panel._matchesById[String(m.id)] = m;
+    });
+  }
+
+  function selectArrivalMatch(tr, match) {
+    if (!match || !match.id) return;
+    var hid = ensureExistingToolHidden(tr);
+    hid.value = String(match.id);
+    tr.setAttribute("data-existing-tool-id", String(match.id));
+    tr.classList.add("is-existing-pick");
+    if (match.warehouse_address) {
+      var addrHid = tr.querySelector('[data-k="warehouse_address"]');
+      var addrTxt = tr.querySelector(".js-arrival-addr-text");
+      if (addrHid && !(addrHid.value || "").trim()) {
+        addrHid.value = String(match.warehouse_address).toUpperCase();
+        if (addrTxt) addrTxt.textContent = addrHid.value;
+      }
+    }
+    renderArrivalSelectedMatch(tr, match);
+  }
+
+  function scheduleArrivalMatchSearch(tr) {
+    if (!tr || tr.classList.contains("is-existing-pick")) return;
+    clearTimeout(tr._arrivalMatchTimer);
+    tr._arrivalMatchTimer = setTimeout(function () {
+      runArrivalMatchSearch(tr);
+    }, 380);
+  }
+
+  function runArrivalMatchSearch(tr) {
+    if (!tr || !tr.isConnected || tr.classList.contains("is-existing-pick")) return;
+    var panel = arrivalMatchPanel(tr);
+    if (!panel) return;
+    var row = collectArrivalRowData(tr);
+    var url = (INV && INV.arrival_matches_url) || "/inventory/api/arrival-matches/";
+    var seq = (tr._arrivalMatchSeq || 0) + 1;
+    tr._arrivalMatchSeq = seq;
+    panel.hidden = false;
+    panel.innerHTML = '<div class="arrival-matches__loading">Ищем похожие в базе…</div>';
+    fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRFToken": arrivalCsrfToken || "",
+      },
+      body: JSON.stringify({ row: row, limit: 15 }),
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (data) {
+        if (tr._arrivalMatchSeq !== seq || tr.classList.contains("is-existing-pick")) return;
+        if (!data || !data.ok) {
+          panel.hidden = true;
+          panel.innerHTML = "";
+          return;
+        }
+        if (!data.ready) {
+          panel.hidden = true;
+          panel.innerHTML = "";
+          return;
+        }
+        renderArrivalMatches(tr, data.matches || []);
+      })
+      .catch(function () {
+        if (tr._arrivalMatchSeq !== seq) return;
+        panel.hidden = true;
+        panel.innerHTML = "";
+      });
+  }
+
+  function attachArrivalMatchRow(tr, body) {
+    ensureExistingToolHidden(tr);
+    var matchTr = document.createElement("tr");
+    matchTr.className = "arrival-match-row";
+    matchTr.innerHTML =
+      '<td colspan="40"><div class="arrival-matches js-arrival-matches" hidden></div></td>';
+    body.appendChild(tr);
+    body.appendChild(matchTr);
+    scheduleArrivalMatchSearch(tr);
   }
 
   var arrivalGroupTitles = {
@@ -1682,6 +1924,7 @@ var INV = (function () {
         '<td><input type="text" data-k="collet_size_label" maxlength="64" placeholder="Параметры"></td>'
       );
     }
+    cells.push(arrivalAddressCellHtml(""));
     cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     return cells;
   }
@@ -1746,15 +1989,244 @@ var INV = (function () {
   }
 
   function arrivalHead(cols) {
+    var list = cols.slice();
+    var hasAddr = list.some(function (c) { return c.key === "warehouse_address"; });
+    if (!hasAddr) {
+      var qtyIdx = -1;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].key === "quantity") {
+          qtyIdx = i;
+          break;
+        }
+      }
+      if (qtyIdx >= 0) {
+        list.splice(qtyIdx, 0, { key: "warehouse_address", label: "Адрес", cls: "address-col" });
+      }
+    }
     return (
       "<tr>" +
-      cols
+      list
         .map(function (col) {
           return arrivalTh(col.key, col.label, col.cls || "");
         })
         .join("") +
       "</tr>"
     );
+  }
+
+  function arrivalAddressCellHtml(addr) {
+    var val = String(addr || "").trim().toUpperCase();
+    var label = val || "—";
+    return (
+      '<td class="address-col arrival-addr-cell">' +
+      '<input type="hidden" data-k="warehouse_address" value="' +
+      escAttr(val) +
+      '">' +
+      '<button type="button" class="btn btn-sm btn-ghost js-arrival-addr-pick" title="Выбрать адрес на визуальном складе">' +
+      '<span class="js-arrival-addr-text">' +
+      escAttr(label) +
+      "</span></button></td>"
+    );
+  }
+
+  var arrivalAddrPickerOpen = false;
+
+  function openArrivalAddressPicker(btn) {
+    if (arrivalAddrPickerOpen) return;
+    var cell = btn.closest(".arrival-addr-cell");
+    if (!cell) return;
+    var hidden = cell.querySelector('[data-k="warehouse_address"]');
+    var textEl = cell.querySelector(".js-arrival-addr-text");
+    var current = ((hidden && hidden.value) || "").trim().toUpperCase();
+    arrivalAddrPickerOpen = true;
+    cell.classList.add("is-editing-address");
+
+    function placeOptionLabelLocal(p) {
+      var bits = [p.place_label || "?"];
+      if (p.label) bits.push(p.label);
+      else bits.push(p.kind_label || "Место");
+      if (p.furniture_name) bits.push(p.furniture_name);
+      else if (p.cabinet_name) bits.push(p.cabinet_name);
+      return bits.join(" · ");
+    }
+
+    function fillSelectLocal(sel, options, selected) {
+      sel.innerHTML = "";
+      options.forEach(function (opt) {
+        var o = document.createElement("option");
+        o.value = opt.value;
+        o.textContent = opt.label;
+        if (String(opt.value) === String(selected)) o.selected = true;
+        sel.appendChild(o);
+      });
+    }
+
+    var url = (INV && INV.warehouse_locations_url) || "/inventory/api/warehouse-locations/";
+    fetch(url, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin",
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (data) {
+        if (!data || !data.ok) throw new Error((data && data.error) || "Не удалось загрузить адреса");
+        var furniture = (data.furniture || []).slice().sort(function (a, b) {
+          return (
+            (a.sort_order || 0) - (b.sort_order || 0) ||
+            String(a.code || "").localeCompare(String(b.code || ""), "ru") ||
+            String(a.name || "").localeCompare(String(b.name || ""), "ru")
+          );
+        });
+        var places = data.places || [];
+
+        var pop = document.createElement("div");
+        pop.className = "inv-addr-popover";
+        pop.innerHTML =
+          '<div class="inv-addr-popover__row"><label>Мебель</label><select class="js-addr-furniture"></select></div>' +
+          '<div class="inv-addr-popover__row"><label>Полка</label><select class="js-addr-shelf"></select></div>' +
+          '<div class="inv-addr-popover__row"><label>Место</label><select class="js-addr-place"></select></div>' +
+          '<div class="inv-addr-popover__actions">' +
+          '<button type="button" class="btn btn-sm btn-ghost js-addr-clear">Очистить</button>' +
+          '<button type="button" class="btn btn-sm btn-ghost js-addr-cancel">Отмена</button>' +
+          '<button type="button" class="btn btn-sm btn-primary js-addr-save">OK</button>' +
+          "</div>";
+        document.body.appendChild(pop);
+
+        var furnitureSel = pop.querySelector(".js-addr-furniture");
+        var shelfSel = pop.querySelector(".js-addr-shelf");
+        var placeSel = pop.querySelector(".js-addr-place");
+
+        var curPlace =
+          places.find(function (p) {
+            return String(p.address || "").toUpperCase() === current;
+          }) || null;
+        var initFurniture = curPlace
+          ? String(curPlace.furniture_id || "")
+          : furniture[0]
+            ? String(furniture[0].id)
+            : "";
+        var initShelf = curPlace ? String(curPlace.shelf_label || "") : "";
+        var initAddr = curPlace ? String(curPlace.address || "") : "";
+
+        function placesFor(furnitureId, shelfLabel) {
+          return places.filter(function (p) {
+            if (furnitureId && String(p.furniture_id) !== String(furnitureId)) return false;
+            if (shelfLabel && String(p.shelf_label) !== String(shelfLabel)) return false;
+            return true;
+          });
+        }
+
+        function syncShelves(keepShelf) {
+          var fid = furnitureSel.value;
+          var shelves = [];
+          var seen = {};
+          placesFor(fid, "").forEach(function (p) {
+            var sl = p.shelf_label;
+            if (!sl || seen[sl]) return;
+            seen[sl] = true;
+            shelves.push({ value: sl, label: sl });
+          });
+          shelves.sort(function (a, b) {
+            return String(a.value).localeCompare(String(b.value));
+          });
+          var want = keepShelf && seen[keepShelf] ? keepShelf : shelves[0] ? shelves[0].value : "";
+          fillSelectLocal(shelfSel, shelves.length ? shelves : [{ value: "", label: "—" }], want);
+          syncPlaces(initAddr);
+          initAddr = "";
+        }
+
+        function syncPlaces(keepAddr) {
+          var list = placesFor(furnitureSel.value, shelfSel.value);
+          var opts = list.map(function (p) {
+            return { value: p.address, label: placeOptionLabelLocal(p) };
+          });
+          if (!opts.length) opts = [{ value: "", label: "Нет мест — создайте в визуальном складе" }];
+          var want =
+            keepAddr &&
+            list.some(function (p) {
+              return p.address === keepAddr;
+            })
+              ? keepAddr
+              : opts[0]
+                ? opts[0].value
+                : "";
+          fillSelectLocal(placeSel, opts, want);
+        }
+
+        fillSelectLocal(
+          furnitureSel,
+          furniture.length
+            ? furniture.map(function (f) {
+                var code = (f.code || "?").toString();
+                return { value: String(f.id), label: code + (f.name ? " — " + f.name : "") };
+              })
+            : [{ value: "", label: "Нет мебели" }],
+          initFurniture
+        );
+        syncShelves(initShelf);
+
+        furnitureSel.addEventListener("change", function () {
+          syncShelves("");
+        });
+        shelfSel.addEventListener("change", function () {
+          syncPlaces("");
+        });
+
+        function applyAddr(val) {
+          var v = String(val || "").trim().toUpperCase();
+          if (hidden) hidden.value = v;
+          if (textEl) textEl.textContent = v || "—";
+        }
+
+        function closePop() {
+          if (pop.parentNode) pop.parentNode.removeChild(pop);
+          document.removeEventListener("mousedown", onDocDown, true);
+          document.removeEventListener("keydown", onKey);
+          cell.classList.remove("is-editing-address");
+          arrivalAddrPickerOpen = false;
+        }
+
+        function onDocDown(e) {
+          if (pop.contains(e.target) || cell.contains(e.target)) return;
+          closePop();
+        }
+        function onKey(e) {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            closePop();
+          }
+        }
+
+        pop.querySelector(".js-addr-cancel").addEventListener("click", function () {
+          closePop();
+        });
+        pop.querySelector(".js-addr-clear").addEventListener("click", function () {
+          applyAddr("");
+          closePop();
+        });
+        pop.querySelector(".js-addr-save").addEventListener("click", function () {
+          var val = (placeSel.value || "").trim().toUpperCase();
+          if (!val) {
+            alert("Выберите место на полке.");
+            return;
+          }
+          applyAddr(val);
+          closePop();
+        });
+
+        var rect = cell.getBoundingClientRect();
+        pop.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 320)) + "px";
+        pop.style.top = Math.min(rect.bottom + 4, window.innerHeight - 220) + "px";
+        document.addEventListener("mousedown", onDocDown, true);
+        document.addEventListener("keydown", onKey);
+        furnitureSel.focus();
+      })
+      .catch(function (err) {
+        cell.classList.remove("is-editing-address");
+        arrivalAddrPickerOpen = false;
+        alert(err.message || "Не удалось загрузить адреса склада");
+      });
   }
 
   function escAttr(s) {
@@ -2109,13 +2581,13 @@ var INV = (function () {
     insert:
       "<tr>" +
       insertArrivalTh("family", "Семейство") +
-      insertArrivalTh("shape", "Форма") +
       insertArrivalTh("edge_l", "L", "short-col insert-code-col") +
       insertArrivalTh("thickness_s", "S", "short-col insert-code-col") +
       insertArrivalTh("radius_r", "R", "short-col insert-code-col") +
       insertArrivalTh("machining_application", "Обр.", "insert-app-col") +
       insertArrivalTh("tool_material", "Сплав", "stack-words tm-col-tool-material") +
       insertArrivalTh("coating", "Покрытие") +
+      insertArrivalTh("warehouse_address", "Адрес", "address-col") +
       insertArrivalTh("quantity", "Кол-во", "qty-col") +
       insertArrivalTh("row_remove", "×") +
       "</tr>",
@@ -2245,6 +2717,7 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
+      cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "body_tool") {
       if (bodyCutter === "face") {
@@ -2259,6 +2732,7 @@ var INV = (function () {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
+          cells.push(arrivalAddressCellHtml(""));
           cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "end") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
@@ -2273,6 +2747,7 @@ var INV = (function () {
         cells.push('<td class="short-col"><select data-k="bt_angle_deg">' + buildOptionsHtml([{ value: "", label: "—" }].concat(INV.face_mill_angles || [])) + '</select></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
+          cells.push(arrivalAddressCellHtml(""));
           cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "chamfer") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
@@ -2286,6 +2761,7 @@ var INV = (function () {
         cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
+          cells.push(arrivalAddressCellHtml(""));
           cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "high_speed") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
@@ -2300,6 +2776,7 @@ var INV = (function () {
         cells.push('<td class="short-col"><select data-k="bt_angle_deg">' + buildOptionsHtml(INV.high_speed_angle_options || [{ value: "", label: "—" }].concat(INV.face_mill_angles || []).concat([{ value: "variable", label: "Переменный" }])) + '</select></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
+          cells.push(arrivalAddressCellHtml(""));
           cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "round_insert") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
@@ -2315,6 +2792,7 @@ var INV = (function () {
         cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
+          cells.push(arrivalAddressCellHtml(""));
           cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "disc") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
@@ -2326,6 +2804,7 @@ var INV = (function () {
         cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
+          cells.push(arrivalAddressCellHtml(""));
           cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "ball") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
@@ -2338,6 +2817,7 @@ var INV = (function () {
         cells.push('<td><input type="text" data-k="bt_insert_compat" maxlength="80" placeholder="RD.. / RP.."></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
+          cells.push(arrivalAddressCellHtml(""));
           cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "modular_head") {
         cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
@@ -2349,6 +2829,7 @@ var INV = (function () {
         cells.push('<td><input type="text" data-k="bt_insert_compat" maxlength="80" placeholder="APKT / RCKT…"></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
+          cells.push(arrivalAddressCellHtml(""));
           cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else {
         cells.push('<td><select data-k="body_cutter" required>' + buildOptionsHtml(INV.indexable_mill_cutter_types || []) + '</select></td>');
@@ -2361,6 +2842,7 @@ var INV = (function () {
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
+          cells.push(arrivalAddressCellHtml(""));
           cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       }
     } else if (cat === "tap") {
@@ -2376,6 +2858,7 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
+      cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "center_drill") {
       cells.push(arrivalRequiredDiamCell("cd_diameter_mm"));
@@ -2384,6 +2867,7 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
+      cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "countersink") {
       cells.push('<td><select data-k="cs_type">' + buildOptionsHtml(INV.countersink_types || []) + '</select></td>');
@@ -2394,16 +2878,17 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
+      cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "insert") {
       cells.push('<td class="ins-family-cell">' + buildInsertFamilyCellHtml() + "</td>");
-      cells.push('<td><select data-k="ins_shape" required>' + buildOptionsHtml(INV.insert_shapes || []) + '</select></td>');
       cells.push('<td class="short-col insert-code-col"><select data-k="ins_edge_code" required>' + buildInsertIsoCodeOptionsHtml(INV.insert_edge_length_codes || []) + "</select></td>");
       cells.push('<td class="short-col insert-code-col"><select data-k="ins_thickness_code" required>' + buildInsertIsoCodeOptionsHtml(INV.insert_thickness_codes || []) + "</select></td>");
       cells.push('<td class="short-col insert-code-col"><select data-k="ins_nose_code" required>' + buildInsertIsoCodeOptionsHtml(INV.insert_nose_radius_codes || []) + "</select></td>");
       cells.push(buildInsertMachiningAppCellHtml(""));
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
+      cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "collet") {
       cells = buildColletCells(colletType);
@@ -2415,6 +2900,7 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
+      cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "reamer") {
       cells.push(arrivalRequiredDiamCell("rm_diameter_mm"));
@@ -2429,12 +2915,13 @@ var INV = (function () {
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
+      cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     }
     cells.push('<td><button type="button" class="btn btn-ghost js-arrival-row-remove">×</button></td>');
     tr.innerHTML = cells.join("");
     if (cat === "collet") {
-      body.appendChild(tr);
+      attachArrivalMatchRow(tr, body);
       return;
     }
     var insFamilyCell = tr.querySelector(".ins-family-cell");
@@ -2473,7 +2960,7 @@ var INV = (function () {
       }
     });
     tr.querySelector(".co-cell").appendChild(buildColoredCoatingSelect("none"));
-    body.appendChild(tr);
+    attachArrivalMatchRow(tr, body);
   }
 
   addBtn.addEventListener("click", addRow);
@@ -2497,8 +2984,34 @@ var INV = (function () {
 
   groupsWrap.addEventListener("input", function (e) {
     var t = e.target;
-    if (!t || !t.classList || !t.classList.contains("is-invalid")) return;
-    if (isPositiveNumberField(t)) t.classList.remove("is-invalid");
+    if (t && t.classList && t.classList.contains("is-invalid") && isPositiveNumberField(t)) {
+      t.classList.remove("is-invalid");
+    }
+    var tr = t && t.closest && t.closest("tr[data-arrival-row]");
+    if (!tr) return;
+    if (tr.classList.contains("is-existing-pick") && t.getAttribute("data-k") !== "quantity") {
+      // характеристики меняются — снять привязку к старой позиции
+      if (t.getAttribute("data-k") && t.getAttribute("data-k") !== "existing_tool_id") {
+        var hid = tr.querySelector('[data-k="existing_tool_id"]');
+        if (hid) hid.value = "";
+        tr.classList.remove("is-existing-pick");
+        tr.removeAttribute("data-existing-tool-id");
+      }
+    }
+    scheduleArrivalMatchSearch(tr);
+  });
+
+  groupsWrap.addEventListener("change", function (e) {
+    var t = e.target;
+    var tr = t && t.closest && t.closest("tr[data-arrival-row]");
+    if (!tr) return;
+    if (tr.classList.contains("is-existing-pick") && t.getAttribute("data-k") !== "quantity") {
+      var hid = tr.querySelector('[data-k="existing_tool_id"]');
+      if (hid) hid.value = "";
+      tr.classList.remove("is-existing-pick");
+      tr.removeAttribute("data-existing-tool-id");
+    }
+    scheduleArrivalMatchSearch(tr);
   });
 
   form.addEventListener("submit", function (e) {
@@ -2513,51 +3026,8 @@ var INV = (function () {
 
     var rows = [];
     groupsWrap.querySelectorAll("tr[data-arrival-row]").forEach(function (tr) {
-      var row = { category: tr.getAttribute("data-category") || "" };
-      var colletTypeAttr = tr.getAttribute("data-collet-type");
-      if (colletTypeAttr) row.collet_type = colletTypeAttr;
-      var bodyFamilyAttr = tr.getAttribute("data-body-family");
-      if (bodyFamilyAttr) row.body_family = bodyFamilyAttr;
-      var bodyCutterAttr = tr.getAttribute("data-body-cutter");
-      if (bodyCutterAttr) row.body_cutter = bodyCutterAttr;
-      tr.querySelectorAll("[data-k]").forEach(function (el) {
-        var k = el.getAttribute("data-k");
-        if (k === "tool_material_custom" || k === "ins_family_custom" || k === "bt_insert_family_custom" || k === "bt_insert_size_custom") return;
-        if (el.type === "checkbox") {
-          row[k] = el.checked ? "1" : "";
-          return;
-        }
-        if (k === "tool_material" && (el.value || "") === toolMaterialFilterOther) {
-          var cin = tr.querySelector('[data-k="tool_material_custom"]');
-          row.tool_material = (cin && cin.value || "").trim();
-        } else if (k === "ins_family") {
-          if ((el.value || "") === insertFamilyOther) {
-            var fin = tr.querySelector('[data-k="ins_family_custom"]');
-            row.ins_family = normalizeInsertFamilyValue(fin && fin.value || "");
-          } else {
-            row.ins_family = normalizeInsertFamilyValue(el.value || "");
-          }
-        } else if (k === "bt_insert_family") {
-          if ((el.value || "") === insertFamilyOther) {
-            var bfin = tr.querySelector('[data-k="bt_insert_family_custom"]');
-            row.bt_insert_family = normalizeInsertFamilyValue(bfin && bfin.value || "");
-          } else {
-            row.bt_insert_family = normalizeInsertFamilyValue(el.value || "");
-          }
-        } else if (k === "bt_insert_size") {
-          if ((el.value || "") === insertSizeOther) {
-            var szin = tr.querySelector('[data-k="bt_insert_size_custom"]');
-            row.bt_insert_size = ((szin && szin.value) || "").trim().toUpperCase();
-          } else {
-            row.bt_insert_size = (el.value || "").trim();
-          }
-        } else {
-          var rawVal = (el.value || "").trim();
-          row[k] = isArrivalNumericField(el, k) ? normalizeDecimalComma(rawVal) : rawVal;
-        }
-      });
+      var row = collectArrivalRowData(tr);
       row.movement_date = (arrivalDateInput.value || "").trim();
-      resolveInsertArrivalRowMaterials(row);
       rows.push(row);
     });
     if (!rows.length) {
@@ -2589,10 +3059,45 @@ var INV = (function () {
   }, true);
 
   groupsWrap.addEventListener("click", function (e) {
+    var pickBtn = e.target.closest(".js-arrival-match-pick");
+    if (pickBtn) {
+      e.preventDefault();
+      var matchTr = pickBtn.closest("tr.arrival-match-row");
+      var dataTr = matchTr && matchTr.previousElementSibling;
+      if (!dataTr || !dataTr.hasAttribute("data-arrival-row")) return;
+      var panel = matchTr.querySelector(".js-arrival-matches");
+      var id = pickBtn.getAttribute("data-tool-id");
+      var match = panel && panel._matchesById ? panel._matchesById[String(id)] : null;
+      if (!match) {
+        match = { id: id, label: pickBtn.closest("li") && pickBtn.closest("li").textContent };
+      }
+      selectArrivalMatch(dataTr, match);
+      return;
+    }
+    var clearBtn = e.target.closest(".js-arrival-match-clear");
+    if (clearBtn) {
+      e.preventDefault();
+      var matchTrClear = clearBtn.closest("tr.arrival-match-row");
+      var dataTrClear = matchTrClear && matchTrClear.previousElementSibling;
+      if (dataTrClear && dataTrClear.hasAttribute("data-arrival-row")) {
+        clearArrivalExistingPick(dataTrClear);
+      }
+      return;
+    }
+    var addrBtn = e.target.closest(".js-arrival-addr-pick");
+    if (addrBtn) {
+      e.preventDefault();
+      openArrivalAddressPicker(addrBtn);
+      return;
+    }
     var rm = e.target.closest(".js-arrival-row-remove");
     if (!rm) return;
     var row = rm.closest("tr[data-arrival-row]");
-    if (row) row.remove();
+    if (row) {
+      var next = row.nextElementSibling;
+      if (next && next.classList.contains("arrival-match-row")) next.remove();
+      row.remove();
+    }
     var grp = rm.closest(".arrival-group");
     if (grp && !grp.querySelector("tr[data-arrival-row]")) grp.remove();
   });
