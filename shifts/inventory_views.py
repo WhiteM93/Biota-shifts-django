@@ -89,9 +89,11 @@ from .insert_constants import (
     INSERT_COLUMN_TOOLTIPS,
     INSERT_FAMILY_OTHER,
     INSERT_GRADE_OTHER,
+    INSERT_KINDS,
     INSERT_MACHINING_APPLICATIONS,
     MILLING_INSERT_FAMILIES,
     merge_insert_chipbreaker_grades,
+    normalize_insert_kind,
     normalize_insert_machining_apps,
     build_insert_display_name,
     normalize_milling_family,
@@ -302,13 +304,11 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
         edge = (row.get("ins_edge_code") or "").strip()
         th = (row.get("ins_thickness_code") or "").strip()
         nr = (row.get("ins_nose_code") or "").strip()
-        mach = normalize_insert_machining_apps(
-            row.get("ins_machining_app") or row.get("machining_application")
-        )
+        kind = normalize_insert_kind(row.get("ins_kind") or row.get("insert_kind"))
         if not edge or not th or not nr:
             errs.append(f"Строка {idx}: для пластины укажите L (длина), S (толщина) и R (радиус).")
-        if not mach:
-            errs.append(f"Строка {idx}: укажите хотя бы один вид обработки (чистовая / получистовая / черновая).")
+        if not kind:
+            errs.append(f"Строка {idx}: укажите тип пластины (фрезерная / токарная / уникальная).")
         return errs
     spec = _ARRIVAL_REQUIRED_DIAMETER.get(category)
     if spec:
@@ -566,11 +566,15 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
         family = _milling_family_from_request(row)
         if family:
             qs = qs.filter(insert_spec__milling_family=family)
-        mach = normalize_insert_machining_apps(
-            row.get("ins_machining_app") or row.get("machining_application")
-        )
-        if mach:
-            qs = qs.filter(insert_spec__machining_application=mach)
+        kind = normalize_insert_kind(row.get("ins_kind") or row.get("insert_kind"))
+        if kind:
+            qs = qs.filter(insert_spec__insert_kind=kind)
+        brand = (row.get("ins_brand") or row.get("brand") or "").strip()[:80]
+        if brand:
+            qs = qs.filter(insert_spec__brand__iexact=brand)
+        grade = (row.get("ins_grade") or row.get("chipbreaker_grade") or "").strip()[:40]
+        if grade:
+            qs = qs.filter(insert_spec__chipbreaker_grade__iexact=grade)
     elif category == "collet":
         qs = qs.select_related("collet_spec")
         fields = _collet_spec_fields_from_row(row)
@@ -703,6 +707,7 @@ def _log_inventory_stock_event(
 _STOCK_INLINE_FIELD_LABELS = {
     "warehouse_address": "Адрес",
     "quantity": "Количество",
+    "notes": "Описание",
     "main_diameter_mm": "Основной диаметр",
     "tool_material": "Материал",
     "coating_type": "Покрытие",
@@ -766,7 +771,9 @@ _STOCK_INLINE_FIELD_LABELS = {
     "ins_thickness_code": "Толщина",
     "ins_nose_code": "Радиус вершины",
     "ins_family": "Семейство",
+    "ins_kind": "Тип пластины",
     "ins_grade": "Сплав",
+    "ins_brand": "Бренд",
     "ins_iso": "ISO",
     "collet_type": "Тип цанги",
     "er_size": "Размер ER",
@@ -1253,7 +1260,9 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "ins_thickness_code",
         "ins_nose_code",
         "ins_family",
+        "ins_kind",
         "ins_grade",
+        "ins_brand",
         "ins_iso",
         "collet_type",
         "collet_er_size",
@@ -1392,7 +1401,9 @@ _STOCK_KEYS_BY_CATEGORY = {
             "ins_thickness_code",
             "ins_nose_code",
             "ins_family",
+            "ins_kind",
             "ins_grade",
+            "ins_brand",
             "ins_iso",
         }
     ),
@@ -1733,9 +1744,15 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         ins_family_raw = g("ins_family")
         if ins_family_raw:
             qs = qs.filter(insert_spec__milling_family=ins_family_raw)
+        ins_kind_raw = g("ins_kind")
+        if ins_kind_raw:
+            qs = qs.filter(insert_spec__insert_kind=normalize_insert_kind(ins_kind_raw))
         ins_grade_raw = g("ins_grade")
         if ins_grade_raw:
             qs = qs.filter(insert_spec__chipbreaker_grade__iexact=ins_grade_raw)
+        ins_brand_raw = g("ins_brand")
+        if ins_brand_raw:
+            qs = qs.filter(insert_spec__brand__iexact=ins_brand_raw)
         ins_iso_raw = g("ins_iso")
         if ins_iso_raw:
             qs = qs.filter(insert_spec__iso_designation__iexact=ins_iso_raw)
@@ -1896,6 +1913,10 @@ def _build_reamer_name(diameter_mm, overall_length_mm, cutting_length_mm, accura
 
 
 def _milling_family_from_request(data) -> str:
+    a = (data.get("ins_family_a") or "").strip()
+    b = (data.get("ins_family_b") or "").strip()
+    if a or b:
+        return normalize_milling_family(f"{a}{b}")
     sel = (data.get("ins_family") or data.get("milling_family") or "").strip()
     if sel == INSERT_FAMILY_OTHER:
         return normalize_milling_family(data.get("ins_family_custom") or "")
@@ -1903,6 +1924,10 @@ def _milling_family_from_request(data) -> str:
 
 
 def _body_insert_family_from_row(data) -> str:
+    a = (data.get("bt_insert_family_a") or "").strip()
+    b = (data.get("bt_insert_family_b") or "").strip()
+    if a or b:
+        return normalize_milling_family(f"{a}{b}")
     sel = (data.get("bt_insert_family") or data.get("ins_family") or "").strip()
     if sel == INSERT_FAMILY_OTHER:
         return normalize_milling_family(data.get("bt_insert_family_custom") or data.get("ins_family_custom") or "")
@@ -1971,7 +1996,9 @@ def _insert_spec_fields_from_mapping(data: dict) -> dict:
         "thickness_code": (data.get("ins_thickness_code") or data.get("thickness_code") or "").strip()[:2],
         "nose_radius_code": (data.get("ins_nose_code") or data.get("nose_radius_code") or "").strip()[:2],
         "milling_family": _milling_family_from_request(data),
+        "insert_kind": normalize_insert_kind(data.get("ins_kind") or data.get("insert_kind")),
         "chipbreaker_grade": (data.get("ins_grade") or data.get("chipbreaker_grade") or "").strip()[:40],
+        "brand": (data.get("ins_brand") or data.get("brand") or "").strip()[:80],
         "machining_application": normalize_insert_machining_apps(
             data.get("ins_machining_app") or data.get("machining_application")
         ),
@@ -1990,8 +2017,9 @@ def _find_insert_tool_match(tool_material, coating_type, main_diameter_mm, spec_
             insert_spec__thickness_code=spec_fields["thickness_code"],
             insert_spec__nose_radius_code=spec_fields["nose_radius_code"],
             insert_spec__milling_family=spec_fields["milling_family"],
+            insert_spec__insert_kind=spec_fields["insert_kind"],
             insert_spec__chipbreaker_grade=spec_fields["chipbreaker_grade"],
-            insert_spec__machining_application=spec_fields["machining_application"],
+            insert_spec__brand=spec_fields["brand"],
         )
         .first()
     )
@@ -2574,7 +2602,9 @@ def inventory_view(request):
             ins.thickness_code = (request.POST.get("ins_thickness_code") or ins.thickness_code or "").strip()[:2]
             ins.nose_radius_code = (request.POST.get("ins_nose_code") or ins.nose_radius_code or "").strip()[:2]
             ins.milling_family = _milling_family_from_request(request.POST) or normalize_milling_family(ins.milling_family)
+            ins.insert_kind = normalize_insert_kind(request.POST.get("ins_kind") or request.POST.get("insert_kind")) or ins.insert_kind
             ins.chipbreaker_grade = (request.POST.get("ins_grade") or ins.chipbreaker_grade or "").strip()[:40]
+            ins.brand = (request.POST.get("ins_brand") or ins.brand or "").strip()[:80]
             ins.save()
             tool.name = build_insert_display_name(ins.iso_designation, ins.milling_family, ins.chipbreaker_grade)
 
@@ -2588,6 +2618,76 @@ def inventory_view(request):
         )
         messages.success(request, "Данные инструмента обновлены.")
         return redirect(f"{request.path}?panel=stock&category={tool.category}")
+
+    if action == "replace_body_tool_photo":
+        if not can_manage_stock:
+            return JsonResponse({"ok": False, "error": "Недостаточно прав."}, status=403)
+        tool_id = _to_int(request.POST.get("tool_id"), 0)
+        tool = (
+            ToolItem.objects.select_related("body_tool_spec")
+            .filter(id=tool_id, category="body_tool", is_deleted=False)
+            .first()
+        )
+        if not tool or not tool.body_tool_spec:
+            return JsonResponse({"ok": False, "error": "Позиция не найдена."}, status=404)
+        image_file = request.FILES.get("image")
+        if not image_file:
+            return JsonResponse({"ok": False, "error": "Выберите фото."}, status=400)
+        name = (getattr(image_file, "name", "") or "").lower()
+        if not name.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif")):
+            return JsonResponse({"ok": False, "error": "Допустимы jpg, png, webp, gif."}, status=400)
+        if getattr(image_file, "size", 0) and image_file.size > 8 * 1024 * 1024:
+            return JsonResponse({"ok": False, "error": "Файл больше 8 МБ."}, status=400)
+        bt = tool.body_tool_spec
+        if bt.photo:
+            try:
+                bt.photo.delete(save=False)
+            except Exception:
+                pass
+        bt.photo = image_file
+        bt.save(update_fields=["photo"])
+        _log_inventory_stock_event(
+            actor=username,
+            event_type=InventoryStockEvent.EVENT_TOOL_EDIT,
+            tool=tool,
+            summary=f"{tool.name}: фото обновлено",
+            details={"tool_id": tool.id, "field": "photo", "category": tool.category},
+        )
+        return JsonResponse(
+            {
+                "ok": True,
+                "tool_id": tool.id,
+                "url": bt.photo.url if bt.photo else "",
+            }
+        )
+
+    if action == "delete_body_tool_photo":
+        if not can_manage_stock:
+            return JsonResponse({"ok": False, "error": "Недостаточно прав."}, status=403)
+        tool_id = _to_int(request.POST.get("tool_id"), 0)
+        tool = (
+            ToolItem.objects.select_related("body_tool_spec")
+            .filter(id=tool_id, category="body_tool", is_deleted=False)
+            .first()
+        )
+        if not tool or not tool.body_tool_spec:
+            return JsonResponse({"ok": False, "error": "Позиция не найдена."}, status=404)
+        bt = tool.body_tool_spec
+        if bt.photo:
+            try:
+                bt.photo.delete(save=False)
+            except Exception:
+                pass
+            bt.photo = ""
+            bt.save(update_fields=["photo"])
+            _log_inventory_stock_event(
+                actor=username,
+                event_type=InventoryStockEvent.EVENT_TOOL_EDIT,
+                tool=tool,
+                summary=f"{tool.name}: фото удалено",
+                details={"tool_id": tool.id, "field": "photo", "category": tool.category},
+            )
+        return JsonResponse({"ok": True, "tool_id": tool.id, "url": ""})
 
     if action == "update_tool_cell":
         if not can_manage_stock:
@@ -2636,6 +2736,10 @@ def inventory_view(request):
 
             tool.warehouse_address = normalize_address(value_raw or "")
             tool.save(update_fields=["warehouse_address", "updated_at"])
+            common_ok = True
+        elif field == "notes":
+            tool.notes = (value_raw or "").strip()[:300]
+            tool.save(update_fields=["notes", "updated_at"])
             common_ok = True
 
         if not common_ok:
@@ -2867,6 +2971,12 @@ def inventory_view(request):
                     ins.save(update_fields=["milling_family"])
                     tool.name = build_insert_display_name(ins.iso_designation, ins.milling_family, ins.chipbreaker_grade)
                     tool.save(update_fields=["name", "updated_at"])
+                elif field == "ins_kind":
+                    kind = normalize_insert_kind(value_raw)
+                    if not kind:
+                        return JsonResponse({"ok": False, "error": "Укажите тип пластины."}, status=400)
+                    ins.insert_kind = kind
+                    ins.save(update_fields=["insert_kind"])
                 elif field == "ins_shape":
                     ins.insert_shape = (value_raw or ins.insert_shape or "C")[:1]
                     ins.save(update_fields=["insert_shape"])
@@ -2884,6 +2994,9 @@ def inventory_view(request):
                     ins.save(update_fields=["chipbreaker_grade"])
                     tool.name = build_insert_display_name(ins.iso_designation, ins.milling_family, ins.chipbreaker_grade)
                     tool.save(update_fields=["name", "updated_at"])
+                elif field == "ins_brand":
+                    ins.brand = (value_raw or "").strip()[:80]
+                    ins.save(update_fields=["brand"])
                 else:
                     return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
             elif cat == "collet" and tool.collet_spec:
@@ -4067,7 +4180,9 @@ def inventory_view(request):
     ins_thickness_code_raw = _sq("ins_thickness_code")
     ins_nose_code_raw = _sq("ins_nose_code")
     ins_family_raw = _sq("ins_family")
+    ins_kind_raw = _sq("ins_kind")
     ins_grade_raw = _sq("ins_grade")
+    ins_brand_raw = _sq("ins_brand")
     ins_iso_raw = _sq("ins_iso")
     collet_type_raw = _sq("collet_type")
     collet_er_size_raw = _sq("collet_er_size")
@@ -4292,6 +4407,7 @@ def inventory_view(request):
         _opt_qs("insert", "ins_grade"), "insert_spec__chipbreaker_grade"
     )
     insert_grades = merge_insert_chipbreaker_grades(insert_grades_db)
+    insert_brands = _distinct_text_values(_opt_qs("insert", "ins_brand"), "insert_spec__brand")
     insert_isos = _distinct_text_values(_opt_qs("insert", "ins_iso"), "insert_spec__iso_designation")
 
     tool_material_extra_options = _tool_material_extra_options(
@@ -4680,7 +4796,9 @@ def inventory_view(request):
             "ins_thickness_code": ins_thickness_code_raw,
             "ins_nose_code": ins_nose_code_raw,
             "ins_family": ins_family_raw,
+            "ins_kind": ins_kind_raw,
             "ins_grade": ins_grade_raw,
+            "ins_brand": ins_brand_raw,
             "ins_iso": ins_iso_raw,
             "collet_type": collet_type_raw,
             "collet_er_size": collet_er_size_raw,
@@ -4819,8 +4937,10 @@ def inventory_view(request):
             "nose_codes": insert_nose_codes,
             "families": insert_families,
             "grades": insert_grades,
+            "brands": insert_brands,
             "isos": insert_isos,
         },
+        "insert_kinds": INSERT_KINDS,
         "insert_shapes": INSERT_SHAPES,
         "insert_relief_angles": INSERT_RELIEF_ANGLES,
         "insert_tolerance_classes": INSERT_TOLERANCE_CLASSES,

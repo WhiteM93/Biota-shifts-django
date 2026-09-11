@@ -44,26 +44,54 @@ class InsertMachiningAppsTests(TestCase):
 
 
 class ArrivalBulkValidationTests(TestCase):
-    def test_insert_requires_machining(self):
+    def test_insert_allows_empty_machining(self):
         row = {
             "category": "insert",
             "ins_shape": "C",
             "ins_edge_code": "12",
             "ins_thickness_code": "04",
             "ins_nose_code": "08",
+            "ins_kind": "milling",
             "ins_machining_app": "",
         }
         errs = _arrival_bulk_row_validation_errors(row, 1)
-        self.assertTrue(any("вид обработки" in e for e in errs))
+        self.assertEqual(errs, [])
+
+    def test_insert_requires_ls_r_codes(self):
+        row = {
+            "category": "insert",
+            "ins_shape": "C",
+            "ins_edge_code": "",
+            "ins_thickness_code": "04",
+            "ins_nose_code": "08",
+            "ins_kind": "milling",
+        }
+        errs = _arrival_bulk_row_validation_errors(row, 1)
+        self.assertTrue(any("пластины" in e for e in errs))
+
+    def test_insert_requires_kind(self):
+        row = {
+            "category": "insert",
+            "ins_shape": "C",
+            "ins_edge_code": "12",
+            "ins_thickness_code": "04",
+            "ins_nose_code": "08",
+        }
+        errs = _arrival_bulk_row_validation_errors(row, 1)
+        self.assertTrue(any("тип пластины" in e.lower() for e in errs))
 
     def test_end_mill_requires_diameter(self):
         row = {"category": "end_mill", "em_diameter_mm": ""}
         errs = _arrival_bulk_row_validation_errors(row, 1)
         self.assertTrue(any("диаметр" in e.lower() for e in errs))
 
-    def test_insert_spec_mapping_multi_machining(self):
-        fields = _insert_spec_fields_from_mapping({"ins_machining_app": "2,1", "ins_shape": "C"})
+    def test_insert_spec_mapping_includes_brand(self):
+        fields = _insert_spec_fields_from_mapping(
+            {"ins_machining_app": "2,1", "ins_shape": "C", "ins_brand": "Sandvik", "ins_kind": "turning"}
+        )
         self.assertEqual(fields["machining_application"], "1,2")
+        self.assertEqual(fields["brand"], "Sandvik")
+        self.assertEqual(fields["insert_kind"], "turning")
 
 
 class InventoryViewTests(TestCase):

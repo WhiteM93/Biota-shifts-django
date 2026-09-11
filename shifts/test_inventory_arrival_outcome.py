@@ -136,6 +136,7 @@ def _insert_row(*, qty: int = 3, machining: str = "1,3") -> dict:
         "ins_nose_code": "08",
         "ins_machining_app": machining,
         "ins_family": "APKT",
+        "ins_kind": "milling",
         "ins_grade": "YG501",
     }
 
@@ -217,22 +218,28 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         self.assertTrue(data.get("ready"))
         self.assertTrue(any(m.get("quantity") == 1 for m in data.get("matches") or []))
 
-    def test_bulk_insert_creates_spec_with_machining_apps(self):
-        resp = self._post_arrival_bulk([_insert_row(qty=6, machining="2,3")])
+    def test_bulk_insert_creates_spec_with_brand(self):
+        row = _insert_row(qty=6, machining="2,3")
+        row["ins_brand"] = "Sandvik"
+        resp = self._post_arrival_bulk([row])
         self.assertEqual(resp.status_code, 200)
 
         tool = ToolItem.objects.filter(category="insert", insert_spec__chipbreaker_grade="YG501").first()
         self.assertIsNotNone(tool)
         self.assertEqual(tool.quantity, 6)
+        self.assertEqual(tool.insert_spec.brand, "Sandvik")
         self.assertEqual(tool.insert_spec.machining_application, "2,3")
 
-
-    def test_bulk_rejects_insert_without_machining(self):
+    def test_bulk_allows_insert_without_machining(self):
         row = _insert_row()
         row["ins_machining_app"] = ""
+        row["ins_brand"] = "Kennametal"
         resp = self._post_arrival_bulk([row])
-        self.assertTrue(any("вид обработки" in m for m in self._messages(resp)))
-        self.assertEqual(ToolItem.objects.filter(category="insert", insert_spec__chipbreaker_grade="YG501").count(), 0)
+        self.assertEqual(resp.status_code, 200)
+        tool = ToolItem.objects.filter(category="insert", insert_spec__chipbreaker_grade="YG501").first()
+        self.assertIsNotNone(tool)
+        self.assertEqual(tool.insert_spec.brand, "Kennametal")
+        self.assertEqual(tool.insert_spec.machining_application, "")
 
     def test_bulk_rejects_empty_payload(self):
         resp = self.client.post(

@@ -101,6 +101,22 @@ INSERT_NOSE_RADIUS_CODES = [(k, f"{k} ({v} мм)") for k, v in sorted(INSERT_NOS
 # Семейства пластин для фрез (каталоги поставщиков, в т.ч. cncmagazine.ru)
 INSERT_FAMILY_OTHER = "OTHER"
 
+INSERT_KINDS = [
+    ("milling", "Фрезерная"),
+    ("turning", "Токарная"),
+    ("unique", "Уникальная"),
+]
+INSERT_KIND_VALUES = frozenset(k for k, _ in INSERT_KINDS)
+INSERT_KIND_DEFAULT = "milling"
+
+
+def normalize_insert_kind(value: str) -> str:
+    v = (value or "").strip().lower()
+    if v in INSERT_KIND_VALUES:
+        return v
+    return ""
+
+
 # Вид обработки (геометрия стружколома): 1 чистовая, 2 получистовая, 3 черновая
 INSERT_MACHINING_APPLICATIONS = [
     ("1", "Чистовая"),
@@ -301,7 +317,8 @@ def merge_insert_chipbreaker_grades(*extra_lists: list[str] | None) -> list[str]
 # Подсказки к столбцам и полям пластинок (приход, склад, фильтры)
 INSERT_COLUMN_TOOLTIPS = {
     "iso": "Полная маркировка ISO 1832",
-    "family": "Семейство пластины (APKT, APMT, SEHT и др.)",
+    "family": "Семейство пластины: две буквы + две буквы (например AP + KT)",
+    "kind": "Назначение: фрезерная, токарная или уникальная",
     "shape": "Форма пластины по ISO 1832 (C, D, T…)",
     "relief": "Задний угол (рельеф) пластины",
     "tolerance": "Класс допуска по ISO",
@@ -309,6 +326,7 @@ INSERT_COLUMN_TOOLTIPS = {
     "thickness_s": "Толщина пластинки — код S по ISO 1832",
     "radius_r": "Радиус пластинки — код R по ISO 1832",
     "grade": "Сплав / марка пластины (YG501, ВК8, TC1225 и др.)",
+    "brand": "Производитель / торговая марка",
     "machining_application": "Вид обработки (можно несколько): чистовая, получистовая, черновая",
     "tool_material": "Сплав / марка пластины (YG501, ВК8, TC1225 и др.)",
     "coating": "Покрытие пластины",

@@ -160,6 +160,9 @@ from .insert_constants import (
     INSERT_SHAPE_VALUES,
     INSERT_TOLERANCE_CLASSES,
     INSERT_TOLERANCE_VALUES,
+    INSERT_KINDS,
+    INSERT_KIND_VALUES,
+    normalize_insert_kind,
     MILLING_INSERT_FAMILIES,
     INSERT_EDGE_LENGTH_CODES,
     INSERT_THICKNESS_CODES,
@@ -986,7 +989,15 @@ class InsertSpec(models.Model):
     milling_family = models.CharField(
         max_length=24, blank=True, default="", choices=MILLING_INSERT_FAMILIES, verbose_name="Семейство"
     )
+    insert_kind = models.CharField(
+        max_length=12,
+        blank=True,
+        default="",
+        choices=INSERT_KINDS,
+        verbose_name="Тип пластины",
+    )
     chipbreaker_grade = models.CharField(max_length=40, blank=True, default="", verbose_name="Стужколом / сплав")
+    brand = models.CharField(max_length=80, blank=True, default="", verbose_name="Бренд")
     machining_application = models.CharField(
         max_length=7,
         blank=True,
@@ -1102,6 +1113,9 @@ class InsertSpec(models.Model):
             self.mounting_chip = "G"
         self.machining_application = normalize_insert_machining_apps(self.machining_application)
         self.milling_family = normalize_milling_family(self.milling_family)
+        self.insert_kind = normalize_insert_kind(self.insert_kind)
+        self.chipbreaker_grade = (self.chipbreaker_grade or "").strip()[:40]
+        self.brand = (self.brand or "").strip()[:80]
         self.sync_derived_fields()
         super().save(*args, **kwargs)
 
@@ -1316,6 +1330,12 @@ class BodyToolSpec(models.Model):
         default="",
         choices=MODULAR_HEAD_THREADS,
         verbose_name="Резьба крепления",
+    )
+    photo = models.FileField(
+        upload_to="inventory/body_tool_photos/",
+        blank=True,
+        verbose_name="Фото",
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png", "webp", "gif"])],
     )
 
     class Meta:

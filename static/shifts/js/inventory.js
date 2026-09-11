@@ -964,21 +964,41 @@ var INV = (function () {
     return (v || "").trim().toUpperCase();
   }
 
-  function buildInsertFamilyCellHtml() {
-    var opts = buildOptionsHtml(INV.milling_insert_families || []);
+  function buildInsertFamilyPairHtml(familyKey, title, ariaLabel) {
+    var key = familyKey || "ins_family";
+    var tip = title || "Семейство: две буквы + две буквы (например AP + KT)";
+    var aria = ariaLabel || "Семейство";
     return (
-      '<div class="arrival-field-combo js-arrival-field-combo">' +
-      '<select data-k="ins_family" class="arrival-field-combo-native" tabindex="-1" aria-hidden="true">' +
-      opts +
-      "</select>" +
-      '<button type="button" class="arrival-field-combo-btn js-arrival-combo-btn" aria-haspopup="listbox" aria-expanded="false">' +
-      '<span class="arrival-field-combo-text js-arrival-combo-text">— не указано —</span>' +
-      '<span class="arrival-field-combo-chevron" aria-hidden="true"></span>' +
-      "</button>" +
-      '<div class="arrival-field-combo-panel js-arrival-combo-panel" hidden role="listbox"></div>' +
-      "</div>" +
-      '<input type="text" class="ins-family-custom" data-k="ins_family_custom" maxlength="24" ' +
-      'placeholder="APMT" style="display:none;margin-top:4px;max-width:100%;text-transform:uppercase">'
+      '<div class="bt-insert-family-pair js-insert-family-pair" data-family-key="' +
+      key +
+      '" title="' +
+      tip.replace(/"/g, "&quot;") +
+      '">' +
+      '<input type="text" class="bt-insert-family-part" data-k="' +
+      key +
+      '_a" maxlength="2" ' +
+      'placeholder="AP" inputmode="text" spellcheck="false" autocomplete="off" aria-label="' +
+      aria +
+      ', первые 2 буквы">' +
+      '<span class="bt-insert-family-sep" aria-hidden="true">+</span>' +
+      '<input type="text" class="bt-insert-family-part" data-k="' +
+      key +
+      '_b" maxlength="2" ' +
+      'placeholder="KT" inputmode="text" spellcheck="false" autocomplete="off" aria-label="' +
+      aria +
+      ', вторые 2 буквы">' +
+      '<input type="hidden" data-k="' +
+      key +
+      '" value="">' +
+      "</div>"
+    );
+  }
+
+  function buildInsertFamilyCellHtml() {
+    return buildInsertFamilyPairHtml(
+      "ins_family",
+      "Семейство: две буквы + две буквы (например AP + KT)",
+      "Семейство"
     );
   }
 
@@ -1185,21 +1205,84 @@ var INV = (function () {
   }
 
   function buildBodyInsertFamilyCellHtml() {
-    var opts = buildOptionsHtml(INV.milling_insert_families || []);
-    return (
-      '<div class="arrival-field-combo js-arrival-field-combo">' +
-      '<select data-k="bt_insert_family" class="arrival-field-combo-native" tabindex="-1" aria-hidden="true">' +
-      opts +
-      "</select>" +
-      '<button type="button" class="arrival-field-combo-btn js-arrival-combo-btn" aria-haspopup="listbox" aria-expanded="false">' +
-      '<span class="arrival-field-combo-text js-arrival-combo-text">— не указано —</span>' +
-      '<span class="arrival-field-combo-chevron" aria-hidden="true"></span>' +
-      "</button>" +
-      '<div class="arrival-field-combo-panel js-arrival-combo-panel" hidden role="listbox"></div>' +
-      "</div>" +
-      '<input type="text" class="ins-family-custom" data-k="bt_insert_family_custom" maxlength="24" ' +
-      'placeholder="APKT" style="display:none;margin-top:4px;max-width:100%;text-transform:uppercase">'
+    return buildInsertFamilyPairHtml(
+      "bt_insert_family",
+      "Формфактор: две буквы + две буквы (например AP + KT)",
+      "Формфактор"
     );
+  }
+
+  function normalizeInsertFamilyPart(raw) {
+    return String(raw == null ? "" : raw)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 2);
+  }
+
+  function insertFamilyPairParts(pair) {
+    var key = (pair && pair.getAttribute("data-family-key")) || "bt_insert_family";
+    return {
+      key: key,
+      a: pair.querySelector('[data-k="' + key + '_a"]'),
+      b: pair.querySelector('[data-k="' + key + '_b"]'),
+      hid: pair.querySelector('[data-k="' + key + '"]'),
+    };
+  }
+
+  function syncBodyInsertFamilyHidden(pair) {
+    if (!pair) return;
+    var parts = insertFamilyPairParts(pair);
+    if (!parts.hid) return;
+    var av = normalizeInsertFamilyPart(parts.a && parts.a.value);
+    var bv = normalizeInsertFamilyPart(parts.b && parts.b.value);
+    if (parts.a && parts.a.value !== av) parts.a.value = av;
+    if (parts.b && parts.b.value !== bv) parts.b.value = bv;
+    parts.hid.value = normalizeInsertFamilyValue(av + bv);
+  }
+
+  function setBodyInsertFamilyPairValue(pair, value) {
+    if (!pair) return;
+    var v = normalizeInsertFamilyValue(value || "").replace(/[^A-Z0-9]/g, "").slice(0, 4);
+    var parts = insertFamilyPairParts(pair);
+    if (parts.a) parts.a.value = v.slice(0, 2);
+    if (parts.b) parts.b.value = v.slice(2, 4);
+    syncBodyInsertFamilyHidden(pair);
+  }
+
+  function wireBodyInsertFamilyPair(cell) {
+    var pair =
+      (cell && cell.querySelector(".js-insert-family-pair")) ||
+      (cell && cell.querySelector(".js-bt-insert-family-pair"));
+    if (!pair || pair.getAttribute("data-wired") === "1") return;
+    pair.setAttribute("data-wired", "1");
+    var parts = insertFamilyPairParts(pair);
+    var a = parts.a;
+    var b = parts.b;
+    function onPartInput(el, isFirst) {
+      var raw = String(el.value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (isFirst && raw.length > 2) {
+        setBodyInsertFamilyPairValue(pair, raw);
+        if (b) b.focus();
+        return;
+      }
+      el.value = raw.slice(0, 2);
+      syncBodyInsertFamilyHidden(pair);
+      if (isFirst && el.value.length >= 2 && b) b.focus();
+    }
+    if (a) {
+      a.addEventListener("input", function () { onPartInput(a, true); });
+      a.addEventListener("blur", function () { syncBodyInsertFamilyHidden(pair); });
+    }
+    if (b) {
+      b.addEventListener("input", function () { onPartInput(b, false); });
+      b.addEventListener("blur", function () { syncBodyInsertFamilyHidden(pair); });
+      b.addEventListener("keydown", function (e) {
+        if (e.key === "Backspace" && !(b.value || "") && a) {
+          a.focus();
+        }
+      });
+    }
+    syncBodyInsertFamilyHidden(pair);
   }
 
   function buildBodyInsertSizeCellHtml() {
@@ -1472,23 +1555,30 @@ var INV = (function () {
   };
 
   function validateInsertRow(tr, rowIndex) {
-    var bad = false;
-    ["ins_edge_code", "ins_thickness_code", "ins_nose_code", "ins_machining_app"].forEach(function (k) {
-        var el = tr.querySelector('[data-k="' + k + '"]');
-        if (!el || !(el.value || "").trim()) {
-          if (el) el.classList.add("is-invalid");
-          bad = true;
-        }
+    var issues = [];
+    var kindEl = tr.querySelector('[data-k="ins_kind"]');
+    if (!kindEl || !(kindEl.value || "").trim()) {
+      if (kindEl) kindEl.classList.add("is-invalid");
+      issues.push({
+        msg: "Строка " + rowIndex + ": укажите тип пластины (фрезерная / токарная / уникальная).",
+        el: kindEl,
+      });
+    }
+    var codesBad = false;
+    ["ins_edge_code", "ins_thickness_code", "ins_nose_code"].forEach(function (k) {
+      var el = tr.querySelector('[data-k="' + k + '"]');
+      if (!el || !(el.value || "").trim()) {
+        if (el) el.classList.add("is-invalid");
+        codesBad = true;
       }
-    );
-    return bad
-      ? [
-          {
-            msg: "Строка " + rowIndex + ": для пластины укажите L, S, R и вид обработки.",
-            el: null,
-          },
-        ]
-      : [];
+    });
+    if (codesBad) {
+      issues.push({
+        msg: "Строка " + rowIndex + ": для пластины укажите L, S и R.",
+        el: null,
+      });
+    }
+    return issues;
   }
 
   function clearArrivalBulkErrors() {
@@ -1578,7 +1668,11 @@ var INV = (function () {
       if (
         k === "tool_material_custom" ||
         k === "ins_family_custom" ||
+        k === "ins_family_a" ||
+        k === "ins_family_b" ||
         k === "bt_insert_family_custom" ||
+        k === "bt_insert_family_a" ||
+        k === "bt_insert_family_b" ||
         k === "bt_insert_size_custom"
       ) {
         return;
@@ -1591,6 +1685,8 @@ var INV = (function () {
         var cin = tr.querySelector('[data-k="tool_material_custom"]');
         row.tool_material = ((cin && cin.value) || "").trim();
       } else if (k === "ins_family") {
+        var insPair = tr.querySelector('.js-insert-family-pair[data-family-key="ins_family"]');
+        if (insPair) syncBodyInsertFamilyHidden(insPair);
         if ((el.value || "") === insertFamilyOther) {
           var fin = tr.querySelector('[data-k="ins_family_custom"]');
           row.ins_family = normalizeInsertFamilyValue((fin && fin.value) || "");
@@ -1598,12 +1694,9 @@ var INV = (function () {
           row.ins_family = normalizeInsertFamilyValue(el.value || "");
         }
       } else if (k === "bt_insert_family") {
-        if ((el.value || "") === insertFamilyOther) {
-          var bfin = tr.querySelector('[data-k="bt_insert_family_custom"]');
-          row.bt_insert_family = normalizeInsertFamilyValue((bfin && bfin.value) || "");
-        } else {
-          row.bt_insert_family = normalizeInsertFamilyValue(el.value || "");
-        }
+        var pair = tr.querySelector(".js-insert-family-pair, .js-bt-insert-family-pair");
+        if (pair) syncBodyInsertFamilyHidden(pair);
+        row.bt_insert_family = normalizeInsertFamilyValue(el.value || "");
       } else if (k === "bt_insert_size") {
         row.bt_insert_size = (el.value || "").trim().toUpperCase().replace(/\s+/g, "").replace(",", ".");
       } else {
@@ -2632,11 +2725,12 @@ var INV = (function () {
     ]),
     insert:
       "<tr>" +
+      insertArrivalTh("brand", "Бренд") +
+      insertArrivalTh("kind", "Тип") +
       insertArrivalTh("family", "Семейство") +
       insertArrivalTh("edge_l", "L", "short-col insert-code-col") +
       insertArrivalTh("thickness_s", "S", "short-col insert-code-col") +
       insertArrivalTh("radius_r", "R", "short-col insert-code-col") +
-      insertArrivalTh("machining_application", "Обр.", "insert-app-col") +
       insertArrivalTh("tool_material", "Сплав", "stack-words tm-col-tool-material") +
       insertArrivalTh("coating", "Покрытие") +
       insertArrivalTh("warehouse_address", "Адрес", "address-col") +
@@ -2924,11 +3018,21 @@ var INV = (function () {
       cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "insert") {
+      cells.push('<td><input type="text" data-k="ins_brand" maxlength="80" placeholder="Sandvik"></td>');
+      cells.push(
+        '<td><select data-k="ins_kind" required>' +
+          (INV.insert_kinds || [])
+            .map(function (x) {
+              var sel = x.value === "milling" ? " selected" : "";
+              return '<option value="' + x.value + '"' + sel + ">" + x.label + "</option>";
+            })
+            .join("") +
+          "</select></td>"
+      );
       cells.push('<td class="ins-family-cell">' + buildInsertFamilyCellHtml() + "</td>");
       cells.push('<td class="short-col insert-code-col"><select data-k="ins_edge_code" required>' + buildInsertIsoCodeOptionsHtml(INV.insert_edge_length_codes || []) + "</select></td>");
       cells.push('<td class="short-col insert-code-col"><select data-k="ins_thickness_code" required>' + buildInsertIsoCodeOptionsHtml(INV.insert_thickness_codes || []) + "</select></td>");
       cells.push('<td class="short-col insert-code-col"><select data-k="ins_nose_code" required>' + buildInsertIsoCodeOptionsHtml(INV.insert_nose_radius_codes || []) + "</select></td>");
-      cells.push(buildInsertMachiningAppCellHtml(""));
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
       cells.push(arrivalAddressCellHtml(""));
@@ -2968,10 +3072,15 @@ var INV = (function () {
       return;
     }
     var insFamilyCell = tr.querySelector(".ins-family-cell");
-    if (insFamilyCell) wireInsertFamilyCell(insFamilyCell);
+    if (insFamilyCell) {
+      if (insFamilyCell.querySelector(".js-insert-family-pair, .js-bt-insert-family-pair")) {
+        wireBodyInsertFamilyPair(insFamilyCell);
+      } else {
+        wireInsertFamilyCell(insFamilyCell);
+      }
+    }
     var insSizeCell = tr.querySelector(".bt-insert-size-cell");
     if (insSizeCell) wireBodyInsertSizeCell(insSizeCell);
-    wireInsertMachiningAppPicker(tr);
     var tmCell = tr.querySelector(".tm-cell-tool-material");
     if (tmCell) {
       var tmOpts = cat === "insert" ? buildArrivalInsertAlloyMaterialOptions() : toolMaterialOptions;
@@ -3169,7 +3278,8 @@ var INV = (function () {
 (function () {
   var editableCells = document.querySelectorAll(".stock-inline-edit");
   var selectToggle = document.querySelector(".js-stock-select-toggle");
-  if (!editableCells.length && !selectToggle) return;
+  var hasNotesTips = !!document.querySelector(".inv-stock-notes-tip[data-hint], .inv-stock-notes-col");
+  if (!editableCells.length && !selectToggle && !hasNotesTips) return;
   var csrfEl = document.querySelector('input[name="csrfmiddlewaretoken"]');
   var csrfToken = csrfEl ? csrfEl.value : "";
   var activeCell = null;
@@ -3210,6 +3320,8 @@ var INV = (function () {
   (INV.reamer_accuracy_classes || []).forEach(function (x) { reamerAccuracyClassLabels[x.value] = x.label; });
   var insertShapeLabels = {};
   (INV.insert_shapes || []).forEach(function (x) { insertShapeLabels[x.value] = x.label; });
+  var insertKindLabels = {};
+  (INV.insert_kinds || []).forEach(function (x) { insertKindLabels[x.value] = x.label; });
   var insertEdgeLabels = {};
   (INV.insert_edge_length_codes || []).forEach(function (x) { insertEdgeLabels[x.value] = x.label; });
   var insertThicknessLabels = {};
@@ -3261,7 +3373,25 @@ var INV = (function () {
     });
   }
 
+  function formatNotesTipHtml(value) {
+    var text = String(value == null ? "" : value).trim();
+    var empty = !text;
+    var esc = escapeHtml(text);
+    var tipAttrs = empty
+      ? ' title="Нет описания" aria-label="Нет описания"'
+      : ' data-hint="' + esc + '" aria-label="' + esc + '"';
+    return (
+      '<span class="inv-stock-notes-tip' + (empty ? " is-empty" : "") + '"' + tipAttrs + ">" +
+      '<svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<circle cx="12" cy="12" r="10"/>' +
+      '<line x1="12" y1="16" x2="12" y2="12"/>' +
+      '<line x1="12" y1="8" x2="12.01" y2="8"/>' +
+      "</svg></span>"
+    );
+  }
+
   function formatCell(field, value) {
+    if (field === "notes") return formatNotesTipHtml(value);
     var v = normalizeDecimalComma(value == null ? "" : value);
     if (field === "size_label" || field === "cs_size_label") {
       v = v.replace(/\u041c/g, "M").replace(/\u043c/g, "M");
@@ -3273,7 +3403,7 @@ var INV = (function () {
     if (field === "body_cutter") return bodyCutterLabels[v] || v;
     if (field === "bt_coupling") return bodyCouplingLabels[v] || v || "—";
     if (field === "bt_shank_type") return bodyShankLabels[v] || v || "—";
-    if (field === "bt_insert_family") return (insertFamilyLabels[v] || v || "-").toString().toUpperCase();
+    if (field === "bt_insert_family") return (v || "-").toString().toUpperCase();
     if (field === "bt_insert_size") return v || "-";
     if (field === "bt_coolant") return v === "1" ? "Есть" : "Нет";
     if (field === "bt_variable_angle") return v === "1" ? "Да" : "Нет";
@@ -3284,6 +3414,8 @@ var INV = (function () {
       return v ? (hsAngleLabels[v] || (String(v).replace(/\.0+$/, "") + "°")) : "-";
     }
     if (field === "bt_brand") return v || "-";
+    if (field === "ins_brand") return v || "-";
+    if (field === "ins_kind") return insertKindLabels[v] || v || "-";
     if (field === "bt_insert_compat") return v || "-";
     if (field === "bt_mount_thread") return modularThreadLabels[v] || v || "—";
     if (field === "thread_standard") return threadStandardLabels[v] || v;
@@ -3346,8 +3478,6 @@ var INV = (function () {
       options = fromMap(bodyShankLabels);
     } else if (field === "bt_mount_thread") {
       options = fromMap(modularThreadLabels);
-    } else if (field === "bt_insert_family") {
-      options = fromMap(insertFamilyLabels);
     } else if (field === "bt_coolant") {
       options = [
         { value: "0", label: "Нет", title: "Нет" },
@@ -3401,6 +3531,8 @@ var INV = (function () {
       }
     } else if (field === "ins_shape") {
       options = fromMap(insertShapeLabels);
+    } else if (field === "ins_kind") {
+      options = fromMap(insertKindLabels);
     } else if (field === "ins_edge_code") {
       options = fromMap(insertEdgeLabels);
     } else if (field === "ins_thickness_code") {
@@ -3773,6 +3905,7 @@ var INV = (function () {
       editor.type = type === "text" ? "text" : "number";
       editor.className = "stock-inline-editor";
       if (type !== "text") editor.step = type === "int" ? "1" : "0.01";
+      if (field === "notes") editor.maxLength = 300;
       editor.value = current;
       editor.title = "Enter - сохранить, Esc - отменить";
     }
@@ -3821,6 +3954,48 @@ var INV = (function () {
   editableCells.forEach(function (cell) {
     cell.addEventListener("click", function () { activate(cell); });
   });
+
+  (function bindStockNotesTips() {
+    var tipEl = null;
+    var tipOwner = null;
+    function hideNotesTip() {
+      if (tipEl && tipEl.parentNode) tipEl.parentNode.removeChild(tipEl);
+      tipEl = null;
+      tipOwner = null;
+    }
+    function showNotesTip(owner) {
+      var text = (owner.getAttribute("data-hint") || "").trim();
+      if (!text) return;
+      if (tipOwner === owner && tipEl) return;
+      hideNotesTip();
+      tipEl = document.createElement("div");
+      tipEl.className = "inv-stock-notes-floating-tip";
+      tipEl.setAttribute("role", "tooltip");
+      tipEl.textContent = text;
+      document.body.appendChild(tipEl);
+      tipOwner = owner;
+      var rect = owner.getBoundingClientRect();
+      var tw = tipEl.offsetWidth;
+      var th = tipEl.offsetHeight;
+      var left = Math.max(8, Math.min(rect.left + rect.width / 2 - tw / 2, window.innerWidth - tw - 8));
+      var top = rect.bottom + 8;
+      if (top + th > window.innerHeight - 8) top = Math.max(8, rect.top - th - 8);
+      tipEl.style.left = left + "px";
+      tipEl.style.top = top + "px";
+    }
+    document.addEventListener("mouseover", function (e) {
+      var tip = e.target && e.target.closest ? e.target.closest(".inv-stock-notes-tip[data-hint]") : null;
+      if (tip) showNotesTip(tip);
+    });
+    document.addEventListener("mouseout", function (e) {
+      var tip = e.target && e.target.closest ? e.target.closest(".inv-stock-notes-tip[data-hint]") : null;
+      if (!tip || !tipOwner) return;
+      var to = e.relatedTarget;
+      if (to && tip.contains(to)) return;
+      if (tipOwner === tip) hideNotesTip();
+    });
+    window.addEventListener("scroll", hideNotesTip, true);
+  })();
 
   var stockPage = document.querySelector(".inv-page--stock");
   var selectBar = document.querySelector(".js-stock-select-bar");
@@ -4653,5 +4828,185 @@ var INV = (function () {
     gridId: "defect-add-cal-grid",
     titleId: "defect-add-cal-title",
     fromInputId: "defect-add-date-val",
+  });
+})();
+
+(function () {
+  var modal = document.getElementById("inv-stock-photo-modal");
+  if (!modal && !document.querySelector(".inv-stock-photo-col")) return;
+
+  function csrfToken() {
+    var el = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return el ? el.value : "";
+  }
+
+  function postUrl() {
+    return window.location.pathname + (window.location.search || "");
+  }
+
+  var activeWrap = null;
+  var imgEl = modal && modal.querySelector(".js-inv-stock-photo-img");
+  var replaceBtn = modal && modal.querySelector(".js-inv-stock-photo-replace");
+  var deleteBtn = modal && modal.querySelector(".js-inv-stock-photo-delete");
+
+  function syncBtn(wrap) {
+    if (!wrap) return;
+    var url = (wrap.getAttribute("data-photo-url") || "").trim();
+    var btn = wrap.querySelector(".js-inv-stock-photo-btn");
+    if (!btn) return;
+    btn.classList.toggle("has-photo", !!url);
+    var canUpload = !!wrap.querySelector(".inv-stock-photo-input");
+    btn.title = url
+      ? canUpload
+        ? "Фото корпуса (Alt+клик — заменить)"
+        : "Фото корпуса"
+      : "Прикрепить фото";
+    btn.setAttribute("aria-label", url ? "Открыть фото" : "Прикрепить фото");
+  }
+
+  function setPhotoUrl(wrap, url) {
+    if (!wrap) return;
+    wrap.setAttribute("data-photo-url", String(url || "").trim());
+    syncBtn(wrap);
+  }
+
+  function closeModal() {
+    if (!modal) return;
+    modal.hidden = true;
+    if (imgEl) imgEl.removeAttribute("src");
+    activeWrap = null;
+    document.body.style.overflow = "";
+  }
+
+  function openModal(wrap) {
+    if (!modal || !imgEl || !wrap) return;
+    var url = (wrap.getAttribute("data-photo-url") || "").trim();
+    if (!url) return;
+    activeWrap = wrap;
+    imgEl.src = url;
+    modal.hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+
+  function pickFile(wrap) {
+    if (!wrap) return;
+    var input = wrap.querySelector(".inv-stock-photo-input");
+    if (!input) return;
+    input.value = "";
+    input.click();
+  }
+
+  function uploadPhoto(wrap, file) {
+    if (!wrap || !file) return Promise.resolve();
+    var cell = wrap.closest("td.inv-stock-photo-col");
+    var toolId = cell && cell.getAttribute("data-tool-id");
+    if (!toolId) {
+      alert("Не найден id позиции.");
+      return Promise.resolve();
+    }
+    var fd = new FormData();
+    fd.append("action", "replace_body_tool_photo");
+    fd.append("tool_id", toolId);
+    fd.append("image", file);
+    return fetch(postUrl(), {
+      method: "POST",
+      headers: { "X-CSRFToken": csrfToken(), "X-Requested-With": "XMLHttpRequest" },
+      body: fd,
+      credentials: "same-origin",
+    })
+      .then(function (resp) {
+        return resp.json().then(function (data) {
+          if (!resp.ok || !data || !data.ok) {
+            throw new Error((data && data.error) || "Не удалось загрузить фото.");
+          }
+          setPhotoUrl(wrap, data.url || "");
+        });
+      })
+      .catch(function (err) {
+        alert(err.message || "Не удалось загрузить фото.");
+      });
+  }
+
+  function deletePhoto(wrap) {
+    if (!wrap) return Promise.resolve();
+    var cell = wrap.closest("td.inv-stock-photo-col");
+    var toolId = cell && cell.getAttribute("data-tool-id");
+    if (!toolId) return Promise.resolve();
+    if (!window.confirm("Удалить фото этой позиции?")) return Promise.resolve();
+    var fd = new FormData();
+    fd.append("action", "delete_body_tool_photo");
+    fd.append("tool_id", toolId);
+    return fetch(postUrl(), {
+      method: "POST",
+      headers: { "X-CSRFToken": csrfToken(), "X-Requested-With": "XMLHttpRequest" },
+      body: fd,
+      credentials: "same-origin",
+    })
+      .then(function (resp) {
+        return resp.json().then(function (data) {
+          if (!resp.ok || !data || !data.ok) {
+            throw new Error((data && data.error) || "Не удалось удалить фото.");
+          }
+          setPhotoUrl(wrap, "");
+          closeModal();
+        });
+      })
+      .catch(function (err) {
+        alert(err.message || "Не удалось удалить фото.");
+      });
+  }
+
+  document.addEventListener("click", function (e) {
+    var closeEl = e.target && e.target.closest ? e.target.closest(".js-inv-stock-photo-close") : null;
+    if (closeEl) {
+      e.preventDefault();
+      closeModal();
+      return;
+    }
+    var btn = e.target && e.target.closest ? e.target.closest(".js-inv-stock-photo-btn") : null;
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var wrap = btn.closest(".inv-stock-photo-wrap");
+    if (!wrap) return;
+    var url = (wrap.getAttribute("data-photo-url") || "").trim();
+    var canUpload = !!wrap.querySelector(".inv-stock-photo-input");
+    if (canUpload && (!url || e.altKey)) {
+      pickFile(wrap);
+      return;
+    }
+    if (url) openModal(wrap);
+  });
+
+  document.addEventListener("change", function (e) {
+    var input = e.target;
+    if (!input || !input.classList || !input.classList.contains("inv-stock-photo-input")) return;
+    var file = input.files && input.files[0];
+    var wrap = input.closest(".inv-stock-photo-wrap");
+    if (!file || !wrap) return;
+    uploadPhoto(wrap, file).then(function () {
+      input.value = "";
+      var url = (wrap.getAttribute("data-photo-url") || "").trim();
+      if (!url) return;
+      if (modal && !modal.hidden && activeWrap === wrap && imgEl) {
+        imgEl.src = url + (url.indexOf("?") >= 0 ? "&" : "?") + "t=" + Date.now();
+      } else {
+        openModal(wrap);
+      }
+    });
+  });
+
+  if (replaceBtn) {
+    replaceBtn.addEventListener("click", function () {
+      if (activeWrap) pickFile(activeWrap);
+    });
+  }
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", function () {
+      if (activeWrap) deletePhoto(activeWrap);
+    });
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && modal && !modal.hidden) closeModal();
   });
 })();
