@@ -2157,59 +2157,71 @@
         <span>Параметры прихода</span>
       </div>
       <div class="inv-arrival-toolbar">
-        <div class="inv-arrival-field">
-          <label class="inv-arrival-label" for="arrival-bulk-category">Категория инструмента</label>
-          <div class="inv-arrival-select-wrap">
-            <select class="inv-arrival-sel js-arrival-bulk-category" id="arrival-bulk-category">
-              <option value="">Выбрать...</option>
-              {% include "shifts/includes/stock_category_optgroups.html" with selected_category="" %}
-            </select>
+        <div class="inv-arrival-toolbar__fields">
+          <div class="inv-arrival-field">
+            <label class="inv-arrival-label" for="arrival-bulk-category">Категория инструмента</label>
+            <div class="inv-arrival-select-wrap">
+              <select class="inv-arrival-sel js-arrival-bulk-category" id="arrival-bulk-category">
+                <option value="">Выбрать...</option>
+                {% include "shifts/includes/stock_category_optgroups.html" with selected_category="" %}
+              </select>
+            </div>
+          </div>
+          <div class="inv-arrival-field inv-arrival-field--body-family" id="arrival-body-family-wrap" hidden>
+            <label class="inv-arrival-label" for="arrival-body-family">Семейство</label>
+            <div class="inv-arrival-select-wrap">
+              <select class="inv-arrival-sel" id="arrival-body-family" aria-label="Семейство корпусного инструмента">
+                {% for key, label in body_tool_families %}
+                <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="inv-arrival-field inv-arrival-field--body-cutter" id="arrival-body-cutter-wrap" hidden>
+            <label class="inv-arrival-label" for="arrival-body-cutter">Тип фрезы</label>
+            <div class="inv-arrival-select-wrap">
+              <select class="inv-arrival-sel" id="arrival-body-cutter" aria-label="Тип корпусной фрезы">
+                {% for key, label in indexable_mill_cutter_types %}
+                <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="inv-arrival-field inv-arrival-field--collet-type" id="arrival-collet-type-wrap" hidden>
+            <label class="inv-arrival-label" for="arrival-collet-type">Тип цанги</label>
+            <div class="inv-arrival-select-wrap">
+              <select class="inv-arrival-sel" id="arrival-collet-type" aria-label="Тип цанги">
+                <option value="">Выбрать...</option>
+                {% for item in collet_types_ui %}
+                <option value="{{ item.value }}" title="{{ item.tip }}">{{ item.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="inv-arrival-field">
+            <label class="inv-arrival-label" for="arrival-bulk-date">Дата прихода</label>
+            <input type="date" class="inv-arrival-inp" id="arrival-bulk-date" value="{{ today }}">
           </div>
         </div>
-        <div class="inv-arrival-field inv-arrival-field--body-family" id="arrival-body-family-wrap" hidden>
-          <label class="inv-arrival-label" for="arrival-body-family">Семейство</label>
-          <div class="inv-arrival-select-wrap">
-            <select class="inv-arrival-sel" id="arrival-body-family" aria-label="Семейство корпусного инструмента">
-              {% for key, label in body_tool_families %}
-              <option value="{{ key }}">{{ label }}</option>
-              {% endfor %}
-            </select>
+        <div class="inv-arrival-toolbar__actions">
+          <div class="inv-arrival-field inv-arrival-field--match-toggle">
+            <span class="inv-arrival-label" id="arrival-match-suggest-label">Поиск в базе</span>
+            <label class="inv-arrival-switch" title="Показывать похожие позиции из склада при заполнении строк">
+              <input type="checkbox" id="arrival-match-suggest" checked aria-labelledby="arrival-match-suggest-label">
+              <span class="inv-arrival-switch__track" aria-hidden="true"><span class="inv-arrival-switch__thumb"></span></span>
+              <span class="inv-arrival-switch__text js-arrival-match-suggest-text">Вкл</span>
+            </label>
           </div>
-        </div>
-        <div class="inv-arrival-field inv-arrival-field--body-cutter" id="arrival-body-cutter-wrap" hidden>
-          <label class="inv-arrival-label" for="arrival-body-cutter">Тип фрезы</label>
-          <div class="inv-arrival-select-wrap">
-            <select class="inv-arrival-sel" id="arrival-body-cutter" aria-label="Тип корпусной фрезы">
-              {% for key, label in indexable_mill_cutter_types %}
-              <option value="{{ key }}">{{ label }}</option>
-              {% endfor %}
-            </select>
+          <div class="inv-arrival-field inv-arrival-field--add">
+            <span class="inv-arrival-label inv-arrival-label--ghost">Строка</span>
+            <button type="button" class="inv-arrival-add-btn" id="arrival-bulk-add-row" title="Добавить строку">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <line x1="10" y1="4" x2="10" y2="16"/>
+                <line x1="4" y1="10" x2="16" y2="10"/>
+              </svg>
+              <span>Добавить</span>
+            </button>
           </div>
-        </div>
-        <div class="inv-arrival-field inv-arrival-field--collet-type" id="arrival-collet-type-wrap" hidden>
-          <label class="inv-arrival-label" for="arrival-collet-type">Тип цанги</label>
-          <div class="inv-arrival-select-wrap">
-            <select class="inv-arrival-sel" id="arrival-collet-type" aria-label="Тип цанги">
-              <option value="">Выбрать...</option>
-              {% for item in collet_types_ui %}
-              <option value="{{ item.value }}" title="{{ item.tip }}">{{ item.label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-        <div class="inv-arrival-field">
-          <label class="inv-arrival-label" for="arrival-bulk-date">Дата прихода</label>
-          <input type="date" class="inv-arrival-inp" id="arrival-bulk-date" value="{{ today }}">
-        </div>
-        <div class="inv-arrival-field inv-arrival-field--add">
-          <span class="inv-arrival-label inv-arrival-label--ghost">Строка</span>
-          <button type="button" class="inv-arrival-add-btn" id="arrival-bulk-add-row" title="Добавить строку">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <line x1="10" y1="4" x2="10" y2="16"/>
-              <line x1="4" y1="10" x2="16" y2="10"/>
-            </svg>
-            <span>Добавить</span>
-          </button>
         </div>
       </div>
     </section>

@@ -1203,33 +1203,22 @@ var INV = (function () {
   }
 
   function buildBodyInsertSizeCellHtml() {
-    var sizeOpts = (INV.insert_edge_length_codes || []).map(function (x) {
-      return { value: x.value, label: x.value || x.label };
-    });
-    sizeOpts.push({ value: insertSizeOther, label: "Другое" });
     return (
-      '<select data-k="bt_insert_size">' +
-      buildOptionsHtml([{ value: "", label: "—" }].concat(sizeOpts)) +
-      "</select>" +
-      '<input type="text" class="bt-insert-size-custom" data-k="bt_insert_size_custom" maxlength="24" ' +
-      'placeholder="1604" style="display:none;margin-top:4px;max-width:100%;text-transform:uppercase">'
+      '<input type="text" inputmode="decimal" data-k="bt_insert_size" maxlength="24" ' +
+      'placeholder="12" title="Размер пластины цифрами" class="bt-insert-size-input" ' +
+      'style="max-width:100%;text-transform:uppercase">'
     );
   }
 
   function wireBodyInsertSizeCell(cell) {
-    var sel = cell.querySelector('select[data-k="bt_insert_size"]');
-    var cin = cell.querySelector('[data-k="bt_insert_size_custom"]');
-    if (!sel || !cin) return;
-    function syncCustom() {
-      var isOther = sel.value === insertSizeOther;
-      cin.style.display = isOther ? "block" : "none";
-      if (!isOther) cin.value = "";
-    }
-    sel.addEventListener("change", syncCustom);
-    cin.addEventListener("input", function () {
-      cin.value = (cin.value || "").toUpperCase().replace(/\s+/g, "");
+    var inp = cell && cell.querySelector('[data-k="bt_insert_size"]');
+    if (!inp || inp.tagName === "SELECT") return;
+    inp.addEventListener("input", function () {
+      inp.value = String(inp.value || "")
+        .toUpperCase()
+        .replace(/\s+/g, "")
+        .replace(",", ".");
     });
-    syncCustom();
   }
 
   function bodyCutterLabel(key) {
@@ -1616,12 +1605,7 @@ var INV = (function () {
           row.bt_insert_family = normalizeInsertFamilyValue(el.value || "");
         }
       } else if (k === "bt_insert_size") {
-        if ((el.value || "") === insertSizeOther) {
-          var szin = tr.querySelector('[data-k="bt_insert_size_custom"]');
-          row.bt_insert_size = ((szin && szin.value) || "").trim().toUpperCase();
-        } else {
-          row.bt_insert_size = (el.value || "").trim();
-        }
+        row.bt_insert_size = (el.value || "").trim().toUpperCase().replace(/\s+/g, "").replace(",", ".");
       } else {
         var rawVal = (el.value || "").trim();
         row[k] = isArrivalNumericField(el, k) ? normalizeDecimalComma(rawVal) : rawVal;
@@ -1635,6 +1619,74 @@ var INV = (function () {
     var matchTr = tr.nextElementSibling;
     if (!matchTr || !matchTr.classList.contains("arrival-match-row")) return null;
     return matchTr.querySelector(".js-arrival-matches");
+  }
+
+  var ARRIVAL_MATCH_LS_KEY = "biota_arrival_match_suggest";
+  var arrivalMatchSuggestEl = document.getElementById("arrival-match-suggest");
+  var arrivalMatchSuggestText = document.querySelector(".js-arrival-match-suggest-text");
+
+  function isArrivalMatchSuggestOn() {
+    return !!(arrivalMatchSuggestEl && arrivalMatchSuggestEl.checked);
+  }
+
+  function syncArrivalMatchSuggestUi() {
+    if (arrivalMatchSuggestText) {
+      arrivalMatchSuggestText.textContent = isArrivalMatchSuggestOn() ? "Вкл" : "Выкл";
+    }
+    if (groupsWrap) {
+      groupsWrap.classList.toggle("arrival-match-suggest-off", !isArrivalMatchSuggestOn());
+    }
+  }
+
+  function hideAllArrivalMatchPanels(clearPicks) {
+    groupsWrap.querySelectorAll("tr[data-arrival-row]").forEach(function (tr) {
+      if (clearPicks) {
+        var hid = tr.querySelector('[data-k="existing_tool_id"]');
+        if (hid) hid.value = "";
+        tr.classList.remove("is-existing-pick");
+        tr.removeAttribute("data-existing-tool-id");
+      }
+      var panel = arrivalMatchPanel(tr);
+      if (panel) {
+        panel.hidden = true;
+        panel.innerHTML = "";
+        panel._matchesById = null;
+      }
+    });
+  }
+
+  function refreshAllArrivalMatchSearches() {
+    groupsWrap.querySelectorAll("tr[data-arrival-row]").forEach(function (tr) {
+      if (tr.classList.contains("is-existing-pick")) return;
+      scheduleArrivalMatchSearch(tr);
+    });
+  }
+
+  function loadArrivalMatchSuggestPref() {
+    try {
+      var raw = localStorage.getItem(ARRIVAL_MATCH_LS_KEY);
+      if (raw === "0" || raw === "false") {
+        if (arrivalMatchSuggestEl) arrivalMatchSuggestEl.checked = false;
+      } else if (raw === "1" || raw === "true") {
+        if (arrivalMatchSuggestEl) arrivalMatchSuggestEl.checked = true;
+      }
+    } catch (_e) {}
+    syncArrivalMatchSuggestUi();
+  }
+
+  if (arrivalMatchSuggestEl) {
+    loadArrivalMatchSuggestPref();
+    arrivalMatchSuggestEl.addEventListener("change", function () {
+      try {
+        localStorage.setItem(ARRIVAL_MATCH_LS_KEY, isArrivalMatchSuggestOn() ? "1" : "0");
+      } catch (_e) {}
+      syncArrivalMatchSuggestUi();
+      if (!isArrivalMatchSuggestOn()) {
+        hideAllArrivalMatchPanels(true);
+      } else {
+        refreshAllArrivalMatchSearches();
+      }
+    });
   }
 
   function ensureExistingToolHidden(tr) {
@@ -1744,6 +1796,14 @@ var INV = (function () {
 
   function scheduleArrivalMatchSearch(tr) {
     if (!tr || tr.classList.contains("is-existing-pick")) return;
+    if (!isArrivalMatchSuggestOn()) {
+      var panelOff = arrivalMatchPanel(tr);
+      if (panelOff) {
+        panelOff.hidden = true;
+        panelOff.innerHTML = "";
+      }
+      return;
+    }
     clearTimeout(tr._arrivalMatchTimer);
     tr._arrivalMatchTimer = setTimeout(function () {
       runArrivalMatchSearch(tr);
@@ -1752,6 +1812,7 @@ var INV = (function () {
 
   function runArrivalMatchSearch(tr) {
     if (!tr || !tr.isConnected || tr.classList.contains("is-existing-pick")) return;
+    if (!isArrivalMatchSuggestOn()) return;
     var panel = arrivalMatchPanel(tr);
     if (!panel) return;
     var row = collectArrivalRowData(tr);
@@ -2385,17 +2446,12 @@ var INV = (function () {
       { key: "row_remove", label: "" },
     ]),
     body_tool: arrivalHead([
+      { key: "brand", label: "Бренд" },
       { key: "OD", label: "ØD", cls: "short-col" },
       { key: "Z", label: "Z", cls: "short-col" },
-      { key: "d_mount", label: "d посадки", cls: "short-col" },
-      { key: "coolant", label: "СОЖ" },
+      { key: "d", label: "d", cls: "short-col th-keep-case" },
       { key: "form_factor", label: "Формфактор" },
       { key: "insert_size", label: "Размер" },
-      { key: "ap", label: "ap", cls: "short-col" },
-      { key: "angle", label: "Угол", cls: "short-col" },
-      { key: "brand", label: "Бренд" },
-      { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
-      { key: "coating", label: "Покрытие" },
       { key: "quantity", label: "Кол-во", cls: "qty-col" },
       { key: "row_remove", label: "" },
     ]),
@@ -2403,12 +2459,11 @@ var INV = (function () {
       { key: "brand", label: "Бренд" },
       { key: "shank", label: "Хвостовик" },
       { key: "OD", label: "ØD", cls: "short-col" },
-      { key: "d", label: "d", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col th-keep-case" },
       { key: "L", label: "L", cls: "short-col" },
       { key: "Z", label: "Z", cls: "short-col" },
       { key: "form_factor", label: "Формфактор" },
       { key: "insert_size", label: "Размер" },
-      { key: "coolant", label: "СОЖ" },
       { key: "angle", label: "Угол", cls: "short-col" },
       { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
       { key: "coating", label: "Покрытие" },
@@ -2419,10 +2474,9 @@ var INV = (function () {
       { key: "brand", label: "Бренд" },
       { key: "shank", label: "Хвостовик" },
       { key: "OD", label: "ØD", cls: "short-col" },
-      { key: "d", label: "d", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col th-keep-case" },
       { key: "Z", label: "Z", cls: "short-col" },
       { key: "variable_angle", label: "Перем. угол" },
-      { key: "coolant", label: "СОЖ" },
       { key: "form_factor", label: "Формфактор" },
       { key: "insert_size", label: "Размер" },
       { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
@@ -2434,7 +2488,7 @@ var INV = (function () {
       { key: "brand", label: "Бренд" },
       { key: "shank", label: "Хвостовик" },
       { key: "OD", label: "ØD", cls: "short-col" },
-      { key: "d", label: "d", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col th-keep-case" },
       { key: "Z", label: "Z", cls: "short-col" },
       { key: "hs_type", label: "Тип" },
       { key: "hs_purpose", label: "Назначение" },
@@ -2450,12 +2504,11 @@ var INV = (function () {
       { key: "brand", label: "Бренд" },
       { key: "shank", label: "Хвостовик" },
       { key: "OD", label: "ØD", cls: "short-col" },
-      { key: "d", label: "d", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col th-keep-case" },
       { key: "L", label: "L", cls: "short-col" },
       { key: "Z", label: "Z", cls: "short-col" },
       { key: "bt_type", label: "Тип" },
       { key: "R", label: "R", cls: "short-col" },
-      { key: "coolant", label: "СОЖ" },
       { key: "form_factor", label: "Формфактор" },
       { key: "insert_size", label: "Размер" },
       { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
@@ -2466,7 +2519,7 @@ var INV = (function () {
     body_tool_disc: arrivalHead([
       { key: "brand", label: "Бренд" },
       { key: "OD", label: "ØD", cls: "short-col" },
-      { key: "d", label: "d", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col th-keep-case" },
       { key: "Z", label: "Z", cls: "short-col" },
       { key: "H", label: "H", cls: "short-col" },
       { key: "form_factor", label: "Формфактор" },
@@ -2480,10 +2533,9 @@ var INV = (function () {
       { key: "brand", label: "Бренд" },
       { key: "shank", label: "Хвостовик" },
       { key: "OD", label: "ØD", cls: "short-col" },
-      { key: "d", label: "d", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col th-keep-case" },
       { key: "L", label: "L", cls: "short-col" },
       { key: "Z", label: "Z", cls: "short-col" },
-      { key: "coolant", label: "СОЖ" },
       { key: "suitable_inserts", label: "Подходящие пластины" },
       { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
       { key: "coating", label: "Покрытие" },
@@ -2493,10 +2545,9 @@ var INV = (function () {
     body_tool_modular_head: arrivalHead([
       { key: "brand", label: "Бренд" },
       { key: "OD", label: "ØD", cls: "short-col" },
-      { key: "d", label: "d", cls: "short-col" },
+      { key: "d", label: "d", cls: "short-col th-keep-case" },
       { key: "thread", label: "Резьба" },
       { key: "Z", label: "Z", cls: "short-col" },
-      { key: "coolant", label: "СОЖ" },
       { key: "suitable_inserts", label: "Подходящие пластины" },
       { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
       { key: "coating", label: "Покрытие" },
@@ -2504,6 +2555,7 @@ var INV = (function () {
       { key: "row_remove", label: "" },
     ]),
     body_tool_generic: arrivalHead([
+      { key: "brand", label: "Бренд" },
       { key: "bt_type", label: "Тип" },
       { key: "D", label: "D", cls: "short-col" },
       { key: "L", label: "L", cls: "short-col" },
@@ -2721,17 +2773,12 @@ var INV = (function () {
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "body_tool") {
       if (bodyCutter === "face") {
+        cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
         cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
         cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
-        cells.push('<td><select data-k="bt_coolant"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
         cells.push('<td class="ins-family-cell">' + buildBodyInsertFamilyCellHtml() + "</td>");
         cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
-        cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_ap_max_mm" placeholder="ap"></td>');
-        cells.push('<td class="short-col"><select data-k="bt_angle_deg">' + buildOptionsHtml([{ value: "", label: "—" }].concat(INV.face_mill_angles || [])) + '</select></td>');
-        cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
-        cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
-        cells.push('<td class="co-cell"></td>');
           cells.push(arrivalAddressCellHtml(""));
           cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else if (bodyCutter === "end") {
@@ -2743,7 +2790,6 @@ var INV = (function () {
         cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
         cells.push('<td class="ins-family-cell">' + buildBodyInsertFamilyCellHtml() + "</td>");
         cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
-        cells.push('<td><select data-k="bt_coolant"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
         cells.push('<td class="short-col"><select data-k="bt_angle_deg">' + buildOptionsHtml([{ value: "", label: "—" }].concat(INV.face_mill_angles || [])) + '</select></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
@@ -2756,7 +2802,6 @@ var INV = (function () {
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
         cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
         cells.push('<td><select data-k="bt_variable_angle"><option value="0">Нет</option><option value="1">Да</option></select></td>');
-        cells.push('<td><select data-k="bt_coolant"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
         cells.push('<td class="ins-family-cell">' + buildBodyInsertFamilyCellHtml() + "</td>");
         cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
@@ -2787,7 +2832,6 @@ var INV = (function () {
         cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
         cells.push('<td><select data-k="bt_hs_body_style">' + buildOptionsHtml(INV.high_speed_body_styles || []) + '</select></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_corner_radius_mm" placeholder="R"></td>');
-        cells.push('<td><select data-k="bt_coolant"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
         cells.push('<td class="ins-family-cell">' + buildBodyInsertFamilyCellHtml() + "</td>");
         cells.push('<td class="bt-insert-size-cell">' + buildBodyInsertSizeCellHtml() + "</td>");
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
@@ -2813,7 +2857,6 @@ var INV = (function () {
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_overall_length_mm" placeholder="L"></td>');
         cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
-        cells.push('<td><select data-k="bt_coolant"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
         cells.push('<td><input type="text" data-k="bt_insert_compat" maxlength="80" placeholder="RD.. / RP.."></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
@@ -2825,13 +2868,13 @@ var INV = (function () {
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
         cells.push('<td><select data-k="bt_mount_thread">' + buildOptionsHtml(INV.modular_head_threads || []) + '</select></td>');
         cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
-        cells.push('<td><select data-k="bt_coolant"><option value="0">Нет</option><option value="1">Есть</option></select></td>');
         cells.push('<td><input type="text" data-k="bt_insert_compat" maxlength="80" placeholder="APKT / RCKT…"></td>');
         cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
         cells.push('<td class="co-cell"></td>');
           cells.push(arrivalAddressCellHtml(""));
           cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
       } else {
+        cells.push('<td><input type="text" data-k="bt_brand" maxlength="80" placeholder="Sandvik"></td>');
         cells.push('<td><select data-k="body_cutter" required>' + buildOptionsHtml(INV.indexable_mill_cutter_types || []) + '</select></td>');
         cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
         cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_overall_length_mm"></td>');
@@ -2930,36 +2973,39 @@ var INV = (function () {
     if (insSizeCell) wireBodyInsertSizeCell(insSizeCell);
     wireInsertMachiningAppPicker(tr);
     var tmCell = tr.querySelector(".tm-cell-tool-material");
-    var tmOpts = cat === "insert" ? buildArrivalInsertAlloyMaterialOptions() : toolMaterialOptions;
-    var tmDefault = "";
-    tmCell.appendChild(buildSelect(tmOpts, tmDefault));
-    var tmSel = tmCell.querySelector("select");
-    tmSel.setAttribute("data-k", "tool_material");
-    var tmCustom = document.createElement("input");
-    tmCustom.type = "text";
-    tmCustom.maxLength = 80;
-    tmCustom.className = "tm-tool-material-custom";
-    tmCustom.setAttribute("data-k", "tool_material_custom");
-    tmCustom.style.display = "none";
-    tmCustom.style.marginTop = "4px";
-    tmCustom.style.maxWidth = "100%";
-    tmCustom.placeholder = "Свой материал";
-    tmCell.appendChild(tmCustom);
-    tmSel.addEventListener("change", function () {
-      var isO = tmSel.value === toolMaterialFilterOther;
-      tmCustom.style.display = isO ? "block" : "none";
-      if (!isO) tmCustom.value = "";
-    });
-    tmCustom.addEventListener("blur", function () {
-      applyCustomToolMaterial(tmSel, tmCustom);
-    });
-    tmCustom.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        tmCustom.blur();
-      }
-    });
-    tr.querySelector(".co-cell").appendChild(buildColoredCoatingSelect("none"));
+    if (tmCell) {
+      var tmOpts = cat === "insert" ? buildArrivalInsertAlloyMaterialOptions() : toolMaterialOptions;
+      var tmDefault = "";
+      tmCell.appendChild(buildSelect(tmOpts, tmDefault));
+      var tmSel = tmCell.querySelector("select");
+      tmSel.setAttribute("data-k", "tool_material");
+      var tmCustom = document.createElement("input");
+      tmCustom.type = "text";
+      tmCustom.maxLength = 80;
+      tmCustom.className = "tm-tool-material-custom";
+      tmCustom.setAttribute("data-k", "tool_material_custom");
+      tmCustom.style.display = "none";
+      tmCustom.style.marginTop = "4px";
+      tmCustom.style.maxWidth = "100%";
+      tmCustom.placeholder = "Свой материал";
+      tmCell.appendChild(tmCustom);
+      tmSel.addEventListener("change", function () {
+        var isO = tmSel.value === toolMaterialFilterOther;
+        tmCustom.style.display = isO ? "block" : "none";
+        if (!isO) tmCustom.value = "";
+      });
+      tmCustom.addEventListener("blur", function () {
+        applyCustomToolMaterial(tmSel, tmCustom);
+      });
+      tmCustom.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          tmCustom.blur();
+        }
+      });
+    }
+    var coCell = tr.querySelector(".co-cell");
+    if (coCell) coCell.appendChild(buildColoredCoatingSelect("none"));
     attachArrivalMatchRow(tr, body);
   }
 

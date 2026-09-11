@@ -621,7 +621,7 @@ def restore_body_tool_cutter_catalog(*, replace_fields: bool = True) -> dict[str
         ),
         (
             "end",
-            "Концевые насадные фрезы",
+            "Концевые фрезы",
             [
                 ("brand", "Бренд", "text", [], False, "", 10),
                 ("shank-type", "Хвостовик", "select", _shank_choices(END_MILL_SHANK_TYPES), False, "", 20),

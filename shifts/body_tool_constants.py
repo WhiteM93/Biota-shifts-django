@@ -19,7 +19,7 @@ BODY_TOOL_FAMILY_LABELS = dict(BODY_TOOL_FAMILIES)
 # Типы внутри «Фрезы со сменными пластинами»
 INDEXABLE_MILL_CUTTER_TYPES = [
     ("face", "Торцевые насадные фрезы"),
-    ("end", "Концевые насадные фрезы"),
+    ("end", "Концевые фрезы"),
     ("chamfer", "Фасочные фрезы"),
     ("high_speed", "Высокоскоростные фрезы"),
     ("round_insert", "Фрезы с круглыми пластинами"),
