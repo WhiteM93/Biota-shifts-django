@@ -2154,6 +2154,8 @@ def inventory_view(request):
         category = (request.POST.get("watch_category") or "").strip()
         group_field = normalize_group_field(category, (request.POST.get("watch_group_field") or "").strip())
         group_value = (request.POST.get("watch_group_value") or "").strip()[:80]
+        if group_field == "size_label":
+            group_value = (normalize_cutting_size_label(group_value) or group_value)[:80]
         min_qty = max(1, min(9999, _to_int(request.POST.get("watch_min_qty"), 5)))
         notes = (request.POST.get("watch_notes") or "").strip()[:255]
         if not name or category not in _INVENTORY_CATEGORIES or not group_value:

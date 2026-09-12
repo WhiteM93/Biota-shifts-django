@@ -310,7 +310,12 @@ def stock_filter_query(category: str, group_field: str, group_value: str) -> dic
     param = STOCK_FILTER_PARAMS.get(category, {}).get(group_field)
     if not param or not group_value or group_value == "—":
         return {"panel": "stock", "category": category}
-    return {"panel": "stock", "category": category, param: group_value}
+    value = group_value
+    if group_field == "size_label":
+        from shifts.size_label_normalize import normalize_cutting_size_label
+
+        value = normalize_cutting_size_label(group_value) or group_value
+    return {"panel": "stock", "category": category, param: value}
 
 
 def _base_qs(*, include_zero: bool) -> Any:
@@ -363,11 +368,23 @@ def group_total_qty(category: str, group_field: str, group_value: str, *, includ
     if not path or not group_value or group_value == "—":
         return 0
     qs = _base_qs(include_zero=include_zero).filter(category=category)
-    parsed = _parse_group_filter_value(group_value, group_field)
-    if parsed is None:
-        qs = qs.filter(**{f"{path}__iexact": group_value.strip()})
+    # size_label: М/M и запятая/точка — один размер (как в фильтрах склада)
+    if group_field == "size_label":
+        from shifts.size_label_normalize import size_label_match_variants
+
+        variants = size_label_match_variants(group_value)
+        if not variants:
+            return 0
+        q = Q()
+        for variant in variants:
+            q |= Q(**{f"{path}__iexact": variant})
+        qs = qs.filter(q)
     else:
-        qs = qs.filter(**{path: parsed})
+        parsed = _parse_group_filter_value(group_value, group_field)
+        if parsed is None:
+            qs = qs.filter(**{f"{path}__iexact": group_value.strip()})
+        else:
+            qs = qs.filter(**{path: parsed})
     return int(qs.aggregate(total=Sum("quantity"))["total"] or 0)
 
 

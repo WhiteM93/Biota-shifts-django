@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from shifts.inventory_analysis import aggregate_by_group, group_total_qty, watch_status
-from shifts.models import EndMillSpec, InventoryWatchTemplate, ToolItem
+from shifts.models import EndMillSpec, InventoryWatchTemplate, TapSpec, ToolItem
 
 
 class InventoryAnalysisTests(TestCase):
@@ -16,6 +16,11 @@ class InventoryAnalysisTests(TestCase):
             quantity=qty,
         )
         EndMillSpec.objects.create(tool=tool, diameter_mm=Decimal(diameter), mill_type="end", flutes_count=2)
+        return tool
+
+    def _tap(self, name: str, size_label: str, qty: int) -> ToolItem:
+        tool = ToolItem.objects.create(category="tap", name=name, quantity=qty)
+        TapSpec.objects.create(tool=tool, size_label=size_label)
         return tool
 
     def test_aggregate_by_diameter(self):
@@ -31,6 +36,15 @@ class InventoryAnalysisTests(TestCase):
         self._end_mill("F1", "2", 4)
         self._end_mill("F2", "2", 1)
         self.assertEqual(group_total_qty("end_mill", "diameter_mm", "2"), 5)
+
+    def test_group_total_qty_size_label_variants(self):
+        """Контроль с М/запятой должен видеть нормализованные остатки M/точки."""
+        self._tap("T1", "M3", 10)
+        self._tap("T2", "M2.5", 7)
+        # save() нормализует size_label; создаём «грязный» контроль как в старых шаблонах
+        self.assertEqual(group_total_qty("tap", "size_label", "М3"), 10)
+        self.assertEqual(group_total_qty("tap", "size_label", "M2,5"), 7)
+        self.assertEqual(group_total_qty("tap", "size_label", "M3"), 10)
 
     def test_watch_status(self):
         self.assertEqual(watch_status(10, 5), "ok")
