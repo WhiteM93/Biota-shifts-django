@@ -424,40 +424,138 @@ def list_watch_templates(username: str) -> list[InventoryWatchTemplate]:
 
 
 def analysis_context(request, username: str) -> dict:
+    """Контекст вкладки «Анализ»: панель руководителя склада."""
+    from django.db.models import F, IntegerField, Sum, Value
+    from django.db.models.functions import Coalesce
+
+    from shifts.models import StockMovement, VisualContainer
+
+    base_tools = ToolItem.objects.filter(is_deleted=False)
+    nomenclature = base_tools.count()
+    total_qty = int(base_tools.aggregate(t=Coalesce(Sum("quantity"), Value(0)))["t"] or 0)
+
+    templates = list_watch_templates(username)
+    watch_rows = evaluate_watch_templates(templates)
+    alerts = [r for r in watch_rows if r["status"] != "ok"]
+    if templates:
+        below_min = len(alerts)
+    else:
+        below_min = base_tools.filter(quantity__lte=0).count()
+
+    issued_qty = int(
+        StockMovement.objects.filter(movement_type="issue", is_reverted=False)
+        .annotate(
+            processed_qty=Coalesce(
+                Sum("issue_outcomes__quantity"),
+                Value(0, output_field=IntegerField()),
+            )
+        )
+        .annotate(remaining_qty=F("quantity") - F("processed_qty"))
+        .filter(remaining_qty__gt=0)
+        .aggregate(t=Coalesce(Sum("remaining_qty"), Value(0)))["t"]
+        or 0
+    )
+
+    writeoff_count = StockMovement.objects.filter(movement_type="writeoff", is_reverted=False).count()
+
+    storage_cells = VisualContainer.objects.filter(parent__isnull=True).count()
+    if storage_cells <= 0:
+        storage_cells = (
+            base_tools.exclude(warehouse_address="")
+            .exclude(warehouse_address__isnull=True)
+            .values("warehouse_address")
+            .distinct()
+            .count()
+        )
+
+    cat_labels = dict(category_choices())
+    by_cat_raw = list(
+        base_tools.values("category")
+        .annotate(total_qty=Coalesce(Sum("quantity"), Value(0)), sku_count=Count("id"))
+        .order_by("-total_qty", "category")
+    )
+    by_category = [
+        {
+            "category": row["category"],
+            "label": cat_labels.get(row["category"], row["category"]),
+            "total_qty": int(row["total_qty"] or 0),
+            "sku_count": int(row["sku_count"] or 0),
+        }
+        for row in by_cat_raw
+    ]
+
+    top_items = list(
+        base_tools.filter(quantity__gt=0)
+        .order_by("-quantity", "name")
+        .values("id", "name", "quantity", "category")[:12]
+    )
+    nomenclature_bars = [
+        {
+            "id": row["id"],
+            "name": (row["name"] or "—")[:48],
+            "quantity": int(row["quantity"] or 0),
+            "category": row["category"],
+        }
+        for row in top_items
+    ]
+
+    # Сохраняем старые ключи сводки (пустые), чтобы старые шаблоны/ссылки не падали
     category = (request.GET.get("analysis_category") or request.GET.get("category") or "end_mill").strip()
     if category not in GROUP_FIELD_PATHS:
         category = "end_mill"
     group_field = normalize_group_field(category, (request.GET.get("group_by") or "").strip())
-    include_zero = (request.GET.get("show_zero") or "") == "1"
-    search = (request.GET.get("analysis_search") or "").strip()
 
-    summary_rows = aggregate_by_group(
-        category,
-        group_field,
-        include_zero=include_zero,
-        search=search,
-    )
-    templates = list_watch_templates(username)
-    watch_rows = evaluate_watch_templates(templates)
+    kpi_rows = [
+        {"label": "Номенклатура", "value": nomenclature},
+        {"label": "Позиций ниже минимума", "value": below_min},
+        {"label": "Общее количество на складе", "value": total_qty},
+        {"label": "Инструмента выдано сейчас", "value": issued_qty},
+        {"label": "Количество списаний", "value": writeoff_count},
+        {"label": "Ячеек хранения", "value": storage_cells},
+    ]
 
-    alerts = [r for r in watch_rows if r["status"] != "ok"]
-    group_label = GROUP_FIELD_LABELS.get(category, {}).get(group_field, group_field)
-    cat_label = dict(category_choices()).get(category, category)
+    # Круговая диаграмма: только неотрицательные доли (отрицательные остатки — в таблице)
+    pie_cats = [r for r in by_category if r["total_qty"] > 0]
+    if not pie_cats and by_category:
+        pie_cats = [{"label": r["label"], "total_qty": 0} for r in by_category[:1]]
+
+    chart_payload = {
+        "nomenclature": {
+            "labels": [r["name"] for r in nomenclature_bars],
+            "values": [r["quantity"] for r in nomenclature_bars],
+        },
+        "categories": {
+            "labels": [r["label"] for r in pie_cats],
+            "values": [r["total_qty"] for r in pie_cats],
+        },
+    }
 
     return {
+        "analysis_dashboard": True,
+        "dash_kpi_rows": kpi_rows,
+        "dash_by_category": by_category,
+        "dash_nomenclature_bars": nomenclature_bars,
+        "dash_chart_data": chart_payload,
+        "dash_nomenclature": nomenclature,
+        "dash_below_min": below_min,
+        "dash_total_qty": total_qty,
+        "dash_issued_qty": issued_qty,
+        "dash_writeoff_count": writeoff_count,
+        "dash_storage_cells": storage_cells,
+        "analysis_watch_alerts": alerts,
+        "analysis_watch_rows": watch_rows,
+        "analysis_watch_templates": templates,
+        # legacy keys (фильтры сводки больше не в UI)
         "analysis_category": category,
         "analysis_group_field": group_field,
-        "analysis_group_label": group_label,
-        "analysis_category_label": cat_label,
-        "analysis_include_zero": include_zero,
-        "analysis_search": search,
-        "analysis_rows": summary_rows,
+        "analysis_group_label": GROUP_FIELD_LABELS.get(category, {}).get(group_field, group_field),
+        "analysis_category_label": cat_labels.get(category, category),
+        "analysis_include_zero": False,
+        "analysis_search": "",
+        "analysis_rows": [],
         "analysis_group_fields": group_field_choices(category),
         "analysis_categories": category_choices(),
         "stock_category_groups": category_grouped_choices(),
-        "analysis_watch_rows": watch_rows,
-        "analysis_watch_alerts": alerts,
-        "analysis_watch_templates": templates,
-        "analysis_total_skus": sum(r["sku_count"] for r in summary_rows),
-        "analysis_total_qty": sum(r["total_qty"] for r in summary_rows),
+        "analysis_total_skus": nomenclature,
+        "analysis_total_qty": total_qty,
     }

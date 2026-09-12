@@ -2479,7 +2479,7 @@ var INV = (function () {
   var colletArrivalHeadHtml = {
     er: arrivalHead([
       { key: "er_size", label: "ER" },
-      { key: "er_range", label: "Зажим Ø" },
+      { key: "er_range", label: "Ø Цанги" },
       { key: "er_aa", label: "AA" },
       { key: "quantity", label: "Кол-во", cls: "qty-col" },
       { key: "row_remove", label: "" },

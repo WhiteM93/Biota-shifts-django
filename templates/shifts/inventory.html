@@ -2777,7 +2777,8 @@
           <span class="calc-label">Статус</span>
           <span class="calc-sel-wrap">
             <select name="purchase_status" class="calc-sel">
-              <option value="">Все</option>
+              <option value="" {% if not purchase_filters.status %}selected{% endif %}>Активные</option>
+              <option value="all" {% if purchase_filters.status == "all" %}selected{% endif %}>Все</option>
               {% for key, label in purchase_statuses %}
               <option value="{{ key }}" {% if purchase_filters.status == key %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
