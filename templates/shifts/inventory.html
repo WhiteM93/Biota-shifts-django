@@ -291,17 +291,17 @@
     <thead>
       <tr>
         <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable">Тип фрезы</th>
-        <th class="sortable">D, мм</th>
+        <th class="sortable hint-cell" data-hint="Тип концевой фрезы">Тип фрезы</th>
+        <th class="sortable hint-cell" data-hint="Диаметр режущей части, мм">D, мм</th>
         <th class="sortable hint-cell" data-hint="Радиус инструмента">R, мм</th>
         <th class="sortable hint-cell" data-hint="Длина инструмента">L, мм</th>
         <th class="sortable hint-cell" data-hint="Длина режущей части">Lc, мм</th>
         <th class="sortable hint-cell" data-hint="Количество кромок">Z</th>
-        <th class="sortable">D осн, мм</th>
-        <th class="sortable">Материал инструмента</th>
-        <th class="sortable">Покрытие</th>
-        <th class="sortable">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
+        <th class="sortable hint-cell" data-hint="Основной диаметр зажима (хвостовик), мм">D осн, мм</th>
+        <th class="sortable hint-cell" data-hint="Материал инструмента (HRC, HSS, твердосплав и др.)">Материал инструмента</th>
+        <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
+        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
+        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -805,20 +805,20 @@
     <thead>
       <tr>
         <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable">Размер</th>
+        <th class="sortable hint-cell" data-hint="Размер резьбы (M6, 1/4-20…)">Размер</th>
         <th class="sortable hint-cell" data-hint="Стандартная или нестандартная резьба">Тип резьбы</th>
-        <th class="sortable">Стандарт</th>
+        <th class="sortable hint-cell" data-hint="Стандарт резьбы (метрическая, UNC…)">Стандарт</th>
         <th class="sortable hint-cell" data-hint="Шаг резьбы">Шаг, мм</th>
         <th class="sortable hint-cell" data-hint="Количество витков на дюйм">TPI</th>
-        <th class="sortable">Тип отверстия</th>
-        <th class="sortable">Тип инструмента</th>
+        <th class="sortable hint-cell" data-hint="Тип отверстия (сквозное / глухое / универсальный)">Тип отверстия</th>
+        <th class="sortable hint-cell" data-hint="Тип метчика (режущий, раскатник, резьбофреза…)">Тип инструмента</th>
         <th class="sortable hint-cell" data-hint="Длина инструмента">L, мм</th>
         <th class="sortable hint-cell" data-hint="Длина режущей части">Lc, мм</th>
-        <th class="sortable">D осн, мм</th>
-        <th class="sortable">Материал инструмента</th>
-        <th class="sortable">Покрытие</th>
-        <th class="sortable">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
+        <th class="sortable hint-cell" data-hint="Основной диаметр зажима (хвостовик), мм">D осн, мм</th>
+        <th class="sortable hint-cell" data-hint="Материал инструмента (HRC, HSS, твердосплав и др.)">Материал инструмента</th>
+        <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
+        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
+        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -863,14 +863,14 @@
     <thead>
       <tr>
         <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable">D, мм</th>
-        <th class="sortable">L, мм</th>
-        <th class="sortable">Угол, °</th>
-        <th class="sortable">D осн, мм</th>
-        <th class="sortable">Материал инструмента</th>
-        <th class="sortable">Покрытие</th>
-        <th class="sortable">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
+        <th class="sortable hint-cell" data-hint="Диаметр режущей части, мм">D, мм</th>
+        <th class="sortable hint-cell" data-hint="Длина инструмента">L, мм</th>
+        <th class="sortable hint-cell" data-hint="Угол заточки центровочного сверла, °">Угол, °</th>
+        <th class="sortable hint-cell" data-hint="Основной диаметр зажима (хвостовик), мм">D осн, мм</th>
+        <th class="sortable hint-cell" data-hint="Материал инструмента (HRC, HSS, твердосплав и др.)">Материал инструмента</th>
+        <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
+        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
+        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -909,17 +909,17 @@
     <thead>
       <tr>
         <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable">Тип</th>
-        <th class="sortable">D, мм</th>
-        <th class="sortable">Угол, °</th>
-        <th class="sortable">L, мм</th>
-        <th class="sortable">Z</th>
-        <th class="sortable">Размер</th>
-        <th class="sortable">D осн, мм</th>
-        <th class="sortable">Материал инструмента</th>
-        <th class="sortable">Покрытие</th>
-        <th class="sortable">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
+        <th class="sortable hint-cell" data-hint="Тип зенковки">Тип</th>
+        <th class="sortable hint-cell" data-hint="Диаметр режущей части, мм">D, мм</th>
+        <th class="sortable hint-cell" data-hint="Угол зенковки, °">Угол, °</th>
+        <th class="sortable hint-cell" data-hint="Длина инструмента">L, мм</th>
+        <th class="sortable hint-cell" data-hint="Количество кромок">Z</th>
+        <th class="sortable hint-cell" data-hint="Размер / обозначение">Размер</th>
+        <th class="sortable hint-cell" data-hint="Основной диаметр зажима (хвостовик), мм">D осн, мм</th>
+        <th class="sortable hint-cell" data-hint="Материал инструмента (HRC, HSS, твердосплав и др.)">Материал инструмента</th>
+        <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
+        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
+        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -1015,15 +1015,15 @@
     <thead>
       <tr>
         <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable">D, мм</th>
-        <th class="sortable">L, мм</th>
-        <th class="sortable">Lc, мм</th>
-        <th class="sortable">Угол, °</th>
-        <th class="sortable">D осн, мм</th>
-        <th class="sortable">Материал инструмента</th>
-        <th class="sortable">Покрытие</th>
-        <th class="sortable">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
+        <th class="sortable hint-cell" data-hint="Диаметр режущей части, мм">D, мм</th>
+        <th class="sortable hint-cell" data-hint="Длина инструмента">L, мм</th>
+        <th class="sortable hint-cell" data-hint="Длина режущей части">Lc, мм</th>
+        <th class="sortable hint-cell" data-hint="Угол при вершине сверла, °">Угол, °</th>
+        <th class="sortable hint-cell" data-hint="Основной диаметр зажима (хвостовик), мм">D осн, мм</th>
+        <th class="sortable hint-cell" data-hint="Материал инструмента (HRC, HSS, твердосплав и др.)">Материал инструмента</th>
+        <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
+        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
+        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -1063,16 +1063,16 @@
     <thead>
       <tr>
         <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable">D, мм</th>
-        <th class="sortable">L, мм</th>
-        <th class="sortable">Lc, мм</th>
-        <th class="sortable">Квалитет</th>
-        <th class="sortable">Z</th>
-        <th class="sortable">D осн, мм</th>
-        <th class="sortable">Материал инструмента</th>
-        <th class="sortable">Покрытие</th>
-        <th class="sortable">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
+        <th class="sortable hint-cell" data-hint="Диаметр режущей части, мм">D, мм</th>
+        <th class="sortable hint-cell" data-hint="Длина инструмента">L, мм</th>
+        <th class="sortable hint-cell" data-hint="Длина режущей части">Lc, мм</th>
+        <th class="sortable hint-cell" data-hint="Квалитет / класс точности развёртки">Квалитет</th>
+        <th class="sortable hint-cell" data-hint="Количество кромок">Z</th>
+        <th class="sortable hint-cell" data-hint="Основной диаметр зажима (хвостовик), мм">D осн, мм</th>
+        <th class="sortable hint-cell" data-hint="Материал инструмента (HRC, HSS, твердосплав и др.)">Материал инструмента</th>
+        <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
+        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
+        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
       </tr>
     </thead>
     <tbody>
