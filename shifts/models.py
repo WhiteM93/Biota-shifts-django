@@ -140,6 +140,7 @@ from .collet_constants import (
     COLLET_TYPES,
     COLLET_TYPE_TOOLTIPS,
 )
+from .tool_extension_constants import TOOL_EXTENSION_CLAMP_TYPES
 from .body_tool_constants import (
     BODY_TOOL_COUPLINGS,
     BODY_TOOL_FAMILIES,
@@ -196,6 +197,7 @@ TOOL_ITEM_CATEGORY_CHOICES = [
     ("insert", "Пластинки"),
     ("collet", "Цанги"),
     ("body_tool", "Корпусной инструмент"),
+    ("tool_extension", "Удлинители"),
 ]
 
 # Только UI / справочник «Типы склада». В БД ToolItem.category остаётся плоским ключом.
@@ -208,7 +210,7 @@ STOCK_CATEGORY_GROUPS = [
     (
         "tooling",
         "Оснастка",
-        ("collet", "body_tool"),
+        ("collet", "body_tool", "tool_extension"),
     ),
 ]
 
@@ -501,6 +503,16 @@ class ToolItem(models.Model):
                 f"ост {self.quantity}",
                 self.name,
             ]
+        elif cat == "tool_extension":
+            ex = getattr(self, "tool_extension_spec", None)
+            segs = [
+                self.get_category_display(),
+                (ex.brand if ex and ex.brand else "—"),
+                (ex.get_clamp_type_display() if ex else "—"),
+                f"Dосн Ø{main_d()}",
+                (ex.compatible_parts if ex and ex.compatible_parts else "—"),
+                f"ост {self.quantity}",
+            ]
         else:
             segs = [self.get_category_display(), self.name, f"ост {self.quantity}"]
 
@@ -703,6 +715,17 @@ class ToolItem(models.Model):
                     specs_parts.append(bt.brand.strip())
             else:
                 tool_type = "Фрезы со сменными пластинами"
+        elif cat == "tool_extension":
+            ex = getattr(self, "tool_extension_spec", None)
+            tool_type = self.get_category_display()
+            if ex:
+                if (ex.brand or "").strip():
+                    specs_parts.append(ex.brand.strip())
+                specs_parts.append(ex.get_clamp_type_display())
+                if self.main_diameter_mm is not None:
+                    specs_parts.append(f"Dосн={main_d()} мм")
+                if (ex.compatible_parts or "").strip():
+                    specs_parts.append(ex.compatible_parts.strip())
         else:
             tool_type = self.get_category_display()
             specs_parts = [self.name] if (self.name or "").strip() else []
@@ -852,6 +875,8 @@ class ToolItem(models.Model):
                 out["shank_type"] = (bt.shank_type or "").strip()
                 out["length"] = fmt_num(bt.mount_diameter_mm)
                 out["cutting_length"] = fmt_num(bt.ap_max_mm)
+        elif cat == "tool_extension":
+            out["diameter"] = fmt_num(self.main_diameter_mm)
         return out
 
 
@@ -1250,6 +1275,50 @@ class ColletSpec(models.Model):
         self.threading_series = normalize_collet_threading_series(self.threading_series)
         self.thread_size_label = (self.thread_size_label or "").strip()[:32]
         self.size_label = (self.size_label or "").strip()[:64]
+        super().save(*args, **kwargs)
+
+
+class ToolExtensionSpec(models.Model):
+    """Удлинитель инструмента (оснастка)."""
+
+    tool = models.OneToOneField(
+        ToolItem, on_delete=models.CASCADE, related_name="tool_extension_spec"
+    )
+    brand = models.CharField(max_length=80, blank=True, default="", verbose_name="Бренд")
+    clamp_type = models.CharField(
+        max_length=16,
+        choices=TOOL_EXTENSION_CLAMP_TYPES,
+        default="collet",
+        verbose_name="Зажим",
+    )
+    compatible_parts = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        verbose_name="Подходящие цанги / винты",
+        help_text="Для цангового — цанги; для боковой/термо — винты",
+    )
+
+    class Meta:
+        verbose_name = "Параметры удлинителя"
+        verbose_name_plural = "Параметры удлинителей"
+
+    def __str__(self):
+        from .tool_extension_constants import build_tool_extension_display_name
+
+        return build_tool_extension_display_name(
+            brand=self.brand,
+            clamp_type=self.clamp_type,
+            main_diameter_mm=self.tool.main_diameter_mm if self.tool_id else None,
+            compatible_parts=self.compatible_parts,
+        )
+
+    def save(self, *args, **kwargs):
+        from .tool_extension_constants import normalize_tool_extension_clamp
+
+        self.brand = (self.brand or "").strip()[:80]
+        self.clamp_type = normalize_tool_extension_clamp(self.clamp_type) or "collet"
+        self.compatible_parts = (self.compatible_parts or "").strip()[:120]
         super().save(*args, **kwargs)
 
 

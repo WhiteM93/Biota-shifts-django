@@ -23,6 +23,7 @@ BODY_TOOL_KIND_TYPES = [
     ("high_speed", "Высокоскоростная"),
     ("disc", "Т-образная"),
     ("ball", "Сферическая"),
+    ("thread", "Резьбовая"),
 ]
 
 # Полный список choices модели (включая устаревшие ключи для старых записей)
@@ -159,6 +160,10 @@ def normalize_indexable_mill_cutter(raw) -> str:
         "высокоскоростная": "high_speed",
         "т-образная": "disc",
         "сферическая": "ball",
+        "резьбовая": "thread",
+        "резьбовой": "thread",
+        "threading": "thread",
+        "thread_mill": "thread",
     }
     v = aliases.get(v, v)
     if v in INDEXABLE_MILL_CUTTER_VALUES:

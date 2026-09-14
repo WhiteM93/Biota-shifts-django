@@ -751,7 +751,7 @@ var INV = (function () {
 
     // материалы по типу
     var picker = root.querySelector(".js-tool-filter-material-picker");
-    if (picker && category !== "collet") {
+    if (picker && category !== "collet" && category !== "tool_extension") {
       var present = {};
       Array.prototype.forEach.call(toolSelect.options, function (opt, idx) {
         if (idx === 0) return;
@@ -1555,6 +1555,7 @@ var INV = (function () {
     reamer: { key: "rm_diameter_mm", label: "диаметр D (мм) для развертки" },
     end_mill: { key: "em_diameter_mm", label: "диаметр D (мм) для фрезы" },
     body_tool: { key: "bt_diameter_mm", label: "диаметр Dост (мм) для корпусного инструмента" },
+    tool_extension: { key: "main_diameter_mm", label: "диаметр Dосн (мм) для удлинителя" },
     center_drill: { key: "cd_diameter_mm", label: "диаметр D (мм) для центровки" },
     countersink: { key: "cs_diameter_mm", label: "диаметр D (мм) для зенкера" },
   };
@@ -1629,6 +1630,16 @@ var INV = (function () {
           issues.push({
             msg: "Строка " + (i + 1) + ": укажите вид фрезы.",
             el: cutEl,
+          });
+        }
+      }
+      if (cat === "tool_extension") {
+        var clampEl = tr.querySelector('[data-k="ext_clamp_type"]');
+        if (!clampEl || !(clampEl.value || "").trim()) {
+          if (clampEl) clampEl.classList.add("is-invalid");
+          issues.push({
+            msg: "Строка " + (i + 1) + ": укажите тип зажима удлинителя.",
+            el: clampEl,
           });
         }
       }
@@ -1960,6 +1971,7 @@ var INV = (function () {
     insert: "Пластинки",
     collet: "Цанги",
     body_tool: "Корпусной инструмент",
+    tool_extension: "Удлинители",
   };
 
   (INV.collet_types || []).forEach(function (o) {
@@ -2528,6 +2540,15 @@ var INV = (function () {
       { key: "quantity", label: "Кол-во", cls: "qty-col" },
       { key: "row_remove", label: "" },
     ]),
+    tool_extension: arrivalHead([
+      { key: "brand", label: "Бренд" },
+      { key: "ext_clamp", label: "Зажим" },
+      { key: "D_shank", label: "Dосн", cls: "short-col" },
+      { key: "ext_compat", label: "Подходит" },
+      { key: "notes", label: "Описание" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
     tap: arrivalHead([
       { key: "tap_size", label: "Размер", cls: "tap-size-col" },
       { key: "tap_thread_kind", label: "Тип резьбы" },
@@ -2705,6 +2726,20 @@ var INV = (function () {
       cells.push(arrivalRequiredDiamCell("bt_diameter_mm"));
       cells.push('<td class="short-col"><input type="number" data-k="bt_teeth_count" min="1" placeholder="Z"></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="bt_mount_diameter_mm" placeholder="d"></td>');
+      cells.push('<td><input type="text" data-k="notes" maxlength="300" placeholder="Описание" title="Описание"></td>');
+      cells.push(arrivalAddressCellHtml(""));
+      cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+    } else if (cat === "tool_extension") {
+      var clampOpts = INV.tool_extension_clamp_types || [];
+      var compatPh = (INV.tool_extension_compat_placeholders && INV.tool_extension_compat_placeholders.collet) || "Цанги / винты…";
+      cells.push('<td><input type="text" data-k="ext_brand" maxlength="80" placeholder="Sandvik"></td>');
+      cells.push('<td><select data-k="ext_clamp_type" class="js-ext-clamp-type" required>' + buildOptionsHtml(clampOpts) + "</select></td>");
+      cells.push(arrivalRequiredDiamCell("main_diameter_mm"));
+      cells.push(
+        '<td><input type="text" data-k="ext_compatible_parts" class="js-ext-compat" maxlength="120" placeholder="' +
+          compatPh.replace(/"/g, "&quot;") +
+          '" title="Подходящие цанги или винты"></td>'
+      );
       cells.push('<td><input type="text" data-k="notes" maxlength="300" placeholder="Описание" title="Описание"></td>');
       cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
@@ -2886,6 +2921,13 @@ var INV = (function () {
     var t = e.target;
     var tr = t && t.closest && t.closest("tr[data-arrival-row]");
     if (!tr) return;
+    if (t.getAttribute("data-k") === "ext_clamp_type") {
+      var compat = tr.querySelector(".js-ext-compat");
+      var phMap = INV.tool_extension_compat_placeholders || {};
+      if (compat) {
+        compat.placeholder = phMap[t.value] || "Цанги / винты…";
+      }
+    }
     if (tr.classList.contains("is-existing-pick") && t.getAttribute("data-k") !== "quantity") {
       var hid = tr.querySelector('[data-k="existing_tool_id"]');
       if (hid) hid.value = "";
@@ -3027,6 +3069,8 @@ var INV = (function () {
   (INV.body_tool_shank_types || []).forEach(function (x) {
     if (!bodyShankLabels[x.value]) bodyShankLabels[x.value] = x.label;
   });
+  var extClampLabels = {};
+  (INV.tool_extension_clamp_types || []).forEach(function (x) { extClampLabels[x.value] = x.label; });
   var hsBodyStyleLabels = { "": "—" };
   (INV.high_speed_body_styles || []).forEach(function (x) { hsBodyStyleLabels[x.value] = x.label; });
   var hsAngleLabels = {};
@@ -3147,6 +3191,9 @@ var INV = (function () {
     if (field === "body_cutter") return bodyCutterLabels[v] || v;
     if (field === "bt_coupling") return bodyCouplingLabels[v] || v || "—";
     if (field === "bt_shank_type") return bodyShankLabels[v] || v || "—";
+    if (field === "ext_clamp_type") return extClampLabels[v] || v || "-";
+    if (field === "ext_brand") return v || "-";
+    if (field === "ext_compatible_parts") return v || "-";
     if (field === "bt_insert_family") return (v || "-").toString().toUpperCase();
     if (field === "bt_insert_size") return v || "-";
     if (field === "bt_coolant") return v === "1" ? "Есть" : "Нет";
@@ -3240,6 +3287,8 @@ var INV = (function () {
       options = fromMap(bodyCouplingLabels);
     } else if (field === "bt_shank_type") {
       options = fromMap(bodyShankLabels);
+    } else if (field === "ext_clamp_type") {
+      options = fromMap(extClampLabels);
     } else if (field === "bt_mount_thread") {
       options = fromMap(modularThreadLabels);
     } else if (field === "bt_coolant") {

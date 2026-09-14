@@ -741,6 +741,51 @@
       {% endfor %}
     </tbody>
   </table>
+
+  {% elif filters.category == "tool_extension" %}
+  <table class="data-grid inv-stock-grid js-sortable-table">
+    <thead>
+      <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
+        <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
+        <th class="sortable hint-cell" data-hint="Тип зажима удлинителя">Зажим</th>
+        <th class="sortable hint-cell" data-hint="Основной диаметр удлинителя">Dосн, мм</th>
+        <th class="sortable hint-cell" data-hint="Подходящие цанги (для цангового) или винты (для боковой/термо)">Подходит</th>
+        <th class="sortable hint-cell inv-stock-notes-text-col" data-hint="Описание позиции">Описание</th>
+        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
+        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tool_items %}
+      {% with e=t.tool_extension_spec %}
+      <tr>
+        <td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
+        <td data-sort="{% if e %}{{ e.brand|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and e %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ext_brand" data-type="text" data-value="{{ e.brand|default:'' }}"{% endif %}>{% if e %}{{ e.brand|default:"-" }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if e %}{{ e.get_clamp_type_display|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and e %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ext_clamp_type" data-type="select" data-value="{{ e.clamp_type|default:'' }}"{% endif %}>{% if e %}{{ e.get_clamp_type_display|default:"-" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.main_diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="main_diameter_mm" data-type="number" data-value="{{ t.main_diameter_mm|default:'' }}"{% endif %}>{% if t.main_diameter_mm is not None %}Ø{{ t.main_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if e %}{{ e.compatible_parts|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and e %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ext_compatible_parts" data-type="text" data-value="{{ e.compatible_parts|default:'' }}"{% endif %}>{% if e %}{{ e.compatible_parts|default:"-" }}{% else %}-{% endif %}</td>
+        <td class="inv-stock-notes-text-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}>{{ t.notes|default:"-" }}</td>
+        <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
+        {% if can_manage_stock %}
+        <td class="inv-stock-col-delete">
+          <form method="post" class="inv-stock-delete-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_tool_item">
+            <input type="hidden" name="tool_id" value="{{ t.id }}">
+            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
+              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            </button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% endwith %}
+      {% empty %}
+      <tr><td colspan="{% if can_manage_stock %}8{% else %}7{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
   {% endif %}
 
     </div>
@@ -918,6 +963,23 @@
         <option value="">Все</option>
         {% for key, label in er_collet_sizes %}
         <option value="{{ key }}" {% if filters.collet_er_size == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "tool_extension" %}
+    <label class="field"><span>Зажим</span>
+      <select name="ext_clamp_type">
+        <option value="">Все</option>
+        {% for key, label in tool_extension_clamp_types %}
+        <option value="{{ key }}" {% if filters.ext_clamp_type == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Dосн, мм</span>
+      <select name="ext_main_diameter_mm">
+        <option value="">Все</option>
+        {% for v in tool_extension_filter_options.diameters %}
+        <option value="{{ v }}" {% if filters.ext_main_diameter_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -1203,7 +1265,24 @@
       </select>
     </label>
     {% endif %}
-    {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "insert" %}
+        {% elif filters.category == "tool_extension" %}
+    <label class="field"><span>Бренд</span>
+      <select name="ext_brand">
+        <option value="">Все</option>
+        {% for v in tool_extension_filter_options.brands %}
+        <option value="{{ v }}" {% if filters.ext_brand == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Подходит</span>
+      <select name="ext_compatible_parts">
+        <option value="">Все</option>
+        {% for v in tool_extension_filter_options.compats %}
+        <option value="{{ v }}" {% if filters.ext_compatible_parts == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "insert" and filters.category != "tool_extension" %}
     <label class="field"><span>Материал инструмента</span>
       <select name="tool_material" class="js-stock-filter-tool-material">
         <option value="">Все</option>
@@ -1218,7 +1297,7 @@
       <input type="text" name="tool_material_custom" maxlength="80" class="js-stock-filter-tool-material-custom" placeholder="Свой вариант, до 80 символов" value="{{ filters.tool_material_custom }}" autocomplete="off" {% if filters.tool_material_select != tool_material_filter_other %}style="display:none;margin-top:6px;max-width:100%;"{% else %}style="margin-top:6px;max-width:100%;"{% endif %} />
     </label>
     {% endif %}
-    {% if filters.category != "collet" and filters.category != "body_tool" %}
+    {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "tool_extension" %}
     <div class="field">
       <span{% if filters.category == "insert" %} title="{{ insert_column_tooltips.coating }}"{% endif %}>Материал покрытия</span>
       <div class="coating-picker"{% if filters.category == "insert" %} title="{{ insert_column_tooltips.coating }}"{% endif %}>
@@ -3031,6 +3110,9 @@
   "indexable_mill_cutter_types": [{% for key, label in indexable_mill_cutter_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "body_tool_kind_types": [{% for key, label in body_tool_kind_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "body_tool_mount_types": [{% for key, label in body_tool_mount_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "tool_extension_clamp_types": [{% for key, label in tool_extension_clamp_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "tool_extension_compat_placeholders": { {% for k, v in tool_extension_compat_placeholders.items %}"{{ k|escapejs }}":"{{ v|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %} },
+  "tool_extension_compat_labels": { {% for k, v in tool_extension_compat_labels.items %}"{{ k|escapejs }}":"{{ v|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %} },
   "body_tool_couplings": [{% for key, label in body_tool_couplings %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "thread_standards": [{% for key, label in thread_standards %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "thread_kinds": [{% for key, label in thread_kinds %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
