@@ -483,7 +483,8 @@ class ToolItem(models.Model):
                 ),
                 (("СОЖ" if bt.coolant_through else "без СОЖ") if bt else "—"),
                 (
-                    " ".join(
+                    ((bt.insert_compat or "").strip() if bt else "")
+                    or " ".join(
                         x
                         for x in [
                             (bt.insert_family or "").strip().upper() if bt else "",
@@ -682,17 +683,18 @@ class ToolItem(models.Model):
                 if bt.cutter_type == "disc" and bt.cutting_length_mm is not None:
                     specs_parts.append(f"H={fmt_mm(bt.cutting_length_mm)} мм")
                 specs_parts.append("СОЖ" if bt.coolant_through else "без СОЖ")
-                ins_bits = []
-                if bt.cutter_type in ("ball", "modular_head") and (bt.insert_compat or "").strip():
+                if (bt.insert_compat or "").strip():
                     specs_parts.append(bt.insert_compat.strip())
                 if bt.cutter_type == "modular_head" and (bt.mount_thread or "").strip():
                     specs_parts.append(bt.get_mount_thread_display())
-                if (bt.insert_family or "").strip():
-                    ins_bits.append(bt.insert_family.strip().upper())
-                if (bt.insert_size or "").strip():
-                    ins_bits.append(bt.insert_size.strip())
-                if ins_bits:
-                    specs_parts.append(" ".join(ins_bits))
+                if not (bt.insert_compat or "").strip():
+                    ins_bits = []
+                    if (bt.insert_family or "").strip():
+                        ins_bits.append(bt.insert_family.strip().upper())
+                    if (bt.insert_size or "").strip():
+                        ins_bits.append(bt.insert_size.strip())
+                    if ins_bits:
+                        specs_parts.append(" ".join(ins_bits))
                 if bt.ap_max_mm is not None:
                     specs_parts.append(f"ap={fmt_mm(bt.ap_max_mm)} мм")
                 if bt.approach_angle_deg is not None:
@@ -840,8 +842,12 @@ class ToolItem(models.Model):
                 out["length"] = fmt_num(bt.overall_length_mm)
                 out["cutting_length"] = fmt_num(bt.cutting_length_mm)
                 out["teeth"] = str(bt.teeth_count) if bt.teeth_count is not None else ""
-                out["ins_family"] = (bt.insert_family or "").strip()
-                out["size_label"] = (bt.insert_size or "").strip()
+                out["ins_family"] = (
+                    (bt.insert_compat or "").strip()
+                    or (bt.insert_family or "").strip()
+                )
+                out["size_label"] = "" if (bt.insert_compat or "").strip() else (bt.insert_size or "").strip()
+                out["insert_compat"] = (bt.insert_compat or "").strip()
                 out["angle"] = fmt_num(bt.approach_angle_deg)
                 out["shank_type"] = (bt.shank_type or "").strip()
                 out["length"] = fmt_num(bt.mount_diameter_mm)
@@ -1260,7 +1266,7 @@ class BodyToolSpec(models.Model):
     cutter_type = models.CharField(
         max_length=20,
         choices=INDEXABLE_MILL_CUTTER_TYPES,
-        default="face",
+        default="end",
         verbose_name="Тип фрезы",
     )
     diameter_mm = models.DecimalField(

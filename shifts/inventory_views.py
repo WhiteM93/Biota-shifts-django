@@ -36,6 +36,8 @@ from .auth_utils import (
 from .body_tool_constants import (
     BODY_TOOL_COUPLINGS,
     BODY_TOOL_FAMILIES,
+    BODY_TOOL_KIND_TYPES,
+    BODY_TOOL_MOUNT_TYPES,
     BODY_TOOL_SHANK_TYPES,
     BALL_MILL_SHANK_TYPES,
     CHAMFER_MILL_SHANK_TYPES,
@@ -309,9 +311,9 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
         return errs
     if category == "body_tool":
         if not (row.get("body_cutter") or "").strip():
-            errs.append(f"Строка {idx}: укажите тип корпусной фрезы.")
+            errs.append(f"Строка {idx}: укажите вид фрезы.")
         if _to_decimal_or_none(row.get("bt_diameter_mm")) is None:
-            errs.append(f"Строка {idx}: укажите диаметр D (мм) для корпусного инструмента.")
+            errs.append(f"Строка {idx}: укажите диаметр Dост (мм) для корпусного инструмента.")
         return errs
     if category == "insert":
         iname = normalize_insert_item_name(row.get("ins_name") or row.get("item_name"))
@@ -471,7 +473,7 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
             qs = qs.filter(body_tool_spec__insert_size=ins_s)
         compat = (row.get("bt_insert_compat") or "").strip()[:80]
         if compat:
-            qs = qs.filter(body_tool_spec__insert_compat__iexact=compat)
+            qs = qs.filter(body_tool_spec__insert_compat__icontains=compat)
         mount_thread = normalize_modular_head_thread(row.get("bt_mount_thread"))
         if mount_thread:
             qs = qs.filter(body_tool_spec__mount_thread=mount_thread)
@@ -725,7 +727,7 @@ _STOCK_INLINE_FIELD_LABELS = {
     "bt_has_purpose": "Назначение",
     "bt_hs_body_style": "Корпус",
     "bt_brand": "Бренд",
-    "bt_insert_compat": "Совместимость",
+    "bt_insert_compat": "Подходящие пластины",
     "bt_mount_thread": "Резьба крепления",
     "bt_shank_type": "Хвостовик",
     "size_label": "Размер",
@@ -1924,13 +1926,14 @@ def _body_insert_size_from_row(data) -> str:
 
 
 def _body_tool_name_from_spec(bt) -> str:
+    compat = (bt.insert_compat or "").strip()
     return build_body_tool_display_name(
         family=bt.family,
         cutter_type=bt.cutter_type,
         diameter_mm=bt.diameter_mm,
         teeth_count=bt.teeth_count,
-        insert_family=bt.insert_family,
-        insert_size=bt.insert_size,
+        insert_family=compat or bt.insert_family,
+        insert_size="" if compat else bt.insert_size,
         brand=bt.brand,
     )
 
@@ -2478,8 +2481,9 @@ def inventory_view(request):
             bt.cutting_length_mm = _to_decimal_or_none(request.POST.get("bt_cutting_length_mm"))
             bt.teeth_count = _to_int_or_none(request.POST.get("bt_teeth_count"))
             bt.coupling = normalize_body_tool_coupling(request.POST.get("bt_coupling"))
-            bt.insert_family = _body_insert_family_from_row(request.POST)
-            bt.insert_size = _body_insert_size_from_row(request.POST)
+            bt.insert_family = ""
+            bt.insert_size = ""
+            bt.insert_compat = (request.POST.get("bt_insert_compat") or "").strip()[:80]
             bt.mount_diameter_mm = _to_decimal_or_none(request.POST.get("bt_mount_diameter_mm"))
             bt.coolant_through = _to_bool(request.POST.get("bt_coolant"))
             bt.ap_max_mm = _to_decimal_or_none(request.POST.get("bt_ap_max_mm"))
@@ -2503,10 +2507,7 @@ def inventory_view(request):
                 bt.coupling = derived
             bt.size_label = ""
             if bt.cutter_type == "ball":
-                bt.insert_compat = (request.POST.get("bt_insert_compat") or "").strip()[:80]
                 bt.mount_thread = ""
-                bt.insert_family = ""
-                bt.insert_size = ""
                 bt.approach_angle_deg = None
                 bt.variable_angle = False
                 bt.ap_max_mm = None
@@ -2514,12 +2515,9 @@ def inventory_view(request):
                 bt.has_purpose = False
                 bt.corner_radius_mm = None
             elif bt.cutter_type == "modular_head":
-                bt.insert_compat = (request.POST.get("bt_insert_compat") or "").strip()[:80]
                 bt.mount_thread = normalize_modular_head_thread(request.POST.get("bt_mount_thread"))
                 bt.coupling = "modular"
                 bt.shank_type = ""
-                bt.insert_family = ""
-                bt.insert_size = ""
                 bt.overall_length_mm = None
                 bt.cutting_length_mm = None
                 bt.approach_angle_deg = None
@@ -2529,7 +2527,6 @@ def inventory_view(request):
                 bt.has_purpose = False
                 bt.corner_radius_mm = None
             else:
-                bt.insert_compat = ""
                 bt.mount_thread = ""
             bt.save()
             tool.name = _body_tool_name_from_spec(bt)
@@ -2839,7 +2836,9 @@ def inventory_view(request):
                     bt.save(update_fields=["corner_radius_mm"])
                 elif field == "bt_insert_compat":
                     bt.insert_compat = (value_raw or "").strip()[:80]
-                    bt.save(update_fields=["insert_compat"])
+                    bt.insert_family = ""
+                    bt.insert_size = ""
+                    bt.save(update_fields=["insert_compat", "insert_family", "insert_size"])
                 elif field == "bt_mount_thread":
                     bt.mount_thread = normalize_modular_head_thread(value_raw)
                     bt.coupling = "modular"
@@ -3485,70 +3484,27 @@ def inventory_view(request):
                             flutes_count=flutes_count,
                         )
                 elif category == "body_tool":
-                    family = normalize_body_tool_family(row.get("body_family"))
+                    family = normalize_body_tool_family(row.get("body_family")) or "indexable_mill"
                     cutter_type = normalize_indexable_mill_cutter(row.get("body_cutter"))
                     diameter_mm = _to_decimal_or_none(row.get("bt_diameter_mm"))
-                    overall_length_mm = _to_decimal_or_none(row.get("bt_overall_length_mm"))
-                    cutting_length_mm = _to_decimal_or_none(row.get("bt_cutting_length_mm"))
+                    overall_length_mm = None
+                    cutting_length_mm = None
                     teeth_count = _to_int_or_none(row.get("bt_teeth_count"))
-                    coupling = normalize_body_tool_coupling(row.get("bt_coupling"))
-                    insert_family = _body_insert_family_from_row(row)
-                    insert_size = _body_insert_size_from_row(row)
+                    insert_family = ""
+                    insert_size = ""
                     mount_diameter_mm = _to_decimal_or_none(row.get("bt_mount_diameter_mm"))
-                    coolant_through = _to_bool(row.get("bt_coolant"))
-                    ap_max_mm = _to_decimal_or_none(row.get("bt_ap_max_mm"))
+                    coolant_through = False
+                    ap_max_mm = None
                     brand = (row.get("bt_brand") or "").strip()[:80]
                     shank_type = normalize_body_tool_shank(row.get("bt_shank_type"))
-                    hs_body_style = normalize_high_speed_body_style(row.get("bt_hs_body_style"))
-                    has_purpose = _to_bool(row.get("bt_has_purpose"))
-                    corner_radius_mm = _to_decimal_or_none(row.get("bt_corner_radius_mm"))
+                    hs_body_style = ""
+                    has_purpose = False
+                    corner_radius_mm = None
                     insert_compat = (row.get("bt_insert_compat") or "").strip()[:80]
-                    mount_thread = normalize_modular_head_thread(row.get("bt_mount_thread"))
-                    if cutter_type == "ball":
-                        insert_family = ""
-                        insert_size = ""
-                        approach_angle_deg = None
-                        variable_angle = False
-                        ap_max_mm = None
-                        hs_body_style = ""
-                        has_purpose = False
-                        corner_radius_mm = None
-                        mount_thread = ""
-                    elif cutter_type == "modular_head":
-                        insert_family = ""
-                        insert_size = ""
-                        overall_length_mm = None
-                        cutting_length_mm = None
-                        approach_angle_deg = None
-                        variable_angle = False
-                        ap_max_mm = None
-                        hs_body_style = ""
-                        has_purpose = False
-                        corner_radius_mm = None
-                        shank_type = ""
-                        coupling = "modular"
-                    else:
-                        insert_compat = ""
-                        mount_thread = ""
-                    ang_val, ang_var = parse_angle_or_variable(row.get("bt_angle_deg"))
-                    if cutter_type not in ("ball", "modular_head"):
-                        if ang_var:
-                            variable_angle = True
-                            approach_angle_deg = None
-                        else:
-                            variable_angle = _to_bool(row.get("bt_variable_angle"))
-                            approach_angle_deg = _to_decimal_or_none(
-                                ang_val if ang_val is not None else row.get("bt_angle_deg")
-                            )
-                            if variable_angle:
-                                approach_angle_deg = None
-                    derived = coupling_from_shank(shank_type)
-                    if derived:
-                        coupling = derived
-                    elif cutter_type == "end" and not coupling:
-                        coupling = "shank"
-                    elif cutter_type == "modular_head":
-                        coupling = "modular"
+                    mount_thread = ""
+                    approach_angle_deg = None
+                    variable_angle = False
+                    coupling = coupling_from_shank(shank_type)
                     tool = (
                         ToolItem.objects.select_for_update()
                         .filter(
@@ -3558,22 +3514,11 @@ def inventory_view(request):
                             body_tool_spec__family=family,
                             body_tool_spec__cutter_type=cutter_type,
                             body_tool_spec__diameter_mm=diameter_mm,
-                            body_tool_spec__overall_length_mm=overall_length_mm,
                             body_tool_spec__teeth_count=teeth_count,
-                            body_tool_spec__insert_family=insert_family,
-                            body_tool_spec__insert_size=insert_size,
                             body_tool_spec__insert_compat=insert_compat,
                             body_tool_spec__mount_diameter_mm=mount_diameter_mm,
-                            body_tool_spec__mount_thread=mount_thread,
-                            body_tool_spec__coolant_through=coolant_through,
-                            body_tool_spec__ap_max_mm=ap_max_mm,
-                            body_tool_spec__approach_angle_deg=approach_angle_deg,
                             body_tool_spec__brand=brand,
                             body_tool_spec__shank_type=shank_type,
-                            body_tool_spec__variable_angle=variable_angle,
-                            body_tool_spec__hs_body_style=hs_body_style,
-                            body_tool_spec__has_purpose=has_purpose,
-                            body_tool_spec__corner_radius_mm=corner_radius_mm,
                         )
                         .first()
                     )
@@ -3588,8 +3533,8 @@ def inventory_view(request):
                                 cutter_type=cutter_type,
                                 diameter_mm=diameter_mm,
                                 teeth_count=teeth_count,
-                                insert_family=insert_family or insert_compat,
-                                insert_size=insert_size,
+                                insert_family=insert_compat or insert_family,
+                                insert_size="" if insert_compat else insert_size,
                                 brand=brand,
                             ),
                             tool_material=tool_material,
@@ -3868,7 +3813,7 @@ def inventory_view(request):
                 if addr and (tool.warehouse_address or "") != addr:
                     tool.warehouse_address = addr
                     tool.save(update_fields=["warehouse_address", "updated_at"])
-                if category == "insert":
+                if category in ("insert", "body_tool"):
                     notes = (row.get("notes") or "").strip()[:300]
                     if notes and (tool.notes or "") != notes:
                         tool.notes = notes
@@ -4875,8 +4820,10 @@ def inventory_view(request):
         },
         "body_tool_families": BODY_TOOL_FAMILIES,
         "indexable_mill_cutter_types": INDEXABLE_MILL_CUTTER_TYPES,
+        "body_tool_kind_types": BODY_TOOL_KIND_TYPES,
         "body_tool_couplings": BODY_TOOL_COUPLINGS,
         "body_tool_shank_types": BODY_TOOL_SHANK_TYPES,
+        "body_tool_mount_types": BODY_TOOL_MOUNT_TYPES,
         "end_mill_shank_types": END_MILL_SHANK_TYPES,
         "chamfer_mill_shank_types": CHAMFER_MILL_SHANK_TYPES,
         "high_speed_shank_types": HIGH_SPEED_SHANK_TYPES,

@@ -341,23 +341,19 @@
     </tbody>
   </table>
   {% elif filters.category == "body_tool" %}
-  {% if filters.body_cutter == "end" %}
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
       <tr>
         <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable hint-cell" data-hint="Группа корпусного инструмента (фрезы со сменными пластинами и т.п.)">Семейство</th>
-        <th class="sortable hint-cell" data-hint="Тип фрезы со сменными пластинами">Тип</th>
         <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
-        <th class="sortable hint-cell" data-hint="Тип хвостовика или посадки корпуса">Хвостовик</th>
+        <th class="sortable hint-cell" data-hint="Вид фрезы">Вид</th>
+        <th class="sortable hint-cell" data-hint="Крепление: насадная, цилиндрическая, Weldon">Крепление</th>
         <th class="sortable hint-cell inv-stock-photo-col" data-hint="Фото корпуса — нажмите на иконку">Фото</th>
         <th class="sortable hint-cell inv-stock-notes-col" data-hint="Описание позиции — наведите на иконку в строке" aria-label="Описание"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></th>
-        <th class="sortable hint-cell" data-hint="Диаметр фрезы">ØD, мм</th>
-        <th class="sortable hint-cell" data-hint="Диаметр хвостовика или посадки">d, мм</th>
-        <th class="sortable hint-cell" data-hint="Общая длина">L, мм</th>
+        <th class="sortable hint-cell" data-hint="Формфактор — подходящие пластины">Формфактор</th>
+        <th class="sortable hint-cell" data-hint="Наружный диаметр">Dост, мм</th>
         <th class="sortable hint-cell" data-hint="Число зубьев / пластин">Z</th>
-        <th class="sortable hint-cell" data-hint="Семейство / формфактор сменной пластины (APKT, SEHT и др.)">Формфактор</th>
-        <th class="sortable hint-cell" data-hint="Типоразмер сменной пластины">Размер пластины</th>
+        <th class="sortable hint-cell" data-hint="Диаметр хвостовика или посадки">d, мм</th>
         <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
         {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
       </tr>
@@ -366,308 +362,17 @@
       {% for t in tool_items %}
       <tr>
 <td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_family_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_family" data-type="select" data-value="{{ t.body_tool_spec.family|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_family_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
+        <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_shank_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_shank_type" data-type="select" data-value="{{ t.body_tool_spec.shank_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_shank_type_display|default:"-" }}</td>
         <td class="inv-stock-photo-col" data-tool-id="{{ t.id }}"><div class="inv-stock-photo-wrap" data-photo-url="{% if t.body_tool_spec.photo %}{{ t.body_tool_spec.photo.url }}{% endif %}">{% if t.body_tool_spec.photo or can_manage_stock %}<button type="button" class="inv-stock-photo-btn js-inv-stock-photo-btn{% if t.body_tool_spec.photo %} has-photo{% endif %}" title="{% if t.body_tool_spec.photo %}Фото корпуса{% if can_manage_stock %} (Alt+клик — заменить){% endif %}{% else %}Прикрепить фото{% endif %}" aria-label="{% if t.body_tool_spec.photo %}Открыть фото{% else %}Прикрепить фото{% endif %}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 3a2 2 0 00-2 2v1H5a2 2 0 00-2 2v11a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a2 2 0 00-2-2H9zm0 2h6v1H9V5zm-2 4h10v9H7V9zm5 1.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/></svg></button>{% if can_manage_stock %}<input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="inv-stock-photo-input" hidden />{% endif %}{% else %}<span class="inv-stock-photo-empty muted">—</span>{% endif %}</div></td>
         <td class="inv-stock-notes-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}><span class="inv-stock-notes-tip{% if not t.notes %} is-empty{% endif %}" {% if t.notes %}data-hint="{{ t.notes|escape }}"{% else %}title="Нет описания"{% endif %} aria-label="{% if t.notes %}{{ t.notes|escape }}{% else %}Нет описания{% endif %}"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span></td>
+        <td data-sort="{{ t.body_tool_spec.insert_compat|default:t.body_tool_spec.insert_family|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_compat" data-type="text" data-value="{{ t.body_tool_spec.insert_compat|default:'' }}"{% endif %}>{% if t.body_tool_spec.insert_compat %}{{ t.body_tool_spec.insert_compat }}{% elif t.body_tool_spec.insert_family or t.body_tool_spec.insert_size %}{{ t.body_tool_spec.insert_family }}{% if t.body_tool_spec.insert_family and t.body_tool_spec.insert_size %} {% endif %}{{ t.body_tool_spec.insert_size }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.body_tool_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="bt_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.diameter_mm|default:'' }}"{% endif %}>
           {% if t.body_tool_spec.diameter_mm %}Ø{{ t.body_tool_spec.diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}
         </td>
-        <td data-sort="{{ t.body_tool_spec.mount_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_mount_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.mount_diameter_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.mount_diameter_mm is not None %}{{ t.body_tool_spec.mount_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.overall_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_overall_length_mm" data-type="number" data-value="{{ t.body_tool_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.overall_length_mm is not None %}{{ t.body_tool_spec.overall_length_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.body_tool_spec.teeth_count|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_teeth_count" data-type="int" data-value="{{ t.body_tool_spec.teeth_count|default:'' }}"{% endif %}>{{ t.body_tool_spec.teeth_count|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_family|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_family" data-type="text" data-value="{{ t.body_tool_spec.insert_family|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_family|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_size|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_size" data-type="text" data-value="{{ t.body_tool_spec.insert_size|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_size|default:"-" }}</td>
-        <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
-        {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
-      </tr>
-      {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}15{% else %}14{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% elif filters.body_cutter == "chamfer" %}
-  <table class="data-grid inv-stock-grid js-sortable-table">
-    <thead>
-      <tr>
-        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable hint-cell" data-hint="Группа корпусного инструмента (фрезы со сменными пластинами и т.п.)">Семейство</th>
-        <th class="sortable hint-cell" data-hint="Тип фрезы со сменными пластинами">Тип</th>
-        <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
-        <th class="sortable hint-cell" data-hint="Тип хвостовика или посадки корпуса">Хвостовик</th>
-        <th class="sortable hint-cell inv-stock-photo-col" data-hint="Фото корпуса — нажмите на иконку">Фото</th>
-        <th class="sortable hint-cell inv-stock-notes-col" data-hint="Описание позиции — наведите на иконку в строке" aria-label="Описание"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></th>
-        <th class="sortable hint-cell" data-hint="Диаметр фрезы">ØD, мм</th>
-        <th class="sortable hint-cell" data-hint="Диаметр хвостовика или посадки">d, мм</th>
-        <th class="sortable hint-cell" data-hint="Число зубьев / пластин">Z</th>
-        <th class="sortable hint-cell" data-hint="Особенности: с переменным углом">Перем. угол</th>
-        <th class="sortable hint-cell" data-hint="Семейство / формфактор сменной пластины (APKT, SEHT и др.)">Формфактор</th>
-        <th class="sortable hint-cell" data-hint="Типоразмер сменной пластины">Размер пластины</th>
-        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in tool_items %}
-      <tr>
-<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_family_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_family" data-type="select" data-value="{{ t.body_tool_spec.family|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_family_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_shank_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_shank_type" data-type="select" data-value="{{ t.body_tool_spec.shank_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_shank_type_display|default:"-" }}</td>
-        <td class="inv-stock-photo-col" data-tool-id="{{ t.id }}"><div class="inv-stock-photo-wrap" data-photo-url="{% if t.body_tool_spec.photo %}{{ t.body_tool_spec.photo.url }}{% endif %}">{% if t.body_tool_spec.photo or can_manage_stock %}<button type="button" class="inv-stock-photo-btn js-inv-stock-photo-btn{% if t.body_tool_spec.photo %} has-photo{% endif %}" title="{% if t.body_tool_spec.photo %}Фото корпуса{% if can_manage_stock %} (Alt+клик — заменить){% endif %}{% else %}Прикрепить фото{% endif %}" aria-label="{% if t.body_tool_spec.photo %}Открыть фото{% else %}Прикрепить фото{% endif %}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 3a2 2 0 00-2 2v1H5a2 2 0 00-2 2v11a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a2 2 0 00-2-2H9zm0 2h6v1H9V5zm-2 4h10v9H7V9zm5 1.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/></svg></button>{% if can_manage_stock %}<input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="inv-stock-photo-input" hidden />{% endif %}{% else %}<span class="inv-stock-photo-empty muted">—</span>{% endif %}</div></td>
-        <td class="inv-stock-notes-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}><span class="inv-stock-notes-tip{% if not t.notes %} is-empty{% endif %}" {% if t.notes %}data-hint="{{ t.notes|escape }}"{% else %}title="Нет описания"{% endif %} aria-label="{% if t.notes %}{{ t.notes|escape }}{% else %}Нет описания{% endif %}"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span></td>
-        <td data-sort="{{ t.body_tool_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="bt_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.diameter_mm|default:'' }}"{% endif %}>
-          {% if t.body_tool_spec.diameter_mm %}Ø{{ t.body_tool_spec.diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}
-        </td>
         <td data-sort="{{ t.body_tool_spec.mount_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_mount_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.mount_diameter_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.mount_diameter_mm is not None %}{{ t.body_tool_spec.mount_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.teeth_count|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_teeth_count" data-type="int" data-value="{{ t.body_tool_spec.teeth_count|default:'' }}"{% endif %}>{{ t.body_tool_spec.teeth_count|default:"-" }}</td>
-        <td data-sort="{% if t.body_tool_spec.variable_angle %}1{% else %}0{% endif %}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_variable_angle" data-type="select" data-value="{% if t.body_tool_spec.variable_angle %}1{% else %}0{% endif %}"{% endif %}>{% if t.body_tool_spec.variable_angle %}Да{% else %}Нет{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_family|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_family" data-type="text" data-value="{{ t.body_tool_spec.insert_family|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_family|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_size|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_size" data-type="text" data-value="{{ t.body_tool_spec.insert_size|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_size|default:"-" }}</td>
-        <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
-        {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
-      </tr>
-      {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}15{% else %}14{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% elif filters.body_cutter == "high_speed" %}
-  <table class="data-grid inv-stock-grid js-sortable-table">
-    <thead>
-      <tr>
-        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable hint-cell" data-hint="Группа корпусного инструмента (фрезы со сменными пластинами и т.п.)">Семейство</th>
-        <th class="sortable hint-cell" data-hint="Тип фрезы со сменными пластинами">Тип</th>
-        <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
-        <th class="sortable hint-cell" data-hint="Тип хвостовика или посадки корпуса">Хвостовик</th>
-        <th class="sortable hint-cell inv-stock-photo-col" data-hint="Фото корпуса — нажмите на иконку">Фото</th>
-        <th class="sortable hint-cell inv-stock-notes-col" data-hint="Описание позиции — наведите на иконку в строке" aria-label="Описание"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></th>
-        <th class="sortable hint-cell" data-hint="Диаметр фрезы">ØD, мм</th>
-        <th class="sortable hint-cell" data-hint="Диаметр хвостовика или посадки">d, мм</th>
-        <th class="sortable hint-cell" data-hint="Число зубьев / пластин">Z</th>
-        <th class="sortable hint-cell" data-hint="Тип корпуса: насадная или концевая">Насадная/концевая</th>
-        <th class="sortable hint-cell" data-hint="Есть ли специальное назначение у фрезы">Назначение</th>
-        <th class="sortable hint-cell" data-hint="Семейство / формфактор сменной пластины (APKT, SEHT и др.)">Формфактор</th>
-        <th class="sortable hint-cell" data-hint="Типоразмер сменной пластины">Размер пластины</th>
-        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in tool_items %}
-      <tr>
-<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_family_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_family" data-type="select" data-value="{{ t.body_tool_spec.family|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_family_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_shank_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_shank_type" data-type="select" data-value="{{ t.body_tool_spec.shank_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_shank_type_display|default:"-" }}</td>
-        <td class="inv-stock-photo-col" data-tool-id="{{ t.id }}"><div class="inv-stock-photo-wrap" data-photo-url="{% if t.body_tool_spec.photo %}{{ t.body_tool_spec.photo.url }}{% endif %}">{% if t.body_tool_spec.photo or can_manage_stock %}<button type="button" class="inv-stock-photo-btn js-inv-stock-photo-btn{% if t.body_tool_spec.photo %} has-photo{% endif %}" title="{% if t.body_tool_spec.photo %}Фото корпуса{% if can_manage_stock %} (Alt+клик — заменить){% endif %}{% else %}Прикрепить фото{% endif %}" aria-label="{% if t.body_tool_spec.photo %}Открыть фото{% else %}Прикрепить фото{% endif %}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 3a2 2 0 00-2 2v1H5a2 2 0 00-2 2v11a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a2 2 0 00-2-2H9zm0 2h6v1H9V5zm-2 4h10v9H7V9zm5 1.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/></svg></button>{% if can_manage_stock %}<input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="inv-stock-photo-input" hidden />{% endif %}{% else %}<span class="inv-stock-photo-empty muted">—</span>{% endif %}</div></td>
-        <td class="inv-stock-notes-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}><span class="inv-stock-notes-tip{% if not t.notes %} is-empty{% endif %}" {% if t.notes %}data-hint="{{ t.notes|escape }}"{% else %}title="Нет описания"{% endif %} aria-label="{% if t.notes %}{{ t.notes|escape }}{% else %}Нет описания{% endif %}"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span></td>
-        <td data-sort="{{ t.body_tool_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="bt_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.diameter_mm|default:'' }}"{% endif %}>
-          {% if t.body_tool_spec.diameter_mm %}Ø{{ t.body_tool_spec.diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}
-        </td>
-        <td data-sort="{{ t.body_tool_spec.mount_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_mount_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.mount_diameter_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.mount_diameter_mm is not None %}{{ t.body_tool_spec.mount_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.teeth_count|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_teeth_count" data-type="int" data-value="{{ t.body_tool_spec.teeth_count|default:'' }}"{% endif %}>{{ t.body_tool_spec.teeth_count|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_hs_body_style_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_hs_body_style" data-type="select" data-value="{{ t.body_tool_spec.hs_body_style|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_hs_body_style_display|default:"-" }}</td>
-        <td data-sort="{% if t.body_tool_spec.has_purpose %}1{% else %}0{% endif %}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_has_purpose" data-type="select" data-value="{% if t.body_tool_spec.has_purpose %}1{% else %}0{% endif %}"{% endif %}>{% if t.body_tool_spec.has_purpose %}Есть{% else %}Нет{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_family|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_family" data-type="text" data-value="{{ t.body_tool_spec.insert_family|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_family|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_size|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_size" data-type="text" data-value="{{ t.body_tool_spec.insert_size|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_size|default:"-" }}</td>
-        <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
-        {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
-      </tr>
-      {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}16{% else %}15{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% elif filters.body_cutter == "round_insert" %}
-  <table class="data-grid inv-stock-grid js-sortable-table">
-    <thead>
-      <tr>
-        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable hint-cell" data-hint="Группа корпусного инструмента (фрезы со сменными пластинами и т.п.)">Семейство</th>
-        <th class="sortable hint-cell" data-hint="Тип фрезы со сменными пластинами">Тип</th>
-        <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
-        <th class="sortable hint-cell" data-hint="Тип хвостовика или посадки корпуса">Хвостовик</th>
-        <th class="sortable hint-cell inv-stock-photo-col" data-hint="Фото корпуса — нажмите на иконку">Фото</th>
-        <th class="sortable hint-cell inv-stock-notes-col" data-hint="Описание позиции — наведите на иконку в строке" aria-label="Описание"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></th>
-        <th class="sortable hint-cell" data-hint="Диаметр фрезы">ØD, мм</th>
-        <th class="sortable hint-cell" data-hint="Диаметр хвостовика или посадки">d, мм</th>
-        <th class="sortable hint-cell" data-hint="Общая длина">L, мм</th>
-        <th class="sortable hint-cell" data-hint="Число зубьев / пластин">Z</th>
-        <th class="sortable hint-cell" data-hint="Тип корпуса: насадная или концевая">Насадная/концевая</th>
-        <th class="sortable hint-cell" data-hint="Радиус скругления / радиус круглой пластины">Радиус, мм</th>
-        <th class="sortable hint-cell" data-hint="Семейство / формфактор сменной пластины (APKT, SEHT и др.)">Формфактор</th>
-        <th class="sortable hint-cell" data-hint="Типоразмер сменной пластины">Размер пластины</th>
-        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in tool_items %}
-      <tr>
-<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_family_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_family" data-type="select" data-value="{{ t.body_tool_spec.family|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_family_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_shank_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_shank_type" data-type="select" data-value="{{ t.body_tool_spec.shank_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_shank_type_display|default:"-" }}</td>
-        <td class="inv-stock-photo-col" data-tool-id="{{ t.id }}"><div class="inv-stock-photo-wrap" data-photo-url="{% if t.body_tool_spec.photo %}{{ t.body_tool_spec.photo.url }}{% endif %}">{% if t.body_tool_spec.photo or can_manage_stock %}<button type="button" class="inv-stock-photo-btn js-inv-stock-photo-btn{% if t.body_tool_spec.photo %} has-photo{% endif %}" title="{% if t.body_tool_spec.photo %}Фото корпуса{% if can_manage_stock %} (Alt+клик — заменить){% endif %}{% else %}Прикрепить фото{% endif %}" aria-label="{% if t.body_tool_spec.photo %}Открыть фото{% else %}Прикрепить фото{% endif %}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 3a2 2 0 00-2 2v1H5a2 2 0 00-2 2v11a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a2 2 0 00-2-2H9zm0 2h6v1H9V5zm-2 4h10v9H7V9zm5 1.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/></svg></button>{% if can_manage_stock %}<input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="inv-stock-photo-input" hidden />{% endif %}{% else %}<span class="inv-stock-photo-empty muted">—</span>{% endif %}</div></td>
-        <td class="inv-stock-notes-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}><span class="inv-stock-notes-tip{% if not t.notes %} is-empty{% endif %}" {% if t.notes %}data-hint="{{ t.notes|escape }}"{% else %}title="Нет описания"{% endif %} aria-label="{% if t.notes %}{{ t.notes|escape }}{% else %}Нет описания{% endif %}"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span></td>
-        <td data-sort="{{ t.body_tool_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="bt_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.diameter_mm|default:'' }}"{% endif %}>
-          {% if t.body_tool_spec.diameter_mm %}Ø{{ t.body_tool_spec.diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}
-        </td>
-        <td data-sort="{{ t.body_tool_spec.mount_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_mount_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.mount_diameter_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.mount_diameter_mm is not None %}{{ t.body_tool_spec.mount_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.overall_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_overall_length_mm" data-type="number" data-value="{{ t.body_tool_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.overall_length_mm is not None %}{{ t.body_tool_spec.overall_length_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.teeth_count|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_teeth_count" data-type="int" data-value="{{ t.body_tool_spec.teeth_count|default:'' }}"{% endif %}>{{ t.body_tool_spec.teeth_count|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_hs_body_style_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_hs_body_style" data-type="select" data-value="{{ t.body_tool_spec.hs_body_style|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_hs_body_style_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.corner_radius_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_corner_radius_mm" data-type="number" data-value="{{ t.body_tool_spec.corner_radius_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.corner_radius_mm is not None %}{{ t.body_tool_spec.corner_radius_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_family|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_family" data-type="text" data-value="{{ t.body_tool_spec.insert_family|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_family|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_size|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_size" data-type="text" data-value="{{ t.body_tool_spec.insert_size|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_size|default:"-" }}</td>
-        <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
-        {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
-      </tr>
-      {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}17{% else %}16{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% elif filters.body_cutter == "disc" %}
-  <table class="data-grid inv-stock-grid js-sortable-table">
-    <thead>
-      <tr>
-        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable hint-cell" data-hint="Группа корпусного инструмента (фрезы со сменными пластинами и т.п.)">Семейство</th>
-        <th class="sortable hint-cell" data-hint="Тип фрезы со сменными пластинами">Тип</th>
-        <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
-        <th class="sortable hint-cell inv-stock-photo-col" data-hint="Фото корпуса — нажмите на иконку">Фото</th>
-        <th class="sortable hint-cell inv-stock-notes-col" data-hint="Описание позиции — наведите на иконку в строке" aria-label="Описание"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></th>
-        <th class="sortable hint-cell" data-hint="Диаметр фрезы">ØD, мм</th>
-        <th class="sortable hint-cell" data-hint="Диаметр хвостовика или посадки">d, мм</th>
-        <th class="sortable hint-cell" data-hint="Число зубьев / пластин">Z</th>
-        <th class="sortable hint-cell" data-hint="Ширина паза">H, мм</th>
-        <th class="sortable hint-cell" data-hint="Семейство / формфактор сменной пластины (APKT, SEHT и др.)">Формфактор</th>
-        <th class="sortable hint-cell" data-hint="Типоразмер сменной пластины">Размер пластины</th>
-        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in tool_items %}
-      <tr>
-<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_family_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_family" data-type="select" data-value="{{ t.body_tool_spec.family|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_family_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
-        <td class="inv-stock-photo-col" data-tool-id="{{ t.id }}"><div class="inv-stock-photo-wrap" data-photo-url="{% if t.body_tool_spec.photo %}{{ t.body_tool_spec.photo.url }}{% endif %}">{% if t.body_tool_spec.photo or can_manage_stock %}<button type="button" class="inv-stock-photo-btn js-inv-stock-photo-btn{% if t.body_tool_spec.photo %} has-photo{% endif %}" title="{% if t.body_tool_spec.photo %}Фото корпуса{% if can_manage_stock %} (Alt+клик — заменить){% endif %}{% else %}Прикрепить фото{% endif %}" aria-label="{% if t.body_tool_spec.photo %}Открыть фото{% else %}Прикрепить фото{% endif %}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 3a2 2 0 00-2 2v1H5a2 2 0 00-2 2v11a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a2 2 0 00-2-2H9zm0 2h6v1H9V5zm-2 4h10v9H7V9zm5 1.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/></svg></button>{% if can_manage_stock %}<input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="inv-stock-photo-input" hidden />{% endif %}{% else %}<span class="inv-stock-photo-empty muted">—</span>{% endif %}</div></td>
-        <td class="inv-stock-notes-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}><span class="inv-stock-notes-tip{% if not t.notes %} is-empty{% endif %}" {% if t.notes %}data-hint="{{ t.notes|escape }}"{% else %}title="Нет описания"{% endif %} aria-label="{% if t.notes %}{{ t.notes|escape }}{% else %}Нет описания{% endif %}"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span></td>
-        <td data-sort="{{ t.body_tool_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="bt_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.diameter_mm|default:'' }}"{% endif %}>
-          {% if t.body_tool_spec.diameter_mm %}Ø{{ t.body_tool_spec.diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}
-        </td>
-        <td data-sort="{{ t.body_tool_spec.mount_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_mount_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.mount_diameter_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.mount_diameter_mm is not None %}{{ t.body_tool_spec.mount_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.teeth_count|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_teeth_count" data-type="int" data-value="{{ t.body_tool_spec.teeth_count|default:'' }}"{% endif %}>{{ t.body_tool_spec.teeth_count|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.cutting_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_cutting_length_mm" data-type="number" data-value="{{ t.body_tool_spec.cutting_length_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.cutting_length_mm is not None %}{{ t.body_tool_spec.cutting_length_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_family|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_family" data-type="text" data-value="{{ t.body_tool_spec.insert_family|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_family|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_size|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_size" data-type="text" data-value="{{ t.body_tool_spec.insert_size|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_size|default:"-" }}</td>
-        <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
-        {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
-      </tr>
-      {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}14{% else %}13{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% elif filters.body_cutter == "ball" %}
-  <table class="data-grid inv-stock-grid js-sortable-table">
-    <thead>
-      <tr>
-        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
-        <th class="sortable hint-cell" data-hint="Тип хвостовика: МТ3, МТ4, Weldon или цилиндрический">Хвостовик</th>
-        <th class="sortable hint-cell inv-stock-photo-col" data-hint="Фото корпуса — нажмите на иконку">Фото</th>
-        <th class="sortable hint-cell inv-stock-notes-col" data-hint="Описание позиции — наведите на иконку в строке" aria-label="Описание"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></th>
-        <th class="sortable hint-cell" data-hint="Диаметр фрезы">ØD, мм</th>
-        <th class="sortable hint-cell" data-hint="Диаметр хвостовика или посадки">d, мм</th>
-        <th class="sortable hint-cell" data-hint="Общая длина">L, мм</th>
-        <th class="sortable hint-cell" data-hint="Число зубьев / пластин">Z</th>
-        <th class="sortable hint-cell" data-hint="Подходящие сменные пластины для корпуса">Подходящие пластины</th>
-        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in tool_items %}
-      <tr>
-<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_shank_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_shank_type" data-type="select" data-value="{{ t.body_tool_spec.shank_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_shank_type_display|default:"-" }}</td>
-        <td class="inv-stock-photo-col" data-tool-id="{{ t.id }}"><div class="inv-stock-photo-wrap" data-photo-url="{% if t.body_tool_spec.photo %}{{ t.body_tool_spec.photo.url }}{% endif %}">{% if t.body_tool_spec.photo or can_manage_stock %}<button type="button" class="inv-stock-photo-btn js-inv-stock-photo-btn{% if t.body_tool_spec.photo %} has-photo{% endif %}" title="{% if t.body_tool_spec.photo %}Фото корпуса{% if can_manage_stock %} (Alt+клик — заменить){% endif %}{% else %}Прикрепить фото{% endif %}" aria-label="{% if t.body_tool_spec.photo %}Открыть фото{% else %}Прикрепить фото{% endif %}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 3a2 2 0 00-2 2v1H5a2 2 0 00-2 2v11a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a2 2 0 00-2-2H9zm0 2h6v1H9V5zm-2 4h10v9H7V9zm5 1.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/></svg></button>{% if can_manage_stock %}<input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="inv-stock-photo-input" hidden />{% endif %}{% else %}<span class="inv-stock-photo-empty muted">—</span>{% endif %}</div></td>
-        <td class="inv-stock-notes-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}><span class="inv-stock-notes-tip{% if not t.notes %} is-empty{% endif %}" {% if t.notes %}data-hint="{{ t.notes|escape }}"{% else %}title="Нет описания"{% endif %} aria-label="{% if t.notes %}{{ t.notes|escape }}{% else %}Нет описания{% endif %}"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span></td>
-        <td data-sort="{{ t.body_tool_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="bt_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.diameter_mm|default:'' }}"{% endif %}>
-          {% if t.body_tool_spec.diameter_mm %}Ø{{ t.body_tool_spec.diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}
-        </td>
-        <td data-sort="{{ t.body_tool_spec.mount_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_mount_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.mount_diameter_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.mount_diameter_mm is not None %}{{ t.body_tool_spec.mount_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.overall_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_overall_length_mm" data-type="number" data-value="{{ t.body_tool_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.overall_length_mm is not None %}{{ t.body_tool_spec.overall_length_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.teeth_count|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_teeth_count" data-type="int" data-value="{{ t.body_tool_spec.teeth_count|default:'' }}"{% endif %}>{{ t.body_tool_spec.teeth_count|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_compat|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_compat" data-type="text" data-value="{{ t.body_tool_spec.insert_compat|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_compat|default:"-" }}</td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
         <td class="inv-stock-col-delete">
@@ -687,119 +392,6 @@
       {% endfor %}
     </tbody>
   </table>
-  {% elif filters.body_cutter == "modular_head" %}
-  <table class="data-grid inv-stock-grid js-sortable-table">
-    <thead>
-      <tr>
-        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
-        <th class="sortable hint-cell inv-stock-photo-col" data-hint="Фото корпуса — нажмите на иконку">Фото</th>
-        <th class="sortable hint-cell inv-stock-notes-col" data-hint="Описание позиции — наведите на иконку в строке" aria-label="Описание"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></th>
-        <th class="sortable hint-cell" data-hint="Диаметр фрезы">ØD, мм</th>
-        <th class="sortable hint-cell" data-hint="Диаметр хвостовика или посадки">d, мм</th>
-        <th class="sortable hint-cell" data-hint="Резьба крепления головки: М6–М20">Резьба</th>
-        <th class="sortable hint-cell" data-hint="Число зубьев / пластин">Z</th>
-        <th class="sortable hint-cell" data-hint="Подходящие сменные пластины для корпуса">Подходящие пластины</th>
-        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in tool_items %}
-      <tr>
-<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
-        <td class="inv-stock-photo-col" data-tool-id="{{ t.id }}"><div class="inv-stock-photo-wrap" data-photo-url="{% if t.body_tool_spec.photo %}{{ t.body_tool_spec.photo.url }}{% endif %}">{% if t.body_tool_spec.photo or can_manage_stock %}<button type="button" class="inv-stock-photo-btn js-inv-stock-photo-btn{% if t.body_tool_spec.photo %} has-photo{% endif %}" title="{% if t.body_tool_spec.photo %}Фото корпуса{% if can_manage_stock %} (Alt+клик — заменить){% endif %}{% else %}Прикрепить фото{% endif %}" aria-label="{% if t.body_tool_spec.photo %}Открыть фото{% else %}Прикрепить фото{% endif %}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 3a2 2 0 00-2 2v1H5a2 2 0 00-2 2v11a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a2 2 0 00-2-2H9zm0 2h6v1H9V5zm-2 4h10v9H7V9zm5 1.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/></svg></button>{% if can_manage_stock %}<input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="inv-stock-photo-input" hidden />{% endif %}{% else %}<span class="inv-stock-photo-empty muted">—</span>{% endif %}</div></td>
-        <td class="inv-stock-notes-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}><span class="inv-stock-notes-tip{% if not t.notes %} is-empty{% endif %}" {% if t.notes %}data-hint="{{ t.notes|escape }}"{% else %}title="Нет описания"{% endif %} aria-label="{% if t.notes %}{{ t.notes|escape }}{% else %}Нет описания{% endif %}"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span></td>
-        <td data-sort="{{ t.body_tool_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="bt_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.diameter_mm|default:'' }}"{% endif %}>
-          {% if t.body_tool_spec.diameter_mm %}Ø{{ t.body_tool_spec.diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}
-        </td>
-        <td data-sort="{{ t.body_tool_spec.mount_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_mount_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.mount_diameter_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.mount_diameter_mm is not None %}{{ t.body_tool_spec.mount_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.body_tool_spec.mount_thread|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_mount_thread" data-type="select" data-value="{{ t.body_tool_spec.mount_thread|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_mount_thread_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.teeth_count|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_teeth_count" data-type="int" data-value="{{ t.body_tool_spec.teeth_count|default:'' }}"{% endif %}>{{ t.body_tool_spec.teeth_count|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_compat|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_compat" data-type="text" data-value="{{ t.body_tool_spec.insert_compat|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_compat|default:"-" }}</td>
-        <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
-        {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
-      </tr>
-      {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}11{% else %}10{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <table class="data-grid inv-stock-grid js-sortable-table">
-    <thead>
-      <tr>
-        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
-        <th class="sortable hint-cell" data-hint="Группа корпусного инструмента (фрезы со сменными пластинами и т.п.)">Семейство</th>
-        <th class="sortable hint-cell" data-hint="Тип фрезы со сменными пластинами">Тип</th>
-        <th class="sortable hint-cell inv-stock-photo-col" data-hint="Фото корпуса — нажмите на иконку">Фото</th>
-        <th class="sortable hint-cell inv-stock-notes-col" data-hint="Описание позиции — наведите на иконку в строке" aria-label="Описание"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></th>
-        <th class="sortable hint-cell" data-hint="Диаметр фрезы">ØD, мм</th>
-        <th class="sortable hint-cell" data-hint="Число зубьев / пластин">Z</th>
-        <th class="sortable hint-cell" data-hint="Диаметр хвостовика или посадки">d посадки, мм</th>
-        {% if filters.body_cutter != "face" %}
-        <th class="sortable hint-cell" data-hint="Тип хвостовика или посадки корпуса">Хвостовик</th>
-        <th class="sortable hint-cell" data-hint="Общая длина">L, мм</th>
-        {% endif %}
-        <th class="sortable hint-cell" data-hint="Семейство / формфактор сменной пластины (APKT, SEHT и др.)">Формфактор</th>
-        <th class="sortable hint-cell" data-hint="Типоразмер сменной пластины">Размер пластины</th>
-        <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
-        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in tool_items %}
-      <tr>
-<td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_family_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_family" data-type="select" data-value="{{ t.body_tool_spec.family|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_family_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
-        <td class="inv-stock-photo-col" data-tool-id="{{ t.id }}"><div class="inv-stock-photo-wrap" data-photo-url="{% if t.body_tool_spec.photo %}{{ t.body_tool_spec.photo.url }}{% endif %}">{% if t.body_tool_spec.photo or can_manage_stock %}<button type="button" class="inv-stock-photo-btn js-inv-stock-photo-btn{% if t.body_tool_spec.photo %} has-photo{% endif %}" title="{% if t.body_tool_spec.photo %}Фото корпуса{% if can_manage_stock %} (Alt+клик — заменить){% endif %}{% else %}Прикрепить фото{% endif %}" aria-label="{% if t.body_tool_spec.photo %}Открыть фото{% else %}Прикрепить фото{% endif %}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 3a2 2 0 00-2 2v1H5a2 2 0 00-2 2v11a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a2 2 0 00-2-2H9zm0 2h6v1H9V5zm-2 4h10v9H7V9zm5 1.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/></svg></button>{% if can_manage_stock %}<input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="inv-stock-photo-input" hidden />{% endif %}{% else %}<span class="inv-stock-photo-empty muted">—</span>{% endif %}</div></td>
-        <td class="inv-stock-notes-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}><span class="inv-stock-notes-tip{% if not t.notes %} is-empty{% endif %}" {% if t.notes %}data-hint="{{ t.notes|escape }}"{% else %}title="Нет описания"{% endif %} aria-label="{% if t.notes %}{{ t.notes|escape }}{% else %}Нет описания{% endif %}"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span></td>
-        <td data-sort="{{ t.body_tool_spec.diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="bt_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.diameter_mm|default:'' }}"{% endif %}>
-          {% if t.body_tool_spec.diameter_mm %}Ø{{ t.body_tool_spec.diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}
-        </td>
-        <td data-sort="{{ t.body_tool_spec.teeth_count|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_teeth_count" data-type="int" data-value="{{ t.body_tool_spec.teeth_count|default:'' }}"{% endif %}>{{ t.body_tool_spec.teeth_count|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.mount_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_mount_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.mount_diameter_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.mount_diameter_mm is not None %}{{ t.body_tool_spec.mount_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        {% if filters.body_cutter != "face" %}
-        <td data-sort="{{ t.body_tool_spec.get_shank_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_shank_type" data-type="select" data-value="{{ t.body_tool_spec.shank_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_shank_type_display|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.overall_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_overall_length_mm" data-type="number" data-value="{{ t.body_tool_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.overall_length_mm is not None %}{{ t.body_tool_spec.overall_length_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        {% endif %}
-        <td data-sort="{{ t.body_tool_spec.insert_family|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_family" data-type="text" data-value="{{ t.body_tool_spec.insert_family|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_family|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.insert_size|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_insert_size" data-type="text" data-value="{{ t.body_tool_spec.insert_size|default:'' }}"{% endif %}>{{ t.body_tool_spec.insert_size|default:"-" }}</td>
-        <td data-sort="{{ t.body_tool_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_brand" data-type="text" data-value="{{ t.body_tool_spec.brand|default:'' }}"{% endif %}>{{ t.body_tool_spec.brand|default:"-" }}</td>
-        <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
-        {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
-      </tr>
-      {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}{% if filters.body_cutter == 'face' %}13{% else %}15{% endif %}{% else %}{% if filters.body_cutter == 'face' %}12{% else %}14{% endif %}{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
   {% elif filters.category == "tap" %}
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
@@ -1205,23 +797,25 @@
       </select>
     </label>
     {% elif filters.category == "body_tool" %}
-    <label class="field"><span>Семейство</span>
-      <select name="body_family">
-        <option value="">Все</option>
-        {% for key, label in body_tool_families %}
-          <option value="{{ key }}" {% if filters.body_family == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span>Тип</span>
+    <label class="field"><span>Вид</span>
       <select name="body_cutter">
         <option value="">Все</option>
-        {% for key, label in indexable_mill_cutter_types %}
+        {% for key, label in body_tool_kind_types %}
           <option value="{{ key }}" {% if filters.body_cutter == key %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
     </label>
-    <label class="field"><span>Диаметр, мм</span>
+    <label class="field"><span>Крепление</span>
+      <select name="bt_shank_type">
+        <option value="">Все</option>
+        {% for key, label in body_tool_mount_types %}
+          {% if key %}
+          <option value="{{ key }}" {% if filters.bt_shank_type == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Dост, мм</span>
       <select name="bt_diameter_mm">
         <option value="">Все</option>
         {% for v in body_tool_filter_options.diameters %}
@@ -1366,49 +960,7 @@
       </select>
     </label>
     {% elif filters.category == "body_tool" %}
-    {% if filters.body_cutter == "end" or filters.body_cutter == "chamfer" or filters.body_cutter == "high_speed" or filters.body_cutter == "round_insert" or filters.body_cutter == "ball" %}
-    <label class="field"><span>Хвостовик</span>
-      <select name="bt_shank_type">
-        <option value="">Все</option>
-        {% if filters.body_cutter == "chamfer" or filters.body_cutter == "round_insert" %}
-          {% for key, label in round_insert_shank_types %}
-            {% if key %}
-            <option value="{{ key }}" {% if filters.bt_shank_type == key %}selected{% endif %}>{{ label }}</option>
-            {% endif %}
-          {% endfor %}
-        {% elif filters.body_cutter == "high_speed" %}
-          {% for key, label in high_speed_shank_types %}
-            {% if key %}
-            <option value="{{ key }}" {% if filters.bt_shank_type == key %}selected{% endif %}>{{ label }}</option>
-            {% endif %}
-          {% endfor %}
-        {% elif filters.body_cutter == "ball" %}
-          {% for key, label in ball_mill_shank_types %}
-            {% if key %}
-            <option value="{{ key }}" {% if filters.bt_shank_type == key %}selected{% endif %}>{{ label }}</option>
-            {% endif %}
-          {% endfor %}
-        {% else %}
-          {% for key, label in end_mill_shank_types %}
-            {% if key %}
-            <option value="{{ key }}" {% if filters.bt_shank_type == key %}selected{% endif %}>{{ label }}</option>
-            {% endif %}
-          {% endfor %}
-        {% endif %}
-      </select>
-    </label>
-    {% endif %}
-    {% if filters.body_cutter == "end" or filters.body_cutter == "round_insert" or filters.body_cutter == "ball" %}
-    <label class="field"><span>L, мм</span>
-      <select name="bt_overall_length_mm">
-        <option value="">Все</option>
-        {% for v in body_tool_filter_options.overall_lengths %}
-        <option value="{{ v }}" {% if filters.bt_overall_length_mm == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    {% endif %}
-    <label class="field"><span>d посадки, мм</span>
+    <label class="field"><span>d, мм</span>
       <select name="bt_mount_diameter_mm">
         <option value="">Все</option>
         {% for v in body_tool_filter_options.mount_diameters %}
@@ -1424,70 +976,7 @@
         {% endfor %}
       </select>
     </label>
-    {% if filters.body_cutter == "high_speed" or filters.body_cutter == "round_insert" %}
-    <label class="field"><span>Насадная/концевая</span>
-      <select name="bt_hs_body_style">
-        <option value="">Все</option>
-        {% for key, label in high_speed_body_styles %}
-          {% if key %}
-          <option value="{{ key }}" {% if filters.bt_hs_body_style == key %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
-        {% endfor %}
-      </select>
-    </label>
-    {% endif %}
-    {% if filters.body_cutter == "high_speed" %}
-    <label class="field"><span>Назначение</span>
-      <select name="bt_has_purpose">
-        <option value="">Все</option>
-        <option value="1" {% if filters.bt_has_purpose == "1" %}selected{% endif %}>Есть</option>
-        <option value="0" {% if filters.bt_has_purpose == "0" %}selected{% endif %}>Нет</option>
-      </select>
-    </label>
-    {% endif %}
-    {% if filters.body_cutter == "round_insert" %}
-    <label class="field"><span>Радиус, мм</span>
-      <select name="bt_corner_radius_mm">
-        <option value="">Все</option>
-        {% for v in body_tool_filter_options.radii %}
-        <option value="{{ v }}" {% if filters.bt_corner_radius_mm == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    {% endif %}
-    {% if filters.body_cutter == "disc" %}
-    <label class="field"><span>H (ширина паза), мм</span>
-      <select name="bt_cutting_length_mm">
-        <option value="">Все</option>
-        {% for v in body_tool_filter_options.cutting_lengths %}
-        <option value="{{ v }}" {% if filters.bt_cutting_length_mm == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    {% endif %}
-    {% if filters.body_cutter == "chamfer" %}
-    <label class="field"><span>Перем. угол</span>
-      <select name="bt_variable_angle">
-        <option value="">Все</option>
-        <option value="1" {% if filters.bt_variable_angle == "1" %}selected{% endif %}>Да</option>
-        <option value="0" {% if filters.bt_variable_angle == "0" %}selected{% endif %}>Нет</option>
-      </select>
-    </label>
-    {% endif %}
-    {% if filters.body_cutter == "ball" or filters.body_cutter == "modular_head" %}
-    {% if filters.body_cutter == "modular_head" %}
-    <label class="field"><span>Резьба</span>
-      <select name="bt_mount_thread">
-        <option value="">Все</option>
-        {% for key, label in modular_head_threads %}
-          {% if key %}
-          <option value="{{ key }}" {% if filters.bt_mount_thread == key %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
-        {% endfor %}
-      </select>
-    </label>
-    {% endif %}
-    <label class="field"><span>Подходящие пластины</span>
+    <label class="field"><span>Формфактор</span>
       <select name="bt_insert_compat">
         <option value="">Все</option>
         {% for v in body_tool_filter_options.insert_compats %}
@@ -1495,24 +984,6 @@
         {% endfor %}
       </select>
     </label>
-    {% else %}
-    <label class="field"><span>Формфактор</span>
-      <select name="bt_insert_family">
-        <option value="">Все</option>
-        {% for v in body_tool_filter_options.insert_families %}
-        <option value="{{ v }}" {% if filters.bt_insert_family == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span>Размер пластины</span>
-      <select name="bt_insert_size">
-        <option value="">Все</option>
-        {% for v in body_tool_filter_options.insert_sizes %}
-        <option value="{{ v }}" {% if filters.bt_insert_size == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    {% endif %}
     <label class="field"><span>Бренд</span>
       <select name="bt_brand">
         <option value="">Все</option>
@@ -2044,26 +1515,6 @@
               <select class="inv-arrival-sel js-arrival-bulk-category" id="arrival-bulk-category">
                 <option value="">Выбрать...</option>
                 {% include "shifts/includes/stock_category_optgroups.html" with selected_category="" %}
-              </select>
-            </div>
-          </div>
-          <div class="inv-arrival-field inv-arrival-field--body-family" id="arrival-body-family-wrap" hidden>
-            <label class="inv-arrival-label" for="arrival-body-family">Семейство</label>
-            <div class="inv-arrival-select-wrap">
-              <select class="inv-arrival-sel" id="arrival-body-family" aria-label="Семейство корпусного инструмента">
-                {% for key, label in body_tool_families %}
-                <option value="{{ key }}">{{ label }}</option>
-                {% endfor %}
-              </select>
-            </div>
-          </div>
-          <div class="inv-arrival-field inv-arrival-field--body-cutter" id="arrival-body-cutter-wrap" hidden>
-            <label class="inv-arrival-label" for="arrival-body-cutter">Тип фрезы</label>
-            <div class="inv-arrival-select-wrap">
-              <select class="inv-arrival-sel" id="arrival-body-cutter" aria-label="Тип корпусной фрезы">
-                {% for key, label in indexable_mill_cutter_types %}
-                <option value="{{ key }}">{{ label }}</option>
-                {% endfor %}
               </select>
             </div>
           </div>
@@ -3576,6 +3027,8 @@
   "end_mill_types": [{% for key, label in end_mill_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "body_tool_families": [{% for key, label in body_tool_families %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "indexable_mill_cutter_types": [{% for key, label in indexable_mill_cutter_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "body_tool_kind_types": [{% for key, label in body_tool_kind_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "body_tool_mount_types": [{% for key, label in body_tool_mount_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "body_tool_couplings": [{% for key, label in body_tool_couplings %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "thread_standards": [{% for key, label in thread_standards %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "thread_kinds": [{% for key, label in thread_kinds %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],

@@ -16,20 +16,25 @@ BODY_TOOL_FAMILIES = [
 BODY_TOOL_FAMILY_VALUES = frozenset(k for k, _ in BODY_TOOL_FAMILIES)
 BODY_TOOL_FAMILY_LABELS = dict(BODY_TOOL_FAMILIES)
 
-# Типы внутри «Фрезы со сменными пластинами»
-INDEXABLE_MILL_CUTTER_TYPES = [
-    ("face", "Торцевые насадные фрезы"),
-    ("end", "Концевые фрезы"),
-    ("chamfer", "Фасочные фрезы"),
-    ("high_speed", "Высокоскоростные фрезы"),
-    ("round_insert", "Фрезы с круглыми пластинами"),
-    ("disc", "Дисковые фрезы"),
-    ("ball", "Сферические фрезы"),
-    ("modular_head", "Фрезерные головки с пластинами"),
+# Виды фрезы (единый шаблон корпусного инструмента)
+BODY_TOOL_KIND_TYPES = [
+    ("end", "Концевая"),
+    ("chamfer", "Фасочная"),
+    ("high_speed", "Высокоскоростная"),
+    ("disc", "Т-образная"),
+    ("ball", "Сферическая"),
+]
+
+# Полный список choices модели (включая устаревшие ключи для старых записей)
+INDEXABLE_MILL_CUTTER_TYPES = BODY_TOOL_KIND_TYPES + [
+    ("face", "Торцевая"),
+    ("round_insert", "С круглыми пластинами"),
+    ("modular_head", "Модульная головка"),
 ]
 
 INDEXABLE_MILL_CUTTER_VALUES = frozenset(k for k, _ in INDEXABLE_MILL_CUTTER_TYPES)
 INDEXABLE_MILL_CUTTER_LABELS = dict(INDEXABLE_MILL_CUTTER_TYPES)
+BODY_TOOL_KIND_VALUES = frozenset(k for k, _ in BODY_TOOL_KIND_TYPES)
 
 # Крепление корпуса
 BODY_TOOL_COUPLINGS = [
@@ -50,17 +55,22 @@ FACE_MILL_ANGLES = [
     ("90", "90°"),
 ]
 
-BODY_TOOL_SHANK_TYPES = [
+# Крепление в едином шаблоне
+BODY_TOOL_MOUNT_TYPES = [
     ("", "—"),
+    ("bore", "Насадная"),
+    ("cylindrical", "Цилиндрическая"),
+    ("weldon", "Weldon"),
+]
+
+BODY_TOOL_SHANK_TYPES = BODY_TOOL_MOUNT_TYPES + [
     ("mt3", "МТ3"),
     ("mt4", "МТ4"),
-    ("weldon", "Weldon"),
-    ("bore", "Отверстие (насадная)"),
-    ("cylindrical", "Цилиндрический"),
 ]
 
 BODY_TOOL_SHANK_VALUES = frozenset(k for k, _ in BODY_TOOL_SHANK_TYPES if k)
 BODY_TOOL_SHANK_LABELS = {k: lab for k, lab in BODY_TOOL_SHANK_TYPES if k}
+BODY_TOOL_MOUNT_VALUES = frozenset(k for k, _ in BODY_TOOL_MOUNT_TYPES if k)
 
 # Для концевых — без насадного отверстия и Морзе; для фасочных — все;
 # для высокоскоростных — отверстие или цилиндр;
@@ -136,15 +146,24 @@ def normalize_indexable_mill_cutter(raw) -> str:
         "round": "round_insert",
         "kruglye": "round_insert",
         "diskovye": "disc",
+        "t_obraznaya": "disc",
+        "t-obraznaya": "disc",
+        "тобразная": "disc",
+        "т_образная": "disc",
         "sfericheskie": "ball",
         "spherical": "ball",
         "golovki": "modular_head",
         "head": "modular_head",
+        "концевая": "end",
+        "фасочная": "chamfer",
+        "высокоскоростная": "high_speed",
+        "т-образная": "disc",
+        "сферическая": "ball",
     }
     v = aliases.get(v, v)
     if v in INDEXABLE_MILL_CUTTER_VALUES:
         return v
-    return "face"
+    return "end"
 
 
 def normalize_body_tool_coupling(raw) -> str:
@@ -259,11 +278,10 @@ def build_body_tool_display_name(
     insert_size: str = "",
     brand: str = "",
 ) -> str:
-    fam = BODY_TOOL_FAMILY_LABELS.get(normalize_body_tool_family(family), "Фрезы со сменными пластинами")
     cut = INDEXABLE_MILL_CUTTER_LABELS.get(
         normalize_indexable_mill_cutter(cutter_type), cutter_type
     )
-    parts = [fam, cut]
+    parts = [cut]
     if diameter_mm is not None and str(diameter_mm) != "":
         try:
             d = Decimal(str(diameter_mm))
