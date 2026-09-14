@@ -69,7 +69,7 @@ INSERT_EDGE_LENGTH_CODES = [
     ("32", "32"),
 ]
 
-# Код толщины (поз. 6 ISO) → мм (стандарт ISO 1832)
+# Код толщины (поз. 6 ISO) → мм (ISO 1832 + распространённые каталожные, напр. APMT1135 → 35)
 INSERT_THICKNESS_CODE_MM: dict[str, Decimal] = {
     "01": Decimal("1.98"),
     "02": Decimal("2.38"),
@@ -78,8 +78,11 @@ INSERT_THICKNESS_CODE_MM: dict[str, Decimal] = {
     "05": Decimal("5.56"),
     "06": Decimal("6.35"),
     "07": Decimal("7.94"),
+    "08": Decimal("8.00"),
     "09": Decimal("9.52"),
     "12": Decimal("12.70"),
+    "25": Decimal("2.50"),
+    "35": Decimal("3.50"),
 }
 
 INSERT_THICKNESS_CODES = [(k, f"{k} ({v} мм)") for k, v in sorted(INSERT_THICKNESS_CODE_MM.items())]
@@ -89,6 +92,7 @@ INSERT_NOSE_RADIUS_CODE_MM: dict[str, Decimal] = {
     "00": Decimal("0"),
     "02": Decimal("0.2"),
     "04": Decimal("0.4"),
+    "05": Decimal("0.5"),
     "08": Decimal("0.8"),
     "12": Decimal("1.2"),
     "16": Decimal("1.6"),
