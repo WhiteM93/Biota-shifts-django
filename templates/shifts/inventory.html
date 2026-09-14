@@ -963,20 +963,9 @@
       <tr>
         <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable" title="Производитель / торговая марка">Бренд</th>
-        <th class="sortable" title="{{ tips.kind }}">Тип</th>
-        <th class="sortable" title="{{ tips.custom_type }}">Свой тип</th>
         <th class="sortable" title="{{ tips.item_name }}">Наименование</th>
-        <th class="sortable" title="{{ tips.thread_size }}">Разм.</th>
-        <th class="sortable" title="{{ tips.thread_side }}">В/Н</th>
-        <th class="sortable" title="{{ tips.thread_hand }}">Л/П</th>
-        <th class="sortable" title="{{ tips.thread_pitch }}">Шаг</th>
-        <th class="sortable" title="{{ tips.family }}">Семейство</th>
-        <th class="sortable" title="{{ tips.shape }}">Форма</th>
-        <th class="sortable insert-code-col" title="{{ tips.edge_l }}">L</th>
-        <th class="sortable insert-code-col" title="{{ tips.thickness_s }}">S</th>
-        <th class="sortable insert-code-col" title="{{ tips.radius_r }}">R</th>
-        <th class="sortable" title="{{ tips.grade }}">Сплав</th>
         <th class="sortable" title="{{ tips.coating }}">Покрытие</th>
+        <th class="sortable hint-cell inv-stock-notes-col" data-hint="Заметка — наведите на иконку в строке" aria-label="Заметка"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></th>
         <th class="sortable" title="{{ tips.stock_qty }}">Остаток</th>
         {% if can_manage_stock %}<th class="inv-stock-col-delete" title="{{ tips.delete }}">Удалить</th>{% endif %}
       </tr>
@@ -986,22 +975,11 @@
       <tr>
 <td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.insert_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_brand" data-type="text" data-value="{{ t.insert_spec.brand|default:'' }}"{% endif %}>{{ t.insert_spec.brand|default:"-" }}</td>
-        <td data-sort="{{ t.insert_spec.insert_kind|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_kind" data-type="select" data-value="{{ t.insert_spec.insert_kind|default:'' }}"{% endif %}>{% if t.insert_spec.insert_kind %}{{ t.insert_spec.get_insert_kind_display }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.insert_spec.custom_type|default:'-' }}" {% if can_manage_stock and t.insert_spec.insert_kind == "other" %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_custom_type" data-type="text" data-value="{{ t.insert_spec.custom_type|default:'' }}"{% endif %}>{{ t.insert_spec.custom_type|default:"-" }}</td>
-        <td data-sort="{{ t.insert_spec.item_name|default:'-' }}" {% if can_manage_stock and t.insert_spec.insert_kind == "other" %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_name" data-type="text" data-value="{{ t.insert_spec.item_name|default:'' }}"{% endif %}>{{ t.insert_spec.item_name|default:"-" }}</td>
-        <td data-sort="{{ t.insert_spec.thread_size|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_thread_size" data-type="select" data-value="{{ t.insert_spec.thread_size|default:'' }}"{% endif %}>{{ t.insert_spec.thread_size|default:"-" }}</td>
-        <td data-sort="{{ t.insert_spec.thread_side|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_thread_side" data-type="select" data-value="{{ t.insert_spec.thread_side|default:'' }}"{% endif %}>{% if t.insert_spec.thread_side %}{{ t.insert_spec.get_thread_side_display }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.insert_spec.thread_hand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_thread_hand" data-type="select" data-value="{{ t.insert_spec.thread_hand|default:'' }}"{% endif %}>{% if t.insert_spec.thread_hand %}{{ t.insert_spec.get_thread_hand_display }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.insert_spec.thread_pitch_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_thread_pitch" data-type="number" data-value="{{ t.insert_spec.thread_pitch_mm|default:'' }}"{% endif %}>{% if t.insert_spec.thread_pitch_mm is not None %}{{ t.insert_spec.thread_pitch_mm|dotformat:"-3" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.insert_spec.milling_family|default:'-' }}" title="{{ t.insert_spec.milling_family_cell_title }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_family" data-type="select" data-value="{{ t.insert_spec.milling_family|default:'' }}"{% endif %}>{{ t.insert_spec.milling_family|default:"-"|upper }}</td>
-        <td data-sort="{{ t.insert_spec.insert_shape|default:'-' }}" title="{{ t.insert_spec.insert_shape_cell_title }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_shape" data-type="select" data-value="{{ t.insert_spec.insert_shape|default:'' }}"{% endif %}>{{ t.insert_spec.insert_shape|default:"-" }}</td>
-        <td class="insert-code-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.insert_spec.cutting_edge_length_code|default:'-' }}" title="{{ t.insert_spec.cutting_edge_length_cell_title }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="ins_edge_code" data-type="select" data-value="{{ t.insert_spec.cutting_edge_length_code|default:'' }}"{% endif %}>{{ t.insert_spec.cutting_edge_length_code|default:"-" }}</td>
-        <td class="insert-code-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.insert_spec.thickness_code|default:'-' }}" title="{{ t.insert_spec.thickness_cell_title }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="ins_thickness_code" data-type="select" data-value="{{ t.insert_spec.thickness_code|default:'' }}"{% endif %}>{{ t.insert_spec.thickness_code|default:"-" }}</td>
-        <td class="insert-code-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.insert_spec.nose_radius_code|default:'-' }}" title="{{ t.insert_spec.nose_radius_cell_title }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="ins_nose_code" data-type="select" data-value="{{ t.insert_spec.nose_radius_code|default:'' }}"{% endif %}>{{ t.insert_spec.nose_radius_code|default:"-" }}</td>
-        <td data-sort="{{ t.insert_spec.chipbreaker_grade|default:'-' }}" title="{{ t.insert_spec.chipbreaker_grade_cell_title }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_grade" data-type="text" data-value="{{ t.insert_spec.chipbreaker_grade|default:'' }}"{% endif %}>{{ t.insert_spec.chipbreaker_grade|default:"-" }}</td>
+        <td data-sort="{{ t.insert_spec.item_name|default:t.name|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_name" data-type="text" data-value="{{ t.insert_spec.item_name|default:'' }}"{% endif %}>{% if t.insert_spec.item_name %}{{ t.insert_spec.item_name }}{% else %}{{ t.name|default:"-" }}{% endif %}</td>
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
           {% with ct=t.coating_type|default:'none' %}<span class="coating-cell" title="{{ ct|coating_hover_title }}"><span class="coating-dot swatch-{{ ct }}" title="{{ ct|coating_hover_title }}"></span>{% if ct == "none" %}<span class="coating-inline-label">без покрытия</span>{% endif %}</span>{% endwith %}
         </td>
+        <td class="inv-stock-notes-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}><span class="inv-stock-notes-tip{% if not t.notes %} is-empty{% endif %}" {% if t.notes %}data-hint="{{ t.notes|escape }}"{% else %}title="Нет заметки"{% endif %} aria-label="{% if t.notes %}{{ t.notes|escape }}{% else %}Нет заметки{% endif %}"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span></td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
         <td class="inv-stock-col-delete">
@@ -1017,7 +995,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}19{% else %}18{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}7{% else %}6{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -1318,23 +1296,16 @@
     </label>
     {% elif filters.category == "insert" %}
     {% with tips=insert_column_tooltips %}
-    <label class="field"><span title="{{ tips.shape }}">Форма</span>
-      <select name="ins_shape" title="{{ tips.shape }}">
+    <label class="field"><span title="Производитель / торговая марка">Бренд</span>
+      <select name="ins_brand" title="Производитель / торговая марка">
         <option value="">Все</option>
-        {% for key, label in insert_shapes %}
-          {% if key in insert_filter_options.shapes %}
-          <option value="{{ key }}" {% if filters.ins_shape == key %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
+        {% for v in insert_filter_options.brands %}
+        <option value="{{ v }}" {% if filters.ins_brand == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
-    <label class="field"><span title="{{ tips.iso }}">Маркировка ISO</span>
-      <select name="ins_iso" title="{{ tips.iso }}">
-        <option value="">Все</option>
-        {% for v in insert_filter_options.isos %}
-        <option value="{{ v }}" {% if filters.ins_iso == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
+    <label class="field"><span title="{{ tips.item_name }}">Наименование</span>
+      <input type="text" name="ins_name" value="{{ filters.ins_name }}" maxlength="120" title="{{ tips.item_name }}" placeholder="поиск…">
     </label>
     {% endwith %}
     {% elif filters.category == "collet" %}
@@ -1716,133 +1687,7 @@
       </select>
     </label>
     {% elif filters.category == "insert" %}
-    {% with tips=insert_column_tooltips %}
-    <label class="field"><span title="{{ tips.relief }}">Задний угол</span>
-      <select name="ins_relief" title="{{ tips.relief }}">
-        <option value="">Все</option>
-        {% for key, label in insert_relief_angles %}
-          {% if key in insert_filter_options.reliefs %}
-          <option value="{{ key }}" {% if filters.ins_relief == key %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.tolerance }}">Допуск</span>
-      <select name="ins_tolerance" title="{{ tips.tolerance }}">
-        <option value="">Все</option>
-        {% for key, label in insert_tolerance_classes %}
-          {% if key in insert_filter_options.tolerances %}
-          <option value="{{ key }}" {% if filters.ins_tolerance == key %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.edge_l }}">L (длина)</span>
-      <select name="ins_edge_code" title="{{ tips.edge_l }}">
-        <option value="">Все</option>
-        {% for v in insert_filter_options.edge_codes %}
-        <option value="{{ v }}" {% if filters.ins_edge_code == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.thickness_s }}">S (толщина)</span>
-      <select name="ins_thickness_code" title="{{ tips.thickness_s }}">
-        <option value="">Все</option>
-        {% for key, label in insert_thickness_codes %}
-          {% if key in insert_filter_options.thickness_codes %}
-          <option value="{{ key }}" {% if filters.ins_thickness_code == key %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.radius_r }}">R (радиус)</span>
-      <select name="ins_nose_code" title="{{ tips.radius_r }}">
-        <option value="">Все</option>
-        {% for key, label in insert_nose_radius_codes %}
-          {% if key in insert_filter_options.nose_codes %}
-          <option value="{{ key }}" {% if filters.ins_nose_code == key %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.family }}">Семейство</span>
-      <select name="ins_family" title="{{ tips.family }}">
-        <option value="">Все</option>
-        {% for key, label in milling_insert_families %}
-          {% if key in insert_filter_options.families or not key %}
-          <option value="{{ key }}" {% if filters.ins_family == key %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.kind }}">Тип</span>
-      <select name="ins_kind" title="{{ tips.kind }}">
-        <option value="">Все</option>
-        {% for key, label in insert_kinds %}
-        <option value="{{ key }}" {% if filters.ins_kind == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.custom_type }}">Свой тип</span>
-      <select name="ins_custom_type" title="{{ tips.custom_type }}">
-        <option value="">Все</option>
-        {% for v in insert_custom_types %}
-        <option value="{{ v }}" {% if filters.ins_custom_type == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.item_name }}">Наименование</span>
-      <input type="text" name="ins_name" value="{{ filters.ins_name }}" maxlength="120" title="{{ tips.item_name }}" placeholder="поиск…">
-    </label>
-    <label class="field"><span title="{{ tips.thread_size }}">Разм. резьб.</span>
-      <select name="ins_thread_size" title="{{ tips.thread_size }}">
-        <option value="">Все</option>
-        {% for key, label in insert_thread_sizes %}
-        <option value="{{ key }}" {% if filters.ins_thread_size == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.thread_side }}">В/Н</span>
-      <select name="ins_thread_side" title="{{ tips.thread_side }}">
-        <option value="">Все</option>
-        {% for key, label in insert_thread_sides %}
-        <option value="{{ key }}" {% if filters.ins_thread_side == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.thread_hand }}">Л/П</span>
-      <select name="ins_thread_hand" title="{{ tips.thread_hand }}">
-        <option value="">Все</option>
-        {% for key, label in insert_thread_hands %}
-        <option value="{{ key }}" {% if filters.ins_thread_hand == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.thread_pitch }}">Шаг</span>
-      <select name="ins_thread_pitch" title="{{ tips.thread_pitch }}">
-        <option value="">Все</option>
-        {% for key, label in insert_thread_pitch_options %}
-        <option value="{{ key }}" {% if filters.ins_thread_pitch == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="Производитель / торговая марка">Бренд</span>
-      <select name="ins_brand" title="Производитель / торговая марка">
-        <option value="">Все</option>
-        {% for v in insert_filter_options.brands %}
-        <option value="{{ v }}" {% if filters.ins_brand == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="field"><span title="{{ tips.grade }}">Сплав / стружколом</span>
-      <select name="ins_grade" title="{{ tips.grade }}">
-        <option value="">Все</option>
-        {% for v in insert_filter_options.grades %}
-        <option value="{{ v }}" {% if filters.ins_grade == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    {% endwith %}
+    {# фильтры бренда/наименования выше; дополнительные поля убраны #}
     {% elif filters.category == "collet" %}
     <label class="field"><span>Диапазон зажима</span>
       <select name="collet_clamp_range">
@@ -1885,9 +1730,9 @@
       </select>
     </label>
     {% endif %}
-    {% if filters.category != "collet" and filters.category != "body_tool" %}
-    <label class="field"><span{% if filters.category == "insert" %} title="{{ insert_column_tooltips.tool_material }}"{% endif %}>Материал инструмента</span>
-      <select name="tool_material" class="js-stock-filter-tool-material"{% if filters.category == "insert" %} title="{{ insert_column_tooltips.tool_material }}"{% endif %}>
+    {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "insert" %}
+    <label class="field"><span>Материал инструмента</span>
+      <select name="tool_material" class="js-stock-filter-tool-material">
         <option value="">Все</option>
         {% for key, label in tool_material_types %}
         <option value="{{ key }}" {% if filters.tool_material_select == key %}selected{% endif %}>{{ label }}</option>
@@ -1899,6 +1744,8 @@
       </select>
       <input type="text" name="tool_material_custom" maxlength="80" class="js-stock-filter-tool-material-custom" placeholder="Свой вариант, до 80 символов" value="{{ filters.tool_material_custom }}" autocomplete="off" {% if filters.tool_material_select != tool_material_filter_other %}style="display:none;margin-top:6px;max-width:100%;"{% else %}style="margin-top:6px;max-width:100%;"{% endif %} />
     </label>
+    {% endif %}
+    {% if filters.category != "collet" and filters.category != "body_tool" %}
     <div class="field">
       <span{% if filters.category == "insert" %} title="{{ insert_column_tooltips.coating }}"{% endif %}>Материал покрытия</span>
       <div class="coating-picker"{% if filters.category == "insert" %} title="{{ insert_column_tooltips.coating }}"{% endif %}>

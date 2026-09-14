@@ -90,6 +90,7 @@ from .insert_constants import (
     INSERT_FAMILY_OTHER,
     INSERT_GRADE_OTHER,
     INSERT_KINDS,
+    INSERT_KIND_OTHER,
     INSERT_MACHINING_APPLICATIONS,
     INSERT_THREAD_SIDES,
     INSERT_THREAD_HANDS,
@@ -104,6 +105,7 @@ from .insert_constants import (
     normalize_insert_thread_size,
     normalize_insert_custom_type,
     normalize_insert_item_name,
+    normalize_insert_brand,
     build_insert_display_name,
     build_threading_insert_display_name,
     build_other_insert_display_name,
@@ -312,35 +314,9 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
             errs.append(f"Строка {idx}: укажите диаметр D (мм) для корпусного инструмента.")
         return errs
     if category == "insert":
-        kind = normalize_insert_kind(row.get("ins_kind") or row.get("insert_kind"))
-        if not kind:
-            errs.append(
-                f"Строка {idx}: укажите тип пластины (фрезерная / токарная / резьбовая / другое)."
-            )
-            return errs
-        if kind == "other":
-            ctype = normalize_insert_custom_type(row.get("ins_custom_type") or row.get("custom_type"))
-            iname = normalize_insert_item_name(row.get("ins_name") or row.get("item_name"))
-            if not ctype:
-                errs.append(f"Строка {idx}: укажите название своего типа пластины.")
-            if not iname:
-                errs.append(f"Строка {idx}: укажите наименование.")
-            return errs
-        if kind == "threading":
-            size = normalize_insert_thread_size(row.get("ins_thread_size") or row.get("thread_size"))
-            side = normalize_insert_thread_side(row.get("ins_thread_side") or row.get("thread_side"))
-            hand = normalize_insert_thread_hand(row.get("ins_thread_hand") or row.get("thread_hand"))
-            pitch = _to_decimal_or_none(row.get("ins_thread_pitch") or row.get("thread_pitch_mm"))
-            if not size:
-                errs.append(f"Строка {idx}: для резьбовой пластины укажите размер (06, 11, 16…).")
-            if not side:
-                errs.append(f"Строка {idx}: укажите тип резьбы (внутренняя / наружная).")
-            if not hand:
-                errs.append(f"Строка {idx}: укажите исполнение (левая / правая).")
-            if pitch is None or pitch <= 0:
-                errs.append(f"Строка {idx}: укажите шаг резьбы, мм.")
-            return errs
-        # L / S / R необязательны («-» = пусто)
+        iname = normalize_insert_item_name(row.get("ins_name") or row.get("item_name"))
+        if not iname:
+            errs.append(f"Строка {idx}: укажите наименование пластины.")
         return errs
     spec = _ARRIVAL_REQUIRED_DIAMETER.get(category)
     if spec:
@@ -373,25 +349,9 @@ def _arrival_search_ready(row: dict) -> bool:
     if category == "reamer":
         return _to_decimal_or_none(row.get("rm_diameter_mm")) is not None
     if category == "insert":
-        kind = normalize_insert_kind(row.get("ins_kind") or row.get("insert_kind"))
-        if kind == "threading":
-            return bool(
-                normalize_insert_thread_size(row.get("ins_thread_size") or row.get("thread_size"))
-                or normalize_insert_thread_side(row.get("ins_thread_side") or row.get("thread_side"))
-                or normalize_insert_thread_hand(row.get("ins_thread_hand") or row.get("thread_hand"))
-                or _to_decimal_or_none(row.get("ins_thread_pitch") or row.get("thread_pitch_mm")) is not None
-            )
-        if kind == "other":
-            return bool(
-                normalize_insert_custom_type(row.get("ins_custom_type") or row.get("custom_type"))
-                or normalize_insert_item_name(row.get("ins_name") or row.get("item_name"))
-                or (row.get("ins_brand") or row.get("brand") or "").strip()
-            )
         return bool(
-            (row.get("ins_edge_code") or "").strip()
-            or (row.get("ins_thickness_code") or "").strip()
-            or (row.get("ins_nose_code") or "").strip()
-            or _milling_family_from_request(row)
+            normalize_insert_item_name(row.get("ins_name") or row.get("item_name"))
+            or normalize_insert_brand(row.get("ins_brand") or row.get("brand"))
         )
     if category == "collet":
         ct = normalize_collet_type(row.get("collet_type"))
@@ -600,48 +560,12 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
             qs = qs.filter(reamer_spec__flutes_count=fl)
     elif category == "insert":
         qs = qs.select_related("insert_spec")
-        kind = normalize_insert_kind(row.get("ins_kind") or row.get("insert_kind"))
-        if kind:
-            qs = qs.filter(insert_spec__insert_kind=kind)
-        brand = (row.get("ins_brand") or row.get("brand") or "").strip()[:80]
+        brand = normalize_insert_brand(row.get("ins_brand") or row.get("brand"))
         if brand:
             qs = qs.filter(insert_spec__brand__iexact=brand)
-        grade = (row.get("ins_grade") or row.get("chipbreaker_grade") or "").strip()[:40]
-        if grade:
-            qs = qs.filter(insert_spec__chipbreaker_grade__iexact=grade)
-        if kind == "threading":
-            size = normalize_insert_thread_size(row.get("ins_thread_size") or row.get("thread_size"))
-            if size:
-                qs = qs.filter(insert_spec__thread_size=size)
-            side = normalize_insert_thread_side(row.get("ins_thread_side") or row.get("thread_side"))
-            if side:
-                qs = qs.filter(insert_spec__thread_side=side)
-            hand = normalize_insert_thread_hand(row.get("ins_thread_hand") or row.get("thread_hand"))
-            if hand:
-                qs = qs.filter(insert_spec__thread_hand=hand)
-            pitch = _to_decimal_or_none(row.get("ins_thread_pitch") or row.get("thread_pitch_mm"))
-            if pitch is not None:
-                qs = qs.filter(insert_spec__thread_pitch_mm=pitch)
-        elif kind == "other":
-            ctype = normalize_insert_custom_type(row.get("ins_custom_type") or row.get("custom_type"))
-            if ctype:
-                qs = qs.filter(insert_spec__custom_type__iexact=ctype)
-            iname = normalize_insert_item_name(row.get("ins_name") or row.get("item_name"))
-            if iname:
-                qs = qs.filter(insert_spec__item_name__iexact=iname)
-        else:
-            edge = (row.get("ins_edge_code") or "").strip()
-            th = (row.get("ins_thickness_code") or "").strip()
-            nr = (row.get("ins_nose_code") or "").strip()
-            if edge:
-                qs = qs.filter(insert_spec__cutting_edge_length_code=edge)
-            if th:
-                qs = qs.filter(insert_spec__thickness_code=th)
-            if nr:
-                qs = qs.filter(insert_spec__nose_radius_code=nr)
-            family = _milling_family_from_request(row)
-            if family:
-                qs = qs.filter(insert_spec__milling_family=family)
+        iname = normalize_insert_item_name(row.get("ins_name") or row.get("item_name"))
+        if iname:
+            qs = qs.filter(insert_spec__item_name__icontains=iname)
     elif category == "collet":
         qs = qs.select_related("collet_spec")
         fields = _collet_spec_fields_from_row(row)
@@ -1808,59 +1732,12 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
             if reamer_flutes > 0:
                 qs = qs.filter(reamer_spec__flutes_count=reamer_flutes)
     elif category == "insert":
-        ins_shape_raw = g("ins_shape")
-        if ins_shape_raw:
-            qs = qs.filter(insert_spec__insert_shape=ins_shape_raw)
-        ins_relief_raw = g("ins_relief")
-        if ins_relief_raw:
-            qs = qs.filter(insert_spec__relief_angle=ins_relief_raw)
-        ins_tolerance_raw = g("ins_tolerance")
-        if ins_tolerance_raw:
-            qs = qs.filter(insert_spec__tolerance_class=ins_tolerance_raw)
-        ins_edge_code_raw = g("ins_edge_code")
-        if ins_edge_code_raw:
-            qs = qs.filter(insert_spec__cutting_edge_length_code=ins_edge_code_raw)
-        ins_thickness_code_raw = g("ins_thickness_code")
-        if ins_thickness_code_raw:
-            qs = qs.filter(insert_spec__thickness_code=ins_thickness_code_raw)
-        ins_nose_code_raw = g("ins_nose_code")
-        if ins_nose_code_raw:
-            qs = qs.filter(insert_spec__nose_radius_code=ins_nose_code_raw)
-        ins_family_raw = g("ins_family")
-        if ins_family_raw:
-            qs = qs.filter(insert_spec__milling_family=ins_family_raw)
-        ins_kind_raw = g("ins_kind")
-        if ins_kind_raw:
-            qs = qs.filter(insert_spec__insert_kind=normalize_insert_kind(ins_kind_raw))
-        ins_custom_type_raw = g("ins_custom_type")
-        if ins_custom_type_raw:
-            qs = qs.filter(insert_spec__custom_type__iexact=normalize_insert_custom_type(ins_custom_type_raw))
         ins_name_raw = g("ins_name")
         if ins_name_raw:
             qs = qs.filter(insert_spec__item_name__icontains=normalize_insert_item_name(ins_name_raw))
-        ins_thread_size_raw = g("ins_thread_size")
-        if ins_thread_size_raw:
-            qs = qs.filter(insert_spec__thread_size=normalize_insert_thread_size(ins_thread_size_raw))
-        ins_thread_side_raw = g("ins_thread_side")
-        if ins_thread_side_raw:
-            qs = qs.filter(insert_spec__thread_side=normalize_insert_thread_side(ins_thread_side_raw))
-        ins_thread_hand_raw = g("ins_thread_hand")
-        if ins_thread_hand_raw:
-            qs = qs.filter(insert_spec__thread_hand=normalize_insert_thread_hand(ins_thread_hand_raw))
-        ins_thread_pitch_raw = g("ins_thread_pitch")
-        if ins_thread_pitch_raw:
-            pitch_f = _to_decimal_or_none(ins_thread_pitch_raw)
-            if pitch_f is not None:
-                qs = qs.filter(insert_spec__thread_pitch_mm=pitch_f)
-        ins_grade_raw = g("ins_grade")
-        if ins_grade_raw:
-            qs = qs.filter(insert_spec__chipbreaker_grade__iexact=ins_grade_raw)
         ins_brand_raw = g("ins_brand")
         if ins_brand_raw:
             qs = qs.filter(insert_spec__brand__iexact=ins_brand_raw)
-        ins_iso_raw = g("ins_iso")
-        if ins_iso_raw:
-            qs = qs.filter(insert_spec__iso_designation__iexact=ins_iso_raw)
     elif category == "collet":
         collet_type_raw = g("collet_type")
         if collet_type_raw:
@@ -1887,7 +1764,7 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         if collet_threading_series_raw:
             qs = qs.filter(collet_spec__threading_series=collet_threading_series_raw)
 
-    if category not in ("collet", "body_tool") and "tool_material" not in ex and "tool_material_custom" not in ex:
+    if category not in ("collet", "body_tool", "insert") and "tool_material" not in ex and "tool_material_custom" not in ex:
         tool_material = _resolve_stock_tool_material(params)
         if tool_material:
             qs = qs.filter(tool_material=tool_material)
@@ -2091,117 +1968,49 @@ def _merged_milling_insert_families():
     return known
 
 
-def _normalize_insert_iso_code(raw) -> str:
-    v = (raw or "").strip()
-    if v in ("-", "—", "–"):
-        return ""
-    return v[:2]
-
-
 def _insert_spec_fields_from_mapping(data: dict) -> dict:
-    kind = normalize_insert_kind(data.get("ins_kind") or data.get("insert_kind"))
-    fields = {
-        "insert_shape": (data.get("ins_shape") or data.get("insert_shape") or "C").strip()[:1] or "C",
-        "relief_angle": (data.get("ins_relief") or data.get("relief_angle") or "N").strip()[:1] or "N",
-        "tolerance_class": (data.get("ins_tolerance") or data.get("tolerance_class") or "M").strip()[:1] or "M",
-        "mounting_chip": (data.get("ins_mounting") or data.get("mounting_chip") or "G").strip()[:1] or "G",
-        "cutting_edge_length_code": _normalize_insert_iso_code(
-            data.get("ins_edge_code") or data.get("cutting_edge_length_code")
-        ),
-        "thickness_code": _normalize_insert_iso_code(
-            data.get("ins_thickness_code") or data.get("thickness_code")
-        ),
-        "nose_radius_code": _normalize_insert_iso_code(
-            data.get("ins_nose_code") or data.get("nose_radius_code")
-        ),
-        "milling_family": _milling_family_from_request(data),
-        "insert_kind": kind,
-        "thread_side": normalize_insert_thread_side(data.get("ins_thread_side") or data.get("thread_side")),
-        "thread_hand": normalize_insert_thread_hand(data.get("ins_thread_hand") or data.get("thread_hand")),
-        "thread_size": normalize_insert_thread_size(data.get("ins_thread_size") or data.get("thread_size")),
-        "thread_pitch_mm": _to_decimal_or_none(data.get("ins_thread_pitch") or data.get("thread_pitch_mm")),
-        "custom_type": normalize_insert_custom_type(data.get("ins_custom_type") or data.get("custom_type")),
+    """Все пластины: бренд + наименование (остальные поля очищаются)."""
+    return {
+        "insert_shape": "C",
+        "relief_angle": "N",
+        "tolerance_class": "M",
+        "mounting_chip": "G",
+        "cutting_edge_length_code": "",
+        "thickness_code": "",
+        "nose_radius_code": "",
+        "milling_family": "",
+        "insert_kind": INSERT_KIND_OTHER,
+        "thread_side": "",
+        "thread_hand": "",
+        "thread_size": "",
+        "thread_pitch_mm": None,
+        "custom_type": "",
         "item_name": normalize_insert_item_name(data.get("ins_name") or data.get("item_name")),
-        "chipbreaker_grade": (data.get("ins_grade") or data.get("chipbreaker_grade") or "").strip()[:40],
-        "brand": (data.get("ins_brand") or data.get("brand") or "").strip()[:80],
-        "machining_application": normalize_insert_machining_apps(
-            data.get("ins_machining_app") or data.get("machining_application")
-        ),
+        "chipbreaker_grade": "",
+        "brand": normalize_insert_brand(data.get("ins_brand") or data.get("brand")),
+        "machining_application": "",
     }
-    if kind == "threading":
-        # L/S/R и семейство для резьбовых не используются
-        fields["cutting_edge_length_code"] = ""
-        fields["thickness_code"] = ""
-        fields["nose_radius_code"] = ""
-        fields["milling_family"] = ""
-        fields["custom_type"] = ""
-        fields["item_name"] = ""
-    elif kind == "other":
-        fields["cutting_edge_length_code"] = ""
-        fields["thickness_code"] = ""
-        fields["nose_radius_code"] = ""
-        fields["milling_family"] = ""
-        fields["thread_side"] = ""
-        fields["thread_hand"] = ""
-        fields["thread_size"] = ""
-        fields["thread_pitch_mm"] = None
-    else:
-        fields["custom_type"] = ""
-        fields["item_name"] = ""
-        fields["thread_side"] = ""
-        fields["thread_hand"] = ""
-        fields["thread_size"] = ""
-        fields["thread_pitch_mm"] = None
-    return fields
 
 
 def _find_insert_tool_match(tool_material, coating_type, main_diameter_mm, spec_fields: dict):
-    qs = ToolItem.objects.select_for_update().filter(
-        category="insert",
-        tool_material=tool_material,
-        coating_type=coating_type,
-        main_diameter_mm=main_diameter_mm,
-        insert_spec__insert_kind=spec_fields["insert_kind"],
-        insert_spec__chipbreaker_grade=spec_fields["chipbreaker_grade"],
-        insert_spec__brand=spec_fields["brand"],
-    )
-    if spec_fields.get("insert_kind") == "threading":
-        return qs.filter(
-            insert_spec__thread_size=spec_fields["thread_size"],
-            insert_spec__thread_side=spec_fields["thread_side"],
-            insert_spec__thread_hand=spec_fields["thread_hand"],
-            insert_spec__thread_pitch_mm=spec_fields["thread_pitch_mm"],
-        ).first()
-    if spec_fields.get("insert_kind") == "other":
-        return qs.filter(
-            insert_spec__custom_type__iexact=spec_fields["custom_type"],
+    return (
+        ToolItem.objects.select_for_update()
+        .filter(
+            category="insert",
+            tool_material=tool_material,
+            coating_type=coating_type,
+            main_diameter_mm=main_diameter_mm,
+            insert_spec__brand__iexact=spec_fields["brand"],
             insert_spec__item_name__iexact=spec_fields["item_name"],
-        ).first()
-    return qs.filter(
-        insert_spec__cutting_edge_length_code=spec_fields["cutting_edge_length_code"],
-        insert_spec__thickness_code=spec_fields["thickness_code"],
-        insert_spec__nose_radius_code=spec_fields["nose_radius_code"],
-        insert_spec__milling_family=spec_fields["milling_family"],
-    ).first()
+        )
+        .first()
+    )
 
 
 def _create_insert_tool(quantity, tool_material, coating_type, main_diameter_mm, spec_fields: dict) -> ToolItem:
     spec = InsertSpec(**spec_fields)
     spec.sync_derived_fields()
-    if spec.insert_kind == "threading":
-        name = build_threading_insert_display_name(
-            spec.thread_size,
-            spec.thread_side,
-            spec.thread_hand,
-            spec.thread_pitch_mm,
-            spec.chipbreaker_grade,
-        )
-    elif spec.insert_kind == "other":
-        name = build_other_insert_display_name(
-            spec.custom_type, spec.item_name, spec.brand, spec.chipbreaker_grade
-        )
-    else:
-        name = build_insert_display_name(spec.iso_designation, spec.milling_family, spec.chipbreaker_grade)
+    name = build_other_insert_display_name("", spec.item_name, spec.brand, "")
     tool = ToolItem.objects.create(
         category="insert",
         name=name,
@@ -2770,52 +2579,27 @@ def inventory_view(request):
             )
         elif tool.category == "insert" and tool.insert_spec:
             ins = tool.insert_spec
-            ins.insert_shape = (request.POST.get("ins_shape") or ins.insert_shape or "C").strip()[:1]
-            ins.relief_angle = (request.POST.get("ins_relief") or ins.relief_angle or "N").strip()[:1]
-            ins.tolerance_class = (request.POST.get("ins_tolerance") or ins.tolerance_class or "M").strip()[:1]
-            ins.mounting_chip = (request.POST.get("ins_mounting") or ins.mounting_chip or "G").strip()[:1]
-            ins.cutting_edge_length_code = (request.POST.get("ins_edge_code") or ins.cutting_edge_length_code or "").strip()[:2]
-            ins.thickness_code = (request.POST.get("ins_thickness_code") or ins.thickness_code or "").strip()[:2]
-            ins.nose_radius_code = (request.POST.get("ins_nose_code") or ins.nose_radius_code or "").strip()[:2]
-            ins.milling_family = _milling_family_from_request(request.POST) or normalize_milling_family(ins.milling_family)
-            ins.insert_kind = normalize_insert_kind(request.POST.get("ins_kind") or request.POST.get("insert_kind")) or ins.insert_kind
-            ins.thread_side = normalize_insert_thread_side(
-                request.POST.get("ins_thread_side") or request.POST.get("thread_side")
-            ) or ins.thread_side
-            ins.thread_hand = normalize_insert_thread_hand(
-                request.POST.get("ins_thread_hand") or request.POST.get("thread_hand")
-            ) or ins.thread_hand
-            size_raw = request.POST.get("ins_thread_size") or request.POST.get("thread_size")
-            if size_raw is not None:
-                ins.thread_size = normalize_insert_thread_size(size_raw)
-            pitch_raw = request.POST.get("ins_thread_pitch") or request.POST.get("thread_pitch_mm")
-            if pitch_raw is not None and str(pitch_raw).strip() != "":
-                ins.thread_pitch_mm = _to_decimal_or_none(pitch_raw)
-            if request.POST.get("ins_custom_type") is not None or request.POST.get("custom_type") is not None:
-                ins.custom_type = normalize_insert_custom_type(
-                    request.POST.get("ins_custom_type") or request.POST.get("custom_type")
-                )
             if request.POST.get("ins_name") is not None or request.POST.get("item_name") is not None:
                 ins.item_name = normalize_insert_item_name(
                     request.POST.get("ins_name") or request.POST.get("item_name")
                 )
-            ins.chipbreaker_grade = (request.POST.get("ins_grade") or ins.chipbreaker_grade or "").strip()[:40]
-            ins.brand = (request.POST.get("ins_brand") or ins.brand or "").strip()[:80]
+            if request.POST.get("ins_brand") is not None or request.POST.get("brand") is not None:
+                ins.brand = normalize_insert_brand(
+                    request.POST.get("ins_brand") or request.POST.get("brand")
+                )
+            ins.insert_kind = INSERT_KIND_OTHER
+            ins.custom_type = ""
+            ins.chipbreaker_grade = ""
+            ins.milling_family = ""
+            ins.cutting_edge_length_code = ""
+            ins.thickness_code = ""
+            ins.nose_radius_code = ""
+            ins.thread_side = ""
+            ins.thread_hand = ""
+            ins.thread_size = ""
+            ins.thread_pitch_mm = None
             ins.save()
-            if ins.insert_kind == "threading":
-                tool.name = build_threading_insert_display_name(
-                    ins.thread_size,
-                    ins.thread_side,
-                    ins.thread_hand,
-                    ins.thread_pitch_mm,
-                    ins.chipbreaker_grade,
-                )
-            elif ins.insert_kind == "other":
-                tool.name = build_other_insert_display_name(
-                    ins.custom_type, ins.item_name, ins.brand, ins.chipbreaker_grade
-                )
-            else:
-                tool.name = build_insert_display_name(ins.iso_designation, ins.milling_family, ins.chipbreaker_grade)
+            tool.name = build_other_insert_display_name("", ins.item_name, ins.brand, "")
 
         tool.save()
         _log_inventory_stock_event(
@@ -3175,128 +2959,21 @@ def inventory_view(request):
                 tool.save(update_fields=["name", "updated_at"])
             elif cat == "insert" and tool.insert_spec:
                 ins = tool.insert_spec
-                if field == "ins_family":
-                    ins.milling_family = normalize_milling_family(value_raw) or ins.milling_family
-                    ins.save(update_fields=["milling_family"])
-                    tool.name = build_insert_display_name(ins.iso_designation, ins.milling_family, ins.chipbreaker_grade)
-                    tool.save(update_fields=["name", "updated_at"])
-                elif field == "ins_kind":
-                    kind = normalize_insert_kind(value_raw)
-                    if not kind:
-                        return JsonResponse({"ok": False, "error": "Укажите тип пластины."}, status=400)
-                    ins.insert_kind = kind
-                    ins.save(update_fields=["insert_kind"])
-                    if kind == "threading":
-                        tool.name = build_threading_insert_display_name(
-                            ins.thread_size,
-                            ins.thread_side,
-                            ins.thread_hand,
-                            ins.thread_pitch_mm,
-                            ins.chipbreaker_grade,
-                        )
-                        tool.save(update_fields=["name", "updated_at"])
-                    elif kind == "other":
-                        tool.name = build_other_insert_display_name(
-                            ins.custom_type, ins.item_name, ins.brand, ins.chipbreaker_grade
-                        )
-                        tool.save(update_fields=["name", "updated_at"])
-                elif field == "ins_custom_type":
-                    ctype = normalize_insert_custom_type(value_raw)
-                    if not ctype:
-                        return JsonResponse({"ok": False, "error": "Укажите название типа."}, status=400)
-                    ins.custom_type = ctype
-                    ins.save(update_fields=["custom_type"])
-                    if ins.insert_kind == "other":
-                        tool.name = build_other_insert_display_name(
-                            ins.custom_type, ins.item_name, ins.brand, ins.chipbreaker_grade
-                        )
-                        tool.save(update_fields=["name", "updated_at"])
-                elif field == "ins_name":
+                if field == "ins_name":
                     iname = normalize_insert_item_name(value_raw)
                     if not iname:
                         return JsonResponse({"ok": False, "error": "Укажите наименование."}, status=400)
                     ins.item_name = iname
-                    ins.save(update_fields=["item_name"])
-                    if ins.insert_kind == "other":
-                        tool.name = build_other_insert_display_name(
-                            ins.custom_type, ins.item_name, ins.brand, ins.chipbreaker_grade
-                        )
-                        tool.save(update_fields=["name", "updated_at"])
-                elif field == "ins_thread_size":
-                    ins.thread_size = normalize_insert_thread_size(value_raw)
-                    ins.save(update_fields=["thread_size"])
-                    if ins.insert_kind == "threading":
-                        tool.name = build_threading_insert_display_name(
-                            ins.thread_size, ins.thread_side, ins.thread_hand, ins.thread_pitch_mm, ins.chipbreaker_grade
-                        )
-                        tool.save(update_fields=["name", "updated_at"])
-                elif field == "ins_thread_side":
-                    side = normalize_insert_thread_side(value_raw)
-                    if not side:
-                        return JsonResponse({"ok": False, "error": "Укажите внутреннюю или наружную."}, status=400)
-                    ins.thread_side = side
-                    ins.save(update_fields=["thread_side"])
-                    if ins.insert_kind == "threading":
-                        tool.name = build_threading_insert_display_name(
-                            ins.thread_size, ins.thread_side, ins.thread_hand, ins.thread_pitch_mm, ins.chipbreaker_grade
-                        )
-                        tool.save(update_fields=["name", "updated_at"])
-                elif field == "ins_thread_hand":
-                    hand = normalize_insert_thread_hand(value_raw)
-                    if not hand:
-                        return JsonResponse({"ok": False, "error": "Укажите левую или правую."}, status=400)
-                    ins.thread_hand = hand
-                    ins.save(update_fields=["thread_hand"])
-                    if ins.insert_kind == "threading":
-                        tool.name = build_threading_insert_display_name(
-                            ins.thread_size, ins.thread_side, ins.thread_hand, ins.thread_pitch_mm, ins.chipbreaker_grade
-                        )
-                        tool.save(update_fields=["name", "updated_at"])
-                elif field == "ins_thread_pitch":
-                    pitch = _to_decimal_or_none(value_raw)
-                    if pitch is None or pitch <= 0:
-                        return JsonResponse({"ok": False, "error": "Укажите шаг резьбы."}, status=400)
-                    ins.thread_pitch_mm = pitch
-                    ins.save(update_fields=["thread_pitch_mm"])
-                    if ins.insert_kind == "threading":
-                        tool.name = build_threading_insert_display_name(
-                            ins.thread_size, ins.thread_side, ins.thread_hand, ins.thread_pitch_mm, ins.chipbreaker_grade
-                        )
-                        tool.save(update_fields=["name", "updated_at"])
-                elif field == "ins_shape":
-                    ins.insert_shape = (value_raw or ins.insert_shape or "C")[:1]
-                    ins.save(update_fields=["insert_shape"])
-                elif field == "ins_edge_code":
-                    ins.cutting_edge_length_code = (value_raw or "")[:2]
-                    ins.save(update_fields=["cutting_edge_length_code"])
-                elif field == "ins_thickness_code":
-                    ins.thickness_code = (value_raw or "")[:2]
-                    ins.save(update_fields=["thickness_code"])
-                elif field == "ins_nose_code":
-                    ins.nose_radius_code = (value_raw or "")[:2]
-                    ins.save(update_fields=["nose_radius_code"])
-                elif field == "ins_grade":
-                    ins.chipbreaker_grade = (value_raw or "")[:40]
-                    ins.save(update_fields=["chipbreaker_grade"])
-                    if ins.insert_kind == "threading":
-                        tool.name = build_threading_insert_display_name(
-                            ins.thread_size, ins.thread_side, ins.thread_hand, ins.thread_pitch_mm, ins.chipbreaker_grade
-                        )
-                    elif ins.insert_kind == "other":
-                        tool.name = build_other_insert_display_name(
-                            ins.custom_type, ins.item_name, ins.brand, ins.chipbreaker_grade
-                        )
-                    else:
-                        tool.name = build_insert_display_name(ins.iso_designation, ins.milling_family, ins.chipbreaker_grade)
+                    ins.insert_kind = INSERT_KIND_OTHER
+                    ins.save(update_fields=["item_name", "insert_kind"])
+                    tool.name = build_other_insert_display_name("", ins.item_name, ins.brand, "")
                     tool.save(update_fields=["name", "updated_at"])
                 elif field == "ins_brand":
-                    ins.brand = (value_raw or "").strip()[:80]
-                    ins.save(update_fields=["brand"])
-                    if ins.insert_kind == "other":
-                        tool.name = build_other_insert_display_name(
-                            ins.custom_type, ins.item_name, ins.brand, ins.chipbreaker_grade
-                        )
-                        tool.save(update_fields=["name", "updated_at"])
+                    ins.brand = normalize_insert_brand(value_raw)
+                    ins.insert_kind = INSERT_KIND_OTHER
+                    ins.save(update_fields=["brand", "insert_kind"])
+                    tool.name = build_other_insert_display_name("", ins.item_name, ins.brand, "")
+                    tool.save(update_fields=["name", "updated_at"])
                 else:
                     return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
             elif cat == "collet" and tool.collet_spec:
@@ -4191,6 +3868,11 @@ def inventory_view(request):
                 if addr and (tool.warehouse_address or "") != addr:
                     tool.warehouse_address = addr
                     tool.save(update_fields=["warehouse_address", "updated_at"])
+                if category == "insert":
+                    notes = (row.get("notes") or "").strip()[:300]
+                    if notes and (tool.notes or "") != notes:
+                        tool.notes = notes
+                        tool.save(update_fields=["notes", "updated_at"])
                 StockMovement.objects.create(
                     movement_type="restock",
                     tool=tool,

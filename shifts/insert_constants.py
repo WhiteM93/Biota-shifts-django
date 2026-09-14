@@ -250,7 +250,11 @@ def normalize_insert_custom_type(value: str) -> str:
 
 
 def normalize_insert_item_name(value: str) -> str:
-    return (value or "").strip()[:120]
+    return (value or "").strip().upper()[:120]
+
+
+def normalize_insert_brand(value: str) -> str:
+    return (value or "").strip().upper()[:80]
 
 
 def build_other_insert_display_name(
@@ -259,20 +263,14 @@ def build_other_insert_display_name(
     brand: str = "",
     grade: str = "",
 ) -> str:
-    """Имя для типа «Другое»: категория + наименование (+ бренд/сплав)."""
-    ctype = normalize_insert_custom_type(custom_type)
+    """Имя пластины: наименование (+ бренд)."""
     name = normalize_insert_item_name(item_name)
-    brand_s = (brand or "").strip()
-    grade_s = (grade or "").strip()
+    brand_s = normalize_insert_brand(brand)
     parts: list[str] = []
-    if ctype:
-        parts.append(ctype)
     if name:
         parts.append(name)
     if brand_s:
         parts.append(brand_s)
-    if grade_s:
-        parts.append(grade_s)
     return " ".join(parts) if parts else "Пластина"
 
 # Вид обработки (геометрия стружколома): 1 чистовая, 2 получистовая, 3 черновая
@@ -478,7 +476,7 @@ INSERT_COLUMN_TOOLTIPS = {
     "family": "Семейство пластины: две буквы + две буквы (например AP + KT)",
     "kind": "Назначение: фрезерная, токарная, резьбовая или другое",
     "custom_type": "Свой тип / категория пластины (для «Другое»)",
-    "item_name": "Наименование позиции",
+    "item_name": "Наименование пластины",
     "shape": "Форма пластины по ISO 1832 (C, D, T…)",
     "relief": "Задний угол (рельеф) пластины",
     "tolerance": "Класс допуска по ISO",
@@ -494,6 +492,7 @@ INSERT_COLUMN_TOOLTIPS = {
     "machining_application": "Вид обработки (можно несколько): чистовая, получистовая, черновая",
     "tool_material": "Сплав / марка пластины (YG501, ВК8, TC1225 и др.)",
     "coating": "Покрытие пластины",
+    "notes": "Заметка / примечание к позиции",
     "quantity": "Количество в приходе, шт.",
     "stock_qty": "Остаток на складе, шт.",
     "row_remove": "Удалить строку прихода",

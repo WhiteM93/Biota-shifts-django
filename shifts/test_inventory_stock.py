@@ -44,94 +44,17 @@ class InsertMachiningAppsTests(TestCase):
 
 
 class ArrivalBulkValidationTests(TestCase):
-    def test_insert_allows_empty_machining(self):
-        row = {
-            "category": "insert",
-            "ins_shape": "C",
-            "ins_edge_code": "12",
-            "ins_thickness_code": "04",
-            "ins_nose_code": "08",
-            "ins_kind": "milling",
-            "ins_machining_app": "",
-        }
+    def test_insert_requires_name(self):
+        row = {"category": "insert", "ins_brand": "Sandvik", "ins_name": ""}
         errs = _arrival_bulk_row_validation_errors(row, 1)
-        self.assertEqual(errs, [])
+        self.assertTrue(any("наименование" in e.lower() for e in errs))
 
-    def test_insert_allows_empty_ls_r_codes(self):
+    def test_insert_ok_with_name_and_brand(self):
         row = {
             "category": "insert",
-            "ins_shape": "C",
-            "ins_edge_code": "",
-            "ins_thickness_code": "",
-            "ins_nose_code": "",
-            "ins_kind": "milling",
-        }
-        errs = _arrival_bulk_row_validation_errors(row, 1)
-        self.assertEqual(errs, [])
-
-    def test_insert_requires_kind(self):
-        row = {
-            "category": "insert",
-            "ins_shape": "C",
-            "ins_edge_code": "12",
-            "ins_thickness_code": "04",
-            "ins_nose_code": "08",
-        }
-        errs = _arrival_bulk_row_validation_errors(row, 1)
-        self.assertTrue(any("тип пластины" in e.lower() for e in errs))
-
-    def test_insert_threading_requires_size_side_hand_pitch(self):
-        row = {
-            "category": "insert",
-            "ins_kind": "threading",
-            "ins_thread_size": "",
-            "ins_thread_side": "external",
-            "ins_thread_hand": "right",
-            "ins_thread_pitch": "0.5",
-        }
-        errs = _arrival_bulk_row_validation_errors(row, 1)
-        self.assertTrue(any("размер" in e.lower() for e in errs))
-
-    def test_insert_threading_ok(self):
-        row = {
-            "category": "insert",
-            "ins_kind": "threading",
-            "ins_thread_size": "16",
-            "ins_thread_side": "external",
-            "ins_thread_hand": "right",
-            "ins_thread_pitch": "0.5",
-            "ins_brand": "DaoQin",
-            "ins_grade": "DM215",
-        }
-        errs = _arrival_bulk_row_validation_errors(row, 1)
-        self.assertEqual(errs, [])
-
-    def test_insert_other_requires_custom_type_and_name(self):
-        row = {
-            "category": "insert",
-            "ins_kind": "other",
-            "ins_custom_type": "",
-            "ins_name": "Пластина X",
-        }
-        errs = _arrival_bulk_row_validation_errors(row, 1)
-        self.assertTrue(any("своего типа" in e.lower() for e in errs))
-        row2 = {
-            "category": "insert",
-            "ins_kind": "other",
-            "ins_custom_type": "Керамика",
-            "ins_name": "",
-        }
-        errs2 = _arrival_bulk_row_validation_errors(row2, 1)
-        self.assertTrue(any("наименование" in e.lower() for e in errs2))
-
-    def test_insert_other_ok(self):
-        row = {
-            "category": "insert",
-            "ins_kind": "other",
-            "ins_custom_type": "Керамика",
-            "ins_name": "RNGN120700",
-            "ins_brand": "Kennametal",
-            "ins_grade": "KY1615",
+            "ins_brand": "Sandvik",
+            "ins_name": "CNMG120408",
+            "coating_type": "yellow",
         }
         errs = _arrival_bulk_row_validation_errors(row, 1)
         self.assertEqual(errs, [])
@@ -141,56 +64,23 @@ class ArrivalBulkValidationTests(TestCase):
         errs = _arrival_bulk_row_validation_errors(row, 1)
         self.assertTrue(any("диаметр" in e.lower() for e in errs))
 
-    def test_insert_spec_mapping_includes_brand(self):
-        fields = _insert_spec_fields_from_mapping(
-            {"ins_machining_app": "2,1", "ins_shape": "C", "ins_brand": "Sandvik", "ins_kind": "turning"}
-        )
-        self.assertEqual(fields["machining_application"], "1,2")
-        self.assertEqual(fields["brand"], "Sandvik")
-        self.assertEqual(fields["insert_kind"], "turning")
-
-    def test_insert_spec_mapping_threading(self):
+    def test_insert_spec_mapping_simple(self):
         fields = _insert_spec_fields_from_mapping(
             {
-                "ins_kind": "threading",
-                "ins_thread_size": "16",
-                "ins_thread_side": "external",
-                "ins_thread_hand": "right",
-                "ins_thread_pitch": "0.5",
-                "ins_brand": "DaoQin",
-                "ins_grade": "DM215",
-                "ins_edge_code": "12",
-            }
-        )
-        self.assertEqual(fields["insert_kind"], "threading")
-        self.assertEqual(fields["thread_size"], "16")
-        self.assertEqual(fields["thread_side"], "external")
-        self.assertEqual(fields["thread_hand"], "right")
-        self.assertEqual(str(fields["thread_pitch_mm"]), "0.5")
-        self.assertEqual(fields["cutting_edge_length_code"], "")
-        self.assertEqual(fields["brand"], "DaoQin")
-        self.assertEqual(fields["chipbreaker_grade"], "DM215")
-
-    def test_insert_spec_mapping_other(self):
-        fields = _insert_spec_fields_from_mapping(
-            {
-                "ins_kind": "other",
-                "ins_custom_type": "Керамика",
-                "ins_name": "RNGN120700",
-                "ins_brand": "Kennametal",
-                "ins_grade": "KY1615",
+                "ins_brand": "Sandvik",
+                "ins_name": "CNMG120408",
+                "ins_kind": "milling",
                 "ins_edge_code": "12",
                 "ins_thread_size": "16",
             }
         )
         self.assertEqual(fields["insert_kind"], "other")
-        self.assertEqual(fields["custom_type"], "Керамика")
-        self.assertEqual(fields["item_name"], "RNGN120700")
-        self.assertEqual(fields["brand"], "Kennametal")
-        self.assertEqual(fields["chipbreaker_grade"], "KY1615")
+        self.assertEqual(fields["brand"], "SANDVIK")
+        self.assertEqual(fields["item_name"], "CNMG120408")
         self.assertEqual(fields["cutting_edge_length_code"], "")
         self.assertEqual(fields["thread_size"], "")
-        self.assertIsNone(fields["thread_pitch_mm"])
+        self.assertEqual(fields["custom_type"], "")
+        self.assertEqual(fields["chipbreaker_grade"], "")
 
 
 class InventoryViewTests(TestCase):
@@ -218,21 +108,15 @@ class InventoryViewTests(TestCase):
         )
         ins_tool = ToolItem.objects.create(
             category="insert",
-            name="Пластина тест",
-            tool_material="carbide",
+            name="CNMG120408 Sandvik",
+            tool_material="",
             quantity=3,
         )
         InsertSpec.objects.create(
             tool=ins_tool,
-            insert_shape="C",
-            relief_angle="N",
-            tolerance_class="M",
-            mounting_chip="G",
-            cutting_edge_length_code="12",
-            thickness_code="04",
-            nose_radius_code="08",
-            machining_application="1,2",
-            chipbreaker_grade="YG501",
+            insert_kind="other",
+            brand="Sandvik",
+            item_name="CNMG120408",
         )
 
     def test_stock_page_loads(self):
@@ -246,7 +130,8 @@ class InventoryViewTests(TestCase):
             if cat == "end_mill":
                 self.assertIn("Ø6", content)
             if cat == "insert":
-                self.assertIn("YG501", content)
+                self.assertIn("CNMG120408", content)
+                self.assertIn("Sandvik", content)
 
     def test_arrival_page_has_inv_options(self):
         resp = self.client.get(reverse("inventory") + "?panel=arrival")

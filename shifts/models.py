@@ -170,6 +170,7 @@ from .insert_constants import (
     normalize_insert_thread_size,
     normalize_insert_custom_type,
     normalize_insert_item_name,
+    normalize_insert_brand,
     build_threading_insert_display_name,
     build_other_insert_display_name,
     MILLING_INSERT_FAMILIES,
@@ -420,41 +421,13 @@ class ToolItem(models.Model):
             ]
         elif cat == "insert":
             ins = getattr(self, "insert_spec", None)
-            if ins and (ins.insert_kind or "") == "threading":
-                segs = [
-                    self.get_category_display(),
-                    "Резьбовая",
-                    (ins.thread_size or "—"),
-                    (ins.get_thread_side_display() if ins.thread_side else "—"),
-                    (ins.get_thread_hand_display() if ins.thread_hand else "—"),
-                    (fmt_mm(ins.thread_pitch_mm) if ins.thread_pitch_mm is not None else "—"),
-                    (ins.chipbreaker_grade if ins.chipbreaker_grade else "—"),
-                    coating_txt(),
-                    f"ост {self.quantity}",
-                ]
-            elif ins and (ins.insert_kind or "") == "other":
-                segs = [
-                    self.get_category_display(),
-                    (ins.custom_type or "Другое"),
-                    (ins.item_name or "—"),
-                    (ins.brand or "—"),
-                    (ins.chipbreaker_grade if ins.chipbreaker_grade else "—"),
-                    coating_txt(),
-                    f"ост {self.quantity}",
-                ]
-            else:
-                segs = [
-                    self.get_category_display(),
-                    (ins.milling_family.upper() if ins and ins.milling_family else "—"),
-                    (ins.insert_shape if ins else "—"),
-                    (ins.cutting_edge_length_code if ins and ins.cutting_edge_length_code else "—"),
-                    (ins.thickness_code if ins and ins.thickness_code else "—"),
-                    (ins.nose_radius_code if ins and ins.nose_radius_code else "—"),
-                    (ins.get_machining_applications_display() if ins else "—"),
-                    (ins.chipbreaker_grade if ins and ins.chipbreaker_grade else "—"),
-                    coating_txt(),
-                    f"ост {self.quantity}",
-                ]
+            segs = [
+                self.get_category_display(),
+                (ins.brand if ins and ins.brand else "—"),
+                (ins.item_name if ins and ins.item_name else (self.name or "—")),
+                coating_txt(),
+                f"ост {self.quantity}",
+            ]
         elif cat == "collet":
             cl = getattr(self, "collet_spec", None)
             segs = [
@@ -1176,7 +1149,7 @@ class InsertSpec(models.Model):
         self.custom_type = normalize_insert_custom_type(self.custom_type)
         self.item_name = normalize_insert_item_name(self.item_name)
         self.chipbreaker_grade = (self.chipbreaker_grade or "").strip()[:40]
-        self.brand = (self.brand or "").strip()[:80]
+        self.brand = normalize_insert_brand(self.brand)
         self.sync_derived_fields()
         super().save(*args, **kwargs)
 
