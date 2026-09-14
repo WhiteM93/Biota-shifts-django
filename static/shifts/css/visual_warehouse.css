@@ -174,17 +174,67 @@ html[data-theme="dawn"] .vw-btn-ghost:hover {
   display: flex;
   flex-wrap: nowrap;
   justify-content: center;
-  align-items: stretch;
-  overflow: hidden;
+  align-items: flex-start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 8px 4px;
   height: var(--vw-floor-h, 60vh);
   max-height: var(--vw-floor-h, 60vh);
 }
 
 .vw-floor.is-open .vw-cabinet {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   width: 100%;
   max-width: 100%;
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  align-self: flex-start;
+}
+
+/* Открытый шкаф растёт по содержимому — полки не сжимаются до нечитаемых надписей */
+.vw-floor.is-open .vw-cab-frame {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.vw-floor.is-open .vw-cab-interior {
+  height: auto;
+  overflow: visible;
+}
+
+.vw-floor.is-open .vw-bay {
+  flex: 0 0 auto;
+  min-height: 88px;
+  overflow: visible;
+}
+
+.vw-floor.is-open .vw-bay--drawer {
+  min-height: 100px;
+}
+
+.vw-floor.is-open .vw-bay-space {
+  min-height: 72px;
+  overflow: visible;
+}
+
+.vw-floor.is-open .vw-pile {
+  height: auto;
+  min-height: 68px;
+  overflow: visible;
+}
+
+.vw-floor.is-open .vw-bin,
+.vw-floor.is-open .vw-shelf-slot,
+.vw-floor.is-open .vw-shelf-empty {
+  min-height: 68px;
+}
+
+.vw-floor.is-open .vw-bin-text {
+  font-size: 13px;
 }
 
 .vw-cab-tile {
@@ -2210,6 +2260,25 @@ html[data-theme="dawn"] .vw-audit-row {
     min-width: 0;
     max-width: 100%;
     height: 100%;
+  }
+
+  .vw-floor.is-open .vw-cabinet,
+  .vw-floor.is-open .vw-cabinet[data-kind="rack"],
+  .vw-floor.is-open .vw-cabinet[data-kind="drawer_chest"] {
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    flex: 0 0 auto;
+  }
+
+  .vw-floor.is-open .vw-bay {
+    min-height: 80px;
+  }
+
+  .vw-floor.is-open .vw-bin,
+  .vw-floor.is-open .vw-shelf-slot,
+  .vw-floor.is-open .vw-shelf-empty {
+    min-height: 64px;
   }
 
   .vw-cab-frame {

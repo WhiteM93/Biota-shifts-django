@@ -971,8 +971,8 @@
 
   function fitLabelText(el) {
     if (!el) return;
-    var minPx = 7;
-    var maxPx = 12;
+    var minPx = 8;
+    var maxPx = 13;
     var size = maxPx;
     el.style.fontSize = size + "px";
     // Shrink until each line fits width and block fits parent height.
