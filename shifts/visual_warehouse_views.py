@@ -1281,15 +1281,26 @@ def visual_warehouse_api_container_upsert(request):
             return _err(overlap)
 
     if cid:
-        cont = get_object_or_404(VisualContainer, pk=cid, cabinet=cab)
+        cont = get_object_or_404(VisualContainer.objects.select_related("cabinet", "parent"), pk=cid)
+        old_cab = cont.cabinet
+        if cont.parent_id and cont.cabinet_id != cab.id:
+            return _err("Ячейку органайзера нельзя перенести в другой стеллаж отдельно — перенесите органайзер")
+        if cont.parent_id and parent and parent.pk != cont.parent_id:
+            return _err("Нельзя сменить родительский органайзер через эту форму")
+        if cont.parent_id:
+            # Ячейка остаётся в шкафу родителя
+            cab = old_cab
+            parent = cont.parent
         if cont.parent_id and cont_kind == VisualContainer.KIND_ORGANIZER:
             return _err("Нельзя превратить ячейку в органайзер")
-        old_addr = normalize_address(resolve_container_address(cont, cab, prefer_stored=True))
+        cabinet_changed = (not cont.parent_id) and cont.cabinet_id != cab.id
+        old_addr = normalize_address(resolve_container_address(cont, old_cab, prefer_stored=True))
         old_suggested = (
             ""
             if cont.parent_id
-            else normalize_address(suggested_address(cab, shelf=cont.shelf, column=cont.column))
+            else normalize_address(suggested_address(old_cab, shelf=cont.shelf, column=cont.column))
         )
+        cont.cabinet = cab
         cont.kind = cont_kind
         cont.shelf = shelf
         cont.stack = stack
@@ -1300,15 +1311,24 @@ def visual_warehouse_api_container_upsert(request):
         cont.color = color
         cont.notes = notes
         if address is not None:
-            cont.address = address
+            addr_norm = normalize_address(address)
+            if cabinet_changed and (
+                not addr_norm or addr_norm == old_addr or addr_norm == old_suggested
+            ):
+                cont.address = "" if parent else suggested_address(cab, shelf=shelf, column=column)
+            else:
+                cont.address = address
         elif not parent:
             new_suggested = suggested_address(cab, shelf=shelf, column=column)
-            if not (cont.address or "").strip() or old_addr == old_suggested:
+            if not (cont.address or "").strip() or old_addr == old_suggested or cabinet_changed:
                 cont.address = new_suggested
         if cont_kind == VisualContainer.KIND_ORGANIZER:
             cont.inner_tiers = inner_tiers
             cont.inner_columns = inner_columns
         cont.save()
+        if cabinet_changed:
+            # Дочерние ячейки органайзера должны остаться с тем же шкафом
+            VisualContainer.objects.filter(parent_id=cont.pk).update(cabinet=cab)
         if cont_kind == VisualContainer.KIND_ORGANIZER:
             _ensure_organizer_children(cont)
         new_addr = normalize_address(resolve_container_address(cont, cab, prefer_stored=True))

@@ -87,11 +87,13 @@
 
   var cabinets = [];
   var editMode = false;
+  var openCabinetId = null;
   var openContainerId = null;
   var openContainerData = null;
   var editingCabinetId = null;
   var auditMode = false;
   var savingAudit = false;
+  var btnBackList = document.querySelector(".js-vw-back-list");
 
   var CAT_LABELS = {
     end_mill: "Фрезы",
@@ -350,6 +352,18 @@
     return pad2(total - top + 1);
   }
 
+  /** Номер полки снизу вверх (1 = низ), как на экране и в адресе. */
+  function shelfTopToDisplayNum(cab, shelfTop1) {
+    return parseInt(shelfDisplayLabel(cab, shelfTop1), 10) || 1;
+  }
+
+  /** Обратно: номер с экрана → значение для БД (1 = верх). */
+  function shelfDisplayToTop(cab, displayNum) {
+    var total = Math.max(1, parseInt(cab && cab.shelves, 10) || 1);
+    var disp = Math.max(1, Math.min(parseInt(displayNum, 10) || 1, total));
+    return total - disp + 1;
+  }
+
   function placeDisplayLabel(col) {
     return pad2(Math.max(1, parseInt(col, 10) || 1));
   }
@@ -367,11 +381,6 @@
       btnToggleEdit.setAttribute("aria-pressed", editMode ? "true" : "false");
       btnToggleEdit.textContent = editMode ? "Готово" : "Редактировать";
     }
-    if (modeHint) {
-      modeHint.textContent = editMode
-        ? "Правка: «+» или пустое место — создать место/контейнер. Клик по ящику — изменить. Содержимое задаётся на складе (адрес). «Готово» — просмотр."
-        : "Нажмите на контейнер: список по адресу со склада и инвентаризация";
-    }
     if (itemForm) setVisible(itemForm, false);
     if (rulesBlock) setVisible(rulesBlock, false);
     if (photoUploadWrap) setVisible(photoUploadWrap, editMode && canEdit);
@@ -379,6 +388,7 @@
     syncItemMillTypeRow();
     if (openContainerData) renderPhotos(openContainerData);
     renderFloor();
+    requestAnimationFrame(syncViewportHeightFit);
   }
 
   function occupiedMap(cab) {
@@ -403,18 +413,8 @@
     return { shelf: shelf, stack: 1, column: cab.columns + 1 };
   }
 
-  function renderFloor() {
-    if (!floorEl) return;
-    floorEl.querySelectorAll(".vw-cabinet").forEach(function (n) { n.remove(); });
-
-    if (!cabinets.length) {
-      setVisible(emptyEl, true);
-      if (emptyEl && !floorEl.contains(emptyEl)) floorEl.appendChild(emptyEl);
-      return;
-    }
-    setVisible(emptyEl, false);
-
-    var sorted = cabinets.slice().sort(function (a, b) {
+  function sortedCabinets() {
+    return cabinets.slice().sort(function (a, b) {
       var so = (a.sort_order || 0) - (b.sort_order || 0);
       if (so) return so;
       var ca = String(a.code || "").localeCompare(String(b.code || ""), "ru");
@@ -423,11 +423,177 @@
       if (na) return na;
       return (a.id || 0) - (b.id || 0);
     });
-    sorted.forEach(function (cab) {
-      floorEl.appendChild(buildCabinetCard(cab));
+  }
+
+  function cabinetKindNoun(kind) {
+    if (kind === "rack") return "Стеллаж";
+    if (kind === "drawer_chest") return "Тумба";
+    return "Шкаф";
+  }
+
+  function countTopContainers(cab) {
+    return (cab.containers || []).filter(function (c) { return !c.parent_id; }).length;
+  }
+
+  function syncOpenCabinetChrome() {
+    var openCab = openCabinetId
+      ? cabinets.find(function (c) { return c.id === openCabinetId; })
+      : null;
+    if (btnBackList) setVisible(btnBackList, !!openCab);
+    if (floorEl) {
+      floorEl.classList.toggle("is-list", !openCab);
+      floorEl.classList.toggle("is-open", !!openCab);
+    }
+    if (modeHint) {
+      if (!openCab) {
+        modeHint.textContent = editMode
+          ? "Список мебели. Нажмите карточку, чтобы открыть. «Параметры» — изменить шкаф."
+          : "Выберите шкаф или стеллаж";
+      } else if (editMode) {
+        modeHint.textContent = "Правка: «+» или пустое место — создать. Клик по ящику — изменить. «← К списку» — назад.";
+      } else {
+        modeHint.textContent = "Нажмите на контейнер: список по адресу и инвентаризация";
+      }
+    }
+    if (root) {
+      var titleEl = root.querySelector(".vw-title");
+      if (titleEl) {
+        if (openCab) {
+          var code = (openCab.code || "").toString().trim().toUpperCase();
+          titleEl.textContent = code
+            ? (code + " — " + (openCab.name || cabinetKindNoun(cabinetKindOf(openCab))))
+            : (openCab.name || "Мебель");
+        } else {
+          titleEl.textContent = "Визуальный склад";
+        }
+      }
+    }
+  }
+
+  function openCabinetView(cabId) {
+    openCabinetId = cabId || null;
+    syncOpenCabinetChrome();
+    renderFloor();
+  }
+
+  function closeCabinetView() {
+    openCabinetId = null;
+    syncOpenCabinetChrome();
+    renderFloor();
+  }
+
+  function buildCabinetListCard(cab) {
+    var kind = cabinetKindOf(cab);
+    var code = (cab.code || "").toString().trim().toUpperCase();
+    var places = countTopContainers(cab);
+    var card = document.createElement("button");
+    card.type = "button";
+    card.className = "vw-cab-tile";
+    card.dataset.kind = kind;
+    card.dataset.cabinetId = String(cab.id);
+
+    var icon = document.createElement("span");
+    icon.className = "vw-cab-tile__icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = kind === "rack" ? "▦" : (kind === "drawer_chest" ? "☰" : "▣");
+    card.appendChild(icon);
+
+    var body = document.createElement("span");
+    body.className = "vw-cab-tile__body";
+    var title = document.createElement("strong");
+    title.className = "vw-cab-tile__title";
+    title.textContent = code ? (code + " — " + (cab.name || "")) : (cab.name || "Без названия");
+    body.appendChild(title);
+    var meta = document.createElement("span");
+    meta.className = "vw-cab-tile__meta";
+    meta.textContent = cabinetKindNoun(kind)
+      + " · " + (cab.shelves || 0) + " пол."
+      + " · " + places + " мест";
+    body.appendChild(meta);
+    card.appendChild(body);
+
+    card.title = "Открыть";
+    card.addEventListener("click", function () {
+      openCabinetView(cab.id);
     });
 
+    if (canEdit) {
+      var gear = document.createElement("span");
+      gear.className = "vw-cab-tile__gear";
+      gear.textContent = "⚙";
+      gear.title = "Параметры";
+      gear.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (!editMode) setEditMode(true);
+        openCabinetForm(cab);
+      });
+      card.appendChild(gear);
+    }
+
+    return card;
+  }
+
+  function syncViewportHeightFit() {
+    if (!root || !floorEl) return;
+    document.documentElement.classList.add("vw-fit-height");
+    document.body.classList.add("vw-fit-height");
+
+    var nav = document.querySelector(".nav");
+    var navH = nav ? Math.ceil(nav.getBoundingClientRect().height) : 56;
+    document.documentElement.style.setProperty("--vw-nav-h", navH + "px");
+
+    var vv = window.visualViewport;
+    var viewH = vv ? vv.height : window.innerHeight;
+    var container = root.closest(".container");
+    if (container) {
+      var contH = Math.floor(viewH - navH);
+      if (contH < 200) contH = 200;
+      container.style.height = contH + "px";
+      container.style.maxHeight = contH + "px";
+    }
+
+    var top = floorEl.getBoundingClientRect().top;
+    var avail = Math.floor(viewH - top - 4);
+    if (!isFinite(avail) || avail < 160) avail = 160;
+    root.style.setProperty("--vw-floor-h", avail + "px");
+  }
+
+  function renderFloor() {
+    if (!floorEl) return;
+    floorEl.querySelectorAll(".vw-cabinet, .vw-cab-tile").forEach(function (n) { n.remove(); });
+
+    if (!cabinets.length) {
+      setVisible(emptyEl, true);
+      if (emptyEl && !floorEl.contains(emptyEl)) floorEl.appendChild(emptyEl);
+      if (openCabinetId) openCabinetId = null;
+      syncOpenCabinetChrome();
+      syncViewportHeightFit();
+      return;
+    }
+    setVisible(emptyEl, false);
+
+    var openCab = openCabinetId
+      ? cabinets.find(function (c) { return c.id === openCabinetId; })
+      : null;
+    if (openCabinetId && !openCab) {
+      openCabinetId = null;
+      openCab = null;
+    }
+    syncOpenCabinetChrome();
+
+    if (!openCab) {
+      sortedCabinets().forEach(function (cab) {
+        floorEl.appendChild(buildCabinetListCard(cab));
+      });
+      syncViewportHeightFit();
+      return;
+    }
+
+    floorEl.appendChild(buildCabinetCard(openCab));
+    syncViewportHeightFit();
     requestAnimationFrame(function () {
+      syncViewportHeightFit();
       floorEl.querySelectorAll(".vw-bin-text").forEach(fitLabelText);
     });
   }
@@ -445,6 +611,42 @@
     return "шкафа";
   }
 
+  function cabinetOptionLabel(cab) {
+    var code = (cab && (cab.code || "")).toString().trim().toUpperCase();
+    var name = (cab && cab.name) || ("#" + (cab && cab.id));
+    var kind = cabinetKindOf(cab);
+    var kindLab = kind === "rack" ? "стеллаж" : (kind === "drawer_chest" ? "тумба" : "шкаф");
+    return (code ? (code + " — ") : "") + name + " (" + kindLab + ")";
+  }
+
+  function fillContainerCabinetSelect(selectedId, disabled) {
+    var sel = contForm && contForm.querySelector(".js-vw-cont-cabinet");
+    if (!sel) return;
+    var cur = String(selectedId || "");
+    sel.innerHTML = "";
+    cabinets.slice().sort(function (a, b) {
+      var ca = (a.code || "").toString();
+      var cb = (b.code || "").toString();
+      if (ca !== cb) return ca < cb ? -1 : 1;
+      return (a.name || "").localeCompare(b.name || "", "ru");
+    }).forEach(function (cab) {
+      var opt = document.createElement("option");
+      opt.value = String(cab.id);
+      opt.textContent = cabinetOptionLabel(cab);
+      sel.appendChild(opt);
+    });
+    if (cur && [].some.call(sel.options, function (o) { return o.value === cur; })) {
+      sel.value = cur;
+    } else if (sel.options.length) {
+      sel.selectedIndex = 0;
+    }
+    sel.disabled = !!disabled;
+    var row = contForm.querySelector(".js-vw-cont-cabinet-row");
+    var hint = contForm.querySelector(".js-vw-cont-cabinet-hint");
+    if (row) setVisible(row, true);
+    if (hint) setVisible(hint, !disabled);
+  }
+
   function containerKindLabel(kind) {
     if (kind === "shelf_slot") return "На полке";
     if (kind === "drawer_cell") return "Ячейка";
@@ -458,6 +660,7 @@
     wrap.dataset.cabinetId = String(cab.id);
     wrap.dataset.kind = cabinetKindOf(cab);
     wrap.style.setProperty("--vw-cols", String(Math.max(1, parseInt(cab.columns, 10) || 1)));
+    wrap.style.setProperty("--vw-shelves", String(Math.max(1, parseInt(cab.shelves, 10) || 1)));
 
     var name = document.createElement("h2");
     name.className = "vw-cabinet-name";
@@ -1049,7 +1252,7 @@
         ? "Новая ячейка"
         : (cabKind === "rack" ? "Новое место" : "Новый контейнер"));
     contForm.querySelector(".js-vw-cont-id").value = cont ? String(cont.id) : "";
-    contForm.querySelector(".js-vw-cont-cabinet").value = String(cab.id);
+    fillContainerCabinetSelect(cab.id, isChild);
     var kindRow = contForm.querySelector(".js-vw-cont-kind-row");
     var kindSel = contForm.querySelector(".js-vw-cont-kind");
     if (kindRow && kindSel) {
@@ -1060,7 +1263,11 @@
     syncOrganizerFields(contKind, cont);
     contForm.querySelector(".js-vw-cont-label").value = cont ? cont.label : "";
     contForm.querySelector(".js-vw-cont-color").value = (cont && cont.color) || "#e74c3c";
-    contForm.querySelector(".js-vw-cont-shelf").value = String(cont ? cont.shelf : shelf || 1);
+    var shelfTop = cont ? cont.shelf : (shelf || 1);
+    // В форме — номер как на экране (снизу вверх); в БД по-прежнему 1 = верх
+    contForm.querySelector(".js-vw-cont-shelf").value = String(
+      isChild ? shelfTop : shelfTopToDisplayNum(cab, shelfTop)
+    );
     var stackEl = contForm.querySelector(".js-vw-cont-stack");
     var stackRow = contForm.querySelector(".js-vw-cont-stack-row");
     var stackHint = contForm.querySelector(".js-vw-cont-stack-hint");
@@ -1081,7 +1288,7 @@
         stackHint.textContent = "Для этого типа ярус всегда 1.";
         setVisible(stackHint, true);
       } else {
-        stackHint.textContent = "Ярус 1 на полке. Ярус 2 — поверх другого ящика в том же месте.";
+        stackHint.textContent = "Полка 1 — нижняя (как в адресе). Ярус 1 на полке, ярус 2 — поверх другого ящика.";
         setVisible(stackHint, true);
       }
     }
@@ -1092,7 +1299,7 @@
         ? cont.address
         : suggestAddress(
           cab,
-          cont ? cont.shelf : (shelf || 1),
+          shelfTop,
           cont ? cont.column : (col || 1)
         );
       addressEl.value = addr || "";
@@ -1133,13 +1340,10 @@
         shelfLabel.textContent = "Ярус внутри";
         return;
       }
-      var shelfInp = contForm.querySelector(".js-vw-cont-shelf");
-      var shelfVal = parseInt(shelfInp && shelfInp.value, 10) || 1;
-      var disp = shelfDisplayLabel(cab, shelfVal);
       if (cabKind === "drawer_chest") {
-        shelfLabel.textContent = "Ящик (1 — верхний, на экране " + disp + ")";
+        shelfLabel.textContent = "Ящик (1 — нижний, как на экране)";
       } else {
-        shelfLabel.textContent = "Полка (1 — верхняя, на экране " + disp + ")";
+        shelfLabel.textContent = "Полка (1 — нижняя, как на экране)";
       }
     }
     syncShelfLabelHint();
@@ -1157,12 +1361,10 @@
           labelEl.textContent = "Ярус внутри";
           return;
         }
-        var shelfVal = parseInt(shelfInpForHint.value, 10) || 1;
-        var disp = shelfDisplayLabel(currentCab, shelfVal);
         var kindNow = cabinetKindOf(currentCab);
         labelEl.textContent = kindNow === "drawer_chest"
-          ? ("Ящик (1 — верхний, на экране " + disp + ")")
-          : ("Полка (1 — верхняя, на экране " + disp + ")");
+          ? "Ящик (1 — нижний, как на экране)"
+          : "Полка (1 — нижняя, как на экране)";
       });
     }
     var colLabel = contForm.querySelector(".js-vw-cont-column") &&
@@ -1196,8 +1398,20 @@
   });
 
   document.addEventListener("keydown", function (ev) {
-    if (ev.key === "Escape") closeAllDialogs();
+    if (ev.key !== "Escape") return;
+    var anyOpen = document.querySelector(".vw-modal:not([hidden])");
+    if (anyOpen) {
+      closeAllDialogs();
+      return;
+    }
+    if (openCabinetId) closeCabinetView();
   });
+
+  if (btnBackList) {
+    btnBackList.addEventListener("click", function () {
+      closeCabinetView();
+    });
+  }
 
   if (btnToggleEdit) {
     btnToggleEdit.addEventListener("click", function () {
@@ -1222,8 +1436,10 @@
       if (!cab) return;
       var shelf = parseInt(contForm.querySelector(".js-vw-cont-shelf").value, 10) || 1;
       var column = parseInt(contForm.querySelector(".js-vw-cont-column").value, 10) || 1;
+      var parentId = contForm.dataset.parentId;
+      var shelfTop = parentId ? shelf : shelfDisplayToTop(cab, shelf);
       var addressEl = contForm.querySelector(".js-vw-cont-address");
-      if (addressEl) addressEl.value = suggestAddress(cab, shelf, column);
+      if (addressEl) addressEl.value = suggestAddress(cab, shelfTop, column);
     });
   }
 
@@ -1264,6 +1480,41 @@
           }
           if (parseInt(spanSel.value, 10) < 2) spanSel.value = prefer;
         }
+      }
+    });
+  }
+
+  var contCabinetSelect = document.querySelector(".js-vw-cont-cabinet");
+  if (contCabinetSelect && !contCabinetSelect._vwCabChangeBound) {
+    contCabinetSelect._vwCabChangeBound = true;
+    contCabinetSelect.addEventListener("change", function () {
+      if (!contForm || contForm.dataset.parentId) return;
+      var cabId = parseInt(contCabinetSelect.value, 10);
+      var cab = cabinets.find(function (c) { return c.id === cabId; });
+      if (!cab) return;
+      var kindSel = contForm.querySelector(".js-vw-cont-kind");
+      var curKind = kindSel ? kindSel.value : "bin";
+      syncContainerKindOptions(cabinetKindOf(cab), curKind, false);
+      if (kindSel) kindSel.dispatchEvent(new Event("change"));
+      var shelfInp = contForm.querySelector(".js-vw-cont-shelf");
+      var colInp = contForm.querySelector(".js-vw-cont-column");
+      var shelfDisp = parseInt(shelfInp && shelfInp.value, 10) || 1;
+      var column = parseInt(colInp && colInp.value, 10) || 1;
+      var total = Math.max(1, parseInt(cab.shelves, 10) || 1);
+      if (shelfDisp > total) {
+        shelfDisp = total;
+        if (shelfInp) shelfInp.value = String(total);
+      }
+      var addressEl = contForm.querySelector(".js-vw-cont-address");
+      if (addressEl) {
+        addressEl.value = suggestAddress(cab, shelfDisplayToTop(cab, shelfDisp), column);
+      }
+      var labelEl = shelfInp && shelfInp.closest(".vw-row") &&
+        shelfInp.closest(".vw-row").querySelector(".vw-row-label");
+      if (labelEl) {
+        labelEl.textContent = cabinetKindOf(cab) === "drawer_chest"
+          ? "Ящик (1 — нижний, как на экране)"
+          : "Полка (1 — нижняя, как на экране)";
       }
     });
   }
@@ -1343,10 +1594,12 @@
     }
     var tiersEl = contForm.querySelector(".js-vw-cont-inner-tiers");
     var colsEl = contForm.querySelector(".js-vw-cont-inner-cols");
+    var shelfFormVal = parseInt(contForm.querySelector(".js-vw-cont-shelf").value, 10) || 1;
+    var shelfForApi = parentId ? shelfFormVal : shelfDisplayToTop(cab || { shelves: 1 }, shelfFormVal);
     var body = {
       cabinet_id: cabinetId,
       kind: contKind,
-      shelf: parseInt(contForm.querySelector(".js-vw-cont-shelf").value, 10) || 1,
+      shelf: shelfForApi,
       stack: stackVal,
       column: parseInt(contForm.querySelector(".js-vw-cont-column").value, 10) || 1,
       col_span: parseInt(contForm.querySelector(".js-vw-cont-colspan").value, 10) || 1,
@@ -1411,9 +1664,11 @@
       var id = cabForm.querySelector(".js-vw-cab-id").value;
       if (!id) return;
       if (!confirm("Удалить шкаф и все контейнеры?")) return;
+      var deletedId = parseInt(id, 10);
       fetchJson(detailUrl(apiCabinetTpl, id), { method: "DELETE" })
         .then(function () {
           closeDialog(dlgCab);
+          if (openCabinetId === deletedId) openCabinetId = null;
           return loadCabinets();
         })
         .catch(function (e) { alert(e.message); });
@@ -2492,5 +2747,18 @@
   }
 
   setEditMode(false);
+  document.documentElement.classList.add("vw-fit-height");
+  document.body.classList.add("vw-fit-height");
   loadCabinets();
+  window.addEventListener("resize", function () {
+    syncViewportHeightFit();
+    if (!floorEl) return;
+    requestAnimationFrame(function () {
+      syncViewportHeightFit();
+      floorEl.querySelectorAll(".vw-bin-text").forEach(fitLabelText);
+    });
+  });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", syncViewportHeightFit);
+  }
 })();

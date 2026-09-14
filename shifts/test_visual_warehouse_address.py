@@ -109,3 +109,47 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
         self.assertEqual(cont.address, "CUSTOM-99")
         cab.refresh_from_db()
         self.assertEqual(suggested_address(cab, shelf=1, column=1), "B-02-01")
+
+    def test_move_container_to_another_cabinet(self):
+        cab_a = VisualCabinet.objects.create(
+            name="Стеллаж A",
+            kind=VisualCabinet.KIND_RACK,
+            shelves=4,
+            columns=3,
+            code="A",
+        )
+        cab_b = VisualCabinet.objects.create(
+            name="Стеллаж B",
+            kind=VisualCabinet.KIND_RACK,
+            shelves=4,
+            columns=3,
+            code="B",
+        )
+        cont = VisualContainer.objects.create(
+            cabinet=cab_a,
+            kind=VisualContainer.KIND_SHELF_SLOT,
+            shelf=2,
+            column=1,
+            label="Коробка",
+            address="A-03-01",
+        )
+        res = self._post_json(
+            self.upsert_url,
+            {
+                "id": cont.pk,
+                "cabinet_id": cab_b.pk,
+                "kind": "shelf_slot",
+                "shelf": 2,
+                "stack": 1,
+                "column": 1,
+                "label": "Коробка",
+                "color": "#5dade2",
+                "address": "A-03-01",
+            },
+        )
+        self.assertEqual(res.status_code, 200, res.content[:400])
+        data = res.json()["container"]
+        self.assertEqual(data["cabinet_id"], cab_b.pk)
+        cont.refresh_from_db()
+        self.assertEqual(cont.cabinet_id, cab_b.pk)
+        self.assertEqual(cont.address, "B-03-01")

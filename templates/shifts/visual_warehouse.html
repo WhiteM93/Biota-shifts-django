@@ -24,9 +24,10 @@
   <header class="vw-topbar">
     <div class="vw-topbar-text">
       <h1 class="vw-title">Визуальный склад</h1>
-      <p class="vw-subtitle js-vw-mode-hint">Нажмите на контейнер, чтобы посмотреть содержимое</p>
+      <p class="vw-subtitle js-vw-mode-hint">Выберите шкаф или стеллаж</p>
     </div>
     <div class="vw-topbar-actions">
+      <button type="button" class="vw-btn-secondary js-vw-back-list vw-is-hidden" hidden>← К списку</button>
       {% if biota_can_edit %}
       <button type="button" class="vw-btn-secondary js-vw-toggle-edit" aria-pressed="false">Редактировать</button>
       <button type="button" class="vw-btn-primary js-vw-new-cabinet">+ Мебель</button>
@@ -34,7 +35,7 @@
     </div>
   </header>
 
-  <div class="vw-floor js-vw-floor">
+  <div class="vw-floor js-vw-floor is-list">
     <div class="vw-empty js-vw-empty">
       <p>Пока нет шкафов и стеллажей.{% if biota_can_edit %} Создайте первый — «+ Мебель».{% endif %}</p>
     </div>
@@ -108,11 +109,15 @@
       </header>
       <div class="vw-form-scroll">
         <input type="hidden" class="js-vw-cont-id" value="">
-        <input type="hidden" class="js-vw-cont-cabinet" value="">
         <input type="hidden" class="js-vw-cont-notes" value="">
 
         <section class="vw-form-section">
           <h3 class="vw-form-section-title">Этикетка</h3>
+          <label class="vw-row js-vw-cont-cabinet-row">
+            <span class="vw-row-label">Мебель</span>
+            <select class="vw-control js-vw-cont-cabinet"></select>
+          </label>
+          <p class="vw-hint-inline js-vw-cont-cabinet-hint">Можно перенести контейнер в другой шкаф или стеллаж. Адрес обновится по букве мебели.</p>
           <label class="vw-row js-vw-cont-kind-row">
             <span class="vw-row-label">Тип</span>
             <select class="vw-control js-vw-cont-kind">
@@ -207,7 +212,7 @@
               <input type="number" class="vw-control js-vw-cont-stack" min="1" value="1" inputmode="numeric">
             </label>
           </div>
-          <p class="vw-hint-inline js-vw-cont-stack-hint">Полка 1 — верхняя. Ярус 1 — на полке, 2 — поверх другого ящика.</p>
+          <p class="vw-hint-inline js-vw-cont-stack-hint">Полка 1 — нижняя (как в адресе и на экране). Ярус 1 — на полке, 2 — поверх другого ящика.</p>
         </section>
       </div>
       <footer class="vw-form-footer">
