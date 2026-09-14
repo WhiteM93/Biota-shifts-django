@@ -1264,8 +1264,7 @@
         {% endfor %}
       </select>
     </label>
-    {% endif %}
-        {% elif filters.category == "tool_extension" %}
+    {% elif filters.category == "tool_extension" %}
     <label class="field"><span>Бренд</span>
       <select name="ext_brand">
         <option value="">Все</option>
@@ -1282,6 +1281,7 @@
         {% endfor %}
       </select>
     </label>
+    {% endif %}
     {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "insert" and filters.category != "tool_extension" %}
     <label class="field"><span>Материал инструмента</span>
       <select name="tool_material" class="js-stock-filter-tool-material">
