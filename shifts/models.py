@@ -162,7 +162,16 @@ from .insert_constants import (
     INSERT_TOLERANCE_VALUES,
     INSERT_KINDS,
     INSERT_KIND_VALUES,
+    INSERT_THREAD_SIDES,
+    INSERT_THREAD_HANDS,
     normalize_insert_kind,
+    normalize_insert_thread_side,
+    normalize_insert_thread_hand,
+    normalize_insert_thread_size,
+    normalize_insert_custom_type,
+    normalize_insert_item_name,
+    build_threading_insert_display_name,
+    build_other_insert_display_name,
     MILLING_INSERT_FAMILIES,
     INSERT_EDGE_LENGTH_CODES,
     INSERT_THICKNESS_CODES,
@@ -411,18 +420,41 @@ class ToolItem(models.Model):
             ]
         elif cat == "insert":
             ins = getattr(self, "insert_spec", None)
-            segs = [
-                self.get_category_display(),
-                (ins.milling_family.upper() if ins and ins.milling_family else "—"),
-                (ins.insert_shape if ins else "—"),
-                (ins.cutting_edge_length_code if ins and ins.cutting_edge_length_code else "—"),
-                (ins.thickness_code if ins and ins.thickness_code else "—"),
-                (ins.nose_radius_code if ins and ins.nose_radius_code else "—"),
-                (ins.get_machining_applications_display() if ins else "—"),
-                (ins.chipbreaker_grade if ins and ins.chipbreaker_grade else "—"),
-                coating_txt(),
-                f"ост {self.quantity}",
-            ]
+            if ins and (ins.insert_kind or "") == "threading":
+                segs = [
+                    self.get_category_display(),
+                    "Резьбовая",
+                    (ins.thread_size or "—"),
+                    (ins.get_thread_side_display() if ins.thread_side else "—"),
+                    (ins.get_thread_hand_display() if ins.thread_hand else "—"),
+                    (fmt_mm(ins.thread_pitch_mm) if ins.thread_pitch_mm is not None else "—"),
+                    (ins.chipbreaker_grade if ins.chipbreaker_grade else "—"),
+                    coating_txt(),
+                    f"ост {self.quantity}",
+                ]
+            elif ins and (ins.insert_kind or "") == "other":
+                segs = [
+                    self.get_category_display(),
+                    (ins.custom_type or "Другое"),
+                    (ins.item_name or "—"),
+                    (ins.brand or "—"),
+                    (ins.chipbreaker_grade if ins.chipbreaker_grade else "—"),
+                    coating_txt(),
+                    f"ост {self.quantity}",
+                ]
+            else:
+                segs = [
+                    self.get_category_display(),
+                    (ins.milling_family.upper() if ins and ins.milling_family else "—"),
+                    (ins.insert_shape if ins else "—"),
+                    (ins.cutting_edge_length_code if ins and ins.cutting_edge_length_code else "—"),
+                    (ins.thickness_code if ins and ins.thickness_code else "—"),
+                    (ins.nose_radius_code if ins and ins.nose_radius_code else "—"),
+                    (ins.get_machining_applications_display() if ins else "—"),
+                    (ins.chipbreaker_grade if ins and ins.chipbreaker_grade else "—"),
+                    coating_txt(),
+                    f"ост {self.quantity}",
+                ]
         elif cat == "collet":
             cl = getattr(self, "collet_spec", None)
             segs = [
@@ -996,6 +1028,30 @@ class InsertSpec(models.Model):
         choices=INSERT_KINDS,
         verbose_name="Тип пластины",
     )
+    thread_side = models.CharField(
+        max_length=12,
+        blank=True,
+        default="",
+        choices=INSERT_THREAD_SIDES,
+        verbose_name="Резьба: внутр./наруж.",
+    )
+    thread_hand = models.CharField(
+        max_length=8,
+        blank=True,
+        default="",
+        choices=INSERT_THREAD_HANDS,
+        verbose_name="Резьба: лев./прав.",
+    )
+    thread_size = models.CharField(max_length=8, blank=True, default="", verbose_name="Размер резьбовой пластины")
+    thread_pitch_mm = models.DecimalField(
+        max_digits=6, decimal_places=3, null=True, blank=True, verbose_name="Шаг резьбы, мм"
+    )
+    custom_type = models.CharField(
+        max_length=80, blank=True, default="", verbose_name="Свой тип / категория"
+    )
+    item_name = models.CharField(
+        max_length=120, blank=True, default="", verbose_name="Наименование"
+    )
     chipbreaker_grade = models.CharField(max_length=40, blank=True, default="", verbose_name="Стужколом / сплав")
     brand = models.CharField(max_length=80, blank=True, default="", verbose_name="Бренд")
     machining_application = models.CharField(
@@ -1114,6 +1170,11 @@ class InsertSpec(models.Model):
         self.machining_application = normalize_insert_machining_apps(self.machining_application)
         self.milling_family = normalize_milling_family(self.milling_family)
         self.insert_kind = normalize_insert_kind(self.insert_kind)
+        self.thread_side = normalize_insert_thread_side(self.thread_side)
+        self.thread_hand = normalize_insert_thread_hand(self.thread_hand)
+        self.thread_size = normalize_insert_thread_size(self.thread_size)
+        self.custom_type = normalize_insert_custom_type(self.custom_type)
+        self.item_name = normalize_insert_item_name(self.item_name)
         self.chipbreaker_grade = (self.chipbreaker_grade or "").strip()[:40]
         self.brand = (self.brand or "").strip()[:80]
         self.sync_derived_fields()

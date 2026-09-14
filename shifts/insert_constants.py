@@ -109,10 +109,49 @@ INSERT_FAMILY_OTHER = "OTHER"
 INSERT_KINDS = [
     ("milling", "Фрезерная"),
     ("turning", "Токарная"),
-    ("unique", "Уникальная"),
+    ("threading", "Резьбовая"),
+    ("other", "Другое"),
 ]
 INSERT_KIND_VALUES = frozenset(k for k, _ in INSERT_KINDS)
 INSERT_KIND_DEFAULT = "milling"
+INSERT_KIND_OTHER = "other"
+
+# Резьбовые пластины (каталог: размер + внутр/наруж + лев/прав + шаг)
+INSERT_THREAD_SIDES = [
+    ("internal", "Внутренняя"),
+    ("external", "Наружная"),
+]
+INSERT_THREAD_SIDE_VALUES = frozenset(k for k, _ in INSERT_THREAD_SIDES)
+
+INSERT_THREAD_HANDS = [
+    ("right", "Правая"),
+    ("left", "Левая"),
+]
+INSERT_THREAD_HAND_VALUES = frozenset(k for k, _ in INSERT_THREAD_HANDS)
+
+# Типовые размеры по каталогам (06IR…, 11ER…, 16ER…)
+INSERT_THREAD_SIZES = [
+    ("06", "06"),
+    ("08", "08"),
+    ("11", "11"),
+    ("16", "16"),
+    ("22", "22"),
+]
+INSERT_THREAD_SIZE_VALUES = frozenset(k for k, _ in INSERT_THREAD_SIZES)
+
+# Часто встречающиеся шаги метрической резьбы полного профиля
+INSERT_THREAD_PITCH_OPTIONS = [
+    ("0.5", "0.5"),
+    ("0.7", "0.7"),
+    ("0.75", "0.75"),
+    ("1", "1"),
+    ("1.25", "1.25"),
+    ("1.5", "1.5"),
+    ("1.75", "1.75"),
+    ("2", "2"),
+    ("2.5", "2.5"),
+    ("3", "3"),
+]
 
 
 def normalize_insert_kind(value: str) -> str:
@@ -121,6 +160,120 @@ def normalize_insert_kind(value: str) -> str:
         return v
     return ""
 
+
+def normalize_insert_thread_side(value: str) -> str:
+    v = (value or "").strip().lower()
+    if v in INSERT_THREAD_SIDE_VALUES:
+        return v
+    # русские/короткие алиасы с каталогов
+    aliases = {
+        "внутренняя": "internal",
+        "внутр": "internal",
+        "internal": "internal",
+        "in": "internal",
+        "i": "internal",
+        "наружная": "external",
+        "наруж": "external",
+        "external": "external",
+        "out": "external",
+        "e": "external",
+    }
+    return aliases.get(v, "")
+
+
+def normalize_insert_thread_hand(value: str) -> str:
+    v = (value or "").strip().lower()
+    if v in INSERT_THREAD_HAND_VALUES:
+        return v
+    aliases = {
+        "правая": "right",
+        "правое": "right",
+        "прав": "right",
+        "right": "right",
+        "r": "right",
+        "левая": "left",
+        "левое": "left",
+        "лев": "left",
+        "left": "left",
+        "l": "left",
+    }
+    return aliases.get(v, "")
+
+
+def normalize_insert_thread_size(value: str) -> str:
+    v = (value or "").strip().upper().replace(" ", "")
+    if not v:
+        return ""
+    if v.isdigit() and len(v) == 1:
+        v = f"0{v}"
+    return v[:8]
+
+
+def insert_thread_mark(side: str, hand: str) -> str:
+    """Марка по каталогу: ER/IR/EL/IL."""
+    s = normalize_insert_thread_side(side)
+    h = normalize_insert_thread_hand(hand)
+    if s == "external" and h == "right":
+        return "ER"
+    if s == "internal" and h == "right":
+        return "IR"
+    if s == "external" and h == "left":
+        return "EL"
+    if s == "internal" and h == "left":
+        return "IL"
+    return ""
+
+
+def build_threading_insert_display_name(size: str, side: str, hand: str, pitch, grade: str = "") -> str:
+    size_s = normalize_insert_thread_size(size)
+    mark = insert_thread_mark(side, hand)
+    head = f"{size_s}{mark}" if size_s or mark else "Резьбовая"
+    pitch_s = ""
+    if pitch is not None and str(pitch).strip() != "":
+        try:
+            from decimal import Decimal
+
+            pitch_s = format(Decimal(str(pitch).replace(",", ".")), "f").rstrip("0").rstrip(".")
+        except Exception:
+            pitch_s = str(pitch).strip()
+    grade_s = (grade or "").strip()
+    parts = [head]
+    if pitch_s:
+        parts.append(pitch_s)
+    if grade_s:
+        parts.append(grade_s)
+    return " ".join(parts)
+
+
+def normalize_insert_custom_type(value: str) -> str:
+    return (value or "").strip()[:80]
+
+
+def normalize_insert_item_name(value: str) -> str:
+    return (value or "").strip()[:120]
+
+
+def build_other_insert_display_name(
+    custom_type: str = "",
+    item_name: str = "",
+    brand: str = "",
+    grade: str = "",
+) -> str:
+    """Имя для типа «Другое»: категория + наименование (+ бренд/сплав)."""
+    ctype = normalize_insert_custom_type(custom_type)
+    name = normalize_insert_item_name(item_name)
+    brand_s = (brand or "").strip()
+    grade_s = (grade or "").strip()
+    parts: list[str] = []
+    if ctype:
+        parts.append(ctype)
+    if name:
+        parts.append(name)
+    if brand_s:
+        parts.append(brand_s)
+    if grade_s:
+        parts.append(grade_s)
+    return " ".join(parts) if parts else "Пластина"
 
 # Вид обработки (геометрия стружколома): 1 чистовая, 2 получистовая, 3 черновая
 INSERT_MACHINING_APPLICATIONS = [
@@ -323,14 +476,20 @@ def merge_insert_chipbreaker_grades(*extra_lists: list[str] | None) -> list[str]
 INSERT_COLUMN_TOOLTIPS = {
     "iso": "Полная маркировка ISO 1832",
     "family": "Семейство пластины: две буквы + две буквы (например AP + KT)",
-    "kind": "Назначение: фрезерная, токарная или уникальная",
+    "kind": "Назначение: фрезерная, токарная, резьбовая или другое",
+    "custom_type": "Свой тип / категория пластины (для «Другое»)",
+    "item_name": "Наименование позиции",
     "shape": "Форма пластины по ISO 1832 (C, D, T…)",
     "relief": "Задний угол (рельеф) пластины",
     "tolerance": "Класс допуска по ISO",
     "edge_l": "Длина пластинки — код L по ISO 1832",
     "thickness_s": "Толщина пластинки — код S по ISO 1832",
     "radius_r": "Радиус пластинки — код R по ISO 1832",
-    "grade": "Сплав / марка пластины (YG501, ВК8, TC1225 и др.)",
+    "thread_size": "Размер резьбовой пластины (06, 11, 16…)",
+    "thread_side": "Тип: внутренняя или наружная резьба",
+    "thread_hand": "Исполнение: левая или правая",
+    "thread_pitch": "Шаг резьбы, мм",
+    "grade": "Сплав / марка пластины (YG501, ВК8, TC1225, DM215 и др.)",
     "brand": "Производитель / торговая марка",
     "machining_application": "Вид обработки (можно несколько): чистовая, получистовая, черновая",
     "tool_material": "Сплав / марка пластины (YG501, ВК8, TC1225 и др.)",

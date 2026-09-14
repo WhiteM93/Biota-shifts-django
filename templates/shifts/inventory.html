@@ -964,6 +964,12 @@
         <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable" title="Производитель / торговая марка">Бренд</th>
         <th class="sortable" title="{{ tips.kind }}">Тип</th>
+        <th class="sortable" title="{{ tips.custom_type }}">Свой тип</th>
+        <th class="sortable" title="{{ tips.item_name }}">Наименование</th>
+        <th class="sortable" title="{{ tips.thread_size }}">Разм.</th>
+        <th class="sortable" title="{{ tips.thread_side }}">В/Н</th>
+        <th class="sortable" title="{{ tips.thread_hand }}">Л/П</th>
+        <th class="sortable" title="{{ tips.thread_pitch }}">Шаг</th>
         <th class="sortable" title="{{ tips.family }}">Семейство</th>
         <th class="sortable" title="{{ tips.shape }}">Форма</th>
         <th class="sortable insert-code-col" title="{{ tips.edge_l }}">L</th>
@@ -981,6 +987,12 @@
 <td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.insert_spec.brand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_brand" data-type="text" data-value="{{ t.insert_spec.brand|default:'' }}"{% endif %}>{{ t.insert_spec.brand|default:"-" }}</td>
         <td data-sort="{{ t.insert_spec.insert_kind|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_kind" data-type="select" data-value="{{ t.insert_spec.insert_kind|default:'' }}"{% endif %}>{% if t.insert_spec.insert_kind %}{{ t.insert_spec.get_insert_kind_display }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.insert_spec.custom_type|default:'-' }}" {% if can_manage_stock and t.insert_spec.insert_kind == "other" %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_custom_type" data-type="text" data-value="{{ t.insert_spec.custom_type|default:'' }}"{% endif %}>{{ t.insert_spec.custom_type|default:"-" }}</td>
+        <td data-sort="{{ t.insert_spec.item_name|default:'-' }}" {% if can_manage_stock and t.insert_spec.insert_kind == "other" %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_name" data-type="text" data-value="{{ t.insert_spec.item_name|default:'' }}"{% endif %}>{{ t.insert_spec.item_name|default:"-" }}</td>
+        <td data-sort="{{ t.insert_spec.thread_size|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_thread_size" data-type="select" data-value="{{ t.insert_spec.thread_size|default:'' }}"{% endif %}>{{ t.insert_spec.thread_size|default:"-" }}</td>
+        <td data-sort="{{ t.insert_spec.thread_side|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_thread_side" data-type="select" data-value="{{ t.insert_spec.thread_side|default:'' }}"{% endif %}>{% if t.insert_spec.thread_side %}{{ t.insert_spec.get_thread_side_display }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.insert_spec.thread_hand|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_thread_hand" data-type="select" data-value="{{ t.insert_spec.thread_hand|default:'' }}"{% endif %}>{% if t.insert_spec.thread_hand %}{{ t.insert_spec.get_thread_hand_display }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.insert_spec.thread_pitch_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_thread_pitch" data-type="number" data-value="{{ t.insert_spec.thread_pitch_mm|default:'' }}"{% endif %}>{% if t.insert_spec.thread_pitch_mm is not None %}{{ t.insert_spec.thread_pitch_mm|dotformat:"-3" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.insert_spec.milling_family|default:'-' }}" title="{{ t.insert_spec.milling_family_cell_title }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_family" data-type="select" data-value="{{ t.insert_spec.milling_family|default:'' }}"{% endif %}>{{ t.insert_spec.milling_family|default:"-"|upper }}</td>
         <td data-sort="{{ t.insert_spec.insert_shape|default:'-' }}" title="{{ t.insert_spec.insert_shape_cell_title }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ins_shape" data-type="select" data-value="{{ t.insert_spec.insert_shape|default:'' }}"{% endif %}>{{ t.insert_spec.insert_shape|default:"-" }}</td>
         <td class="insert-code-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.insert_spec.cutting_edge_length_code|default:'-' }}" title="{{ t.insert_spec.cutting_edge_length_cell_title }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="ins_edge_code" data-type="select" data-value="{{ t.insert_spec.cutting_edge_length_code|default:'' }}"{% endif %}>{{ t.insert_spec.cutting_edge_length_code|default:"-" }}</td>
@@ -1005,7 +1017,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}13{% else %}12{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}19{% else %}18{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -1768,6 +1780,49 @@
         <option value="">Все</option>
         {% for key, label in insert_kinds %}
         <option value="{{ key }}" {% if filters.ins_kind == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.custom_type }}">Свой тип</span>
+      <select name="ins_custom_type" title="{{ tips.custom_type }}">
+        <option value="">Все</option>
+        {% for v in insert_custom_types %}
+        <option value="{{ v }}" {% if filters.ins_custom_type == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.item_name }}">Наименование</span>
+      <input type="text" name="ins_name" value="{{ filters.ins_name }}" maxlength="120" title="{{ tips.item_name }}" placeholder="поиск…">
+    </label>
+    <label class="field"><span title="{{ tips.thread_size }}">Разм. резьб.</span>
+      <select name="ins_thread_size" title="{{ tips.thread_size }}">
+        <option value="">Все</option>
+        {% for key, label in insert_thread_sizes %}
+        <option value="{{ key }}" {% if filters.ins_thread_size == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.thread_side }}">В/Н</span>
+      <select name="ins_thread_side" title="{{ tips.thread_side }}">
+        <option value="">Все</option>
+        {% for key, label in insert_thread_sides %}
+        <option value="{{ key }}" {% if filters.ins_thread_side == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.thread_hand }}">Л/П</span>
+      <select name="ins_thread_hand" title="{{ tips.thread_hand }}">
+        <option value="">Все</option>
+        {% for key, label in insert_thread_hands %}
+        <option value="{{ key }}" {% if filters.ins_thread_hand == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span title="{{ tips.thread_pitch }}">Шаг</span>
+      <select name="ins_thread_pitch" title="{{ tips.thread_pitch }}">
+        <option value="">Все</option>
+        {% for key, label in insert_thread_pitch_options %}
+        <option value="{{ key }}" {% if filters.ins_thread_pitch == key %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
     </label>
@@ -3685,6 +3740,11 @@
   "reamer_accuracy_classes": [{% for key, label in reamer_accuracy_classes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "insert_shapes": [{% for key, label in insert_shapes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "insert_kinds": [{% for key, label in insert_kinds %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_custom_types": [{% for v in insert_custom_types %}"{{ v|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_thread_sides": [{% for key, label in insert_thread_sides %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_thread_hands": [{% for key, label in insert_thread_hands %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_thread_sizes": [{% for key, label in insert_thread_sizes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "insert_thread_pitch_options": [{% for key, label in insert_thread_pitch_options %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "insert_relief_angles": [{% for key, label in insert_relief_angles %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "insert_tolerance_classes": [{% for key, label in insert_tolerance_classes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "insert_edge_length_codes": [{% for key, label in insert_edge_length_codes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],

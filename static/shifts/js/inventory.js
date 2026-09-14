@@ -1516,12 +1516,17 @@ var INV = (function () {
   }
 
   function buildInsertIsoCodeOptionsHtml(items) {
-    return (items || []).map(function (x) {
-      var code = x.value || "";
-      var full = x.label || code;
-      var titleAttr = full !== code ? ' title="' + String(full).replace(/"/g, "&quot;") + '"' : "";
-      return '<option value="' + code + '"' + titleAttr + ">" + code + "</option>";
-    }).join("");
+    var opts =
+      '<option value="">-</option>' +
+      (items || [])
+        .map(function (x) {
+          var code = x.value || "";
+          var full = x.label || code;
+          var titleAttr = full !== code ? ' title="' + String(full).replace(/"/g, "&quot;") + '"' : "";
+          return '<option value="' + code + '"' + titleAttr + ">" + code + "</option>";
+        })
+        .join("");
+    return opts;
   }
 
   function buildTapStandardOptionsHtml(items) {
@@ -1557,28 +1562,113 @@ var INV = (function () {
   function validateInsertRow(tr, rowIndex) {
     var issues = [];
     var kindEl = tr.querySelector('[data-k="ins_kind"]');
-    if (!kindEl || !(kindEl.value || "").trim()) {
+    var kind = ((kindEl && kindEl.value) || "").trim();
+    if (!kind) {
       if (kindEl) kindEl.classList.add("is-invalid");
       issues.push({
-        msg: "Строка " + rowIndex + ": укажите тип пластины (фрезерная / токарная / уникальная).",
+        msg: "Строка " + rowIndex + ": укажите тип пластины (фрезерная / токарная / резьбовая / другое).",
         el: kindEl,
       });
+      return issues;
     }
-    var codesBad = false;
-    ["ins_edge_code", "ins_thickness_code", "ins_nose_code"].forEach(function (k) {
-      var el = tr.querySelector('[data-k="' + k + '"]');
-      if (!el || !(el.value || "").trim()) {
-        if (el) el.classList.add("is-invalid");
-        codesBad = true;
+    if (kind === "other") {
+      var ctypeEl = tr.querySelector('[data-k="ins_custom_type"]');
+      var nameEl = tr.querySelector('[data-k="ins_name"]');
+      if (!ctypeEl || !(ctypeEl.value || "").trim()) {
+        if (ctypeEl) ctypeEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите название своего типа.", el: ctypeEl });
       }
-    });
-    if (codesBad) {
-      issues.push({
-        msg: "Строка " + rowIndex + ": для пластины укажите L, S и R.",
-        el: null,
-      });
+      if (!nameEl || !(nameEl.value || "").trim()) {
+        if (nameEl) nameEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите наименование.", el: nameEl });
+      }
+      return issues;
+    }
+    if (kind === "threading") {
+      var sizeEl = tr.querySelector('[data-k="ins_thread_size"]');
+      var sideEl = tr.querySelector('[data-k="ins_thread_side"]');
+      var handEl = tr.querySelector('[data-k="ins_thread_hand"]');
+      var pitchEl = tr.querySelector('[data-k="ins_thread_pitch"]');
+      if (!sizeEl || !(sizeEl.value || "").trim()) {
+        if (sizeEl) sizeEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите размер резьбовой пластины.", el: sizeEl });
+      }
+      if (!sideEl || !(sideEl.value || "").trim()) {
+        if (sideEl) sideEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите внутреннюю или наружную.", el: sideEl });
+      }
+      if (!handEl || !(handEl.value || "").trim()) {
+        if (handEl) handEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите левую или правую.", el: handEl });
+      }
+      if (!isPositiveNumberField(pitchEl)) {
+        if (pitchEl) pitchEl.classList.add("is-invalid");
+        issues.push({ msg: "Строка " + rowIndex + ": укажите шаг резьбы, мм.", el: pitchEl });
+      }
+      return issues;
     }
     return issues;
+  }
+
+  function ensureInsertCustomTypesDatalist() {
+    var id = "inv-insert-custom-types";
+    var dl = document.getElementById(id);
+    if (!dl) {
+      dl = document.createElement("datalist");
+      dl.id = id;
+      document.body.appendChild(dl);
+    }
+    dl.innerHTML = (INV.insert_custom_types || [])
+      .map(function (t) {
+        return '<option value="' + escAttr(String(t || "")) + '">';
+      })
+      .join("");
+    return id;
+  }
+
+  function syncInsertArrivalRowMode(tr) {
+    if (!tr) return;
+    var kindEl = tr.querySelector('[data-k="ins_kind"]');
+    var kind = ((kindEl && kindEl.value) || "").trim();
+    var isOther = kind === "other";
+    var isThread = kind === "threading";
+    tr.querySelectorAll(".js-ins-col-other").forEach(function (el) {
+      el.hidden = !isOther;
+    });
+    tr.querySelectorAll(".js-ins-col-thread").forEach(function (el) {
+      el.hidden = !isThread;
+    });
+    tr.querySelectorAll(".js-ins-col-geo").forEach(function (el) {
+      el.hidden = isOther || isThread;
+    });
+    var group = tr.closest(".arrival-group");
+    if (group) syncInsertArrivalGroupHead(group);
+  }
+
+  function syncInsertArrivalGroupHead(group) {
+    if (!group) return;
+    var rows = group.querySelectorAll("tr[data-arrival-row][data-category='insert']");
+    var anyOther = false;
+    var anyThread = false;
+    var anyGeo = false;
+    rows.forEach(function (row) {
+      var kind = ((row.querySelector('[data-k="ins_kind"]') || {}).value || "").trim();
+      if (kind === "other") anyOther = true;
+      else if (kind === "threading") anyThread = true;
+      else anyGeo = true;
+    });
+    if (!rows.length) anyGeo = true;
+    var head = group.querySelector("thead tr");
+    if (!head) return;
+    head.querySelectorAll(".js-ins-col-other").forEach(function (el) {
+      el.hidden = !anyOther;
+    });
+    head.querySelectorAll(".js-ins-col-thread").forEach(function (el) {
+      el.hidden = !anyThread;
+    });
+    head.querySelectorAll(".js-ins-col-geo").forEach(function (el) {
+      el.hidden = !anyGeo;
+    });
   }
 
   function clearArrivalBulkErrors() {
@@ -2131,11 +2221,12 @@ var INV = (function () {
   var insertColTips = INV.insert_column_tooltips || {};
   var arrivalColTips = Object.assign({}, INV.arrival_column_tooltips || {}, insertColTips);
 
-  function insertArrivalTh(key, label, cls) {
+  function insertArrivalTh(key, label, cls, hidden) {
     var tip = arrivalColTips[key] || insertColTips[key];
     var c = cls ? ' class="' + cls + '"' : "";
     var ti = tip ? ' title="' + escapeThTitle(tip) + '"' : "";
-    return "<th" + c + ti + ">" + label + "</th>";
+    var hid = hidden ? " hidden" : "";
+    return "<th" + c + ti + hid + ">" + label + "</th>";
   }
 
   function arrivalTh(tipKey, label, cls) {
@@ -2727,10 +2818,16 @@ var INV = (function () {
       "<tr>" +
       insertArrivalTh("brand", "Бренд") +
       insertArrivalTh("kind", "Тип") +
-      insertArrivalTh("family", "Семейство") +
-      insertArrivalTh("edge_l", "L", "short-col insert-code-col") +
-      insertArrivalTh("thickness_s", "S", "short-col insert-code-col") +
-      insertArrivalTh("radius_r", "R", "short-col insert-code-col") +
+      insertArrivalTh("custom_type", "Свой тип", "js-ins-col-other", true) +
+      insertArrivalTh("item_name", "Наименование", "js-ins-col-other", true) +
+      insertArrivalTh("thread_size", "Разм.", "js-ins-col-thread", true) +
+      insertArrivalTh("thread_side", "В/Н", "js-ins-col-thread", true) +
+      insertArrivalTh("thread_hand", "Л/П", "js-ins-col-thread", true) +
+      insertArrivalTh("thread_pitch", "Шаг", "js-ins-col-thread", true) +
+      insertArrivalTh("family", "Семейство", "js-ins-col-geo") +
+      insertArrivalTh("edge_l", "L", "short-col insert-code-col js-ins-col-geo") +
+      insertArrivalTh("thickness_s", "S", "short-col insert-code-col js-ins-col-geo") +
+      insertArrivalTh("radius_r", "R", "short-col insert-code-col js-ins-col-geo") +
       insertArrivalTh("tool_material", "Сплав", "stack-words tm-col-tool-material") +
       insertArrivalTh("coating", "Покрытие") +
       insertArrivalTh("warehouse_address", "Адрес", "address-col") +
@@ -3018,9 +3115,10 @@ var INV = (function () {
       cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "insert") {
+      var customTypesDl = ensureInsertCustomTypesDatalist();
       cells.push('<td><input type="text" data-k="ins_brand" maxlength="80" placeholder="Sandvik"></td>');
       cells.push(
-        '<td><select data-k="ins_kind" required>' +
+        '<td><select data-k="ins_kind" required class="js-ins-kind">' +
           (INV.insert_kinds || [])
             .map(function (x) {
               var sel = x.value === "milling" ? " selected" : "";
@@ -3029,10 +3127,42 @@ var INV = (function () {
             .join("") +
           "</select></td>"
       );
-      cells.push('<td class="ins-family-cell">' + buildInsertFamilyCellHtml() + "</td>");
-      cells.push('<td class="short-col insert-code-col"><select data-k="ins_edge_code" required>' + buildInsertIsoCodeOptionsHtml(INV.insert_edge_length_codes || []) + "</select></td>");
-      cells.push('<td class="short-col insert-code-col"><select data-k="ins_thickness_code" required>' + buildInsertIsoCodeOptionsHtml(INV.insert_thickness_codes || []) + "</select></td>");
-      cells.push('<td class="short-col insert-code-col"><select data-k="ins_nose_code" required>' + buildInsertIsoCodeOptionsHtml(INV.insert_nose_radius_codes || []) + "</select></td>");
+      cells.push(
+        '<td class="js-ins-col-other" hidden><input type="text" data-k="ins_custom_type" list="' +
+          customTypesDl +
+          '" maxlength="80" placeholder="Категория" title="Свой тип / категория"></td>'
+      );
+      cells.push(
+        '<td class="js-ins-col-other" hidden><input type="text" data-k="ins_name" maxlength="120" placeholder="Наименование"></td>'
+      );
+      cells.push(
+        '<td class="short-col js-ins-col-thread" hidden><select data-k="ins_thread_size">' +
+          '<option value="">—</option>' +
+          buildOptionsHtml(INV.insert_thread_sizes || []) +
+          "</select></td>"
+      );
+      cells.push(
+        '<td class="js-ins-col-thread" hidden><select data-k="ins_thread_side">' +
+          '<option value="">—</option>' +
+          buildOptionsHtml(INV.insert_thread_sides || []) +
+          "</select></td>"
+      );
+      cells.push(
+        '<td class="js-ins-col-thread" hidden><select data-k="ins_thread_hand">' +
+          '<option value="">—</option>' +
+          buildOptionsHtml(INV.insert_thread_hands || []) +
+          "</select></td>"
+      );
+      cells.push(
+        '<td class="short-col js-ins-col-thread" hidden><select data-k="ins_thread_pitch">' +
+          '<option value="">—</option>' +
+          buildOptionsHtml(INV.insert_thread_pitch_options || []) +
+          "</select></td>"
+      );
+      cells.push('<td class="ins-family-cell js-ins-col-geo">' + buildInsertFamilyCellHtml() + "</td>");
+      cells.push('<td class="short-col insert-code-col js-ins-col-geo"><select data-k="ins_edge_code">' + buildInsertIsoCodeOptionsHtml(INV.insert_edge_length_codes || []) + "</select></td>");
+      cells.push('<td class="short-col insert-code-col js-ins-col-geo"><select data-k="ins_thickness_code">' + buildInsertIsoCodeOptionsHtml(INV.insert_thickness_codes || []) + "</select></td>");
+      cells.push('<td class="short-col insert-code-col js-ins-col-geo"><select data-k="ins_nose_code">' + buildInsertIsoCodeOptionsHtml(INV.insert_nose_radius_codes || []) + "</select></td>");
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
       cells.push(arrivalAddressCellHtml(""));
@@ -3115,6 +3245,15 @@ var INV = (function () {
     }
     var coCell = tr.querySelector(".co-cell");
     if (coCell) coCell.appendChild(buildColoredCoatingSelect("none"));
+    if (cat === "insert") {
+      syncInsertArrivalRowMode(tr);
+      var kindSel = tr.querySelector(".js-ins-kind");
+      if (kindSel) {
+        kindSel.addEventListener("change", function () {
+          syncInsertArrivalRowMode(tr);
+        });
+      }
+    }
     attachArrivalMatchRow(tr, body);
   }
 
@@ -3248,13 +3387,17 @@ var INV = (function () {
     var rm = e.target.closest(".js-arrival-row-remove");
     if (!rm) return;
     var row = rm.closest("tr[data-arrival-row]");
+    var grp = rm.closest(".arrival-group");
     if (row) {
       var next = row.nextElementSibling;
       if (next && next.classList.contains("arrival-match-row")) next.remove();
       row.remove();
     }
-    var grp = rm.closest(".arrival-group");
-    if (grp && !grp.querySelector("tr[data-arrival-row]")) grp.remove();
+    if (grp && !grp.querySelector("tr[data-arrival-row]")) {
+      grp.remove();
+    } else if (grp) {
+      syncInsertArrivalGroupHead(grp);
+    }
   });
 
   document.addEventListener("biota-theme-change", function () {
@@ -3322,6 +3465,12 @@ var INV = (function () {
   (INV.insert_shapes || []).forEach(function (x) { insertShapeLabels[x.value] = x.label; });
   var insertKindLabels = {};
   (INV.insert_kinds || []).forEach(function (x) { insertKindLabels[x.value] = x.label; });
+  var insertThreadSideLabels = {};
+  (INV.insert_thread_sides || []).forEach(function (x) { insertThreadSideLabels[x.value] = x.label; });
+  var insertThreadHandLabels = {};
+  (INV.insert_thread_hands || []).forEach(function (x) { insertThreadHandLabels[x.value] = x.label; });
+  var insertThreadSizeLabels = {};
+  (INV.insert_thread_sizes || []).forEach(function (x) { insertThreadSizeLabels[x.value] = x.label; });
   var insertEdgeLabels = {};
   (INV.insert_edge_length_codes || []).forEach(function (x) { insertEdgeLabels[x.value] = x.label; });
   var insertThicknessLabels = {};
@@ -3416,6 +3565,10 @@ var INV = (function () {
     if (field === "bt_brand") return v || "-";
     if (field === "ins_brand") return v || "-";
     if (field === "ins_kind") return insertKindLabels[v] || v || "-";
+    if (field === "ins_thread_size") return insertThreadSizeLabels[v] || v || "-";
+    if (field === "ins_thread_side") return insertThreadSideLabels[v] || v || "-";
+    if (field === "ins_thread_hand") return insertThreadHandLabels[v] || v || "-";
+    if (field === "ins_thread_pitch") return v || "-";
     if (field === "bt_insert_compat") return v || "-";
     if (field === "bt_mount_thread") return modularThreadLabels[v] || v || "—";
     if (field === "thread_standard") return threadStandardLabels[v] || v;
@@ -3427,9 +3580,9 @@ var INV = (function () {
     if (field === "cs_angle_deg") return countersinkAngleLabels[v] || v;
     if (field === "rm_accuracy_class") return reamerAccuracyClassLabels[v] || v || "-";
     if (field === "ins_shape") return insertShapeLabels[v] || v;
-    if (field === "ins_edge_code") return insertEdgeLabels[v] || v;
-    if (field === "ins_thickness_code") return insertThicknessLabels[v] || v;
-    if (field === "ins_nose_code") return insertNoseLabels[v] || v;
+    if (field === "ins_edge_code") return insertEdgeLabels[v] || v || "-";
+    if (field === "ins_thickness_code") return insertThicknessLabels[v] || v || "-";
+    if (field === "ins_nose_code") return insertNoseLabels[v] || v || "-";
     if (field === "ins_family") return (insertFamilyLabels[v] || v || "-").toString().toUpperCase();
     if (field === "collet_type") return colletTypeLabels[v] || v;
     if (field === "er_size") return erSizeLabels[v] || v || "-";
@@ -3529,16 +3682,22 @@ var INV = (function () {
         options.push({ value: current, label: current, title: current });
         reamerAccuracyClassLabels[current] = current;
       }
-    } else if (field === "ins_shape") {
-      options = fromMap(insertShapeLabels);
     } else if (field === "ins_kind") {
       options = fromMap(insertKindLabels);
+    } else if (field === "ins_thread_size") {
+      options = fromMap(insertThreadSizeLabels);
+    } else if (field === "ins_thread_side") {
+      options = fromMap(insertThreadSideLabels);
+    } else if (field === "ins_thread_hand") {
+      options = fromMap(insertThreadHandLabels);
+    } else if (field === "ins_shape") {
+      options = fromMap(insertShapeLabels);
     } else if (field === "ins_edge_code") {
-      options = fromMap(insertEdgeLabels);
+      options = [{ value: "", label: "-" }].concat(fromMap(insertEdgeLabels));
     } else if (field === "ins_thickness_code") {
-      options = fromMap(insertThicknessLabels);
+      options = [{ value: "", label: "-" }].concat(fromMap(insertThicknessLabels));
     } else if (field === "ins_nose_code") {
-      options = fromMap(insertNoseLabels);
+      options = [{ value: "", label: "-" }].concat(fromMap(insertNoseLabels));
     } else if (field === "ins_family") {
       options = fromMap(insertFamilyLabels);
     } else if (field === "collet_type") {
