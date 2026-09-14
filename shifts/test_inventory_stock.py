@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from shifts.insert_constants import normalize_insert_machining_apps
+from shifts.insert_constants import insert_search_tokens, normalize_insert_machining_apps
 from shifts.inventory_views import _arrival_bulk_row_validation_errors, _insert_spec_fields_from_mapping
 from shifts.models import (
     DrillSpec,
@@ -14,6 +14,22 @@ from shifts.models import (
     StockMovement,
     ToolItem,
 )
+
+
+class InsertSearchTokensTests(TestCase):
+    def test_formfactor_mb07_finds_catalog_code(self):
+        tokens = insert_search_tokens("MB‑07‑T3")
+        self.assertIn("MB07", tokens)
+        self.assertTrue(any(t.startswith("MB-07") or t.startswith("MB‑07") or "MB07" in t for t in tokens))
+
+    def test_catalog_name_contains_family_core(self):
+        tokens = insert_search_tokens("MB-07-T3")
+        name = "3MB07GR200-4.5-D17 M30"
+        self.assertTrue(any(tok in name.upper().replace(" ", "") or tok in name.upper() for tok in tokens))
+
+    def test_plain_iso_still_works(self):
+        tokens = insert_search_tokens("CNMG120408")
+        self.assertIn("CNMG120408", tokens)
 
 
 class InsertMachiningAppsTests(TestCase):

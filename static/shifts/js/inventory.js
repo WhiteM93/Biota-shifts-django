@@ -3221,9 +3221,9 @@ var INV = (function () {
       return (
         '<a class="js-bt-formfactor-link inv-stock-formfactor-link" href="' +
         href +
-        '" title="Найти пластины на складе по «' +
+        '" title="Потенциальные пластины по «' +
         escapeHtml(ff) +
-        '»">' +
+        '» (ищем также по ядру вроде MB07)">' +
         escapeHtml(ff) +
         "</a>"
       );

@@ -1,6 +1,7 @@
 """Справочники ISO 1832 для сменных пластин (фрезерные/токарные)."""
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 
 # Форма пластины (1-я буква маркировки ISO)
@@ -251,6 +252,47 @@ def normalize_insert_custom_type(value: str) -> str:
 
 def normalize_insert_item_name(value: str) -> str:
     return (value or "").strip().upper()[:120]
+
+
+# Тире / минусы из Word, каталогов и т.п. → обычный "-"
+_INSERT_DASH_RE = re.compile(
+    r"[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFE58\uFE63\uFF0D\-]+"
+)
+# Семейство + размер: MB07, APKT16, SEHT12…
+_INSERT_FAMILY_SIZE_RE = re.compile(r"([A-Z]{2,5})[\s\-]*(\d{2,3})")
+
+
+def insert_search_tokens(raw: str) -> list[str]:
+    """Токены поиска пластин по формфактору / обозначению.
+
+    «MB‑07‑T3» → MB-07-T3, MB07T3, MB07 — чтобы найти «3MB07GR200-4.5-D17 M30».
+    """
+    text = normalize_insert_item_name(raw)
+    if not text:
+        return []
+    text = _INSERT_DASH_RE.sub("-", text)
+    text = re.sub(r"\s*-\s*", "-", text)
+    text = re.sub(r"\s+", " ", text).strip()
+
+    tokens: list[str] = []
+
+    def add(s: str) -> None:
+        s = (s or "").strip()
+        if len(s) >= 2 and s not in tokens:
+            tokens.append(s)
+
+    add(text)
+    no_space = text.replace(" ", "")
+    add(no_space)
+    no_dash = no_space.replace("-", "")
+    add(no_dash)
+
+    for src in (text, no_dash):
+        m = _INSERT_FAMILY_SIZE_RE.search(src)
+        if m:
+            add(m.group(1) + m.group(2))
+            break
+    return tokens
 
 
 def normalize_insert_brand(value: str) -> str:

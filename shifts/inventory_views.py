@@ -108,6 +108,7 @@ from .insert_constants import (
     normalize_insert_custom_type,
     normalize_insert_item_name,
     normalize_insert_brand,
+    insert_search_tokens,
     build_insert_display_name,
     build_threading_insert_display_name,
     build_other_insert_display_name,
@@ -586,7 +587,11 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
             qs = qs.filter(insert_spec__brand__iexact=brand)
         iname = normalize_insert_item_name(row.get("ins_name") or row.get("item_name"))
         if iname:
-            qs = qs.filter(insert_spec__item_name__icontains=iname)
+            tokens = insert_search_tokens(iname)
+            name_q = Q()
+            for tok in tokens:
+                name_q |= Q(insert_spec__item_name__icontains=tok)
+            qs = qs.filter(name_q)
     elif category == "collet":
         qs = qs.select_related("collet_spec")
         fields = _collet_spec_fields_from_row(row)
@@ -1782,7 +1787,11 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
     elif category == "insert":
         ins_name_raw = g("ins_name")
         if ins_name_raw:
-            qs = qs.filter(insert_spec__item_name__icontains=normalize_insert_item_name(ins_name_raw))
+            tokens = insert_search_tokens(ins_name_raw)
+            name_q = Q()
+            for tok in tokens:
+                name_q |= Q(insert_spec__item_name__icontains=tok)
+            qs = qs.filter(name_q)
         ins_brand_raw = g("ins_brand")
         if ins_brand_raw:
             qs = qs.filter(insert_spec__brand__iexact=ins_brand_raw)
