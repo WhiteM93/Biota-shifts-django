@@ -981,6 +981,28 @@ html[data-theme="dawn"] .inv-history-open-block {
   position: relative;
 }
 
+.inv-page--stock .inv-stock-grid th.inv-stock-notes-text-col,
+.inv-page--stock .inv-stock-grid td.inv-stock-notes-text-col {
+  min-width: 8rem;
+  max-width: 18rem;
+  white-space: normal;
+  word-break: break-word;
+  text-align: left;
+  vertical-align: middle;
+  line-height: 1.25;
+}
+
+.inv-stock-formfactor-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.inv-stock-formfactor-link:hover {
+  color: var(--bio-accent, #1a5f8a);
+}
+
 .inv-stock-notes-tip {
   display: inline-flex;
   align-items: center;

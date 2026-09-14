@@ -3128,8 +3128,14 @@ var INV = (function () {
     );
   }
 
-  function formatCell(field, value) {
-    if (field === "notes") return formatNotesTipHtml(value);
+  function formatCell(field, value, cell) {
+    if (field === "notes") {
+      if (cell && cell.classList.contains("inv-stock-notes-text-col")) {
+        var noteText = String(value == null ? "" : value).trim();
+        return escapeHtml(noteText) || "-";
+      }
+      return formatNotesTipHtml(value);
+    }
     var v = normalizeDecimalComma(value == null ? "" : value);
     if (field === "size_label" || field === "cs_size_label") {
       v = v.replace(/\u041c/g, "M").replace(/\u043c/g, "M");
@@ -3158,7 +3164,23 @@ var INV = (function () {
     if (field === "ins_thread_side") return insertThreadSideLabels[v] || v || "-";
     if (field === "ins_thread_hand") return insertThreadHandLabels[v] || v || "-";
     if (field === "ins_thread_pitch") return v || "-";
-    if (field === "bt_insert_compat") return v || "-";
+    if (field === "bt_insert_compat") {
+      var ff = String(v || "").trim();
+      if (!ff) return "-";
+      var href =
+        window.location.pathname +
+        "?panel=stock&category=insert&ins_name=" +
+        encodeURIComponent(ff);
+      return (
+        '<a class="js-bt-formfactor-link inv-stock-formfactor-link" href="' +
+        href +
+        '" title="Найти пластины на складе по «' +
+        escapeHtml(ff) +
+        '»">' +
+        escapeHtml(ff) +
+        "</a>"
+      );
+    }
     if (field === "bt_mount_thread") return modularThreadLabels[v] || v || "—";
     if (field === "thread_standard") return threadStandardLabels[v] || v;
     if (field === "thread_kind") return threadKindLabels[v] || v || "—";
@@ -3345,7 +3367,7 @@ var INV = (function () {
     var field = cell.getAttribute("data-field");
     var oldValue = cell.getAttribute("data-value") || "";
     if (value === oldValue) {
-      cell.innerHTML = formatCell(field, oldValue);
+      cell.innerHTML = formatCell(field, oldValue, cell);
       activeCell = null;
       return;
     }
@@ -3362,10 +3384,10 @@ var INV = (function () {
     }).then(function (resp) { return resp.json(); }).then(function (data) {
       if (!data || !data.ok) throw new Error((data && data.error) || "Ошибка сохранения");
       cell.setAttribute("data-value", value);
-      cell.innerHTML = formatCell(field, value);
+      cell.innerHTML = formatCell(field, value, cell);
     }).catch(function (err) {
       alert(err.message || "Ошибка сохранения");
-      cell.innerHTML = formatCell(field, oldValue);
+      cell.innerHTML = formatCell(field, oldValue, cell);
     }).finally(function () {
       cell.classList.remove("is-saving");
       activeCell = null;
@@ -3668,7 +3690,7 @@ var INV = (function () {
         newValue = normalizeDecimalComma(newValue).replace(/\u041c/g, "M").replace(/\u043c/g, "M");
       }
       if (!save || cancelled) {
-        cell.innerHTML = formatCell(field, current);
+        cell.innerHTML = formatCell(field, current, cell);
         activeCell = null;
         return;
       }
@@ -3700,7 +3722,17 @@ var INV = (function () {
   }
 
   editableCells.forEach(function (cell) {
-    cell.addEventListener("click", function () { activate(cell); });
+    cell.addEventListener("click", function (e) {
+      var link = e.target && e.target.closest ? e.target.closest(".js-bt-formfactor-link") : null;
+      if (link) {
+        if (e.altKey) {
+          e.preventDefault();
+          activate(cell);
+        }
+        return;
+      }
+      activate(cell);
+    });
   });
 
   (function bindStockNotesTips() {
