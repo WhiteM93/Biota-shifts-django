@@ -932,6 +932,19 @@ var INV = (function () {
     return String(raw == null ? "" : raw).replace(/,/g, ".");
   }
 
+  function normalizeMetricSizeLabel(raw) {
+    var text = normalizeDecimalComma(String(raw == null ? "" : raw)).trim();
+    if (!text) return "";
+    text = text.replace(/\u041c/g, "M").replace(/\u043c/g, "M");
+    if (/^m\d/i.test(text)) text = "M" + text.slice(1);
+    if (/^\d+(?:\.\d+)?$/.test(text)) text = "M" + text;
+    var m = text.match(/^M(\d+)(?:\.(\d+))?$/i);
+    if (m) {
+      text = "M" + String(parseInt(m[1], 10)) + (m[2] != null ? "." + m[2] : "");
+    }
+    return text;
+  }
+
   function isArrivalNumericField(el, key) {
     if (!el) return false;
     if (el.type === "number") return true;
@@ -1701,6 +1714,8 @@ var INV = (function () {
         row.bt_insert_size = (el.value || "").trim().toUpperCase().replace(/\s+/g, "").replace(",", ".");
       } else if (k === "ins_brand" || k === "ins_name") {
         row[k] = String(el.value || "").trim().toUpperCase();
+      } else if (k === "size_label" || k === "cs_size_label") {
+        row[k] = normalizeMetricSizeLabel(el.value);
       } else {
         var rawVal = (el.value || "").trim();
         row[k] = isArrivalNumericField(el, k) ? normalizeDecimalComma(rawVal) : rawVal;
@@ -2921,6 +2936,11 @@ var INV = (function () {
     var t = e.target;
     var tr = t && t.closest && t.closest("tr[data-arrival-row]");
     if (!tr) return;
+    var dk = t.getAttribute("data-k") || "";
+    if (dk === "size_label" || dk === "cs_size_label") {
+      var normSize = normalizeMetricSizeLabel(t.value);
+      if (t.value !== normSize) t.value = normSize;
+    }
     if (t.getAttribute("data-k") === "ext_clamp_type") {
       var compat = tr.querySelector(".js-ext-compat");
       var phMap = INV.tool_extension_compat_placeholders || {};
@@ -2936,6 +2956,15 @@ var INV = (function () {
     }
     scheduleArrivalMatchSearch(tr);
   });
+
+  groupsWrap.addEventListener("blur", function (e) {
+    var t = e.target;
+    if (!t || !t.getAttribute) return;
+    var dk = t.getAttribute("data-k") || "";
+    if (dk !== "size_label" && dk !== "cs_size_label") return;
+    var normSize = normalizeMetricSizeLabel(t.value);
+    if (t.value !== normSize) t.value = normSize;
+  }, true);
 
   form.addEventListener("submit", function (e) {
     clearArrivalBulkErrors();
@@ -3182,7 +3211,7 @@ var INV = (function () {
     }
     var v = normalizeDecimalComma(value == null ? "" : value);
     if (field === "size_label" || field === "cs_size_label") {
-      v = v.replace(/\u041c/g, "M").replace(/\u043c/g, "M");
+      v = normalizeMetricSizeLabel(v);
       return escapeHtml(v || "-");
     }
     if (!v && field !== "high_precision_aa") return "-";
@@ -3409,6 +3438,19 @@ var INV = (function () {
 
   function normalizeDecimalComma(raw) {
     return String(raw == null ? "" : raw).trim().replace(/,/g, ".");
+  }
+
+  function normalizeMetricSizeLabel(raw) {
+    var text = normalizeDecimalComma(String(raw == null ? "" : raw));
+    if (!text) return "";
+    text = text.replace(/\u041c/g, "M").replace(/\u043c/g, "M");
+    if (/^m\d/i.test(text)) text = "M" + text.slice(1);
+    if (/^\d+(?:\.\d+)?$/.test(text)) text = "M" + text;
+    var m = text.match(/^M(\d+)(?:\.(\d+))?$/i);
+    if (m) {
+      text = "M" + String(parseInt(m[1], 10)) + (m[2] != null ? "." + m[2] : "");
+    }
+    return text;
   }
 
   function saveCell(cell, value, editor) {
@@ -3736,7 +3778,7 @@ var INV = (function () {
         newValue = normalizeDecimalComma(newValue);
       }
       if (field === "size_label" || field === "cs_size_label") {
-        newValue = normalizeDecimalComma(newValue).replace(/\u041c/g, "M").replace(/\u043c/g, "M");
+        newValue = normalizeMetricSizeLabel(newValue);
       }
       if (!save || cancelled) {
         cell.innerHTML = formatCell(field, current, cell);

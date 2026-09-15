@@ -503,7 +503,7 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
         qs = qs.select_related("tap_spec")
         size = (row.get("size_label") or "").strip()
         if size:
-            qs = qs.filter(tap_spec__size_label__iexact=size)
+            qs = qs.filter(_size_label_filter_q("tap_spec__size_label", size))
         for key, field in (
             ("thread_standard", "tap_spec__thread_standard"),
             ("hole_type", "tap_spec__hole_type"),
