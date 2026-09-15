@@ -41,6 +41,11 @@
       <span class="cabinet-quick-card__title">Django Admin</span>
       <p class="cabinet-quick-card__desc">Модели, миграции, служебные записи в БД</p>
     </a>
+    <a class="cabinet-quick-card" href="{% url 'inventory_types' %}">
+      <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "nav.inventory" %}</span>
+      <span class="cabinet-quick-card__title">Типы склада</span>
+      <p class="cabinet-quick-card__desc">Справочник категорий и полей инструмента</p>
+    </a>
     <a class="cabinet-quick-card cabinet-quick-card--schedules" href="{% url 'schedule_backups' %}">
       <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "cabinet.schedule_backups" %}</span>
       <span class="cabinet-quick-card__title">Резервные копии графиков</span>

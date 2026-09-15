@@ -70,3 +70,18 @@ def size_label_sort_key(label: str):
         except ValueError:
             pass
     return (1, 0.0, text.casefold())
+
+
+def size_label_sort_number(label: str) -> str:
+    """Число для data-sort в таблице: M10 → «10», иначе пустая строка."""
+    text = normalize_cutting_size_label(label)
+    m = _METRIC_SIZE_RE.match(text)
+    if not m:
+        return ""
+    try:
+        n = float(m.group(1))
+    except ValueError:
+        return ""
+    if n == int(n):
+        return str(int(n))
+    return format(n, "f").rstrip("0").rstrip(".")

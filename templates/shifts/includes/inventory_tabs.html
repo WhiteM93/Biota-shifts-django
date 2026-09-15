@@ -1,0 +1,15 @@
+{# Вкладки разделов склада. active_tab: analysis|stock|history|issue|issue_outcome|arrival|purchases|visual_warehouse #}
+<nav class="inv-tabs" aria-label="Разделы склада">
+  <a class="inv-tab {% if active_tab == 'analysis' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=analysis">Главная</a>
+  <a class="inv-tab {% if active_tab == 'stock' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=stock">Склад</a>
+  <a class="inv-tab {% if active_tab == 'history' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=history">История</a>
+  {% if biota_can_edit %}
+  <a class="inv-tab {% if active_tab == 'issue' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=issue">Выдать</a>
+  <a class="inv-tab {% if active_tab == 'issue_outcome' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=issue_outcome">Списание/Возврат</a>
+  <a class="inv-tab {% if active_tab == 'arrival' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=arrival">Приход</a>
+  {% endif %}
+  <a class="inv-tab {% if active_tab == 'purchases' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=purchases">Закупки</a>
+  {% if biota_nav.visual_warehouse %}
+  <a class="inv-tab {% if active_tab == 'visual_warehouse' %}is-active{% endif %}" href="{% url 'visual_warehouse' %}" title="Визуальный склад">Виз. склад</a>
+  {% endif %}
+</nav>

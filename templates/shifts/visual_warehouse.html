@@ -2,10 +2,14 @@
 {% load static biota_icons %}
 
 {% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/inventory.css' %}?v={{ static_asset_version }}">
 <link rel="stylesheet" href="{% static 'shifts/css/visual_warehouse.css' %}?v={{ static_asset_version }}">
 {% endblock %}
 
 {% block content %}
+<div class="inv-page">
+{% include "shifts/includes/inventory_tabs.html" with active_tab="visual_warehouse" %}
+</div>
 <div
   class="vw-page{% if not biota_can_edit %} is-readonly{% endif %}"
   data-api-cabinets="{% url 'visual_warehouse_api_cabinets' %}"

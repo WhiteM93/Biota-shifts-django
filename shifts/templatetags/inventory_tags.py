@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from shifts.insert_constants import INSERT_MACHINING_APPLICATIONS
 from shifts.models import COATING_TYPES, COATING_TYPE_TOOLTIPS
-from shifts.size_label_normalize import normalize_cutting_size_label
+from shifts.size_label_normalize import normalize_cutting_size_label, size_label_sort_number
 
 register = template.Library()
 
@@ -46,10 +46,21 @@ def insert_machining_tooltip(code):
 
 @register.filter
 def size_norm(value):
-    """Размер метчика/зенкера: М→M, запятая→точка."""
+    """Размер метчика/зенкера: М→M, запятая→точка, 8→M8."""
     if value in (None, ""):
         return value
     return normalize_cutting_size_label(value)
+
+
+@register.filter
+def size_sort(value):
+    """Ключ сортировки размера: M10 → 10 (число), иначе нормализованная строка."""
+    if value in (None, ""):
+        return "-1"
+    num = size_label_sort_number(value)
+    if num:
+        return num
+    return normalize_cutting_size_label(value) or "-1"
 
 
 @register.filter(is_safe=False)

@@ -2,15 +2,33 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from urllib.parse import urlencode
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, F, Max, Q, Sum
 from django.urls import reverse
+from django.utils import timezone
 
 from shifts.models import InventoryWatchTemplate, ToolItem
+
+_MONTHS_RU = (
+    "",
+    "январь",
+    "февраль",
+    "март",
+    "апрель",
+    "май",
+    "июнь",
+    "июль",
+    "август",
+    "сентябрь",
+    "октябрь",
+    "ноябрь",
+    "декабрь",
+)
 
 # group_field → ORM path (values/annotate)
 GROUP_FIELD_PATHS: dict[str, dict[str, str]] = {
@@ -440,6 +458,191 @@ def list_watch_templates(username: str) -> list[InventoryWatchTemplate]:
     )
 
 
+def _month_bounds(today: date | None = None) -> tuple[date, date]:
+    day = today or timezone.localdate()
+    return day.replace(day=1), day
+
+
+def _month_label(day: date) -> str:
+    return f"{_MONTHS_RU[day.month]} {day.year}"
+
+
+def top_employees_by_stock_qty(
+    *,
+    movement_type: str,
+    month_start: date,
+    month_end: date,
+    returns: bool = False,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    """Топ сотрудников: кто брал (выдачи) / кто вернул (возвраты по выдаче) за период."""
+    from django.db.models import CharField, Value
+    from django.db.models.functions import Coalesce, Trim
+
+    from shifts.models import StockMovement
+
+    qs = StockMovement.objects.filter(
+        movement_type=movement_type,
+        is_reverted=False,
+        movement_date__gte=month_start,
+        movement_date__lte=month_end,
+    )
+    if returns:
+        # Возврат на склад по выдаче: сотрудник из возврата или из исходной выдачи
+        qs = qs.filter(parent_issue__isnull=False).annotate(
+            person=Trim(
+                Coalesce(
+                    "employee_name",
+                    "parent_issue__employee_name",
+                    Value(""),
+                    output_field=CharField(),
+                )
+            )
+        )
+    else:
+        qs = qs.annotate(
+            person=Trim(Coalesce("employee_name", Value(""), output_field=CharField()))
+        )
+    qs = qs.exclude(person="")
+    rows = (
+        qs.values("person")
+        .annotate(total=Sum("quantity"))
+        .order_by("-total", "person")[: max(1, min(int(limit), 20))]
+    )
+    return [{"name": r["person"], "qty": int(r["total"] or 0)} for r in rows]
+
+
+def _month_movement_totals(month_start: date, month_end: date) -> dict[str, int]:
+    from django.db.models import Sum, Value
+    from django.db.models.functions import Coalesce
+
+    from shifts.models import StockMovement
+
+    def _sum(qs) -> int:
+        return int(qs.aggregate(t=Coalesce(Sum("quantity"), Value(0)))["t"] or 0)
+
+    base = StockMovement.objects.filter(
+        is_reverted=False,
+        movement_date__gte=month_start,
+        movement_date__lte=month_end,
+    )
+    return {
+        "issued": _sum(base.filter(movement_type="issue")),
+        "returned": _sum(base.filter(movement_type="restock", parent_issue__isnull=False)),
+        "writeoff": _sum(base.filter(movement_type="writeoff")),
+        "arrival": _sum(base.filter(movement_type="restock", parent_issue__isnull=True)),
+    }
+
+
+def _overdue_open_issues(*, today: date, min_days: int = 14, limit: int = 8) -> list[dict[str, Any]]:
+    from django.db.models import IntegerField, Sum, Value
+    from django.db.models.functions import Coalesce
+
+    from shifts.models import StockMovement
+
+    cutoff = today - timedelta(days=min_days)
+    qs = (
+        StockMovement.objects.filter(
+            movement_type="issue",
+            is_reverted=False,
+            movement_date__lte=cutoff,
+        )
+        .select_related("tool")
+        .annotate(
+            processed_qty=Coalesce(
+                Sum("issue_outcomes__quantity"),
+                Value(0, output_field=IntegerField()),
+            )
+        )
+        .annotate(remaining_qty=F("quantity") - F("processed_qty"))
+        .filter(remaining_qty__gt=0)
+        .order_by("movement_date", "id")[: max(1, min(int(limit), 20))]
+    )
+    out: list[dict[str, Any]] = []
+    for iss in qs:
+        days = (today - iss.movement_date).days
+        emp = (iss.employee_name or "").strip() or "—"
+        out.append(
+            {
+                "id": iss.id,
+                "employee": emp,
+                "tool_name": (iss.tool.name if iss.tool_id else "—")[:48],
+                "remaining": int(iss.remaining_qty or 0),
+                "days": days,
+                "date": iss.movement_date,
+                "outcome_url": f"{reverse('inventory')}?{urlencode({'panel': 'issue_outcome', 'outcome_employee': emp if emp != '—' else ''})}",
+            }
+        )
+    return out
+
+
+def _dead_stock_rows(*, today: date, idle_days: int = 90, limit: int = 8) -> list[dict[str, Any]]:
+    cutoff = today - timedelta(days=idle_days)
+    qs = (
+        ToolItem.objects.filter(is_deleted=False, quantity__gt=0)
+        .annotate(
+            last_move=Max(
+                "movements__movement_date",
+                filter=Q(movements__is_reverted=False),
+            )
+        )
+        .filter(Q(last_move__isnull=True) | Q(last_move__lt=cutoff))
+        .order_by(F("last_move").asc(nulls_first=True), "-quantity", "name")[: max(1, min(int(limit), 20))]
+    )
+    cat_labels = dict(category_choices())
+    rows: list[dict[str, Any]] = []
+    for t in qs:
+        last = t.last_move
+        idle = (today - last).days if last else None
+        rows.append(
+            {
+                "id": t.id,
+                "name": (t.name or "—")[:56],
+                "quantity": int(t.quantity or 0),
+                "category_label": cat_labels.get(t.category, t.category or "—"),
+                "last_move": last,
+                "idle_days": idle,
+                "idle_label": f"{idle} дн." if idle is not None else "нет движений",
+                "stock_url": f"{reverse('inventory')}?{urlencode({'panel': 'stock', 'show_all': '1', 'category': t.category or ''})}",
+            }
+        )
+    return rows
+
+
+def _top_tools_by_movement(
+    *,
+    movement_type: str,
+    month_start: date,
+    month_end: date,
+    limit: int = 8,
+) -> list[dict[str, Any]]:
+    from shifts.models import StockMovement
+
+    rows = (
+        StockMovement.objects.filter(
+            movement_type=movement_type,
+            is_reverted=False,
+            movement_date__gte=month_start,
+            movement_date__lte=month_end,
+        )
+        .values("tool_id", "tool__name", "tool__category")
+        .annotate(total=Sum("quantity"))
+        .order_by("-total", "tool__name")[: max(1, min(int(limit), 20))]
+    )
+    cat_labels = dict(category_choices())
+    return [
+        {
+            "tool_id": r["tool_id"],
+            "name": (r["tool__name"] or "—")[:56],
+            "category": r["tool__category"],
+            "category_label": cat_labels.get(r["tool__category"], r["tool__category"] or "—"),
+            "qty": int(r["total"] or 0),
+            "stock_url": f"{reverse('inventory')}?{urlencode({'panel': 'stock', 'show_all': '1', 'category': r['tool__category'] or ''})}",
+        }
+        for r in rows
+    ]
+
+
 def analysis_context(request, username: str) -> dict:
     """Контекст вкладки «Анализ»: панель руководителя склада."""
     from django.db.models import F, IntegerField, Sum, Value
@@ -484,6 +687,41 @@ def analysis_context(request, username: str) -> dict:
             .distinct()
             .count()
         )
+
+    month_start, month_end = _month_bounds()
+    top_issues = top_employees_by_stock_qty(
+        movement_type="issue",
+        month_start=month_start,
+        month_end=month_end,
+        limit=5,
+    )
+    top_returns = top_employees_by_stock_qty(
+        movement_type="restock",
+        month_start=month_start,
+        month_end=month_end,
+        returns=True,
+        limit=5,
+    )
+    no_address_count = (
+        base_tools.filter(Q(warehouse_address="") | Q(warehouse_address__isnull=True)).count()
+    )
+    no_address_url = f"{reverse('inventory')}?{urlencode({'panel': 'stock', 'show_all': '1', 'no_address': '1'})}"
+
+    month_totals = _month_movement_totals(month_start, month_end)
+    overdue_issues = _overdue_open_issues(today=month_end, min_days=14, limit=8)
+    top_tools_issued = _top_tools_by_movement(
+        movement_type="issue",
+        month_start=month_start,
+        month_end=month_end,
+        limit=8,
+    )
+    top_tools_writeoff = _top_tools_by_movement(
+        movement_type="writeoff",
+        month_start=month_start,
+        month_end=month_end,
+        limit=8,
+    )
+    dead_stock = _dead_stock_rows(today=month_end, idle_days=90, limit=8)
 
     cat_labels = dict(category_choices())
     by_cat_raw = list(
@@ -559,6 +797,16 @@ def analysis_context(request, username: str) -> dict:
         "dash_issued_qty": issued_qty,
         "dash_writeoff_count": writeoff_count,
         "dash_storage_cells": storage_cells,
+        "dash_month_label": _month_label(month_start),
+        "dash_top_issues": top_issues,
+        "dash_top_returns": top_returns,
+        "dash_no_address_count": no_address_count,
+        "dash_no_address_url": no_address_url,
+        "dash_month_totals": month_totals,
+        "dash_overdue_issues": overdue_issues,
+        "dash_top_tools_issued": top_tools_issued,
+        "dash_top_tools_writeoff": top_tools_writeoff,
+        "dash_dead_stock": dead_stock,
         "analysis_watch_alerts": alerts,
         "analysis_watch_rows": watch_rows,
         "analysis_watch_templates": templates,

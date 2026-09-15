@@ -27,17 +27,7 @@
 {% block content %}
 <div class="inv-page{% if panel == 'stock' %} inv-page--stock{% endif %}{% if panel == 'arrival' %} inv-page--arrival{% endif %}{% if panel == 'issue_outcome' %} inv-page--issue-outcome{% endif %}{% if panel == 'payroll' %} inv-page--payroll{% endif %}{% if panel == 'purchases' %} inv-page--purchases calc-page{% endif %}{% if panel == 'analysis' %} inv-page--analysis calc-page{% endif %}">
 {% if panel != "defects" and panel != "payroll" and panel != "employees" %}
-<nav class="inv-tabs" aria-label="Разделы склада">
-  <a class="inv-tab {% if panel == 'stock' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=stock">Склад</a>
-  <a class="inv-tab {% if panel == 'history' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=history">История</a>
-  {% if biota_can_edit %}
-  <a class="inv-tab {% if panel == 'issue' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=issue">Выдать</a>
-  <a class="inv-tab {% if panel == 'issue_outcome' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=issue_outcome">Списание/Возврат</a>
-  <a class="inv-tab {% if panel == 'arrival' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=arrival">Приход</a>
-  {% endif %}
-  <a class="inv-tab {% if panel == 'purchases' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=purchases">Закупки</a>
-  <a class="inv-tab {% if panel == 'analysis' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=analysis">Анализ</a>
-</nav>
+{% include "shifts/includes/inventory_tabs.html" with active_tab=panel %}
 {% endif %}
 {% if panel != "defects" and panel != "payroll" and panel != "employees" and panel != "stock" and panel != "arrival" and panel != "issue_outcome" and panel != "purchases" and panel != "history" and panel != "analysis" %}
 <h2 style="margin-top:0;">Склад инструмента</h2>
@@ -419,7 +409,7 @@
       {% for t in tool_items %}
       <tr>
 <td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
-        <td data-sort="{{ t.tap_spec.size_label|size_norm|default:'-' }}" class="tap-size-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="size_label" data-type="text" data-value="{{ t.tap_spec.size_label|size_norm|default:'' }}"{% endif %}>{{ t.tap_spec.size_label|size_norm|default:"-" }}</td>
+        <td data-sort="{{ t.tap_spec.size_label|size_sort }}" class="tap-size-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="size_label" data-type="text" data-value="{{ t.tap_spec.size_label|size_norm|default:'' }}"{% endif %}>{{ t.tap_spec.size_label|size_norm|default:"-" }}</td>
         <td data-sort="{{ t.tap_spec.get_thread_kind_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="thread_kind" data-type="select" data-value="{{ t.tap_spec.thread_kind|default:'' }}"{% endif %}>{{ t.tap_spec.get_thread_kind_display|default:"-" }}</td>
         <td data-sort="{{ t.tap_spec.get_thread_standard_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="thread_standard" data-type="select" data-value="{{ t.tap_spec.thread_standard|default:'' }}"{% endif %}>{{ t.tap_spec.get_thread_standard_display|default:"-" }}</td>
         <td data-sort="{{ t.tap_spec.pitch_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tap_pitch_mm" data-type="number" data-value="{{ t.tap_spec.pitch_mm|default:'' }}"{% endif %}>{{ t.tap_spec.pitch_mm|default:"-" }}</td>
@@ -525,7 +515,7 @@
         <td data-sort="{{ t.countersink_spec.angle_deg|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cs_angle_deg" data-type="select" data-value="{{ t.countersink_spec.angle_deg|default:'' }}"{% endif %}>{{ t.countersink_spec.angle_deg|default:"-" }}</td>
         <td data-sort="{{ t.countersink_spec.overall_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cs_overall_length_mm" data-type="number" data-value="{{ t.countersink_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.countersink_spec.overall_length_mm is not None %}{{ t.countersink_spec.overall_length_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.countersink_spec.flutes_count|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cs_flutes_count" data-type="int" data-value="{{ t.countersink_spec.flutes_count|default:'' }}"{% endif %}>{{ t.countersink_spec.flutes_count|default:"-" }}</td>
-        <td data-sort="{{ t.countersink_spec.size_label|size_norm|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cs_size_label" data-type="text" data-value="{{ t.countersink_spec.size_label|size_norm|default:'' }}"{% endif %}>{{ t.countersink_spec.size_label|size_norm|default:"-" }}</td>
+        <td data-sort="{{ t.countersink_spec.size_label|size_sort }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cs_size_label" data-type="text" data-value="{{ t.countersink_spec.size_label|size_norm|default:'' }}"{% endif %}>{{ t.countersink_spec.size_label|size_norm|default:"-" }}</td>
         <td data-sort="{{ t.main_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="main_diameter_mm" data-type="number" data-value="{{ t.main_diameter_mm|default:'' }}"{% endif %}>{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
         <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
@@ -988,6 +978,12 @@
       <select name="show_all">
         <option value="0" {% if not filters.show_all %}selected{% endif %}>Нет</option>
         <option value="1" {% if filters.show_all %}selected{% endif %}>Да</option>
+      </select>
+    </label>
+    <label class="field"><span>Адрес</span>
+      <select name="no_address">
+        <option value="" {% if not filters.no_address %}selected{% endif %}>Все</option>
+        <option value="1" {% if filters.no_address %}selected{% endif %}>Только без адреса</option>
       </select>
     </label>
     {% if filters.category == "end_mill" %}

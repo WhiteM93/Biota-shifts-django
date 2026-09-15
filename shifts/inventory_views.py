@@ -1258,6 +1258,7 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
     {
         "show_all",
         "category",
+        "no_address",
         "diameter_mm",
         "mill_overall_length_mm",
         "mill_cutting_length_mm",
@@ -1389,6 +1390,7 @@ _STOCK_GLOBAL_KEYS = frozenset(
     {
         "show_all",
         "category",
+        "no_address",
         "tool_material",
         "tool_material_custom",
         "coating_type",
@@ -1557,6 +1559,9 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         if key in ex:
             return ""
         return (params.get(key) or "").strip()
+
+    if g("no_address") in ("1", "true", "yes", "on"):
+        qs = qs.filter(Q(warehouse_address="") | Q(warehouse_address__isnull=True))
 
     if category == "end_mill":
         diameter_mm_raw = g("diameter_mm")
@@ -4960,6 +4965,7 @@ def inventory_view(request):
             "tool_material_custom": tm_custom_input,
             "tool_material_select": tool_material_select,
             "coating_type": coating_type,
+            "no_address": _sq("no_address") in ("1", "true", "yes", "on"),
             "show_all": show_all,
             "history_movement_type": history_movement_type,
             "history_employee": history_employee,

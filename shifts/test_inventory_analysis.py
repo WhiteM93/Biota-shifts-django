@@ -61,3 +61,58 @@ class InventoryAnalysisTests(TestCase):
             min_qty=5,
         )
         self.assertEqual(InventoryWatchTemplate.objects.count(), 1)
+
+
+class DashboardMonthStatsTests(TestCase):
+    def test_top_issue_and_return(self):
+        from datetime import date
+
+        from shifts.inventory_analysis import top_employees_by_stock_qty
+        from shifts.models import StockMovement
+
+        tool = ToolItem.objects.create(category="drill", name="D6", quantity=20)
+        today = date.today()
+        StockMovement.objects.create(
+            movement_type="issue",
+            tool=tool,
+            quantity=10,
+            employee_name="Иванов",
+            movement_date=today,
+        )
+        StockMovement.objects.create(
+            movement_type="issue",
+            tool=tool,
+            quantity=3,
+            employee_name="Петров",
+            movement_date=today,
+        )
+        issue = StockMovement.objects.filter(employee_name="Иванов").first()
+        StockMovement.objects.create(
+            movement_type="restock",
+            tool=tool,
+            parent_issue=issue,
+            quantity=4,
+            employee_name="Иванов",
+            movement_date=today,
+        )
+        StockMovement.objects.create(
+            movement_type="restock",
+            tool=tool,
+            quantity=99,
+            employee_name="Складской приход",
+            movement_date=today,
+        )
+        month_start = today.replace(day=1)
+        issues = top_employees_by_stock_qty(
+            movement_type="issue", month_start=month_start, month_end=today
+        )
+        self.assertEqual(issues[0]["name"], "Иванов")
+        self.assertEqual(issues[0]["qty"], 10)
+        returns = top_employees_by_stock_qty(
+            movement_type="restock",
+            month_start=month_start,
+            month_end=today,
+            returns=True,
+        )
+        self.assertEqual(returns[0]["name"], "Иванов")
+        self.assertEqual(returns[0]["qty"], 4)

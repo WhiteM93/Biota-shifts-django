@@ -4,11 +4,6 @@
 {{ dash_chart_data|json_script:"inv-dash-charts-data" }}
 
 <div class="inv-dash">
-  <header class="inv-dash__hero">
-    <h1 class="inv-dash__title">Склад — панель руководителя</h1>
-    <p class="inv-dash__lead">Сводка остатков, выдач и списаний по всему складу</p>
-  </header>
-
   {% if analysis_watch_alerts %}
   <section class="inv-dash-alerts" aria-label="Ниже минимума">
     {% for row in analysis_watch_alerts|slice:":6" %}
@@ -81,6 +76,178 @@
         <p class="inv-dash-empty">Нет данных</p>
         {% endif %}
       </div>
+    </section>
+  </div>
+
+  <section class="inv-dash-card inv-dash-card--ops" aria-label="Операции за месяц">
+    <h2 class="inv-dash-card__title">За {{ dash_month_label }}</h2>
+    <div class="inv-dash-activity">
+      <div class="inv-dash-activity__item">
+        <span class="inv-dash-activity__val">{{ dash_month_totals.issued }}</span>
+        <span class="inv-dash-activity__lab">выдано, шт.</span>
+      </div>
+      <div class="inv-dash-activity__item">
+        <span class="inv-dash-activity__val">{{ dash_month_totals.returned }}</span>
+        <span class="inv-dash-activity__lab">возвращено, шт.</span>
+      </div>
+      <div class="inv-dash-activity__item">
+        <span class="inv-dash-activity__val">{{ dash_month_totals.writeoff }}</span>
+        <span class="inv-dash-activity__lab">списано, шт.</span>
+      </div>
+      <div class="inv-dash-activity__item">
+        <span class="inv-dash-activity__val">{{ dash_month_totals.arrival }}</span>
+        <span class="inv-dash-activity__lab">приход, шт.</span>
+      </div>
+    </div>
+    <div class="inv-dash-ops">
+      <div class="inv-dash-ops__col">
+        <div class="inv-dash-ops__label">Кто больше всех брал</div>
+        {% if dash_top_issues %}
+        <div class="inv-dash-ops__leader">
+          <strong>{{ dash_top_issues.0.name }}</strong>
+          <span class="inv-dash-ops__qty">{{ dash_top_issues.0.qty }} шт.</span>
+        </div>
+        {% if dash_top_issues|length > 1 %}
+        <ol class="inv-dash-ops__list">
+          {% for row in dash_top_issues|slice:"1:4" %}
+          <li><span>{{ row.name }}</span><span>{{ row.qty }}</span></li>
+          {% endfor %}
+        </ol>
+        {% endif %}
+        {% else %}
+        <p class="inv-dash-empty">Никто не брал инструмент за месяц</p>
+        {% endif %}
+      </div>
+      <div class="inv-dash-ops__col">
+        <div class="inv-dash-ops__label">Кто больше всех вернул</div>
+        {% if dash_top_returns %}
+        <div class="inv-dash-ops__leader">
+          <strong>{{ dash_top_returns.0.name }}</strong>
+          <span class="inv-dash-ops__qty">{{ dash_top_returns.0.qty }} шт.</span>
+        </div>
+        {% if dash_top_returns|length > 1 %}
+        <ol class="inv-dash-ops__list">
+          {% for row in dash_top_returns|slice:"1:4" %}
+          <li><span>{{ row.name }}</span><span>{{ row.qty }}</span></li>
+          {% endfor %}
+        </ol>
+        {% endif %}
+        {% else %}
+        <p class="inv-dash-empty">Никто не возвращал за месяц</p>
+        {% endif %}
+      </div>
+      <div class="inv-dash-ops__col inv-dash-ops__col--stat">
+        <div class="inv-dash-ops__label">Без адреса</div>
+        <a class="inv-dash-ops__stat" href="{{ dash_no_address_url }}" title="Показать позиции без адреса на складе">
+          <span class="inv-dash-ops__stat-num">{{ dash_no_address_count }}</span>
+          <span class="inv-dash-ops__stat-hint">позиций</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <div class="inv-dash__grid inv-dash__grid--insights">
+    <section class="inv-dash-card" aria-label="Просроченные выдачи">
+      <h2 class="inv-dash-card__title">Не возвращено &gt; 14 дней</h2>
+      <table class="inv-dash-table">
+        <thead>
+          <tr>
+            <th>Сотрудник</th>
+            <th>Инструмент</th>
+            <th>Дней</th>
+            <th>Ост.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in dash_overdue_issues %}
+          <tr>
+            <td><a href="{{ row.outcome_url }}">{{ row.employee }}</a></td>
+            <td class="inv-dash-table__tool" title="{{ row.tool_name }}">{{ row.tool_name }}</td>
+            <td class="inv-dash-table__num {% if row.days >= 30 %}is-warn{% endif %}">{{ row.days }}</td>
+            <td class="inv-dash-table__num">{{ row.remaining }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="inv-dash-empty">Просроченных выдач нет</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="inv-dash-card" aria-label="Ходовой инструмент">
+      <h2 class="inv-dash-card__title">Ходовой инструмент · {{ dash_month_label }}</h2>
+      <table class="inv-dash-table">
+        <thead>
+          <tr>
+            <th>Позиция</th>
+            <th>Выдано</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in dash_top_tools_issued %}
+          <tr>
+            <td>
+              <a href="{{ row.stock_url }}" title="{{ row.name }}">{{ row.name }}</a>
+              <span class="inv-dash-table__meta">{{ row.category_label }}</span>
+            </td>
+            <td class="inv-dash-table__num">{{ row.qty }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="2" class="inv-dash-empty">Нет выдач за месяц</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="inv-dash-card" aria-label="Списания за месяц">
+      <h2 class="inv-dash-card__title">Списания · {{ dash_month_label }}</h2>
+      <table class="inv-dash-table">
+        <thead>
+          <tr>
+            <th>Позиция</th>
+            <th>Списано</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in dash_top_tools_writeoff %}
+          <tr>
+            <td>
+              <a href="{{ row.stock_url }}" title="{{ row.name }}">{{ row.name }}</a>
+              <span class="inv-dash-table__meta">{{ row.category_label }}</span>
+            </td>
+            <td class="inv-dash-table__num">{{ row.qty }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="2" class="inv-dash-empty">Списаний за месяц нет</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="inv-dash-card" aria-label="Залежавшийся остаток">
+      <h2 class="inv-dash-card__title">Без движений &gt; 90 дней</h2>
+      <table class="inv-dash-table">
+        <thead>
+          <tr>
+            <th>Позиция</th>
+            <th>Остаток</th>
+            <th>Простой</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in dash_dead_stock %}
+          <tr>
+            <td>
+              <a href="{{ row.stock_url }}" title="{{ row.name }}">{{ row.name }}</a>
+              <span class="inv-dash-table__meta">{{ row.category_label }}</span>
+            </td>
+            <td class="inv-dash-table__num">{{ row.quantity }}</td>
+            <td class="inv-dash-table__num inv-dash-table__idle">{{ row.idle_label }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="inv-dash-empty">Залежавшихся позиций нет</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </section>
   </div>
 </div>

@@ -333,10 +333,16 @@ var INV = (function () {
 
   function toSortableValue(cell) {
     var raw = (cell.getAttribute("data-sort") || cell.textContent || "").trim();
-    var normalized = raw.replace(",", ".");
+    var normalized = raw.replace(",", ".").replace(/\u041c/g, "M").replace(/\u043c/g, "M");
+    // M1.6 / M2 / M10 — по числу, не лексикографически
+    var metric = normalized.match(/^M(\d+(?:\.\d+)?)/i);
+    if (metric) {
+      var mn = parseFloat(metric[1]);
+      if (!Number.isNaN(mn)) return mn;
+    }
     var num = parseFloat(normalized);
     if (!Number.isNaN(num) && /^-?\d+(\.\d+)?$/.test(normalized)) return num;
-    return raw.toLowerCase();
+    return normalized.toLowerCase();
   }
 
   Array.prototype.forEach.call(tables, function (table) {
@@ -3475,7 +3481,14 @@ var INV = (function () {
     }).then(function (resp) { return resp.json(); }).then(function (data) {
       if (!data || !data.ok) throw new Error((data && data.error) || "Ошибка сохранения");
       cell.setAttribute("data-value", value);
-      cell.innerHTML = formatCell(field, value, cell);
+      if (field === "size_label" || field === "cs_size_label") {
+        var norm = normalizeMetricSizeLabel(value);
+        var mSort = String(norm || "").match(/^M(\d+(?:\.\d+)?)/i);
+        cell.setAttribute("data-sort", mSort ? mSort[1] : (norm || value));
+        cell.innerHTML = formatCell(field, norm || value, cell);
+      } else {
+        cell.innerHTML = formatCell(field, value, cell);
+      }
     }).catch(function (err) {
       alert(err.message || "Ошибка сохранения");
       cell.innerHTML = formatCell(field, oldValue, cell);

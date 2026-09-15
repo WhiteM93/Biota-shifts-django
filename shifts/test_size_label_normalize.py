@@ -2,7 +2,11 @@
 
 from django.test import TestCase
 
-from shifts.size_label_normalize import normalize_cutting_size_label, size_label_match_variants
+from shifts.size_label_normalize import (
+    normalize_cutting_size_label,
+    size_label_match_variants,
+    size_label_sort_number,
+)
 
 
 class MetricSizeLabelNormalizeTests(TestCase):
@@ -31,3 +35,9 @@ class MetricSizeLabelNormalizeTests(TestCase):
         self.assertIn("M8", variants)
         self.assertIn("8", variants)
         self.assertIn("М8", variants)
+
+    def test_sort_number_metric_order(self):
+        keys = [float(size_label_sort_number(x)) for x in ("M1.6", "M2", "M2.5", "M10", "M12")]
+        self.assertEqual(keys, sorted(keys))
+        self.assertEqual(size_label_sort_number("M10"), "10")
+        self.assertEqual(size_label_sort_number("M2.5"), "2.5")
