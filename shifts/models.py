@@ -511,7 +511,7 @@ class ToolItem(models.Model):
                 (ex.get_clamp_type_display() if ex else "—"),
                 f"Dосн Ø{main_d()}",
                 (f"L {fmt_mm(ex.overall_length_mm)}" if ex and ex.overall_length_mm is not None else ""),
-                (f"Dвн Ø{fmt_mm(ex.inner_diameter_mm)}" if ex and ex.inner_diameter_mm is not None else ""),
+                (f"Dвн {ex.inner_diameter}" if ex and (ex.inner_diameter or "").strip() else ""),
                 (ex.compatible_parts if ex and ex.compatible_parts else "—"),
                 f"ост {self.quantity}",
             ]
@@ -728,8 +728,8 @@ class ToolItem(models.Model):
                     specs_parts.append(f"Dосн={main_d()} мм")
                 if ex.overall_length_mm is not None:
                     specs_parts.append(f"L={fmt_mm(ex.overall_length_mm)} мм")
-                if ex.inner_diameter_mm is not None:
-                    specs_parts.append(f"Dвн={fmt_mm(ex.inner_diameter_mm)} мм")
+                if (ex.inner_diameter or "").strip():
+                    specs_parts.append(f"Dвн={ex.inner_diameter.strip()}")
                 if (ex.compatible_parts or "").strip():
                     specs_parts.append(ex.compatible_parts.strip())
         else:
@@ -1314,13 +1314,12 @@ class ToolExtensionSpec(models.Model):
         blank=True,
         verbose_name="Общая длина L, мм",
     )
-    inner_diameter_mm = models.DecimalField(
-        max_digits=7,
-        decimal_places=2,
-        null=True,
+    inner_diameter = models.CharField(
+        max_length=40,
         blank=True,
-        verbose_name="Внутренний диаметр Dвн, мм",
-        help_text="Для термо и боковой фиксации",
+        default="",
+        verbose_name="Внутренний диаметр Dвн",
+        help_text="Для термо и боковой фиксации: мм, дюймы (1/2) или G1/8",
     )
 
     class Meta:
@@ -1335,16 +1334,20 @@ class ToolExtensionSpec(models.Model):
             clamp_type=self.clamp_type,
             main_diameter_mm=self.tool.main_diameter_mm if self.tool_id else None,
             overall_length_mm=self.overall_length_mm,
-            inner_diameter_mm=self.inner_diameter_mm,
+            inner_diameter=self.inner_diameter,
             compatible_parts=self.compatible_parts,
         )
 
     def save(self, *args, **kwargs):
-        from .tool_extension_constants import normalize_tool_extension_clamp
+        from .tool_extension_constants import (
+            normalize_tool_extension_clamp,
+            normalize_tool_extension_inner_diameter,
+        )
 
-        self.brand = (self.brand or "").strip()[:80]
+        self.brand = (self.brand or "").strip().upper()[:80]
         self.clamp_type = normalize_tool_extension_clamp(self.clamp_type) or "collet"
         self.compatible_parts = (self.compatible_parts or "").strip()[:120]
+        self.inner_diameter = normalize_tool_extension_inner_diameter(self.inner_diameter)
         super().save(*args, **kwargs)
 
 

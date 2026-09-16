@@ -1572,7 +1572,7 @@ var INV = (function () {
   function syncExtInnerDiameterField(tr) {
     if (!tr) return;
     var clampEl = tr.querySelector('[data-k="ext_clamp_type"]');
-    var innerEl = tr.querySelector('[data-k="ext_inner_diameter_mm"]');
+    var innerEl = tr.querySelector('[data-k="ext_inner_diameter"]');
     if (!innerEl) return;
     var clamp = ((clampEl && clampEl.value) || "").trim();
     var need =
@@ -1581,7 +1581,7 @@ var INV = (function () {
     if (need) {
       innerEl.required = true;
       innerEl.setAttribute("aria-required", "true");
-      innerEl.title = "Внутренний диаметр Dвн, мм (обязательно)";
+      innerEl.title = "Dвн: мм, 1/2, G1/8… (обязательно)";
     } else {
       innerEl.required = false;
       innerEl.removeAttribute("aria-required");
@@ -1696,14 +1696,14 @@ var INV = (function () {
             ((clampEl && clampEl.value) || "").trim()
           ) >= 0;
         if (needInner) {
-          var innerEl = tr.querySelector('[data-k="ext_inner_diameter_mm"]');
-          if (!isPositiveNumberField(innerEl)) {
+          var innerEl = tr.querySelector('[data-k="ext_inner_diameter"]');
+          if (!innerEl || !(innerEl.value || "").trim()) {
             if (innerEl) innerEl.classList.add("is-invalid");
             issues.push({
               msg:
                 "Строка " +
                 (i + 1) +
-                ": укажите внутренний диаметр Dвн (мм) для термо/боковой фиксации.",
+                ": укажите Dвн (мм, 1/2, G1/8…) для термо/боковой фиксации.",
               el: innerEl,
             });
           }
@@ -1765,7 +1765,7 @@ var INV = (function () {
         row.bt_insert_family = normalizeInsertFamilyValue(el.value || "");
       } else if (k === "bt_insert_size") {
         row.bt_insert_size = (el.value || "").trim().toUpperCase().replace(/\s+/g, "").replace(",", ".");
-      } else if (k === "ins_brand" || k === "ins_name") {
+      } else if (k === "ins_brand" || k === "ins_name" || k === "ext_brand") {
         row[k] = String(el.value || "").trim().toUpperCase();
       } else if (k === "size_label" || k === "cs_size_label") {
         row[k] = normalizeMetricSizeLabel(el.value);
@@ -2802,14 +2802,14 @@ var INV = (function () {
     } else if (cat === "tool_extension") {
       var clampOpts = INV.tool_extension_clamp_types || [];
       var compatPh = (INV.tool_extension_compat_placeholders && INV.tool_extension_compat_placeholders.collet) || "Цанги / винты…";
-      cells.push('<td><input type="text" data-k="ext_brand" maxlength="80" placeholder="Sandvik"></td>');
+      cells.push('<td><input type="text" data-k="ext_brand" maxlength="80" placeholder="SANDVIK" class="js-insert-upper" autocomplete="off" spellcheck="false"></td>');
       cells.push('<td><select data-k="ext_clamp_type" class="js-ext-clamp-type" required>' + buildOptionsHtml(clampOpts) + "</select></td>");
       cells.push(arrivalRequiredDiamCell("main_diameter_mm"));
       cells.push(
         '<td class="short-col"><input type="number" step="0.01" min="0.01" class="arrival-diam-input" data-k="ext_overall_length_mm" required placeholder="L" title="Общая длина L, мм"></td>'
       );
       cells.push(
-        '<td class="short-col"><input type="number" step="0.01" min="0.01" class="arrival-diam-input js-ext-inner-d" data-k="ext_inner_diameter_mm" placeholder="Dвн" title="Внутренний диаметр Dвн, мм (термо и боковая фиксация)" disabled></td>'
+        '<td class="short-col"><input type="text" maxlength="40" class="arrival-diam-input js-ext-inner-d" data-k="ext_inner_diameter" placeholder="6 / 1/2 / G1/8" title="Dвн: мм, дюймы или G1/8" disabled autocomplete="off" spellcheck="false"></td>'
       );
       cells.push(
         '<td><input type="text" data-k="ext_compatible_parts" class="js-ext-compat" maxlength="120" placeholder="' +

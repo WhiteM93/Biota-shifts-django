@@ -741,7 +741,7 @@
         <th class="sortable hint-cell" data-hint="Тип зажима удлинителя">Зажим</th>
         <th class="sortable hint-cell" data-hint="Основной диаметр удлинителя">Dосн, мм</th>
         <th class="sortable hint-cell" data-hint="Общая длина удлинителя L, мм">L, мм</th>
-        <th class="sortable hint-cell" data-hint="Внутренний диаметр Dвн (термо и боковая фиксация)">Dвн, мм</th>
+        <th class="sortable hint-cell" data-hint="Внутренний диаметр Dвн: мм, дюймы (1/2) или G1/8">Dвн</th>
         <th class="sortable hint-cell" data-hint="Подходящие цанги (для цангового) или винты (для боковой/термо)">Подходит</th>
         <th class="sortable hint-cell inv-stock-notes-text-col" data-hint="Описание позиции">Описание</th>
         <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
@@ -757,7 +757,7 @@
         <td data-sort="{% if e %}{{ e.get_clamp_type_display|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and e %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ext_clamp_type" data-type="select" data-value="{{ e.clamp_type|default:'' }}"{% endif %}>{% if e %}{{ e.get_clamp_type_display|default:"-" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.main_diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="main_diameter_mm" data-type="number" data-value="{{ t.main_diameter_mm|default:'' }}"{% endif %}>{% if t.main_diameter_mm is not None %}Ø{{ t.main_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{% if e and e.overall_length_mm is not None %}{{ e.overall_length_mm }}{% else %}-1{% endif %}" {% if can_manage_stock and e %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ext_overall_length_mm" data-type="number" data-value="{{ e.overall_length_mm|default:'' }}"{% endif %}>{% if e and e.overall_length_mm is not None %}{{ e.overall_length_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{% if e and e.inner_diameter_mm is not None %}{{ e.inner_diameter_mm }}{% else %}-1{% endif %}" {% if can_manage_stock and e and e.clamp_type != "collet" %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ext_inner_diameter_mm" data-type="number" data-value="{{ e.inner_diameter_mm|default:'' }}"{% endif %}>{% if e and e.inner_diameter_mm is not None %}Ø{{ e.inner_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if e and e.inner_diameter %}{{ e.inner_diameter }}{% else %}-{% endif %}" {% if can_manage_stock and e and e.clamp_type != "collet" %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ext_inner_diameter" data-type="text" data-value="{{ e.inner_diameter|default:'' }}"{% endif %}>{% if e and e.inner_diameter %}{{ e.inner_diameter }}{% else %}-{% endif %}</td>
         <td data-sort="{% if e %}{{ e.compatible_parts|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and e %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ext_compatible_parts" data-type="text" data-value="{{ e.compatible_parts|default:'' }}"{% endif %}>{% if e %}{{ e.compatible_parts|default:"-" }}{% else %}-{% endif %}</td>
         <td class="inv-stock-notes-text-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}>{{ t.notes|default:"-" }}</td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
@@ -985,11 +985,11 @@
         {% endfor %}
       </select>
     </label>
-    <label class="field"><span>Dвн, мм</span>
-      <select name="ext_inner_diameter_mm">
+    <label class="field"><span>Dвн</span>
+      <select name="ext_inner_diameter">
         <option value="">Все</option>
         {% for v in tool_extension_filter_options.inner_diameters %}
-        <option value="{{ v }}" {% if filters.ext_inner_diameter_mm == v %}selected{% endif %}>{{ v }}</option>
+        <option value="{{ v }}" {% if filters.ext_inner_diameter == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>

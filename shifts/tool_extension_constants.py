@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 
 TOOL_EXTENSION_CLAMP_TYPES = [
@@ -57,6 +58,31 @@ def tool_extension_needs_inner_diameter(clamp_type: str) -> bool:
     return normalize_tool_extension_clamp(clamp_type) in TOOL_EXTENSION_INNER_DIAMETER_CLAMPS
 
 
+def normalize_tool_extension_inner_diameter(raw) -> str:
+    """Dвн: мм (6 / 6.0), дюймы (1/2) или трубная резьба (G1/8)."""
+    v = str(raw or "").strip()
+    if not v:
+        return ""
+    v = re.sub(r"\s+", "", v)
+    if re.fullmatch(r"\d+[,.]\d+", v):
+        v = v.replace(",", ".")
+        try:
+            d = Decimal(v)
+            s = format(d, "f")
+            if "." in s:
+                s = s.rstrip("0").rstrip(".")
+            v = s or "0"
+        except Exception:
+            pass
+    elif re.fullmatch(r"\d+", v):
+        pass
+    else:
+        m = re.match(r"^([A-Za-zА-Яа-яЁё]+)(.*)$", v)
+        if m:
+            v = m.group(1).upper() + m.group(2)
+    return v[:40]
+
+
 def _fmt_extension_mm(raw) -> str:
     try:
         d = Decimal(str(raw))
@@ -74,7 +100,7 @@ def build_tool_extension_display_name(
     clamp_type: str = "",
     main_diameter_mm=None,
     overall_length_mm=None,
-    inner_diameter_mm=None,
+    inner_diameter: str = "",
     compatible_parts: str = "",
 ) -> str:
     clamp = TOOL_EXTENSION_CLAMP_LABELS.get(
@@ -87,8 +113,12 @@ def build_tool_extension_display_name(
         parts.append(f"Dосн Ø{_fmt_extension_mm(main_diameter_mm)}")
     if overall_length_mm is not None and str(overall_length_mm) != "":
         parts.append(f"L {_fmt_extension_mm(overall_length_mm)}")
-    if inner_diameter_mm is not None and str(inner_diameter_mm) != "":
-        parts.append(f"Dвн Ø{_fmt_extension_mm(inner_diameter_mm)}")
+    inner = normalize_tool_extension_inner_diameter(inner_diameter)
+    if inner:
+        if re.fullmatch(r"\d+([.]\d+)?", inner):
+            parts.append(f"Dвн Ø{inner}")
+        else:
+            parts.append(f"Dвн {inner}")
     compat = (compatible_parts or "").strip()
     if compat:
         parts.append(compat)
