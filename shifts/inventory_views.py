@@ -645,6 +645,9 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
         inner_d = _to_decimal_or_none(row.get("ext_inner_diameter_mm"))
         if inner_d is not None:
             qs = qs.filter(tool_extension_spec__inner_diameter_mm=inner_d)
+        notes = (row.get("notes") or "").strip()[:300]
+        if notes:
+            qs = qs.filter(notes=notes)
     else:
         return []
 
@@ -2225,6 +2228,7 @@ def _tool_extension_fields_from_row(row: dict) -> dict:
         "main_diameter_mm": _to_decimal_or_none(row.get("main_diameter_mm")),
         "overall_length_mm": _to_decimal_or_none(row.get("ext_overall_length_mm")),
         "inner_diameter_mm": inner,
+        "notes": (row.get("notes") or "").strip()[:300],
     }
 
 
@@ -2234,6 +2238,7 @@ def _find_tool_extension_tool_match(spec_fields: dict):
         .filter(
             category="tool_extension",
             main_diameter_mm=spec_fields["main_diameter_mm"],
+            notes=spec_fields["notes"],
             tool_extension_spec__brand=spec_fields["brand"],
             tool_extension_spec__clamp_type=spec_fields["clamp_type"],
             tool_extension_spec__compatible_parts=spec_fields["compatible_parts"],
@@ -2260,6 +2265,7 @@ def _create_tool_extension_tool(quantity, spec_fields: dict) -> ToolItem:
         tool_material="",
         coating_type="none",
         main_diameter_mm=spec_fields["main_diameter_mm"],
+        notes=spec_fields.get("notes") or "",
         quantity=quantity,
     )
     ToolExtensionSpec.objects.create(
@@ -4043,7 +4049,7 @@ def inventory_view(request):
                 if addr and (tool.warehouse_address or "") != addr:
                     tool.warehouse_address = addr
                     tool.save(update_fields=["warehouse_address", "updated_at"])
-                if category in ("insert", "body_tool", "tool_extension"):
+                if category in ("insert", "body_tool"):
                     notes = (row.get("notes") or "").strip()[:300]
                     if notes and (tool.notes or "") != notes:
                         tool.notes = notes
