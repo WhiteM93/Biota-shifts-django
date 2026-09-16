@@ -5904,6 +5904,53 @@ html[data-theme="dawn"] .setup-program-preview-modal-dialog {
   font-size: 13px;
   flex: 0 0 auto;
 }
+.setup-program-preview-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(8, 12, 22, 0.72);
+  backdrop-filter: blur(2px);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.setup-program-preview-loading[hidden] {
+  display: none !important;
+}
+.setup-program-preview-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(148, 163, 184, 0.28);
+  border-top-color: #5eead4;
+  animation: setup-program-preview-spin 0.75s linear infinite;
+}
+.setup-program-preview-loading-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+html[data-theme="dawn"] .setup-program-preview-loading {
+  background: rgba(255, 252, 247, 0.82);
+}
+html[data-theme="dawn"] .setup-program-preview-spinner {
+  border-color: rgba(13, 148, 136, 0.22);
+  border-top-color: #0d9488;
+}
+html[data-theme="dawn"] .setup-program-preview-loading-text {
+  color: #134e4a;
+}
+@keyframes setup-program-preview-spin {
+  to { transform: rotate(360deg); }
+}
+.setup-program-preview-modal.is-loading .setup-program-preview-code {
+  opacity: 0.35;
+}
 .setup-program-preview-code {
   margin: 10px 12px 12px;
   padding: 0;

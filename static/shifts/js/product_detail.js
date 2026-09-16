@@ -5407,10 +5407,31 @@ function saveSetupToolNoteEditor() {
       return { html: html.join(""), truncated: truncated, lineCount: lines.length };
     }
 
+    async function highlightGcodeTextAsync(text) {
+      var raw = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      var truncated = false;
+      if (raw.length > GCODE_PREVIEW_MAX_CHARS) {
+        raw = raw.slice(0, GCODE_PREVIEW_MAX_CHARS);
+        truncated = true;
+      }
+      var lines = raw.split("\n");
+      var html = [];
+      var chunk = 350;
+      for (var n = 0; n < lines.length; n++) {
+        html.push('<span class="gcode-ln">' + (n + 1) + "</span>");
+        html.push('<span class="gcode-line">' + highlightGcodeLine(lines[n]) + "</span>");
+        if (n > 0 && n % chunk === 0) {
+          await new Promise(function (resolve) { setTimeout(resolve, 0); });
+        }
+      }
+      return { html: html.join(""), truncated: truncated, lineCount: lines.length };
+    }
+
     function closeSetupProgramPreviewModal() {
       var modal = document.getElementById("setup-program-preview-modal");
       if (!modal) return;
       resetSetupProgramPreviewSearch();
+      setSetupProgramPreviewLoading(false);
       modal.hidden = true;
       modal.setAttribute("aria-hidden", "true");
       var noteModal = document.getElementById("setup-tool-note-edit-modal");
@@ -5430,6 +5451,26 @@ function saveSetupToolNoteEditor() {
       }
       status.hidden = false;
       status.textContent = text || "";
+    }
+
+    function setSetupProgramPreviewLoading(on, text) {
+      var modal = document.getElementById("setup-program-preview-modal");
+      var el = document.querySelector(".js-setup-program-preview-loading");
+      var textEl = document.querySelector(".js-setup-program-preview-loading-text");
+      if (textEl && text) textEl.textContent = text;
+      if (el) {
+        if (on) el.removeAttribute("hidden");
+        else el.setAttribute("hidden", "hidden");
+      }
+      if (modal) modal.classList.toggle("is-loading", !!on);
+    }
+
+    function yieldToUi() {
+      return new Promise(function (resolve) {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(resolve);
+        });
+      });
     }
 
     var setupProgramPreviewSearch = { matches: [], index: -1, query: "" };
@@ -5593,11 +5634,14 @@ function saveSetupToolNoteEditor() {
       }
       resetSetupProgramPreviewSearch();
       codeEl.innerHTML = "";
-      setSetupProgramPreviewStatus("Загрузка…", true);
+      setSetupProgramPreviewStatus("", false);
+      setSetupProgramPreviewLoading(true, "Загрузка программы…");
       modal.hidden = false;
       modal.setAttribute("aria-hidden", "false");
       document.body.style.overflow = "hidden";
+      await yieldToUi();
       if (!url) {
+        setSetupProgramPreviewLoading(false);
         setSetupProgramPreviewStatus("Файл программы не найден.", true);
         return;
       }
@@ -5616,12 +5660,16 @@ function saveSetupToolNoteEditor() {
           text = chunk.join("");
         }
         if (text.indexOf("\u0000") !== -1) {
+          setSetupProgramPreviewLoading(false);
           setSetupProgramPreviewStatus("Файл похож на бинарный — текстовый предпросмотр недоступен. Скачайте файл.", true);
           codeEl.textContent = "";
           return;
         }
-        var highlighted = highlightGcodeText(text);
+        setSetupProgramPreviewLoading(true, "Подготовка предпросмотра…");
+        await yieldToUi();
+        var highlighted = await highlightGcodeTextAsync(text);
         codeEl.innerHTML = highlighted.html;
+        setSetupProgramPreviewLoading(false);
         if (highlighted.truncated) {
           setSetupProgramPreviewStatus(
             "Показаны первые ~" + highlighted.lineCount + " строк (файл большой, предпросмотр обрезан).",
@@ -5637,6 +5685,7 @@ function saveSetupToolNoteEditor() {
           try { searchInput.focus({ preventScroll: true }); } catch (_f) { searchInput.focus(); }
         }
       } catch (err) {
+        setSetupProgramPreviewLoading(false);
         setSetupProgramPreviewStatus("Не удалось загрузить программу для предпросмотра.", true);
         codeEl.textContent = "";
       }
