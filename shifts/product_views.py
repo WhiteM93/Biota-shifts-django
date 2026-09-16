@@ -2216,6 +2216,36 @@ def osnastka_detail_view(request, pk: int):
 @biota_login_required
 @nav_permission_required("products")
 @write_permission_required
+@require_http_methods(["GET", "HEAD"])
+def product_setup_stock_view(request, pk: int, setup_pk: int):
+    """Подбор инструмента со склада под строки установки наладки."""
+    from .setup_stock_match import match_setup_tools
+
+    product = get_object_or_404(Product, pk=pk)
+    setup = get_object_or_404(
+        ProductSetup.objects.prefetch_related("tools"),
+        pk=setup_pk,
+        product=product,
+    )
+    tools = setup.tools.all().order_by("sort_order", "id")
+    rows = match_setup_tools(tools)
+
+    return render(
+        request,
+        "shifts/product_setup_stock.html",
+        {
+            "product": product,
+            "setup": setup,
+            "rows": rows,
+            "product_detail_url": _product_detail_url(product),
+            "setup_tab_url": f"{_product_detail_url(product)}?{urlencode({'tab': f'setup-{setup.pk}'})}",
+        },
+    )
+
+
+@biota_login_required
+@nav_permission_required("products")
+@write_permission_required
 @require_http_methods(["GET", "POST"])
 def product_setup_edit_view(request, pk: int, setup_pk: int):
     product = get_object_or_404(Product, pk=pk)

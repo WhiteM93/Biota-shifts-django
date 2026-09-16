@@ -229,6 +229,7 @@
               <span class="muted">Название установки:</span>
               <span class="product-setup-name" data-field-text="name">{{ setup.name }}</span>
               <a href="{% url 'product_setup_inspection' product.pk setup.pk %}" class="btn btn-ghost product-setup-inspection-btn" title="Контроль размеров этой установки">Замер</a>
+              <a href="{% url 'product_setup_stock' product.pk setup.pk %}" class="btn btn-ghost product-setup-stock-btn" title="Подобрать инструмент этой установки на складе">Склад</a>
               <button
                 type="button"
                 class="product-setup-inwork-toggle{% if setup.in_work %} is-on{% endif %}"

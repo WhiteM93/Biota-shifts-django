@@ -4951,3 +4951,35 @@ var INV = (function () {
     if (e.key === "Escape" && modal && !modal.hidden) closeModal();
   });
 })();
+
+/* Подсветка строки склада по ?tool_id= из страницы подбора наладки */
+(function () {
+  function highlightToolFromQuery() {
+    var params;
+    try {
+      params = new URLSearchParams(window.location.search || "");
+    } catch (e) {
+      return;
+    }
+    if ((params.get("panel") || "") !== "stock") return;
+    var toolId = (params.get("tool_id") || "").trim();
+    if (!toolId || !/^\d+$/.test(toolId)) return;
+    var cell = document.querySelector('[data-tool-id="' + toolId + '"]');
+    if (!cell) return;
+    var tr = cell.closest("tr");
+    if (!tr) return;
+    tr.classList.add("inv-stock-row-hl");
+    try {
+      tr.scrollIntoView({ block: "center", behavior: "smooth" });
+    } catch (e2) {
+      tr.scrollIntoView(true);
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      requestAnimationFrame(highlightToolFromQuery);
+    });
+  } else {
+    requestAnimationFrame(highlightToolFromQuery);
+  }
+})();

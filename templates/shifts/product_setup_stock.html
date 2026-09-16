@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<style>
+  .setup-stock-page { max-width: 1100px; margin: 0 auto; }
+  .setup-stock-page h1 { margin: 8px 0 4px; font-size: 1.35rem; }
+  .setup-stock-meta { color: var(--muted, #888); margin: 0 0 16px; font-size: 14px; }
+  .setup-stock-row {
+    border: 1px solid var(--border, #333);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 0 0 14px;
+    background: var(--surface, transparent);
+  }
+  .setup-stock-row.is-empty { border-color: #a67c00; }
+  .setup-stock-row.is-unmapped { border-color: #666; opacity: 0.92; }
+  .setup-stock-row__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .setup-stock-row__tnum { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .setup-stock-row__req { font-size: 14px; }
+  .setup-stock-row__status { font-size: 13px; color: var(--muted, #888); margin-left: auto; }
+  .setup-stock-row__status.is-ok { color: #2f9e44; }
+  .setup-stock-row__status.is-empty { color: #c92a2a; }
+  .setup-stock-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .setup-stock-table th,
+  .setup-stock-table td {
+    text-align: left;
+    padding: 6px 8px;
+    border-top: 1px solid var(--border, #333);
+    vertical-align: top;
+  }
+  .setup-stock-table th { font-weight: 600; color: var(--muted, #888); border-top: 0; }
+  .setup-stock-qty { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .setup-stock-addr { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .setup-stock-empty-hint { margin: 4px 0 0; font-size: 13px; color: var(--muted, #888); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="setup-stock-page">
+  <div class="page-actions">
+    <a href="{{ product_detail_url }}" class="btn btn-ghost">← К изделию</a>
+    <a href="{{ setup_tab_url }}" class="btn btn-ghost">К установке</a>
+  </div>
+
+  <h1>Склад под наладку</h1>
+  <p class="setup-stock-meta">
+    {{ product.name }}
+    · {% if setup.name %}{{ setup.name }}{% else %}Установка{% endif %}
+  </p>
+
+  {% if not rows %}
+  <p class="muted">В установке нет строк инструмента для подбора.</p>
+  {% endif %}
+
+  {% for row in rows %}
+  <section class="setup-stock-row{% if row.status == 'empty' %} is-empty{% elif row.status == 'unmapped' %} is-unmapped{% endif %}">
+    <div class="setup-stock-row__head">
+      <span class="setup-stock-row__tnum">{{ row.tool_number|default:"—" }}</span>
+      <span class="setup-stock-row__req">
+        {{ row.tool_type|default:"—" }}
+        {% if row.diameter %} · ⌀ {{ row.diameter }}{% endif %}
+        {% if row.tap_hole_type %} · {{ row.tap_hole_type }}{% endif %}
+        {% if row.overhang %} · вылет {{ row.overhang }}{% endif %}
+        {% if row.note %} · {{ row.note }}{% endif %}
+      </span>
+      <span class="setup-stock-row__status is-{{ row.status }}">
+        {{ row.status_label }}
+        {% if row.status == 'ok' %} · всего {{ row.total_qty }} шт.{% endif %}
+      </span>
+    </div>
+
+    {% if row.candidates %}
+    <table class="setup-stock-table">
+      <thead>
+        <tr>
+          <th>Инструмент</th>
+          <th>Адрес</th>
+          <th>Кол-во</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in row.candidates %}
+        <tr>
+          <td>{{ c.label }}</td>
+          <td class="setup-stock-addr">{% if c.address %}{{ c.address }}{% else %}<span class="muted">без адреса</span>{% endif %}</td>
+          <td class="setup-stock-qty">{{ c.qty }}</td>
+          <td><a class="btn btn-ghost btn-sm" href="{{ c.inventory_url }}">На склад</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% elif row.status == 'empty' and row.filter_url %}
+    <p class="setup-stock-empty-hint">
+      Нет точных совпадений.
+      <a href="{{ row.filter_url }}">Открыть склад по фильтрам</a>
+    </p>
+    {% elif row.status == 'unmapped' %}
+    <p class="setup-stock-empty-hint">Этот тип строки наладки пока не мапится на категорию склада.</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

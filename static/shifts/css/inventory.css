@@ -1181,6 +1181,15 @@ html[data-theme="dawn"] .inv-stock-photo-btn.has-photo {
   cursor: pointer;
 }
 
+.inv-page--stock .inv-stock-grid tr.inv-stock-row-hl > td {
+  background: rgba(47, 158, 68, 0.18) !important;
+  box-shadow: inset 0 0 0 1px rgba(47, 158, 68, 0.55);
+}
+
+html[data-theme="dawn"] .inv-page--stock .inv-stock-grid tr.inv-stock-row-hl > td {
+  background: rgba(47, 158, 68, 0.12) !important;
+}
+
 .inv-page--stock.is-select-mode .inv-stock-grid th.address-col,
 .inv-page--stock.is-select-mode .inv-stock-grid td.address-col {
   display: none !important;
