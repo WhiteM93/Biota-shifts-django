@@ -7,8 +7,16 @@
 {% endblock %}
 
 {% block content %}
-<div class="inv-page">
-{% include "shifts/includes/inventory_tabs.html" with active_tab="visual_warehouse" %}
+<div class="inv-page inv-page--vw-chrome">
+  <div class="inv-tabs-wrap js-inv-tabs-wrap">
+    <button type="button" class="inv-tabs-toggle js-inv-tabs-toggle" aria-expanded="true" aria-controls="inv-tabs-panel-vw">
+      <span class="inv-tabs-toggle__label">Меню склада</span>
+      <span class="inv-tabs-toggle__chev" aria-hidden="true"></span>
+    </button>
+    <div class="inv-tabs-panel" id="inv-tabs-panel-vw">
+      {% include "shifts/includes/inventory_tabs.html" with active_tab="visual_warehouse" %}
+    </div>
+  </div>
 </div>
 <div
   class="vw-page{% if not biota_can_edit %} is-readonly{% endif %}"

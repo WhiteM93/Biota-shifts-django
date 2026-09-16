@@ -19,6 +19,8 @@
   var emptyEl = root.querySelector(".js-vw-empty");
   var modeHint = root.querySelector(".js-vw-mode-hint");
   var btnToggleEdit = root.querySelector(".js-vw-toggle-edit");
+  var invTabsWrap = document.querySelector(".js-inv-tabs-wrap");
+  var invTabsToggle = document.querySelector(".js-inv-tabs-toggle");
 
   // Модалки вне .vw-page — ищем в document и вешаем на body
   var dlgCab = document.querySelector(".js-vw-dlg-cabinet");
@@ -437,6 +439,33 @@
     return (cab.containers || []).filter(function (c) { return !c.parent_id; }).length;
   }
 
+  function isMobileTabsMode() {
+    return window.matchMedia && window.matchMedia("(max-width: 720px)").matches;
+  }
+
+  function setInvTabsCollapsed(collapsed) {
+    if (!invTabsWrap) return;
+    invTabsWrap.classList.toggle("is-collapsed", !!collapsed);
+    if (invTabsToggle) {
+      invTabsToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      var label = invTabsToggle.querySelector(".inv-tabs-toggle__label");
+      if (label) label.textContent = collapsed ? "Меню склада" : "Скрыть меню";
+    }
+  }
+
+  function syncInvTabsCollapsed(cabinetOpen) {
+    if (!invTabsWrap || !isMobileTabsMode()) {
+      if (invTabsWrap) invTabsWrap.classList.remove("is-collapsed");
+      if (invTabsToggle) {
+        invTabsToggle.setAttribute("aria-expanded", "true");
+        var label = invTabsToggle.querySelector(".inv-tabs-toggle__label");
+        if (label) label.textContent = "Меню склада";
+      }
+      return;
+    }
+    setInvTabsCollapsed(!!cabinetOpen);
+  }
+
   function syncOpenCabinetChrome() {
     var openCab = openCabinetId
       ? cabinets.find(function (c) { return c.id === openCabinetId; })
@@ -448,6 +477,7 @@
     }
     document.documentElement.classList.toggle("vw-cabinet-open", !!openCab);
     document.body.classList.toggle("vw-cabinet-open", !!openCab);
+    syncInvTabsCollapsed(!!openCab);
     if (modeHint) {
       if (!openCab) {
         modeHint.textContent = editMode
@@ -2755,8 +2785,19 @@
   setEditMode(false);
   document.documentElement.classList.add("vw-fit-height");
   document.body.classList.add("vw-fit-height");
+
+  if (invTabsToggle && invTabsWrap) {
+    invTabsToggle.addEventListener("click", function () {
+      setInvTabsCollapsed(!invTabsWrap.classList.contains("is-collapsed"));
+      requestAnimationFrame(function () {
+        requestAnimationFrame(syncViewportHeightFit);
+      });
+    });
+  }
+
   loadCabinets();
   window.addEventListener("resize", function () {
+    syncInvTabsCollapsed(!!openCabinetId);
     syncViewportHeightFit();
     if (!floorEl) return;
     requestAnimationFrame(function () {

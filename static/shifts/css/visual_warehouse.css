@@ -55,10 +55,34 @@ html.vw-fit-height body {
   padding-bottom: 8px;
 }
 
-/* Вкладки склада внутри того же контейнера — не раздувать высоту */
-.container:has(> .vw-page) > .inv-tabs {
+/* Обёртка вкладок рядом с vw-page: без лишнего padding (иначе пустая дыра) */
+.container:has(> .vw-page) > .inv-page--vw-chrome {
   flex: 0 0 auto;
-  margin-bottom: 8px;
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+}
+
+.container:has(> .vw-page) .inv-tabs {
+  flex: 0 0 auto;
+  margin-bottom: 6px;
+}
+
+.inv-tabs-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.inv-tabs-toggle {
+  display: none;
+}
+
+.inv-tabs-panel {
+  min-width: 0;
 }
 
 html[data-theme="dawn"] .vw-page,
@@ -2235,32 +2259,76 @@ html[data-theme="dawn"] .vw-audit-row {
     padding-right: 8px;
   }
 
-  /* Вкладки: одна полоса, пока список шкафов */
-  .container:has(> .vw-page) > .inv-tabs {
+  /* Кнопка скрыть/показать меню склада */
+  .inv-tabs-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    margin: 0 0 4px;
+    padding: 8px 12px;
+    border: 1px solid var(--bio-filter-border, #3a3a3a);
+    border-radius: 8px;
+    background: var(--bio-surface-item, #1c1c1c);
+    color: var(--bio-body-fg, #e8e8e8);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .inv-tabs-toggle__chev {
+    width: 0.55em;
+    height: 0.55em;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 0.18s ease;
+    opacity: 0.75;
+    flex: 0 0 auto;
+  }
+
+  .inv-tabs-wrap.is-collapsed .inv-tabs-toggle__chev {
+    transform: rotate(-135deg);
+  }
+
+  .inv-tabs-wrap.is-collapsed .inv-tabs-panel {
+    display: none;
+  }
+
+  .container:has(> .vw-page) .inv-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     gap: 2px;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     padding: 3px;
   }
 
-  .container:has(> .vw-page) > .inv-tabs::-webkit-scrollbar {
+  .container:has(> .vw-page) .inv-tabs::-webkit-scrollbar {
     display: none;
   }
 
-  .container:has(> .vw-page) > .inv-tabs .inv-tab {
+  .container:has(> .vw-page) .inv-tabs .inv-tab {
     flex: 0 0 auto;
     padding: 6px 10px;
     font-size: 12px;
     white-space: nowrap;
   }
 
-  /* Открытый шкаф: убрать вкладки и подсказку — максимум места под сетку */
-  html.vw-fit-height:has(.vw-floor.is-open) .container:has(> .vw-page) > .inv-tabs,
-  html.vw-cabinet-open .container:has(> .vw-page) > .inv-tabs {
+  html.vw-cabinet-open .vw-subtitle {
     display: none;
+  }
+
+  html.vw-cabinet-open .vw-title {
+    font-size: 14px;
+  }
+
+  html.vw-cabinet-open .vw-topbar {
+    margin-bottom: 4px;
   }
 
   .vw-page {
@@ -2295,21 +2363,6 @@ html[data-theme="dawn"] .vw-audit-row {
     min-height: 36px;
     padding: 6px 8px;
     font-size: 12px;
-  }
-
-  html.vw-fit-height:has(.vw-floor.is-open) .vw-subtitle,
-  html.vw-cabinet-open .vw-subtitle {
-    display: none;
-  }
-
-  html.vw-fit-height:has(.vw-floor.is-open) .vw-title,
-  html.vw-cabinet-open .vw-title {
-    font-size: 14px;
-  }
-
-  html.vw-fit-height:has(.vw-floor.is-open) .vw-topbar,
-  html.vw-cabinet-open .vw-topbar {
-    margin-bottom: 4px;
   }
 
   .vw-floor {
