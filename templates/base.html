@@ -19,6 +19,12 @@
   {% block extra_styles %}{% endblock %}
 </head>
 <body class="{% if auth_page %}auth-page{% endif %}" data-biota-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}">
+  <div class="biota-site-bg" aria-hidden="true">
+    <div class="biota-site-bg__mesh"></div>
+    <div class="biota-site-bg__dots"></div>
+    <div class="biota-site-bg__beam"></div>
+    <div class="biota-site-bg__grain"></div>
+  </div>
   {% if not hide_nav %}
   <div class="nav">
     {% include "shifts/includes/biota_nav_fragment.html" %}

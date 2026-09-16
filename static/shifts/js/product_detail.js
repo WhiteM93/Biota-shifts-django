@@ -2615,9 +2615,9 @@ function saveSetupToolNoteEditor() {
             if (inlineEditMode) row.removeAttribute("hidden");
             else row.setAttribute("hidden", "hidden");
           });
-          panel.querySelectorAll(".setup-tools-add-row").forEach(function (row) {
-            if (inlineEditMode) row.removeAttribute("hidden");
-            else row.setAttribute("hidden", "hidden");
+          panel.querySelectorAll(".js-setup-tools-edit-action").forEach(function (el) {
+            if (inlineEditMode) el.removeAttribute("hidden");
+            else el.setAttribute("hidden", "hidden");
           });
           setToolsEditMode(panel, inlineEditMode);
           if (panel.querySelector(".setup-tools-view.has-tool-row-move")) {

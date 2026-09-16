@@ -194,17 +194,17 @@ html {
   --bio-btn-local-light-active-bg2: #c5d6f5;
   --bio-btn-local-light-active-border: #5a6d9a;
   --bio-btn-local-light-active-fg: #0f1728;
+  --bio-bg-orb-1: rgba(88, 120, 255, 0.22);
+  --bio-bg-orb-2: rgba(56, 210, 190, 0.14);
+  --bio-bg-orb-3: rgba(110, 90, 255, 0.12);
+  --bio-bg-dot: rgba(180, 200, 255, 0.22);
+  --bio-bg-beam: rgba(160, 210, 255, 0.18);
+  --bio-bg-grain: 0.045;
 }
 
 html[data-theme="dawn"] {
   color-scheme: light;
-  --bio-body-bg:
-    /* Мягкие пятна без сильной мяты внизу справа (иначе просвечивает сквозь полупрозрачные панели). */
-    radial-gradient(ellipse 90% 60% at 96% -10%, rgba(255, 232, 212, 0.85) 0%, rgba(255, 255, 255, 0) 60%),
-    radial-gradient(ellipse 80% 55% at 4% 110%, rgba(235, 228, 255, 0.7) 0%, rgba(255, 255, 255, 0) 55%),
-    radial-gradient(ellipse 58% 42% at 78% 96%, rgba(241, 233, 222, 0.45) 0%, rgba(255, 255, 255, 0) 52%),
-    radial-gradient(ellipse 55% 40% at 18% 10%, rgba(253, 224, 231, 0.55) 0%, rgba(255, 255, 255, 0) 52%),
-    linear-gradient(168deg, #fbf7f1 0%, #f6efe6 45%, #f4f1ec 100%);
+  --bio-body-bg: linear-gradient(165deg, #f3f0ea 0%, #efebe4 48%, #ebe6de 100%);
   --bio-body-fg: #3c362f;
   --bio-nav-bg: rgba(255, 254, 251, 0.94);
   --bio-nav-border: #e0d4c6;
@@ -357,6 +357,12 @@ html[data-theme="dawn"] {
   --bio-btn-local-light-active-bg2: #bae6fd;
   --bio-btn-local-light-active-border: #0284c7;
   --bio-btn-local-light-active-fg: #0c4a6e;
+  --bio-bg-orb-1: rgba(70, 120, 230, 0.28);
+  --bio-bg-orb-2: rgba(13, 148, 136, 0.26);
+  --bio-bg-orb-3: rgba(230, 120, 90, 0.2);
+  --bio-bg-dot: rgba(55, 85, 130, 0.28);
+  --bio-bg-beam: rgba(40, 140, 160, 0.35);
+  --bio-bg-grain: 0.05;
 }
 
 body {
@@ -365,6 +371,153 @@ body {
   background: var(--bio-body-bg);
   color: var(--bio-body-fg);
   transition: background 0.35s ease, color 0.28s ease;
+  position: relative;
+  min-height: 100vh;
+}
+
+.biota-site-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  contain: strict;
+}
+
+.biota-site-bg__mesh,
+.biota-site-bg__dots,
+.biota-site-bg__beam,
+.biota-site-bg__grain {
+  position: absolute;
+  inset: 0;
+}
+
+/* Soft mesh / aurora orbs — trendy, compositor-friendly. */
+.biota-site-bg__mesh {
+  inset: -25%;
+  background:
+    radial-gradient(ellipse 42% 36% at 18% 28%, var(--bio-bg-orb-1), transparent 68%),
+    radial-gradient(ellipse 38% 42% at 82% 22%, var(--bio-bg-orb-2), transparent 70%),
+    radial-gradient(ellipse 48% 40% at 58% 78%, var(--bio-bg-orb-3), transparent 72%),
+    radial-gradient(ellipse 30% 28% at 40% 48%, var(--bio-bg-orb-2), transparent 75%);
+  will-change: transform;
+  animation: biota-bg-mesh 32s ease-in-out infinite alternate;
+}
+
+.biota-site-bg__dots {
+  background-image: radial-gradient(circle at center, var(--bio-bg-dot) 1px, transparent 1.2px);
+  background-size: 24px 24px;
+  background-position: 0 0;
+  opacity: 0.55;
+  -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 40%, #000 20%, transparent 78%);
+  mask-image: radial-gradient(ellipse 85% 75% at 50% 40%, #000 20%, transparent 78%);
+}
+
+.biota-site-bg__beam {
+  /* Oversized so the streak can fully leave the viewport before the loop resets. */
+  top: -90%;
+  right: -90%;
+  bottom: -90%;
+  left: -90%;
+  width: auto;
+  height: auto;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 47.2%,
+    color-mix(in srgb, var(--bio-bg-beam) 25%, transparent) 48.6%,
+    color-mix(in srgb, var(--bio-bg-beam) 70%, transparent) 49.5%,
+    var(--bio-bg-beam) 50%,
+    color-mix(in srgb, var(--bio-bg-beam) 70%, transparent) 50.5%,
+    color-mix(in srgb, var(--bio-bg-beam) 25%, transparent) 51.4%,
+    transparent 52.8%,
+    transparent 100%
+  );
+  opacity: 0.55;
+  mix-blend-mode: screen;
+  /* Soft fade at screen edges → line appears from / disappears into "nothing". */
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0%, #000 10%, #000 90%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
+  mask-image:
+    linear-gradient(to right, transparent 0%, #000 10%, #000 90%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  will-change: transform;
+  animation: biota-bg-beam 32s linear infinite;
+}
+
+/* Dawn uses the same mesh/dots/beam as night — only blend tuned for light canvas. */
+html[data-theme="dawn"] .biota-site-bg__dots {
+  opacity: 0.8;
+}
+
+html[data-theme="dawn"] .biota-site-bg__beam {
+  mix-blend-mode: multiply;
+  opacity: 0.65;
+}
+
+html[data-theme="dawn"] .biota-site-bg__grain {
+  mix-blend-mode: multiply;
+  opacity: 0.04;
+}
+
+.biota-site-bg__grain {
+  opacity: var(--bio-bg-grain);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  mix-blend-mode: overlay;
+}
+
+@keyframes biota-bg-mesh {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, -2%, 0) scale(1.04);
+  }
+  100% {
+    transform: translate3d(-2.5%, 3%, 0) scale(1.02);
+  }
+}
+
+@keyframes biota-bg-beam {
+  /* Start fully off-canvas, end fully off-canvas — loop jump is invisible. */
+  from {
+    transform: translate3d(-42%, -34%, 0);
+  }
+  to {
+    transform: translate3d(42%, 34%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .biota-site-bg__mesh,
+  .biota-site-bg__beam {
+    animation: none;
+    transform: none;
+  }
+  .biota-site-bg__beam {
+    opacity: 0.25;
+  }
+}
+
+@media (max-width: 720px) {
+  .biota-site-bg__mesh {
+    animation-duration: 40s;
+  }
+  .biota-site-bg__beam {
+    opacity: 0.35;
+  }
+  .biota-site-bg__grain {
+    opacity: 0.025;
+  }
+}
+
+.container {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes navItemReveal {

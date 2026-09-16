@@ -129,7 +129,7 @@
       <form method="post" action="{{ product_self_url }}" class="product-add-setup-inline" style="display:inline;">
         {% csrf_token %}
         <input type="hidden" name="action" value="create_setup" />
-        <button type="submit" class="btn btn-ghost" title="Новая установка">+</button>
+        <button type="submit" class="btn btn-ghost product-add-setup-btn" title="Новая установка" aria-label="Новая установка">{% biota_icon "action.plus" "ui-icon" %}</button>
       </form>
       {% endif %}
       <div class="product-setup-select-inline">
@@ -146,10 +146,13 @@
       <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-setup-inline-delete-btn js-phased-delete" id="setup-inline-delete-setup-btn" data-step="0" hidden title="Удалить выбранную установку" aria-label="Удалить выбранную установку">{% biota_icon "action.delete" "btn-inv-delete__icon" %}</button>
       {% endif %}
       {% elif biota_can_edit %}
-      <form method="post" action="{{ product_self_url }}" style="display:inline;">
+      <form method="post" action="{{ product_self_url }}" class="product-add-setup-first" style="display:inline;">
         {% csrf_token %}
         <input type="hidden" name="action" value="create_setup" />
-        <button type="submit" class="btn btn-ghost" title="Добавить первую установку">+ Установка</button>
+        <button type="submit" class="btn btn-ghost product-add-setup-btn product-add-setup-btn--with-label" title="Добавить первую установку" aria-label="Добавить первую установку">
+          {% biota_icon "action.plus" "ui-icon" %}
+          <span>Установка</span>
+        </button>
       </form>
       {% endif %}
       {% for setup in setups %}
@@ -228,8 +231,6 @@
             <div class="product-setup-panel-title">
               <span class="muted">Название установки:</span>
               <span class="product-setup-name" data-field-text="name">{{ setup.name }}</span>
-              <a href="{% url 'product_setup_inspection' product.pk setup.pk %}" class="btn btn-ghost product-setup-inspection-btn" title="Контроль размеров этой установки">Замер</a>
-              <a href="{% url 'product_setup_stock' product.pk setup.pk %}" class="btn btn-ghost product-setup-stock-btn" title="Подобрать инструмент этой установки на складе">Склад</a>
               <button
                 type="button"
                 class="product-setup-inwork-toggle{% if setup.in_work %} is-on{% endif %}"
@@ -537,13 +538,34 @@
                 </div>
               </div>
             </div>
-            {% if biota_can_edit %}
-            <div class="setup-tools-add-row" hidden>
-              <button type="button" class="btn btn-ghost js-setup-tools-add-row">+ Строка инструмента</button>
-              <button type="button" class="btn btn-ghost js-setup-tools-compare" title="Сравнить с инструментом другой наладки и выбрать позиции">Сравнить с наладкой</button>
-              <button type="button" class="btn btn-ghost js-setup-tools-clear-empty" title="Удалить строки без типа, диаметра, вылета, примечания и фото">Удалить пустые</button>
+            <div class="setup-tools-add-row" role="group" aria-label="Действия с таблицей инструмента">
+              <a
+                href="{% url 'product_setup_stock' product.pk setup.pk %}"
+                class="btn btn-ghost setup-tools-action-btn product-setup-stock-btn"
+                title="Показать, какой инструмент из этой установки есть на складе и где лежит"
+              >На складе</a>
+              {% if biota_can_edit %}
+              <span class="setup-tools-add-row__sep" aria-hidden="true"></span>
+              <button
+                type="button"
+                class="btn btn-ghost setup-tools-action-btn js-setup-tools-add-row js-setup-tools-edit-action"
+                title="Добавить пустую строку в таблицу инструмента"
+                hidden
+              >+ Строка</button>
+              <button
+                type="button"
+                class="btn btn-ghost setup-tools-action-btn js-setup-tools-compare js-setup-tools-edit-action"
+                title="Сравнить инструмент с другой наладкой и выбрать позиции"
+                hidden
+              >Сравнить</button>
+              <button
+                type="button"
+                class="btn btn-ghost setup-tools-action-btn js-setup-tools-clear-empty js-setup-tools-edit-action"
+                title="Удалить строки без типа, диаметра, вылета, примечания и фото"
+                hidden
+              >Убрать пустые</button>
+              {% endif %}
             </div>
-            {% endif %}
           </div>
         </div>
         {% if setup.photos.all %}

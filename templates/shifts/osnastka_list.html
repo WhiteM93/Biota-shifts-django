@@ -1,52 +1,80 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static biota_icons %}
 
 {% block content %}
-<div class="page-actions">
-  {% if biota_can_edit %}
-  <a href="{% url 'osnastka_create' %}" class="btn">+ Создать оснастку</a>
-  {% endif %}
-</div>
-
-<form method="get" action="" class="filter-panel products-search-form" style="margin-top:12px;">
-  <div class="filter-grid">
-    <label class="field"><span>Поиск по названию и описанию</span>
-      <input type="search" name="q" value="{{ search_q }}" placeholder="Введите текст…">
-    </label>
-    <div class="filter-actions">
-      <button type="submit" class="btn">Найти</button>
+<div class="products-toolbar">
+  <div class="products-toolbar__main page-actions">
+    {% if biota_can_edit %}
+    <a href="{% url 'osnastka_create' %}" class="btn">+ Создать оснастку</a>
+    {% endif %}
+    <div class="products-search{% if search_q %} is-open{% endif %}" id="products-search" data-has-query="{% if search_q %}1{% else %}0{% endif %}">
+      <button
+        type="button"
+        class="btn btn-ghost products-search__toggle"
+        id="products-search-toggle"
+        aria-expanded="{% if search_q %}true{% else %}false{% endif %}"
+        aria-controls="products-search-panel"
+        title="Поиск"
+        aria-label="Поиск по названию и описанию"
+      >
+        {% biota_icon "action.search" "ui-icon products-search__icon" %}
+      </button>
+      <form
+        method="get"
+        action=""
+        class="products-search__panel"
+        id="products-search-panel"
+        {% if not search_q %}hidden{% endif %}
+      >
+        <input
+          type="search"
+          name="q"
+          id="products-search-input"
+          class="products-search__input"
+          value="{{ search_q }}"
+          placeholder="Название или описание…"
+          autocomplete="off"
+          enterkeyhint="search"
+        >
+        {% if search_q %}
+        <a href="?" class="products-search__clear" title="Сбросить поиск" aria-label="Сбросить поиск">×</a>
+        {% endif %}
+        <button type="submit" class="btn products-search__submit">Найти</button>
+      </form>
     </div>
   </div>
-</form>
+</div>
 
 <div class="products-tiles">
   {% for p in products_page %}
   <article class="product-tile{% if p.in_work_count %} product-tile--has-in-work{% endif %}">
     <a href="{% url 'osnastka_detail' p.pk %}" class="product-tile-title" title="{{ p.name }}">{{ p.name }}</a>
-    {% if p.in_work_count %}
-    <div class="product-tile-in-work" aria-label="Установок в работе: {{ p.in_work_count }}">
-      <span class="product-tile-in-work-dot" aria-hidden="true"></span>
-      <span class="product-tile-in-work-text">В работе</span>
-      <span class="product-tile-in-work-count">{{ p.in_work_count }}</span>
+    <div class="product-tile-preview">
+      {% if p.in_work_count %}
+      <div class="product-tile-in-work" aria-label="Установок в работе: {{ p.in_work_count }}">
+        <span class="product-tile-in-work-dot" aria-hidden="true"></span>
+        <span class="product-tile-in-work-text">В работе</span>
+        <span class="product-tile-in-work-count">{{ p.in_work_count }}</span>
+      </div>
+      {% endif %}
+      {% if p.list_preview_image %}
+        <div class="product-tile-3d product-tile-preview-image-wrap">
+          <img src="{{ p.list_preview_image.url }}" alt="Превью {{ p.name }}" class="product-tile-preview-image" loading="lazy" />
+        </div>
+      {% elif p.preview_stl %}
+        <div class="product-tile-3d" data-stl-url="{{ p.preview_stl.url }}">
+          <p class="muted product-tile-3d-msg">Загрузка 3D…</p>
+        </div>
+      {% elif p.cad_model and p.cad_filename_endswith_stl %}
+        <div class="product-tile-3d" data-stl-url="{{ p.cad_model.url }}">
+          <p class="muted product-tile-3d-msg">Загрузка 3D…</p>
+        </div>
+      {% else %}
+        <div class="product-tile-3d product-tile-3d-empty">
+          <p class="muted product-tile-3d-msg">Нет STL для предпросмотра</p>
+        </div>
+      {% endif %}
     </div>
-    {% endif %}
-    {% if p.list_preview_image %}
-      <div class="product-tile-3d product-tile-preview-image-wrap">
-        <img src="{{ p.list_preview_image.url }}" alt="Превью {{ p.name }}" class="product-tile-preview-image" loading="lazy" />
-      </div>
-    {% elif p.preview_stl %}
-      <div class="product-tile-3d" data-stl-url="{{ p.preview_stl.url }}">
-        <p class="muted product-tile-3d-msg">Загрузка 3D…</p>
-      </div>
-    {% elif p.cad_model and p.cad_filename_endswith_stl %}
-      <div class="product-tile-3d" data-stl-url="{{ p.cad_model.url }}">
-        <p class="muted product-tile-3d-msg">Загрузка 3D…</p>
-      </div>
-    {% else %}
-      <div class="product-tile-3d product-tile-3d-empty">
-        <p class="muted product-tile-3d-msg">Нет STL для предпросмотра</p>
-      </div>
-    {% endif %}
     <div class="product-tile-meta">
       <span class="muted product-tile-date">{{ p.updated_at|date:"d.m.Y H:i" }}</span>
       {% if biota_is_admin %}
@@ -78,6 +106,54 @@
 {% endif %}
 
 <link rel="stylesheet" href="{% static 'shifts/css/products_list.css' %}?v={{ static_asset_version }}">
+<script>
+(function () {
+  var root = document.getElementById("products-search");
+  if (!root) return;
+  var toggle = document.getElementById("products-search-toggle");
+  var panel = document.getElementById("products-search-panel");
+  var input = document.getElementById("products-search-input");
+  var locked = root.getAttribute("data-has-query") === "1";
+
+  function setOpen(on) {
+    root.classList.toggle("is-open", on);
+    if (toggle) toggle.setAttribute("aria-expanded", on ? "true" : "false");
+    if (panel) {
+      if (on) panel.removeAttribute("hidden");
+      else panel.setAttribute("hidden", "hidden");
+    }
+    if (on && input) {
+      requestAnimationFrame(function () {
+        input.focus();
+        try { input.select(); } catch (e) {}
+      });
+    }
+  }
+
+  if (toggle) {
+    toggle.addEventListener("click", function () {
+      var open = root.classList.contains("is-open");
+      if (open && locked) {
+        if (input) input.focus();
+        return;
+      }
+      setOpen(!open);
+    });
+  }
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (!root.classList.contains("is-open") || locked) return;
+    setOpen(false);
+  });
+
+  document.addEventListener("pointerdown", function (e) {
+    if (!root.classList.contains("is-open") || locked) return;
+    if (root.contains(e.target)) return;
+    setOpen(false);
+  });
+})();
+</script>
 
 <script type="importmap">
 {
