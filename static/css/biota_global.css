@@ -425,11 +425,11 @@ body {
     115deg,
     transparent 0%,
     transparent 47.2%,
-    color-mix(in srgb, var(--bio-bg-beam) 25%, transparent) 48.6%,
-    color-mix(in srgb, var(--bio-bg-beam) 70%, transparent) 49.5%,
+    rgba(160, 210, 255, 0.08) 48.6%,
+    rgba(160, 210, 255, 0.28) 49.5%,
     var(--bio-bg-beam) 50%,
-    color-mix(in srgb, var(--bio-bg-beam) 70%, transparent) 50.5%,
-    color-mix(in srgb, var(--bio-bg-beam) 25%, transparent) 51.4%,
+    rgba(160, 210, 255, 0.28) 50.5%,
+    rgba(160, 210, 255, 0.08) 51.4%,
     transparent 52.8%,
     transparent 100%
   );
@@ -497,21 +497,29 @@ html[data-theme="dawn"] .biota-site-bg__grain {
   .biota-site-bg__beam {
     animation: none;
     transform: none;
+    will-change: auto;
   }
   .biota-site-bg__beam {
     opacity: 0.25;
   }
+  .biota-site-bg__grain {
+    display: none !important;
+  }
 }
 
-@media (max-width: 720px) {
-  .biota-site-bg__mesh {
-    animation-duration: 40s;
+/* iPhone / touch: SVG feTurbulence + full-screen animated masks can freeze Safari. */
+@media (max-width: 920px), (hover: none) and (pointer: coarse) {
+  .biota-site-bg__grain {
+    display: none !important;
   }
   .biota-site-bg__beam {
-    opacity: 0.35;
+    display: none !important;
   }
-  .biota-site-bg__grain {
-    opacity: 0.025;
+  .biota-site-bg__mesh {
+    inset: 0;
+    animation: none;
+    transform: none;
+    will-change: auto;
   }
 }
 

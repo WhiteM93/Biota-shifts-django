@@ -899,13 +899,15 @@ html[data-theme="dawn"] .inv-history-open-block {
   box-sizing: border-box;
   overflow-x: auto;
   overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .inv-page--stock .inv-stock-grid.data-grid {
-  width: 100%;
-  min-width: 0 !important;
-  max-width: 100%;
-  table-layout: fixed;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  table-layout: auto;
   border-collapse: collapse;
   font-size: 11px;
   box-sizing: border-box;
@@ -913,10 +915,10 @@ html[data-theme="dawn"] .inv-history-open-block {
 
 .inv-page--stock .inv-stock-grid.data-grid th,
 .inv-page--stock .inv-stock-grid.data-grid td {
-  padding: 4px 4px;
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  padding: 4px 6px;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
   overflow: hidden;
   text-align: center;
   vertical-align: middle;
@@ -928,12 +930,28 @@ html[data-theme="dawn"] .inv-history-open-block {
 .inv-page--stock .inv-stock-table-wrap .inv-stock-grid.data-grid th.hint-cell {
   font-size: 10px;
   font-weight: 600;
-  white-space: normal;
-  word-break: break-word;
+  white-space: nowrap;
+  word-break: normal;
   text-align: center;
   vertical-align: middle;
   line-height: 1.2;
-  hyphens: auto;
+  hyphens: manual;
+}
+
+/* Narrow screens: keep readable cells, scroll sideways instead of crushing columns. */
+@media (max-width: 960px) {
+  .inv-page--stock .inv-stock-table-wrap.table-wrap {
+    padding: 2px 0;
+  }
+  .inv-page--stock .inv-stock-grid.data-grid {
+    min-width: 720px;
+    width: max-content;
+    font-size: 12px;
+  }
+  .inv-page--stock .inv-stock-grid.data-grid th,
+  .inv-page--stock .inv-stock-grid.data-grid td {
+    padding: 6px 8px;
+  }
 }
 
 .inv-page--stock .inv-stock-table-wrap .inv-stock-grid.data-grid th.hint-cell {

@@ -55,6 +55,12 @@ html.vw-fit-height body {
   padding-bottom: 8px;
 }
 
+/* Вкладки склада внутри того же контейнера — не раздувать высоту */
+.container:has(> .vw-page) > .inv-tabs {
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+}
+
 html[data-theme="dawn"] .vw-page,
 html[data-theme="dawn"] .vw-modal {
   --vw-text: #1a1a1a;
@@ -2208,36 +2214,108 @@ html[data-theme="dawn"] .vw-audit-row {
 }
 
 @media (max-width: 720px) {
+  /* Глобальное меню в одну строку со скроллом — не съедает пол-экрана */
+  html.vw-fit-height .nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 6px 8px;
+    gap: 4px;
+  }
+
+  html.vw-fit-height .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .container:has(> .vw-page) {
+    padding-top: 4px;
+    padding-bottom: 4px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  /* Вкладки: одна полоса, пока список шкафов */
+  .container:has(> .vw-page) > .inv-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 2px;
+    margin-bottom: 6px;
+    padding: 3px;
+  }
+
+  .container:has(> .vw-page) > .inv-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .container:has(> .vw-page) > .inv-tabs .inv-tab {
+    flex: 0 0 auto;
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* Открытый шкаф: убрать вкладки и подсказку — максимум места под сетку */
+  html.vw-fit-height:has(.vw-floor.is-open) .container:has(> .vw-page) > .inv-tabs,
+  html.vw-cabinet-open .container:has(> .vw-page) > .inv-tabs {
+    display: none;
+  }
+
   .vw-page {
-    padding: 8px 0 28px;
+    padding: 4px 0 4px;
   }
 
   .vw-title {
-    font-size: 18px;
+    font-size: 15px;
   }
 
   .vw-subtitle {
-    font-size: 12px;
+    font-size: 11px;
+    margin-top: 2px;
   }
 
   .vw-topbar {
-    gap: 10px;
-    margin-bottom: 14px;
+    gap: 6px;
+    margin-bottom: 6px;
   }
 
   .vw-topbar-actions {
     width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
   }
 
   .vw-topbar-actions .vw-btn-primary,
   .vw-topbar-actions .vw-btn-secondary {
-    flex: 1 1 auto;
+    flex: none;
+    width: 100%;
+    min-height: 36px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  html.vw-fit-height:has(.vw-floor.is-open) .vw-subtitle,
+  html.vw-cabinet-open .vw-subtitle {
+    display: none;
+  }
+
+  html.vw-fit-height:has(.vw-floor.is-open) .vw-title,
+  html.vw-cabinet-open .vw-title {
+    font-size: 14px;
+  }
+
+  html.vw-fit-height:has(.vw-floor.is-open) .vw-topbar,
+  html.vw-cabinet-open .vw-topbar {
+    margin-bottom: 4px;
   }
 
   .vw-floor {
     min-height: 0;
     gap: 16px;
-    padding: 8px 2px;
+    padding: 4px 2px;
     border-radius: 8px;
   }
 

@@ -537,11 +537,23 @@ html[data-theme="dawn"] .inv-arrival-toolbar .inv-arrival-select-wrap::after {
   .inv-arrival-toolbar__actions {
     width: 100%;
     margin-left: 0;
-    justify-content: flex-start;
+    flex-wrap: wrap;
+    justify-content: stretch;
+    gap: 12px;
+  }
+
+  .inv-arrival-field--match-toggle {
+    width: auto;
+    flex: 1 1 140px;
   }
 
   .inv-arrival-field--add {
-    flex: 1 1 auto;
+    flex: 1 1 160px;
+    min-width: 0;
+  }
+
+  .inv-arrival-label--ghost {
+    display: none;
   }
 
   .inv-arrival-add-btn {
@@ -555,12 +567,19 @@ html[data-theme="dawn"] .inv-arrival-toolbar .inv-arrival-select-wrap::after {
   }
 
   .inv-arrival-toolbar__actions {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .inv-arrival-field--match-toggle {
-    width: auto;
+  .inv-arrival-field--match-toggle,
+  .inv-arrival-field--add {
+    width: 100%;
     flex: 1 1 auto;
+  }
+
+  .inv-arrival-add-btn {
+    width: 100%;
+    min-height: 44px;
   }
 
   .inv-arrival-submit-bar {

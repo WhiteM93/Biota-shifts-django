@@ -388,7 +388,9 @@
     syncItemMillTypeRow();
     if (openContainerData) renderPhotos(openContainerData);
     renderFloor();
-    requestAnimationFrame(syncViewportHeightFit);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(syncViewportHeightFit);
+    });
   }
 
   function occupiedMap(cab) {
@@ -444,6 +446,8 @@
       floorEl.classList.toggle("is-list", !openCab);
       floorEl.classList.toggle("is-open", !!openCab);
     }
+    document.documentElement.classList.toggle("vw-cabinet-open", !!openCab);
+    document.body.classList.toggle("vw-cabinet-open", !!openCab);
     if (modeHint) {
       if (!openCab) {
         modeHint.textContent = editMode
@@ -538,6 +542,8 @@
     if (!root || !floorEl) return;
     document.documentElement.classList.add("vw-fit-height");
     document.body.classList.add("vw-fit-height");
+    document.documentElement.classList.toggle("vw-cabinet-open", floorEl.classList.contains("is-open"));
+    document.body.classList.toggle("vw-cabinet-open", floorEl.classList.contains("is-open"));
 
     var nav = document.querySelector(".nav");
     var navH = nav ? Math.ceil(nav.getBoundingClientRect().height) : 56;
