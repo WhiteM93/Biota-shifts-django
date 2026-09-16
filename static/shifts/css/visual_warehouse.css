@@ -1780,6 +1780,7 @@ html[data-theme="dawn"] .vw-section-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   width: 34px;
   height: 34px;
   margin: 0;
@@ -1794,9 +1795,16 @@ html[data-theme="dawn"] .vw-section-count {
   cursor: pointer;
 }
 
+.vw-contents-close__text {
+  display: none;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
 .vw-contents-close:hover {
-  color: var(--vw-text);
   background: rgba(255, 255, 255, 0.08);
+  color: var(--vw-text);
 }
 
 html[data-theme="dawn"] .vw-contents-close:hover {
@@ -2845,6 +2853,33 @@ html[data-theme="dawn"] .vw-photo-current {
     min-height: 36px;
     padding: 6px 10px;
     font-size: 12px;
+  }
+
+  /* Закрытие модалки: явная кнопка «Закрыть», а не маленький × */
+  .vw-contents-close {
+    width: auto;
+    min-width: 44px;
+    height: auto;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--vw-border);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--vw-text);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .vw-contents-close__icon {
+    display: none;
+  }
+
+  .vw-contents-close__text {
+    display: inline;
+  }
+
+  html[data-theme="dawn"] .vw-contents-close {
+    background: rgba(0, 0, 0, 0.04);
   }
 
   .js-vw-dlg-contents.is-audit .vw-contents-toolbar .js-vw-show-audits {

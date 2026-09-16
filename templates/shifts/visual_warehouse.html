@@ -61,7 +61,10 @@
     <div class="vw-dialog-body vw-form-body js-vw-cab-form">
       <header class="vw-form-head">
         <h2 id="vw-dlg-cab-title" class="vw-dialog-title js-vw-cab-form-title">Новый шкаф</h2>
-        <button type="button" class="vw-contents-close js-vw-dlg-cancel" aria-label="Закрыть" title="Закрыть">×</button>
+        <button type="button" class="vw-contents-close js-vw-dlg-cancel" aria-label="Закрыть" title="Закрыть">
+          <span class="vw-contents-close__icon" aria-hidden="true">×</span>
+          <span class="vw-contents-close__text">Закрыть</span>
+        </button>
       </header>
       <div class="vw-form-scroll">
         <input type="hidden" class="js-vw-cab-id" value="">
@@ -117,7 +120,10 @@
     <div class="vw-dialog-body vw-form-body js-vw-cont-form">
       <header class="vw-form-head">
         <h2 id="vw-dlg-cont-title" class="vw-dialog-title js-vw-cont-form-title">Ящик</h2>
-        <button type="button" class="vw-contents-close js-vw-dlg-cancel" aria-label="Закрыть" title="Закрыть">×</button>
+        <button type="button" class="vw-contents-close js-vw-dlg-cancel" aria-label="Закрыть" title="Закрыть">
+          <span class="vw-contents-close__icon" aria-hidden="true">×</span>
+          <span class="vw-contents-close__text">Закрыть</span>
+        </button>
       </header>
       <div class="vw-form-scroll">
         <input type="hidden" class="js-vw-cont-id" value="">
@@ -258,7 +264,10 @@
             {% if biota_can_edit %}
             <button type="button" class="vw-btn-primary vw-btn-compact js-vw-start-audit">Инвентаризация</button>
             {% endif %}
-            <button type="button" class="vw-contents-close js-vw-dlg-cancel" aria-label="Закрыть" title="Закрыть">×</button>
+            <button type="button" class="vw-contents-close js-vw-dlg-cancel" aria-label="Закрыть" title="Закрыть">
+              <span class="vw-contents-close__icon" aria-hidden="true">×</span>
+              <span class="vw-contents-close__text">Закрыть</span>
+            </button>
           </div>
         </div>
         <div class="vw-contents-stats js-vw-contents-stats"></div>
