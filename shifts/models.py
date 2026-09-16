@@ -510,6 +510,7 @@ class ToolItem(models.Model):
                 (ex.brand if ex and ex.brand else "—"),
                 (ex.get_clamp_type_display() if ex else "—"),
                 f"Dосн Ø{main_d()}",
+                (f"L {fmt_mm(ex.overall_length_mm)}" if ex and ex.overall_length_mm is not None else ""),
                 (ex.compatible_parts if ex and ex.compatible_parts else "—"),
                 f"ост {self.quantity}",
             ]
@@ -724,6 +725,8 @@ class ToolItem(models.Model):
                 specs_parts.append(ex.get_clamp_type_display())
                 if self.main_diameter_mm is not None:
                     specs_parts.append(f"Dосн={main_d()} мм")
+                if ex.overall_length_mm is not None:
+                    specs_parts.append(f"L={fmt_mm(ex.overall_length_mm)} мм")
                 if (ex.compatible_parts or "").strip():
                     specs_parts.append(ex.compatible_parts.strip())
         else:
@@ -876,7 +879,10 @@ class ToolItem(models.Model):
                 out["length"] = fmt_num(bt.mount_diameter_mm)
                 out["cutting_length"] = fmt_num(bt.ap_max_mm)
         elif cat == "tool_extension":
+            ex = getattr(self, "tool_extension_spec", None)
             out["diameter"] = fmt_num(self.main_diameter_mm)
+            if ex:
+                out["length"] = fmt_num(ex.overall_length_mm)
         return out
 
 
@@ -1298,6 +1304,13 @@ class ToolExtensionSpec(models.Model):
         verbose_name="Подходящие цанги / винты",
         help_text="Для цангового — цанги; для боковой/термо — винты",
     )
+    overall_length_mm = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Общая длина L, мм",
+    )
 
     class Meta:
         verbose_name = "Параметры удлинителя"
@@ -1310,6 +1323,7 @@ class ToolExtensionSpec(models.Model):
             brand=self.brand,
             clamp_type=self.clamp_type,
             main_diameter_mm=self.tool.main_diameter_mm if self.tool_id else None,
+            overall_length_mm=self.overall_length_mm,
             compatible_parts=self.compatible_parts,
         )
 

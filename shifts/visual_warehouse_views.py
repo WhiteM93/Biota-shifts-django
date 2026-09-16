@@ -402,6 +402,10 @@ def _serialize_tool(tool: ToolItem) -> dict:
             cutting_length_mm = float(rm.cutting_length_mm) if rm.cutting_length_mm is not None else None
             flutes_count = int(rm.flutes_count) if rm.flutes_count is not None else None
             angle_deg = (rm.accuracy_class or "").strip() or None
+    elif tool.category == "tool_extension":
+        ex = getattr(tool, "tool_extension_spec", None)
+        if ex:
+            overall_length_mm = float(ex.overall_length_mm) if ex.overall_length_mm is not None else None
     card = tool.issue_combo_card()
     return {
         "id": tool.id,

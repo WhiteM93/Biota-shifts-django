@@ -740,6 +740,7 @@
         <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
         <th class="sortable hint-cell" data-hint="Тип зажима удлинителя">Зажим</th>
         <th class="sortable hint-cell" data-hint="Основной диаметр удлинителя">Dосн, мм</th>
+        <th class="sortable hint-cell" data-hint="Общая длина удлинителя L, мм">L, мм</th>
         <th class="sortable hint-cell" data-hint="Подходящие цанги (для цангового) или винты (для боковой/термо)">Подходит</th>
         <th class="sortable hint-cell inv-stock-notes-text-col" data-hint="Описание позиции">Описание</th>
         <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
@@ -754,6 +755,7 @@
         <td data-sort="{% if e %}{{ e.brand|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and e %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ext_brand" data-type="text" data-value="{{ e.brand|default:'' }}"{% endif %}>{% if e %}{{ e.brand|default:"-" }}{% else %}-{% endif %}</td>
         <td data-sort="{% if e %}{{ e.get_clamp_type_display|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and e %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ext_clamp_type" data-type="select" data-value="{{ e.clamp_type|default:'' }}"{% endif %}>{% if e %}{{ e.get_clamp_type_display|default:"-" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.main_diameter_mm|default:'-1' }}" class="diameter-col{% if can_manage_stock %} stock-inline-edit{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="main_diameter_mm" data-type="number" data-value="{{ t.main_diameter_mm|default:'' }}"{% endif %}>{% if t.main_diameter_mm is not None %}Ø{{ t.main_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if e and e.overall_length_mm is not None %}{{ e.overall_length_mm }}{% else %}-1{% endif %}" {% if can_manage_stock and e %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ext_overall_length_mm" data-type="number" data-value="{{ e.overall_length_mm|default:'' }}"{% endif %}>{% if e and e.overall_length_mm is not None %}{{ e.overall_length_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{% if e %}{{ e.compatible_parts|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and e %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ext_compatible_parts" data-type="text" data-value="{{ e.compatible_parts|default:'' }}"{% endif %}>{% if e %}{{ e.compatible_parts|default:"-" }}{% else %}-{% endif %}</td>
         <td class="inv-stock-notes-text-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}>{{ t.notes|default:"-" }}</td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
@@ -772,7 +774,7 @@
       </tr>
       {% endwith %}
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}8{% else %}7{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}9{% else %}8{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -970,6 +972,14 @@
         <option value="">Все</option>
         {% for v in tool_extension_filter_options.diameters %}
         <option value="{{ v }}" {% if filters.ext_main_diameter_mm == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>L, мм</span>
+      <select name="ext_overall_length_mm">
+        <option value="">Все</option>
+        {% for v in tool_extension_filter_options.overall_lengths %}
+        <option value="{{ v }}" {% if filters.ext_overall_length_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>

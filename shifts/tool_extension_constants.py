@@ -55,6 +55,7 @@ def build_tool_extension_display_name(
     brand: str = "",
     clamp_type: str = "",
     main_diameter_mm=None,
+    overall_length_mm=None,
     compatible_parts: str = "",
 ) -> str:
     clamp = TOOL_EXTENSION_CLAMP_LABELS.get(
@@ -63,13 +64,21 @@ def build_tool_extension_display_name(
     parts = ["Удлинитель"]
     if clamp:
         parts.append(clamp)
-    if main_diameter_mm is not None and str(main_diameter_mm) != "":
+
+    def _fmt_mm(raw) -> str:
         try:
-            d = Decimal(str(main_diameter_mm))
-            ds = format(d, "f").rstrip("0").rstrip(".")
+            d = Decimal(str(raw))
         except Exception:
-            ds = str(main_diameter_mm)
-        parts.append(f"Dосн Ø{ds}")
+            return str(raw)
+        s = format(d, "f")
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s or "0"
+
+    if main_diameter_mm is not None and str(main_diameter_mm) != "":
+        parts.append(f"Dосн Ø{_fmt_mm(main_diameter_mm)}")
+    if overall_length_mm is not None and str(overall_length_mm) != "":
+        parts.append(f"L {_fmt_mm(overall_length_mm)}")
     compat = (compatible_parts or "").strip()
     if compat:
         parts.append(compat)

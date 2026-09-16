@@ -1661,6 +1661,14 @@ var INV = (function () {
             el: clampEl,
           });
         }
+        var lenEl = tr.querySelector('[data-k="ext_overall_length_mm"]');
+        if (!isPositiveNumberField(lenEl)) {
+          if (lenEl) lenEl.classList.add("is-invalid");
+          issues.push({
+            msg: "Строка " + (i + 1) + ": укажите общую длину L (мм) для удлинителя.",
+            el: lenEl,
+          });
+        }
       }
       var spec = arrivalDiamRequiredByCategory[cat];
       if (!spec) return;
@@ -2565,6 +2573,7 @@ var INV = (function () {
       { key: "brand", label: "Бренд" },
       { key: "ext_clamp", label: "Зажим" },
       { key: "D_shank", label: "Dосн", cls: "short-col" },
+      { key: "L", label: "L", cls: "short-col" },
       { key: "ext_compat", label: "Подходит" },
       { key: "notes", label: "Описание" },
       { key: "quantity", label: "Кол-во", cls: "qty-col" },
@@ -2756,6 +2765,9 @@ var INV = (function () {
       cells.push('<td><input type="text" data-k="ext_brand" maxlength="80" placeholder="Sandvik"></td>');
       cells.push('<td><select data-k="ext_clamp_type" class="js-ext-clamp-type" required>' + buildOptionsHtml(clampOpts) + "</select></td>");
       cells.push(arrivalRequiredDiamCell("main_diameter_mm"));
+      cells.push(
+        '<td class="short-col"><input type="number" step="0.01" min="0.01" class="arrival-diam-input" data-k="ext_overall_length_mm" required placeholder="L" title="Общая длина L, мм"></td>'
+      );
       cells.push(
         '<td><input type="text" data-k="ext_compatible_parts" class="js-ext-compat" maxlength="120" placeholder="' +
           compatPh.replace(/"/g, "&quot;") +

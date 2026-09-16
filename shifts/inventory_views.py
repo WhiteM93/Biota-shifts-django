@@ -329,6 +329,8 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
             errs.append(f"Строка {idx}: укажите тип зажима удлинителя.")
         if _to_decimal_or_none(row.get("main_diameter_mm")) is None:
             errs.append(f"Строка {idx}: укажите Dосн (мм) для удлинителя.")
+        if _to_decimal_or_none(row.get("ext_overall_length_mm")) is None:
+            errs.append(f"Строка {idx}: укажите общую длину L (мм) для удлинителя.")
         return errs
     if category == "insert":
         iname = normalize_insert_item_name(row.get("ins_name") or row.get("item_name"))
@@ -359,6 +361,7 @@ def _arrival_search_ready(row: dict) -> bool:
         return bool(
             normalize_tool_extension_clamp(row.get("ext_clamp_type"))
             and _to_decimal_or_none(row.get("main_diameter_mm")) is not None
+            and _to_decimal_or_none(row.get("ext_overall_length_mm")) is not None
         )
     if category == "tap":
         return bool((row.get("size_label") or "").strip())
@@ -624,6 +627,9 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
         compat = (row.get("ext_compatible_parts") or "").strip()[:120]
         if compat:
             qs = qs.filter(tool_extension_spec__compatible_parts__icontains=compat)
+        ol = _to_decimal_or_none(row.get("ext_overall_length_mm"))
+        if ol is not None:
+            qs = qs.filter(tool_extension_spec__overall_length_mm=ol)
     else:
         return []
 
@@ -768,6 +774,7 @@ _STOCK_INLINE_FIELD_LABELS = {
     "ext_brand": "Бренд",
     "ext_clamp_type": "Зажим",
     "ext_compatible_parts": "Подходящие цанги / винты",
+    "ext_overall_length_mm": "Общая длина L",
     "size_label": "Размер",
     "thread_standard": "Стандарт резьбы",
     "thread_kind": "Тип резьбы",
@@ -1345,6 +1352,7 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "ext_brand",
         "ext_compatible_parts",
         "ext_main_diameter_mm",
+        "ext_overall_length_mm",
     }
 )
 
@@ -1506,6 +1514,7 @@ _STOCK_KEYS_BY_CATEGORY = {
             "ext_brand",
             "ext_compatible_parts",
             "ext_main_diameter_mm",
+            "ext_overall_length_mm",
         }
     ),
 }
@@ -1538,6 +1547,8 @@ _STOCK_DECIMAL_PARAM_KEYS = frozenset(
         "bt_ap_max_mm",
         "bt_angle_deg",
         "bt_corner_radius_mm",
+        "ext_main_diameter_mm",
+        "ext_overall_length_mm",
     }
 )
 _STOCK_INT_PARAM_KEYS = frozenset({"mill_flutes_count", "countersink_flutes_count", "reamer_flutes_count", "bt_teeth_count"})
@@ -1838,6 +1849,9 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         ext_d = _to_decimal_or_none(g("ext_main_diameter_mm"))
         if ext_d is not None:
             qs = qs.filter(main_diameter_mm=ext_d)
+        ext_l = _to_decimal_or_none(g("ext_overall_length_mm"))
+        if ext_l is not None:
+            qs = qs.filter(tool_extension_spec__overall_length_mm=ext_l)
 
     if category not in ("collet", "body_tool", "insert", "tool_extension") and "tool_material" not in ex and "tool_material_custom" not in ex:
         tool_material = _resolve_stock_tool_material(params)
@@ -2183,6 +2197,7 @@ def _tool_extension_fields_from_row(row: dict) -> dict:
         "clamp_type": normalize_tool_extension_clamp(row.get("ext_clamp_type")) or "collet",
         "compatible_parts": (row.get("ext_compatible_parts") or "").strip()[:120],
         "main_diameter_mm": _to_decimal_or_none(row.get("main_diameter_mm")),
+        "overall_length_mm": _to_decimal_or_none(row.get("ext_overall_length_mm")),
     }
 
 
@@ -2195,6 +2210,7 @@ def _find_tool_extension_tool_match(spec_fields: dict):
             tool_extension_spec__brand=spec_fields["brand"],
             tool_extension_spec__clamp_type=spec_fields["clamp_type"],
             tool_extension_spec__compatible_parts=spec_fields["compatible_parts"],
+            tool_extension_spec__overall_length_mm=spec_fields["overall_length_mm"],
         )
         .select_related("tool_extension_spec")
         .first()
@@ -2206,6 +2222,7 @@ def _create_tool_extension_tool(quantity, spec_fields: dict) -> ToolItem:
         brand=spec_fields["brand"],
         clamp_type=spec_fields["clamp_type"],
         main_diameter_mm=spec_fields["main_diameter_mm"],
+        overall_length_mm=spec_fields["overall_length_mm"],
         compatible_parts=spec_fields["compatible_parts"],
     )
     tool = ToolItem.objects.create(
@@ -2221,6 +2238,7 @@ def _create_tool_extension_tool(quantity, spec_fields: dict) -> ToolItem:
         brand=spec_fields["brand"],
         clamp_type=spec_fields["clamp_type"],
         compatible_parts=spec_fields["compatible_parts"],
+        overall_length_mm=spec_fields["overall_length_mm"],
     )
     return tool
 
@@ -2836,6 +2854,7 @@ def inventory_view(request):
                     brand=ex.brand,
                     clamp_type=ex.clamp_type,
                     main_diameter_mm=tool.main_diameter_mm,
+                    overall_length_mm=ex.overall_length_mm,
                     compatible_parts=ex.compatible_parts,
                 )
                 update_fields.append("name")
@@ -3119,12 +3138,16 @@ def inventory_view(request):
                 elif field == "ext_compatible_parts":
                     ex.compatible_parts = (value_raw or "").strip()[:120]
                     ex.save(update_fields=["compatible_parts"])
+                elif field == "ext_overall_length_mm":
+                    ex.overall_length_mm = _to_decimal_or_none(value_raw)
+                    ex.save(update_fields=["overall_length_mm"])
                 else:
                     return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
                 tool.name = build_tool_extension_display_name(
                     brand=ex.brand,
                     clamp_type=ex.clamp_type,
                     main_diameter_mm=tool.main_diameter_mm,
+                    overall_length_mm=ex.overall_length_mm,
                     compatible_parts=ex.compatible_parts,
                 )
                 tool.save(update_fields=["name", "updated_at"])
@@ -4313,6 +4336,7 @@ def inventory_view(request):
     ext_brand_raw = _sq("ext_brand")
     ext_compatible_parts_raw = _sq("ext_compatible_parts")
     ext_main_diameter_raw = _sq("ext_main_diameter_mm")
+    ext_overall_length_raw = _sq("ext_overall_length_mm")
 
     tm_param = _sq("tool_material")
     tm_custom_param = (_sq("tool_material_custom") or "")[:80]
@@ -4857,6 +4881,16 @@ def inventory_view(request):
         if v is not None
     ]
     tool_extension_diameters = [v for v in tool_extension_diameters if v]
+    tool_extension_lengths = [
+        _norm_stock_decimal_str(str(v))
+        for v in _opt_qs("tool_extension", "ext_overall_length_mm")
+        .exclude(tool_extension_spec__overall_length_mm__isnull=True)
+        .values_list("tool_extension_spec__overall_length_mm", flat=True)
+        .distinct()
+        .order_by("tool_extension_spec__overall_length_mm")
+        if v is not None
+    ]
+    tool_extension_lengths = [v for v in tool_extension_lengths if v]
 
     ctx = {
         "tool_items": qs.select_related(
@@ -4961,6 +4995,7 @@ def inventory_view(request):
             "ext_brand": ext_brand_raw,
             "ext_compatible_parts": ext_compatible_parts_raw,
             "ext_main_diameter_mm": _norm_stock_decimal_str(ext_main_diameter_raw),
+            "ext_overall_length_mm": _norm_stock_decimal_str(ext_overall_length_raw),
             "tool_material": tool_material,
             "tool_material_custom": tm_custom_input,
             "tool_material_select": tool_material_select,
@@ -5118,6 +5153,7 @@ def inventory_view(request):
             "brands": tool_extension_brands,
             "compats": tool_extension_compats,
             "diameters": tool_extension_diameters,
+            "overall_lengths": tool_extension_lengths,
         },
         "tool_material_types": TOOL_MATERIAL_TYPES,
         "tool_material_extra_options": tool_material_extra_options,
