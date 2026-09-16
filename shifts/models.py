@@ -511,6 +511,7 @@ class ToolItem(models.Model):
                 (ex.get_clamp_type_display() if ex else "—"),
                 f"Dосн Ø{main_d()}",
                 (f"L {fmt_mm(ex.overall_length_mm)}" if ex and ex.overall_length_mm is not None else ""),
+                (f"Dвн Ø{fmt_mm(ex.inner_diameter_mm)}" if ex and ex.inner_diameter_mm is not None else ""),
                 (ex.compatible_parts if ex and ex.compatible_parts else "—"),
                 f"ост {self.quantity}",
             ]
@@ -727,6 +728,8 @@ class ToolItem(models.Model):
                     specs_parts.append(f"Dосн={main_d()} мм")
                 if ex.overall_length_mm is not None:
                     specs_parts.append(f"L={fmt_mm(ex.overall_length_mm)} мм")
+                if ex.inner_diameter_mm is not None:
+                    specs_parts.append(f"Dвн={fmt_mm(ex.inner_diameter_mm)} мм")
                 if (ex.compatible_parts or "").strip():
                     specs_parts.append(ex.compatible_parts.strip())
         else:
@@ -1311,6 +1314,14 @@ class ToolExtensionSpec(models.Model):
         blank=True,
         verbose_name="Общая длина L, мм",
     )
+    inner_diameter_mm = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Внутренний диаметр Dвн, мм",
+        help_text="Для термо и боковой фиксации",
+    )
 
     class Meta:
         verbose_name = "Параметры удлинителя"
@@ -1324,6 +1335,7 @@ class ToolExtensionSpec(models.Model):
             clamp_type=self.clamp_type,
             main_diameter_mm=self.tool.main_diameter_mm if self.tool_id else None,
             overall_length_mm=self.overall_length_mm,
+            inner_diameter_mm=self.inner_diameter_mm,
             compatible_parts=self.compatible_parts,
         )
 

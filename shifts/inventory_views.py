@@ -124,8 +124,10 @@ from .tool_extension_constants import (
     TOOL_EXTENSION_CLAMP_TYPES,
     TOOL_EXTENSION_COMPAT_LABELS,
     TOOL_EXTENSION_COMPAT_PLACEHOLDERS,
+    TOOL_EXTENSION_INNER_DIAMETER_CLAMPS,
     build_tool_extension_display_name,
     normalize_tool_extension_clamp,
+    tool_extension_needs_inner_diameter,
 )
 from .models import (
     CENTER_DRILL_ANGLES,
@@ -325,12 +327,18 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
             errs.append(f"Строка {idx}: укажите диаметр Dост (мм) для корпусного инструмента.")
         return errs
     if category == "tool_extension":
-        if not normalize_tool_extension_clamp(row.get("ext_clamp_type")):
+        clamp = normalize_tool_extension_clamp(row.get("ext_clamp_type"))
+        if not clamp:
             errs.append(f"Строка {idx}: укажите тип зажима удлинителя.")
         if _to_decimal_or_none(row.get("main_diameter_mm")) is None:
             errs.append(f"Строка {idx}: укажите Dосн (мм) для удлинителя.")
         if _to_decimal_or_none(row.get("ext_overall_length_mm")) is None:
             errs.append(f"Строка {idx}: укажите общую длину L (мм) для удлинителя.")
+        if tool_extension_needs_inner_diameter(clamp):
+            if _to_decimal_or_none(row.get("ext_inner_diameter_mm")) is None:
+                errs.append(
+                    f"Строка {idx}: укажите внутренний диаметр Dвн (мм) для термо/боковой фиксации."
+                )
         return errs
     if category == "insert":
         iname = normalize_insert_item_name(row.get("ins_name") or row.get("item_name"))
@@ -358,11 +366,15 @@ def _arrival_search_ready(row: dict) -> bool:
             and _to_decimal_or_none(row.get("bt_diameter_mm")) is not None
         )
     if category == "tool_extension":
-        return bool(
-            normalize_tool_extension_clamp(row.get("ext_clamp_type"))
+        clamp = normalize_tool_extension_clamp(row.get("ext_clamp_type"))
+        ready = bool(
+            clamp
             and _to_decimal_or_none(row.get("main_diameter_mm")) is not None
             and _to_decimal_or_none(row.get("ext_overall_length_mm")) is not None
         )
+        if ready and tool_extension_needs_inner_diameter(clamp):
+            ready = _to_decimal_or_none(row.get("ext_inner_diameter_mm")) is not None
+        return ready
     if category == "tap":
         return bool((row.get("size_label") or "").strip())
     if category == "center_drill":
@@ -630,6 +642,9 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
         ol = _to_decimal_or_none(row.get("ext_overall_length_mm"))
         if ol is not None:
             qs = qs.filter(tool_extension_spec__overall_length_mm=ol)
+        inner_d = _to_decimal_or_none(row.get("ext_inner_diameter_mm"))
+        if inner_d is not None:
+            qs = qs.filter(tool_extension_spec__inner_diameter_mm=inner_d)
     else:
         return []
 
@@ -775,6 +790,7 @@ _STOCK_INLINE_FIELD_LABELS = {
     "ext_clamp_type": "Зажим",
     "ext_compatible_parts": "Подходящие цанги / винты",
     "ext_overall_length_mm": "Общая длина L",
+    "ext_inner_diameter_mm": "Внутренний диаметр Dвн",
     "size_label": "Размер",
     "thread_standard": "Стандарт резьбы",
     "thread_kind": "Тип резьбы",
@@ -1353,6 +1369,7 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "ext_compatible_parts",
         "ext_main_diameter_mm",
         "ext_overall_length_mm",
+        "ext_inner_diameter_mm",
     }
 )
 
@@ -1515,6 +1532,7 @@ _STOCK_KEYS_BY_CATEGORY = {
             "ext_compatible_parts",
             "ext_main_diameter_mm",
             "ext_overall_length_mm",
+            "ext_inner_diameter_mm",
         }
     ),
 }
@@ -1549,6 +1567,7 @@ _STOCK_DECIMAL_PARAM_KEYS = frozenset(
         "bt_corner_radius_mm",
         "ext_main_diameter_mm",
         "ext_overall_length_mm",
+        "ext_inner_diameter_mm",
     }
 )
 _STOCK_INT_PARAM_KEYS = frozenset({"mill_flutes_count", "countersink_flutes_count", "reamer_flutes_count", "bt_teeth_count"})
@@ -1852,6 +1871,9 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         ext_l = _to_decimal_or_none(g("ext_overall_length_mm"))
         if ext_l is not None:
             qs = qs.filter(tool_extension_spec__overall_length_mm=ext_l)
+        ext_inner = _to_decimal_or_none(g("ext_inner_diameter_mm"))
+        if ext_inner is not None:
+            qs = qs.filter(tool_extension_spec__inner_diameter_mm=ext_inner)
 
     if category not in ("collet", "body_tool", "insert", "tool_extension") and "tool_material" not in ex and "tool_material_custom" not in ex:
         tool_material = _resolve_stock_tool_material(params)
@@ -2192,12 +2214,17 @@ def _create_collet_tool(quantity, spec_fields: dict) -> ToolItem:
 
 
 def _tool_extension_fields_from_row(row: dict) -> dict:
+    clamp = normalize_tool_extension_clamp(row.get("ext_clamp_type")) or "collet"
+    inner = _to_decimal_or_none(row.get("ext_inner_diameter_mm"))
+    if not tool_extension_needs_inner_diameter(clamp):
+        inner = None
     return {
         "brand": (row.get("ext_brand") or "").strip()[:80],
-        "clamp_type": normalize_tool_extension_clamp(row.get("ext_clamp_type")) or "collet",
+        "clamp_type": clamp,
         "compatible_parts": (row.get("ext_compatible_parts") or "").strip()[:120],
         "main_diameter_mm": _to_decimal_or_none(row.get("main_diameter_mm")),
         "overall_length_mm": _to_decimal_or_none(row.get("ext_overall_length_mm")),
+        "inner_diameter_mm": inner,
     }
 
 
@@ -2211,6 +2238,7 @@ def _find_tool_extension_tool_match(spec_fields: dict):
             tool_extension_spec__clamp_type=spec_fields["clamp_type"],
             tool_extension_spec__compatible_parts=spec_fields["compatible_parts"],
             tool_extension_spec__overall_length_mm=spec_fields["overall_length_mm"],
+            tool_extension_spec__inner_diameter_mm=spec_fields["inner_diameter_mm"],
         )
         .select_related("tool_extension_spec")
         .first()
@@ -2223,6 +2251,7 @@ def _create_tool_extension_tool(quantity, spec_fields: dict) -> ToolItem:
         clamp_type=spec_fields["clamp_type"],
         main_diameter_mm=spec_fields["main_diameter_mm"],
         overall_length_mm=spec_fields["overall_length_mm"],
+        inner_diameter_mm=spec_fields["inner_diameter_mm"],
         compatible_parts=spec_fields["compatible_parts"],
     )
     tool = ToolItem.objects.create(
@@ -2239,6 +2268,7 @@ def _create_tool_extension_tool(quantity, spec_fields: dict) -> ToolItem:
         clamp_type=spec_fields["clamp_type"],
         compatible_parts=spec_fields["compatible_parts"],
         overall_length_mm=spec_fields["overall_length_mm"],
+        inner_diameter_mm=spec_fields["inner_diameter_mm"],
     )
     return tool
 
@@ -2855,6 +2885,7 @@ def inventory_view(request):
                     clamp_type=ex.clamp_type,
                     main_diameter_mm=tool.main_diameter_mm,
                     overall_length_mm=ex.overall_length_mm,
+                    inner_diameter_mm=ex.inner_diameter_mm,
                     compatible_parts=ex.compatible_parts,
                 )
                 update_fields.append("name")
@@ -3134,13 +3165,25 @@ def inventory_view(request):
                     ex.save(update_fields=["brand"])
                 elif field == "ext_clamp_type":
                     ex.clamp_type = normalize_tool_extension_clamp(value_raw) or ex.clamp_type
-                    ex.save(update_fields=["clamp_type"])
+                    if not tool_extension_needs_inner_diameter(ex.clamp_type):
+                        ex.inner_diameter_mm = None
+                        ex.save(update_fields=["clamp_type", "inner_diameter_mm"])
+                    else:
+                        ex.save(update_fields=["clamp_type"])
                 elif field == "ext_compatible_parts":
                     ex.compatible_parts = (value_raw or "").strip()[:120]
                     ex.save(update_fields=["compatible_parts"])
                 elif field == "ext_overall_length_mm":
                     ex.overall_length_mm = _to_decimal_or_none(value_raw)
                     ex.save(update_fields=["overall_length_mm"])
+                elif field == "ext_inner_diameter_mm":
+                    if not tool_extension_needs_inner_diameter(ex.clamp_type):
+                        return JsonResponse(
+                            {"ok": False, "error": "Dвн только для термо и боковой фиксации."},
+                            status=400,
+                        )
+                    ex.inner_diameter_mm = _to_decimal_or_none(value_raw)
+                    ex.save(update_fields=["inner_diameter_mm"])
                 else:
                     return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
                 tool.name = build_tool_extension_display_name(
@@ -3148,6 +3191,7 @@ def inventory_view(request):
                     clamp_type=ex.clamp_type,
                     main_diameter_mm=tool.main_diameter_mm,
                     overall_length_mm=ex.overall_length_mm,
+                    inner_diameter_mm=ex.inner_diameter_mm,
                     compatible_parts=ex.compatible_parts,
                 )
                 tool.save(update_fields=["name", "updated_at"])
@@ -4337,6 +4381,7 @@ def inventory_view(request):
     ext_compatible_parts_raw = _sq("ext_compatible_parts")
     ext_main_diameter_raw = _sq("ext_main_diameter_mm")
     ext_overall_length_raw = _sq("ext_overall_length_mm")
+    ext_inner_diameter_raw = _sq("ext_inner_diameter_mm")
 
     tm_param = _sq("tool_material")
     tm_custom_param = (_sq("tool_material_custom") or "")[:80]
@@ -4891,6 +4936,16 @@ def inventory_view(request):
         if v is not None
     ]
     tool_extension_lengths = [v for v in tool_extension_lengths if v]
+    tool_extension_inner_diameters = [
+        _norm_stock_decimal_str(str(v))
+        for v in _opt_qs("tool_extension", "ext_inner_diameter_mm")
+        .exclude(tool_extension_spec__inner_diameter_mm__isnull=True)
+        .values_list("tool_extension_spec__inner_diameter_mm", flat=True)
+        .distinct()
+        .order_by("tool_extension_spec__inner_diameter_mm")
+        if v is not None
+    ]
+    tool_extension_inner_diameters = [v for v in tool_extension_inner_diameters if v]
 
     ctx = {
         "tool_items": qs.select_related(
@@ -4996,6 +5051,7 @@ def inventory_view(request):
             "ext_compatible_parts": ext_compatible_parts_raw,
             "ext_main_diameter_mm": _norm_stock_decimal_str(ext_main_diameter_raw),
             "ext_overall_length_mm": _norm_stock_decimal_str(ext_overall_length_raw),
+            "ext_inner_diameter_mm": _norm_stock_decimal_str(ext_inner_diameter_raw),
             "tool_material": tool_material,
             "tool_material_custom": tm_custom_input,
             "tool_material_select": tool_material_select,
@@ -5149,11 +5205,13 @@ def inventory_view(request):
         "tool_extension_clamp_types": TOOL_EXTENSION_CLAMP_TYPES,
         "tool_extension_compat_labels": TOOL_EXTENSION_COMPAT_LABELS,
         "tool_extension_compat_placeholders": TOOL_EXTENSION_COMPAT_PLACEHOLDERS,
+        "tool_extension_inner_diameter_clamps": sorted(TOOL_EXTENSION_INNER_DIAMETER_CLAMPS),
         "tool_extension_filter_options": {
             "brands": tool_extension_brands,
             "compats": tool_extension_compats,
             "diameters": tool_extension_diameters,
             "overall_lengths": tool_extension_lengths,
+            "inner_diameters": tool_extension_inner_diameters,
         },
         "tool_material_types": TOOL_MATERIAL_TYPES,
         "tool_material_extra_options": tool_material_extra_options,

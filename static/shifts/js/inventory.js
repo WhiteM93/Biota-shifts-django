@@ -1569,6 +1569,28 @@ var INV = (function () {
     );
   }
 
+  function syncExtInnerDiameterField(tr) {
+    if (!tr) return;
+    var clampEl = tr.querySelector('[data-k="ext_clamp_type"]');
+    var innerEl = tr.querySelector('[data-k="ext_inner_diameter_mm"]');
+    if (!innerEl) return;
+    var clamp = ((clampEl && clampEl.value) || "").trim();
+    var need =
+      (INV.tool_extension_inner_diameter_clamps || []).indexOf(clamp) >= 0;
+    innerEl.disabled = !need;
+    if (need) {
+      innerEl.required = true;
+      innerEl.setAttribute("aria-required", "true");
+      innerEl.title = "Внутренний диаметр Dвн, мм (обязательно)";
+    } else {
+      innerEl.required = false;
+      innerEl.removeAttribute("aria-required");
+      innerEl.value = "";
+      innerEl.classList.remove("is-invalid");
+      innerEl.title = "Только для термо и боковой фиксации";
+    }
+  }
+
   var arrivalDiamRequiredByCategory = {
     drill: { key: "dr_diameter_mm", label: "диаметр D (мм) для сверла" },
     reamer: { key: "rm_diameter_mm", label: "диаметр D (мм) для развертки" },
@@ -1668,6 +1690,23 @@ var INV = (function () {
             msg: "Строка " + (i + 1) + ": укажите общую длину L (мм) для удлинителя.",
             el: lenEl,
           });
+        }
+        var needInner =
+          (INV.tool_extension_inner_diameter_clamps || []).indexOf(
+            ((clampEl && clampEl.value) || "").trim()
+          ) >= 0;
+        if (needInner) {
+          var innerEl = tr.querySelector('[data-k="ext_inner_diameter_mm"]');
+          if (!isPositiveNumberField(innerEl)) {
+            if (innerEl) innerEl.classList.add("is-invalid");
+            issues.push({
+              msg:
+                "Строка " +
+                (i + 1) +
+                ": укажите внутренний диаметр Dвн (мм) для термо/боковой фиксации.",
+              el: innerEl,
+            });
+          }
         }
       }
       var spec = arrivalDiamRequiredByCategory[cat];
@@ -2574,6 +2613,7 @@ var INV = (function () {
       { key: "ext_clamp", label: "Зажим" },
       { key: "D_shank", label: "Dосн", cls: "short-col" },
       { key: "L", label: "L", cls: "short-col" },
+      { key: "d_inner", label: "Dвн", cls: "short-col" },
       { key: "ext_compat", label: "Подходит" },
       { key: "notes", label: "Описание" },
       { key: "quantity", label: "Кол-во", cls: "qty-col" },
@@ -2769,6 +2809,9 @@ var INV = (function () {
         '<td class="short-col"><input type="number" step="0.01" min="0.01" class="arrival-diam-input" data-k="ext_overall_length_mm" required placeholder="L" title="Общая длина L, мм"></td>'
       );
       cells.push(
+        '<td class="short-col"><input type="number" step="0.01" min="0.01" class="arrival-diam-input js-ext-inner-d" data-k="ext_inner_diameter_mm" placeholder="Dвн" title="Внутренний диаметр Dвн, мм (термо и боковая фиксация)" disabled></td>'
+      );
+      cells.push(
         '<td><input type="text" data-k="ext_compatible_parts" class="js-ext-compat" maxlength="120" placeholder="' +
           compatPh.replace(/"/g, "&quot;") +
           '" title="Подходящие цанги или винты"></td>'
@@ -2896,6 +2939,7 @@ var INV = (function () {
     }
     var coCell = tr.querySelector(".co-cell");
     if (coCell) coCell.appendChild(buildColoredCoatingSelect("none"));
+    if (cat === "tool_extension") syncExtInnerDiameterField(tr);
     attachArrivalMatchRow(tr, body);
   }
 
@@ -2965,6 +3009,7 @@ var INV = (function () {
       if (compat) {
         compat.placeholder = phMap[t.value] || "Цанги / винты…";
       }
+      syncExtInnerDiameterField(tr);
     }
     if (tr.classList.contains("is-existing-pick") && t.getAttribute("data-k") !== "quantity") {
       var hid = tr.querySelector('[data-k="existing_tool_id"]');
