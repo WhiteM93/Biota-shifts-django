@@ -110,6 +110,47 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
         cab.refresh_from_db()
         self.assertEqual(suggested_address(cab, shelf=1, column=1), "B-02-01")
 
+    def test_stale_auto_address_follows_shelf_place(self):
+        """В UI полка/место из геометрии; устаревший A-03-02 не должен перебивать A-02-01."""
+        from shifts.visual_warehouse_address import (
+            build_location_catalog,
+            repair_container_address_if_stale,
+            resolve_container_address,
+        )
+
+        cab = VisualCabinet.objects.create(
+            name="Фрезерный",
+            kind=VisualCabinet.KIND_CABINET,
+            shelves=4,
+            columns=4,
+            code="A",
+        )
+        # shelf_top1=3 → display 02, column=1 → 01 → A-02-01
+        cont = VisualContainer.objects.create(
+            cabinet=cab,
+            kind=VisualContainer.KIND_BIN,
+            shelf=3,
+            column=1,
+            label="Метчик М2 глухой",
+            address="A-03-02",
+        )
+        self.assertEqual(shelf_display_num(shelves=4, shelf_top1=3), "02")
+        self.assertEqual(suggested_address(cab, shelf=3, column=1), "A-02-01")
+        self.assertEqual(resolve_container_address(cont), "A-02-01")
+        self.assertEqual(repair_container_address_if_stale(cont), "A-02-01")
+        cont.refresh_from_db()
+        self.assertEqual(cont.address, "A-02-01")
+
+        places = [
+            p
+            for p in build_location_catalog()["places"]
+            if p["container_id"] == cont.id
+        ]
+        self.assertEqual(len(places), 1)
+        self.assertEqual(places[0]["shelf_label"], "02")
+        self.assertEqual(places[0]["place_label"], "01")
+        self.assertEqual(places[0]["address"], "A-02-01")
+
     def test_move_container_to_another_cabinet(self):
         cab_a = VisualCabinet.objects.create(
             name="Стеллаж A",

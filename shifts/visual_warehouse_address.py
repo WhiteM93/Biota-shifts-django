@@ -93,11 +93,48 @@ def resolve_container_address(
     *,
     prefer_stored: bool = True,
 ) -> str:
+    """Адрес контейнера для склада и UI.
+
+    Хранимый address уважаем, если это осознанный кастом.
+    Если address похож на авто (буква-полка-место этой мебели), но не совпадает
+    с текущими полкой/местом — считаем устаревшим и берём геометрию
+    (иначе в «Куда добавить» видно 02/01, а сохраняется A-03-02).
+    """
+    cabinet = cab or getattr(cont, "cabinet", None)
     stored = normalize_address(getattr(cont, "address", "") or "")
+    suggested = ""
+    if cabinet is not None:
+        suggested = normalize_address(
+            suggested_address(cabinet, shelf=cont.shelf, column=cont.column)
+        )
+
     if prefer_stored and stored:
+        if suggested and stored != suggested and _is_stale_auto_address(stored, cabinet):
+            return suggested
         return stored
-    cabinet = cab or cont.cabinet
-    return suggested_address(cabinet, shelf=cont.shelf, column=cont.column)
+    return suggested or stored
+
+
+def _is_stale_auto_address(stored: str, cab: VisualCabinet | None) -> bool:
+    """Авто-адрес буквы мебели, который мог остаться после смены полки/логики нумерации."""
+    if not is_plausible_address(stored):
+        return False
+    if cab is None:
+        return True
+    code = cabinet_code_of(cab)
+    if code and code != "?":
+        return stored.startswith(f"{code}-")
+    return True
+
+
+def repair_container_address_if_stale(cont: VisualContainer) -> str:
+    """Вернуть актуальный адрес; при устаревшем авто-адресе записать в БД."""
+    addr = normalize_address(resolve_container_address(cont, prefer_stored=True))
+    stored = normalize_address(getattr(cont, "address", "") or "")
+    if addr and addr != stored and not getattr(cont, "parent_id", None):
+        VisualContainer.objects.filter(pk=cont.pk).update(address=addr)
+        cont.address = addr
+    return addr
 
 
 _KIND_LABELS = {
@@ -138,8 +175,8 @@ def build_location_catalog() -> dict:
         for cont in tops:
             shelf_lab = shelf_display_num(shelves=cab.shelves, shelf_top1=cont.shelf)
             place_lab = place_display_num(cont.column)
-            addr = normalize_address(cont.address) or suggested_address(
-                cab, shelf=cont.shelf, column=cont.column, furniture_code=fcode
+            addr = repair_container_address_if_stale(cont) or normalize_address(
+                suggested_address(cab, shelf=cont.shelf, column=cont.column, furniture_code=fcode)
             )
             kind = cont.kind or "bin"
             label = (cont.label or "").strip() or _KIND_LABELS.get(kind, "Место")

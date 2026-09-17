@@ -170,6 +170,7 @@ from .models import (
     THREAD_KINDS,
     THREAD_STANDARDS,
     TOOL_MATERIAL_TYPES,
+    TOOL_MATERIAL_LEGACY_LABELS,
     PURCHASE_STATUSES,
     normalize_thread_kind,
     stock_category_grouped_choices,
@@ -2039,7 +2040,10 @@ def _fmt_unknown(v, prefix: str = "") -> str:
 
 
 def _build_end_mill_name(diameter_mm, flutes_count, tool_material: str) -> str:
-    tool_mat_label = dict(TOOL_MATERIAL_TYPES).get(tool_material, tool_material)
+    tool_mat_label = dict(TOOL_MATERIAL_TYPES).get(
+        tool_material,
+        TOOL_MATERIAL_LEGACY_LABELS.get(tool_material, tool_material),
+    )
     parts = [f"Фреза D{_fmt_unknown(diameter_mm)}", f"{_fmt_unknown(flutes_count)} кром."]
     if tool_mat_label:
         parts.append(tool_mat_label)
@@ -3393,9 +3397,9 @@ def inventory_view(request):
             )
             if not cont:
                 return JsonResponse({"ok": False, "error": "Контейнер не найден."}, status=404)
-            from .visual_warehouse_views import _container_content_address
+            from .visual_warehouse_address import repair_container_address_if_stale
 
-            addr = normalize_address(_container_content_address(cont) or "")
+            addr = normalize_address(repair_container_address_if_stale(cont) or "")
         else:
             addr = normalize_address(request.POST.get("warehouse_address") or "")
         if not addr:
@@ -5348,6 +5352,7 @@ def inventory_view(request):
             "inner_diameters": tool_extension_inner_diameters,
         },
         "tool_material_types": TOOL_MATERIAL_TYPES,
+        "tool_material_legacy_labels": TOOL_MATERIAL_LEGACY_LABELS,
         "tool_material_extra_options": tool_material_extra_options,
         "tool_material_filter_other": TOOL_MATERIAL_FILTER_OTHER,
         "stock_tool_material_extra_json": stock_tool_material_extra_json,

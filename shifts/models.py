@@ -112,19 +112,24 @@ COATING_TYPE_TOOLTIPS = {
 }
 
 TOOL_MATERIAL_TYPES = [
-    ("hrc45", "HRC 45"),
-    ("hrc50", "HRC 50"),
-    ("hrc55", "HRC 55"),
-    ("hrc60", "HRC 60"),
-    ("hrc65", "HRC 65"),
-    ("hrc66", "HRC 66"),
-    ("hrc70", "HRC 70"),
-    ("hrc75", "HRC 75"),
-    ("hrc80", "HRC 80"),
     ("hss", "HSS"),
+    ("hss_e", "HSS-E"),
     ("hss_co", "HSS-Co"),
     ("carbide", "Твердосплав"),
 ]
+
+# Старые значения HRC — только для отображения уже сохранённых позиций.
+TOOL_MATERIAL_LEGACY_LABELS = {
+    "hrc45": "HRC 45",
+    "hrc50": "HRC 50",
+    "hrc55": "HRC 55",
+    "hrc60": "HRC 60",
+    "hrc65": "HRC 65",
+    "hrc66": "HRC 66",
+    "hrc70": "HRC 70",
+    "hrc75": "HRC 75",
+    "hrc80": "HRC 80",
+}
 
 PURCHASE_STATUSES = [
     ("processing", "В обработке"),
@@ -302,7 +307,7 @@ class ToolItem(models.Model):
         for key, label in TOOL_MATERIAL_TYPES:
             if key == v:
                 return str(label)
-        return v
+        return TOOL_MATERIAL_LEGACY_LABELS.get(v, v)
 
     def issue_select_label(self) -> str:
         """Строка для выпадающего списка выдачи: те же параметры, что в строке таблицы склада по категории."""

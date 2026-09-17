@@ -2,7 +2,7 @@
 
 ARRIVAL_COLUMN_TOOLTIPS = {
     # Общие
-    "tool_material": "Материал инструмента (HRC, HSS, твердосплав и др.)",
+    "tool_material": "Материал инструмента (HSS, HSS-E, HSS-Co, твердосплав и др.)",
     "coating": "Покрытие инструмента",
     "quantity": "Количество в приходе, шт.",
     "row_remove": "Удалить строку прихода",

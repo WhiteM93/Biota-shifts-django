@@ -2405,7 +2405,8 @@ var INV = (function () {
       var bits = [p.place_label || "?"];
       if (p.label) bits.push(p.label);
       else bits.push(p.kind_label || "Место");
-      if (p.furniture_name) bits.push(p.furniture_name);
+      if (p.address) bits.push(p.address);
+      else if (p.furniture_name) bits.push(p.furniture_name);
       else if (p.cabinet_name) bits.push(p.cabinet_name);
       return bits.join(" · ");
     }
@@ -3401,6 +3402,11 @@ var INV = (function () {
 
   var toolMaterialLabels = { "": "Неизвестно" };
   (INV.tool_material_types || []).forEach(function (x) { toolMaterialLabels[x.value] = x.label; });
+  Object.keys(INV.tool_material_legacy_labels || {}).forEach(function (k) {
+    if (!Object.prototype.hasOwnProperty.call(toolMaterialLabels, k)) {
+      toolMaterialLabels[k] = INV.tool_material_legacy_labels[k];
+    }
+  });
 
   var toolMaterialFilterOtherStock = INV.tool_material_filter_other;
   try {
@@ -3840,7 +3846,8 @@ var INV = (function () {
     var bits = [p.place_label || "?"];
     if (p.label) bits.push(p.label);
     else bits.push(p.kind_label || "Место");
-    if (p.furniture_name) bits.push(p.furniture_name);
+    if (p.address) bits.push(p.address);
+    else if (p.furniture_name) bits.push(p.furniture_name);
     else if (p.cabinet_name) bits.push(p.cabinet_name);
     return bits.join(" · ");
   }
