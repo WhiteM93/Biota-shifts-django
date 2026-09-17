@@ -196,6 +196,7 @@ class Command(BaseCommand):
             tool=dr1,
             diameter_mm="4.00", overall_length_mm="75.00",
             cutting_length_mm="43.00", angle_deg="118.00",
+            shank_type="cylindrical_same",
         )
 
         dr2 = ToolItem.objects.create(
@@ -206,6 +207,7 @@ class Command(BaseCommand):
             tool=dr2,
             diameter_mm="6.50", overall_length_mm="101.00",
             cutting_length_mm="63.00", angle_deg="118.00",
+            shank_type="cylindrical_same",
         )
 
         dr3 = ToolItem.objects.create(
@@ -217,6 +219,7 @@ class Command(BaseCommand):
             tool=dr3,
             diameter_mm="10.00", overall_length_mm="130.00",
             cutting_length_mm="87.00", angle_deg="140.00",
+            shank_type="cylindrical_same",
         )
 
         dr4 = ToolItem.objects.create(
@@ -228,6 +231,7 @@ class Command(BaseCommand):
             tool=dr4,
             diameter_mm="3.30", overall_length_mm="65.00",
             cutting_length_mm="36.00", angle_deg="118.00",
+            shank_type="cylindrical_same",
         )
 
         all_tools = [em1, em2, em3, em4, em5, tap1, tap2, tap3, cd1, cd2, cs1, cs2, dr1, dr2, dr3, dr4]

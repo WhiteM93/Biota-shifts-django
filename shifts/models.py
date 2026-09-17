@@ -76,6 +76,7 @@ CENTER_DRILL_ANGLES = [
     ("90", "90"),
     ("120", "120"),
 ]
+CENTER_DRILL_ANGLE_OTHER = "__other__"
 
 COUNTERSINK_TYPES = [
     ("hand", "Ручной"),
@@ -393,13 +394,19 @@ class ToolItem(models.Model):
                 self.name,
             ]
         elif cat == "drill":
+            from .drill_constants import DRILL_SHANK_LABELS, normalize_drill_shank
+
             dr = getattr(self, "drill_spec", None)
             segs = [
                 self.get_category_display(),
                 f"D {fmt_mm(dr.diameter_mm) if dr and dr.diameter_mm is not None else '—'}",
                 f"L {fmt_mm(dr.overall_length_mm) if dr and dr.overall_length_mm is not None else '—'}",
-                f"Lc {fmt_mm(dr.cutting_length_mm) if dr and dr.cutting_length_mm is not None else '—'}",
                 f"∠{fmt_mm(dr.angle_deg) if dr and dr.angle_deg is not None else '—'}°",
+                (
+                    DRILL_SHANK_LABELS.get(normalize_drill_shank(dr.shank_type), "—")
+                    if dr
+                    else "—"
+                ),
                 f"Dосн {main_d()}",
                 self.get_tool_material_display() or "—",
                 coating_txt(),
@@ -614,6 +621,8 @@ class ToolItem(models.Model):
                     specs_parts.append(str(cs.size_label).strip())
                 specs_parts.append(f"Dосн={main_d()}")
         elif cat == "drill":
+            from .drill_constants import DRILL_SHANK_LABELS, normalize_drill_shank
+
             dr = getattr(self, "drill_spec", None)
             tool_type = self.get_category_display()
             if dr:
@@ -621,10 +630,11 @@ class ToolItem(models.Model):
                     specs_parts.append(f"D={fmt_mm(dr.diameter_mm)} мм")
                 if dr.overall_length_mm is not None:
                     specs_parts.append(f"L={fmt_mm(dr.overall_length_mm)} мм")
-                if dr.cutting_length_mm is not None:
-                    specs_parts.append(f"Lc={fmt_mm(dr.cutting_length_mm)} мм")
                 if dr.angle_deg is not None:
                     specs_parts.append(f"∠={fmt_mm(dr.angle_deg)}°")
+                shank = DRILL_SHANK_LABELS.get(normalize_drill_shank(dr.shank_type), "")
+                if shank:
+                    specs_parts.append(shank)
                 specs_parts.append(f"Dосн={main_d()}")
         elif cat == "reamer":
             rm = getattr(self, "reamer_spec", None)
@@ -833,12 +843,15 @@ class ToolItem(models.Model):
                 out["flutes"] = str(cs.flutes_count) if cs.flutes_count is not None else ""
                 out["size_label"] = (cs.size_label or "").strip()
         elif cat == "drill":
+            from .drill_constants import normalize_drill_shank
+
             dr = getattr(self, "drill_spec", None)
             if dr:
                 out["diameter"] = fmt_num(dr.diameter_mm)
                 out["length"] = fmt_num(dr.overall_length_mm)
                 out["cutting_length"] = fmt_num(dr.cutting_length_mm)
                 out["angle"] = fmt_num(dr.angle_deg)
+                out["shank_type"] = normalize_drill_shank(dr.shank_type)
         elif cat == "reamer":
             rm = getattr(self, "reamer_spec", None)
             if rm:
@@ -981,13 +994,30 @@ class DrillSpec(models.Model):
     overall_length_mm = models.DecimalField(max_digits=7, decimal_places=2, verbose_name="Длина, мм", null=True, blank=True)
     cutting_length_mm = models.DecimalField(max_digits=7, decimal_places=2, verbose_name="Длина реж. части, мм", null=True, blank=True)
     angle_deg = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="Угол, °", null=True, blank=True)
+    shank_type = models.CharField(
+        max_length=24,
+        blank=True,
+        default="",
+        verbose_name="Хвостовик",
+        help_text="Конус Морзе, цилиндрический или Weldon",
+    )
 
     class Meta:
         verbose_name = "Параметры сверла"
         verbose_name_plural = "Параметры сверл"
 
     def __str__(self):
-        return f"Сверло Ø{self.diameter_mm} / {self.angle_deg}°"
+        from .drill_constants import DRILL_SHANK_LABELS, normalize_drill_shank
+
+        shank = DRILL_SHANK_LABELS.get(normalize_drill_shank(self.shank_type), "")
+        shank_part = f" / {shank}" if shank else ""
+        return f"Сверло Ø{self.diameter_mm} / {self.angle_deg}°{shank_part}"
+
+    def save(self, *args, **kwargs):
+        from .drill_constants import normalize_drill_shank
+
+        self.shank_type = normalize_drill_shank(self.shank_type)
+        super().save(*args, **kwargs)
 
 
 class ReamerSpec(models.Model):

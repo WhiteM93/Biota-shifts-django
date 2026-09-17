@@ -977,8 +977,87 @@ var INV = (function () {
   }
 
   var toolMaterialFilterOther = INV.tool_material_filter_other;
+  var centerDrillAngleOther = INV.center_drill_angle_other || "__other__";
   var insertFamilyOther = INV.insert_family_other || "OTHER";
   var insertSizeOther = INV.insert_size_other || "OTHER";
+
+  function normalizeCenterDrillAngle(raw) {
+    return String(raw || "")
+      .trim()
+      .replace(/°/g, "")
+      .replace(/\s+/g, "")
+      .replace(",", ".");
+  }
+
+  function buildCenterDrillAngleOptions() {
+    var base = (INV.center_drill_angles || []).map(function (x) {
+      return { value: x.value, label: x.label };
+    });
+    base.push({ value: centerDrillAngleOther, label: "Другое" });
+    return base;
+  }
+
+  var centerDrillAngleOptions = buildCenterDrillAngleOptions();
+
+  function addCenterDrillAngleOption(value) {
+    var v = normalizeCenterDrillAngle(value);
+    if (!v || v === centerDrillAngleOther) return;
+    if (centerDrillAngleOptions.some(function (o) { return o.value === v; })) return;
+    var otherIdx = -1;
+    for (var i = 0; i < centerDrillAngleOptions.length; i += 1) {
+      if (centerDrillAngleOptions[i].value === centerDrillAngleOther) {
+        otherIdx = i;
+        break;
+      }
+    }
+    var opt = { value: v, label: v };
+    if (otherIdx >= 0) centerDrillAngleOptions.splice(otherIdx, 0, opt);
+    else centerDrillAngleOptions.push(opt);
+    if (!INV.center_drill_angles) INV.center_drill_angles = [];
+    if (!INV.center_drill_angles.some(function (x) { return x.value === v; })) {
+      INV.center_drill_angles.push({ value: v, label: v });
+    }
+  }
+
+  function ensureCenterDrillAngleSelectOption(sel, value) {
+    var v = normalizeCenterDrillAngle(value);
+    if (!v) return;
+    addCenterDrillAngleOption(v);
+    var found = Array.prototype.some.call(sel.options, function (o) { return o.value === v; });
+    if (!found) {
+      var otherOpt = Array.prototype.find.call(sel.options, function (o) {
+        return o.value === centerDrillAngleOther;
+      });
+      var o = document.createElement("option");
+      o.value = v;
+      o.textContent = v;
+      if (otherOpt) sel.insertBefore(o, otherOpt);
+      else sel.appendChild(o);
+    }
+    sel.value = v;
+  }
+
+  function syncCenterDrillAngleCustom(tr) {
+    if (!tr) return;
+    var sel = tr.querySelector('[data-k="cd_angle_deg"]');
+    var custom = tr.querySelector('[data-k="cd_angle_custom"]');
+    if (!sel || !custom) return;
+    var isOther = sel.value === centerDrillAngleOther;
+    custom.style.display = isOther ? "block" : "none";
+    if (!isOther) {
+      custom.value = "";
+      custom.classList.remove("is-invalid");
+    }
+  }
+
+  function applyCustomCenterDrillAngle(sel, custom) {
+    var v = normalizeCenterDrillAngle(custom && custom.value);
+    if (!v || !sel || sel.value !== centerDrillAngleOther) return;
+    ensureCenterDrillAngleSelectOption(sel, v);
+    custom.style.display = "none";
+    custom.value = "";
+  }
+
   function normalizeInsertFamilyValue(v) {
     return (v || "").trim().toUpperCase();
   }
@@ -1591,6 +1670,47 @@ var INV = (function () {
     }
   }
 
+  function drillShankNeedsMainDiameter(shank) {
+    var need = INV.drill_shank_needs_main_diameter || ["cylindrical_other", "weldon"];
+    return need.indexOf(shank) >= 0;
+  }
+
+  function drillShankCopiesCutting(shank) {
+    var copy = INV.drill_shank_copies_cutting || ["cylindrical_same"];
+    return copy.indexOf(shank) >= 0;
+  }
+
+  function syncDrillShankMainDiameter(tr) {
+    if (!tr) return;
+    var shankEl = tr.querySelector('[data-k="dr_shank_type"]');
+    var mainEl = tr.querySelector('[data-k="main_diameter_mm"]');
+    var dEl = tr.querySelector('[data-k="dr_diameter_mm"]');
+    if (!mainEl) return;
+    var shank = ((shankEl && shankEl.value) || "").trim();
+    if (drillShankCopiesCutting(shank)) {
+      mainEl.disabled = true;
+      mainEl.required = false;
+      mainEl.removeAttribute("aria-required");
+      mainEl.title = "Равен диаметру D";
+      if (dEl && isPositiveNumberField(dEl)) {
+        mainEl.value = dEl.value;
+      }
+      mainEl.classList.remove("is-invalid");
+    } else if (drillShankNeedsMainDiameter(shank)) {
+      mainEl.disabled = false;
+      mainEl.required = true;
+      mainEl.setAttribute("aria-required", "true");
+      mainEl.title = "D осн хвостовика, мм (обязательно)";
+    } else {
+      mainEl.disabled = true;
+      mainEl.required = false;
+      mainEl.removeAttribute("aria-required");
+      mainEl.value = "";
+      mainEl.classList.remove("is-invalid");
+      mainEl.title = "Для конуса Морзе не указывается";
+    }
+  }
+
   var arrivalDiamRequiredByCategory = {
     drill: { key: "dr_diameter_mm", label: "диаметр D (мм) для сверла" },
     reamer: { key: "rm_diameter_mm", label: "диаметр D (мм) для развертки" },
@@ -1709,6 +1829,26 @@ var INV = (function () {
           }
         }
       }
+      if (cat === "drill") {
+        var shankEl = tr.querySelector('[data-k="dr_shank_type"]');
+        var shankVal = ((shankEl && shankEl.value) || "").trim();
+        if (!shankVal) {
+          if (shankEl) shankEl.classList.add("is-invalid");
+          issues.push({
+            msg: "Строка " + (i + 1) + ": укажите тип хвостовика сверла.",
+            el: shankEl,
+          });
+        } else if (drillShankNeedsMainDiameter(shankVal)) {
+          var mainEl = tr.querySelector('[data-k="main_diameter_mm"]');
+          if (!isPositiveNumberField(mainEl)) {
+            if (mainEl) mainEl.classList.add("is-invalid");
+            issues.push({
+              msg: "Строка " + (i + 1) + ": укажите D осн (мм) для выбранного хвостовика.",
+              el: mainEl,
+            });
+          }
+        }
+      }
       var spec = arrivalDiamRequiredByCategory[cat];
       if (!spec) return;
       var el = tr.querySelector('[data-k="' + spec.key + '"]');
@@ -1739,7 +1879,8 @@ var INV = (function () {
         k === "bt_insert_family_custom" ||
         k === "bt_insert_family_a" ||
         k === "bt_insert_family_b" ||
-        k === "bt_insert_size_custom"
+        k === "bt_insert_size_custom" ||
+        k === "cd_angle_custom"
       ) {
         return;
       }
@@ -1750,6 +1891,13 @@ var INV = (function () {
       if (k === "tool_material" && (el.value || "") === toolMaterialFilterOther) {
         var cin = tr.querySelector('[data-k="tool_material_custom"]');
         row.tool_material = ((cin && cin.value) || "").trim();
+      } else if (k === "cd_angle_deg") {
+        if ((el.value || "") === centerDrillAngleOther) {
+          var angCustom = tr.querySelector('[data-k="cd_angle_custom"]');
+          row.cd_angle_deg = normalizeCenterDrillAngle((angCustom && angCustom.value) || "");
+        } else {
+          row.cd_angle_deg = normalizeCenterDrillAngle(el.value);
+        }
       } else if (k === "ins_family") {
         var insPair = tr.querySelector('.js-insert-family-pair[data-family-key="ins_family"]');
         if (insPair) syncBodyInsertFamilyHidden(insPair);
@@ -2637,7 +2785,6 @@ var INV = (function () {
     ]),
     center_drill: arrivalHead([
       { key: "D", label: "D", cls: "short-col" },
-      { key: "L", label: "L", cls: "short-col" },
       { key: "cd_angle", label: "Угол", cls: "angle-col" },
       { key: "D_shank", label: "D осн", cls: "short-col" },
       { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
@@ -2660,8 +2807,8 @@ var INV = (function () {
     drill: arrivalHead([
       { key: "D", label: "D", cls: "short-col" },
       { key: "L", label: "L", cls: "short-col" },
-      { key: "Lc", label: "Lc", cls: "short-col" },
       { key: "dr_angle", label: "Угол", cls: "short-col" },
+      { key: "dr_shank", label: "Хвостовик" },
       { key: "D_shank", label: "D осн", cls: "short-col" },
       { key: "tool_material", label: "Материал<br>инструмента", cls: "stack-words" },
       { key: "coating", label: "Покрытие" },
@@ -2836,8 +2983,14 @@ var INV = (function () {
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "center_drill") {
       cells.push(arrivalRequiredDiamCell("cd_diameter_mm"));
-      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="cd_overall_length_mm"></td>');
-      cells.push('<td class="angle-col"><select data-k="cd_angle_deg">' + buildOptionsHtml(INV.center_drill_angles || []) + '</select></td>');
+      cells.push(
+        '<td class="angle-col">' +
+          '<select data-k="cd_angle_deg" class="js-cd-angle">' +
+          buildOptionsHtml(centerDrillAngleOptions) +
+          "</select>" +
+          '<input type="text" data-k="cd_angle_custom" class="js-cd-angle-custom" maxlength="8" placeholder="Угол °" inputmode="decimal" autocomplete="off" spellcheck="false" style="display:none;margin-top:4px;max-width:100%;">' +
+          "</td>"
+      );
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
@@ -2866,8 +3019,13 @@ var INV = (function () {
     } else if (cat === "drill") {
       cells.push(arrivalRequiredDiamCell("dr_diameter_mm"));
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_overall_length_mm"></td>');
-      cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_cutting_length_mm"></td>');
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="dr_angle_deg"></td>');
+      cells.push(
+        '<td><select data-k="dr_shank_type" class="js-dr-shank" required>' +
+          '<option value="">—</option>' +
+          buildOptionsHtml(INV.drill_shank_types || []) +
+          "</select></td>"
+      );
       cells.push('<td class="short-col"><input type="number" step="0.01" data-k="main_diameter_mm"></td>');
       cells.push('<td class="tm-cell tm-cell-tool-material"></td>');
       cells.push('<td class="co-cell"></td>');
@@ -2940,6 +3098,8 @@ var INV = (function () {
     var coCell = tr.querySelector(".co-cell");
     if (coCell) coCell.appendChild(buildColoredCoatingSelect("none"));
     if (cat === "tool_extension") syncExtInnerDiameterField(tr);
+    if (cat === "center_drill") syncCenterDrillAngleCustom(tr);
+    if (cat === "drill") syncDrillShankMainDiameter(tr);
     attachArrivalMatchRow(tr, body);
   }
 
@@ -2982,6 +3142,9 @@ var INV = (function () {
     }
     var tr = t && t.closest && t.closest("tr[data-arrival-row]");
     if (!tr) return;
+    if (t.getAttribute("data-k") === "dr_diameter_mm") {
+      syncDrillShankMainDiameter(tr);
+    }
     if (tr.classList.contains("is-existing-pick") && t.getAttribute("data-k") !== "quantity") {
       // характеристики меняются — снять привязку к старой позиции
       if (t.getAttribute("data-k") && t.getAttribute("data-k") !== "existing_tool_id") {
@@ -3011,6 +3174,12 @@ var INV = (function () {
       }
       syncExtInnerDiameterField(tr);
     }
+    if (t.getAttribute("data-k") === "cd_angle_deg") {
+      syncCenterDrillAngleCustom(tr);
+    }
+    if (t.getAttribute("data-k") === "dr_shank_type") {
+      syncDrillShankMainDiameter(tr);
+    }
     if (tr.classList.contains("is-existing-pick") && t.getAttribute("data-k") !== "quantity") {
       var hid = tr.querySelector('[data-k="existing_tool_id"]');
       if (hid) hid.value = "";
@@ -3024,6 +3193,14 @@ var INV = (function () {
     var t = e.target;
     if (!t || !t.getAttribute) return;
     var dk = t.getAttribute("data-k") || "";
+    if (dk === "cd_angle_custom") {
+      var trAng = t.closest && t.closest("tr[data-arrival-row]");
+      if (!trAng) return;
+      var angSel = trAng.querySelector('[data-k="cd_angle_deg"]');
+      applyCustomCenterDrillAngle(angSel, t);
+      scheduleArrivalMatchSearch(trAng);
+      return;
+    }
     if (dk !== "size_label" && dk !== "cs_size_label") return;
     var normSize = normalizeMetricSizeLabel(t.value);
     if (t.value !== normSize) t.value = normSize;
@@ -3163,6 +3340,8 @@ var INV = (function () {
   });
   var extClampLabels = {};
   (INV.tool_extension_clamp_types || []).forEach(function (x) { extClampLabels[x.value] = x.label; });
+  var drillShankLabels = { "": "—" };
+  (INV.drill_shank_types || []).forEach(function (x) { drillShankLabels[x.value] = x.label; });
   var hsBodyStyleLabels = { "": "—" };
   (INV.high_speed_body_styles || []).forEach(function (x) { hsBodyStyleLabels[x.value] = x.label; });
   var hsAngleLabels = {};
@@ -3284,6 +3463,7 @@ var INV = (function () {
     if (field === "bt_coupling") return bodyCouplingLabels[v] || v || "—";
     if (field === "bt_shank_type") return bodyShankLabels[v] || v || "—";
     if (field === "ext_clamp_type") return extClampLabels[v] || v || "-";
+    if (field === "dr_shank_type") return drillShankLabels[v] || v || "—";
     if (field === "ext_brand") return v || "-";
     if (field === "ext_compatible_parts") return v || "-";
     if (field === "bt_insert_family") return (v || "-").toString().toUpperCase();
@@ -3381,6 +3561,8 @@ var INV = (function () {
       options = fromMap(bodyShankLabels);
     } else if (field === "ext_clamp_type") {
       options = fromMap(extClampLabels);
+    } else if (field === "dr_shank_type") {
+      options = fromMap(drillShankLabels);
     } else if (field === "bt_mount_thread") {
       options = fromMap(modularThreadLabels);
     } else if (field === "bt_coolant") {
@@ -3420,6 +3602,10 @@ var INV = (function () {
       options = fromMap(tapToolTypeLabels);
     } else if (field === "cd_angle_deg") {
       options = fromMap(centerDrillAngleLabels);
+      if (current && !options.some(function (o) { return o.value === current; })) {
+        options.push({ value: current, label: current, title: current });
+        centerDrillAngleLabels[current] = current;
+      }
     } else if (field === "cs_type") {
       options = fromMap(countersinkTypeLabels);
     } else if (field === "cs_angle_deg") {

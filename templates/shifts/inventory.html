@@ -448,7 +448,6 @@
       <tr>
         <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable hint-cell" data-hint="Диаметр режущей части, мм">D, мм</th>
-        <th class="sortable hint-cell" data-hint="Длина инструмента">L, мм</th>
         <th class="sortable hint-cell" data-hint="Угол заточки центровочного сверла, °">Угол, °</th>
         <th class="sortable hint-cell" data-hint="Основной диаметр зажима (хвостовик), мм">D осн, мм</th>
         <th class="sortable hint-cell" data-hint="Материал инструмента (HRC, HSS, твердосплав и др.)">Материал инструмента</th>
@@ -462,8 +461,7 @@
       <tr>
 <td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.center_drill_spec.diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cd_diameter_mm" data-type="number" data-value="{{ t.center_drill_spec.diameter_mm|default:'' }}"{% endif %}>{% if t.center_drill_spec.diameter_mm is not None %}{{ t.center_drill_spec.diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.center_drill_spec.overall_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cd_overall_length_mm" data-type="number" data-value="{{ t.center_drill_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.center_drill_spec.overall_length_mm is not None %}{{ t.center_drill_spec.overall_length_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.center_drill_spec.angle_deg|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cd_angle_deg" data-type="select" data-value="{{ t.center_drill_spec.angle_deg|default:'' }}"{% endif %}>{{ t.center_drill_spec.angle_deg|default:"-" }}</td>
+        <td data-sort="{{ t.center_drill_spec.angle_deg|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="cd_angle_deg" data-type="text" data-value="{{ t.center_drill_spec.angle_deg|default:'' }}"{% endif %}>{{ t.center_drill_spec.angle_deg|default:"-" }}</td>
         <td data-sort="{{ t.main_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="main_diameter_mm" data-type="number" data-value="{{ t.main_diameter_mm|default:'' }}"{% endif %}>{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
         <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
@@ -484,7 +482,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}8{% else %}7{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -591,8 +589,8 @@
         <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
         <th class="sortable hint-cell" data-hint="Диаметр режущей части, мм">D, мм</th>
         <th class="sortable hint-cell" data-hint="Длина инструмента">L, мм</th>
-        <th class="sortable hint-cell" data-hint="Длина режущей части">Lc, мм</th>
         <th class="sortable hint-cell" data-hint="Угол при вершине сверла, °">Угол, °</th>
+        <th class="sortable hint-cell" data-hint="Тип хвостовика: конус Морзе, цилиндрический или Weldon">Хвостовик</th>
         <th class="sortable hint-cell" data-hint="Основной диаметр зажима (хвостовик), мм">D осн, мм</th>
         <th class="sortable hint-cell" data-hint="Материал инструмента (HRC, HSS, твердосплав и др.)">Материал инструмента</th>
         <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
@@ -606,8 +604,8 @@
 <td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
         <td data-sort="{{ t.drill_spec.diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="dr_diameter_mm" data-type="number" data-value="{{ t.drill_spec.diameter_mm|default:'' }}"{% endif %}>{% if t.drill_spec.diameter_mm is not None %}{{ t.drill_spec.diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.drill_spec.overall_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="dr_overall_length_mm" data-type="number" data-value="{{ t.drill_spec.overall_length_mm|default:'' }}"{% endif %}>{% if t.drill_spec.overall_length_mm is not None %}{{ t.drill_spec.overall_length_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
-        <td data-sort="{{ t.drill_spec.cutting_length_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="dr_cutting_length_mm" data-type="number" data-value="{{ t.drill_spec.cutting_length_mm|default:'' }}"{% endif %}>{% if t.drill_spec.cutting_length_mm is not None %}{{ t.drill_spec.cutting_length_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.drill_spec.angle_deg|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="dr_angle_deg" data-type="number" data-value="{{ t.drill_spec.angle_deg|default:'' }}"{% endif %}>{% if t.drill_spec.angle_deg is not None %}{{ t.drill_spec.angle_deg|dotformat:"-2" }}{% else %}-{% endif %}</td>
+        <td data-sort="{{ t.drill_spec.shank_type|default:'' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="dr_shank_type" data-type="select" data-value="{{ t.drill_spec.shank_type|default:'' }}"{% endif %}>{% if t.drill_spec.shank_type %}{% for key, label in drill_shank_types %}{% if key == t.drill_spec.shank_type %}{{ label }}{% endif %}{% endfor %}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.main_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="main_diameter_mm" data-type="number" data-value="{{ t.main_diameter_mm|default:'' }}"{% endif %}>{% if t.main_diameter_mm is not None %}{{ t.main_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
         <td {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="tool_material" data-type="select" data-value="{{ t.tool_material|default:'' }}"{% endif %}>{{ t.get_tool_material_display|default:"-" }}</td>
         <td data-sort="{{ t.coating_type }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="coating_type" data-type="select" data-value="{{ t.coating_type|default:'none' }}"{% endif %}>
@@ -628,7 +626,7 @@
         {% endif %}
       </tr>
       {% empty %}
-      <tr><td colspan="{% if can_manage_stock %}11{% else %}10{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      <tr><td colspan="{% if can_manage_stock %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -1126,21 +1124,11 @@
       </select>
     </label>
     {% elif filters.category == "center_drill" %}
-    <label class="field"><span>Длина, мм</span>
-      <select name="center_overall_length_mm">
-        <option value="">Все</option>
-        {% for v in center_drill_filter_options.overall_lengths %}
-        <option value="{{ v }}" {% if filters.center_overall_length_mm == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
     <label class="field"><span>Угол, °</span>
       <select name="center_angle_deg">
         <option value="">Все</option>
         {% for key, label in center_drill_angles %}
-          {% if key in center_drill_filter_options.angles %}
-          <option value="{{ key }}" {% if filters.center_angle_deg == key %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
+        <option value="{{ key }}" {% if filters.center_angle_deg == key %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
     </label>
@@ -1188,19 +1176,19 @@
         {% endfor %}
       </select>
     </label>
-    <label class="field"><span>Длина реж. части, мм</span>
-      <select name="drill_cutting_length_mm">
-        <option value="">Все</option>
-        {% for v in drill_filter_options.cutting_lengths %}
-        <option value="{{ v }}" {% if filters.drill_cutting_length_mm == v %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-      </select>
-    </label>
     <label class="field"><span>Угол, °</span>
       <select name="drill_angle_deg">
         <option value="">Все</option>
         {% for v in drill_filter_options.angles %}
         <option value="{{ v }}" {% if filters.drill_angle_deg == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Хвостовик</span>
+      <select name="drill_shank_type">
+        <option value="">Все</option>
+        {% for key, label in drill_shank_types %}
+        <option value="{{ key }}" {% if filters.drill_shank_type == key %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
     </label>
@@ -3136,6 +3124,10 @@
   "tap_hole_types": [{% for key, label in tap_hole_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "tap_tool_types": [{% for key, label in tap_tool_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "center_drill_angles": [{% for key, label in center_drill_angles %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "center_drill_angle_other": "{{ center_drill_angle_other|escapejs }}",
+  "drill_shank_types": [{% for key, label in drill_shank_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "drill_shank_needs_main_diameter": ["cylindrical_other","weldon"],
+  "drill_shank_copies_cutting": ["cylindrical_same"],
   "countersink_types": [{% for key, label in countersink_types %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "countersink_angles": [{% for key, label in countersink_angles %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "reamer_accuracy_classes": [{% for key, label in reamer_accuracy_classes %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],

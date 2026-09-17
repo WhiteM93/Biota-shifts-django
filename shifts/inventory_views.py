@@ -33,6 +33,12 @@ from .auth_utils import (
     inventory_route_nav_access_required,
     write_permission_required,
 )
+from .drill_constants import (
+    DRILL_SHANK_TYPES,
+    drill_shank_copies_cutting_diameter,
+    drill_shank_needs_main_diameter,
+    normalize_drill_shank,
+)
 from .body_tool_constants import (
     BODY_TOOL_COUPLINGS,
     BODY_TOOL_FAMILIES,
@@ -132,6 +138,7 @@ from .tool_extension_constants import (
 )
 from .models import (
     CENTER_DRILL_ANGLES,
+    CENTER_DRILL_ANGLE_OTHER,
     COUNTERSINK_ANGLES,
     COUNTERSINK_TYPES,
     COATING_TYPES,
@@ -170,6 +177,39 @@ from .models import (
 
 TOOL_MATERIAL_FILTER_OTHER = "__other__"
 PURCHASE_STORE_FILTER_OTHER = "__purchase_store_other__"
+
+
+def _normalize_center_drill_angle(raw) -> str:
+    v = str(raw or "").strip().replace("°", "").replace(" ", "").replace(",", ".")
+    if not v or v == CENTER_DRILL_ANGLE_OTHER:
+        return ""
+    return v[:8]
+
+
+def _center_drill_angle_choices():
+    """Стандарт 60/90/120 + уже использованные углы со склада."""
+    seen: list[str] = []
+    out: list[tuple[str, str]] = []
+    for key, label in CENTER_DRILL_ANGLES:
+        k = str(key).strip()
+        if not k or k in seen:
+            continue
+        seen.append(k)
+        out.append((k, str(label)))
+    for raw in (
+        CenterDrillSpec.objects.exclude(angle_deg="")
+        .values_list("angle_deg", flat=True)
+        .distinct()
+        .order_by("angle_deg")
+    ):
+        k = _normalize_center_drill_angle(raw)
+        if not k or k in seen:
+            continue
+        seen.append(k)
+        out.append((k, k))
+    return out
+
+
 _TOOL_MATERIAL_STD_KEYS = frozenset(k for k, _ in TOOL_MATERIAL_TYPES)
 _INVENTORY_CATEGORIES = frozenset(
     {"end_mill", "body_tool", "tap", "center_drill", "countersink", "drill", "reamer", "insert", "collet", "tool_extension"}
@@ -341,6 +381,16 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
                     f"Строка {idx}: укажите внутренний диаметр Dвн (мм, 1/2, G1/8…) для термо/боковой фиксации."
                 )
         return errs
+    if category == "drill":
+        if _to_decimal_or_none(row.get("dr_diameter_mm")) is None:
+            errs.append(f"Строка {idx}: укажите диаметр D (мм) для сверла.")
+        shank = normalize_drill_shank(row.get("dr_shank_type"))
+        if not shank:
+            errs.append(f"Строка {idx}: укажите тип хвостовика сверла.")
+        elif drill_shank_needs_main_diameter(shank):
+            if _to_decimal_or_none(row.get("main_diameter_mm")) is None:
+                errs.append(f"Строка {idx}: укажите D осн (мм) для выбранного хвостовика.")
+        return errs
     if category == "insert":
         iname = normalize_insert_item_name(row.get("ins_name") or row.get("item_name"))
         if not iname:
@@ -449,6 +499,12 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
     if coating_raw and coating_raw != "none":
         qs = qs.filter(coating_type=coating_raw)
     main_d = _to_decimal_or_none(row.get("main_diameter_mm"))
+    if category == "drill":
+        main_d = _resolve_drill_main_diameter(
+            row.get("dr_shank_type"),
+            _to_decimal_or_none(row.get("dr_diameter_mm")),
+            main_d,
+        )
     if main_d is not None:
         qs = qs.filter(main_diameter_mm=main_d)
 
@@ -578,6 +634,9 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
             v = _to_decimal_or_none(row.get(key))
             if v is not None:
                 qs = qs.filter(**{field: v})
+        shank = normalize_drill_shank(row.get("dr_shank_type"))
+        if shank:
+            qs = qs.filter(drill_spec__shank_type=shank)
     elif category == "reamer":
         qs = qs.select_related("reamer_spec")
         d = _to_decimal_or_none(row.get("rm_diameter_mm"))
@@ -817,6 +876,7 @@ _STOCK_INLINE_FIELD_LABELS = {
     "dr_overall_length_mm": "Общая длина",
     "dr_cutting_length_mm": "Длина реж. части",
     "dr_angle_deg": "Угол",
+    "dr_shank_type": "Хвостовик",
     "rm_diameter_mm": "Диаметр",
     "rm_overall_length_mm": "Общая длина",
     "rm_cutting_length_mm": "Длина реж. части",
@@ -882,6 +942,8 @@ def _stock_history_value_display(field: str, value) -> str:
         return dict(TAP_TOOL_TYPES).get(raw, raw)
     if key in {"cd_angle_deg"}:
         return dict(CENTER_DRILL_ANGLES).get(raw, raw)
+    if key == "dr_shank_type":
+        return dict(DRILL_SHANK_TYPES).get(raw, raw)
     if key == "cs_type":
         return dict(COUNTERSINK_TYPES).get(raw, raw)
     if key == "cs_angle_deg":
@@ -1313,6 +1375,7 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "drill_overall_length_mm",
         "drill_cutting_length_mm",
         "drill_angle_deg",
+        "drill_shank_type",
         "reamer_diameter_mm",
         "reamer_overall_length_mm",
         "reamer_cutting_length_mm",
@@ -1460,7 +1523,13 @@ _STOCK_KEYS_BY_CATEGORY = {
         }
     ),
     "drill": frozenset(
-        {"drill_diameter_mm", "drill_overall_length_mm", "drill_cutting_length_mm", "drill_angle_deg"}
+        {
+            "drill_diameter_mm",
+            "drill_overall_length_mm",
+            "drill_cutting_length_mm",
+            "drill_angle_deg",
+            "drill_shank_type",
+        }
     ),
     "reamer": frozenset(
         {
@@ -1798,6 +1867,11 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
             drill_angle = _to_decimal(drill_angle_raw, Decimal("0"))
             if drill_angle > 0:
                 qs = qs.filter(drill_spec__angle_deg=drill_angle)
+        drill_shank_raw = g("drill_shank_type")
+        if drill_shank_raw:
+            shank = normalize_drill_shank(drill_shank_raw)
+            if shank:
+                qs = qs.filter(drill_spec__shank_type=shank)
     elif category == "reamer":
         reamer_diameter_raw = g("reamer_diameter_mm")
         if reamer_diameter_raw:
@@ -1989,12 +2063,25 @@ def _build_countersink_name(countersink_type: str, diameter_mm, angle_deg: str, 
     return f"Зенкер {type_label} D{_fmt_unknown(diameter_mm)} / {angle_deg or '90'}°{size_part}"
 
 
-def _build_drill_name(diameter_mm, overall_length_mm, cutting_length_mm, angle_deg) -> str:
+def _resolve_drill_main_diameter(shank_type, diameter_mm, main_diameter_mm):
+    """Dосн: копия D для цилиндр. как основной; ручной ввод для другого/Weldon; пусто для Морзе."""
+    shank = normalize_drill_shank(shank_type)
+    if drill_shank_copies_cutting_diameter(shank):
+        return diameter_mm
+    if drill_shank_needs_main_diameter(shank):
+        return main_diameter_mm
+    return None
+
+
+def _build_drill_name(diameter_mm, overall_length_mm, cutting_length_mm, angle_deg, shank_type="") -> str:
+    from .drill_constants import DRILL_SHANK_LABELS
+
+    shank = normalize_drill_shank(shank_type)
+    shank_part = f" / {DRILL_SHANK_LABELS[shank]}" if shank in DRILL_SHANK_LABELS else ""
     return (
         f"Сверло D{_fmt_unknown(diameter_mm)} / "
         f"L{_fmt_unknown(overall_length_mm)} / "
-        f"Lc{_fmt_unknown(cutting_length_mm)} / "
-        f"{_fmt_unknown(angle_deg)}°"
+        f"{_fmt_unknown(angle_deg)}°{shank_part}"
     )
 
 
@@ -2721,7 +2808,9 @@ def inventory_view(request):
         elif tool.category == "center_drill" and tool.center_drill_spec:
             tool.center_drill_spec.diameter_mm = _to_decimal_or_none(request.POST.get("cd_diameter_mm"))
             tool.center_drill_spec.overall_length_mm = _to_decimal_or_none(request.POST.get("cd_overall_length_mm"))
-            tool.center_drill_spec.angle_deg = (request.POST.get("cd_angle_deg") or "60").strip()
+            tool.center_drill_spec.angle_deg = _normalize_center_drill_angle(
+                request.POST.get("cd_angle_deg")
+            ) or "60"
             tool.center_drill_spec.save()
         elif tool.category == "countersink" and tool.countersink_spec:
             tool.countersink_spec.countersink_type = (request.POST.get("cs_type") or "machine").strip()
@@ -2736,7 +2825,20 @@ def inventory_view(request):
             tool.drill_spec.overall_length_mm = _to_decimal_or_none(request.POST.get("dr_overall_length_mm"))
             tool.drill_spec.cutting_length_mm = _to_decimal_or_none(request.POST.get("dr_cutting_length_mm"))
             tool.drill_spec.angle_deg = _to_decimal_or_none(request.POST.get("dr_angle_deg"))
+            tool.drill_spec.shank_type = normalize_drill_shank(request.POST.get("dr_shank_type"))
             tool.drill_spec.save()
+            tool.main_diameter_mm = _resolve_drill_main_diameter(
+                tool.drill_spec.shank_type,
+                tool.drill_spec.diameter_mm,
+                _to_decimal_or_none(request.POST.get("main_diameter_mm")),
+            )
+            tool.name = _build_drill_name(
+                tool.drill_spec.diameter_mm,
+                tool.drill_spec.overall_length_mm,
+                tool.drill_spec.cutting_length_mm,
+                tool.drill_spec.angle_deg,
+                tool.drill_spec.shank_type,
+            )
         elif tool.category == "reamer" and tool.reamer_spec:
             tool.reamer_spec.diameter_mm = _to_decimal_or_none(request.POST.get("rm_diameter_mm"))
             tool.reamer_spec.overall_length_mm = _to_decimal_or_none(request.POST.get("rm_overall_length_mm"))
@@ -3076,7 +3178,7 @@ def inventory_view(request):
                     cd.overall_length_mm = _to_decimal_or_none(value_raw)
                     cd.save(update_fields=["overall_length_mm"])
                 elif field == "cd_angle_deg":
-                    cd.angle_deg = value_raw or "60"
+                    cd.angle_deg = _normalize_center_drill_angle(value_raw) or "60"
                     cd.save(update_fields=["angle_deg"])
                 else:
                     return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
@@ -3107,6 +3209,9 @@ def inventory_view(request):
                 if field == "dr_diameter_mm":
                     dr.diameter_mm = _to_decimal_or_none(value_raw)
                     dr.save(update_fields=["diameter_mm"])
+                    if drill_shank_copies_cutting_diameter(dr.shank_type):
+                        tool.main_diameter_mm = dr.diameter_mm
+                        tool.save(update_fields=["main_diameter_mm", "updated_at"])
                 elif field == "dr_overall_length_mm":
                     dr.overall_length_mm = _to_decimal_or_none(value_raw)
                     dr.save(update_fields=["overall_length_mm"])
@@ -3116,6 +3221,22 @@ def inventory_view(request):
                 elif field == "dr_angle_deg":
                     dr.angle_deg = _to_decimal_or_none(value_raw)
                     dr.save(update_fields=["angle_deg"])
+                elif field == "dr_shank_type":
+                    dr.shank_type = normalize_drill_shank(value_raw)
+                    dr.save(update_fields=["shank_type"])
+                    tool.main_diameter_mm = _resolve_drill_main_diameter(
+                        dr.shank_type,
+                        dr.diameter_mm,
+                        tool.main_diameter_mm,
+                    )
+                    tool.name = _build_drill_name(
+                        dr.diameter_mm,
+                        dr.overall_length_mm,
+                        dr.cutting_length_mm,
+                        dr.angle_deg,
+                        dr.shank_type,
+                    )
+                    tool.save(update_fields=["main_diameter_mm", "name", "updated_at"])
                 else:
                     return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
             elif cat == "reamer" and tool.reamer_spec:
@@ -3848,9 +3969,7 @@ def inventory_view(request):
                 elif category == "center_drill":
                     diameter_mm = _to_decimal_or_none(row.get("cd_diameter_mm"))
                     overall_length_mm = _to_decimal_or_none(row.get("cd_overall_length_mm"))
-                    angle_deg = (row.get("cd_angle_deg") or "60").strip()
-                    if angle_deg not in {x[0] for x in CENTER_DRILL_ANGLES}:
-                        angle_deg = "60"
+                    angle_deg = _normalize_center_drill_angle(row.get("cd_angle_deg")) or "60"
                     tool = (
                         ToolItem.objects.select_for_update()
                         .filter(
@@ -3935,6 +4054,10 @@ def inventory_view(request):
                     overall_length_mm = _to_decimal_or_none(row.get("dr_overall_length_mm"))
                     cutting_length_mm = _to_decimal_or_none(row.get("dr_cutting_length_mm"))
                     angle_deg = _to_decimal_or_none(row.get("dr_angle_deg"))
+                    shank_type = normalize_drill_shank(row.get("dr_shank_type"))
+                    main_diameter_mm = _resolve_drill_main_diameter(
+                        shank_type, diameter_mm, main_diameter_mm
+                    )
                     tool = (
                         ToolItem.objects.select_for_update()
                         .filter(
@@ -3946,6 +4069,7 @@ def inventory_view(request):
                             drill_spec__overall_length_mm=overall_length_mm,
                             drill_spec__cutting_length_mm=cutting_length_mm,
                             drill_spec__angle_deg=angle_deg,
+                            drill_spec__shank_type=shank_type,
                         )
                         .first()
                     )
@@ -3955,7 +4079,13 @@ def inventory_view(request):
                     else:
                         tool = ToolItem.objects.create(
                             category="drill",
-                            name=_build_drill_name(diameter_mm, overall_length_mm, cutting_length_mm, angle_deg),
+                            name=_build_drill_name(
+                                diameter_mm,
+                                overall_length_mm,
+                                cutting_length_mm,
+                                angle_deg,
+                                shank_type,
+                            ),
                             tool_material=tool_material,
                             coating_type=coating_type,
                             main_diameter_mm=main_diameter_mm,
@@ -3967,6 +4097,7 @@ def inventory_view(request):
                             overall_length_mm=overall_length_mm,
                             cutting_length_mm=cutting_length_mm,
                             angle_deg=angle_deg,
+                            shank_type=shank_type,
                         )
                 elif category == "reamer":
                     diameter_mm = _to_decimal_or_none(row.get("rm_diameter_mm"))
@@ -4331,6 +4462,7 @@ def inventory_view(request):
     drill_overall_length_raw = _sq("drill_overall_length_mm")
     drill_cutting_length_raw = _sq("drill_cutting_length_mm")
     drill_angle_raw = _sq("drill_angle_deg")
+    drill_shank_raw = _sq("drill_shank_type")
     reamer_diameter_raw = _sq("reamer_diameter_mm")
     reamer_overall_length_raw = _sq("reamer_overall_length_mm")
     reamer_cutting_length_raw = _sq("reamer_cutting_length_mm")
@@ -4994,6 +5126,7 @@ def inventory_view(request):
             "drill_overall_length_mm": _norm_stock_decimal_str(drill_overall_length_raw),
             "drill_cutting_length_mm": _norm_stock_decimal_str(drill_cutting_length_raw),
             "drill_angle_deg": _norm_stock_decimal_str(drill_angle_raw),
+            "drill_shank_type": normalize_drill_shank(drill_shank_raw),
             "reamer_diameter_mm": _norm_stock_decimal_str(reamer_diameter_raw),
             "reamer_overall_length_mm": _norm_stock_decimal_str(reamer_overall_length_raw),
             "reamer_cutting_length_mm": _norm_stock_decimal_str(reamer_cutting_length_raw),
@@ -5128,7 +5261,8 @@ def inventory_view(request):
             "overall_lengths": center_overall_lengths,
             "angles": center_angles,
         },
-        "center_drill_angles": CENTER_DRILL_ANGLES,
+        "center_drill_angles": _center_drill_angle_choices(),
+        "center_drill_angle_other": CENTER_DRILL_ANGLE_OTHER,
         "countersink_filter_options": {
             "types": countersink_types,
             "diameters": countersink_diameters,
@@ -5145,6 +5279,7 @@ def inventory_view(request):
             "cutting_lengths": drill_cutting_lengths,
             "angles": drill_angles,
         },
+        "drill_shank_types": DRILL_SHANK_TYPES,
         "reamer_filter_options": {
             "diameters": reamer_diameters,
             "overall_lengths": reamer_overall_lengths,
