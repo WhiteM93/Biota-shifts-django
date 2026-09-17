@@ -52,6 +52,7 @@ from .models import (
     TapSpec,
     ToolItem,
     VisualCabinet,
+    VisualCabinetLevel,
     VisualContainer,
     VisualContainerAudit,
     VisualContainerAuditLine,
@@ -61,20 +62,32 @@ from .models import (
     stock_category_grouped_choices,
 )
 from .visual_warehouse_address import (
+    apply_cabinet_sections_layout,
     cabinet_code_of,
+    cabinet_section_count,
+    ensure_cabinet_layout,
+    level_total_in_section,
     normalize_address,
     normalize_furniture_code,
     next_available_furniture_code,
     pad2,
     place_display_num,
+    place_index_on_shelf,
+    place_labels_by_container_id,
     resolve_container_address,
+    resync_level_place_addresses,
+    resync_shelf_place_addresses,
     shelf_display_num,
     suggested_address,
+    suggested_address_for_container,
+    sync_cabinet_grid_from_layout,
 )
 
 MAX_CABINETS = 40
 MAX_SHELVES = 20
 MAX_COLUMNS = 12
+MAX_SECTIONS = 6
+MAX_LEVELS_PER_SECTION = 20
 MAX_ITEMS_PER_CONTAINER = 80
 MAX_CONTAINER_PHOTOS = 1
 MAX_AUDIT_LINES = 120
@@ -751,6 +764,8 @@ def _serialize_container(
     *,
     with_items: bool = False,
     children: list[VisualContainer] | None = None,
+    place_labels: dict[int, str] | None = None,
+    shelf_peers: list[VisualContainer] | None = None,
 ) -> dict:
     color = (c.color or "").strip()
     if not _HEX_RE.match(color):
@@ -758,12 +773,32 @@ def _serialize_container(
     kind = _normalize_container_kind(getattr(c, "kind", None))
     if getattr(c, "parent_id", None) and kind == VisualContainer.KIND_BIN:
         kind = VisualContainer.KIND_DRAWER_CELL
+    parent_id = getattr(c, "parent_id", None)
+    if place_labels and c.id in place_labels:
+        place_lab = place_labels[c.id]
+        place_num = int(place_lab)
+    elif parent_id:
+        place_num = max(1, int(c.column or 1))
+        place_lab = place_display_num(place_num)
+    else:
+        place_num = place_index_on_shelf(c, peers=shelf_peers)
+        place_lab = place_display_num(place_num)
+    level = getattr(c, "level", None)
+    section = getattr(level, "section", None) if level else None
+    levels_total = None
+    shelf_top1 = int(c.shelf or 1)
+    if level is not None:
+        shelf_top1 = int(level.index or shelf_top1)
+        levels_total = level_total_in_section(level, section)
     data = {
         "id": c.id,
         "cabinet_id": c.cabinet_id,
-        "parent_id": getattr(c, "parent_id", None),
+        "parent_id": parent_id,
+        "level_id": getattr(c, "level_id", None),
+        "section_index": int(section.index) if section is not None else None,
+        "level_kind": (level.kind if level is not None else ""),
         "kind": kind,
-        "shelf": c.shelf,
+        "shelf": shelf_top1,
         "stack": max(1, int(c.stack or 1)),
         "column": c.column,
         "col_span": max(1, int(c.col_span or 1)),
@@ -773,10 +808,10 @@ def _serialize_container(
         "label": c.label,
         "color": color,
         "notes": c.notes or "",
-        "address": resolve_container_address(c, prefer_stored=True),
+        "address": resolve_container_address(c, prefer_stored=True, peers=shelf_peers),
         "suggested_address": "",
         "shelf_label": "",
-        "place_label": place_display_num(c.column),
+        "place_label": place_lab,
         "items_count": getattr(c, "items_count", None),
         "last_audited_at": _fmt_dt(getattr(c, "last_audited_at", None)),
         "last_audited_by": (getattr(c, "last_audited_by", None) or ""),
@@ -788,12 +823,15 @@ def _serialize_container(
     }
     cab = getattr(c, "cabinet", None)
     if cab is not None:
-        data["shelf_label"] = shelf_display_num(shelves=cab.shelves, shelf_top1=c.shelf)
-        data["suggested_address"] = suggested_address(cab, shelf=c.shelf, column=c.column)
+        total_for_label = levels_total if levels_total is not None else cab.shelves
+        data["shelf_label"] = shelf_display_num(shelves=total_for_label, shelf_top1=shelf_top1)
+        data["suggested_address"] = suggested_address_for_container(
+            c, cab=cab, peers=shelf_peers
+        )
         if not (getattr(c, "address", None) or "").strip():
             data["address"] = data["suggested_address"]
     else:
-        data["shelf_label"] = pad2(c.shelf)
+        data["shelf_label"] = pad2(shelf_top1)
         data["suggested_address"] = data["address"]
     data.update(_photo_summary_fields(c))
     if data["items_count"] is None:
@@ -829,18 +867,37 @@ def _container_overlap_error(
     column: int,
     col_span: int,
     exclude_id: int | None = None,
+    level: VisualCabinetLevel | None = None,
+    max_columns: int | None = None,
 ) -> str | None:
-    if shelf < 1 or shelf > cab.shelves:
+    cols_limit = max_columns
+    if cols_limit is None:
+        cols_limit = int(level.columns) if level is not None else int(cab.columns or 1)
+    if level is not None:
+        max_shelf = max(1, level.section.levels.count()) if level.section_id else cab.shelves
+        shelf_ok = shelf == int(level.index)
+    else:
+        max_shelf = cab.shelves
+        shelf_ok = 1 <= shelf <= max_shelf
+    if not shelf_ok:
         return "Некорректный номер полки"
     if column < 1 or col_span < 1:
         return "Некорректное место на полке"
+    if column + col_span - 1 > max(1, cols_limit):
+        # allow grow later; soft check only when level columns fixed
+        pass
     occupied: set[tuple[int, int, int]] = set()
     qs = VisualContainer.objects.filter(cabinet=cab, parent__isnull=True)
+    if level is not None:
+        qs = qs.filter(level=level)
+    else:
+        qs = qs.filter(shelf=shelf)
     if exclude_id:
         qs = qs.exclude(pk=exclude_id)
     for other in qs:
         cs = max(1, int(other.col_span or 1))
         st = max(1, int(other.stack or 1))
+        # same shelf implied for level-scoped qs; keep shelf in key for legacy
         occupied.update(_cells_of(other.shelf, st, other.column, cs))
     for cell in _cells_of(shelf, stack, column, col_span):
         if cell in occupied:
@@ -906,26 +963,82 @@ def _refresh_container_addresses_for_cabinet(
 ) -> None:
     """Обновляет адреса контейнеров, если они совпадали со старым авто-адресом."""
     furniture_code = cabinet_code_of(cab)
-    for cont in cab.containers.filter(parent__isnull=True):
-        suggested_new = suggested_address(
-            cab, shelf=cont.shelf, column=cont.column, furniture_code=furniture_code
-        )
+    tops = list(
+        cab.containers.filter(parent__isnull=True).select_related("level", "level__section")
+    )
+    peers_by_key: dict[tuple, list[VisualContainer]] = {}
+    for cont in tops:
+        key = (getattr(cont, "level_id", None), int(cont.shelf))
+        peers_by_key.setdefault(key, []).append(cont)
+    for cont in tops:
+        peers = peers_by_key.get((getattr(cont, "level_id", None), int(cont.shelf)), [])
+        place = place_index_on_shelf(cont, peers=peers)
+        suggested_new = suggested_address_for_container(cont, cab=cab, peers=peers)
+        # rewrite furniture code part if needed
+        if old_furniture_code and furniture_code and old_furniture_code != furniture_code:
+            suggested_new = suggested_address_for_container(cont, cab=cab, peers=peers)
         stored = normalize_address(cont.address or "")
         if not stored:
             cont.address = suggested_new
             cont.save(update_fields=["address", "updated_at"])
             continue
         if old_furniture_code:
-            suggested_old = suggested_address(
-                cab, shelf=cont.shelf, column=cont.column, furniture_code=old_furniture_code
+            # temporary stub cabinet-like: compute old via string replace of code prefix
+            old_suggested = normalize_address(
+                suggested_address(
+                    cab,
+                    shelf=cont.shelf,
+                    column=cont.column,
+                    furniture_code=old_furniture_code,
+                    place_num=place,
+                    section_index=(
+                        int(cont.level.section.index)
+                        if getattr(cont, "level", None) and cont.level.section_id
+                        else None
+                    ),
+                    levels_in_section=(
+                        level_total_in_section(cont.level, cont.level.section)
+                        if getattr(cont, "level", None)
+                        else None
+                    ),
+                )
             )
-            if stored == normalize_address(suggested_old):
+            if stored == old_suggested:
                 cont.address = suggested_new
                 cont.save(update_fields=["address", "updated_at"])
                 _move_tools_address(stored, suggested_new)
 
 
+def _serialize_level(
+    level: VisualCabinetLevel,
+    *,
+    containers_by_level: dict[int, list[VisualContainer]],
+    children_by_parent: dict[int, list[VisualContainer]],
+    place_labels: dict[int, str],
+) -> dict:
+    tops = containers_by_level.get(level.id, [])
+    return {
+        "id": level.id,
+        "index": level.index,
+        "kind": level.kind,
+        "columns": level.columns,
+        "containers": [
+            _serialize_container(
+                c,
+                children=children_by_parent.get(c.id, []),
+                place_labels=place_labels,
+                shelf_peers=tops,
+            )
+            for c in tops
+        ],
+    }
+
+
 def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> dict:
+    ensure_cabinet_layout(cab)
+    sections_qs = list(
+        cab.sections.prefetch_related("levels").order_by("index", "id")
+    )
     data = {
         "id": cab.id,
         "code": cabinet_code_of(cab),
@@ -933,16 +1046,44 @@ def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> d
         "kind": _normalize_cabinet_kind(getattr(cab, "kind", None)),
         "shelves": cab.shelves,
         "columns": cab.columns,
+        "sections_count": max(1, len(sections_qs) or cabinet_section_count(cab)),
         "notes": cab.notes or "",
         "sort_order": cab.sort_order,
+        "sections": [],
     }
     if with_containers:
         # Подтянуть сетку органайзеров и укоротить старые подписи «Ярус …»
         for org in cab.containers.filter(kind=VisualContainer.KIND_ORGANIZER, parent__isnull=True):
             _ensure_organizer_children(org)
-        all_conts = list(cab.containers.all())
+        all_conts = list(
+            cab.containers.select_related("level", "level__section", "cabinet").all()
+        )
         children_by_parent: dict[int, list[VisualContainer]] = {}
         tops: list[VisualContainer] = []
+        for c in all_conts:
+            if getattr(c, "parent_id", None):
+                children_by_parent.setdefault(c.parent_id, []).append(c)
+            else:
+                tops.append(c)
+        # Выровнять авто-адреса по уровням
+        synced_levels: set[int] = set()
+        synced_shelves: set[int] = set()
+        for c in tops:
+            lid = getattr(c, "level_id", None)
+            if lid and lid not in synced_levels:
+                synced_levels.add(lid)
+                if c.level is not None:
+                    resync_level_place_addresses(cab, c.level, move_tools=_move_tools_address)
+            elif not lid:
+                sh = int(c.shelf)
+                if sh not in synced_shelves:
+                    synced_shelves.add(sh)
+                    resync_shelf_place_addresses(cab, sh, move_tools=_move_tools_address)
+        all_conts = list(
+            cab.containers.select_related("level", "level__section", "cabinet").all()
+        )
+        children_by_parent = {}
+        tops = []
         for c in all_conts:
             if getattr(c, "parent_id", None):
                 children_by_parent.setdefault(c.parent_id, []).append(c)
@@ -952,9 +1093,61 @@ def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> d
         for kids in children_by_parent.values():
             flat_containers.extend(kids)
         _attach_photo_summaries(flat_containers)
+        place_labels = place_labels_by_container_id(tops)
+        containers_by_level: dict[int, list[VisualContainer]] = {}
+        peers_by_shelf: dict[int, list[VisualContainer]] = {}
+        for c in tops:
+            if c.level_id:
+                containers_by_level.setdefault(c.level_id, []).append(c)
+            peers_by_shelf.setdefault(int(c.shelf), []).append(c)
         data["containers"] = [
-            _serialize_container(c, children=children_by_parent.get(c.id, []))
+            _serialize_container(
+                c,
+                children=children_by_parent.get(c.id, []),
+                place_labels=place_labels,
+                shelf_peers=(
+                    containers_by_level.get(c.level_id)
+                    if c.level_id
+                    else peers_by_shelf.get(int(c.shelf))
+                ),
+            )
             for c in tops
+        ]
+        data["sections"] = [
+            {
+                "id": sec.id,
+                "index": sec.index,
+                "name": sec.name or "",
+                "levels": [
+                    _serialize_level(
+                        lvl,
+                        containers_by_level=containers_by_level,
+                        children_by_parent=children_by_parent,
+                        place_labels=place_labels,
+                    )
+                    for lvl in sorted(sec.levels.all(), key=lambda x: (x.index, x.id))
+                ],
+            }
+            for sec in sections_qs
+        ]
+    else:
+        data["sections"] = [
+            {
+                "id": sec.id,
+                "index": sec.index,
+                "name": sec.name or "",
+                "levels": [
+                    {
+                        "id": lvl.id,
+                        "index": lvl.index,
+                        "kind": lvl.kind,
+                        "columns": lvl.columns,
+                        "containers": [],
+                    }
+                    for lvl in sorted(sec.levels.all(), key=lambda x: (x.index, x.id))
+                ],
+            }
+            for sec in sections_qs
         ]
     return data
 
@@ -1095,6 +1288,27 @@ def _cabinets_create(request):
         sort_order=sort_order,
         created_by=_username(request),
     )
+    layout_payload = body.get("sections")
+    if isinstance(layout_payload, list) and layout_payload:
+        _, err = apply_cabinet_sections_layout(
+            cab, layout_payload, default_columns=columns
+        )
+        if err:
+            cab.delete()
+            return _err(err)
+    else:
+        level_kind = (
+            VisualCabinetLevel.KIND_DRAWER
+            if kind == VisualCabinet.KIND_DRAWER_CHEST
+            else VisualCabinetLevel.KIND_SHELF
+        )
+        ensure_cabinet_layout(
+            cab,
+            sections=1,
+            shelves_per_section=shelves,
+            columns=columns,
+            level_kind=level_kind,
+        )
     cab = VisualCabinet.objects.get(pk=cab.pk)
     return JsonResponse({"ok": True, "cabinet": _serialize_cabinet(cab)}, status=201)
 
@@ -1164,7 +1378,18 @@ def _cabinet_mutate(request, cab: VisualCabinet):
         cab.kind = new_kind
     if "notes" in body:
         cab.notes = str(body.get("notes") or "").strip()[:300]
-    if "shelves" in body or "columns" in body:
+    layout_changed = False
+    if "sections" in body and isinstance(body.get("sections"), list):
+        _, err = apply_cabinet_sections_layout(
+            cab,
+            body["sections"],
+            default_columns=_clamp_int(body.get("columns", cab.columns), cab.columns, 1, MAX_COLUMNS),
+        )
+        if err:
+            return _err(err)
+        layout_changed = True
+        cab.refresh_from_db()
+    elif "shelves" in body or "columns" in body:
         shelves = _clamp_int(body.get("shelves", cab.shelves), cab.shelves, 1, MAX_SHELVES)
         columns = _clamp_int(body.get("columns", cab.columns), cab.columns, 1, MAX_COLUMNS)
         for cont in cab.containers.filter(parent__isnull=True):
@@ -1173,19 +1398,57 @@ def _cabinet_mutate(request, cab: VisualCabinet):
                 return _err("Уменьшить сетку нельзя: контейнеры не помещаются")
         cab.shelves = shelves
         cab.columns = columns
+        # sync first section layout for simple edits
+        ensure_cabinet_layout(cab)
+        secs = list(cab.sections.order_by("index"))
+        if len(secs) == 1:
+            sec = secs[0]
+            levels = list(sec.levels.order_by("index"))
+            default_kind = (
+                VisualCabinetLevel.KIND_DRAWER
+                if cab.kind == VisualCabinet.KIND_DRAWER_CHEST
+                else VisualCabinetLevel.KIND_SHELF
+            )
+            while len(levels) < shelves:
+                levels.append(
+                    VisualCabinetLevel.objects.create(
+                        section=sec,
+                        index=len(levels) + 1,
+                        kind=default_kind,
+                        columns=columns,
+                    )
+                )
+            while len(levels) > shelves:
+                last = levels[-1]
+                if last.containers.filter(parent__isnull=True).exists():
+                    return _err("Уменьшить сетку нельзя: контейнеры не помещаются")
+                last.delete()
+                levels.pop()
+            for lv in levels:
+                if lv.columns != columns:
+                    for cont in lv.containers.filter(parent__isnull=True):
+                        cs = max(1, int(cont.col_span or 1))
+                        if cont.column + cs - 1 > columns:
+                            return _err("Уменьшить сетку нельзя: контейнеры не помещаются")
+                    lv.columns = columns
+                    lv.save(update_fields=["columns"])
+            sync_cabinet_grid_from_layout(cab)
+        layout_changed = True
     if "sort_order" in body:
         cab.sort_order = _clamp_int(body.get("sort_order"), cab.sort_order, 0, 9999)
     cab.save()
-    if code_changed or "shelves" in body:
+    if code_changed or layout_changed:
         cab = VisualCabinet.objects.get(pk=cab.pk)
         _refresh_container_addresses_for_cabinet(cab, old_furniture_code=old_furniture_code)
     cab = VisualCabinet.objects.prefetch_related(
         Prefetch(
             "containers",
-            queryset=VisualContainer.objects.select_related("cabinet").annotate(
+            queryset=VisualContainer.objects.select_related("cabinet", "level", "level__section").annotate(
                 items_count=Count("items")
             ),
-        )
+        ),
+        "sections",
+        "sections__levels",
     ).get(pk=cab.pk)
     return JsonResponse({"ok": True, "cabinet": _serialize_cabinet(cab)})
 
@@ -1199,7 +1462,32 @@ def visual_warehouse_api_container_upsert(request):
     if body is None:
         return _err("Некорректный JSON")
     cab = get_object_or_404(VisualCabinet, pk=body.get("cabinet_id"))
-    shelf = _clamp_int(body.get("shelf"), 0, 1, cab.shelves)
+    ensure_cabinet_layout(cab)
+    cab.refresh_from_db()
+
+    level = None
+    level_id_raw = body.get("level_id")
+    if level_id_raw not in (None, ""):
+        try:
+            level = VisualCabinetLevel.objects.select_related("section").get(
+                pk=int(level_id_raw), section__cabinet=cab
+            )
+        except (TypeError, ValueError, VisualCabinetLevel.DoesNotExist):
+            return _err("Некорректный уровень шкафа")
+
+    if level is not None:
+        shelf = int(level.index)
+        max_cols_for_level = max(1, int(level.columns or 1))
+    else:
+        shelf = _clamp_int(body.get("shelf"), 0, 1, cab.shelves)
+        max_cols_for_level = max(1, int(cab.columns or 1))
+        # legacy: map shelf → level in first section
+        first_sec = cab.sections.order_by("index").first()
+        if first_sec is not None:
+            level = first_sec.levels.filter(index=shelf).first()
+            if level is not None:
+                max_cols_for_level = max(1, int(level.columns or 1))
+
     stack = _clamp_int(body.get("stack"), 1, 1, 20)
     # Важно: не ограничивать column текущим cab.columns — иначе «место 2»
     # при columns=1 сжимается в 1 и всегда пересекается с первым ящиком.
@@ -1227,6 +1515,10 @@ def visual_warehouse_api_container_upsert(request):
         except (TypeError, ValueError, VisualContainer.DoesNotExist):
             return _err("Некорректный органайзер для ячейки")
 
+    level_is_drawer = bool(level and level.kind == VisualCabinetLevel.KIND_DRAWER)
+    if level_is_drawer:
+        stack = 1
+
     if cont_kind == VisualContainer.KIND_SHELF_SLOT and cab_kind != VisualCabinet.KIND_RACK:
         return _err("Зона «на полке» доступна только на стеллаже")
     if cont_kind == VisualContainer.KIND_SHELF_SLOT and stack > 1:
@@ -1234,21 +1526,29 @@ def visual_warehouse_api_container_upsert(request):
     if cont_kind == VisualContainer.KIND_DRAWER_CELL:
         if parent:
             pass  # ячейка внутри органайзера в шкафу/стеллаже
-        elif cab_kind != VisualCabinet.KIND_DRAWER_CHEST:
-            return _err("Ячейка ящика доступна только в тумбе с ящиками или внутри органайзера")
+        elif cab_kind == VisualCabinet.KIND_DRAWER_CHEST or level_is_drawer:
+            pass
+        else:
+            return _err(
+                "Ячейка ящика доступна только в тумбе, на уровне-ящике или внутри органайзера"
+            )
         if stack > 1:
             return _err("Ячейка ящика не ставится в стопку — только ярус 1")
     if cont_kind == VisualContainer.KIND_ORGANIZER:
         if parent:
             return _err("Органайзер нельзя вложить в другой органайзер")
-        if cab_kind == VisualCabinet.KIND_DRAWER_CHEST:
-            return _err("Органайзер ставьте в шкаф или на стеллаж, не в тумбу с ящиками")
+        if cab_kind == VisualCabinet.KIND_DRAWER_CHEST or level_is_drawer:
+            return _err("Органайзер ставьте на полку шкафа или стеллажа, не в ящик")
         stack = 1
     if cab_kind == VisualCabinet.KIND_DRAWER_CHEST and cont_kind == VisualContainer.KIND_SHELF_SLOT:
         return _err("На тумбе с ящиками нельзя зону «на полке» — используйте ячейку ящика")
-    # В тумбе по умолчанию ячейки лежат в одном ярусе-ящике
-    if cab_kind == VisualCabinet.KIND_DRAWER_CHEST and cont_kind == VisualContainer.KIND_BIN and stack > 1:
-        return _err("В тумбе с ящиками стопки не используются — ячейки в одном ярусе")
+    # В тумбе / на уровне-ящике стопки не используются
+    if (
+        (cab_kind == VisualCabinet.KIND_DRAWER_CHEST or level_is_drawer)
+        and cont_kind == VisualContainer.KIND_BIN
+        and stack > 1
+    ):
+        return _err("В ящике стопки не используются — ячейки в одном ряду")
 
     inner_tiers = _clamp_int(body.get("inner_tiers"), 3, 1, MAX_ORGANIZER_TIERS)
     inner_columns = _clamp_int(body.get("inner_columns"), 2, 1, MAX_ORGANIZER_COLUMNS)
@@ -1258,6 +1558,7 @@ def visual_warehouse_api_container_upsert(request):
 
     cid = body.get("id")
     exclude_id = int(cid) if cid else None
+    old_level = None
 
     # Ячейки органайзера не занимают место на полке шкафа — координаты внутри родителя
     if parent:
@@ -1265,11 +1566,18 @@ def visual_warehouse_api_container_upsert(request):
         column = _clamp_int(body.get("column"), 1, 1, max(1, int(parent.inner_columns or 1)))
         col_span = 1
         stack = 1
+        level = None
     else:
         need_cols = column + col_span - 1
         if need_cols > MAX_COLUMNS:
             return _err(f"Максимум мест в ряд: {MAX_COLUMNS}")
-        if need_cols > cab.columns:
+        if level is not None and need_cols > int(level.columns or 1):
+            level.columns = need_cols
+            level.save(update_fields=["columns"])
+            max_cols_for_level = need_cols
+            sync_cabinet_grid_from_layout(cab)
+            cab.refresh_from_db()
+        elif need_cols > cab.columns:
             cab.columns = need_cols
             cab.save(update_fields=["columns", "updated_at"])
 
@@ -1280,13 +1588,19 @@ def visual_warehouse_api_container_upsert(request):
             column=column,
             col_span=col_span,
             exclude_id=exclude_id,
+            level=level,
+            max_columns=max_cols_for_level,
         )
         if overlap:
             return _err(overlap)
 
     if cid:
-        cont = get_object_or_404(VisualContainer.objects.select_related("cabinet", "parent"), pk=cid)
+        cont = get_object_or_404(
+            VisualContainer.objects.select_related("cabinet", "parent", "level"),
+            pk=cid,
+        )
         old_cab = cont.cabinet
+        old_level = cont.level
         if cont.parent_id and cont.cabinet_id != cab.id:
             return _err("Ячейку органайзера нельзя перенести в другой стеллаж отдельно — перенесите органайзер")
         if cont.parent_id and parent and parent.pk != cont.parent_id:
@@ -1295,6 +1609,7 @@ def visual_warehouse_api_container_upsert(request):
             # Ячейка остаётся в шкафу родителя
             cab = old_cab
             parent = cont.parent
+            level = None
         if cont.parent_id and cont_kind == VisualContainer.KIND_ORGANIZER:
             return _err("Нельзя превратить ячейку в органайзер")
         cabinet_changed = (not cont.parent_id) and cont.cabinet_id != cab.id
@@ -1302,10 +1617,12 @@ def visual_warehouse_api_container_upsert(request):
         old_suggested = (
             ""
             if cont.parent_id
-            else normalize_address(suggested_address(old_cab, shelf=cont.shelf, column=cont.column))
+            else normalize_address(suggested_address_for_container(cont, cab=old_cab))
         )
+        old_shelf = int(cont.shelf)
         cont.cabinet = cab
         cont.kind = cont_kind
+        cont.level = level
         cont.shelf = shelf
         cont.stack = stack
         cont.column = column
@@ -1319,11 +1636,23 @@ def visual_warehouse_api_container_upsert(request):
             if cabinet_changed and (
                 not addr_norm or addr_norm == old_addr or addr_norm == old_suggested
             ):
-                cont.address = "" if parent else suggested_address(cab, shelf=shelf, column=column)
+                cont.address = "" if parent else suggested_address(
+                    cab, shelf=shelf, column=column, place_num=column,
+                    section_index=int(level.section.index) if level and level.section_id else None,
+                    levels_in_section=level_total_in_section(level) if level else None,
+                )
             else:
                 cont.address = address
         elif not parent:
-            new_suggested = suggested_address(cab, shelf=shelf, column=column)
+            # временно по колонке; ниже resync пересчитает по стопкам на полке
+            new_suggested = suggested_address(
+                cab,
+                shelf=shelf,
+                column=column,
+                place_num=column,
+                section_index=int(level.section.index) if level and level.section_id else None,
+                levels_in_section=level_total_in_section(level) if level else None,
+            )
             if not (cont.address or "").strip() or old_addr == old_suggested or cabinet_changed:
                 cont.address = new_suggested
         if cont_kind == VisualContainer.KIND_ORGANIZER:
@@ -1335,16 +1664,40 @@ def visual_warehouse_api_container_upsert(request):
             VisualContainer.objects.filter(parent_id=cont.pk).update(cabinet=cab)
         if cont_kind == VisualContainer.KIND_ORGANIZER:
             _ensure_organizer_children(cont)
+        if not parent:
+            if cabinet_changed and old_level is not None:
+                resync_level_place_addresses(old_cab, old_level, move_tools=_move_tools_address)
+            elif cabinet_changed:
+                resync_shelf_place_addresses(old_cab, old_shelf, move_tools=_move_tools_address)
+            if level is not None:
+                resync_level_place_addresses(cab, level, move_tools=_move_tools_address)
+                if old_level is not None and old_level.pk != level.pk:
+                    resync_level_place_addresses(cab, old_level, move_tools=_move_tools_address)
+            else:
+                shelves_to_sync = {int(shelf), int(old_shelf)}
+                if cabinet_changed:
+                    shelves_to_sync = {int(shelf)}
+                for sh in shelves_to_sync:
+                    resync_shelf_place_addresses(cab, sh, move_tools=_move_tools_address)
+            cont.refresh_from_db()
         new_addr = normalize_address(resolve_container_address(cont, cab, prefer_stored=True))
         if old_addr and new_addr and old_addr != new_addr:
             _move_tools_address(old_addr, new_addr)
     else:
         auto_addr = address if address is not None else (
-            "" if parent else suggested_address(cab, shelf=shelf, column=column)
+            "" if parent else suggested_address(
+                cab,
+                shelf=shelf,
+                column=column,
+                place_num=column,
+                section_index=int(level.section.index) if level and level.section_id else None,
+                levels_in_section=level_total_in_section(level) if level else None,
+            )
         )
         cont = VisualContainer.objects.create(
             cabinet=cab,
             parent=parent,
+            level=level,
             kind=cont_kind,
             shelf=shelf,
             stack=stack,
@@ -1360,8 +1713,14 @@ def visual_warehouse_api_container_upsert(request):
         )
         if cont_kind == VisualContainer.KIND_ORGANIZER:
             _ensure_organizer_children(cont)
+        if not parent:
+            if level is not None:
+                resync_level_place_addresses(cab, level, move_tools=_move_tools_address)
+            else:
+                resync_shelf_place_addresses(cab, shelf, move_tools=_move_tools_address)
+            cont.refresh_from_db()
     cont = (
-        VisualContainer.objects.select_related("cabinet")
+        VisualContainer.objects.select_related("cabinet", "level", "level__section")
         .annotate(items_count=Count("items"))
         .prefetch_related(
             Prefetch("items", queryset=VisualContainerItem.objects.select_related("tool_item")),

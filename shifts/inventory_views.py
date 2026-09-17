@@ -5356,6 +5356,7 @@ def inventory_view(request):
         "tool_material_extra_options": tool_material_extra_options,
         "tool_material_filter_other": TOOL_MATERIAL_FILTER_OTHER,
         "stock_tool_material_extra_json": stock_tool_material_extra_json,
+        "warehouse_address_titles": _warehouse_address_titles_for_stock(panel),
         "coating_types": COATING_TYPES,
         "today": date.today().isoformat(),
         "movement_tool_options": ToolItem.objects.select_related(
@@ -5503,3 +5504,11 @@ def inventory_api_warehouse_locations(request):
         "furniture": data["furniture"],
         "places": data["places"],
     })
+
+
+def _warehouse_address_titles_for_stock(panel: str) -> dict:
+    if panel != "stock":
+        return {}
+    from .visual_warehouse_address import address_container_titles
+
+    return address_container_titles()

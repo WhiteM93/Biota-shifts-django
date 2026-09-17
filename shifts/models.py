@@ -3255,8 +3255,14 @@ class VisualCabinet(models.Model):
         default=KIND_CABINET,
         verbose_name="Тип",
     )
-    shelves = models.PositiveSmallIntegerField(default=4, verbose_name="Число полок")
-    columns = models.PositiveSmallIntegerField(default=3, verbose_name="Число столбцов")
+    shelves = models.PositiveSmallIntegerField(
+        default=4,
+        verbose_name="Число полок (устар., синхронизируется с уровнями)",
+    )
+    columns = models.PositiveSmallIntegerField(
+        default=3,
+        verbose_name="Число столбцов по умолчанию",
+    )
     notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
     sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
     created_by = models.CharField(max_length=150, blank=True, default="", verbose_name="Автор")
@@ -3273,8 +3279,71 @@ class VisualCabinet(models.Model):
         return f"{code} — {self.name}" if code else self.name
 
 
+class VisualCabinetSection(models.Model):
+    """Вертикальная секция шкафа (слева направо)."""
+
+    cabinet = models.ForeignKey(
+        VisualCabinet,
+        on_delete=models.CASCADE,
+        related_name="sections",
+        verbose_name="Шкаф",
+    )
+    index = models.PositiveSmallIntegerField(verbose_name="Номер слева (1…)")
+    name = models.CharField(max_length=80, blank=True, default="", verbose_name="Название")
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        ordering = ("index", "id")
+        verbose_name = "Секция визуального шкафа"
+        verbose_name_plural = "Секции визуального шкафа"
+        constraints = [
+            models.UniqueConstraint(fields=("cabinet", "index"), name="uniq_vw_section_cabinet_index"),
+        ]
+
+    def __str__(self) -> str:
+        label = (self.name or "").strip() or f"Секция {self.index}"
+        return f"{self.cabinet_id}:{label}"
+
+
+class VisualCabinetLevel(models.Model):
+    """Уровень внутри секции: полка или выдвижной ящик (сверху вниз, index=1 верх)."""
+
+    KIND_SHELF = "shelf"
+    KIND_DRAWER = "drawer"
+    KIND_CHOICES = (
+        (KIND_SHELF, "Полка"),
+        (KIND_DRAWER, "Ящик"),
+    )
+
+    section = models.ForeignKey(
+        VisualCabinetSection,
+        on_delete=models.CASCADE,
+        related_name="levels",
+        verbose_name="Секция",
+    )
+    index = models.PositiveSmallIntegerField(verbose_name="Номер сверху (1…)")
+    kind = models.CharField(
+        max_length=16,
+        choices=KIND_CHOICES,
+        default=KIND_SHELF,
+        verbose_name="Тип уровня",
+    )
+    columns = models.PositiveSmallIntegerField(default=3, verbose_name="Мест / ячеек")
+
+    class Meta:
+        ordering = ("index", "id")
+        verbose_name = "Уровень визуального шкафа"
+        verbose_name_plural = "Уровни визуального шкафа"
+        constraints = [
+            models.UniqueConstraint(fields=("section", "index"), name="uniq_vw_level_section_index"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.section_id}:ур{self.index}/{self.kind}"
+
+
 class VisualContainer(models.Model):
-    """Контейнер в шкафу/стеллаже/тумбе: полка → слой → позиция слева направо."""
+    """Контейнер в шкафу/стеллаже/тумбе: уровень → слой → позиция слева направо."""
 
     KIND_BIN = "bin"
     KIND_SHELF_SLOT = "shelf_slot"
@@ -3293,6 +3362,14 @@ class VisualContainer(models.Model):
         related_name="containers",
         verbose_name="Шкаф",
     )
+    level = models.ForeignKey(
+        VisualCabinetLevel,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="containers",
+        verbose_name="Уровень",
+    )
     parent = models.ForeignKey(
         "self",
         on_delete=models.CASCADE,
@@ -3307,7 +3384,9 @@ class VisualContainer(models.Model):
         default=KIND_BIN,
         verbose_name="Тип",
     )
-    shelf = models.PositiveSmallIntegerField(verbose_name="Полка (сверху = 1, отображение снизу вверх)")
+    shelf = models.PositiveSmallIntegerField(
+        verbose_name="Полка/уровень (сверху = 1; зеркало level.index)"
+    )
     stack = models.PositiveSmallIntegerField(
         default=1,
         verbose_name="Слой на полке (1 = верхний)",
@@ -3330,7 +3409,7 @@ class VisualContainer(models.Model):
         blank=True,
         default="",
         verbose_name="Адрес",
-        help_text="Зона-полка-место, например A-01-02",
+        help_text="Буква-полка-место или буква-секция-полка-место",
     )
     notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
     last_audited_at = models.DateTimeField(null=True, blank=True, verbose_name="Последняя инвентаризация")

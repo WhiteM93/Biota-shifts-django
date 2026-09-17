@@ -570,6 +570,153 @@ html[data-theme="dawn"] .vw-floor {
   box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.35);
 }
 
+.vw-cab-interior--sections {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 6px;
+  height: auto;
+  overflow: auto;
+}
+
+.vw-cab-section {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-right: 1px solid rgba(0, 0, 0, 0.28);
+  padding-right: 4px;
+  align-self: flex-start;
+}
+
+.vw-cab-section:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+
+.vw-cab-section-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.72);
+  text-align: center;
+  padding: 2px 0 4px;
+  flex-shrink: 0;
+}
+
+.vw-cab-section-levels {
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* В многосекционном шкафу уровни не растягиваем на всю высоту —
+   иначе ящики/полки с разным числом уровней раздуваются пустотой. */
+.vw-cab-interior--sections .vw-bay,
+.vw-cab-interior--sections .vw-bay--drawer {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 64px;
+  overflow: visible;
+}
+
+.vw-cab-interior--sections .vw-bay-space {
+  flex: 0 0 auto;
+  min-height: 52px;
+  height: auto;
+  overflow: visible;
+}
+
+.vw-cab-interior--sections .vw-drawer {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+}
+
+.vw-cab-interior--sections .vw-drawer-cells {
+  flex: 0 0 auto;
+  min-height: 48px;
+  height: auto;
+}
+
+.vw-cab-interior--sections .vw-shelf-empty,
+.vw-cab-interior--sections .vw-drawer-empty-cell {
+  min-height: 48px;
+  max-height: 72px;
+  height: 52px;
+}
+
+.vw-floor.is-open .vw-cab-interior--sections .vw-bay,
+.vw-floor.is-open .vw-cab-interior--sections .vw-bay--drawer {
+  flex: 0 0 auto;
+  min-height: 72px;
+}
+
+.vw-floor.is-open .vw-cab-interior--sections .vw-bay-space {
+  min-height: 56px;
+}
+
+.vw-floor.is-open .vw-cab-interior--sections .vw-shelf-empty,
+.vw-floor.is-open .vw-cab-interior--sections .vw-drawer-empty-cell,
+.vw-floor.is-open .vw-cab-interior--sections .vw-bin,
+.vw-floor.is-open .vw-cab-interior--sections .vw-drawer-cell {
+  min-height: 52px;
+  max-height: 80px;
+  height: 56px;
+}
+
+.vw-cab-layout {
+  margin: 0.4rem 0 0.2rem;
+}
+
+.vw-cab-sections-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+
+.vw-cab-section-card {
+  border: 1px solid var(--vw-border, #c5cad0);
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.vw-cab-section-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.vw-cab-section-card-head .js-vw-sec-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.vw-cab-levels-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.vw-cab-level-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr) auto;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.vw-cab-level-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
 .vw-bay {
   display: flex;
   flex-direction: column;
@@ -948,7 +1095,7 @@ html[data-theme="dawn"] .vw-floor {
   align-items: stretch;
   padding: 0 1px;
   height: auto;
-  max-height: none;
+  max-height: 80px;
 }
 
 .vw-drawer-cell-slot:not(:last-child)::after {

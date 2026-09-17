@@ -3172,6 +3172,7 @@
   "collet_threading_series": [{% for key, label in collet_threading_series %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "collet_threading_use": [{% for key, label in collet_threading_use %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "warehouse_locations_url": "{% url 'inventory_api_warehouse_locations' %}",
+  "warehouse_address_titles": { {% for addr, label in warehouse_address_titles.items %}"{{ addr|escapejs }}":"{{ label|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %} },
   "arrival_matches_url": "{% url 'inventory_api_arrival_matches' %}"
 }</script>
 

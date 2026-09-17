@@ -85,7 +85,7 @@
           <span class="vw-row-label">Название</span>
           <input type="text" class="vw-control js-vw-cab-name" maxlength="120" autocomplete="off" placeholder="Шкаф №1">
         </label>
-        <div class="vw-row-pair">
+        <div class="vw-row-pair js-vw-cab-simple-grid">
           <label class="vw-row">
             <span class="vw-row-label js-vw-cab-shelves-label">Полок</span>
             <input type="number" class="vw-control js-vw-cab-shelves" min="1" max="20" value="5">
@@ -94,6 +94,14 @@
             <span class="vw-row-label js-vw-cab-columns-label">Мест в ряд</span>
             <input type="number" class="vw-control js-vw-cab-columns" min="1" max="12" value="4">
           </label>
+        </div>
+        <div class="js-vw-cab-layout vw-cab-layout" hidden>
+          <div class="vw-row" style="align-items:center;justify-content:space-between;gap:.5rem">
+            <span class="vw-row-label" style="margin:0">Секции</span>
+            <button type="button" class="vw-btn-ghost vw-btn-compact js-vw-cab-add-section">+ секция</button>
+          </div>
+          <div class="js-vw-cab-sections vw-cab-sections-editor"></div>
+          <p class="vw-hint-inline">В каждой секции сверху вниз: полки и/или ящики. Адрес при нескольких секциях: буква-секция-уровень-место.</p>
         </div>
         <p class="vw-hint-inline js-vw-cab-kind-hint">Шкаф — с дверцами. Стеллаж — открытый. Тумба — ящики с ячейками. Полки нумеруются снизу вверх: 01… Адрес: буква-полка-место.</p>
         <label class="vw-row">
@@ -127,6 +135,7 @@
       </header>
       <div class="vw-form-scroll">
         <input type="hidden" class="js-vw-cont-id" value="">
+        <input type="hidden" class="js-vw-cont-level-id" value="">
         <input type="hidden" class="js-vw-cont-notes" value="">
 
         <section class="vw-form-section">
@@ -168,7 +177,7 @@
               <button type="button" class="vw-btn-ghost js-vw-cont-address-suggest" title="Подставить буква+полка+место">Авто</button>
             </div>
           </label>
-          <p class="vw-hint-inline js-vw-cont-address-hint">Формат: буква-полка-место (например A-01-02). Полка снизу вверх (01 — нижняя), место слева направо.</p>
+          <p class="vw-hint-inline js-vw-cont-address-hint">Одна секция: буква-уровень-место (A-01-02). Несколько секций: буква-секция-уровень-место (A-1-01-02). Уровень снизу вверх (01 — низ), место сверху вниз и слева направо.</p>
           <div class="vw-row">
             <span class="vw-row-label">Цвет</span>
             <div class="vw-color-row">

@@ -3317,7 +3317,8 @@ var INV = (function () {
   var editableCells = document.querySelectorAll(".stock-inline-edit");
   var selectToggle = document.querySelector(".js-stock-select-toggle");
   var hasNotesTips = !!document.querySelector(".inv-stock-notes-tip[data-hint], .inv-stock-notes-col");
-  if (!editableCells.length && !selectToggle && !hasNotesTips) return;
+  var hasAddressCells = !!document.querySelector("td.address-col");
+  if (!editableCells.length && !selectToggle && !hasNotesTips && !hasAddressCells) return;
   var csrfEl = document.querySelector('input[name="csrfmiddlewaretoken"]');
   var csrfToken = csrfEl ? csrfEl.value : "";
   var activeCell = null;
@@ -3714,6 +3715,7 @@ var INV = (function () {
     var oldValue = cell.getAttribute("data-value") || "";
     if (value === oldValue) {
       cell.innerHTML = formatCell(field, oldValue, cell);
+      if (field === "warehouse_address") setAddressCellTitle(cell, oldValue);
       activeCell = null;
       return;
     }
@@ -3737,6 +3739,10 @@ var INV = (function () {
         cell.innerHTML = formatCell(field, norm || value, cell);
       } else {
         cell.innerHTML = formatCell(field, value, cell);
+        if (field === "warehouse_address") {
+          cell.setAttribute("data-sort", value || "");
+          setAddressCellTitle(cell, value);
+        }
       }
     }).catch(function (err) {
       alert(err.message || "Ошибка сохранения");
@@ -3833,6 +3839,8 @@ var INV = (function () {
           furniture: data.furniture || [],
           places: data.places || [],
         };
+        syncWarehouseAddressTitlesFromCatalog(warehouseLocationsCache);
+        applyAddressCellTitles();
         return warehouseLocationsCache;
       })
       .catch(function (err) {
@@ -3840,6 +3848,40 @@ var INV = (function () {
         throw err;
       });
     return warehouseLocationsPromise;
+  }
+
+  var warehouseAddressTitles = Object.assign({}, (INV && INV.warehouse_address_titles) || {});
+
+  function syncWarehouseAddressTitlesFromCatalog(catalog) {
+    ((catalog && catalog.places) || []).forEach(function (p) {
+      var addr = String((p && p.address) || "").trim().toUpperCase();
+      if (!addr) return;
+      var label = String((p && (p.label || p.kind_label)) || "").trim();
+      if (label) warehouseAddressTitles[addr] = label;
+    });
+  }
+
+  function setAddressCellTitle(cell, addr) {
+    if (!cell) return;
+    var a = String(addr || "").trim().toUpperCase();
+    if (!a || a === "-") {
+      cell.removeAttribute("title");
+      return;
+    }
+    var title = warehouseAddressTitles[a] || "";
+    if (title) cell.setAttribute("title", title);
+    else cell.removeAttribute("title");
+  }
+
+  function applyAddressCellTitles(root) {
+    (root || document).querySelectorAll("td.address-col").forEach(function (cell) {
+      var addr = cell.getAttribute("data-value") || cell.getAttribute("data-sort") || "";
+      if (!addr) {
+        var text = String(cell.textContent || "").trim();
+        if (text && text !== "-") addr = text;
+      }
+      setAddressCellTitle(cell, addr);
+    });
   }
 
   function placeOptionLabel(p) {
@@ -3964,6 +4006,7 @@ var INV = (function () {
           cell.classList.remove("is-editing-address");
           if (restore) {
             cell.innerHTML = formatCell("warehouse_address", current);
+            setAddressCellTitle(cell, current);
             activeCell = null;
           }
         }
@@ -4375,6 +4418,7 @@ var INV = (function () {
             cell.setAttribute("data-value", newAddr);
             cell.setAttribute("data-sort", newAddr);
             cell.innerHTML = formatCell("warehouse_address", newAddr);
+            setAddressCellTitle(cell, newAddr);
           });
         });
         closeBulkModal();
@@ -4423,6 +4467,8 @@ var INV = (function () {
     var bulkSave = bulkModal.querySelector(".js-bulk-addr-save");
     if (bulkSave) bulkSave.addEventListener("click", submitBulkAssign);
   }
+
+  applyAddressCellTitles();
 })();
 (function () {
   var rows = document.querySelectorAll(".issue-candidate-row");

@@ -215,8 +215,8 @@ class VisualWarehouseKindsTests(TestCase):
         org = VisualContainer.objects.get(pk=body["container"]["id"])
         self.assertEqual(org.children.count(), 6)
         labels = set(org.children.values_list("label", flat=True))
-        self.assertIn("Ярус 1 СК", labels)
-        self.assertIn("Ярус 1 ГЛ", labels)
+        self.assertIn("1СК", labels)
+        self.assertIn("1ГЛ", labels)
         # дочерние не на верхнем уровне шкафа
         tops = [c for c in body["cabinet"]["containers"] if not c.get("parent_id")]
         self.assertEqual(len(tops), 1)
