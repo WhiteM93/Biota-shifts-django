@@ -343,7 +343,7 @@
     contracts.forEach(function (cab, idx) {
       var allPositions = cab.positions || [];
       var positions = allPositions.filter(positionMatchesFilter);
-      if (stageFilter !== "all" && !positions.length) return;
+      if (stageFilter !== "all" && !positions.length && !editMode) return;
 
       shownAny = true;
       var details = document.createElement("details");
@@ -354,19 +354,72 @@
 
       var summary = document.createElement("summary");
       summary.className = "wc-contract-summary";
-      summary.innerHTML =
-        '<span class="wc-contract-chevron" aria-hidden="true"></span>' +
-        '<span class="wc-contract-name"></span>' +
-        '<span class="wc-contract-meta"></span>';
-      summary.querySelector(".wc-contract-name").textContent = cab.name || "Без названия";
+
+      var chevron = document.createElement("span");
+      chevron.className = "wc-contract-chevron";
+      chevron.setAttribute("aria-hidden", "true");
+      summary.appendChild(chevron);
+
+      var nameEl = document.createElement("span");
+      nameEl.className = "wc-contract-name";
+      nameEl.textContent = cab.name || "Без названия";
+      summary.appendChild(nameEl);
+
+      var metaEl = document.createElement("span");
+      metaEl.className = "wc-contract-meta";
       var metaCount = stageFilter === "all"
         ? (cab.positions_count || allPositions.length || 0)
         : positions.length;
       var metaQty = stageFilter === "all"
         ? (cab.positions_qty || 0)
         : positions.reduce(function (s, p) { return s + (p.quantity || 0); }, 0);
-      summary.querySelector(".wc-contract-meta").textContent =
-        metaCount + " поз. · " + metaQty + " шт.";
+      metaEl.textContent = metaCount + " поз. · " + metaQty + " шт.";
+      summary.appendChild(metaEl);
+
+      if (editMode) {
+        var cabActs = document.createElement("span");
+        cabActs.className = "wc-contract-acts";
+        cabActs.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+        });
+
+        var btnEditCab = document.createElement("button");
+        btnEditCab.type = "button";
+        btnEditCab.className = "wc-icon-btn";
+        btnEditCab.title = "Изменить название";
+        btnEditCab.setAttribute("aria-label", "Изменить контракт");
+        btnEditCab.innerHTML =
+          '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">' +
+          '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+          'd="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>' +
+          "</svg>";
+        btnEditCab.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          openContractForm(cab);
+        });
+        cabActs.appendChild(btnEditCab);
+
+        var btnDelCab = document.createElement("button");
+        btnDelCab.type = "button";
+        btnDelCab.className = "wc-icon-btn wc-icon-btn-danger";
+        btnDelCab.title = "Удалить контракт";
+        btnDelCab.setAttribute("aria-label", "Удалить контракт");
+        btnDelCab.innerHTML =
+          '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">' +
+          '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+          'd="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>' +
+          "</svg>";
+        btnDelCab.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          deleteContract(cab);
+        });
+        cabActs.appendChild(btnDelCab);
+        summary.appendChild(cabActs);
+      }
+
       details.appendChild(summary);
 
       var body = document.createElement("div");
@@ -382,15 +435,6 @@
       if (editMode) {
         var bar = document.createElement("div");
         bar.className = "wc-contract-toolbar";
-        var btnEditCab = document.createElement("button");
-        btnEditCab.type = "button";
-        btnEditCab.className = "wc-btn-ghost wc-btn-compact";
-        btnEditCab.textContent = "Параметры";
-        btnEditCab.addEventListener("click", function (ev) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          openContractForm(cab);
-        });
         var btnAddPos = document.createElement("button");
         btnAddPos.type = "button";
         btnAddPos.className = "wc-btn-primary wc-btn-compact";
@@ -400,7 +444,6 @@
           ev.stopPropagation();
           openPositionForm(cab, null);
         });
-        bar.appendChild(btnEditCab);
         bar.appendChild(btnAddPos);
         body.appendChild(bar);
       }
@@ -817,13 +860,29 @@
 
   function openContractForm(cab) {
     if (!cabForm || !dlgCab) return;
-    cabForm.querySelector(".js-wc-contract-form-title").textContent = cab ? "Параметры контракта" : "Новый контракт";
+    cabForm.querySelector(".js-wc-contract-form-title").textContent = cab ? "Контракт" : "Новый контракт";
     cabForm.querySelector(".js-wc-contract-id").value = cab ? String(cab.id) : "";
     cabForm.querySelector(".js-wc-contract-name").value = cab ? (cab.name || "") : "";
     cabForm.querySelector(".js-wc-contract-notes").value = cab ? (cab.notes || "") : "";
     var del = cabForm.querySelector(".js-wc-contract-del");
     if (del) del.hidden = !cab;
     openDialog(dlgCab);
+  }
+
+  function deleteContract(cab) {
+    if (!cab || !cab.id) return;
+    var label = cab.name || ("#" + cab.id);
+    if (!window.confirm("Удалить контракт «" + label + "» и все его изделия?")) return;
+    fetchJson(detailUrl(root.getAttribute("data-api-contract-del-tpl"), cab.id), {
+      method: "POST",
+      body: {}
+    })
+      .then(function () {
+        contracts = contracts.filter(function (c) { return c.id !== cab.id; });
+        closeDialog(dlgCab);
+        render();
+      })
+      .catch(function (e) { window.alert(e.message); });
   }
 
   function clearOpsList() {
@@ -1041,14 +1100,12 @@
     if (delCab) {
       delCab.addEventListener("click", function () {
         var id = (cabForm.querySelector(".js-wc-contract-id").value || "").trim();
-        if (!id || !window.confirm("Удалить контракт и все изделия?")) return;
-        fetchJson(detailUrl(root.getAttribute("data-api-contract-del-tpl"), id), { method: "POST", body: {} })
-          .then(function () {
-            contracts = contracts.filter(function (c) { return String(c.id) !== id; });
-            closeDialog(dlgCab);
-            render();
-          })
-          .catch(function (e) { window.alert(e.message); });
+        if (!id) return;
+        var cab = findContract(parseInt(id, 10));
+        if (cab) deleteContract(cab);
+        else {
+          deleteContract({ id: parseInt(id, 10), name: cabForm.querySelector(".js-wc-contract-name").value || "" });
+        }
       });
     }
   }
