@@ -82,6 +82,9 @@
   {% biota_icon "nav.forms" %}
 </a>
 {% endif %}
+{% if biota_nav.contracts %}
+<a href="{% url 'contracts' %}" class="{% if request.resolver_match.url_name == 'contracts' %}active{% endif %}">Контракты</a>
+{% endif %}
 {% if biota_nav.calculator %}
 <a href="{% url 'calculator' %}" class="nav-icon-btn nav-ctl {% if request.resolver_match.url_name == 'calculator' %}active{% endif %}" title="Калькулятор" aria-label="Калькулятор">
   {% biota_icon "nav.calculator" %}

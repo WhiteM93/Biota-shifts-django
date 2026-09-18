@@ -65,6 +65,8 @@ def _nav_key_for_url_name(url_name: str) -> str | None:
         return "forms"
     if n == "visual_warehouse" or n.startswith("visual_warehouse_api"):
         return "visual_warehouse"
+    if n == "contracts" or n.startswith("contracts_"):
+        return "contracts"
     return None
 
 
@@ -120,6 +122,7 @@ def post_login_redirect(username: str | None, next_path: str | None = None) -> s
         "forms",
         "calculator",
         "visual_warehouse",
+        "contracts",
     )
     for k in order:
         if not perms.get(k, True):

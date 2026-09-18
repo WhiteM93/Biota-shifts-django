@@ -644,6 +644,7 @@ NAV_KEYS_NO_DEPT_FILTER = (
     "machines",
     "calculator",
     "forms",
+    "contracts",
     "home",
 )
 
@@ -663,6 +664,7 @@ NAV_KEYS = (
     "calculator",
     "forms",
     "visual_warehouse",
+    "contracts",
 )
 USER_ROLE_MANAGER = "manager"
 USER_ROLE_EXECUTOR = "executor"
@@ -683,6 +685,7 @@ NAV_LABELS_RU = {
     "calculator": "Калькулятор",
     "forms": "Формы",
     "visual_warehouse": "Визуальный склад",
+    "contracts": "Контракты",
 }
 NAV_LABELS_SHORT = {
     "home": "Главная",
@@ -700,6 +703,7 @@ NAV_LABELS_SHORT = {
     "calculator": "Калькулятор",
     "forms": "Формы",
     "visual_warehouse": "Виз. склад",
+    "contracts": "Контракты",
 }
 
 
@@ -740,6 +744,7 @@ def nav_permissions_for_user(username: str | None) -> dict[str, bool]:
     out = defaults.copy()
     # Новый раздел — только по явной выдаче в кабинете (пока ключа нет в store).
     out["inventory_types"] = False
+    out["contracts"] = False
     for k in NAV_KEYS:
         if k in nav:
             out[k] = bool(nav[k])

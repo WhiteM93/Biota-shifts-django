@@ -3857,3 +3857,113 @@ class StockToolField(models.Model):
     def __str__(self) -> str:
         scope = self.subtype.name if self.subtype_id else self.tool_type.name
         return f"{scope}: {self.label}"
+
+
+class WorkContract(models.Model):
+    """Производственный контракт: группирует позиции (изделия) с количествами."""
+
+    name = models.CharField(max_length=200, verbose_name="Контракт")
+    notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("sort_order", "name", "id")
+        verbose_name = "Контракт (производство)"
+        verbose_name_plural = "Контракты (производство)"
+
+    def __str__(self) -> str:
+        return (self.name or "").strip() or f"Контракт #{self.pk}"
+
+
+class WorkContractPosition(models.Model):
+    """Позиция контракта: изделие, описание, количество, текущий этап производства."""
+
+    STAGE_NOT_STARTED = "not_started"
+    STAGE_N_A = "n_a"
+    STAGE_NO_INFO = "no_info"
+    STAGE_OPERATION = "operation"
+    STAGE_DONE = "done"
+    STAGE_PAUSED = "paused"
+    STAGE_CHOICES = (
+        (STAGE_NOT_STARTED, "Не запущено"),
+        (STAGE_N_A, "не касается"),
+        (STAGE_NO_INFO, "не приехал или нет информации"),
+        (STAGE_OPERATION, "На операции"),
+        (STAGE_DONE, "Все этапы пройдены"),
+        (STAGE_PAUSED, "Пауза"),
+    )
+
+    contract = models.ForeignKey(
+        WorkContract,
+        on_delete=models.CASCADE,
+        related_name="positions",
+        verbose_name="Контракт",
+    )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="splits",
+        verbose_name="Отрыв от",
+        help_text="Если задано — это отрыв (часть) от родительской позиции",
+    )
+    name = models.CharField(max_length=320, verbose_name="Изделие")
+    description = models.TextField(blank=True, default="", verbose_name="Описание")
+    quantity = models.PositiveIntegerField(default=1, verbose_name="Количество")
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    stage = models.CharField(
+        max_length=16,
+        choices=STAGE_CHOICES,
+        default=STAGE_NOT_STARTED,
+        verbose_name="Этап",
+    )
+    current_operation = models.ForeignKey(
+        "WorkPositionOperation",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Текущая операция",
+    )
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Позиция контракта"
+        verbose_name_plural = "Позиции контрактов"
+
+    def __str__(self) -> str:
+        return f"{self.contract_id}: {(self.name or '')[:80]}"
+
+    def stage_label(self) -> str:
+        if self.stage == self.STAGE_OPERATION and self.current_operation_id:
+            return f"На {self.current_operation.name}"
+        if self.stage == self.STAGE_PAUSED and self.current_operation_id:
+            return f"Пауза ({self.current_operation.name})"
+        for code, lab in self.STAGE_CHOICES:
+            if code == self.stage:
+                return lab
+        return "Не запущено"
+
+
+class WorkPositionOperation(models.Model):
+    """Операция в маршруте изделия (порядок задаёт sort_order)."""
+
+    position = models.ForeignKey(
+        WorkContractPosition,
+        on_delete=models.CASCADE,
+        related_name="operations",
+        verbose_name="Изделие",
+    )
+    name = models.CharField(max_length=120, verbose_name="Операция")
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        ordering = ("sort_order", "id")
+        verbose_name = "Операция изделия"
+        verbose_name_plural = "Операции изделий"
+
+    def __str__(self) -> str:
+        return f"{self.position_id}: {self.sort_order + 1}. {self.name}"

@@ -10,6 +10,9 @@ from .models import (
     ProductFile,
     ProductSetup,
     ProductSetupPhoto,
+    WorkContract,
+    WorkContractPosition,
+    WorkPositionOperation,
 )
 
 
@@ -66,6 +69,39 @@ class PlanContractAdmin(admin.ModelAdmin):
     @admin.display(description="Примечание")
     def title_short(self, obj: PlanContract) -> str:
         return (obj.title or "—")[:80]
+
+
+class WorkContractPositionInline(admin.TabularInline):
+    model = WorkContractPosition
+    extra = 0
+    ordering = ("sort_order", "id")
+    fields = ("name", "quantity", "parent", "stage", "current_operation", "sort_order", "description")
+    autocomplete_fields = ()
+    raw_id_fields = ("current_operation", "parent")
+
+
+class WorkPositionOperationInline(admin.TabularInline):
+    model = WorkPositionOperation
+    extra = 0
+    ordering = ("sort_order", "id")
+
+
+@admin.register(WorkContract)
+class WorkContractAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "sort_order", "updated_at")
+    list_display_links = ("id", "name")
+    search_fields = ("name", "notes")
+    readonly_fields = ("created_at", "updated_at")
+    inlines = (WorkContractPositionInline,)
+
+
+@admin.register(WorkContractPosition)
+class WorkContractPositionAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "contract", "quantity", "parent", "stage", "sort_order")
+    list_filter = ("stage",)
+    search_fields = ("name", "description", "contract__name")
+    inlines = (WorkPositionOperationInline,)
+    raw_id_fields = ("contract", "current_operation", "parent")
 
 
 @admin.register(PlannedProduct)

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% load static biota_icons %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/contracts.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
+{% block content %}
+<div
+  class="wc-page{% if not biota_can_edit %} is-readonly{% endif %}"
+  id="wc-root"
+  data-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}"
+  data-api-list="{% url 'contracts_api_list' %}"
+  data-api-contract="{% url 'contracts_api_contract_upsert' %}"
+  data-api-contract-del-tpl="{% url 'contracts_api_contract_delete' 0 %}"
+  data-api-position="{% url 'contracts_api_position_upsert' %}"
+  data-api-position-del-tpl="{% url 'contracts_api_position_delete' 0 %}"
+  data-api-stage-tpl="{% url 'contracts_api_position_stage' 0 %}"
+  data-api-split-tpl="{% url 'contracts_api_position_split' 0 %}"
+  data-api-ops-tpl="{% url 'contracts_api_operations_replace' 0 %}"
+>
+  <header class="wc-topbar">
+    <div class="wc-topbar-text">
+      <h1 class="wc-title">Контракты</h1>
+      <p class="wc-subtitle">Изделия, операции и текущий этап производства</p>
+    </div>
+    <div class="wc-topbar-actions">
+      <button type="button" class="wc-btn-secondary js-wc-expand-all">Развернуть</button>
+      <button type="button" class="wc-btn-secondary js-wc-collapse-all">Свернуть</button>
+      {% if biota_can_edit %}
+      <button
+        type="button"
+        class="btn product-btn-edit-mode product-btn-edit-mode--icon-only js-wc-toggle-edit"
+        aria-pressed="false"
+        aria-label="Редактировать"
+        title="Редактировать"
+      >
+        <span class="product-btn-edit-mode__icon" aria-hidden="true">
+          <span class="qe-icon-glow"></span>
+          {% biota_icon "action.quick_edit" "qe-icon qe-icon--edit" %}
+          {% biota_icon "action.quick_edit_save" "qe-icon qe-icon--save" %}
+        </span>
+      </button>
+      <button type="button" class="wc-btn-primary js-wc-new-contract wc-edit-only" hidden>+ Контракт</button>
+      {% endif %}
+    </div>
+  </header>
+
+  <div class="wc-filters" role="toolbar" aria-label="Фильтр по этапу">
+    <span class="wc-filters-label">Этап:</span>
+    <div class="wc-filters-chips js-wc-filters"></div>
+  </div>
+
+  <p class="wc-empty js-wc-empty" hidden>Пока нет контрактов.</p>
+  <p class="wc-empty js-wc-filter-empty" hidden>Нет позиций на выбранном этапе.</p>
+  <div class="wc-list js-wc-list" role="list"></div>
+</div>
+
+{% if biota_can_edit %}
+<dialog class="wc-dialog js-wc-dlg-contract">
+  <form method="dialog" class="wc-dialog-card js-wc-contract-form">
+    <h2 class="wc-dialog-title js-wc-contract-form-title">Новый контракт</h2>
+    <input type="hidden" class="js-wc-contract-id" value="">
+    <label class="wc-row">
+      <span class="wc-row-label">Название</span>
+      <input type="text" class="wc-control js-wc-contract-name" maxlength="200" required autocomplete="off">
+    </label>
+    <label class="wc-row">
+      <span class="wc-row-label">Примечание</span>
+      <input type="text" class="wc-control js-wc-contract-notes" maxlength="300" autocomplete="off">
+    </label>
+    <div class="wc-dialog-actions">
+      <button type="button" class="wc-btn-danger wc-btn-compact js-wc-contract-del" hidden>Удалить</button>
+      <span class="wc-dialog-spacer"></span>
+      <button type="button" class="wc-btn-secondary js-wc-dlg-cancel">Отмена</button>
+      <button type="submit" class="wc-btn-primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="wc-dialog js-wc-dlg-position">
+  <form method="dialog" class="wc-dialog-card js-wc-position-form">
+    <h2 class="wc-dialog-title js-wc-position-form-title">Новое изделие</h2>
+    <input type="hidden" class="js-wc-position-id" value="">
+    <input type="hidden" class="js-wc-position-contract-id" value="">
+    <label class="wc-row">
+      <span class="wc-row-label">Изделие</span>
+      <input type="text" class="wc-control js-wc-position-name" maxlength="320" required autocomplete="off" placeholder="Кожух ВРПЕ…">
+    </label>
+    <label class="wc-row">
+      <span class="wc-row-label">Описание</span>
+      <textarea class="wc-control js-wc-position-desc" rows="2" maxlength="2000" placeholder="Материал / заготовка"></textarea>
+    </label>
+    <label class="wc-row">
+      <span class="wc-row-label">Количество</span>
+      <input type="number" class="wc-control js-wc-position-qty" min="1" max="1000000" value="1">
+    </label>
+    <div class="wc-ops-block">
+      <div class="wc-ops-head">
+        <span class="wc-row-label">Операции (по порядку)</span>
+        <button type="button" class="wc-op-add-btn js-wc-op-add" title="Добавить операцию" aria-label="Добавить операцию">+</button>
+      </div>
+      <div class="js-wc-ops-list wc-ops-list"></div>
+      <p class="wc-hint">Перетащите операции за ⋮⋮, чтобы изменить порядок. Текущий этап — в таблице.</p>
+    </div>
+    <div class="wc-dialog-actions">
+      <button type="button" class="wc-btn-danger wc-btn-compact js-wc-position-del" hidden>Удалить</button>
+      <span class="wc-dialog-spacer"></span>
+      <button type="button" class="wc-btn-secondary js-wc-dlg-cancel">Отмена</button>
+      <button type="submit" class="wc-btn-primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="wc-dialog js-wc-dlg-split">
+  <form method="dialog" class="wc-dialog-card js-wc-split-form">
+    <h2 class="wc-dialog-title">Отрыв</h2>
+    <p class="wc-hint js-wc-split-hint">Укажите, сколько деталей оторвать в отдельную позицию.</p>
+    <input type="hidden" class="js-wc-split-position-id" value="">
+    <label class="wc-row">
+      <span class="wc-row-label">Количество отрыва</span>
+      <input type="number" class="wc-control js-wc-split-qty" min="1" max="999999" value="1" required>
+    </label>
+    <div class="wc-dialog-actions">
+      <span class="wc-dialog-spacer"></span>
+      <button type="button" class="wc-btn-secondary js-wc-dlg-cancel">Отмена</button>
+      <button type="submit" class="wc-btn-primary">Оторвать</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+<script type="application/json" id="wc-bootstrap">{{ contracts_json|safe }}</script>
+<script src="{% static 'shifts/js/contracts.js' %}?v={{ static_asset_version }}"></script>
+{% endblock %}

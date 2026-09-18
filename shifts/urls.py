@@ -17,6 +17,7 @@ from . import skud_views
 from . import forms_views
 from . import machines_views
 from . import visual_warehouse_views
+from . import contract_views
 from . import views
 
 urlpatterns = [
@@ -103,6 +104,43 @@ urlpatterns = [
     path("forms/api/", forms_views.forms_api_list, name="forms_api_list"),
     path("forms/api/upload/", forms_views.forms_api_upload, name="forms_api_upload"),
     path("forms/api/<int:pk>/", forms_views.forms_api_detail, name="forms_api_detail"),
+    path("contracts/", contract_views.contracts_view, name="contracts"),
+    path("contracts/api/", contract_views.contracts_api_list, name="contracts_api_list"),
+    path(
+        "contracts/api/contract/",
+        contract_views.contracts_api_contract_upsert,
+        name="contracts_api_contract_upsert",
+    ),
+    path(
+        "contracts/api/contract/<int:pk>/delete/",
+        contract_views.contracts_api_contract_delete,
+        name="contracts_api_contract_delete",
+    ),
+    path(
+        "contracts/api/position/",
+        contract_views.contracts_api_position_upsert,
+        name="contracts_api_position_upsert",
+    ),
+    path(
+        "contracts/api/position/<int:pk>/delete/",
+        contract_views.contracts_api_position_delete,
+        name="contracts_api_position_delete",
+    ),
+    path(
+        "contracts/api/position/<int:pk>/stage/",
+        contract_views.contracts_api_position_stage,
+        name="contracts_api_position_stage",
+    ),
+    path(
+        "contracts/api/position/<int:pk>/split/",
+        contract_views.contracts_api_position_split,
+        name="contracts_api_position_split",
+    ),
+    path(
+        "contracts/api/position/<int:pk>/operations/",
+        contract_views.contracts_api_operations_replace,
+        name="contracts_api_operations_replace",
+    ),
     path("visual-warehouse/", visual_warehouse_views.visual_warehouse_view, name="visual_warehouse"),
     path(
         "visual-warehouse/api/cabinets/",
