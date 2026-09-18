@@ -87,25 +87,27 @@ def _backfill_missing_operations() -> None:
 
 
 def _ensure_demo_contracts() -> None:
-    if WorkContract.objects.exists():
-        _backfill_missing_operations()
-        return
-    with transaction.atomic():
-        for i, (title, rows) in enumerate(_DEMO_SEED):
-            cab = WorkContract.objects.create(name=title, sort_order=i)
-            for j, (name, desc, qty, ops) in enumerate(rows):
-                pos = WorkContractPosition.objects.create(
-                    contract=cab,
-                    name=name,
-                    description=desc,
-                    quantity=qty,
-                    sort_order=j,
-                    stage=WorkContractPosition.STAGE_NOT_STARTED,
-                )
-                for k, op_name in enumerate(ops):
-                    WorkPositionOperation.objects.create(
-                        position=pos, name=op_name, sort_order=k
+    from .contract_seed import ensure_goz_2026_25_contract
+
+    if not WorkContract.objects.exists():
+        with transaction.atomic():
+            for i, (title, rows) in enumerate(_DEMO_SEED):
+                cab = WorkContract.objects.create(name=title, sort_order=i)
+                for j, (name, desc, qty, ops) in enumerate(rows):
+                    pos = WorkContractPosition.objects.create(
+                        contract=cab,
+                        name=name,
+                        description=desc,
+                        quantity=qty,
+                        sort_order=j,
+                        stage=WorkContractPosition.STAGE_NOT_STARTED,
                     )
+                    for k, op_name in enumerate(ops):
+                        WorkPositionOperation.objects.create(
+                            position=pos, name=op_name, sort_order=k
+                        )
+    ensure_goz_2026_25_contract()
+    _backfill_missing_operations()
 
 
 def _serialize_operation(op: WorkPositionOperation) -> dict:
