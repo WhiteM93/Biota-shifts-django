@@ -40,10 +40,12 @@
     "Токарный",
     "Гальваника",
     "Слесарный",
+    "Сборочная",
     "Монтаж",
     "Размонтаж",
     "Сварка",
     "Гибка",
+    "Изоляция под покраску",
     "Покраска",
     "Маркировка",
     "Мойка",
@@ -57,10 +59,12 @@
     if (n.indexOf("токар") >= 0) return "wc-tone-lathe";
     if (n.indexOf("гальван") >= 0) return "wc-tone-galv";
     if (n.indexOf("слесар") >= 0 || n.indexOf("сесар") >= 0) return "wc-tone-fitter";
+    if (n.indexOf("сбороч") >= 0 || n.indexOf("сборк") >= 0) return "wc-tone-assembly";
     if (n.indexOf("размонт") >= 0) return "wc-tone-demount";
     if (n.indexOf("монтаж") >= 0) return "wc-tone-mount";
     if (n.indexOf("свар") >= 0) return "wc-tone-weld";
     if (n.indexOf("гибк") >= 0) return "wc-tone-bend";
+    if (n.indexOf("изоляц") >= 0) return "wc-tone-isolate";
     if (n.indexOf("покра") >= 0) return "wc-tone-paint";
     if (n.indexOf("маркир") >= 0) return "wc-tone-mark";
     if (n.indexOf("мойк") >= 0) return "wc-tone-wash";

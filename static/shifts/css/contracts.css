@@ -139,6 +139,9 @@
 .wc-filter-chip.wc-tone-fitter { color: #aab7b8; border-color: rgba(93,109,126,0.45); }
 .wc-filter-chip.wc-tone-fitter.is-active { background: #5d6d7e; border-color: #85929e; color: #fff; }
 
+.wc-filter-chip.wc-tone-assembly { color: #26a69a; border-color: rgba(38,166,154,0.45); }
+.wc-filter-chip.wc-tone-assembly.is-active { background: #00897b; border-color: #4db6ac; color: #fff; }
+
 .wc-filter-chip.wc-tone-mount { color: #a29bfe; border-color: rgba(108,92,231,0.45); }
 .wc-filter-chip.wc-tone-mount.is-active { background: #6c5ce7; border-color: #a29bfe; color: #fff; }
 
@@ -150,6 +153,9 @@
 
 .wc-filter-chip.wc-tone-bend { color: #4dd0e1; border-color: rgba(0,172,193,0.45); }
 .wc-filter-chip.wc-tone-bend.is-active { background: #00acc1; border-color: #4dd0e1; color: #fff; }
+
+.wc-filter-chip.wc-tone-isolate { color: #90caf9; border-color: rgba(66,165,245,0.45); }
+.wc-filter-chip.wc-tone-isolate.is-active { background: #42a5f5; border-color: #90caf9; color: #fff; }
 
 .wc-filter-chip.wc-tone-paint { color: #f06292; border-color: rgba(194,24,91,0.45); }
 .wc-filter-chip.wc-tone-paint.is-active { background: #c2185b; border-color: #f06292; color: #fff; }
@@ -183,10 +189,12 @@ html[data-theme="dawn"] .wc-filter-chip.wc-tone-mill { color: #d35400; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-lathe { color: #2471a3; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-galv { color: #0e6655; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-fitter { color: #5d6d7e; }
+html[data-theme="dawn"] .wc-filter-chip.wc-tone-assembly { color: #00695c; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-mount { color: #5b4cdb; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-demount { color: #7d3c98; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-weld { color: #a04000; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-bend { color: #00838f; }
+html[data-theme="dawn"] .wc-filter-chip.wc-tone-isolate { color: #1565c0; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-paint { color: #ad1457; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-mark { color: #558b2f; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-wash { color: #0277bd; }
@@ -722,6 +730,11 @@ button.wc-op-chip:not(:disabled):hover {
   border-color: #85929e;
   box-shadow: 0 0 0 2px rgba(93, 109, 126, 0.4);
 }
+.wc-op-chip.is-current.wc-tone-assembly {
+  background: #00897b;
+  border-color: #4db6ac;
+  box-shadow: 0 0 0 2px rgba(0, 137, 123, 0.4);
+}
 .wc-op-chip.is-current.wc-tone-mount {
   background: #6c5ce7;
   border-color: #a29bfe;
@@ -741,6 +754,11 @@ button.wc-op-chip:not(:disabled):hover {
   background: #00acc1;
   border-color: #4dd0e1;
   box-shadow: 0 0 0 2px rgba(0, 172, 193, 0.4);
+}
+.wc-op-chip.is-current.wc-tone-isolate {
+  background: #42a5f5;
+  border-color: #90caf9;
+  box-shadow: 0 0 0 2px rgba(66, 165, 245, 0.4);
 }
 .wc-op-chip.is-current.wc-tone-paint {
   background: #c2185b;
@@ -774,10 +792,12 @@ button.wc-op-chip:not(:disabled):hover {
 .wc-op-chip.is-todo.wc-tone-lathe { color: rgba(52, 152, 219, 0.75); }
 .wc-op-chip.is-todo.wc-tone-galv { color: rgba(26, 188, 156, 0.75); }
 .wc-op-chip.is-todo.wc-tone-fitter { color: rgba(149, 165, 166, 0.85); }
+.wc-op-chip.is-todo.wc-tone-assembly { color: rgba(38, 166, 154, 0.8); }
 .wc-op-chip.is-todo.wc-tone-mount { color: rgba(108, 92, 231, 0.75); }
 .wc-op-chip.is-todo.wc-tone-demount { color: rgba(155, 89, 182, 0.75); }
 .wc-op-chip.is-todo.wc-tone-weld { color: rgba(211, 84, 0, 0.75); }
 .wc-op-chip.is-todo.wc-tone-bend { color: rgba(0, 188, 212, 0.75); }
+.wc-op-chip.is-todo.wc-tone-isolate { color: rgba(66, 165, 245, 0.8); }
 .wc-op-chip.is-todo.wc-tone-paint { color: rgba(233, 30, 99, 0.75); }
 .wc-op-chip.is-todo.wc-tone-mark { color: rgba(139, 195, 74, 0.8); }
 .wc-op-chip.is-todo.wc-tone-wash { color: rgba(3, 169, 244, 0.75); }
@@ -1120,10 +1140,12 @@ html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-mill { color: #d35400; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-lathe { color: #2471a3; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-galv { color: #0e6655; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-fitter { color: #5d6d7e; }
+html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-assembly { color: #00695c; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-mount { color: #5b4cdb; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-demount { color: #7d3c98; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-weld { color: #a04000; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-bend { color: #00838f; }
+html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-isolate { color: #1565c0; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-paint { color: #ad1457; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-mark { color: #558b2f; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-wash { color: #0277bd; }
