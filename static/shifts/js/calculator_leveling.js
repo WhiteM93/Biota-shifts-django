@@ -117,12 +117,18 @@
     });
   }
 
+  /** Номера опор слева / справа: подряд 1…N (без пропусков). */
   function footNumsForCount(n) {
     n = Math.max(4, Math.min(16, n || 8));
-    var pairs = Math.floor(n / 2);
-    if (pairs <= 2) return { left: [1, 5], right: [6, 9] };
-    if (pairs === 3) return { left: [1, 2, 5], right: [6, 7, 9] };
-    return { left: [1, 2, 4, 5], right: [6, 7, 8, 9] };
+    if (n % 2) n += 1;
+    var pairs = n / 2;
+    var left = [];
+    var right = [];
+    for (var i = 0; i < pairs; i++) {
+      left.push(i + 1);
+      right.push(pairs + i + 1);
+    }
+    return { left: left, right: right };
   }
 
   function buildFeet(w, L, x2, y2, feetN) {
@@ -159,12 +165,6 @@
   }
 
   function currentFeet() {
-    var card = findCard(activeId);
-    if (card && Array.isArray(card.feet_positions) && card.feet_positions.length) {
-      return card.feet_positions.map(function (f) {
-        return { num: f.num, x_mm: Number(f.x_mm) || 0, y_mm: Number(f.y_mm) || 0 };
-      });
-    }
     var s = readSetup();
     return buildFeet(s.w, s.L, s.x2, s.y2, s.feetN);
   }
@@ -640,11 +640,16 @@
         if (h && h.kind === "ok") cls += " is-ok";
         var orderBadge =
           h && h.order
-            ? '<text class="lv-level-order" x="' +
-              (cx + 16) +
+            ? '<circle class="lv-level-order-bg" cx="' +
+              (cx + 14) +
+              '" cy="' +
+              (cy - 12) +
+              '" r="9"/>' +
+              '<text class="lv-level-order" x="' +
+              (cx + 14) +
               '" y="' +
-              (cy - 10) +
-              '">' +
+              (cy - 8) +
+              '" text-anchor="middle">' +
               h.order +
               "</text>"
             : "";
