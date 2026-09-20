@@ -49,6 +49,20 @@
     return inp ? inp.value : "";
   }
 
+  function parseWeightKg(raw) {
+    var s = String(raw == null ? "" : raw).trim().replace(/\s/g, "").replace(",", ".");
+    if (!s) return "";
+    // "5.000" как тысячи → 5000, если после точки ровно 3 цифры и число < 100
+    if (/^\d{1,3}\.\d{3}$/.test(s)) {
+      var head = s.slice(0, s.indexOf("."));
+      if (parseInt(head, 10) < 100) s = s.replace(".", "");
+    }
+    var n = parseFloat(s);
+    if (isNaN(n) || n < 0) return "";
+    if (n > 999999) n = 999999;
+    return String(Math.round(n * 10) / 10);
+  }
+
   function parseNum(elOrVal) {
     var v =
       elOrVal && elOrVal.value !== undefined
@@ -836,7 +850,7 @@
       id: activeId || 0,
       name: ($("lv-name").value || "").trim(),
       serial_number: ($("lv-serial").value || "").trim(),
-      weight_kg: ($("lv-weight").value || "").trim(),
+      weight_kg: parseWeightKg($("lv-weight") && $("lv-weight").value),
       feet_count: s.feetN,
       foot_layout: layout,
       bed_width_mm: s.w,
