@@ -25,6 +25,32 @@
       <p class="wc-subtitle">Изделия, операции и текущий этап производства</p>
     </div>
     <div class="wc-topbar-actions">
+      <div class="products-search" id="wc-search" data-has-query="0">
+        <button
+          type="button"
+          class="btn btn-ghost products-search__toggle"
+          id="wc-search-toggle"
+          aria-expanded="false"
+          aria-controls="wc-search-panel"
+          title="Поиск"
+          aria-label="Поиск по контрактам и изделиям"
+        >
+          {% biota_icon "action.search" "ui-icon products-search__icon" %}
+        </button>
+        <form class="products-search__panel" id="wc-search-panel" hidden>
+          <input
+            type="search"
+            id="wc-search-input"
+            class="products-search__input"
+            placeholder="003 · −СБ скрыть…"
+            title="Фильтр: текст — показать совпадения, −слово — скрыть. Можно несколько: 003 −СБ"
+            autocomplete="off"
+            enterkeyhint="search"
+          >
+          <button type="button" class="products-search__clear js-wc-search-clear" title="Сбросить поиск" aria-label="Сбросить поиск" hidden>×</button>
+          <button type="submit" class="btn products-search__submit">Найти</button>
+        </form>
+      </div>
       <button type="button" class="wc-btn-secondary js-wc-expand-all">Развернуть</button>
       <button type="button" class="wc-btn-secondary js-wc-collapse-all">Свернуть</button>
       {% if biota_can_edit %}
@@ -101,7 +127,7 @@
         <button type="button" class="wc-op-add-btn js-wc-op-add" title="Добавить операцию" aria-label="Добавить операцию">+</button>
       </div>
       <div class="js-wc-ops-list wc-ops-list"></div>
-      <p class="wc-hint">Перетащите операции за ⋮⋮, чтобы изменить порядок. Текущий этап — в таблице.</p>
+      <p class="wc-hint">Перетащите операции за ⋮⋮. Описание видно при наведении на этап в таблице.</p>
     </div>
     <div class="wc-dialog-actions">
       <button type="button" class="wc-btn-danger wc-btn-compact js-wc-position-del" hidden>Удалить</button>

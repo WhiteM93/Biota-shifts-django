@@ -87,26 +87,25 @@ def _backfill_missing_operations() -> None:
 
 
 def _ensure_demo_contracts() -> None:
-    from .contract_seed import ensure_goz_2026_25_contract
-
-    if not WorkContract.objects.exists():
-        with transaction.atomic():
-            for i, (title, rows) in enumerate(_DEMO_SEED):
-                cab = WorkContract.objects.create(name=title, sort_order=i)
-                for j, (name, desc, qty, ops) in enumerate(rows):
-                    pos = WorkContractPosition.objects.create(
-                        contract=cab,
-                        name=name,
-                        description=desc,
-                        quantity=qty,
-                        sort_order=j,
-                        stage=WorkContractPosition.STAGE_NOT_STARTED,
+    if WorkContract.objects.exists():
+        _backfill_missing_operations()
+        return
+    with transaction.atomic():
+        for i, (title, rows) in enumerate(_DEMO_SEED):
+            cab = WorkContract.objects.create(name=title, sort_order=i)
+            for j, (name, desc, qty, ops) in enumerate(rows):
+                pos = WorkContractPosition.objects.create(
+                    contract=cab,
+                    name=name,
+                    description=desc,
+                    quantity=qty,
+                    sort_order=j,
+                    stage=WorkContractPosition.STAGE_NOT_STARTED,
+                )
+                for k, op_name in enumerate(ops):
+                    WorkPositionOperation.objects.create(
+                        position=pos, name=op_name, sort_order=k
                     )
-                    for k, op_name in enumerate(ops):
-                        WorkPositionOperation.objects.create(
-                            position=pos, name=op_name, sort_order=k
-                        )
-    ensure_goz_2026_25_contract()
     _backfill_missing_operations()
 
 
@@ -115,8 +114,26 @@ def _serialize_operation(op: WorkPositionOperation) -> dict:
         "id": op.id,
         "position_id": op.position_id,
         "name": op.name,
+        "description": op.description or "",
         "sort_order": op.sort_order,
     }
+
+
+def _clean_operations_payload(ops_raw) -> list[tuple[str, str]]:
+    """Список (name, description) из JSON body."""
+    out: list[tuple[str, str]] = []
+    if not isinstance(ops_raw, list):
+        return out
+    for item in ops_raw[:MAX_OPS]:
+        if isinstance(item, dict):
+            name = str(item.get("name") or "").strip()[:120]
+            note = str(item.get("description") or item.get("note") or "").strip()[:300]
+        else:
+            name = str(item or "").strip()[:120]
+            note = ""
+        if name:
+            out.append((name, note))
+    return out
 
 
 def _serialize_position(pos: WorkContractPosition, *, depth: int = 0) -> dict:
@@ -363,17 +380,11 @@ def contracts_api_position_upsert(request):
             stage=WorkContractPosition.STAGE_NOT_STARTED,
         )
         ops_raw = body.get("operations")
-        if isinstance(ops_raw, list) and ops_raw:
-            for i, item in enumerate(ops_raw[:MAX_OPS]):
-                if isinstance(item, dict):
-                    op_name = str(item.get("name") or "").strip()[:120]
-                else:
-                    op_name = str(item or "").strip()[:120]
-                if not op_name:
-                    continue
-                WorkPositionOperation.objects.create(
-                    position=pos, name=op_name, sort_order=i
-                )
+        cleaned = _clean_operations_payload(ops_raw)
+        for i, (op_name, op_note) in enumerate(cleaned):
+            WorkPositionOperation.objects.create(
+                position=pos, name=op_name, description=op_note, sort_order=i
+            )
     pos = _load_position(pos.pk)
     return JsonResponse(
         {"ok": True, "position": _serialize_position(pos, depth=_position_depth(pos))}
@@ -448,7 +459,10 @@ def contracts_api_position_split(request, pk: int):
         )
         for i, op in enumerate(parent.operations.order_by("sort_order", "id")):
             WorkPositionOperation.objects.create(
-                position=child, name=op.name, sort_order=i
+                position=child,
+                name=op.name,
+                description=op.description or "",
+                sort_order=i,
             )
 
     parent = _load_position(parent.pk)
@@ -472,17 +486,9 @@ def contracts_api_operations_replace(request, pk: int):
     if body is None:
         return _err("Некорректный JSON")
     pos = get_object_or_404(WorkContractPosition, pk=pk)
-    ops_raw = body.get("operations")
-    if not isinstance(ops_raw, list):
+    if not isinstance(body.get("operations"), list):
         return _err("Укажите список операций")
-    cleaned: list[str] = []
-    for item in ops_raw[:MAX_OPS]:
-        if isinstance(item, dict):
-            name = str(item.get("name") or "").strip()[:120]
-        else:
-            name = str(item or "").strip()[:120]
-        if name:
-            cleaned.append(name)
+    cleaned = _clean_operations_payload(body.get("operations"))
     with transaction.atomic():
         old_current_name = (
             pos.current_operation.name
@@ -491,9 +497,11 @@ def contracts_api_operations_replace(request, pk: int):
         )
         pos.operations.all().delete()
         created = []
-        for i, name in enumerate(cleaned):
+        for i, (name, note) in enumerate(cleaned):
             created.append(
-                WorkPositionOperation.objects.create(position=pos, name=name, sort_order=i)
+                WorkPositionOperation.objects.create(
+                    position=pos, name=name, description=note, sort_order=i
+                )
             )
         # сохранить текущий этап, если операция с тем же именем осталась
         if old_current_name:

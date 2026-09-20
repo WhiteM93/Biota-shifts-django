@@ -84,7 +84,7 @@ class WorkPositionOperationInline(admin.TabularInline):
     model = WorkPositionOperation
     extra = 0
     ordering = ("sort_order", "id")
-
+    fields = ("sort_order", "name", "description")
 
 @admin.register(WorkContract)
 class WorkContractAdmin(admin.ModelAdmin):

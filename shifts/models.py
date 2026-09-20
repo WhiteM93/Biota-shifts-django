@@ -4127,6 +4127,13 @@ class WorkPositionOperation(models.Model):
         verbose_name="Изделие",
     )
     name = models.CharField(max_length=120, verbose_name="Операция")
+    description = models.CharField(
+        max_length=300,
+        blank=True,
+        default="",
+        verbose_name="Описание",
+        help_text="Подсказка при наведении на этап",
+    )
     sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
 
     class Meta:

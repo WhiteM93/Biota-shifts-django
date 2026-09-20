@@ -7,6 +7,7 @@
   var canEdit = root.getAttribute("data-can-edit") === "1";
   var editMode = false;
   var stageFilter = "all";
+  var searchQuery = "";
   var collapsedSplits = {};
   try {
     collapsedSplits = JSON.parse(sessionStorage.getItem("wc-collapsed-splits") || "{}") || {};
@@ -247,6 +248,58 @@
     return false;
   }
 
+  function normSearch(s) {
+    return String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+  }
+
+  function parseSearchTokens(raw) {
+    var q = normSearch(raw).replace(/[−–—]/g, "-");
+    var include = [];
+    var exclude = [];
+    if (!q) return { include: include, exclude: exclude };
+    q.split(" ").forEach(function (tok) {
+      if (!tok) return;
+      if (tok.charAt(0) === "-") {
+        var ex = tok.slice(1).trim();
+        if (ex) exclude.push(ex);
+      } else {
+        include.push(tok);
+      }
+    });
+    return { include: include, exclude: exclude };
+  }
+
+  function hasActiveSearch() {
+    var t = parseSearchTokens(searchQuery);
+    return !!(t.include.length || t.exclude.length);
+  }
+
+  function positionSearchHaystack(pos, cab) {
+    // название контракта + обозначение изделия (не описание и не операции —
+    // иначе «-СБ» спрячет и «Сборочная»)
+    return normSearch(
+      [(cab && cab.name) || "", (cab && cab.notes) || "", (pos && pos.name) || ""].join(" ")
+    );
+  }
+
+  function positionMatchesSearch(pos, cab) {
+    var t = parseSearchTokens(searchQuery);
+    if (!t.include.length && !t.exclude.length) return true;
+    var hay = positionSearchHaystack(pos, cab);
+    var i;
+    for (i = 0; i < t.exclude.length; i++) {
+      if (hay.indexOf(t.exclude[i]) >= 0) return false;
+    }
+    for (i = 0; i < t.include.length; i++) {
+      if (hay.indexOf(t.include[i]) < 0) return false;
+    }
+    return true;
+  }
+
+  function positionVisible(pos, cab) {
+    return positionMatchesFilter(pos) && positionMatchesSearch(pos, cab);
+  }
+
   function collectStageStats() {
     var stats = {
       all: { count: 0, qty: 0 },
@@ -344,15 +397,18 @@
     if (emptyEl) emptyEl.hidden = true;
 
     var shownAny = false;
+    var hasActiveFilter = stageFilter !== "all" || hasActiveSearch();
     contracts.forEach(function (cab, idx) {
       var allPositions = cab.positions || [];
-      var positions = allPositions.filter(positionMatchesFilter);
-      if (stageFilter !== "all" && !positions.length && !editMode) return;
+      var positions = allPositions.filter(function (p) {
+        return positionVisible(p, cab);
+      });
+      if (hasActiveFilter && !positions.length && !editMode) return;
 
       shownAny = true;
       var details = document.createElement("details");
       details.className = "wc-contract js-wc-contract";
-      var forceOpen = stageFilter !== "all";
+      var forceOpen = hasActiveFilter;
       details.open = forceOpen || idx === 0 || !!cab._keepOpen;
       details.dataset.contractId = String(cab.id);
 
@@ -371,10 +427,10 @@
 
       var metaEl = document.createElement("span");
       metaEl.className = "wc-contract-meta";
-      var metaCount = stageFilter === "all"
+      var metaCount = !hasActiveFilter
         ? (cab.positions_count || allPositions.length || 0)
         : positions.length;
-      var metaQty = stageFilter === "all"
+      var metaQty = !hasActiveFilter
         ? (cab.positions_qty || 0)
         : positions.reduce(function (s, p) { return s + (p.quantity || 0); }, 0);
       metaEl.textContent = metaCount + " поз. · " + metaQty + " шт.";
@@ -482,13 +538,21 @@
 
       details.appendChild(body);
       details.addEventListener("toggle", function () {
-        if (stageFilter === "all") cab._keepOpen = details.open;
+        if (stageFilter === "all" && !hasActiveSearch()) cab._keepOpen = details.open;
       });
       listEl.appendChild(details);
     });
 
-    if (filterEmptyEl) filterEmptyEl.hidden = shownAny || stageFilter === "all";
-    if (!shownAny && stageFilter !== "all" && emptyEl) emptyEl.hidden = true;
+    if (filterEmptyEl) {
+      var searching = hasActiveSearch();
+      filterEmptyEl.hidden = shownAny || (!searching && stageFilter === "all");
+      filterEmptyEl.textContent = searching
+        ? "Ничего не найдено."
+        : "Нет позиций на выбранном этапе.";
+    }
+    if (!shownAny && (stageFilter !== "all" || hasActiveSearch()) && emptyEl) {
+      emptyEl.hidden = true;
+    }
   }
 
   function buildPositionRow(cab, pos) {
@@ -553,25 +617,6 @@
       nameWrap.appendChild(btnFold);
     }
 
-    if (editMode && (pos.quantity || 0) > 1) {
-      var btnSplit = document.createElement("button");
-      btnSplit.type = "button";
-      btnSplit.className = "wc-icon-btn";
-      btnSplit.title = "Отрыв";
-      btnSplit.setAttribute("aria-label", "Отрыв: оторвать часть количества");
-      btnSplit.innerHTML =
-        '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">' +
-        '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
-        'd="M6 3v12a3 3 0 0 0 3 3h3M6 9h7a3 3 0 0 1 3 3v6M15 18l3 3 3-3"/>' +
-        "</svg>";
-      btnSplit.addEventListener("click", function (ev) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        openSplitForm(pos);
-      });
-      nameWrap.appendChild(btnSplit);
-    }
-
     tdName.appendChild(nameWrap);
     tr.appendChild(tdName);
 
@@ -606,6 +651,29 @@
     if (editMode) {
       var tdAct = document.createElement("td");
       tdAct.className = "wc-col-act";
+      var acts = document.createElement("div");
+      acts.className = "wc-pos-actions";
+
+      if ((pos.quantity || 0) > 1) {
+        var btnSplit = document.createElement("button");
+        btnSplit.type = "button";
+        btnSplit.className = "wc-split-btn";
+        btnSplit.title = "Отрыв";
+        btnSplit.setAttribute("aria-label", "Отрыв: оторвать часть количества");
+        btnSplit.innerHTML =
+          '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">' +
+          '<path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+          'd="M6 3v12a3 3 0 0 0 3 3h3M6 9h7a3 3 0 0 1 3 3v6M15 18l3 3 3-3"/>' +
+          "</svg>" +
+          '<span class="wc-split-btn-label">Отрыв</span>';
+        btnSplit.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          openSplitForm(pos);
+        });
+        acts.appendChild(btnSplit);
+      }
+
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className = "wc-icon-btn";
@@ -619,7 +687,8 @@
       btn.addEventListener("click", function () {
         openPositionForm(cab, pos);
       });
-      tdAct.appendChild(btn);
+      acts.appendChild(btn);
+      tdAct.appendChild(acts);
       tr.appendChild(tdAct);
     }
 
@@ -651,8 +720,8 @@
 
   function isSplitCollapsedAway(cab, pos) {
     if (!pos || !pos.parent_id) return false;
-    // при фильтре по этапу не прячем совпавшие отрывы
-    if (stageFilter !== "all") return false;
+    // при фильтре по этапу / поиску не прячем совпавшие отрывы
+    if (stageFilter !== "all" || hasActiveSearch()) return false;
     var positions = (cab && cab.positions) || [];
     var byId = {};
     positions.forEach(function (p) { byId[p.id] = p; });
@@ -772,21 +841,29 @@
     ops.forEach(function (op, idx) {
       appendArrow();
       var tone = opToneClass(op.name);
+      var note = String(op.description || "").trim();
+      var baseTitle;
+      if (allDone) {
+        baseTitle = canEdit ? ("Поставить этап: " + (op.name || "")) : (op.name || "");
+      } else if (idx === currentIdx && paused) {
+        baseTitle = "Пауза на этапе: " + (op.name || "");
+      } else if (idx === currentIdx && onOp) {
+        baseTitle = op.name || "";
+      } else {
+        baseTitle = canEdit ? ("Поставить этап: " + (op.name || "")) : (op.name || "");
+      }
+      var title = note ? ((op.name || baseTitle) + " — " + note) : baseTitle;
       var cls;
-      var title;
       if (allDone) {
         cls = "is-done " + tone;
-        title = canEdit ? ("Поставить этап: " + (op.name || "")) : (op.name || "");
       } else if (idx === currentIdx && paused) {
         cls = "is-paused-at is-current " + tone;
-        title = "Пауза на этапе: " + (op.name || "");
       } else if (idx === currentIdx && onOp) {
         cls = "is-current " + tone;
-        title = op.name || "";
       } else {
         cls = "is-todo " + tone;
-        title = canEdit ? ("Поставить этап: " + (op.name || "")) : (op.name || "");
       }
+      if (note) cls += " has-note";
       var chip = makeChip(op.name || ("Оп. " + (idx + 1)), cls, title, function () {
         saveStage(pos, {
           stage: "operation",
@@ -795,6 +872,9 @@
       });
       if (idx === currentIdx && !allDone) {
         chip.setAttribute("aria-current", "step");
+      }
+      if (note) {
+        chip.setAttribute("aria-description", note);
       }
     });
 
@@ -918,7 +998,7 @@
     });
   }
 
-  function addOpRow(name) {
+  function addOpRow(name, description) {
     var box = posForm.querySelector(".js-wc-ops-list");
     if (!box) return;
     bindOpsListDnD(box);
@@ -971,6 +1051,15 @@
     });
     sel.value = chosen;
 
+    var note = document.createElement("input");
+    note.type = "text";
+    note.className = "wc-control js-wc-op-desc";
+    note.maxLength = 300;
+    note.placeholder = "Описание (подсказка на этапе)";
+    note.setAttribute("aria-label", "Описание операции");
+    note.value = String(description || "");
+    note.autocomplete = "off";
+
     var del = document.createElement("button");
     del.type = "button";
     del.className = "wc-btn-ghost wc-btn-compact js-wc-op-del";
@@ -986,6 +1075,7 @@
     row.appendChild(num);
     row.appendChild(sel);
     row.appendChild(del);
+    row.appendChild(note);
     box.appendChild(row);
     renumberOps();
   }
@@ -1003,9 +1093,15 @@
     var box = posForm.querySelector(".js-wc-ops-list");
     if (!box) return [];
     var out = [];
-    [].forEach.call(box.querySelectorAll(".js-wc-op-name"), function (inp) {
-      var v = (inp.value || "").trim();
-      if (v) out.push(v);
+    [].forEach.call(box.querySelectorAll(".wc-op-row"), function (row) {
+      var sel = row.querySelector(".js-wc-op-name");
+      var note = row.querySelector(".js-wc-op-desc");
+      var v = sel ? (sel.value || "").trim() : "";
+      if (!v) return;
+      out.push({
+        name: v,
+        description: note ? String(note.value || "").trim() : ""
+      });
     });
     return out;
   }
@@ -1023,7 +1119,9 @@
       ? pos.operations
       : [{ name: "Лазерный" }, { name: "Фрезерный" }];
     if (!pos) ops = [{ name: "" }];
-    ops.forEach(function (op) { addOpRow(op.name || ""); });
+    ops.forEach(function (op) {
+      addOpRow(op.name || "", op.description || "");
+    });
     var del = posForm.querySelector(".js-wc-position-del");
     if (del) del.hidden = !pos;
     openDialog(dlgPos);
@@ -1196,6 +1294,109 @@
   contracts.forEach(function (c) {
     c.positions = flattenPositionsLocal(c.positions || []);
   });
+
+  (function initSearch() {
+    var searchRoot = document.getElementById("wc-search");
+    if (!searchRoot) return;
+    var toggle = document.getElementById("wc-search-toggle");
+    var panel = document.getElementById("wc-search-panel");
+    var input = document.getElementById("wc-search-input");
+    var clearBtn = searchRoot.querySelector(".js-wc-search-clear");
+
+    function locked() {
+      return searchRoot.getAttribute("data-has-query") === "1";
+    }
+
+    function setOpen(on) {
+      searchRoot.classList.toggle("is-open", on);
+      if (toggle) toggle.setAttribute("aria-expanded", on ? "true" : "false");
+      if (panel) {
+        if (on) panel.removeAttribute("hidden");
+        else panel.setAttribute("hidden", "hidden");
+      }
+      if (on && input) {
+        requestAnimationFrame(function () {
+          input.focus();
+          try { input.select(); } catch (_e) {}
+        });
+      }
+    }
+
+    function syncClear() {
+      if (!clearBtn) return;
+      clearBtn.hidden = !String(searchQuery || "").trim();
+    }
+
+    function applySearch(raw) {
+      searchQuery = String(raw || "");
+      var active = hasActiveSearch();
+      searchRoot.setAttribute("data-has-query", active || String(searchQuery).trim() ? "1" : "0");
+      syncClear();
+      if (String(searchQuery).trim()) setOpen(true);
+      render();
+    }
+
+    var liveTimer = 0;
+    function scheduleLiveFilter() {
+      if (liveTimer) window.clearTimeout(liveTimer);
+      liveTimer = window.setTimeout(function () {
+        liveTimer = 0;
+        applySearch(input ? input.value : "");
+      }, 120);
+    }
+
+    if (toggle) {
+      toggle.addEventListener("click", function () {
+        var open = searchRoot.classList.contains("is-open");
+        if (open && locked()) {
+          if (input) input.focus();
+          return;
+        }
+        setOpen(!open);
+      });
+    }
+
+    if (panel) {
+      panel.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        if (liveTimer) {
+          window.clearTimeout(liveTimer);
+          liveTimer = 0;
+        }
+        applySearch(input ? input.value : "");
+      });
+    }
+
+    if (input) {
+      input.addEventListener("input", scheduleLiveFilter);
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function () {
+        if (liveTimer) {
+          window.clearTimeout(liveTimer);
+          liveTimer = 0;
+        }
+        if (input) input.value = "";
+        applySearch("");
+        if (input) input.focus();
+      });
+    }
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      if (!searchRoot.classList.contains("is-open") || locked()) return;
+      setOpen(false);
+    });
+
+    document.addEventListener("pointerdown", function (e) {
+      if (!searchRoot.classList.contains("is-open") || locked()) return;
+      if (searchRoot.contains(e.target)) return;
+      setOpen(false);
+    });
+
+    syncClear();
+  })();
 
   setEditMode(false);
   render();
