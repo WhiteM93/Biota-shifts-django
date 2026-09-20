@@ -437,6 +437,251 @@ def _calculator_save_cutting_modes(request):
     )
 
 
+def _leveling_card_to_dict(card) -> dict:
+    from decimal import Decimal
+
+    def _num(v):
+        if v is None:
+            return None
+        if isinstance(v, Decimal):
+            s = format(v, "f").rstrip("0").rstrip(".")
+            return s or "0"
+        return str(v)
+
+    hist = card.measurements if isinstance(card.measurements, list) else []
+    wf = card.workflow if isinstance(card.workflow, dict) else {}
+    feet = card.feet_positions if isinstance(card.feet_positions, list) else []
+    return {
+        "id": card.pk,
+        "name": card.name or "",
+        "serial_number": card.serial_number or "",
+        "weight_kg": _num(card.weight_kg),
+        "feet_count": int(card.feet_count or len(feet) or 8),
+        "foot_layout": card.foot_layout or "custom",
+        "bed_width_mm": int(card.bed_width_mm or 1200),
+        "bed_length_mm": int(card.bed_length_mm or 2200),
+        "thread_pitch_mm": _num(card.thread_pitch_mm) or "1.5",
+        "table_span_x_mm": int(card.table_span_x_mm or 850),
+        "table_span_y_mm": int(card.table_span_y_mm or 500),
+        "feet_positions": feet,
+        "workflow": wf,
+        "notes": card.notes or "",
+        "measurements": hist[-40:],
+        "updated_by": card.updated_by or "",
+        "updated_at": card.updated_at.strftime("%d.%m.%Y %H:%M") if card.updated_at else "",
+    }
+
+
+def _calculator_leveling_cards_payload() -> list:
+    from .models import MachineLevelingCard
+
+    return [_leveling_card_to_dict(c) for c in MachineLevelingCard.objects.all()[:200]]
+
+
+def _calculator_parse_json_body(request):
+    import json as _json
+
+    if (request.content_type or "").startswith("application/json"):
+        try:
+            return _json.loads(request.body.decode("utf-8") or "{}")
+        except (_json.JSONDecodeError, UnicodeDecodeError):
+            return None
+    return None
+
+
+def _calculator_save_leveling_card(request):
+    from decimal import Decimal, InvalidOperation
+
+    from biota_shifts.auth import user_is_executor
+
+    from .models import MachineLevelingCard
+
+    u = biota_user(request)
+    if u and not _is_admin(u) and user_is_executor(u):
+        return JsonResponse(
+            {"ok": False, "error": "У вас роль «исполнитель»: сохранение карточки станка недоступно."},
+            status=403,
+        )
+
+    body = _calculator_parse_json_body(request)
+    if body is None and (request.content_type or "").startswith("application/json"):
+        return JsonResponse({"ok": False, "error": "Некорректный JSON."}, status=400)
+    src = body if isinstance(body, dict) else request.POST
+
+    def _s(key, maxlen=120):
+        return str(src.get(key) or "").strip()[:maxlen]
+
+    def _dec(key, default=None):
+        raw = str(src.get(key) or "").strip().replace(",", ".")
+        if not raw:
+            return default
+        try:
+            return Decimal(raw)
+        except (InvalidOperation, ValueError):
+            return default
+
+    def _int(key, default=0):
+        raw = str(src.get(key) or "").strip()
+        try:
+            return int(float(raw.replace(",", ".")))
+        except (TypeError, ValueError):
+            return default
+
+    card_id = _int("id", 0)
+    name = _s("name", 120)
+    if not name:
+        return JsonResponse({"ok": False, "error": "Укажите название станка."}, status=400)
+
+    if card_id > 0:
+        card = MachineLevelingCard.objects.filter(pk=card_id).first()
+        if not card:
+            return JsonResponse({"ok": False, "error": "Карточка не найдена."}, status=404)
+    else:
+        card = MachineLevelingCard()
+
+    layout = _s("foot_layout", 16) or MachineLevelingCard.LAYOUT_CUSTOM
+    if layout not in {
+        MachineLevelingCard.LAYOUT_CUSTOM,
+        MachineLevelingCard.LAYOUT_RECT4,
+        MachineLevelingCard.LAYOUT_RECT6,
+        MachineLevelingCard.LAYOUT_RECT8,
+    }:
+        layout = MachineLevelingCard.LAYOUT_CUSTOM
+
+    card.name = name
+    card.serial_number = _s("serial_number", 80)
+    card.weight_kg = _dec("weight_kg")
+    card.foot_layout = layout
+    card.bed_width_mm = max(100, min(20000, _int("bed_width_mm", 1200) or 1200))
+    card.bed_length_mm = max(100, min(20000, _int("bed_length_mm", 2200) or 2200))
+    pitch = _dec("thread_pitch_mm", Decimal("1.50"))
+    if pitch is None or pitch <= 0:
+        pitch = Decimal("1.50")
+    card.thread_pitch_mm = pitch
+    card.table_span_x_mm = max(50, min(20000, _int("table_span_x_mm", card.bed_width_mm) or card.bed_width_mm))
+    card.table_span_y_mm = max(50, min(20000, _int("table_span_y_mm", card.bed_length_mm) or card.bed_length_mm))
+    card.notes = _s("notes", 400)
+    card.updated_by = (u or "").strip() or "?"
+
+    feet_raw = src.get("feet_positions")
+    if isinstance(feet_raw, str):
+        import json as _json
+
+        try:
+            feet_raw = _json.loads(feet_raw)
+        except _json.JSONDecodeError:
+            feet_raw = []
+    if isinstance(feet_raw, list) and feet_raw:
+        card.feet_positions = feet_raw
+        card.foot_layout = MachineLevelingCard.LAYOUT_CUSTOM
+    elif layout != MachineLevelingCard.LAYOUT_CUSTOM:
+        card.feet_positions = MachineLevelingCard.default_feet_template(
+            layout, card.bed_width_mm, card.bed_length_mm
+        )
+    elif not isinstance(card.feet_positions, list) or not card.feet_positions:
+        card.feet_positions = MachineLevelingCard.default_feet_template(
+            MachineLevelingCard.LAYOUT_RECT8, card.bed_width_mm, card.bed_length_mm
+        )
+
+    wf = src.get("workflow")
+    if isinstance(wf, str):
+        import json as _json
+
+        try:
+            wf = _json.loads(wf)
+        except _json.JSONDecodeError:
+            wf = None
+    if isinstance(wf, dict):
+        card.workflow = wf
+
+    card.save()
+    return JsonResponse({"ok": True, "card": _leveling_card_to_dict(card)})
+
+
+def _calculator_delete_leveling_card(request):
+    from biota_shifts.auth import user_is_executor
+
+    from .models import MachineLevelingCard
+
+    u = biota_user(request)
+    if u and not _is_admin(u) and user_is_executor(u):
+        return JsonResponse(
+            {"ok": False, "error": "У вас роль «исполнитель»: удаление карточки недоступно."},
+            status=403,
+        )
+
+    body = _calculator_parse_json_body(request)
+    src = body if isinstance(body, dict) else request.POST
+    try:
+        card_id = int(str(src.get("id") or "0").strip() or "0")
+    except (TypeError, ValueError):
+        card_id = 0
+    if card_id <= 0:
+        return JsonResponse({"ok": False, "error": "Не указана карточка."}, status=400)
+    deleted, _ = MachineLevelingCard.objects.filter(pk=card_id).delete()
+    if not deleted:
+        return JsonResponse({"ok": False, "error": "Карточка не найдена."}, status=404)
+    return JsonResponse({"ok": True, "id": card_id})
+
+
+def _calculator_save_leveling_measurement(request):
+    from datetime import datetime
+
+    from biota_shifts.auth import user_is_executor
+
+    from .models import MachineLevelingCard
+
+    u = biota_user(request)
+    if u and not _is_admin(u) and user_is_executor(u):
+        return JsonResponse(
+            {"ok": False, "error": "У вас роль «исполнитель»: сохранение замера недоступно."},
+            status=403,
+        )
+
+    body = _calculator_parse_json_body(request)
+    if body is None and (request.content_type or "").startswith("application/json"):
+        return JsonResponse({"ok": False, "error": "Некорректный JSON."}, status=400)
+    src = body if isinstance(body, dict) else request.POST
+
+    try:
+        card_id = int(str(src.get("id") or "0").strip() or "0")
+    except (TypeError, ValueError):
+        card_id = 0
+    card = MachineLevelingCard.objects.filter(pk=card_id).first() if card_id > 0 else None
+    if not card:
+        return JsonResponse({"ok": False, "error": "Карточка не найдена."}, status=404)
+
+    def _f(key):
+        raw = str(src.get(key) or "").strip().replace(",", ".")
+        if not raw:
+            return None
+        try:
+            return float(raw)
+        except ValueError:
+            return None
+
+    entry = {
+        "kind": str(src.get("kind") or "static").strip()[:24] or "static",
+        "level_x": _f("level_x"),
+        "level_y": _f("level_y"),
+        "fl": _f("fl"),
+        "fr": _f("fr"),
+        "bl": _f("bl"),
+        "br": _f("br"),
+        "pos_mm": _f("pos_mm"),
+        "axis": str(src.get("axis") or "").strip()[:8],
+        "unit": str(src.get("unit") or "mm_m").strip()[:16] or "mm_m",
+        "ts": datetime.now().strftime("%d.%m.%Y %H:%M"),
+        "author": (u or "").strip() or "?",
+    }
+    hist = list(card.measurements) if isinstance(card.measurements, list) else []
+    hist.append(entry)
+    card.measurements = hist[-40:]
+    card.updated_by = (u or "").strip() or "?"
+    card.save(update_fields=["measurements", "updated_at", "updated_by"])
+    return JsonResponse({"ok": True, "card": _leveling_card_to_dict(card)})
+
+
 @biota_login_required
 @require_http_methods(["GET", "POST"])
 def calculator_view(request):
@@ -455,6 +700,12 @@ def calculator_view(request):
                 action = ""
         if action == "save_cutting_modes":
             return _calculator_save_cutting_modes(request)
+        if action == "save_leveling_card":
+            return _calculator_save_leveling_card(request)
+        if action == "delete_leveling_card":
+            return _calculator_delete_leveling_card(request)
+        if action == "save_leveling_measurement":
+            return _calculator_save_leveling_measurement(request)
         if action != "save_piece_norm":
             return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
         u = biota_user(request)
@@ -583,10 +834,13 @@ def calculator_view(request):
     u = biota_user(request)
     can_edit_modes = bool(u) and (_is_admin(u) or not user_is_executor(u))
     shared_modes = _calculator_shared_modes_payload()
+    leveling_cards = _calculator_leveling_cards_payload()
 
     return render(request, "shifts/calculator.html", {
         "products_json": _json.dumps(products_data, ensure_ascii=False),
         "cutting_modes_json": _json.dumps(cutting_modes_payload(), ensure_ascii=False),
         "shared_modes_json": _json.dumps(shared_modes, ensure_ascii=False),
+        "leveling_cards_json": _json.dumps(leveling_cards, ensure_ascii=False),
         "can_edit_modes": can_edit_modes,
+        "can_edit_leveling": can_edit_modes,
     })

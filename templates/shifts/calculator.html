@@ -47,6 +47,16 @@
       </svg>
       Режимы резания
     </button>
+    <button class="calc-tab" role="tab" aria-selected="false" data-tab="leveling">
+      <svg class="calc-tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <rect x="3" y="8" width="14" height="6" rx="1"/>
+        <line x1="5" y1="16" x2="5" y2="18"/>
+        <line x1="10" y1="16" x2="10" y2="18"/>
+        <line x1="15" y1="16" x2="15" y2="18"/>
+        <line x1="4" y1="5" x2="16" y2="5"/>
+      </svg>
+      Выставление станков
+    </button>
     <div class="calc-tab-slider" id="calc-tab-slider"></div>
   </div>
 
@@ -569,10 +579,154 @@
 
   </div><!-- /#calc-panel-modes -->
 
+  <!-- ══════════════════════════════════════
+       ВКЛАДКА 4 — Выставление станков
+  ══════════════════════════════════════ -->
+  <div class="calc-panel" id="calc-panel-leveling" hidden
+       data-can-edit="{% if can_edit_leveling %}1{% else %}0{% endif %}">
+
+    <div class="lv-mobile-bar">
+      <label class="lv-mobile-card-pick">
+        <span>Станок</span>
+        <select id="lv-card-select" aria-label="Выбор станка"></select>
+      </label>
+      <button type="button" class="btn btn-ghost calc-leveling-btn-sm" id="lv-new-card" {% if not can_edit_leveling %}disabled{% endif %}>+ Новый</button>
+    </div>
+
+    <div class="calc-leveling-layout">
+      <aside class="calc-leveling-sidebar lv-desktop-only">
+        <div class="calc-leveling-side-head">
+          <span>Станки</span>
+        </div>
+        <ul class="calc-leveling-list" id="lv-card-list" aria-label="Список станков"></ul>
+        <p class="calc-leveling-empty muted" id="lv-list-empty">Пока нет карточек.</p>
+      </aside>
+
+      <div class="calc-leveling-main" id="lv-main" hidden>
+        <span class="calc-leveling-status" id="lv-card-status" aria-live="polite"></span>
+
+        <!-- Страница 1: паспорт станка -->
+        <div id="lv-page-1" class="lv-page">
+          <div class="lv-page-tabs" id="lv-page-tabs" hidden>
+            <button type="button" class="lv-page-tab is-active" data-page="1">1. Паспорт</button>
+            <button type="button" class="lv-page-tab" data-page="2">2. Выставление</button>
+          </div>
+          <div class="lv-setup">
+            <form class="lv-setup-form" id="lv-setup-form" autocomplete="off" onsubmit="return false;">
+              <label class="lv-setup-row">
+                <span>Модель станка</span>
+                <input type="text" id="lv-name" maxlength="120" placeholder="VMC 855">
+              </label>
+              <label class="lv-setup-row">
+                <span>Серийный №</span>
+                <input type="text" id="lv-serial" maxlength="80" placeholder="S/N">
+              </label>
+              <label class="lv-setup-row">
+                <span>Вес станка, кг</span>
+                <input type="number" id="lv-weight" step="0.1" min="0" placeholder="5000" inputmode="decimal">
+              </label>
+              <label class="lv-setup-row">
+                <span>Кол-во опор</span>
+                <input type="number" id="lv-feet-n" step="1" min="4" max="16" value="8" inputmode="numeric">
+              </label>
+              <label class="lv-setup-row">
+                <span>L — длина стола <small class="lv-setup-hint">(зад → оператор)</small></span>
+                <input type="number" id="lv-bed-l" step="1" min="100" value="2200" inputmode="numeric">
+              </label>
+              <label class="lv-setup-row">
+                <span>W — ширина стола <small class="lv-setup-hint">(лево ↔ право)</small></span>
+                <input type="number" id="lv-bed-w" step="1" min="100" value="1200" inputmode="numeric">
+              </label>
+              <label class="lv-setup-row lv-setup-row--dim">
+                <span>X2 — ширина базы опор</span>
+                <input type="number" id="lv-x2" step="1" min="50" value="1200" inputmode="numeric" placeholder="мм">
+              </label>
+              <label class="lv-setup-row lv-setup-row--dim">
+                <span>Y2 — длина базы опор</span>
+                <input type="number" id="lv-y2" step="1" min="50" value="2200" inputmode="numeric" placeholder="мм">
+              </label>
+              <label class="lv-setup-row">
+                <span>Шаг резьбы опоры <small class="lv-setup-hint">мм за 1 оборот (для подсказки «сколько крутить»)</small></span>
+                <input type="number" id="lv-pitch" step="0.01" min="0.1" value="1.5" inputmode="decimal">
+              </label>
+              <div class="lv-setup-actions">
+                <button type="button" class="btn lv-setup-save" id="lv-save-card" {% if not can_edit_leveling %}disabled{% endif %}>СОХРАНИТЬ</button>
+                <button type="button" class="btn" id="lv-goto-2" {% if not can_edit_leveling %}disabled{% endif %}>Далее →</button>
+                <button type="button" class="btn btn-ghost calc-leveling-btn-sm" id="lv-delete-card" {% if not can_edit_leveling %}disabled{% endif %}>Удалить</button>
+              </div>
+            </form>
+            <div class="lv-setup-diagram" id="lv-setup-diagram" aria-label="Схема опор"></div>
+          </div>
+          <input type="hidden" id="lv-tol" value="0.02">
+          <input type="hidden" id="lv-notes" value="">
+        </div>
+
+        <!-- Страница 2: прогон стола + порядок ног -->
+        <div id="lv-page-2" class="lv-page" hidden>
+          <div class="lv-page-tabs">
+            <button type="button" class="lv-page-tab" data-page="1">1. Паспорт</button>
+            <button type="button" class="lv-page-tab is-active" data-page="2">2. Выставление</button>
+          </div>
+          <div class="lv-level">
+            <div class="lv-level-left">
+              <h3 class="lv-level-title">Замеры уровня</h3>
+              <p class="lv-level-orient muted">
+                <span>Y+</span> зад · <span>Y−</span> к вам ·
+                <span>X−</span> лево · <span>X+</span> право ·
+                центр = <span>0</span>
+              </p>
+              <div class="lv-level-howto">
+                <p>Центр стола — нулевая точка. Углы — относительно неё:</p>
+                <ul>
+                  <li><b>X− Y+</b> — верх-лево (зад–лево)</li>
+                  <li><b>X+ Y+</b> — верх-право (зад–право)</li>
+                  <li><b>X+ Y−</b> — низ-право (к вам–право)</li>
+                  <li><b>X− Y−</b> — низ-лево (к вам–лево)</li>
+                </ul>
+                <p>В каждой точке пишите два показания уровня в <b>мм/м</b>:</p>
+                <ul>
+                  <li><b>поперёк W</b> — вдоль оси X (лево↔право)</li>
+                  <li><b>вдоль L</b> — вдоль оси Y (зад↔к вам)</li>
+                </ul>
+              </div>
+              <div class="lv-corner-head" aria-hidden="true">
+                <span>Точка на столе</span>
+                <span>поперёк W<br><small>мм/м · ось X</small></span>
+                <span>вдоль L<br><small>мм/м · ось Y</small></span>
+              </div>
+              <div class="lv-corner-list" id="lv-corner-list"></div>
+              <div class="calc-leveling-form-actions">
+                <button type="button" class="btn" id="lv-analyze">Расчёт</button>
+                <button type="button" class="btn btn-ghost calc-leveling-btn-sm" id="lv-clear-corners">Сбросить</button>
+                <button type="button" class="btn btn-ghost calc-leveling-btn-sm" id="lv-save-measure" {% if not can_edit_leveling %}disabled{% endif %}>Сохранить</button>
+              </div>
+              <div class="lv-advice-box" id="lv-advice" hidden>
+                <ol class="calc-leveling-steps" id="lv-steps"></ol>
+                <p class="calc-leveling-warn" id="lv-warn"></p>
+              </div>
+            </div>
+            <div class="lv-level-right">
+              <p class="lv-level-map-caption muted">Порядок регулировки ног</p>
+              <div class="lv-level-map" id="lv-level-map" aria-label="Схема ног"></div>
+              <p class="muted lv-legend-tap" style="margin-top:8px">
+                <span class="lv-swatch lv-swatch--down"></span> опустить ·
+                <span class="lv-swatch lv-swatch--up"></span> поднять ·
+                красные цифры — порядок
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /#calc-panel-leveling -->
+
 </div><!-- /.calc-page -->
+
+<script type="application/json" id="calc-leveling-cards-json">{{ leveling_cards_json|default:"[]"|safe }}</script>
 
 <!-- ══════════════ СТИЛИ ══════════════ -->
 <link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}?v={{ static_asset_version }}">
+<script src="{% static 'shifts/js/calculator_leveling.js' %}?v={{ static_asset_version }}" defer></script>
 
 
 <script>
@@ -584,37 +738,83 @@
   })();
 
   /* ════════════════════════════════
-     ВКЛАДКИ — слайдер
+     ВКЛАДКИ — слайдер + запоминание
   ════════════════════════════════ */
   var tabs   = document.querySelectorAll(".calc-tab");
   var slider = document.getElementById("calc-tab-slider");
+  var TAB_STORE_KEY = "biota_calc_tab";
 
   function moveSlider(btn) {
+    if (!slider || !btn) return;
     slider.style.left  = btn.offsetLeft + "px";
     slider.style.width = btn.offsetWidth + "px";
   }
 
+  function rememberTab(tabId) {
+    try {
+      localStorage.setItem(TAB_STORE_KEY, tabId);
+    } catch (e) {}
+    try {
+      var url = new URL(window.location.href);
+      if (tabId && tabId !== "piece") url.searchParams.set("tab", tabId);
+      else url.searchParams.delete("tab");
+      history.replaceState(null, "", url.pathname + url.search + url.hash);
+    } catch (e2) {}
+  }
+
+  function activateTab(btn, opts) {
+    if (!btn) return;
+    opts = opts || {};
+    tabs.forEach(function (b) {
+      b.classList.remove("active");
+      b.setAttribute("aria-selected", "false");
+    });
+    document.querySelectorAll(".calc-panel").forEach(function (p) {
+      p.hidden = true;
+    });
+    btn.classList.add("active");
+    btn.setAttribute("aria-selected", "true");
+    var panel = document.getElementById("calc-panel-" + btn.dataset.tab);
+    if (panel) panel.hidden = false;
+    moveSlider(btn);
+    if (btn.dataset.tab === "batch" || btn.dataset.tab === "piece") {
+      if (typeof calcTime === "function") calcTime();
+    }
+    if (!opts.skipRemember) rememberTab(btn.dataset.tab);
+    requestAnimationFrame(function () {
+      moveSlider(btn);
+    });
+  }
+
   tabs.forEach(function (btn) {
     btn.addEventListener("click", function () {
-      tabs.forEach(function (b) { b.classList.remove("active"); b.setAttribute("aria-selected","false"); });
-      document.querySelectorAll(".calc-panel").forEach(function (p) { p.hidden = true; });
-      btn.classList.add("active");
-      btn.setAttribute("aria-selected","true");
-      var panel = document.getElementById("calc-panel-" + btn.dataset.tab);
-      if (panel) panel.hidden = false;
-      moveSlider(btn);
-      if (btn.dataset.tab === "batch" || btn.dataset.tab === "piece") {
-        if (typeof calcTime === "function") calcTime();
-      }
-      requestAnimationFrame(function () { moveSlider(btn); });
+      activateTab(btn);
     });
   });
 
-  /* Инит позиции слайдера */
+  /* Инит: ?tab=… → localStorage → активная по умолчанию */
   var activeTab = document.querySelector(".calc-tab.active");
+  try {
+    var tabParam = (new URLSearchParams(window.location.search).get("tab") || "").trim();
+    if (!tabParam) {
+      try {
+        tabParam = (localStorage.getItem(TAB_STORE_KEY) || "").trim();
+      } catch (eLs) {}
+    }
+    if (tabParam) {
+      var want = document.querySelector('.calc-tab[data-tab="' + tabParam + '"]');
+      if (want) {
+        activateTab(want, { skipRemember: false });
+        activeTab = want;
+      }
+    } else if (activeTab) {
+      rememberTab(activeTab.dataset.tab);
+    }
+  } catch (eTab) {}
   if (activeTab) {
-    /* ждём рендер */
-    requestAnimationFrame(function () { moveSlider(activeTab); });
+    requestAnimationFrame(function () {
+      moveSlider(activeTab);
+    });
   }
 
   /* ════════════════════════════════

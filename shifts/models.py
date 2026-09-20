@@ -3196,6 +3196,175 @@ class CalculatorModesState(models.Model):
         return "Режимы резания (общая база)"
 
 
+class MachineLevelingCard(models.Model):
+    """Карточка станка для выставления по уровню (калькулятор)."""
+
+    LAYOUT_RECT8 = "rect8"
+    LAYOUT_RECT4 = "rect4"
+    LAYOUT_RECT6 = "rect6"
+    LAYOUT_CUSTOM = "custom"
+    LAYOUT_CHOICES = (
+        (LAYOUT_CUSTOM, "Свои координаты опор"),
+        (LAYOUT_RECT8, "Шаблон 8: 1-2-4-5 | 6-7-8-9"),
+        (LAYOUT_RECT6, "Шаблон 6"),
+        (LAYOUT_RECT4, "Шаблон 4 (углы)"),
+    )
+
+    name = models.CharField(max_length=120, verbose_name="Название")
+    serial_number = models.CharField(max_length=80, blank=True, default="", verbose_name="Серийный номер")
+    weight_kg = models.DecimalField(
+        max_digits=8, decimal_places=1, null=True, blank=True, verbose_name="Вес, кг"
+    )
+    feet_count = models.PositiveSmallIntegerField(default=8, verbose_name="Число ножек")
+    foot_layout = models.CharField(
+        max_length=16, choices=LAYOUT_CHOICES, default=LAYOUT_CUSTOM, verbose_name="Схема опор"
+    )
+    bed_width_mm = models.PositiveIntegerField(
+        default=1200,
+        verbose_name="Ширина станины X, мм",
+        help_text="Габарит станины слева→направо (ось X)",
+    )
+    bed_length_mm = models.PositiveIntegerField(
+        default=2200,
+        verbose_name="Длина станины Y, мм",
+        help_text="Габарит станины сзади→вперёд к оператору (ось Y)",
+    )
+    thread_pitch_mm = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default="1.50",
+        verbose_name="Шаг резьбы опоры, мм",
+        help_text="Сколько мм подъёма за один полный оборот винта/клина",
+    )
+    table_span_x_mm = models.PositiveIntegerField(
+        default=850, verbose_name="База уровня по X, мм", help_text="Длина базы уровня при замере по X"
+    )
+    table_span_y_mm = models.PositiveIntegerField(
+        default=500, verbose_name="База уровня по Y, мм", help_text="Длина базы уровня при замере по Y"
+    )
+    feet_positions = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Координаты опор",
+        help_text="[{num, x_mm, y_mm}, …]; начало — задний левый угол, X→право, Y→оператор",
+    )
+    workflow = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Этапы выставления",
+        help_text="stage, tol_mm_m, travel_x, travel_y, done flags",
+    )
+    notes = models.CharField(max_length=400, blank=True, default="", verbose_name="Заметка")
+    measurements = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="История замеров",
+        help_text="Список объектов: level_x, level_y, corners, ts, author",
+    )
+    updated_by = models.CharField(max_length=200, blank=True, default="", verbose_name="Кто обновил")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("name", "id")
+        verbose_name = "Выставление станка"
+        verbose_name_plural = "Выставление станков"
+
+    def __str__(self) -> str:
+        sn = f" / {self.serial_number}" if (self.serial_number or "").strip() else ""
+        return f"{self.name}{sn}"
+
+    @staticmethod
+    def default_feet_template(layout: str, width_mm: int, length_mm: int) -> list[dict]:
+        """Шаблон координат опор в мм от заднего левого угла."""
+        w = max(100, int(width_mm or 1200))
+        L = max(100, int(length_mm or 2200))
+        layout = (layout or "").strip() or MachineLevelingCard.LAYOUT_RECT8
+
+        def pts(nums_left, nums_right, y_fracs):
+            out = []
+            for i, yf in enumerate(y_fracs):
+                y = round(L * yf, 1)
+                if i < len(nums_left):
+                    out.append({"num": int(nums_left[i]), "x_mm": 0.0, "y_mm": y})
+                if i < len(nums_right):
+                    out.append({"num": int(nums_right[i]), "x_mm": float(w), "y_mm": y})
+            return out
+
+        if layout == MachineLevelingCard.LAYOUT_RECT4:
+            return [
+                {"num": 1, "x_mm": 0.0, "y_mm": 0.0},
+                {"num": 2, "x_mm": float(w), "y_mm": 0.0},
+                {"num": 3, "x_mm": 0.0, "y_mm": float(L)},
+                {"num": 4, "x_mm": float(w), "y_mm": float(L)},
+            ]
+        if layout == MachineLevelingCard.LAYOUT_RECT6:
+            return pts([1, 3, 5], [2, 4, 6], [0.0, 0.5, 1.0])
+        # rect8 / custom default: заводская нумерация VMC 1-2-4-5 | 6-7-8-9
+        return pts([1, 2, 4, 5], [6, 7, 8, 9], [0.0, 1 / 3, 2 / 3, 1.0])
+
+    @staticmethod
+    def normalize_feet_positions(raw, *, width_mm: int, length_mm: int) -> list[dict]:
+        w = max(100, int(width_mm or 1200))
+        L = max(100, int(length_mm or 2200))
+        out: list[dict] = []
+        seen = set()
+        if not isinstance(raw, list):
+            return MachineLevelingCard.default_feet_template(MachineLevelingCard.LAYOUT_RECT8, w, L)
+        for item in raw[:24]:
+            if not isinstance(item, dict):
+                continue
+            try:
+                num = int(item.get("num"))
+            except (TypeError, ValueError):
+                continue
+            if num <= 0 or num in seen:
+                continue
+            try:
+                x = float(str(item.get("x_mm", 0)).replace(",", "."))
+                y = float(str(item.get("y_mm", 0)).replace(",", "."))
+            except (TypeError, ValueError):
+                continue
+            x = max(0.0, min(float(w), x))
+            y = max(0.0, min(float(L), y))
+            seen.add(num)
+            out.append({"num": num, "x_mm": round(x, 1), "y_mm": round(y, 1)})
+        out.sort(key=lambda f: (f["y_mm"], f["x_mm"], f["num"]))
+        return out
+
+    def save(self, *args, **kwargs):
+        self.bed_width_mm = max(100, min(20000, int(self.bed_width_mm or 1200)))
+        self.bed_length_mm = max(100, min(20000, int(self.bed_length_mm or 2200)))
+        self.table_span_x_mm = max(50, min(20000, int(self.table_span_x_mm or self.bed_width_mm)))
+        self.table_span_y_mm = max(50, min(20000, int(self.table_span_y_mm or self.bed_length_mm)))
+        layout = (self.foot_layout or "").strip()
+        if layout not in {
+            self.LAYOUT_CUSTOM,
+            self.LAYOUT_RECT4,
+            self.LAYOUT_RECT6,
+            self.LAYOUT_RECT8,
+        }:
+            layout = self.LAYOUT_CUSTOM
+        self.foot_layout = layout
+        positions = self.feet_positions if isinstance(self.feet_positions, list) else []
+        if not positions or layout != self.LAYOUT_CUSTOM:
+            if layout == self.LAYOUT_CUSTOM and positions:
+                pass
+            elif layout != self.LAYOUT_CUSTOM:
+                positions = self.default_feet_template(
+                    layout, self.bed_width_mm, self.bed_length_mm
+                )
+            else:
+                positions = self.default_feet_template(
+                    self.LAYOUT_RECT8, self.bed_width_mm, self.bed_length_mm
+                )
+        self.feet_positions = self.normalize_feet_positions(
+            positions, width_mm=self.bed_width_mm, length_mm=self.bed_length_mm
+        )
+        self.feet_count = max(2, min(24, len(self.feet_positions) or int(self.feet_count or 8)))
+        super().save(*args, **kwargs)
+
+
 class PrintForm(models.Model):
     """Шаблон печатной формы A4 (конструктор «Формы»)."""
 
