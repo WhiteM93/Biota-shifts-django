@@ -268,6 +268,9 @@ html[data-theme="dawn"] .products-search__clear:hover {
 .wc-filter-chip.wc-tone-done { color: #2ecc71; border-color: rgba(46,204,113,0.45); }
 .wc-filter-chip.wc-tone-done.is-active { background: #27ae60; border-color: #2ecc71; color: #fff; }
 
+.wc-filter-chip.wc-tone-blank { color: #c9a66b; border-color: rgba(183,149,92,0.45); }
+.wc-filter-chip.wc-tone-blank.is-active { background: #a67c3d; border-color: #c9a66b; color: #fff; }
+
 .wc-filter-chip.wc-tone-laser { color: #e74c3c; border-color: rgba(231,76,60,0.45); }
 .wc-filter-chip.wc-tone-laser.is-active { background: #e74c3c; border-color: #ff6b5a; color: #fff; }
 
@@ -301,6 +304,9 @@ html[data-theme="dawn"] .products-search__clear:hover {
 .wc-filter-chip.wc-tone-isolate { color: #90caf9; border-color: rgba(66,165,245,0.45); }
 .wc-filter-chip.wc-tone-isolate.is-active { background: #42a5f5; border-color: #90caf9; color: #fff; }
 
+.wc-filter-chip.wc-tone-primer { color: #ce93d8; border-color: rgba(156,39,176,0.45); }
+.wc-filter-chip.wc-tone-primer.is-active { background: #8e24aa; border-color: #ce93d8; color: #fff; }
+
 .wc-filter-chip.wc-tone-paint { color: #f06292; border-color: rgba(194,24,91,0.45); }
 .wc-filter-chip.wc-tone-paint.is-active { background: #c2185b; border-color: #f06292; color: #fff; }
 
@@ -328,6 +334,7 @@ html[data-theme="dawn"] .wc-filter-chip {
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-idle { color: #6b7280; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-pause { color: #b7950b; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-done { color: #1e8449; }
+html[data-theme="dawn"] .wc-filter-chip.wc-tone-blank { color: #8d6e3a; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-laser { color: #c0392b; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-mill { color: #d35400; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-lathe { color: #2471a3; }
@@ -339,6 +346,7 @@ html[data-theme="dawn"] .wc-filter-chip.wc-tone-demount { color: #7d3c98; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-weld { color: #a04000; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-bend { color: #00838f; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-isolate { color: #1565c0; }
+html[data-theme="dawn"] .wc-filter-chip.wc-tone-primer { color: #7b1fa2; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-paint { color: #ad1457; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-mark { color: #558b2f; }
 html[data-theme="dawn"] .wc-filter-chip.wc-tone-wash { color: #0277bd; }
@@ -916,6 +924,11 @@ button.wc-op-chip:not(:disabled):hover {
 }
 
 /* Цвета этапов (активный чип) */
+.wc-op-chip.is-current.wc-tone-blank {
+  background: #a67c3d;
+  border-color: #c9a66b;
+  box-shadow: 0 0 0 2px rgba(166, 124, 61, 0.4);
+}
 .wc-op-chip.is-current.wc-tone-laser {
   background: #e74c3c;
   border-color: #ff6b5a;
@@ -971,6 +984,11 @@ button.wc-op-chip:not(:disabled):hover {
   border-color: #90caf9;
   box-shadow: 0 0 0 2px rgba(66, 165, 245, 0.4);
 }
+.wc-op-chip.is-current.wc-tone-primer {
+  background: #8e24aa;
+  border-color: #ce93d8;
+  box-shadow: 0 0 0 2px rgba(142, 36, 170, 0.4);
+}
 .wc-op-chip.is-current.wc-tone-paint {
   background: #c2185b;
   border-color: #f06292;
@@ -998,6 +1016,7 @@ button.wc-op-chip:not(:disabled):hover {
 }
 
 /* Лёгкий оттенок названия операции в неактивном состоянии */
+.wc-op-chip.is-todo.wc-tone-blank { color: rgba(201, 166, 107, 0.85); }
 .wc-op-chip.is-todo.wc-tone-laser { color: rgba(231, 76, 60, 0.7); }
 .wc-op-chip.is-todo.wc-tone-mill { color: rgba(230, 126, 34, 0.7); }
 .wc-op-chip.is-todo.wc-tone-lathe { color: rgba(52, 152, 219, 0.75); }
@@ -1009,6 +1028,7 @@ button.wc-op-chip:not(:disabled):hover {
 .wc-op-chip.is-todo.wc-tone-weld { color: rgba(211, 84, 0, 0.75); }
 .wc-op-chip.is-todo.wc-tone-bend { color: rgba(0, 188, 212, 0.75); }
 .wc-op-chip.is-todo.wc-tone-isolate { color: rgba(66, 165, 245, 0.8); }
+.wc-op-chip.is-todo.wc-tone-primer { color: rgba(186, 104, 200, 0.85); }
 .wc-op-chip.is-todo.wc-tone-paint { color: rgba(233, 30, 99, 0.75); }
 .wc-op-chip.is-todo.wc-tone-mark { color: rgba(139, 195, 74, 0.8); }
 .wc-op-chip.is-todo.wc-tone-wash { color: rgba(3, 169, 244, 0.75); }
@@ -1359,6 +1379,7 @@ html[data-theme="dawn"] .wc-op-chip.is-todo {
   border-color: transparent;
 }
 
+html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-blank { color: #8d6e3a; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-laser { color: #c0392b; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-mill { color: #d35400; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-lathe { color: #2471a3; }
@@ -1370,6 +1391,7 @@ html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-demount { color: #7d3c98; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-weld { color: #a04000; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-bend { color: #00838f; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-isolate { color: #1565c0; }
+html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-primer { color: #7b1fa2; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-paint { color: #ad1457; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-mark { color: #558b2f; }
 html[data-theme="dawn"] .wc-op-chip.is-todo.wc-tone-wash { color: #0277bd; }

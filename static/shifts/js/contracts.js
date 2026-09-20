@@ -36,6 +36,7 @@
   var splitForm = document.querySelector(".js-wc-split-form");
 
   var OP_CATALOG = [
+    "Заготовительная",
     "Лазерный",
     "Фрезерный",
     "Токарный",
@@ -47,6 +48,7 @@
     "Сварка",
     "Гибка",
     "Изоляция под покраску",
+    "Грунтование",
     "Покраска",
     "Маркировка",
     "Мойка",
@@ -55,6 +57,7 @@
 
   function opToneClass(name) {
     var n = String(name || "").toLowerCase();
+    if (n.indexOf("заготов") >= 0) return "wc-tone-blank";
     if (n.indexOf("лазер") >= 0) return "wc-tone-laser";
     if (n.indexOf("фрезер") >= 0) return "wc-tone-mill";
     if (n.indexOf("токар") >= 0) return "wc-tone-lathe";
@@ -66,6 +69,7 @@
     if (n.indexOf("свар") >= 0) return "wc-tone-weld";
     if (n.indexOf("гибк") >= 0) return "wc-tone-bend";
     if (n.indexOf("изоляц") >= 0) return "wc-tone-isolate";
+    if (n.indexOf("грунт") >= 0) return "wc-tone-primer";
     if (n.indexOf("покра") >= 0) return "wc-tone-paint";
     if (n.indexOf("маркир") >= 0) return "wc-tone-mark";
     if (n.indexOf("мойк") >= 0) return "wc-tone-wash";
