@@ -1344,7 +1344,7 @@
       </select>
     </label>
     <label class="field"><span>Поиск инструмента</span>
-      <input type="text" class="js-tool-search" data-target-select="issue-tool-select" placeholder="Например: 1, 1.0, M6, D1">
+      <input type="text" class="js-tool-search" data-target-select="issue-tool-select" placeholder="Например: 1, 1.0, M6, D1 / для пластинок — наименование">
     </label>
 
     {% include "shifts/includes/issue_tool_filters.html" with radio_prefix="issue_ui" target_select_id="issue-tool-select" %}
@@ -1382,6 +1382,8 @@
             data-f-ins_iso="{{ m.ins_iso|escape }}"
             data-f-ins_shape="{{ m.ins_shape|escape }}"
             data-f-ins_family="{{ m.ins_family|escape }}"
+            data-f-ins_name="{{ m.ins_name|escape }}"
+            data-f-ins_brand="{{ m.ins_brand|escape }}"
             data-f-collet_type="{{ m.collet_type|escape }}"
             data-f-er_size="{{ m.er_size|escape }}"
             data-f-clamp_range="{{ m.clamp_range|escape }}"
@@ -1810,6 +1812,8 @@
                 data-f-ins_iso="{{ m.ins_iso|escape }}"
                 data-f-ins_shape="{{ m.ins_shape|escape }}"
                 data-f-ins_family="{{ m.ins_family|escape }}"
+                data-f-ins_name="{{ m.ins_name|escape }}"
+                data-f-ins_brand="{{ m.ins_brand|escape }}"
                 data-f-collet_type="{{ m.collet_type|escape }}"
                 data-f-er_size="{{ m.er_size|escape }}"
                 data-f-clamp_range="{{ m.clamp_range|escape }}"

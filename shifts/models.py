@@ -660,14 +660,14 @@ class ToolItem(models.Model):
             ins = getattr(self, "insert_spec", None)
             tool_type = self.get_category_display()
             if ins:
-                if (ins.iso_designation or "").strip():
+                brand = (ins.brand or "").strip()
+                iname = (ins.item_name or "").strip() or (self.name or "").strip()
+                if brand:
+                    tool_type = f"{self.get_category_display()} · {brand}"
+                if iname:
+                    specs_parts.append(iname)
+                elif (ins.iso_designation or "").strip():
                     specs_parts.append(ins.iso_designation.strip())
-                if ins.cutting_edge_length_mm is not None:
-                    specs_parts.append(f"L={fmt_mm(ins.cutting_edge_length_mm)} мм")
-                if ins.thickness_mm is not None:
-                    specs_parts.append(f"S={fmt_mm(ins.thickness_mm)} мм")
-                if ins.nose_radius_mm is not None:
-                    specs_parts.append(f"R={fmt_mm(ins.nose_radius_mm)} мм")
         elif cat == "collet":
             cl = getattr(self, "collet_spec", None)
             tool_type = (
@@ -803,6 +803,8 @@ class ToolItem(models.Model):
             "ins_iso": "",
             "ins_shape": "",
             "ins_family": "",
+            "ins_name": "",
+            "ins_brand": "",
             "collet_type": "",
             "er_size": "",
             "clamp_range": "",
@@ -868,6 +870,8 @@ class ToolItem(models.Model):
         elif cat == "insert":
             ins = getattr(self, "insert_spec", None)
             if ins:
+                out["ins_name"] = (ins.item_name or "").strip() or (self.name or "").strip()
+                out["ins_brand"] = (ins.brand or "").strip()
                 out["ins_iso"] = (getattr(ins, "iso_designation", None) or "").strip()
                 out["ins_shape"] = (ins.insert_shape or "").strip()
                 out["ins_family"] = (ins.milling_family or "").strip()

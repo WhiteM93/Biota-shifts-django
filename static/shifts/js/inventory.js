@@ -400,9 +400,17 @@ var INV = (function () {
     if (!queryRaw) return true;
     var hay = optionSearchHaystack(opt);
     var query = normalizeSearchText(queryRaw);
-    var hayCompact = hay.replace(/\.0+\b/g, "");
-    var queryCompact = query.replace(/\.0+\b/g, "");
-    return hay.indexOf(query) !== -1 || hayCompact.indexOf(queryCompact) !== -1;
+    var hayCompact = hay.replace(/\.0+\b/g, "").replace(/\s+/g, "");
+    var queryCompact = query.replace(/\.0+\b/g, "").replace(/\s+/g, "");
+    if (hay.indexOf(query) !== -1 || hayCompact.indexOf(queryCompact) !== -1) return true;
+    // несколько слов: все токены должны встретиться (удобно для наименования пластинок)
+    var tokens = query.split(/\s+/).filter(Boolean);
+    if (tokens.length > 1) {
+      return tokens.every(function (tok) {
+        return hay.indexOf(tok) !== -1 || hayCompact.indexOf(tok.replace(/\s+/g, "")) !== -1;
+      });
+    }
+    return false;
   }
 
   function comboFindOptionByValue(sel, value) {
@@ -733,6 +741,12 @@ var INV = (function () {
       // материал/покрытие скрываем для цанг, как на складе
       el.hidden = category === "collet";
     });
+    var search = root.querySelector(".js-tool-search");
+    if (search) {
+      search.placeholder = category === "insert"
+        ? "Наименование, бренд…"
+        : "Например: 1, 1.0, M6, D1";
+    }
     if (!category) return;
     var panel = root.querySelector('.js-issue-cat-panel[data-cat="' + category + '"]');
     if (!panel) return;
