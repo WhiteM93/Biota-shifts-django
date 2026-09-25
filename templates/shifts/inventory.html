@@ -356,7 +356,7 @@
         <td data-sort="{{ t.body_tool_spec.get_cutter_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="body_cutter" data-type="select" data-value="{{ t.body_tool_spec.cutter_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_cutter_type_display|default:"-" }}</td>
         <td data-sort="{{ t.body_tool_spec.get_shank_type_display|default:'-' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_shank_type" data-type="select" data-value="{{ t.body_tool_spec.shank_type|default:'' }}"{% endif %}>{{ t.body_tool_spec.get_shank_type_display|default:"-" }}</td>
         <td class="inv-stock-photo-col" data-tool-id="{{ t.id }}"><div class="inv-stock-photo-wrap" data-photo-url="{% if t.body_tool_spec.photo %}{{ t.body_tool_spec.photo.url }}{% endif %}">{% if t.body_tool_spec.photo or can_manage_stock %}<button type="button" class="inv-stock-photo-btn js-inv-stock-photo-btn{% if t.body_tool_spec.photo %} has-photo{% endif %}" title="{% if t.body_tool_spec.photo %}Фото корпуса{% if can_manage_stock %} (Alt+клик — заменить){% endif %}{% else %}Прикрепить фото{% endif %}" aria-label="{% if t.body_tool_spec.photo %}Открыть фото{% else %}Прикрепить фото{% endif %}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 3a2 2 0 00-2 2v1H5a2 2 0 00-2 2v11a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-2V5a2 2 0 00-2-2H9zm0 2h6v1H9V5zm-2 4h10v9H7V9zm5 1.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/></svg></button>{% if can_manage_stock %}<input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif" class="inv-stock-photo-input" hidden />{% endif %}{% else %}<span class="inv-stock-photo-empty muted">—</span>{% endif %}</div></td>
-        <td class="inv-stock-notes-text-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}>{{ t.notes|default:"-" }}</td>
+        <td class="inv-stock-notes-text-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{% if t.notes %}{{ t.notes }}{% else %}{{ t.name }}{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}>{% if t.notes %}{{ t.notes }}{% elif t.name %}<span class="muted" title="Автоимя (описание пустое)">{{ t.name }}</span>{% else %}-{% endif %}</td>
         {% with ff=t.body_tool_spec.insert_compat|default:"" %}
         <td class="inv-stock-formfactor-cell{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{% if ff %}{{ ff }}{% elif t.body_tool_spec.insert_family %}{{ t.body_tool_spec.insert_family }}{% else %}-{% endif %}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="bt_insert_compat" data-type="text" data-value="{{ ff }}"{% endif %}>{% if ff %}<a class="js-bt-formfactor-link inv-stock-formfactor-link" href="{% url 'inventory' %}?panel=stock&amp;category=insert&amp;ins_name={{ ff|urlencode }}" title="Потенциальные пластины по «{{ ff }}» (ищем также по ядру вроде MB07)">{{ ff }}</a>{% elif t.body_tool_spec.insert_family %}<a class="js-bt-formfactor-link inv-stock-formfactor-link" href="{% url 'inventory' %}?panel=stock&amp;category=insert&amp;ins_name={{ t.body_tool_spec.insert_family|urlencode }}" title="Потенциальные пластины на складе">{{ t.body_tool_spec.insert_family }}{% if t.body_tool_spec.insert_size %} {{ t.body_tool_spec.insert_size }}{% endif %}</a>{% else %}-{% endif %}</td>
         {% endwith %}
@@ -1344,7 +1344,7 @@
       </select>
     </label>
     <label class="field"><span>Поиск инструмента</span>
-      <input type="text" class="js-tool-search" data-target-select="issue-tool-select" placeholder="Например: 1, 1.0, M6, D1 / для пластинок — наименование">
+      <input type="text" class="js-tool-search" data-target-select="issue-tool-select" placeholder="Имя, описание, Ø, SNHT, бренд…">
     </label>
 
     {% include "shifts/includes/issue_tool_filters.html" with radio_prefix="issue_ui" target_select_id="issue-tool-select" %}
@@ -1388,6 +1388,14 @@
             data-f-er_size="{{ m.er_size|escape }}"
             data-f-clamp_range="{{ m.clamp_range|escape }}"
             data-f-accuracy_class="{{ m.accuracy_class|escape }}"
+            data-f-body_cutter="{{ m.body_cutter|escape }}"
+            data-f-teeth="{{ m.teeth|escape }}"
+            data-f-shank_type="{{ m.shank_type|escape }}"
+            data-f-insert_compat="{{ m.insert_compat|escape }}"
+            data-f-mount_diameter="{{ m.mount_diameter|escape }}"
+            data-f-notes="{{ m.notes|escape }}"
+            data-issue-notes="{{ t.notes|default:''|escape }}"
+            data-issue-name="{{ t.name|default:''|escape }}"
           >{{ t.issue_select_label }}</option>
           {% endwith %}
           {% endfor %}
@@ -1818,6 +1826,14 @@
                 data-f-er_size="{{ m.er_size|escape }}"
                 data-f-clamp_range="{{ m.clamp_range|escape }}"
                 data-f-accuracy_class="{{ m.accuracy_class|escape }}"
+                data-f-body_cutter="{{ m.body_cutter|escape }}"
+                data-f-teeth="{{ m.teeth|escape }}"
+                data-f-shank_type="{{ m.shank_type|escape }}"
+                data-f-insert_compat="{{ m.insert_compat|escape }}"
+                data-f-mount_diameter="{{ m.mount_diameter|escape }}"
+                data-f-notes="{{ m.notes|escape }}"
+                data-issue-notes="{{ iss.tool.notes|default:''|escape }}"
+                data-issue-name="{{ iss.tool.name|default:''|escape }}"
               >{{ iss.tool.issue_select_label }}</option>
               {% endwith %}
               {% endfor %}

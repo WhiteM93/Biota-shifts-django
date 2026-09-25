@@ -128,6 +128,27 @@
   </label>
 </div>
 
+<div class="js-issue-cat-panel issue-cat-panel" data-cat="body_tool" hidden>
+  <label class="field"><span>Вид</span>
+    <select class="js-issue-f" data-fkey="body_cutter" data-choice="body_tool_kind_types" data-subtype="1"></select>
+  </label>
+  <label class="field"><span>Dост, мм</span>
+    <select class="js-issue-f" data-fkey="diameter" data-num="1"></select>
+  </label>
+  <label class="field"><span>Z</span>
+    <select class="js-issue-f" data-fkey="teeth" data-num="1"></select>
+  </label>
+  <label class="field"><span>Крепление</span>
+    <select class="js-issue-f" data-fkey="shank_type" data-choice="body_tool_mount_types"></select>
+  </label>
+  <label class="field"><span>Формфактор</span>
+    <select class="js-issue-f" data-fkey="insert_compat"></select>
+  </label>
+  <label class="field"><span>Бренд</span>
+    <select class="js-issue-f" data-fkey="ins_brand"></select>
+  </label>
+</div>
+
 <div class="field issue-filter-chips-field js-issue-common-filters">
   <span>Материал инструмента</span>
   <div class="issue-mat-picker js-tool-filter-material-picker" data-target-select="{{ target_select_id }}" role="radiogroup" aria-label="Материал инструмента">

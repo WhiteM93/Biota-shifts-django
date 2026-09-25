@@ -514,6 +514,7 @@ class ToolItem(models.Model):
                 coating_txt(),
                 f"ост {self.quantity}",
                 self.name,
+                ((self.notes or "").strip() or ""),
             ]
         elif cat == "tool_extension":
             ex = getattr(self, "tool_extension_spec", None)
@@ -680,10 +681,9 @@ class ToolItem(models.Model):
         elif cat == "body_tool":
             bt = getattr(self, "body_tool_spec", None)
             if bt:
-                from shifts.body_tool_constants import BODY_TOOL_FAMILY_LABELS
-
-                fam = BODY_TOOL_FAMILY_LABELS.get(bt.family, "Фрезы со сменными пластинами")
-                tool_type = f"{fam} · {bt.get_cutter_type_display()}"
+                tool_type = (
+                    f"{self.get_category_display()} · {bt.get_cutter_type_display()}"
+                )
                 if bt.diameter_mm is not None:
                     specs_parts.append(f"ØD={fmt_mm(bt.diameter_mm)} мм")
                 if bt.teeth_count is not None:
@@ -731,7 +731,10 @@ class ToolItem(models.Model):
                 if (bt.brand or "").strip():
                     specs_parts.append(bt.brand.strip())
             else:
-                tool_type = "Фрезы со сменными пластинами"
+                tool_type = self.get_category_display()
+            notes = (self.notes or "").strip()
+            if notes:
+                specs_parts.append(notes)
         elif cat == "tool_extension":
             ex = getattr(self, "tool_extension_spec", None)
             tool_type = self.get_category_display()
@@ -812,6 +815,11 @@ class ToolItem(models.Model):
             "body_family": "",
             "body_cutter": "",
             "teeth": "",
+            "shank_type": "",
+            "insert_compat": "",
+            "mount_diameter": "",
+            "ap_max": "",
+            "notes": "",
         }
         cat = self.category
         if cat == "end_mill":
@@ -901,13 +909,17 @@ class ToolItem(models.Model):
                 out["insert_compat"] = (bt.insert_compat or "").strip()
                 out["angle"] = fmt_num(bt.approach_angle_deg)
                 out["shank_type"] = (bt.shank_type or "").strip()
-                out["length"] = fmt_num(bt.mount_diameter_mm)
-                out["cutting_length"] = fmt_num(bt.ap_max_mm)
+                out["mount_diameter"] = fmt_num(bt.mount_diameter_mm)
+                out["ap_max"] = fmt_num(bt.ap_max_mm)
+                out["ins_brand"] = (bt.brand or "").strip()
+            out["notes"] = (self.notes or "").strip()
         elif cat == "tool_extension":
             ex = getattr(self, "tool_extension_spec", None)
             out["diameter"] = fmt_num(self.main_diameter_mm)
             if ex:
                 out["length"] = fmt_num(ex.overall_length_mm)
+        if not out.get("notes"):
+            out["notes"] = (self.notes or "").strip()
         return out
 
 
