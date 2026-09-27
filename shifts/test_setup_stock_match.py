@@ -86,6 +86,28 @@ class SetupStockMatchTests(TestCase):
         url = reverse("product_setup_stock", kwargs={"pk": product.pk, "setup_pk": setup.pk})
         self.assertTrue(url.endswith(f"/products/{product.pk}/setups/{setup.pk}/stock/"))
 
+    def test_probe_sensor_skipped_from_stock_match(self):
+        product = Product.objects.create(name="TEST.SETUP.PROBE")
+        setup = ProductSetup.objects.create(product=product, name="Уст 1")
+        ProductSetupToolRow.objects.create(
+            setup=setup,
+            sort_order=1,
+            tool_number="T20",
+            tool_type="Датчик привязки",
+            diameter="Шарик ø6 мм",
+        )
+        ProductSetupToolRow.objects.create(
+            setup=setup, sort_order=2, tool_number="T03", tool_type="Центровка", diameter="3"
+        )
+        CenterDrillSpec.objects.create(
+            tool=ToolItem.objects.create(category="center_drill", name="Центр 3", quantity=1),
+            diameter_mm=Decimal("3"),
+        )
+        rows = match_setup_tools(setup.tools.all())
+        types = {r.tool_type for r in rows}
+        self.assertNotIn("Датчик привязки", types)
+        self.assertIn("Центровка", types)
+
     def test_open_holders_when_stock_zero(self):
         product = Product.objects.create(name="TEST.SETUP.HOLDERS")
         setup = ProductSetup.objects.create(product=product, name="Уст 1")

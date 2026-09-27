@@ -880,6 +880,19 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   .product-setup-ai-out[hidden] {
     display: none !important;
   }
+  .product-setup-ai-out .setup-ai-crit,
+  .setup-ai-out .setup-ai-crit {
+    color: #ff6b6b;
+    background: rgba(220, 38, 38, 0.16);
+    border-radius: 3px;
+    padding: 0 2px;
+    font-weight: 650;
+  }
+  html[data-theme="dawn"] .product-setup-ai-out .setup-ai-crit,
+  html[data-theme="dawn"] .setup-ai-out .setup-ai-crit {
+    color: #b91c1c;
+    background: rgba(185, 28, 28, 0.12);
+  }
   .product-setup-inwork-toggle {
     display: inline-flex;
     align-items: center;

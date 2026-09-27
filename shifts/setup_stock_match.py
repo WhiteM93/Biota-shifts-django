@@ -33,8 +33,13 @@ _SETUP_TYPE_MAP: dict[str, dict[str, str]] = {
     "Фреза чистовая": {"category": "end_mill", "mill_type": "end"},
     "Фреза профильная": {"category": "end_mill", "mill_type": "end"},
     "Фреза фасочная": {"category": "end_mill", "mill_type": "end", "fallback_category": "countersink"},
+    # Корпус со сменными пластинами: торцевая, насадная/модульная головка и т.п.
     "Фреза с СМП": {"category": "body_tool"},
 }
+
+# Не сверяем со складом (постоянный датчик станка и т.п.).
+_SKIP_STOCK_CHECK_TYPES = frozenset({"Датчик привязки"})
+
 
 _HOLE_MAP = {
     "Сквозной": "through",
@@ -443,6 +448,11 @@ def match_setup_tool_row(row: Any) -> SetupStockRowResult:
     if not tool_type and not diameter_raw and not note:
         base.status = "skip"
         base.status_label = "Пустая строка"
+        return base
+
+    if tool_type in _SKIP_STOCK_CHECK_TYPES:
+        base.status = "skip"
+        base.status_label = "Не проверяется по складу"
         return base
 
     mapping = _SETUP_TYPE_MAP.get(tool_type)

@@ -62,7 +62,7 @@ class SetupAiPromptTests(SimpleTestCase):
 
         row = SetupStockRowResult(
             row_id=1,
-            tool_number="1",
+            tool_number="T03",
             tool_type="Метчик",
             diameter="M3",
             overhang="",
@@ -83,9 +83,50 @@ class SetupAiPromptTests(SimpleTestCase):
                 tool_label="Метчик M3",
             )
         ]
-        text = build_setup_analysis_prompt(product=P(), setup=S(), match_rows=[row])
+        smp = SetupStockRowResult(
+            row_id=2,
+            tool_number="T07",
+            tool_type="Фреза с СМП",
+            diameter="32",
+            overhang="",
+            tap_hole_type="",
+            note="",
+            status="empty",
+            status_label="На складе не найдено",
+            total_qty=0,
+        )
+        text = build_setup_analysis_prompt(product=P(), setup=S(), match_rows=[row, smp], tools=[])
         self.assertIn("Метчик", text)
         self.assertIn("На складе не найдено", text)
         self.assertIn("зажать в тисках", text)
         self.assertIn("Сидоров", text)
         self.assertIn("на руках", text)
+        self.assertIn("T03", text)
+        self.assertNotIn("TT03", text)
+        self.assertIn("корпусной инструмент", text.lower())
+        self.assertIn("Фреза с СМП", text)
+        self.assertIn("Сводка слотов", text)
+
+    def test_empty_match_explains_no_filled_rows(self):
+        class P:
+            pk = 1
+            name = "X"
+
+        class S:
+            pk = 2
+            name = "Уст"
+            workpiece = material = size = binding_x = binding_y = binding_z = ""
+            gcode_system = "G54"
+            setup_notes = ""
+
+        class Tool:
+            def __init__(self, tool_type="", diameter="", name=""):
+                self.tool_type = tool_type
+                self.diameter = diameter
+                self.name = name
+
+        tools = [Tool(), Tool(tool_type="Датчик привязки", diameter="6")]
+        text = build_setup_analysis_prompt(product=P(), setup=S(), match_rows=[], tools=tools)
+        self.assertIn("датчик привязки (не проверяем) 1", text)
+        self.assertIn("пустых 1", text)
+        self.assertIn("нет заполненных строк для сверки", text)

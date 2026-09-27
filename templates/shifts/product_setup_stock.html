@@ -74,6 +74,17 @@
   }
   .setup-ai-out.is-err { color: #fecaca; }
   .setup-ai-out[hidden] { display: none !important; }
+  .setup-ai-out .setup-ai-crit {
+    color: #ff6b6b;
+    background: rgba(220, 38, 38, 0.16);
+    border-radius: 3px;
+    padding: 0 2px;
+    font-weight: 650;
+  }
+  html[data-theme="dawn"] .setup-ai-out .setup-ai-crit {
+    color: #b91c1c;
+    background: rgba(185, 28, 28, 0.12);
+  }
 </style>
 {% endblock %}
 
@@ -186,6 +197,19 @@
     var m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
     return m ? decodeURIComponent(m[1]) : "";
   }
+  function escapeHtml(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function formatSetupAiReplyHtml(text) {
+    var esc = escapeHtml(text);
+    var critRe =
+      /(отсутствует|не\s+найден[аоы]?|не\s+сопоставлен[аоы]?|остаток\s*0|нет\s+в\s+наличии|не\s+хватает|критичн\w*|на\s+руках\s*:\s*[^\n]+|на\s+руках\s*\([^)]*не\s+возвращ[^)]*\))/gi;
+    return esc.replace(critRe, '<mark class="setup-ai-crit">$1</mark>');
+  }
   if (!btn || !out || !url) return;
   btn.addEventListener("click", function () {
     btn.disabled = true;
@@ -210,7 +234,7 @@
         var data = res.data;
         if (data.ok && data.reply) {
           out.classList.remove("is-err");
-          out.textContent = data.reply;
+          out.innerHTML = formatSetupAiReplyHtml(data.reply);
         } else {
           out.classList.add("is-err");
           out.textContent = data.error || "Не удалось получить анализ.";

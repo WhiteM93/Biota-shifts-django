@@ -6927,6 +6927,20 @@ function saveSetupToolNoteEditor() {
       var m = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
       return m ? decodeURIComponent(m[1]) : "";
     }
+    function escapeHtml(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+    function formatSetupAiReplyHtml(text) {
+      var esc = escapeHtml(text);
+      /* Не подсвечиваем шаблонные «на руках» в заголовках — только реальные проблемы. */
+      var critRe =
+        /(отсутствует|не\s+найден[аоы]?|не\s+сопоставлен[аоы]?|остаток\s*0|нет\s+в\s+наличии|не\s+хватает|критичн\w*|на\s+руках\s*:\s*[^\n]+|на\s+руках\s*\([^)]*не\s+возвращ[^)]*\))/gi;
+      return esc.replace(critRe, '<mark class="setup-ai-crit">$1</mark>');
+    }
     document.querySelectorAll(".js-setup-ai-run").forEach(function (btn) {
       if (btn._setupAiBound) return;
       btn._setupAiBound = true;
@@ -6958,7 +6972,7 @@ function saveSetupToolNoteEditor() {
             var data = res.data;
             if (data.ok && data.reply) {
               out.classList.remove("is-err");
-              out.textContent = data.reply;
+              out.innerHTML = formatSetupAiReplyHtml(data.reply);
             } else {
               out.classList.add("is-err");
               out.textContent = data.error || "Не удалось получить анализ.";
