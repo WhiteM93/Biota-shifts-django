@@ -13,6 +13,15 @@ logger = logging.getLogger(__name__)
 
 YANDEX_COMPLETION_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
+# Старые URI с /latest; новые (5 / 5.1) — без суффикса.
+_LEGACY_MODELS_WITH_LATEST = frozenset(
+    {
+        "yandexgpt-lite",
+        "yandexgpt",
+        "yandexgpt-pro",
+    }
+)
+
 
 class YandexGptError(Exception):
     """Ошибка конфигурации или вызова YandexGPT."""
@@ -25,12 +34,23 @@ def yandex_gpt_configured() -> bool:
     )
 
 
-def yandex_gpt_model_uri() -> str:
+def yandex_gpt_model_uri(model: str | None = None) -> str:
+    """
+    modelUri: gpt://<folder>/<model>
+    По умолчанию yandexgpt-5-lite (дешевле/быстрее).
+    """
     folder = (getattr(settings, "YANDEX_GPT_FOLDER_ID", "") or "").strip()
-    model = (getattr(settings, "YANDEX_GPT_MODEL", "") or "yandexgpt-lite").strip() or "yandexgpt-lite"
-    if model.startswith("gpt://"):
-        return model
-    return f"gpt://{folder}/{model}/latest"
+    raw = (model if model is not None else getattr(settings, "YANDEX_GPT_MODEL", "") or "").strip()
+    if not raw:
+        raw = "yandexgpt-5-lite"
+    if raw.startswith("gpt://") or raw.startswith("cls://"):
+        return raw
+    # уже с /latest или суффиксом дообучения
+    if "/latest" in raw or "@" in raw:
+        return f"gpt://{folder}/{raw}"
+    if raw in _LEGACY_MODELS_WITH_LATEST:
+        return f"gpt://{folder}/{raw}/latest"
+    return f"gpt://{folder}/{raw}"
 
 
 def complete(
@@ -39,6 +59,7 @@ def complete(
     temperature: float | None = None,
     max_tokens: int | None = None,
     timeout: float | None = None,
+    model: str | None = None,
 ) -> str:
     """Синхронный completion. messages: [{role, text}, ...]."""
     if not yandex_gpt_configured():
@@ -47,17 +68,25 @@ def complete(
     api_key = (settings.YANDEX_GPT_API_KEY or "").strip()
     folder_id = (settings.YANDEX_GPT_FOLDER_ID or "").strip()
     temp = temperature if temperature is not None else float(getattr(settings, "YANDEX_GPT_TEMPERATURE", 0.1))
-    tokens = max_tokens if max_tokens is not None else int(getattr(settings, "YANDEX_GPT_MAX_TOKENS", 1200) or 1200)
+    default_tok = int(getattr(settings, "YANDEX_GPT_MAX_TOKENS", 700) or 700)
+    tokens = max_tokens if max_tokens is not None else default_tok
     wait = timeout if timeout is not None else float(getattr(settings, "YANDEX_GPT_TIMEOUT", 45) or 45)
 
+    compact_msgs = []
+    for m in messages:
+        role = (m.get("role") or "user").strip()
+        text = (m.get("text") or "").strip()
+        if text:
+            compact_msgs.append({"role": role, "text": text})
+
     body: dict[str, Any] = {
-        "modelUri": yandex_gpt_model_uri(),
+        "modelUri": yandex_gpt_model_uri(model),
         "completionOptions": {
             "stream": False,
             "temperature": temp,
-            "maxTokens": str(tokens),
+            "maxTokens": str(int(tokens)),
         },
-        "messages": [{"role": m["role"], "text": m["text"]} for m in messages],
+        "messages": compact_msgs,
     }
     data = json.dumps(body, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(

@@ -6847,3 +6847,56 @@ function saveSetupToolNoteEditor() {
 
     document.querySelectorAll(".program-search-input").forEach(bindSearchInput);
   })();
+
+  (function bindSetupAiAnalyze() {
+    function csrfToken() {
+      var m = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+      return m ? decodeURIComponent(m[1]) : "";
+    }
+    document.querySelectorAll(".js-setup-ai-run").forEach(function (btn) {
+      if (btn._setupAiBound) return;
+      btn._setupAiBound = true;
+      btn.addEventListener("click", function () {
+        var url = btn.getAttribute("data-url") || "";
+        var outSel = btn.getAttribute("data-out") || "";
+        var out = outSel ? document.querySelector(outSel) : null;
+        if (!url || !out) return;
+        btn.disabled = true;
+        out.hidden = false;
+        out.classList.remove("is-err");
+        out.textContent = "Анализирую…";
+        fetch(url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken(),
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          body: "{}",
+        })
+          .then(function (r) {
+            return r.json().then(function (data) {
+              return { status: r.status, data: data || {} };
+            });
+          })
+          .then(function (res) {
+            var data = res.data;
+            if (data.ok && data.reply) {
+              out.classList.remove("is-err");
+              out.textContent = data.reply;
+            } else {
+              out.classList.add("is-err");
+              out.textContent = data.error || "Не удалось получить анализ.";
+            }
+          })
+          .catch(function () {
+            out.classList.add("is-err");
+            out.textContent = "Ошибка сети.";
+          })
+          .finally(function () {
+            btn.disabled = false;
+          });
+      });
+    });
+  })();

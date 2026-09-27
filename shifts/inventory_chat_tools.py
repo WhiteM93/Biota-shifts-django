@@ -1,6 +1,7 @@
 """Read-only инструменты склада для чата YandexGPT."""
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timedelta
 from typing import Any, Callable
 
@@ -50,7 +51,146 @@ def _tool_label(tool: ToolItem) -> str:
         if iname:
             parts.append(iname.strip())
         return " · ".join(parts)
+    if tool.category == "tap":
+        tp = getattr(tool, "tap_spec", None)
+        parts = [cat]
+        if tp:
+            size = (tp.size_label or "").strip()
+            if size:
+                parts.append(size)
+            try:
+                hole = tp.get_hole_type_display()
+            except Exception:
+                hole = ""
+            if hole:
+                parts.append(str(hole))
+            try:
+                ttype = tp.get_tap_type_display()
+            except Exception:
+                ttype = ""
+            if ttype:
+                parts.append(str(ttype))
+        elif name:
+            parts.append(name)
+        return " · ".join(parts)
     return f"{cat} · {name}" if name else cat
+
+
+_HOLE_ALIASES = {
+    "сквозн": "through",
+    "сквозной": "through",
+    "сквозное": "through",
+    "through": "through",
+    "глух": "blind",
+    "глухой": "blind",
+    "глухое": "blind",
+    "blind": "blind",
+    "универс": "any",
+    "any": "any",
+}
+
+
+def _normalize_hole_token(tok: str) -> str | None:
+    t = (tok or "").strip().lower().replace("ё", "е")
+    if not t:
+        return None
+    for key, val in _HOLE_ALIASES.items():
+        if t == key or t.startswith(key):
+            return val
+    return None
+
+
+def search_issues(
+    query: str = "",
+    date_from: Any = None,
+    date_to: Any = None,
+    limit: int = 20,
+    movement_type: str = "issue",
+) -> dict[str, Any]:
+    """Поиск выдач/движений по названию инструмента (метчик M3, сверло D2.5…)."""
+    q = _clip(query, MAX_QUERY_LEN)
+    if len(q) < 1:
+        return {"error": "Укажите что искать (например: метчик M3 сквозной).", "rows": []}
+
+    today = timezone.localdate()
+    d_to = _parse_date(date_to, default=today) or today
+    d_from = _parse_date(date_from, default=d_to - timedelta(days=180)) or (d_to - timedelta(days=180))
+    if d_from > d_to:
+        d_from, d_to = d_to, d_from
+    lim = max(1, min(int(limit or 20), MAX_ROWS))
+    mtype = (movement_type or "issue").strip().lower()
+    if mtype == "all":
+        mtype = ""
+    allowed = {"", "issue", "restock", "writeoff"}
+    if mtype not in allowed:
+        mtype = "issue"
+
+    tokens = [t for t in re.split(r"[\s,/|]+", q) if t]
+    hole_codes: list[str] = []
+    search_tokens: list[str] = []
+    for tok in tokens:
+        hole = _normalize_hole_token(tok)
+        if hole:
+            hole_codes.append(hole)
+        else:
+            search_tokens.append(tok)
+
+    qs = (
+        StockMovement.objects.filter(
+            is_reverted=False,
+            movement_date__gte=d_from,
+            movement_date__lte=d_to,
+        )
+        .select_related("tool", "tool__insert_spec", "tool__tap_spec", "tool__drill_spec")
+        .order_by("-movement_date", "-id")
+    )
+    if mtype:
+        qs = qs.filter(movement_type=mtype)
+    if hole_codes:
+        qs = qs.filter(tool__tap_spec__hole_type__in=list(set(hole_codes)))
+
+    for tok in search_tokens:
+        tok_q = (
+            Q(tool__name__icontains=tok)
+            | Q(tool__tap_spec__size_label__icontains=tok)
+            | Q(tool__insert_spec__item_name__icontains=tok)
+            | Q(tool__insert_spec__brand__icontains=tok)
+            | Q(tool__collet_spec__size_label__icontains=tok)
+            | Q(comment__icontains=tok)
+            | Q(employee_name__icontains=tok)
+        )
+        low = tok.lower().replace("ё", "е")
+        if "метчик" in low or "tap" in low:
+            tok_q |= Q(tool__category="tap")
+        if "сверл" in low or "drill" in low:
+            tok_q |= Q(tool__category="drill")
+        if "пластин" in low or "insert" in low:
+            tok_q |= Q(tool__category="insert")
+        if "фрез" in low:
+            tok_q |= Q(tool__category="end_mill") | Q(tool__category="body_tool")
+        qs = qs.filter(tok_q)
+
+    rows = []
+    for m in qs[:lim]:
+        rows.append(
+            {
+                "date": m.movement_date.strftime("%d.%m.%Y"),
+                "type": m.get_movement_type_display(),
+                "employee": _clip(m.employee_name, 80),
+                "tool": _clip(_tool_label(m.tool), 180),
+                "qty": m.quantity,
+                "comment": _clip(m.comment, 60),
+            }
+        )
+    return {
+        "query": q,
+        "from": d_from.strftime("%d.%m.%Y"),
+        "to": d_to.strftime("%d.%m.%Y"),
+        "type": mtype or "все",
+        "count": len(rows),
+        "rows": rows,
+        "hint": "Первая строка — самая свежая выдача по запросу." if rows else "",
+    }
 
 
 def issues_by_employee(
@@ -265,7 +405,106 @@ def recent_movements(
     }
 
 
+def build_warehouse_context(*, max_chars: int | None = None, recent_issues: int | None = None) -> str:
+    """
+    Компактный снимок склада для промпта: остатки + свежие выдачи.
+    Модель видит данные сразу, без отдельного tool-вызова.
+    """
+    from django.conf import settings
+
+    if max_chars is None:
+        max_chars = int(getattr(settings, "YANDEX_GPT_CONTEXT_CHARS", 7000) or 7000)
+    if recent_issues is None:
+        recent_issues = int(getattr(settings, "YANDEX_GPT_RECENT_ISSUES", 20) or 20)
+    max_chars = max(2000, min(int(max_chars), 14000))
+    recent_issues = max(5, min(int(recent_issues), MAX_ROWS))
+    parts: list[str] = []
+    qs = (
+        ToolItem.objects.filter(is_deleted=False, quantity__gt=0)
+        .select_related("insert_spec", "tap_spec", "drill_spec")
+        .order_by("category", "-quantity", "name")
+    )
+    cat_counts: dict[str, int] = {}
+    stock_lines: list[str] = []
+    total_qty = 0
+    for t in qs:
+        cat = t.get_category_display()
+        cat_counts[cat] = cat_counts.get(cat, 0) + 1
+        total_qty += int(t.quantity or 0)
+        addr = (getattr(t, "warehouse_address", "") or "").strip()
+        line = f"{int(t.quantity)}\t{_tool_label(t)}"
+        if addr:
+            line += f"\t[{addr}]"
+        stock_lines.append(line)
+
+    parts.append("=== ОСТАТКИ НА СКЛАДЕ (кол-во > 0) ===")
+    parts.append(
+        "Сводка по типам: "
+        + (", ".join(f"{k}: {v} поз." for k, v in sorted(cat_counts.items())) or "пусто")
+    )
+    parts.append(f"Всего позиций: {len(stock_lines)}, суммарно штук: {total_qty}")
+    parts.append("Формат: остаток <TAB> позиция [<адрес>]")
+
+    budget = max_chars - 800
+    used = 0
+    shown = 0
+    for line in stock_lines:
+        add = len(line) + 1
+        if used + add > budget:
+            parts.append(f"… ещё {len(stock_lines) - shown} позиций не влезло в снимок (зови tool_stock_search / top_stock_tools).")
+            break
+        parts.append(line)
+        used += add
+        shown += 1
+
+    lim = max(1, min(int(recent_issues or 40), MAX_ROWS))
+    issues = (
+        StockMovement.objects.filter(movement_type="issue", is_reverted=False)
+        .select_related("tool", "tool__insert_spec", "tool__tap_spec")
+        .order_by("-movement_date", "-id")[:lim]
+    )
+    parts.append("")
+    parts.append(f"=== ПОСЛЕДНИЕ ВЫДАЧИ (до {lim}, свежие сверху) ===")
+    parts.append("Формат: дата | сотрудник | инструмент | qty")
+    iss_n = 0
+    for m in issues:
+        line = (
+            f"{m.movement_date.strftime('%d.%m.%Y')} | "
+            f"{_clip(m.employee_name, 40) or '—'} | "
+            f"{_clip(_tool_label(m.tool), 120)} | "
+            f"{m.quantity}"
+        )
+        if used + len(line) + 1 > max_chars:
+            parts.append("… список выдач обрезан по размеру контекста.")
+            break
+        parts.append(line)
+        used += len(line) + 1
+        iss_n += 1
+    if iss_n == 0:
+        parts.append("(выдач нет)")
+
+    text = "\n".join(parts)
+    if len(text) > max_chars:
+        return text[: max_chars - 20] + "\n…[обрезано]"
+    return text
+
+
 TOOL_SPECS: dict[str, dict[str, Any]] = {
+    "search_issues": {
+        "description": (
+            "Поиск ВЫДАЧ по названию/типу инструмента: «кто брал метчик M3», «сквозной/глухой», "
+            "«сверло 2.5», APKT и т.п. Возвращает последние подходящие операции (свежие сверху). "
+            "Используй для вопросов «кто последний брал …»."
+        ),
+        "args": {
+            "query": "фраза поиска, напр. метчик M3 сквозной (обязательно)",
+            "date_from": "начало периода (по умолчанию −180 дней)",
+            "date_to": "конец периода (сегодня)",
+            "limit": "до 50",
+            "movement_type": "issue (по умолчанию) | restock | writeoff | all",
+        },
+        "fn": search_issues,
+    },
     "top_stock_tools": {
         "description": (
             "Топ позиций по ТЕКУЩЕМУ ОСТАТКУ на складе (поле quantity). "
@@ -326,15 +565,17 @@ TOOL_SPECS: dict[str, dict[str, Any]] = {
 
 
 def tools_schema_for_prompt() -> str:
-    lines = ["Доступные инструменты (вызови один, верни JSON):"]
-    for name, spec in TOOL_SPECS.items():
-        args = ", ".join(f"{k}: {v}" for k, v in spec["args"].items())
-        lines.append(f"- {name}: {spec['description']} Аргументы: {args}")
-    lines.append(
-        'Формат вызова: {"tool":"имя","args":{...}} — только JSON, без пояснений. '
-        "Если данных достаточно для ответа пользователю — ответь обычным текстом на русском."
+    # Короткий список — экономия входных токенов
+    return (
+        "Tools (JSON only if snapshot недостаточно): "
+        "search_issues{query,date_from?,date_to?,limit?}; "
+        "top_stock_tools{category?,limit?}; "
+        "top_issued_tools{date_from?,date_to?,limit?,category?}; "
+        "issues_by_employee{name,date_from?,date_to?,limit?}; "
+        "tool_stock_search{query,category?,limit?}; "
+        "recent_movements{date_from?,date_to?,movement_type?,limit?}. "
+        'Формат: {"tool":"имя","args":{...}}'
     )
-    return "\n".join(lines)
 
 
 def run_tool(name: str, args: dict[str, Any] | None) -> dict[str, Any]:

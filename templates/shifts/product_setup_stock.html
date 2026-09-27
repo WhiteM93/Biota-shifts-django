@@ -39,6 +39,30 @@
   .setup-stock-qty { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .setup-stock-addr { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .setup-stock-empty-hint { margin: 4px 0 0; font-size: 13px; color: var(--muted, #888); }
+  .setup-ai-box {
+    margin: 0 0 18px;
+    border: 1px solid var(--border, #333);
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: var(--surface, transparent);
+  }
+  .setup-ai-box__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .setup-ai-box__head h2 { margin: 0; font-size: 1.05rem; }
+  .setup-ai-box__hint { margin: 0; font-size: 13px; color: var(--muted, #888); }
+  .setup-ai-out {
+    margin-top: 10px;
+    white-space: pre-wrap;
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+  .setup-ai-out.is-err { color: #fecaca; }
+  .setup-ai-out[hidden] { display: none !important; }
 </style>
 {% endblock %}
 
@@ -54,6 +78,18 @@
     {{ product.name }}
     · {% if setup.name %}{{ setup.name }}{% else %}Установка{% endif %}
   </p>
+
+  <section class="setup-ai-box" id="setup-ai"
+    data-url="{% url 'product_setup_ai_analyze' product.pk setup.pk %}"
+    data-csrf="{{ csrf_token }}"
+  >
+    <div class="setup-ai-box__head">
+      <h2>ИИ-анализ наладки</h2>
+      <button type="button" class="btn btn-primary js-setup-ai-run">Проанализировать</button>
+    </div>
+    <p class="setup-ai-box__hint">Наличие инструмента, замечания по таблице и советы по описанию. Не чаще 1 раза в минуту (админ — без лимита).</p>
+    <div class="setup-ai-out js-setup-ai-out" hidden></div>
+  </section>
 
   {% if not rows %}
   <p class="muted">В установке нет строк инструмента для подбора.</p>
@@ -108,4 +144,56 @@
   </section>
   {% endfor %}
 </div>
+<script>
+(function () {
+  var root = document.getElementById("setup-ai");
+  if (!root) return;
+  var btn = root.querySelector(".js-setup-ai-run");
+  var out = root.querySelector(".js-setup-ai-out");
+  var url = root.getAttribute("data-url") || "";
+  var csrf = root.getAttribute("data-csrf") || "";
+  function cookie(name) {
+    var m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+  if (!btn || !out || !url) return;
+  btn.addEventListener("click", function () {
+    btn.disabled = true;
+    out.hidden = false;
+    out.classList.remove("is-err");
+    out.textContent = "Анализирую…";
+    fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrf || cookie("csrftoken"),
+      },
+      body: "{}",
+    })
+      .then(function (r) {
+        return r.json().then(function (data) {
+          return { status: r.status, data: data || {} };
+        });
+      })
+      .then(function (res) {
+        var data = res.data;
+        if (data.ok && data.reply) {
+          out.classList.remove("is-err");
+          out.textContent = data.reply;
+        } else {
+          out.classList.add("is-err");
+          out.textContent = data.error || "Не удалось получить анализ.";
+        }
+      })
+      .catch(function () {
+        out.classList.add("is-err");
+        out.textContent = "Ошибка сети.";
+      })
+      .finally(function () {
+        btn.disabled = false;
+      });
+  });
+})();
+</script>
 {% endblock %}

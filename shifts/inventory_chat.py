@@ -1,29 +1,19 @@
-"""Оркестратор чата склада: YandexGPT + read-only tools."""
+"""Оркестратор чата склада: YandexGPT + снимок склада + tools."""
 from __future__ import annotations
 
 import json
 import re
 from typing import Any
 
-from .inventory_chat_tools import run_tool, tools_schema_for_prompt
+from django.conf import settings
+
+from .inventory_chat_tools import build_warehouse_context, run_tool, tools_schema_for_prompt
 from .yandex_gpt import YandexGptError, complete, yandex_gpt_configured
 
-SYSTEM_PROMPT = """Ты ассистент склада инструмента Biota.
-Отвечай кратко по-русски, только по фактам из результатов инструментов.
-Не выдумывай остатки и выдачи. Даты в ответах — ДД.ММ.ГГГГ.
-Не предлагай менять склад и не выполняй запись — только чтение.
-Если данных нет — так и скажи.
-
-Выбор инструмента:
-- «какой позиции больше всего», «самый большой остаток», «топ по количеству на складе» → top_stock_tools
-- «что чаще выдавали», «топ выдач», расход за период → top_issued_tools
-- ФИО сотрудника и что ему выдавали → issues_by_employee
-- поиск по названию/бренду → tool_stock_search
-Не подставляй произвольный год (например 2023), если пользователь период не назвал.
-
-Чтобы получить данные, верни один JSON-вызов инструмента (без markdown и пояснений).
-Когда данных достаточно — ответь обычным текстом пользователю.
-"""
+SYSTEM_PROMPT = """Склад Biota. Отвечай кратко по-русски по СНИМКУ (остатки + свежие выдачи).
+Не выдумывай. Даты ДД.ММ.ГГГГ. Только чтение.
+Tool JSON — только если снимка мало (старые выдачи, узкий поиск, топ за период).
+Иначе обычный текст."""
 
 _TOOL_JSON_RE = re.compile(
     r"\{[^{}]*\"tool\"\s*:\s*\"[a-z_]+\"[^{}]*\}",
@@ -35,7 +25,6 @@ def _extract_tool_call(text: str) -> dict[str, Any] | None:
     raw = (text or "").strip()
     if not raw:
         return None
-    # срезать ```json ... ```
     fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL | re.IGNORECASE)
     if fence:
         raw = fence.group(1).strip()
@@ -58,7 +47,7 @@ def _extract_tool_call(text: str) -> dict[str, Any] | None:
     return None
 
 
-def _history_messages(history: list[dict[str, str]] | None, *, max_turns: int = 6) -> list[dict[str, str]]:
+def _history_messages(history: list[dict[str, str]] | None, *, max_turns: int = 4) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
     if not history:
         return out
@@ -68,7 +57,7 @@ def _history_messages(history: list[dict[str, str]] | None, *, max_turns: int = 
         role = (item.get("role") or "").strip()
         text = (item.get("text") or item.get("content") or "").strip()
         if role in {"user", "assistant"} and text:
-            out.append({"role": role, "text": text[:2000]})
+            out.append({"role": role, "text": text[:800]})
     return out
 
 
@@ -77,14 +66,10 @@ def ask_inventory_chat(
     *,
     history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """
-    Возвращает {ok, reply, used_tools?, error?}.
-    До 2 вызовов модели: выбор tool → ответ по данным.
-    """
     q = (question or "").strip()
     if not q:
         return {"ok": False, "error": "Пустой вопрос."}
-    if len(q) > 1500:
+    if len(q) > 800:
         return {"ok": False, "error": "Слишком длинный вопрос."}
     if not yandex_gpt_configured():
         return {
@@ -93,14 +78,22 @@ def ask_inventory_chat(
         }
 
     used_tools: list[str] = []
+    try:
+        snapshot = build_warehouse_context()
+    except Exception as exc:  # noqa: BLE001
+        snapshot = f"(снимок склада недоступен: {exc})"
+
+    max_sys = int(getattr(settings, "YANDEX_GPT_CONTEXT_CHARS", 7000) or 7000) + 1200
+    system_text = SYSTEM_PROMPT + "\n" + tools_schema_for_prompt() + "\n\n" + snapshot
     messages: list[dict[str, str]] = [
-        {"role": "system", "text": SYSTEM_PROMPT + "\n\n" + tools_schema_for_prompt()},
+        {"role": "system", "text": system_text[:max_sys]},
     ]
     messages.extend(_history_messages(history))
-    messages.append({"role": "user", "text": q})
+    messages.append({"role": "user", "text": q[:800]})
 
+    max_out = int(getattr(settings, "YANDEX_GPT_MAX_TOKENS", 700) or 700)
     try:
-        first = complete(messages)
+        first = complete(messages, max_tokens=max_out)
     except YandexGptError as exc:
         return {"ok": False, "error": str(exc)}
 
@@ -117,55 +110,24 @@ def ask_inventory_chat(
         {
             "role": "user",
             "text": (
-                f"Результат инструмента {tool_name}:\n"
-                f"{json.dumps(tool_result, ensure_ascii=False)[:6000]}\n\n"
-                "Ответь пользователю обычным текстом на русском по этим данным. "
-                "Не вызывай инструменты повторно, если данных достаточно."
+                f"Результат {tool_name}:\n"
+                f"{json.dumps(tool_result, ensure_ascii=False)[:3500]}\n"
+                "Ответь кратко текстом. Без JSON."
             ),
         }
     )
     try:
-        second = complete(messages)
+        second = complete(messages, max_tokens=max_out)
     except YandexGptError as exc:
         return {"ok": False, "error": str(exc), "used_tools": used_tools}
 
-    # если модель снова вернула tool — один повтор
     call2 = _extract_tool_call(second)
-    if call2 and call2["tool"] != tool_name:
-        tool_name2 = call2["tool"]
-        tool_result2 = run_tool(tool_name2, call2.get("args") or {})
-        used_tools.append(tool_name2)
-        messages.append({"role": "assistant", "text": json.dumps(call2, ensure_ascii=False)})
-        messages.append(
-            {
-                "role": "user",
-                "text": (
-                    f"Результат инструмента {tool_name2}:\n"
-                    f"{json.dumps(tool_result2, ensure_ascii=False)[:6000]}\n\n"
-                    "Ответь пользователю обычным текстом. Больше инструменты не вызывай."
-                ),
-            }
-        )
-        try:
-            third = complete(messages)
-        except YandexGptError as exc:
-            return {"ok": False, "error": str(exc), "used_tools": used_tools}
-        if _extract_tool_call(third):
-            return {
-                "ok": True,
-                "reply": "Получил данные, но не смог сформулировать ответ. Уточните вопрос.",
-                "used_tools": used_tools,
-            }
-        return {"ok": True, "reply": third, "used_tools": used_tools}
-
     if call2:
-        # повтор того же tool — отдаём текстовый fallback по уже полученным данным
         return {
             "ok": True,
             "reply": _fallback_reply(tool_result),
             "used_tools": used_tools,
         }
-
     return {"ok": True, "reply": second, "used_tools": used_tools}
 
 
@@ -177,8 +139,8 @@ def _fallback_reply(tool_result: dict[str, Any]) -> str:
         if not rows:
             return "По запросу ничего не найдено."
         lines = []
-        for row in rows[:15]:
+        for row in rows[:12]:
             if isinstance(row, dict):
                 lines.append(" · ".join(f"{k}: {v}" for k, v in row.items() if v not in ("", None)))
         return "Найдено:\n" + "\n".join(lines)
-    return json.dumps(tool_result, ensure_ascii=False)[:1500]
+    return json.dumps(tool_result, ensure_ascii=False)[:1200]

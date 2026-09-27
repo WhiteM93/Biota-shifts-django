@@ -14,6 +14,7 @@ from . import inventory_chat_views
 from . import inventory_types_views
 from . import payroll_views
 from . import product_views
+from . import setup_ai_views
 from . import skud_views
 from . import forms_views
 from . import machines_views
@@ -203,6 +204,11 @@ urlpatterns = [
         "products/<int:pk>/setups/<int:setup_pk>/stock/",
         product_views.product_setup_stock_view,
         name="product_setup_stock",
+    ),
+    path(
+        "products/<int:pk>/setups/<int:setup_pk>/ai-analyze/",
+        setup_ai_views.product_setup_ai_analyze,
+        name="product_setup_ai_analyze",
     ),
     path("products/<int:pk>/setups/<int:setup_pk>/pdf/<str:mode>/", product_views.product_setup_pdf_export_view, name="product_setup_pdf_export"),
     path("products/<int:pk>/save-list-preview/", product_views.product_save_list_preview_view, name="product_save_list_preview"),

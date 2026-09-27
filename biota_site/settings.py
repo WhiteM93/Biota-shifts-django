@@ -192,20 +192,35 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # Увеличивайте после правок CSS/JS, чтобы браузер и nginx не отдавали старые файлы.
-STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "418").strip() or "418"
+STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "421").strip() or "421"
 
-# YandexGPT (чат склада). Ключи — в .env.secrets.
+# YandexGPT (чат склада / анализ наладок). Ключи — в .env.secrets.
+# Модели: yandexgpt-5-lite (дешевле), yandexgpt-5.1 / yandexgpt-5-pro (дороже).
 YANDEX_GPT_API_KEY = (os.getenv("YANDEX_GPT_API_KEY") or "").strip()
 YANDEX_GPT_FOLDER_ID = (os.getenv("YANDEX_GPT_FOLDER_ID") or "").strip()
-YANDEX_GPT_MODEL = (os.getenv("YANDEX_GPT_MODEL") or "yandexgpt-lite").strip() or "yandexgpt-lite"
+YANDEX_GPT_MODEL = (os.getenv("YANDEX_GPT_MODEL") or "yandexgpt-5-lite").strip() or "yandexgpt-5-lite"
+# Пусто = та же модель, что YANDEX_GPT_MODEL
+YANDEX_GPT_MODEL_SETUP = (os.getenv("YANDEX_GPT_MODEL_SETUP") or "").strip()
 try:
     YANDEX_GPT_TEMPERATURE = float(os.getenv("YANDEX_GPT_TEMPERATURE") or "0.1")
 except ValueError:
     YANDEX_GPT_TEMPERATURE = 0.1
 try:
-    YANDEX_GPT_MAX_TOKENS = int(os.getenv("YANDEX_GPT_MAX_TOKENS") or "1200")
+    YANDEX_GPT_MAX_TOKENS = int(os.getenv("YANDEX_GPT_MAX_TOKENS") or "700")
 except ValueError:
-    YANDEX_GPT_MAX_TOKENS = 1200
+    YANDEX_GPT_MAX_TOKENS = 700
+try:
+    YANDEX_GPT_MAX_TOKENS_SETUP = int(os.getenv("YANDEX_GPT_MAX_TOKENS_SETUP") or "900")
+except ValueError:
+    YANDEX_GPT_MAX_TOKENS_SETUP = 900
+try:
+    YANDEX_GPT_CONTEXT_CHARS = int(os.getenv("YANDEX_GPT_CONTEXT_CHARS") or "7000")
+except ValueError:
+    YANDEX_GPT_CONTEXT_CHARS = 7000
+try:
+    YANDEX_GPT_RECENT_ISSUES = int(os.getenv("YANDEX_GPT_RECENT_ISSUES") or "20")
+except ValueError:
+    YANDEX_GPT_RECENT_ISSUES = 20
 try:
     YANDEX_GPT_TIMEOUT = float(os.getenv("YANDEX_GPT_TIMEOUT") or "45")
 except ValueError:

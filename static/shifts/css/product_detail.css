@@ -842,6 +842,7 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   .product-setup-panel-title {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     margin: 0;
     min-width: 0;
@@ -854,11 +855,36 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     font-weight: 600;
     min-width: 0;
   }
+  .product-setup-ai-btn {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: 12px;
+    padding: 4px 10px;
+    line-height: 1.2;
+  }
+  .product-setup-ai-out {
+    margin: 6px 0 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border, #333);
+    border-radius: 10px;
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    max-height: 320px;
+    overflow: auto;
+  }
+  .product-setup-ai-out.is-err {
+    color: #fecaca;
+    border-color: #7f1d1d;
+  }
+  .product-setup-ai-out[hidden] {
+    display: none !important;
+  }
   .product-setup-inwork-toggle {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    margin-left: auto;
+    margin-left: 0;
     padding: 2px 4px 2px 2px;
     border: none;
     background: transparent;

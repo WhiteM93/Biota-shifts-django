@@ -3,14 +3,16 @@ from django.utils import timezone
 
 from shifts.inventory_chat import _extract_tool_call
 from shifts.inventory_chat_tools import (
+    build_warehouse_context,
     issues_by_employee,
     recent_movements,
     run_tool,
+    search_issues,
     tool_stock_search,
     top_issued_tools,
     top_stock_tools,
 )
-from shifts.models import InsertSpec, StockMovement, ToolItem
+from shifts.models import InsertSpec, StockMovement, TapSpec, ToolItem
 
 
 class ExtractToolCallTests(SimpleTestCase):
@@ -77,3 +79,31 @@ class InventoryChatToolsTests(TestCase):
 
     def test_run_tool_unknown(self):
         self.assertIn("error", run_tool("nope", {}))
+
+    def test_search_issues_tap_m3_through(self):
+        tap = ToolItem.objects.create(category="tap", name="Метчик M3 сквозной", quantity=5)
+        TapSpec.objects.create(
+            tool=tap,
+            size_label="M3",
+            hole_type="through",
+            tap_type="cutting",
+        )
+        StockMovement.objects.create(
+            movement_type="issue",
+            tool=tap,
+            quantity=1,
+            employee_name="Чумак Р.",
+            movement_date=timezone.localdate(),
+        )
+        data = search_issues(query="метчик M3 сквозной")
+        self.assertGreaterEqual(data["count"], 1)
+        self.assertIn("Чумак", data["rows"][0]["employee"])
+        data_blind = search_issues(query="метчик M3 глухой")
+        self.assertEqual(data_blind["count"], 0)
+
+    def test_warehouse_context_contains_stock_and_issues(self):
+        text = build_warehouse_context()
+        self.assertIn("ОСТАТКИ НА СКЛАДЕ", text)
+        self.assertIn("ПОСЛЕДНИЕ ВЫДАЧИ", text)
+        self.assertIn("APKT1135", text)
+        self.assertIn("Иванов", text)
