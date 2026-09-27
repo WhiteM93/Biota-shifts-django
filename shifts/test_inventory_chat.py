@@ -1,7 +1,7 @@
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
-from shifts.inventory_chat import _extract_tool_call
+from shifts.inventory_chat import _extract_tool_call, forced_tool_call
 from shifts.inventory_chat_tools import (
     build_warehouse_context,
     issues_by_employee,
@@ -29,6 +29,24 @@ class ExtractToolCallTests(SimpleTestCase):
 
     def test_text_is_not_tool(self):
         self.assertIsNone(_extract_tool_call("На складе 3 позиции APKT."))
+
+
+class ForcedToolCallTests(SimpleTestCase):
+    def test_usage_question_uses_issued_not_stock(self):
+        call = forced_tool_call("какие позиции чаще всего используются?")
+        self.assertEqual(call["tool"], "top_issued_tools")
+
+    def test_followup_conduct_uses_history(self):
+        hist = [
+            {"role": "user", "text": "какие позиции чаще всего используются?"},
+            {"role": "assistant", "text": "По снимку часто сверла…"},
+        ]
+        call = forced_tool_call("проводи", hist)
+        self.assertEqual(call["tool"], "top_issued_tools")
+
+    def test_stock_top_question(self):
+        call = forced_tool_call("какой позиции на складе больше всего по остатку?")
+        self.assertEqual(call["tool"], "top_stock_tools")
 
 
 class InventoryChatToolsTests(TestCase):

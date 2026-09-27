@@ -530,9 +530,9 @@ TOOL_SPECS: dict[str, dict[str, Any]] = {
     },
     "top_issued_tools": {
         "description": (
-            "Топ по ВЫДАЧАМ за период (сколько раз/штук выдавали). "
-            "Только если явно спрашивают про выдачи/расход/«что чаще выдавали». "
-            "НЕ используй для вопроса про остаток на складе."
+            "Топ по ВЫДАЧАМ / использованию за период (что чаще выдавали, популярные позиции). "
+            "Для «какие позиции чаще используют», «топ выдач», «расход». "
+            "НЕ для вопроса про текущий остаток на складе."
         ),
         "args": {
             "date_from": "начало периода",
@@ -567,10 +567,10 @@ TOOL_SPECS: dict[str, dict[str, Any]] = {
 def tools_schema_for_prompt() -> str:
     # Короткий список — экономия входных токенов
     return (
-        "Tools (JSON only if snapshot недостаточно): "
+        "Tools: "
+        "top_issued_tools{date_from?,date_to?,limit?,category?} — чаще используют/выдачи; "
+        "top_stock_tools{category?,limit?} — топ остатков на складе; "
         "search_issues{query,date_from?,date_to?,limit?}; "
-        "top_stock_tools{category?,limit?}; "
-        "top_issued_tools{date_from?,date_to?,limit?,category?}; "
         "issues_by_employee{name,date_from?,date_to?,limit?}; "
         "tool_stock_search{query,category?,limit?}; "
         "recent_movements{date_from?,date_to?,movement_type?,limit?}. "
