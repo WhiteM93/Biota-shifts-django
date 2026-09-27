@@ -5,6 +5,7 @@
 
 {% block extra_styles %}
 <link rel="stylesheet" href="{% static 'shifts/css/inventory.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% static 'shifts/css/inventory_chat.css' %}?v={{ static_asset_version }}">
 {% if panel == "arrival" %}
 <link rel="stylesheet" href="{% static 'shifts/css/inventory_arrival.css' %}?v={{ static_asset_version }}">
 {% endif %}
@@ -3209,4 +3210,34 @@
 </div>
 
 <script src="{% static 'shifts/js/inventory.js' %}?v={{ static_asset_version }}" defer></script>
+{% if panel != "defects" and panel != "payroll" and panel != "employees" %}
+<div
+  id="inv-chat"
+  class="inv-chat"
+  data-url="{% url 'inventory_chat_api' %}"
+  data-csrf="{{ csrf_token }}"
+>
+  <button type="button" class="inv-chat-fab js-inv-chat-fab" aria-expanded="false" aria-controls="inv-chat-panel" title="Чат склада">AI</button>
+  <div id="inv-chat-panel" class="inv-chat-panel js-inv-chat-panel" hidden role="dialog" aria-label="Чат склада">
+    <div class="inv-chat-head">
+      <h3>Чат склада</h3>
+      <div class="inv-chat-head-actions">
+        <button type="button" class="inv-chat-icon-btn js-inv-chat-clear" title="Очистить">⌫</button>
+        <button type="button" class="inv-chat-icon-btn js-inv-chat-close" title="Закрыть" aria-label="Закрыть">×</button>
+      </div>
+    </div>
+    <div class="inv-chat-hints">
+      <button type="button" class="inv-chat-hint js-inv-chat-hint" data-q="Какой позиции на складе сейчас больше всего по остатку?">Топ остатков</button>
+      <button type="button" class="inv-chat-hint js-inv-chat-hint" data-q="Что выдавали чаще всего за последние 30 дней?">Топ выдач</button>
+      <button type="button" class="inv-chat-hint js-inv-chat-hint" data-q="Какие пластинки есть на складе с APKT?">Пластинки APKT</button>
+    </div>
+    <div class="inv-chat-messages js-inv-chat-messages" aria-live="polite"></div>
+    <form class="inv-chat-form js-inv-chat-form">
+      <textarea class="js-inv-chat-input" rows="2" maxlength="1500" placeholder="Например: что выдавали Иванову в сентябре?"></textarea>
+      <button type="submit" class="js-inv-chat-send">Спросить</button>
+    </form>
+  </div>
+</div>
+<script src="{% static 'shifts/js/inventory_chat.js' %}?v={{ static_asset_version }}" defer></script>
+{% endif %}
 {% endblock %}

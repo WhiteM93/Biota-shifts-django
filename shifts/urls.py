@@ -10,6 +10,7 @@ from . import discipline_views
 from . import hours_views
 from . import employee_payroll_views
 from . import inventory_views
+from . import inventory_chat_views
 from . import inventory_types_views
 from . import payroll_views
 from . import product_views
@@ -47,6 +48,11 @@ urlpatterns = [
         name="payroll_settlement",
     ),
     path("inventory/", inventory_views.inventory_view, name="inventory"),
+    path(
+        "inventory/chat/",
+        inventory_chat_views.inventory_chat_api,
+        name="inventory_chat_api",
+    ),
     path(
         "inventory/api/arrival-matches/",
         inventory_views.inventory_api_arrival_matches,

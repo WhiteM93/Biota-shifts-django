@@ -192,7 +192,28 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # Увеличивайте после правок CSS/JS, чтобы браузер и nginx не отдавали старые файлы.
-STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "416").strip() or "416"
+STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "418").strip() or "418"
+
+# YandexGPT (чат склада). Ключи — в .env.secrets.
+YANDEX_GPT_API_KEY = (os.getenv("YANDEX_GPT_API_KEY") or "").strip()
+YANDEX_GPT_FOLDER_ID = (os.getenv("YANDEX_GPT_FOLDER_ID") or "").strip()
+YANDEX_GPT_MODEL = (os.getenv("YANDEX_GPT_MODEL") or "yandexgpt-lite").strip() or "yandexgpt-lite"
+try:
+    YANDEX_GPT_TEMPERATURE = float(os.getenv("YANDEX_GPT_TEMPERATURE") or "0.1")
+except ValueError:
+    YANDEX_GPT_TEMPERATURE = 0.1
+try:
+    YANDEX_GPT_MAX_TOKENS = int(os.getenv("YANDEX_GPT_MAX_TOKENS") or "1200")
+except ValueError:
+    YANDEX_GPT_MAX_TOKENS = 1200
+try:
+    YANDEX_GPT_TIMEOUT = float(os.getenv("YANDEX_GPT_TIMEOUT") or "45")
+except ValueError:
+    YANDEX_GPT_TIMEOUT = 45.0
+try:
+    YANDEX_GPT_CHAT_RATE_LIMIT = int(os.getenv("YANDEX_GPT_CHAT_RATE_LIMIT") or "20")
+except ValueError:
+    YANDEX_GPT_CHAT_RATE_LIMIT = 20
 
 # Оптимизации производительности (пакет A): по умолчанию выключены. См. PERFORMANCE_NOTES.md и .env.example.
 _perf = load_perf_settings()
