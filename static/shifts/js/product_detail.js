@@ -1742,6 +1742,75 @@ function saveSetupToolNoteEditor() {
       return true;
     }
 
+    var _setupStockNavBlockedUntil = 0;
+
+    function blockSetupStockNav(ms) {
+      var wait = typeof ms === "number" ? ms : 1200;
+      var until = Date.now() + wait;
+      if (until > _setupStockNavBlockedUntil) _setupStockNavBlockedUntil = until;
+    }
+
+    function isSetupStockNavBlocked() {
+      return Date.now() < _setupStockNavBlockedUntil;
+    }
+
+    function guardSetupToolsFooterClicks(panel, ms) {
+      /* После удаления строки футер поднимается под курсор — глушим «На складе» и клики по футеру. */
+      if (!panel) return;
+      var wait = typeof ms === "number" ? ms : 1200;
+      blockSetupStockNav(wait);
+      var footer = panel.querySelector(".setup-tools-add-row");
+      if (!footer) return;
+      footer.classList.add("is-click-guard");
+      if (footer._clickGuardSwallow) {
+        ["click", "pointerdown", "pointerup", "mousedown", "mouseup", "touchend"].forEach(function (type) {
+          document.removeEventListener(type, footer._clickGuardSwallow, true);
+        });
+        footer._clickGuardSwallow = null;
+      }
+      var swallow = function (ev) {
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        var stock = t.closest(".product-setup-stock-btn");
+        var foot = t.closest(".setup-tools-add-row");
+        if (stock || foot === footer) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (typeof ev.stopImmediatePropagation === "function") ev.stopImmediatePropagation();
+        }
+      };
+      footer._clickGuardSwallow = swallow;
+      ["click", "pointerdown", "pointerup", "mousedown", "mouseup", "touchend"].forEach(function (type) {
+        document.addEventListener(type, swallow, true);
+      });
+      if (footer._clickGuardTimer) clearTimeout(footer._clickGuardTimer);
+      footer._clickGuardTimer = setTimeout(function () {
+        footer.classList.remove("is-click-guard");
+        ["click", "pointerdown", "pointerup", "mousedown", "mouseup", "touchend"].forEach(function (type) {
+          document.removeEventListener(type, swallow, true);
+        });
+        footer._clickGuardSwallow = null;
+        footer._clickGuardTimer = null;
+      }, wait);
+    }
+
+    if (!document.documentElement._setupStockNavGuardBound) {
+      document.documentElement._setupStockNavGuardBound = true;
+      document.addEventListener(
+        "click",
+        function (ev) {
+          var t = ev.target;
+          if (!t || !t.closest) return;
+          if (!t.closest(".product-setup-stock-btn")) return;
+          if (!isSetupStockNavBlocked()) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (typeof ev.stopImmediatePropagation === "function") ev.stopImmediatePropagation();
+        },
+        true
+      );
+    }
+
     function removeEmptySetupToolRows(panel) {
       if (!panel) return 0;
       var tbody = panel.querySelector(".setup-tools-view tbody");
@@ -1749,6 +1818,10 @@ function saveSetupToolNoteEditor() {
       var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr"));
       if (rows.length <= 1) return 0;
       var removed = 0;
+      var willRemove = rows.some(function (tr) {
+        return isSetupToolRowEmpty(tr);
+      });
+      if (willRemove) guardSetupToolsFooterClicks(panel);
       rows.forEach(function (tr) {
         if (tbody.querySelectorAll("tr").length <= 1) return;
         if (!isSetupToolRowEmpty(tr)) return;
@@ -4323,6 +4396,7 @@ function saveSetupToolNoteEditor() {
             phasedDeleteReset(removeToolRow);
             return;
           }
+          guardSetupToolsFooterClicks(panelRm);
           rowRm.remove();
           syncRowOrderDisplay(panelRm);
           syncToolOverrideClasses(panelRm);

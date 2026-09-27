@@ -547,13 +547,7 @@
               </div>
             </div>
             <div class="setup-tools-add-row" role="group" aria-label="Действия с таблицей инструмента">
-              <a
-                href="{% url 'product_setup_stock' product.pk setup.pk %}"
-                class="btn btn-ghost setup-tools-action-btn product-setup-stock-btn"
-                title="Показать, какой инструмент из этой установки есть на складе и где лежит"
-              >На складе</a>
               {% if biota_can_edit %}
-              <span class="setup-tools-add-row__sep" aria-hidden="true"></span>
               <button
                 type="button"
                 class="btn btn-ghost setup-tools-action-btn js-setup-tools-add-row js-setup-tools-edit-action"
@@ -573,6 +567,11 @@
                 hidden
               >Убрать пустые</button>
               {% endif %}
+              <a
+                href="{% url 'product_setup_stock' product.pk setup.pk %}"
+                class="btn btn-ghost setup-tools-action-btn product-setup-stock-btn"
+                title="Показать, какой инструмент из этой установки есть на складе и где лежит"
+              >На складе</a>
             </div>
           </div>
         </div>

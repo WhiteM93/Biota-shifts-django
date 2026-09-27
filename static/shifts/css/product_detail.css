@@ -2624,6 +2624,14 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     align-items: center;
     gap: 8px;
   }
+  /* Справа — не под колонкой удаления слева (иначе клик «пробивает» после исчезновения строки). */
+  .setup-tools-add-row .product-setup-stock-btn {
+    margin-left: auto;
+  }
+  .setup-tools-add-row.is-click-guard,
+  .setup-tools-add-row.is-click-guard .product-setup-stock-btn {
+    pointer-events: none !important;
+  }
   .setup-tools-add-row__sep {
     display: inline-block;
     width: 1px;

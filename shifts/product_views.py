@@ -48,6 +48,32 @@ from .product_plan_sync import (
 
 SETUP_LIST_ORDER = ("-in_work", "sort_order", "id")
 
+# Стандартный магазин новой установки: T00–T24 и T99; T20 — датчик привязки.
+DEFAULT_SETUP_MAGAZINE_SLOTS: tuple[str, ...] = tuple(f"T{i:02d}" for i in range(0, 25)) + ("T99",)
+DEFAULT_SETUP_PROBE_SLOT = "T20"
+DEFAULT_SETUP_PROBE_TYPE = "Датчик привязки"
+DEFAULT_SETUP_PROBE_DIAMETER = "Шарик ø6 мм"
+
+
+def seed_setup_tool_magazine(setup: ProductSetup) -> int:
+    """Заполнить пустую установку слотами магазина. Возвращает число созданных строк."""
+    if setup.tools.exists():
+        return 0
+    rows: list[ProductSetupToolRow] = []
+    for idx, tn in enumerate(DEFAULT_SETUP_MAGAZINE_SLOTS):
+        kwargs: dict = {
+            "setup": setup,
+            "sort_order": idx,
+            "tool_number": tn,
+        }
+        if tn == DEFAULT_SETUP_PROBE_SLOT:
+            kwargs["tool_type"] = DEFAULT_SETUP_PROBE_TYPE
+            kwargs["diameter"] = DEFAULT_SETUP_PROBE_DIAMETER
+        rows.append(ProductSetupToolRow(**kwargs))
+    ProductSetupToolRow.objects.bulk_create(rows)
+    return len(rows)
+
+
 
 def _piece_norm_entry_dict(entry: ProductSetupPieceNorm) -> dict:
     prev = entry.previous_tsht_norm
@@ -1013,23 +1039,29 @@ def _build_formset_initial_for_setup_edit(existing_rows: list[ProductSetupToolRo
 
 
 def _build_default_tool_rows(existing_rows: list[ProductSetupToolRow] | None = None) -> list[dict]:
-    """Строки для формы: только реальные позиции, без пустых слотов T01–T24."""
+    """Строки для формы: весь магазин (пустые слоты с № тоже)."""
     existing_rows = existing_rows or []
-    out: list[dict] = []
-    for row in sorted(existing_rows, key=_tool_row_sort_key):
-        if _setup_tool_fields_are_empty(
-            tool_type=row.tool_type or "",
-            diameter=row.diameter or "",
-            overhang=row.overhang or "",
-            note=row.name or "",
-            correction_enabled=bool(row.correction_enabled),
-            kor_n=row.kor_n or "",
-            kor_d=row.kor_d or "",
-            has_photo=bool(row.photo),
-        ):
-            continue
-        out.append(_formset_initial_dict_from_db_row(row))
-    return out
+    if not existing_rows:
+        out: list[dict] = []
+        for tn in DEFAULT_SETUP_MAGAZINE_SLOTS:
+            item = {
+                "tool_number": tn,
+                "correction_enabled": False,
+                "kor_n": "",
+                "kor_d": "",
+                "tool_type": "",
+                "tap_hole_type": "",
+                "name": "",
+                "diameter": "",
+                "overhang": "",
+            }
+            if tn == DEFAULT_SETUP_PROBE_SLOT:
+                item["tool_type"] = DEFAULT_SETUP_PROBE_TYPE
+                item["diameter"] = DEFAULT_SETUP_PROBE_DIAMETER
+            out.append(item)
+        return out
+    return [_formset_initial_dict_from_db_row(r) for r in sorted(existing_rows, key=_tool_row_sort_key)]
+
 
 
 def _display_dict_from_tool_row(row: ProductSetupToolRow) -> dict:
@@ -1067,24 +1099,10 @@ def _display_dict_from_tool_row(row: ProductSetupToolRow) -> dict:
 
 
 def _build_display_tool_rows(existing_rows: list[ProductSetupToolRow] | None = None) -> list[dict]:
-    """Отображение на карточке: только заполненные позиции (без пустых T01–T24)."""
+    """Отображение на карточке: все слоты магазина, включая пустые (только №)."""
     existing_rows = existing_rows or []
     ordered = sorted(existing_rows, key=_tool_row_sort_key)
-    out: list[dict] = []
-    for row in ordered:
-        if _setup_tool_fields_are_empty(
-            tool_type=row.tool_type or "",
-            diameter=row.diameter or "",
-            overhang=row.overhang or "",
-            note=row.name or "",
-            correction_enabled=bool(row.correction_enabled),
-            kor_n=row.kor_n or "",
-            kor_d=row.kor_d or "",
-            has_photo=bool(row.photo),
-        ):
-            continue
-        out.append(_display_dict_from_tool_row(row))
-    return out
+    return [_display_dict_from_tool_row(row) for row in ordered]
 
 
 @biota_login_required
@@ -1228,11 +1246,12 @@ def create_product_with_defaults(*, catalog_section: str | None = None) -> Produ
             card_workpiece_type=NEW_PRODUCT_DEFAULT_WORKPIECE,
             catalog_section=section,
         )
-        ProductSetup.objects.create(
+        setup = ProductSetup.objects.create(
             product=product,
             name="Установка 1",
             sort_order=0,
         )
+        seed_setup_tool_magazine(setup)
     return product
 
 
@@ -1418,17 +1437,7 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
             row_vals = (row_tool_number, row_kor_n, row_kor_d, row_tool_type, row_diameter, row_overhang, row_note)
             if all(v == "" for v in row_vals) and not row_correction_enabled:
                 continue
-            # Не сохраняем «пустые слоты» с одним только номером T04…
-            if _setup_tool_fields_are_empty(
-                tool_type=row_tool_type,
-                diameter=row_diameter,
-                overhang=row_overhang,
-                note=row_note,
-                correction_enabled=row_correction_enabled,
-                kor_n=row_kor_n,
-                kor_d=row_kor_d,
-            ):
-                continue
+            # Пустые слоты с номером (T00…) сохраняем — это магазин.
             parsed_rows.append(
                 {
                     "id": row_id,
@@ -1442,41 +1451,43 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
                     "note": row_note,
                 }
             )
-        indexed = list(enumerate(parsed_rows))
-        indexed.sort(key=lambda p: (_tool_row_dict_sort_tuple(p[1]), p[0]))
-        existing_by_id = {r.pk: r for r in setup.tools.all()}
-        kept_ids: list[int] = []
-        for idx, (_, pr) in enumerate(indexed):
-            row_id = pr.get("id")
-            fields = {
-                "sort_order": idx,
-                "tool_number": pr["tool_number"],
-                "correction_enabled": pr["correction_enabled"],
-                "kor_n": pr["kor_n"],
-                "kor_d": pr["kor_d"],
-                "tool_type": pr["tool_type"],
-                "diameter": pr["diameter"],
-                "overhang": pr["overhang"],
-                "tap_hole_type": "",
-                "name": pr["note"],
-            }
-            if row_id and row_id in existing_by_id:
-                obj = existing_by_id[row_id]
-                for k, v in fields.items():
-                    setattr(obj, k, v)
-                obj.save()
-                kept_ids.append(obj.pk)
-            else:
-                obj = ProductSetupToolRow.objects.create(setup=setup, **fields)
-                kept_ids.append(obj.pk)
-        for orphan in setup.tools.exclude(pk__in=kept_ids):
-            if orphan.photo:
-                try:
-                    orphan.photo.delete(save=False)
-                except Exception:
-                    pass
-            orphan.delete()
-        out_tool_rows = True
+        # Пустой список — не трогаем инструмент (сохранение карточки без панели установки).
+        if parsed_rows:
+            indexed = list(enumerate(parsed_rows))
+            indexed.sort(key=lambda p: (_tool_row_dict_sort_tuple(p[1]), p[0]))
+            existing_by_id = {r.pk: r for r in setup.tools.all()}
+            kept_ids: list[int] = []
+            for idx, (_, pr) in enumerate(indexed):
+                row_id = pr.get("id")
+                fields = {
+                    "sort_order": idx,
+                    "tool_number": pr["tool_number"],
+                    "correction_enabled": pr["correction_enabled"],
+                    "kor_n": pr["kor_n"],
+                    "kor_d": pr["kor_d"],
+                    "tool_type": pr["tool_type"],
+                    "diameter": pr["diameter"],
+                    "overhang": pr["overhang"],
+                    "tap_hole_type": "",
+                    "name": pr["note"],
+                }
+                if row_id and row_id in existing_by_id:
+                    obj = existing_by_id[row_id]
+                    for k, v in fields.items():
+                        setattr(obj, k, v)
+                    obj.save()
+                    kept_ids.append(obj.pk)
+                else:
+                    obj = ProductSetupToolRow.objects.create(setup=setup, **fields)
+                    kept_ids.append(obj.pk)
+            for orphan in setup.tools.exclude(pk__in=kept_ids):
+                if orphan.photo:
+                    try:
+                        orphan.photo.delete(save=False)
+                    except Exception:
+                        pass
+                orphan.delete()
+            out_tool_rows = True
     out: dict = {
         "ok": True,
         "setup": {
@@ -1545,6 +1556,7 @@ def product_detail_view(request, pk: int):
                 name=f"Установка {n}",
                 sort_order=next_order,
             )
+            seed_setup_tool_magazine(setup)
             messages.success(request, "Добавлена установка — заполните данные во вкладке.")
             tab_slug = f"setup-{setup.pk}"
             return redirect(f"{_product_detail_url(product)}?{urlencode({'tab': tab_slug})}")
@@ -2270,16 +2282,6 @@ def product_setup_edit_view(request, pk: int, setup_pk: int):
                     cd.get("overhang"),
                 )
                 if all((v or "").strip() == "" for v in row_vals):
-                    continue
-                if _setup_tool_fields_are_empty(
-                    tool_type=cd.get("tool_type") or "",
-                    diameter=cd.get("diameter") or "",
-                    overhang=cd.get("overhang") or "",
-                    note=cd.get("name") or "",
-                    correction_enabled=False,
-                    kor_n=cd.get("kor_n") or "",
-                    kor_d=cd.get("kor_d") or "",
-                ):
                     continue
                 row_tt = cd.get("tool_type") or ""
                 ProductSetupToolRow.objects.create(
