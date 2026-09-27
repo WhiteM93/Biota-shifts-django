@@ -9,8 +9,8 @@ from .setup_stock_match import SetupStockRowResult, match_setup_tools
 from .yandex_gpt import YandexGptError, complete, yandex_gpt_configured
 
 SYSTEM_PROMPT = """Технолог CNC + склад. Кратко по фактам (RU):
-1) вердикт 2) наличие 3) замечания по таблице 4) на что смотреть 5) советы по тексту/заготовке.
-Не выдумывай остатки. Без JSON. До ~250 слов."""
+1) вердикт 2) наличие 3) кого попросить вернуть (если есть «на руках») 4) замечания по таблице 5) советы.
+Не выдумывай остатки и фамилии. Без JSON. До ~250 слов."""
 
 
 def _row_to_text(row: SetupStockRowResult) -> str:
@@ -33,6 +33,15 @@ def _row_to_text(row: SetupStockRowResult) -> str:
         lines.append(f"  → {c.label[:90]} | {c.qty}{addr}")
     if len(row.candidates) > 3:
         lines.append(f"  → +{len(row.candidates) - 3}")
+    holders = getattr(row, "open_holders", None) or []
+    if holders:
+        lines.append("  на руках (не возвращены):")
+        for h in holders[:5]:
+            lines.append(
+                f"  · {h.employee}: {h.remaining} шт. от {h.movement_date or '?'} — {h.tool_label[:70]}"
+            )
+        if len(holders) > 5:
+            lines.append(f"  · +{len(holders) - 5}")
     return "\n".join(lines)
 
 

@@ -3,6 +3,8 @@ from decimal import Decimal
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
+from django.utils import timezone
+
 from shifts.models import (
     CenterDrillSpec,
     DrillSpec,
@@ -10,6 +12,7 @@ from shifts.models import (
     Product,
     ProductSetup,
     ProductSetupToolRow,
+    StockMovement,
     ToolItem,
 )
 from shifts.setup_stock_match import match_setup_tools, parse_diameter_spec
@@ -82,3 +85,27 @@ class SetupStockMatchTests(TestCase):
         setup = ProductSetup.objects.create(product=product, name="Уст")
         url = reverse("product_setup_stock", kwargs={"pk": product.pk, "setup_pk": setup.pk})
         self.assertTrue(url.endswith(f"/products/{product.pk}/setups/{setup.pk}/stock/"))
+
+    def test_open_holders_when_stock_zero(self):
+        product = Product.objects.create(name="TEST.SETUP.HOLDERS")
+        setup = ProductSetup.objects.create(product=product, name="Уст 1")
+        ProductSetupToolRow.objects.create(
+            setup=setup, sort_order=1, tool_number="T01", tool_type="Фреза чистовая", diameter="10"
+        )
+        mill = ToolItem.objects.create(category="end_mill", name="Фреза 10", quantity=0)
+        EndMillSpec.objects.create(tool=mill, mill_type="end", diameter_mm=Decimal("10"))
+        StockMovement.objects.create(
+            movement_type="issue",
+            tool=mill,
+            quantity=2,
+            employee_name="Петров П.",
+            movement_date=timezone.localdate(),
+        )
+        rows = match_setup_tools(setup.tools.all())
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row.total_qty, 0)
+        self.assertEqual(len(row.open_holders), 1)
+        self.assertEqual(row.open_holders[0].employee, "Петров П.")
+        self.assertEqual(row.open_holders[0].remaining, 2)
+        self.assertIn("на руках", row.status_label)

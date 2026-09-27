@@ -34,7 +34,12 @@ class GptRateLimitTests(SimpleTestCase):
         ok2, retry = gpt_rate_limit_allow("worker1", scope="setup_ai", cooldown_sec=60)
         self.assertTrue(ok1)
         self.assertFalse(ok2)
-        self.assertGreaterEqual(retry, 1)
+        self.assertGreater(retry, 0)
+
+        ok_chat, _ = gpt_rate_limit_allow("worker1", scope="inv_chat", cooldown_sec=60)
+        ok_chat2, _ = gpt_rate_limit_allow("worker1", scope="inv_chat", cooldown_sec=60)
+        self.assertTrue(ok_chat)
+        self.assertFalse(ok_chat2)
 
 
 class SetupAiPromptTests(SimpleTestCase):
@@ -67,7 +72,20 @@ class SetupAiPromptTests(SimpleTestCase):
             status_label="На складе не найдено",
             total_qty=0,
         )
+        from shifts.setup_stock_match import OpenHolder
+
+        row.open_holders = [
+            OpenHolder(
+                issue_id=1,
+                employee="Сидоров",
+                remaining=1,
+                movement_date="2026-09-20",
+                tool_label="Метчик M3",
+            )
+        ]
         text = build_setup_analysis_prompt(product=P(), setup=S(), match_rows=[row])
         self.assertIn("Метчик", text)
         self.assertIn("На складе не найдено", text)
         self.assertIn("зажать в тисках", text)
+        self.assertIn("Сидоров", text)
+        self.assertIn("на руках", text)

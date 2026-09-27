@@ -39,6 +39,17 @@
   .setup-stock-qty { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .setup-stock-addr { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .setup-stock-empty-hint { margin: 4px 0 0; font-size: 13px; color: var(--muted, #888); }
+  .setup-stock-holders {
+    margin: 10px 0 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px dashed #a67c00;
+    background: rgba(166, 124, 0, 0.08);
+    font-size: 13px;
+  }
+  .setup-stock-holders__title { font-weight: 600; margin: 0 0 6px; }
+  .setup-stock-holders ul { margin: 0; padding-left: 1.2em; }
+  .setup-stock-holders li { margin: 2px 0; }
   .setup-ai-box {
     margin: 0 0 18px;
     border: 1px solid var(--border, #333);
@@ -140,6 +151,25 @@
     </p>
     {% elif row.status == 'unmapped' %}
     <p class="setup-stock-empty-hint">Этот тип строки наладки пока не мапится на категорию склада.</p>
+    {% endif %}
+
+    {% if row.open_holders %}
+    <div class="setup-stock-holders">
+      <p class="setup-stock-holders__title">На руках (можно попросить вернуть)</p>
+      <ul>
+        {% for h in row.open_holders %}
+        <li>
+          <strong>{{ h.employee }}</strong>
+          — {{ h.remaining }} шт.
+          {% if h.movement_date %}· {{ h.movement_date }}{% endif %}
+          · {{ h.tool_label }}
+          {% if h.outcome_url %}
+          <a class="btn btn-ghost btn-sm" href="{{ h.outcome_url }}">К возврату</a>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
     {% endif %}
   </section>
   {% endfor %}

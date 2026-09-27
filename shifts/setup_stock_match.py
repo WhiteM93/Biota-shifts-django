@@ -8,10 +8,11 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.parse import urlencode
 
-from django.db.models import Q, QuerySet
+from django.db.models import F, IntegerField, Q, QuerySet, Sum, Value
+from django.db.models.functions import Coalesce
 from django.urls import reverse
 
-from .models import ToolItem
+from .models import StockMovement, ToolItem
 from .size_label_normalize import normalize_cutting_size_label, size_label_match_variants
 
 # setup tool_type → warehouse category + optional mill/tap filters
@@ -126,6 +127,18 @@ class StockCandidate:
 
 
 @dataclass
+class OpenHolder:
+    """Незакрытая выдача: инструмент на руках, можно попросить вернуть."""
+
+    issue_id: int
+    employee: str
+    remaining: int
+    movement_date: str
+    tool_label: str
+    outcome_url: str = ""
+
+
+@dataclass
 class SetupStockRowResult:
     row_id: int
     tool_number: str
@@ -141,6 +154,7 @@ class SetupStockRowResult:
     candidates: list[StockCandidate] = field(default_factory=list)
     total_qty: int = 0
     filter_url: str = ""
+    open_holders: list[OpenHolder] = field(default_factory=list)
 
 
 def _base_stock_qs() -> QuerySet:
@@ -323,6 +337,88 @@ def _candidates_from_qs(qs: QuerySet, filter_params: dict[str, str]) -> list[Sto
     return out
 
 
+def _open_issue_movements_qs() -> QuerySet:
+    """Выдачи с остатком к возврату/списанию (remaining_qty > 0)."""
+    return (
+        StockMovement.objects.filter(movement_type="issue", is_reverted=False)
+        .select_related("tool")
+        .annotate(
+            processed_qty=Coalesce(
+                Sum("issue_outcomes__quantity"),
+                Value(0, output_field=IntegerField()),
+            )
+        )
+        .annotate(remaining_qty=F("quantity") - F("processed_qty"))
+        .filter(remaining_qty__gt=0)
+        .order_by("-movement_date", "-id")
+    )
+
+
+def _outcome_url(employee: str) -> str:
+    params = {"panel": "issue_outcome"}
+    if employee:
+        params["outcome_employee"] = employee
+    return reverse("inventory") + "?" + urlencode(params)
+
+
+def _find_open_holders(
+    *,
+    category: str,
+    mapping: dict[str, str],
+    diam: DiameterSpec,
+    hole_type: str,
+    candidate_ids: list[int],
+    limit: int = 12,
+) -> list[OpenHolder]:
+    """Кто держит подходящий инструмент (выдан, не возвращён)."""
+    tool_ids = [int(x) for x in candidate_ids if x]
+    if not tool_ids and category:
+        # В т.ч. удалённые позиции — выдача могла остаться открытой.
+        qs = ToolItem.objects.all().select_related(
+            "end_mill_spec",
+            "tap_spec",
+            "center_drill_spec",
+            "countersink_spec",
+            "drill_spec",
+            "reamer_spec",
+            "body_tool_spec",
+        )
+        qs = _apply_filters(qs, category, mapping, diam, hole_type)
+        tool_ids = list(qs.values_list("pk", flat=True)[:80])
+    if not tool_ids:
+        return []
+
+    out: list[OpenHolder] = []
+    for iss in _open_issue_movements_qs().filter(tool_id__in=tool_ids)[: max(1, min(int(limit), 20))]:
+        emp = (iss.employee_name or "").strip()
+        tool = iss.tool
+        label = _tool_label(tool) if tool else f"#{iss.tool_id}"
+        out.append(
+            OpenHolder(
+                issue_id=int(iss.pk),
+                employee=emp or "—",
+                remaining=int(getattr(iss, "remaining_qty", 0) or 0),
+                movement_date=iss.movement_date.isoformat() if iss.movement_date else "",
+                tool_label=label[:90],
+                outcome_url=_outcome_url(emp),
+            )
+        )
+    return out
+
+
+def _holders_summary(holders: list[OpenHolder], *, max_names: int = 3) -> str:
+    if not holders:
+        return ""
+    parts: list[str] = []
+    for h in holders[:max_names]:
+        parts.append(f"{h.employee} ({h.remaining} шт.)")
+    more = len(holders) - max_names
+    text = ", ".join(parts)
+    if more > 0:
+        text += f" и ещё {more}"
+    return text
+
+
 def match_setup_tool_row(row: Any) -> SetupStockRowResult:
     tool_type = (getattr(row, "tool_type", None) or "").strip()
     diameter_raw = (getattr(row, "diameter", None) or "").strip()
@@ -382,6 +478,23 @@ def match_setup_tool_row(row: Any) -> SetupStockRowResult:
         # ссылка на фильтр без tool_id — чтобы открыть пустой/широкий список
         base.filter_params = filter_params
     base.filter_url = _inventory_url(filter_params) if filter_params else ""
+
+    # Нет на складе (0 шт. или позиций нет) — смотрим, у кого на руках невозврат.
+    if base.status in ("empty", "ok") and base.total_qty <= 0:
+        holders = _find_open_holders(
+            category=category,
+            mapping=mapping,
+            diam=diam,
+            hole_type=hole,
+            candidate_ids=[c.id for c in candidates],
+        )
+        base.open_holders = holders
+        if holders:
+            who = _holders_summary(holders)
+            if base.status == "empty":
+                base.status_label = f"На складе не найдено; на руках: {who}"
+            else:
+                base.status_label = f"Остаток 0; на руках: {who}"
     return base
 
 

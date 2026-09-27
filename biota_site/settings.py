@@ -192,7 +192,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # Увеличивайте после правок CSS/JS, чтобы браузер и nginx не отдавали старые файлы.
-STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "421").strip() or "421"
+STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "422").strip() or "422"
 
 # YandexGPT (чат склада / анализ наладок). Ключи — в .env.secrets.
 # Модели: yandexgpt-5-lite (дешевле), yandexgpt-5.1 / yandexgpt-5-pro (дороже).
@@ -225,10 +225,6 @@ try:
     YANDEX_GPT_TIMEOUT = float(os.getenv("YANDEX_GPT_TIMEOUT") or "45")
 except ValueError:
     YANDEX_GPT_TIMEOUT = 45.0
-try:
-    YANDEX_GPT_CHAT_RATE_LIMIT = int(os.getenv("YANDEX_GPT_CHAT_RATE_LIMIT") or "20")
-except ValueError:
-    YANDEX_GPT_CHAT_RATE_LIMIT = 20
 
 # Оптимизации производительности (пакет A): по умолчанию выключены. См. PERFORMANCE_NOTES.md и .env.example.
 _perf = load_perf_settings()
