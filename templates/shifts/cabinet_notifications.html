@@ -15,6 +15,11 @@
     <p class="cabinet-section__lead" style="margin:0;color:var(--bio-muted);">
       Сводки по СКУД и события склада. Biota отправляет сообщения на сервер бота, бот доставляет в Telegram.
     </p>
+    {% if not notify_outbound_enabled %}
+    <p class="auth-alert" role="status" style="margin-top:12px;">
+      Исходящие уведомления выключены (<code>BIOTA_NOTIFY_ENABLED=0</code>). Сайт не ходит в Telegram и на сервер бота.
+    </p>
+    {% endif %}
   </header>
 
   <div class="notify-status-bar" role="status">

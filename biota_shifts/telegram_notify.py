@@ -33,6 +33,10 @@ def resolve_telegram_bot_token(settings: dict | None = None) -> str:
 
 
 def telegram_notify_configured(settings: dict | None = None) -> bool:
+    from biota_shifts.notification_settings import notify_outbound_enabled
+
+    if not notify_outbound_enabled():
+        return False
     s = settings or load_notification_settings()
     token = resolve_telegram_bot_token(s)
     chat_ids = s.get("telegram_chat_ids") or []
@@ -175,7 +179,7 @@ def explain_telegram_error(message: str) -> str:
     return m
 
 
-def telegram_api_get(token: str, method: str, timeout: float = 15) -> dict:
+def telegram_api_get(token: str, method: str, timeout: float = 5) -> dict:
     if not token:
         raise ValueError("Не задан токен Telegram-бота")
     url = f"https://api.telegram.org/bot{token}/{method}"
@@ -198,8 +202,12 @@ def telegram_api_get(token: str, method: str, timeout: float = 15) -> dict:
 
 
 def fetch_telegram_bot_username(token: str) -> str:
+    from biota_shifts.notification_settings import notify_outbound_enabled
+
+    if not notify_outbound_enabled() or not (token or "").strip():
+        return ""
     try:
-        data = telegram_api_get(token, "getMe")
+        data = telegram_api_get(token, "getMe", timeout=3)
         result = data.get("result") or {}
         return str(result.get("username") or "").strip()
     except Exception:
@@ -211,8 +219,12 @@ def send_telegram_message(
     chat_id: str,
     text: str,
     *,
-    timeout: float = 30,
+    timeout: float = 8,
 ) -> dict:
+    from biota_shifts.notification_settings import notify_outbound_enabled
+
+    if not notify_outbound_enabled():
+        raise RuntimeError("Исходящие уведомления выключены (BIOTA_NOTIFY_ENABLED=0)")
     if not token:
         raise ValueError("Не задан токен Telegram-бота")
     if not str(chat_id).strip():

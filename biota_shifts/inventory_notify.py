@@ -23,6 +23,10 @@ _MOVEMENT_LABELS = {
 
 
 def inventory_notify_enabled(settings: dict | None = None) -> bool:
+    from biota_shifts.notification_settings import notify_outbound_enabled
+
+    if not notify_outbound_enabled():
+        return False
     env = (_config_str("BIOTA_INVENTORY_NOTIFY", "") or "").strip().lower()
     if env in ("0", "false", "no"):
         return False

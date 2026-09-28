@@ -743,6 +743,7 @@ def notifications_settings_view(request):
     from biota_shifts.emp_codes import normalize_emp_code
     from biota_shifts.notification_settings import (
         load_notification_settings,
+        notify_outbound_enabled,
         parse_chat_ids_text,
         save_notification_settings,
         telegram_token_configured,
@@ -756,11 +757,7 @@ def notifications_settings_view(request):
         send_notify_test,
     )
     from biota_shifts.inventory_notify import inventory_notify_enabled, send_inventory_notify_test
-    from biota_shifts.telegram_notify import (
-        fetch_telegram_bot_username,
-        resolve_telegram_bot_token,
-        telegram_notify_configured,
-    )
+    from biota_shifts.telegram_notify import telegram_notify_configured
 
     settings = load_notification_settings()
     preview_text = None
@@ -866,8 +863,8 @@ def notifications_settings_view(request):
         employee_rows.sort(key=lambda r: (r["department_name"].lower(), r["label"].lower()))
 
     chat_ids = settings.get("telegram_chat_ids") or []
-    tg_token = resolve_telegram_bot_token(settings)
     relay_url = resolve_notify_relay_url(settings)
+    outbound_on = notify_outbound_enabled()
     ctx = {
         "settings": settings,
         "employee_rows": employee_rows,
@@ -878,7 +875,8 @@ def notifications_settings_view(request):
         "notify_relay_configured": notify_relay_configured(settings),
         "telegram_configured": telegram_notify_configured(settings),
         "telegram_token_configured": telegram_token_configured(settings),
-        "telegram_bot_username": fetch_telegram_bot_username(tg_token) if tg_token and not relay_url else "",
+        "telegram_bot_username": "",
+        "notify_outbound_enabled": outbound_on,
         "inventory_notify_on": inventory_notify_enabled(settings),
         "preview_text": preview_text,
         "preview_label": preview_label,

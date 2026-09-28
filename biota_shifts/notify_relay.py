@@ -35,16 +35,23 @@ def notify_relay_configured(settings: dict | None = None) -> bool:
 
 
 def notify_delivery_configured(settings: dict | None = None) -> bool:
+    from biota_shifts.notification_settings import notify_outbound_enabled
     from biota_shifts.telegram_notify import telegram_notify_configured
 
+    if not notify_outbound_enabled():
+        return False
     s = settings or load_notification_settings()
     if notify_relay_configured(s):
         return True
     return telegram_notify_configured(s)
 
 
-def post_notify_relay(payload: dict, settings: dict | None = None, *, timeout: float = 30) -> dict:
+def post_notify_relay(payload: dict, settings: dict | None = None, *, timeout: float = 8) -> dict:
     """POST JSON на сервер бота. Возвращает распарсенный ответ (если JSON)."""
+    from biota_shifts.notification_settings import notify_outbound_enabled
+
+    if not notify_outbound_enabled():
+        raise RuntimeError("Исходящие уведомления выключены (BIOTA_NOTIFY_ENABLED=0)")
     url = resolve_notify_relay_url(settings)
     if not url:
         raise ValueError("Не задан URL сервера уведомлений (BIOTA_NOTIFY_RELAY_URL)")

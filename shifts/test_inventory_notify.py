@@ -93,6 +93,14 @@ class InventoryNotifyFormatTests(SimpleTestCase):
         with patch("biota_shifts.inventory_notify._config_str", return_value="0"):
             self.assertFalse(inventory_notify_enabled())
 
+    def test_global_notify_kill_switch(self):
+        with patch("biota_shifts.notification_settings._config_str", return_value="0"):
+            self.assertFalse(inventory_notify_enabled())
+        with patch("biota_shifts.notification_settings.notify_outbound_enabled", return_value=False):
+            from biota_shifts.notify_relay import notify_delivery_configured
+
+            self.assertFalse(notify_delivery_configured({"relay_url": "https://bot.test/x"}))
+
     @patch("biota_shifts.inventory_notify.send_telegram_broadcast")
     @patch("biota_shifts.inventory_notify.notify_relay_configured", return_value=True)
     @patch("biota_shifts.inventory_notify.post_notify_relay")

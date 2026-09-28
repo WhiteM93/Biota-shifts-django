@@ -27,6 +27,15 @@ DEFAULT_SETTINGS: dict = {
 }
 
 
+def notify_outbound_enabled() -> bool:
+    """Глобальный рубильник исходящих уведомлений (Telegram / сервер бота).
+
+    BIOTA_NOTIFY_ENABLED=0 — ничего не шлём наружу (страницы не ждут api.telegram.org).
+    """
+    raw = (_config_str("BIOTA_NOTIFY_ENABLED", "1") or "1").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
 def _normalize_time(value: str, fallback: str) -> str:
     s = (value or "").strip()
     m = _TIME_RE.match(s)
