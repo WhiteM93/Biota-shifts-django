@@ -1,0 +1,392 @@
+<header class="inv-hist-head">
+  <div class="inv-hist-head__text">
+    <h2 class="inv-hist-head__title">История склада</h2>
+    <p class="inv-hist-head__lead">Лента по дням: выдача, возврат, приход, списание и служебные события. Свежие сверху.</p>
+  </div>
+  <p class="inv-hist-head__count">{{ inventory_history|length }} запис.{% if inventory_history|length >= 120 %} <span class="muted">(показаны последние 120)</span>{% endif %}</p>
+</header>
+
+<form method="get" class="inv-history-filter inv-hist-filter" id="inventory-history-filter-form">
+  <input type="hidden" name="panel" value="history">
+  <input type="hidden" name="history_movement_type" value="{{ filters.history_movement_type }}">
+  <div class="inv-hist-filter__top">
+  <nav class="inv-hist-chips" aria-label="Тип записи">
+    <a
+      class="inv-hist-chip{% if not filters.history_movement_type %} is-active{% endif %}"
+      href="{% url 'inventory' %}?panel=history{% if filters.history_employee %}&amp;history_employee={{ filters.history_employee|urlencode }}{% endif %}"
+    >Все</a>
+    {% for key, label in history_movement_types %}
+    <a
+      class="inv-hist-chip{% if filters.history_movement_type == key %} is-active{% endif %}"
+      href="{% url 'inventory' %}?panel=history&amp;history_movement_type={{ key }}{% if filters.history_employee %}&amp;history_employee={{ filters.history_employee|urlencode }}{% endif %}"
+    >{{ label }}</a>
+    {% endfor %}
+  </nav>
+  <div class="inv-hist-filter__side">
+  <div class="field inv-history-filter__employee" style="position:relative;">
+    <span>Сотрудник</span>
+    <input type="hidden" name="history_employee" id="history-employee-value" value="{{ filters.history_employee }}">
+    <input
+      type="text"
+      id="history-employee-search"
+      class="inv-history-emp-search"
+      value="{{ filters.history_employee }}"
+      placeholder="{% if history_employee_options %}Начните вводить ФИО…{% else %}Нет сотрудников в списке{% endif %}"
+      autocomplete="off"
+      {% if not history_employee_options %}disabled{% endif %}
+      aria-label="Сотрудник"
+      aria-autocomplete="list"
+      aria-controls="history-employee-list"
+    >
+    <div id="history-employee-list" class="inv-history-emp-list" hidden role="listbox">
+      {% for row in history_employee_open_rows %}
+      <button
+        type="button"
+        class="inv-history-emp-item is-open"
+        role="option"
+        data-value="{{ row.name }}"
+        data-open="{{ row.open_count }}"
+      >
+        <span class="inv-history-emp-item__name">{{ row.name }}</span>
+        <span class="inv-history-emp-item__open">на руках: {{ row.open_count }}</span>
+      </button>
+      {% endfor %}
+      {% if history_employee_rest_rows %}
+      <details class="inv-history-emp-rest js-emp-rest-group">
+        <summary class="inv-history-emp-rest__summary">
+          Остальные
+          <span class="inv-history-emp-rest__count">{{ history_employee_rest_rows|length }}</span>
+        </summary>
+        <div class="inv-history-emp-rest__body">
+          {% for row in history_employee_rest_rows %}
+          <button
+            type="button"
+            class="inv-history-emp-item"
+            role="option"
+            data-value="{{ row.name }}"
+            data-open="0"
+          >
+            <span class="inv-history-emp-item__name">{{ row.name }}</span>
+          </button>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+      {% if not history_employee_options %}
+      <div class="inv-history-emp-empty muted">Справочник пуст — проверьте права/подключение к Biota.</div>
+      {% endif %}
+    </div>
+  </div>
+  {% if filters.history_movement_type or filters.history_employee %}
+  <a class="btn btn-sm btn-ghost inv-history-filter__reset" href="{% url 'inventory' %}?panel=history">Сбросить</a>
+  {% endif %}
+  </div>
+  </div>
+</form>
+{% if not history_employee_options %}
+<p class="muted inv-history-emp-hint">Список сотрудников пуст. Выдачи без ФИО или без справочника Biota здесь не отобразятся.</p>
+{% endif %}
+
+<script>
+(function () {
+  var form = document.getElementById("inventory-history-filter-form");
+  var search = document.getElementById("history-employee-search");
+  var valueInput = document.getElementById("history-employee-value");
+  var list = document.getElementById("history-employee-list");
+  if (!form || !search || !valueInput || !list) return;
+
+  var items = Array.prototype.slice.call(list.querySelectorAll(".inv-history-emp-item"));
+  var activeIdx = -1;
+
+  function showList() { list.hidden = false; }
+  function hideList() { list.hidden = true; activeIdx = -1; }
+
+  function visibleItems() {
+    return items.filter(function (it) { return !it.hidden; });
+  }
+
+  function filterItems(q) {
+    var lower = (q || "").toLowerCase().trim();
+    var restMatch = false;
+    items.forEach(function (item) {
+      var name = (item.getAttribute("data-value") || "").toLowerCase();
+      var match = !lower || name.indexOf(lower) !== -1;
+      item.hidden = !match;
+      if (match && item.closest(".js-emp-rest-group")) restMatch = true;
+    });
+    var rest = list.querySelector(".js-emp-rest-group");
+    if (rest) {
+      var anyRestVisible = Array.prototype.some.call(
+        rest.querySelectorAll(".inv-history-emp-item"),
+        function (it) { return !it.hidden; }
+      );
+      rest.hidden = !anyRestVisible;
+      if (lower && restMatch) rest.open = true;
+    }
+    return visibleItems();
+  }
+
+  function setActive(vis, idx) {
+    items.forEach(function (it) { it.classList.remove("is-active"); });
+    if (vis[idx]) {
+      vis[idx].classList.add("is-active");
+      vis[idx].scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function submitEmployee(name) {
+    valueInput.value = name || "";
+    search.value = name || "";
+    hideList();
+    if (form.dataset.submitting === "1") return;
+    form.dataset.submitting = "1";
+    form.submit();
+  }
+
+  search.addEventListener("focus", function () {
+    filterItems(search.value);
+    if (items.length) showList();
+  });
+
+  search.addEventListener("input", function () {
+    if ((search.value || "").trim() !== (valueInput.value || "").trim()) {
+      valueInput.value = "";
+    }
+    var vis = filterItems(search.value);
+    activeIdx = -1;
+    if (vis.length) showList(); else hideList();
+  });
+
+  search.addEventListener("keydown", function (e) {
+    var vis = visibleItems();
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (list.hidden) { filterItems(search.value); showList(); vis = visibleItems(); }
+      if (!vis.length) return;
+      activeIdx = (activeIdx + 1) % vis.length;
+      setActive(vis, activeIdx);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!vis.length) return;
+      activeIdx = activeIdx <= 0 ? vis.length - 1 : activeIdx - 1;
+      setActive(vis, activeIdx);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeIdx >= 0 && vis[activeIdx]) {
+        submitEmployee(vis[activeIdx].getAttribute("data-value") || "");
+      } else if ((search.value || "").trim()) {
+        var exact = vis.find(function (it) {
+          return (it.getAttribute("data-value") || "").toLowerCase() === search.value.trim().toLowerCase();
+        });
+        submitEmployee(exact ? (exact.getAttribute("data-value") || "") : search.value.trim());
+      }
+    } else if (e.key === "Escape") {
+      hideList();
+    }
+  });
+
+  list.addEventListener("mousedown", function (e) {
+    if (e.target.closest("summary")) return;
+    var item = e.target.closest(".inv-history-emp-item");
+    if (!item) return;
+    e.preventDefault();
+    submitEmployee(item.getAttribute("data-value") || "");
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest(".inv-history-filter__employee")) hideList();
+  });
+})();
+</script>
+
+{% if filters.history_employee %}
+<section class="inv-hist-open" aria-label="Невозвращённый инструмент">
+  <div class="inv-hist-open__head">
+    <div>
+      <h3 class="inv-hist-open__title">На руках у {{ filters.history_employee }}</h3>
+      <p class="inv-hist-open__meta muted">
+        {% if history_open_issues %}{{ history_open_issues|length }} открыт.{% else %}Открытых выдач нет{% endif %}
+      </p>
+    </div>
+    {% if history_open_issues %}
+    <a
+      class="btn btn-sm inv-history-open-pdf"
+      href="{% url 'inventory_history_open_pdf' %}?history_employee={{ filters.history_employee|urlencode }}"
+    >PDF</a>
+    {% endif %}
+  </div>
+  {% if history_open_issues %}
+  <ul class="inv-hist-open__list">
+    {% for iss in history_open_issues %}
+    <li class="inv-hist-open__row">
+      <span class="inv-hist-open__qty"><strong>{{ iss.remaining_qty }}</strong><span class="muted"> / {{ iss.quantity }}</span></span>
+      <span class="inv-hist-open__tool">{{ iss.tool.name }}{% if iss.tool.is_deleted %} <span class="muted">(удалено)</span>{% endif %}</span>
+      {% if iss.issuer_label %}<span class="inv-hist-open__issuer" title="Кто выдал">выдал {{ iss.issuer_label }}</span>{% endif %}
+      <time class="inv-hist-open__date" datetime="{{ iss.movement_date|date:'Y-m-d' }}">{{ iss.movement_date|date:"d.m.Y" }}</time>
+      {% include "shifts/includes/inventory_history_outcome_form.html" with issue_id=iss.id remaining=iss.remaining_qty employee_name=iss.employee_name tool_title=iss.tool.name %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted inv-history-open-block__empty">У этого сотрудника нет невозвращённого инструмента.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<div class="inv-hist-feed">
+  {% if not inventory_history_days %}
+  <p class="inv-hist-empty muted">{% if filters.history_employee %}Нет операций по этому сотруднику.{% elif filters.history_movement_type %}Нет записей по выбранному типу.{% else %}Пока нет записей в истории.{% endif %}</p>
+  {% else %}
+  {% for day in inventory_history_days %}
+  <section class="inv-hist-day" aria-labelledby="inv-hist-day-{{ day.key }}">
+    <h3 class="inv-hist-day__title" id="inv-hist-day-{{ day.key }}">
+      {{ day.label }}
+      <span class="inv-hist-day__n">{{ day.count }}</span>
+    </h3>
+    <ul class="inv-hist-list">
+      {% for row in day.rows %}
+      {% include "shifts/includes/inventory_history_row.html" %}
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  function closeMore(except) {
+    document.querySelectorAll(".inv-hist-row__more[open]").forEach(function (el) {
+      if (el !== except) el.removeAttribute("open");
+    });
+  }
+
+  document.addEventListener("click", function (e) {
+    var more = e.target.closest(".inv-hist-row__more");
+    if (more) {
+      closeMore(more);
+      return;
+    }
+    closeMore(null);
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeMore(null);
+  });
+})();
+</script>
+
+{% if biota_can_edit %}
+<div id="inv-hist-outcome-modal" class="inv-hist-outcome-modal" hidden>
+  <div class="inv-hist-outcome-modal__backdrop js-hist-outcome-close"></div>
+  <div class="inv-hist-outcome-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="inv-hist-outcome-title">
+    <button type="button" class="btn btn-ghost inv-hist-outcome-modal__close js-hist-outcome-close" aria-label="Закрыть">×</button>
+    <h2 id="inv-hist-outcome-title" class="inv-hist-outcome-modal__title">Возврат</h2>
+    <p class="inv-hist-outcome-modal__meta js-hist-outcome-meta"></p>
+    <form method="post" action="{% url 'inventory' %}" class="inv-hist-outcome-modal__form js-hist-outcome-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="process_issue_outcome">
+      <input type="hidden" name="from_panel" value="history">
+      {% if filters.history_movement_type %}<input type="hidden" name="history_movement_type" value="{{ filters.history_movement_type }}">{% endif %}
+      {% if filters.history_employee %}<input type="hidden" name="history_employee" value="{{ filters.history_employee }}">{% endif %}
+      <input type="hidden" name="issue_id" class="js-hist-outcome-issue" value="">
+      <input type="hidden" name="employee_name" class="js-hist-outcome-employee" value="">
+      <input type="hidden" name="outcome_kind" class="js-hist-outcome-kind" value="return">
+      <div class="inv-hist-outcome-modal__fields">
+        <label class="inv-hist-outcome-modal__field">
+          <span>Количество, шт</span>
+          <input type="number" name="outcome_qty" class="js-hist-outcome-qty" min="1" value="1" required>
+        </label>
+        <label class="inv-hist-outcome-modal__field">
+          <span>Дата</span>
+          <input type="date" name="movement_date" class="js-hist-outcome-date" value="{{ today }}" required>
+        </label>
+        <label class="inv-hist-outcome-modal__field inv-hist-outcome-modal__field--wide">
+          <span>Комментарий</span>
+          <input type="text" name="comment" class="js-hist-outcome-comment" maxlength="240" required placeholder="Причина возврата или списания">
+        </label>
+      </div>
+      <div class="inv-hist-outcome-modal__actions">
+        <button type="button" class="btn btn-ghost js-hist-outcome-close">Отмена</button>
+        <button type="submit" class="btn js-hist-outcome-submit">Провести операцию</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function () {
+  var modal = document.getElementById("inv-hist-outcome-modal");
+  if (!modal) return;
+  var form = modal.querySelector(".js-hist-outcome-form");
+  var titleEl = document.getElementById("inv-hist-outcome-title");
+  var metaEl = modal.querySelector(".js-hist-outcome-meta");
+  var issueEl = modal.querySelector(".js-hist-outcome-issue");
+  var empEl = modal.querySelector(".js-hist-outcome-employee");
+  var kindEl = modal.querySelector(".js-hist-outcome-kind");
+  var qtyEl = modal.querySelector(".js-hist-outcome-qty");
+  var dateEl = modal.querySelector(".js-hist-outcome-date");
+  var commentEl = modal.querySelector(".js-hist-outcome-comment");
+  var submitEl = modal.querySelector(".js-hist-outcome-submit");
+  var defaultDate = dateEl ? dateEl.value : "";
+
+  function closeModal() {
+    if (form && form.dataset.submitting === "1") return;
+    modal.hidden = true;
+  }
+
+  function openModal(btn) {
+    var kind = btn.getAttribute("data-kind") || "return";
+    var remaining = parseInt(btn.getAttribute("data-remaining") || "1", 10) || 1;
+    var tool = btn.getAttribute("data-tool") || "";
+    var emp = btn.getAttribute("data-employee") || "";
+    var isWriteoff = kind === "writeoff";
+    if (titleEl) titleEl.textContent = isWriteoff ? "Списание" : "Возврат";
+    if (metaEl) {
+      var bits = [];
+      if (tool) bits.push(tool);
+      if (emp) bits.push(emp);
+      bits.push("на руках " + remaining + " шт.");
+      metaEl.textContent = bits.join(" · ");
+    }
+    issueEl.value = btn.getAttribute("data-issue-id") || "";
+    empEl.value = emp;
+    kindEl.value = isWriteoff ? "writeoff" : "return";
+    qtyEl.max = String(remaining);
+    qtyEl.value = String(remaining);
+    if (dateEl && !dateEl.value) dateEl.value = defaultDate;
+    commentEl.value = "";
+    submitEl.textContent = isWriteoff ? "Провести списание" : "Провести возврат";
+    submitEl.classList.toggle("inv-hist-outcome-modal__submit--wo", isWriteoff);
+    modal.hidden = false;
+    setTimeout(function () { commentEl.focus(); }, 0);
+  }
+
+  document.addEventListener("click", function (e) {
+    var openBtn = e.target.closest(".js-hist-outcome-open");
+    if (openBtn) {
+      e.preventDefault();
+      openModal(openBtn);
+      return;
+    }
+    if (e.target.closest(".js-hist-outcome-close")) {
+      e.preventDefault();
+      closeModal();
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !modal.hidden) closeModal();
+  });
+
+  form.addEventListener("submit", function (e) {
+    if (form.dataset.submitting === "1") {
+      e.preventDefault();
+      return;
+    }
+    form.dataset.submitting = "1";
+    submitEl.disabled = true;
+    submitEl.textContent = "Проводим…";
+  });
+})();
+</script>
+{% endif %}

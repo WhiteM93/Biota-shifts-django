@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    InventoryAiTurn,
     PlanContract,
     PlanContractLine,
     PlannedAssemblyComponent,
@@ -145,3 +146,27 @@ class ProductAdmin(admin.ModelAdmin):
     @admin.display(description="Превью STL")
     def preview_stl_column(self, obj: Product) -> str:
         return obj.preview_stl_list_label
+
+
+@admin.register(InventoryAiTurn)
+class InventoryAiTurnAdmin(admin.ModelAdmin):
+    list_display = ("id", "created_at", "username", "kind", "ok", "question_short")
+    list_filter = ("kind", "ok")
+    search_fields = ("username", "question", "reply", "session_key")
+    readonly_fields = (
+        "created_at",
+        "username",
+        "kind",
+        "session_key",
+        "question",
+        "reply",
+        "error",
+        "ok",
+        "used_tools",
+        "extra",
+    )
+    date_hierarchy = "created_at"
+
+    @admin.display(description="Вопрос")
+    def question_short(self, obj: InventoryAiTurn) -> str:
+        return (obj.question or "")[:80]

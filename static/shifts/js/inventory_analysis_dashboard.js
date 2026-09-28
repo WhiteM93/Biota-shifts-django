@@ -34,23 +34,58 @@
     return (v || "").trim() || fallback;
   }
 
+  function themeColors() {
+    var dawn = document.documentElement.getAttribute("data-theme") === "dawn";
+    return {
+      text: cssVar("--bio-body-fg", dawn ? "#3c362f" : "#eaf0ff"),
+      muted: cssVar("--bio-muted", dawn ? "#6b6258" : "#c5d0ea"),
+      grid: cssVar("--glass-border", dawn ? "#d8dde6" : "rgba(201, 213, 255, 0.18)"),
+      card: cssVar("--bio-surface-panel", dawn ? "#fff" : "#151b2a"),
+    };
+  }
+
+  function applyChartTheme(chart, colors) {
+    if (!chart) return;
+    var opts = chart.options || {};
+    Chart.defaults.color = colors.text;
+    if (opts.plugins && opts.plugins.legend && opts.plugins.legend.labels) {
+      opts.plugins.legend.labels.color = colors.text;
+    }
+    if (opts.scales) {
+      ["x", "y"].forEach(function (axis) {
+        if (!opts.scales[axis]) return;
+        if (opts.scales[axis].ticks) opts.scales[axis].ticks.color = colors.text;
+        if (opts.scales[axis].title) opts.scales[axis].title.color = colors.muted;
+        if (opts.scales[axis].grid) opts.scales[axis].grid.color = colors.grid;
+      });
+    }
+    if (chart.data && chart.data.datasets) {
+      chart.data.datasets.forEach(function (ds) {
+        if (chart.config && chart.config.type === "pie") ds.borderColor = colors.card;
+      });
+    }
+    chart.update();
+  }
+
   function boot() {
     if (typeof Chart === "undefined") return;
     if (!document.querySelector(".inv-dash")) return;
     var data = parsePayload();
     if (!data) return;
 
-    var text = cssVar("--bio-text", "#1f2933");
-    var muted = cssVar("--bio-text-muted", "#6b7280");
-    var grid = cssVar("--glass-border", "#d8dde6");
+    var colors = themeColors();
+    var text = colors.text;
+    var muted = colors.muted;
+    var grid = colors.grid;
 
-    Chart.defaults.color = muted;
+    Chart.defaults.color = text;
     Chart.defaults.borderColor = grid;
     Chart.defaults.font.family = getComputedStyle(document.body).fontFamily || "system-ui, sans-serif";
 
+    var charts = [];
     var barEl = document.getElementById("inv-dash-bar");
     if (barEl && data.nomenclature && data.nomenclature.labels.length) {
-      new Chart(barEl, {
+      charts.push(new Chart(barEl, {
         type: "bar",
         data: {
           labels: data.nomenclature.labels,
@@ -86,33 +121,33 @@
                 minRotation: 0,
                 autoSkip: true,
                 font: { size: 10 },
-                color: muted,
+                color: text,
               },
               grid: { display: false },
             },
             y: {
               beginAtZero: true,
               title: { display: true, text: "Количество", color: muted },
-              ticks: { precision: 0, color: muted },
+              ticks: { precision: 0, color: text },
               grid: { color: grid },
             },
           },
         },
-      });
+      }));
     }
 
     var pieEl = document.getElementById("inv-dash-pie");
     if (pieEl && data.categories && data.categories.labels.length) {
-      var colors = palette(data.categories.labels.length);
-      new Chart(pieEl, {
+      var sliceColors = palette(data.categories.labels.length);
+      charts.push(new Chart(pieEl, {
         type: "pie",
         data: {
           labels: data.categories.labels,
           datasets: [
             {
               data: data.categories.values,
-              backgroundColor: colors,
-              borderColor: cssVar("--bio-bg-card", "#fff"),
+              backgroundColor: sliceColors,
+              borderColor: colors.card,
               borderWidth: 2,
             },
           ],
@@ -128,7 +163,8 @@
                 boxHeight: 12,
                 padding: 10,
                 color: text,
-                font: { size: 11 },
+                font: { size: 12 },
+                usePointStyle: false,
               },
             },
             tooltip: {
@@ -141,8 +177,15 @@
             },
           },
         },
-      });
+      }));
     }
+
+    window.addEventListener("biota-theme-change", function () {
+      var next = themeColors();
+      charts.forEach(function (ch) {
+        applyChartTheme(ch, next);
+      });
+    });
   }
 
   if (document.readyState === "loading") {

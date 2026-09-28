@@ -8,7 +8,9 @@ from django.views.decorators.http import require_http_methods
 
 from .auth_utils import biota_login_required, biota_user, inventory_route_nav_access_required
 from .gpt_rate_limit import gpt_rate_limit_allow
-from .inventory_chat import ask_inventory_chat
+from .inventory_ai_log import record_ai_turn
+from .inventory_chat import ask_inventory_chat, normalize_page_context
+from .models import InventoryAiTurn
 from .yandex_gpt import yandex_gpt_configured
 
 
@@ -38,8 +40,27 @@ def inventory_chat_api(request):
     history = payload.get("history")
     if history is not None and not isinstance(history, list):
         history = None
+    session_key = str(payload.get("session_key") or "").strip()[:40]
+    page_context = payload.get("page_context") or payload.get("context")
 
-    result = ask_inventory_chat(question, history=history)
+    result = ask_inventory_chat(
+        question,
+        history=history,
+        page_context=page_context if isinstance(page_context, dict) else None,
+        username=username,
+    )
+    extra = normalize_page_context(page_context if isinstance(page_context, dict) else {})
+    try:
+        record_ai_turn(
+            username=username,
+            kind=InventoryAiTurn.KIND_INV_CHAT,
+            question=question,
+            result=result,
+            session_key=session_key,
+            extra=extra,
+        )
+    except Exception:
+        pass
     status = 200 if result.get("ok") else 400
     if not result.get("ok") and "не настроен" in (result.get("error") or "").lower():
         status = 503

@@ -17,6 +17,9 @@
   <link rel="stylesheet" href="{% static 'shifts/css/biota_delete_btn.css' %}?v={{ static_asset_version }}">
   <script src="{% static 'shifts/js/biota_delete_btn.js' %}?v={{ static_asset_version }}"></script>
   {% block extra_styles %}{% endblock %}
+  {% if biota_username and not auth_page and biota_nav.inventory %}
+  <link rel="stylesheet" href="{% static 'shifts/css/inventory_chat.css' %}?v={{ static_asset_version }}">
+  {% endif %}
 </head>
 <body class="{% if auth_page %}auth-page{% endif %}" data-biota-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}">
   <div class="biota-site-bg" aria-hidden="true">
@@ -149,6 +152,9 @@
   </script>
   <script>window.__biotaIcons = {{ biota_icons_json|safe }};</script>
   <script src="{% static 'shifts/js/biota_icons.js' %}?v={{ static_asset_version }}"></script>
+  {% if biota_username and not auth_page and biota_nav.inventory %}
+  {% include "shifts/includes/inventory_chat_widget.html" %}
+  {% endif %}
   {% if perf_diagnostics and biota_username %}
   <script>
     window.__biotaPerfDiag = {

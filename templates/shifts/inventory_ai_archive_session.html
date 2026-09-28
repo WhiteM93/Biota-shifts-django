@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+<style>
+.ai-sess { max-width: 820px; }
+.ai-sess-msg { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--bio-surface-item-border); white-space: pre-wrap; word-break: break-word; }
+.ai-sess-msg--q { background: var(--bio-surface-item); }
+.ai-sess-msg--a { background: transparent; }
+.ai-sess-meta { font-size: 12px; color: var(--bio-muted); margin-bottom: 6px; }
+.ai-sess-err { color: #fecaca; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cabinet-page ai-sess">
+  <header class="cabinet-hero">
+    <p class="cabinet-hero__eyebrow">Администрирование</p>
+    <h1>Диалог ИИ</h1>
+    <p class="cabinet-hero__meta muted">Сессия <code>{{ session_key }}</code></p>
+  </header>
+
+  {% for row in rows %}
+  <article class="ai-sess-msg ai-sess-msg--q">
+    <div class="ai-sess-meta">{{ row.created_at|date:"d.m.Y H:i:s" }} · {{ row.username }} · {{ row.get_kind_display }}</div>
+    <strong>Вопрос</strong>
+    <div>{{ row.question }}</div>
+  </article>
+  <article class="ai-sess-msg ai-sess-msg--a">
+    {% if row.error %}<div class="ai-sess-err">{{ row.error }}</div>{% endif %}
+    {% if row.reply %}<div>{{ row.reply }}</div>{% else %}<p class="muted">Нет ответа.</p>{% endif %}
+    {% if row.used_tools %}<div class="ai-sess-meta">tools: {{ row.used_tools|join:", " }}</div>{% endif %}
+  </article>
+  {% endfor %}
+
+  <p style="margin-top:20px;"><a href="{% url 'inventory_ai_archive' %}">← Архив</a></p>
+</div>
+{% endblock %}

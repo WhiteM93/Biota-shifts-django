@@ -1744,6 +1744,40 @@ class PageLoadDiagnostic(models.Model):
         return f"{self.source} · {self.page_path} · {self.diagnosis[:60]}"
 
 
+class InventoryAiTurn(models.Model):
+    """Реплика диалога с ИИ (чат склада / анализ наладки) — архив для разбора."""
+
+    KIND_INV_CHAT = "inv_chat"
+    KIND_SETUP_AI = "setup_ai"
+    KIND_CHOICES = [
+        (KIND_INV_CHAT, "Чат склада"),
+        (KIND_SETUP_AI, "ИИ-анализ наладки"),
+    ]
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Когда")
+    username = models.CharField(max_length=120, db_index=True, verbose_name="Кто спросил")
+    kind = models.CharField(max_length=16, choices=KIND_CHOICES, db_index=True, verbose_name="Тип")
+    session_key = models.CharField(max_length=40, blank=True, default="", db_index=True, verbose_name="Сессия")
+    question = models.TextField(verbose_name="Вопрос")
+    reply = models.TextField(blank=True, default="", verbose_name="Ответ")
+    error = models.CharField(max_length=400, blank=True, default="", verbose_name="Ошибка")
+    ok = models.BooleanField(default=True, verbose_name="Успех")
+    used_tools = models.JSONField(default=list, blank=True, verbose_name="Tools")
+    extra = models.JSONField(default=dict, blank=True, verbose_name="Контекст")
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = "Реплика ИИ"
+        verbose_name_plural = "Архив диалогов ИИ"
+        indexes = [
+            models.Index(fields=("-created_at", "kind"), name="inv_ai_turn_created_kind"),
+        ]
+
+    def __str__(self) -> str:
+        q = (self.question or "").replace("\n", " ")[:60]
+        return f"{self.username} · {self.get_kind_display()} · {q}"
+
+
 class PurchaseRequest(models.Model):
     requested_item = models.CharField(max_length=255, verbose_name="Что закупить")
     store_name = models.CharField(max_length=120, blank=True, default="", verbose_name="Магазин")

@@ -7,7 +7,8 @@ from django.views.decorators.http import require_http_methods
 
 from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
 from .gpt_rate_limit import gpt_rate_limit_allow
-from .models import Product, ProductSetup
+from .inventory_ai_log import record_ai_turn
+from .models import InventoryAiTurn, Product, ProductSetup
 from .setup_ai import analyze_setup
 from .yandex_gpt import yandex_gpt_configured
 
@@ -36,6 +37,24 @@ def product_setup_ai_analyze(request, pk: int, setup_pk: int):
         product=product,
     )
     result = analyze_setup(product=product, setup=setup)
+    try:
+        pname = (product.name or "").strip() or f"#{product.pk}"
+        sname = (setup.name or "").strip() or f"#{setup.pk}"
+        record_ai_turn(
+            username=username,
+            kind=InventoryAiTurn.KIND_SETUP_AI,
+            question=f"ИИ-анализ наладки: {pname} / {sname}",
+            result=result,
+            extra={
+                "product_id": product.pk,
+                "setup_id": setup.pk,
+                "product_name": pname,
+                "setup_name": sname,
+                "match_summary": result.get("match_summary") or {},
+            },
+        )
+    except Exception:
+        pass
     status = 200 if result.get("ok") else 400
     if not result.get("ok") and "не настроен" in (result.get("error") or "").lower():
         status = 503

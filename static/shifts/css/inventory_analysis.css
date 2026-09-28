@@ -1,5 +1,10 @@
 /* Панель руководителя склада (вкладка «Анализ») */
 
+.inv-page--analysis {
+  --bio-text: var(--bio-body-fg, #eaf0ff);
+  --bio-text-muted: var(--bio-muted, #c5d0ea);
+}
+
 .inv-page--analysis.calc-page {
   max-width: 1280px;
   padding: 8px 0 40px;

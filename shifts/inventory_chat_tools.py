@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from typing import Any, Callable
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, F, IntegerField, Max, Q, Sum, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from .models import StockMovement, ToolItem
@@ -73,6 +75,17 @@ def _tool_label(tool: ToolItem) -> str:
         elif name:
             parts.append(name)
         return " · ".join(parts)
+    if tool.category == "drill":
+        dr = getattr(tool, "drill_spec", None)
+        d = None
+        try:
+            d = dr.diameter_mm if dr else None
+        except Exception:
+            d = None
+        if d is not None:
+            s = format(d, "f").rstrip("0").rstrip(".")
+            return f"{cat} · ⌀{s}" + (f" · {name}" if name else "")
+        return f"{cat} · {name}" if name else cat
     return f"{cat} · {name}" if name else cat
 
 
@@ -100,6 +113,31 @@ def _normalize_hole_token(tok: str) -> str | None:
     return None
 
 
+def _parse_diameter_token(tok: str) -> Decimal | None:
+    t = (tok or "").strip().replace(",", ".")
+    t = re.sub(r"^(?:[dDø⌀ØфФ]\s*)", "", t)
+    t = re.sub(r"\s*(?:мм|mm)$", "", t, flags=re.IGNORECASE).strip()
+    if not re.fullmatch(r"\d+(?:\.\d+)?", t):
+        return None
+    try:
+        return Decimal(t)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _query_wants_category(q_low: str) -> str:
+    """Явный тип в вопросе: drill / tap / mill / insert / ''."""
+    if re.search(r"сверл|drill", q_low):
+        return "drill"
+    if re.search(r"метчик|раскатник|резьбофрез|\btap\b", q_low):
+        return "tap"
+    if re.search(r"фрез", q_low):
+        return "mill"
+    if re.search(r"пластин|insert|apkt|rpmt", q_low):
+        return "insert"
+    return ""
+
+
 def search_issues(
     query: str = "",
     date_from: Any = None,
@@ -125,6 +163,9 @@ def search_issues(
     if mtype not in allowed:
         mtype = "issue"
 
+    q_low = q.lower().replace("ё", "е")
+    want_cat = _query_wants_category(q_low)
+
     tokens = [t for t in re.split(r"[\s,/|]+", q) if t]
     hole_codes: list[str] = []
     search_tokens: list[str] = []
@@ -141,33 +182,49 @@ def search_issues(
             movement_date__gte=d_from,
             movement_date__lte=d_to,
         )
-        .select_related("tool", "tool__insert_spec", "tool__tap_spec", "tool__drill_spec")
+        .select_related(
+            "tool",
+            "tool__insert_spec",
+            "tool__tap_spec",
+            "tool__drill_spec",
+            "tool__end_mill_spec",
+        )
         .order_by("-movement_date", "-id")
     )
     if mtype:
         qs = qs.filter(movement_type=mtype)
-    if hole_codes:
+    if want_cat == "drill":
+        qs = qs.filter(tool__category="drill")
+    elif want_cat == "tap":
+        qs = qs.filter(tool__category="tap")
+    elif want_cat == "mill":
+        qs = qs.filter(tool__category__in=["end_mill", "body_tool"])
+    elif want_cat == "insert":
+        qs = qs.filter(tool__category="insert")
+    if hole_codes and want_cat != "drill":
         qs = qs.filter(tool__tap_spec__hole_type__in=list(set(hole_codes)))
 
     for tok in search_tokens:
-        tok_q = (
-            Q(tool__name__icontains=tok)
-            | Q(tool__tap_spec__size_label__icontains=tok)
-            | Q(tool__insert_spec__item_name__icontains=tok)
-            | Q(tool__insert_spec__brand__icontains=tok)
-            | Q(tool__collet_spec__size_label__icontains=tok)
-            | Q(comment__icontains=tok)
-            | Q(employee_name__icontains=tok)
-        )
         low = tok.lower().replace("ё", "е")
-        if "метчик" in low or "tap" in low:
-            tok_q |= Q(tool__category="tap")
-        if "сверл" in low or "drill" in low:
-            tok_q |= Q(tool__category="drill")
-        if "пластин" in low or "insert" in low:
-            tok_q |= Q(tool__category="insert")
-        if "фрез" in low:
-            tok_q |= Q(tool__category="end_mill") | Q(tool__category="body_tool")
+        if re.search(r"сверл|метчик|раскат|фрез|пластин|drill|tap|insert", low):
+            # Тип уже учтён want_cat — не фильтровать по слову в имени.
+            continue
+        diam = _parse_diameter_token(tok)
+        is_metric_size = bool(re.match(r"^[mм]\d", tok, re.IGNORECASE))
+        tok_q = Q(tool__name__icontains=tok) | Q(comment__icontains=tok)
+        if diam is not None and not is_metric_size:
+            tok_q |= Q(tool__drill_spec__diameter_mm=diam)
+            tok_q |= Q(tool__end_mill_spec__diameter_mm=diam)
+            tok_q |= Q(tool__name__icontains=str(diam).replace(".", ","))
+            tok_q |= Q(tool__name__icontains=str(diam))
+            # Голое «2.5» не должно цеплять метчик M2.5 / M5.
+            if want_cat == "tap" or is_metric_size:
+                tok_q |= Q(tool__tap_spec__size_label__icontains=tok)
+        else:
+            tok_q |= Q(tool__tap_spec__size_label__icontains=tok)
+            tok_q |= Q(tool__insert_spec__item_name__icontains=tok)
+            tok_q |= Q(tool__insert_spec__brand__icontains=tok)
+            tok_q |= Q(tool__collet_spec__size_label__icontains=tok)
         qs = qs.filter(tok_q)
 
     rows = []
@@ -182,6 +239,9 @@ def search_issues(
                 "comment": _clip(m.comment, 60),
             }
         )
+    empty_hint = ""
+    if not rows and want_cat == "drill":
+        empty_hint = "Выдач сверла по этому запросу не найдено (метрический метчик сюда не входит)."
     return {
         "query": q,
         "from": d_from.strftime("%d.%m.%Y"),
@@ -189,7 +249,7 @@ def search_issues(
         "type": mtype or "все",
         "count": len(rows),
         "rows": rows,
-        "hint": "Первая строка — самая свежая выдача по запросу." if rows else "",
+        "hint": "Первая строка — самая свежая выдача по запросу." if rows else empty_hint,
     }
 
 
@@ -306,8 +366,9 @@ def tool_stock_search(query: str = "", category: str = "", limit: int = 30) -> d
         Q(name__icontains=q)
         | Q(insert_spec__item_name__icontains=q)
         | Q(insert_spec__brand__icontains=q)
+        | Q(warehouse_address__icontains=q)
     )
-    qs = ToolItem.objects.filter(filt).select_related("insert_spec")
+    qs = ToolItem.objects.filter(is_deleted=False).filter(filt).select_related("insert_spec")
     if cat:
         qs = qs.filter(category=cat)
     qs = qs.order_by("-quantity", "name")[:lim]
@@ -329,7 +390,7 @@ def top_stock_tools(category: str = "", limit: int = 15, only_positive: Any = Tr
     """Топ позиций по текущему остатку на складе (не по выдачам)."""
     lim = max(1, min(int(limit or 15), MAX_ROWS))
     cat = (category or "").strip()
-    qs = ToolItem.objects.all().select_related("insert_spec")
+    qs = ToolItem.objects.filter(is_deleted=False).select_related("insert_spec")
     if cat:
         qs = qs.filter(category=cat)
     if isinstance(only_positive, bool):
@@ -405,10 +466,369 @@ def recent_movements(
     }
 
 
-def build_warehouse_context(*, max_chars: int | None = None, recent_issues: int | None = None) -> str:
+def _open_issue_qs():
+    """Выдачи с remaining_qty > 0 (не возвращены и не списаны полностью)."""
+    return (
+        StockMovement.objects.filter(movement_type="issue", is_reverted=False)
+        .select_related(
+            "tool",
+            "tool__insert_spec",
+            "tool__tap_spec",
+            "tool__drill_spec",
+            "tool__end_mill_spec",
+        )
+        .annotate(
+            processed_qty=Coalesce(
+                Sum("issue_outcomes__quantity"),
+                Value(0, output_field=IntegerField()),
+            )
+        )
+        .annotate(remaining_qty=F("quantity") - F("processed_qty"))
+        .filter(remaining_qty__gt=0)
+    )
+
+
+def _limit_n(limit: Any, default: int = 20) -> int:
+    try:
+        n = int(limit if limit is not None and limit != "" else default)
+    except (TypeError, ValueError):
+        n = default
+    return max(1, min(n, MAX_ROWS))
+
+
+def overdue_open_issues(min_days: Any = 14, limit: int = 20) -> dict[str, Any]:
+    """Открытые выдачи старше min_days дней (как на вкладке «Анализ»)."""
+    try:
+        days = int(min_days if min_days is not None and min_days != "" else 14)
+    except (TypeError, ValueError):
+        days = 14
+    days = max(1, min(days, 365))
+    lim = _limit_n(limit, 20)
+    today = timezone.localdate()
+    cutoff = today - timedelta(days=days)
+    qs = _open_issue_qs().filter(movement_date__lte=cutoff).order_by("movement_date", "id")[:lim]
+    rows = []
+    for iss in qs:
+        emp = (iss.employee_name or "").strip() or "—"
+        rows.append(
+            {
+                "date": iss.movement_date.strftime("%d.%m.%Y"),
+                "days": (today - iss.movement_date).days,
+                "employee": _clip(emp, 80),
+                "tool": _clip(_tool_label(iss.tool), 180),
+                "remaining": int(iss.remaining_qty or 0),
+            }
+        )
+    return {
+        "title": f"Просроченные открытые выдачи (≥{days} дн.)",
+        "min_days": days,
+        "count": len(rows),
+        "rows": rows,
+        "hint": (
+            "Это невозвращённый остаток по выдаче, не «кто последний брал»."
+            if rows
+            else f"Открытых выдач старше {days} дн. нет."
+        ),
+    }
+
+
+def open_issues(employee: str = "", query: str = "", limit: int = 20) -> dict[str, Any]:
+    """Кто сейчас держит инструмент (открытые выдачи)."""
+    emp = _clip(employee, MAX_NAME_LEN)
+    q = _clip(query, MAX_QUERY_LEN)
+    lim = _limit_n(limit, 20)
+    qs = _open_issue_qs().order_by("-movement_date", "-id")
+    if emp:
+        qs = qs.filter(employee_name__icontains=emp)
+    want_cat = _query_wants_category(q.lower().replace("ё", "е")) if q else ""
+    if want_cat == "drill":
+        qs = qs.filter(tool__category="drill")
+    elif want_cat == "tap":
+        qs = qs.filter(tool__category="tap")
+    elif want_cat == "mill":
+        qs = qs.filter(tool__category__in=["end_mill", "body_tool"])
+    elif want_cat == "insert":
+        qs = qs.filter(tool__category="insert")
+    if q:
+        tokens = [t for t in re.split(r"[\s,/|]+", q) if t]
+        for tok in tokens:
+            low = tok.lower().replace("ё", "е")
+            if re.search(r"сверл|метчик|раскат|фрез|пластин|drill|tap|insert", low):
+                continue
+            diam = _parse_diameter_token(tok)
+            tok_q = Q(tool__name__icontains=tok) | Q(comment__icontains=tok)
+            if diam is not None and not re.match(r"^[mм]\d", tok, re.IGNORECASE):
+                tok_q |= Q(tool__drill_spec__diameter_mm=diam)
+                tok_q |= Q(tool__end_mill_spec__diameter_mm=diam)
+            else:
+                tok_q |= Q(tool__tap_spec__size_label__icontains=tok)
+            qs = qs.filter(tok_q)
+    rows = []
+    for iss in qs[:lim]:
+        emp_name = (iss.employee_name or "").strip() or "—"
+        rows.append(
+            {
+                "date": iss.movement_date.strftime("%d.%m.%Y"),
+                "employee": _clip(emp_name, 80),
+                "tool": _clip(_tool_label(iss.tool), 180),
+                "remaining": int(iss.remaining_qty or 0),
+                "issued": int(iss.quantity or 0),
+            }
+        )
+    hint = "На руках — остаток по выдаче (выдано минус возврат/списание)."
+    if not rows:
+        hint = "Открытых выдач по запросу нет (всё вернули или списали)."
+    return {
+        "title": "Открытые выдачи (на руках)",
+        "employee_query": emp or "все",
+        "query": q or "",
+        "count": len(rows),
+        "rows": rows,
+        "hint": hint,
+    }
+
+
+def locate_tool(query: str = "", limit: int = 20) -> dict[str, Any]:
+    """Где лежит инструмент: адрес ячейки + остаток."""
+    q = _clip(query, MAX_QUERY_LEN)
+    if len(q) < 1:
+        return {"error": "Укажите что искать (сверло 2.5, адрес A-01-02, APKT…).", "rows": []}
+    lim = _limit_n(limit, 20)
+    q_low = q.lower().replace("ё", "е")
+    want_cat = _query_wants_category(q_low)
+    looks_addr = bool(re.search(r"[A-Za-zА-Яа-яЁё0-9]{1,8}-\d", q.replace(" ", "")))
+
+    qs = ToolItem.objects.filter(is_deleted=False).select_related(
+        "insert_spec",
+        "tap_spec",
+        "drill_spec",
+        "end_mill_spec",
+    )
+    if want_cat == "drill":
+        qs = qs.filter(category="drill")
+    elif want_cat == "tap":
+        qs = qs.filter(category="tap")
+    elif want_cat == "mill":
+        qs = qs.filter(category__in=["end_mill", "body_tool"])
+    elif want_cat == "insert":
+        qs = qs.filter(category="insert")
+
+    if looks_addr:
+        addr = q.replace(" ", "")
+        qs = qs.filter(warehouse_address__icontains=addr)
+    else:
+        tokens = [t for t in re.split(r"[\s,/|]+", q) if t]
+        for tok in tokens:
+            low = tok.lower().replace("ё", "е")
+            if re.search(r"сверл|метчик|раскат|фрез|пластин|drill|tap|insert", low):
+                continue
+            diam = _parse_diameter_token(tok)
+            is_metric = bool(re.match(r"^[mм]\d", tok, re.IGNORECASE))
+            tok_q = (
+                Q(name__icontains=tok)
+                | Q(warehouse_address__icontains=tok)
+                | Q(insert_spec__item_name__icontains=tok)
+                | Q(insert_spec__brand__icontains=tok)
+            )
+            if diam is not None and not is_metric:
+                tok_q |= Q(drill_spec__diameter_mm=diam)
+                tok_q |= Q(end_mill_spec__diameter_mm=diam)
+            else:
+                tok_q |= Q(tap_spec__size_label__icontains=tok)
+            qs = qs.filter(tok_q)
+
+    qs = qs.order_by("-quantity", "warehouse_address", "name")[:lim]
+    rows = []
+    for t in qs:
+        addr = (t.warehouse_address or "").strip()
+        rows.append(
+            {
+                "tool": _clip(_tool_label(t), 180),
+                "category": t.get_category_display(),
+                "qty": int(t.quantity or 0),
+                "address": addr or "— без адреса —",
+            }
+        )
+    empty_hint = "На складе не найдено."
+    if want_cat == "drill":
+        empty_hint = "Сверла по запросу не найдены (метрический метчик сюда не входит)."
+    return {
+        "title": "Где лежит (ячейка склада)",
+        "query": q,
+        "count": len(rows),
+        "rows": rows,
+        "hint": "Адрес — warehouse_address / визуальный склад." if rows else empty_hint,
+    }
+
+
+def tools_without_address(limit: int = 20, only_positive: Any = True) -> dict[str, Any]:
+    """Позиции с остатком без адреса ячейки."""
+    lim = _limit_n(limit, 20)
+    if isinstance(only_positive, bool):
+        want_positive = only_positive
+    else:
+        want_positive = str(only_positive).strip().lower() not in ("0", "false", "no")
+    qs = ToolItem.objects.filter(is_deleted=False).filter(
+        Q(warehouse_address="") | Q(warehouse_address__isnull=True)
+    )
+    if want_positive:
+        qs = qs.filter(quantity__gt=0)
+    qs = qs.select_related("insert_spec", "tap_spec", "drill_spec").order_by("-quantity", "name")[:lim]
+    rows = []
+    for t in qs:
+        rows.append(
+            {
+                "tool": _clip(_tool_label(t), 180),
+                "category": t.get_category_display(),
+                "qty": int(t.quantity or 0),
+                "address": "",
+            }
+        )
+    return {
+        "title": "Без адреса ячейки",
+        "count": len(rows),
+        "rows": rows,
+        "hint": "У этих позиций не заполнен адрес склада." if rows else "Все показанные позиции с адресом.",
+    }
+
+
+def dead_stock(idle_days: Any = 90, limit: int = 15) -> dict[str, Any]:
+    """Остаток есть, движений давно не было."""
+    try:
+        idle = int(idle_days if idle_days is not None and idle_days != "" else 90)
+    except (TypeError, ValueError):
+        idle = 90
+    idle = max(14, min(idle, 730))
+    lim = _limit_n(limit, 15)
+    today = timezone.localdate()
+    cutoff = today - timedelta(days=idle)
+    qs = (
+        ToolItem.objects.filter(is_deleted=False, quantity__gt=0)
+        .select_related("insert_spec", "tap_spec", "drill_spec")
+        .annotate(
+            last_move=Max(
+                "movements__movement_date",
+                filter=Q(movements__is_reverted=False),
+            )
+        )
+        .filter(Q(last_move__isnull=True) | Q(last_move__lt=cutoff))
+        .order_by(F("last_move").asc(nulls_first=True), "-quantity", "name")[:lim]
+    )
+    rows = []
+    for t in qs:
+        last = t.last_move
+        idle_n = (today - last).days if last else None
+        rows.append(
+            {
+                "tool": _clip(_tool_label(t), 180),
+                "category": t.get_category_display(),
+                "qty": int(t.quantity or 0),
+                "address": _clip(getattr(t, "warehouse_address", "") or "", 40),
+                "last_move": last.strftime("%d.%m.%Y") if last else "нет",
+                "idle_days": idle_n if idle_n is not None else idle,
+            }
+        )
+    return {
+        "title": f"Залежь (нет движений ≥{idle} дн., остаток > 0)",
+        "idle_days": idle,
+        "count": len(rows),
+        "rows": rows,
+        "hint": "Это не просроченные выдачи, а позиции, которые давно не трогали." if rows else "Залежалых позиций нет.",
+    }
+
+
+def watch_alerts(username: str = "", only_problems: Any = True) -> dict[str, Any]:
+    """Шаблоны контроля остатков текущего пользователя (вкладка «Анализ»)."""
+    from .inventory_analysis import evaluate_watch_templates, list_watch_templates
+
+    user = _clip(username, 120)
+    if not user:
+        return {
+            "error": "Нет имени пользователя для шаблонов контроля.",
+            "rows": [],
+            "hint": "Контроль остатков личный — смотрите вкладку «Анализ».",
+        }
+    if isinstance(only_problems, bool):
+        problems_only = only_problems
+    else:
+        problems_only = str(only_problems).strip().lower() not in ("0", "false", "no")
+    templates = list_watch_templates(user)
+    evaluated = evaluate_watch_templates(templates)
+    rows = []
+    ok_n = 0
+    for item in evaluated:
+        tpl = item["template"]
+        status = item["status"]
+        if status == "ok":
+            ok_n += 1
+            if problems_only:
+                continue
+        rows.append(
+            {
+                "name": _clip(tpl.name, 80),
+                "category": _clip(item.get("category_label") or tpl.category, 40),
+                "group": f"{item.get('group_label') or tpl.group_field}: {tpl.group_value}",
+                "qty": int(item.get("total_qty") or 0),
+                "min_qty": int(tpl.min_qty or 0),
+                "status": status,
+                "notes": _clip(tpl.notes, 80),
+            }
+        )
+    if not templates:
+        hint = "У вас нет активных шаблонов контроля (вкладка «Анализ» склада)."
+    elif problems_only and not rows:
+        hint = f"Все шаблоны в норме ({ok_n} шт.)."
+    else:
+        hint = "critical — 0 шт.; warn — ниже минимума; ok — норма."
+    return {
+        "title": "Контроль остатков (ваши шаблоны)",
+        "count": len(rows),
+        "ok_count": ok_n,
+        "templates_total": len(templates),
+        "rows": rows,
+        "hint": hint,
+    }
+
+
+def build_control_digest(*, username: str = "") -> str:
+    """Короткая строка для снимка: сколько просрочек и алертов контроля."""
+    today = timezone.localdate()
+    cutoff = today - timedelta(days=14)
+    overdue_n = _open_issue_qs().filter(movement_date__lte=cutoff).count()
+    open_n = _open_issue_qs().count()
+    no_addr_n = (
+        ToolItem.objects.filter(is_deleted=False, quantity__gt=0)
+        .filter(Q(warehouse_address="") | Q(warehouse_address__isnull=True))
+        .count()
+    )
+    lines = [
+        "=== КОНТРОЛЬ (цифры склада, не выдумывай другие) ===",
+        f"Открытых выдач (на руках): {open_n}. Просрочено ≥14 дн.: {overdue_n}. Tool: open_issues / overdue_open_issues",
+        f"Позиций с остатком без адреса: {no_addr_n}. Tool: tools_without_address / locate_tool",
+    ]
+    user = (username or "").strip()
+    if user:
+        try:
+            from .inventory_analysis import evaluate_watch_templates, list_watch_templates
+
+            ev = evaluate_watch_templates(list_watch_templates(user))
+            bad = sum(1 for x in ev if x.get("status") in {"warn", "critical"})
+            lines.append(
+                f"Ваши шаблоны контроля: {len(ev)}, ниже минимума: {bad}. Tool: watch_alerts"
+            )
+        except Exception:
+            pass
+    return "\n".join(lines)
+
+
+def build_warehouse_context(
+    *,
+    max_chars: int | None = None,
+    recent_issues: int | None = None,
+    username: str = "",
+) -> str:
     """
-    Компактный снимок склада для промпта: остатки + свежие выдачи.
-    Модель видит данные сразу, без отдельного tool-вызова.
+    Компактный снимок склада для промпта: контроль + остатки + свежие выдачи.
     """
     from django.conf import settings
 
@@ -419,6 +839,11 @@ def build_warehouse_context(*, max_chars: int | None = None, recent_issues: int 
     max_chars = max(2000, min(int(max_chars), 14000))
     recent_issues = max(5, min(int(recent_issues), MAX_ROWS))
     parts: list[str] = []
+    try:
+        parts.append(build_control_digest(username=username))
+        parts.append("")
+    except Exception:
+        pass
     qs = (
         ToolItem.objects.filter(is_deleted=False, quantity__gt=0)
         .select_related("insert_spec", "tap_spec", "drill_spec")
@@ -561,32 +986,104 @@ TOOL_SPECS: dict[str, dict[str, Any]] = {
         },
         "fn": recent_movements,
     },
+    "overdue_open_issues": {
+        "description": (
+            "Просроченные ОТКРЫТЫЕ выдачи: инструмент не вернули N дней. "
+            "Не для «кто последний брал» (это search_issues)."
+        ),
+        "args": {
+            "min_days": "порог дней, по умолчанию 14",
+            "limit": "до 50",
+        },
+        "fn": overdue_open_issues,
+    },
+    "open_issues": {
+        "description": (
+            "Что сейчас НА РУКАХ: невозвращённый остаток по выдаче. "
+            "employee — ФИО, query — сверло 2.5 и т.п."
+        ),
+        "args": {
+            "employee": "фрагмент ФИО или пусто",
+            "query": "фильтр инструмента или пусто",
+            "limit": "до 50",
+        },
+        "fn": open_issues,
+    },
+    "locate_tool": {
+        "description": (
+            "ГДЕ ЛЕЖИТ: адрес ячейки + остаток. Сверло ≠ метчик. "
+            "Можно искать по адресу вида A-01-02."
+        ),
+        "args": {
+            "query": "что искать (обязательно)",
+            "limit": "до 50",
+        },
+        "fn": locate_tool,
+    },
+    "tools_without_address": {
+        "description": "Позиции с остатком БЕЗ адреса ячейки.",
+        "args": {
+            "limit": "до 50",
+            "only_positive": "true — только qty>0",
+        },
+        "fn": tools_without_address,
+    },
+    "dead_stock": {
+        "description": "Залежь: остаток > 0 и давно не было движений. Не путать с просроченными выдачами.",
+        "args": {
+            "idle_days": "порог дней, по умолчанию 90",
+            "limit": "до 50",
+        },
+        "fn": dead_stock,
+    },
+    "watch_alerts": {
+        "description": (
+            "Личные шаблоны КОНТРОЛЯ остатков (вкладка Анализ): ниже минимума / ноль. "
+            "Не топ остатков."
+        ),
+        "args": {
+            "only_problems": "true — только warn/critical",
+        },
+        "fn": watch_alerts,
+    },
 }
 
 
 def tools_schema_for_prompt() -> str:
-    # Короткий список — экономия входных токенов
     return (
         "Tools: "
-        "top_issued_tools{date_from?,date_to?,limit?,category?} — чаще используют/выдачи; "
-        "top_stock_tools{category?,limit?} — топ остатков на складе; "
-        "search_issues{query,date_from?,date_to?,limit?}; "
-        "issues_by_employee{name,date_from?,date_to?,limit?}; "
-        "tool_stock_search{query,category?,limit?}; "
-        "recent_movements{date_from?,date_to?,movement_type?,limit?}. "
+        "overdue_open_issues{min_days?,limit?} — просроченные невозвраты; "
+        "open_issues{employee?,query?,limit?} — сейчас на руках; "
+        "locate_tool{query,limit?} — адрес ячейки; "
+        "tools_without_address{limit?}; "
+        "watch_alerts{only_problems?} — ваши шаблоны контроля; "
+        "dead_stock{idle_days?,limit?} — залежь; "
+        "search_issues{query} — кто брал (история); "
+        "top_issued_tools — чаще выдавали; "
+        "top_stock_tools — топ остатков; "
+        "tool_stock_search{query}; "
+        "issues_by_employee{name}; "
+        "recent_movements{movement_type?}. "
         'Формат: {"tool":"имя","args":{...}}'
     )
 
 
-def run_tool(name: str, args: dict[str, Any] | None) -> dict[str, Any]:
+def run_tool(
+    name: str,
+    args: dict[str, Any] | None = None,
+    *,
+    context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     spec = TOOL_SPECS.get(name)
     if not spec:
         return {"error": f"Неизвестный инструмент: {name}"}
     fn: Callable[..., dict[str, Any]] = spec["fn"]
     raw = args if isinstance(args, dict) else {}
-    # только известные ключи
     allowed = set(spec["args"].keys())
     clean = {k: v for k, v in raw.items() if k in allowed}
+    if name == "watch_alerts":
+        ctx = context if isinstance(context, dict) else {}
+        clean["username"] = str(ctx.get("username") or "")[:120]
     try:
         return fn(**clean)
     except Exception as exc:  # noqa: BLE001 — отдаём модели текст ошибки

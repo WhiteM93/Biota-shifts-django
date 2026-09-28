@@ -28,6 +28,9 @@ class InventoryFlowClientMixin:
     """Сессия admin для inventory_view (biota_username)."""
 
     def setUp(self):
+        import os
+
+        os.environ["BIOTA_INVENTORY_NOTIFY"] = "0"
         self.client = Client()
         session = self.client.session
         session["biota_username"] = ADMIN_USERNAME
@@ -383,3 +386,70 @@ class IssueOutcomePostTests(InventoryFlowClientMixin, TestCase):
             ).get("t"),
             2,
         )
+
+    def test_history_shows_inline_return_writeoff(self):
+        _, issue = self._make_issued_drill()
+        resp = self.client.get(self.inv_url + "?panel=history")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode("utf-8", errors="replace")
+        self.assertIn("inv-hist-outcome", html)
+        self.assertIn("inv-hist-outcome-modal", html)
+        self.assertIn(f'data-issue-id="{issue.id}"', html)
+        self.assertIn('data-kind="return"', html)
+        self.assertIn('data-kind="writeoff"', html)
+        self.assertIn("Провести операцию", html)
+
+        resp_emp = self.client.get(
+            self.inv_url + "?panel=history&history_employee=" + "Тестов Т."
+        )
+        html_emp = resp_emp.content.decode("utf-8", errors="replace")
+        self.assertIn("На руках у", html_emp)
+        self.assertGreaterEqual(html_emp.count("js-hist-outcome-open"), 4)
+
+    def test_history_inline_return_stays_on_history(self):
+        tool, issue = self._make_issued_drill(stock_qty=10, issue_qty=5)
+        qty_before = tool.quantity
+        resp = self.client.post(
+            self.inv_url,
+            {
+                "action": "process_issue_outcome",
+                "from_panel": "history",
+                "history_employee": "Тестов Т.",
+                "issue_id": issue.id,
+                "outcome_qty": 2,
+                "outcome_kind": "return",
+                "comment": "возврат из истории",
+                "employee_name": "Тестов Т.",
+            },
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("panel=history", resp.redirect_chain[0][0])
+        self.assertIn("history_employee", resp.redirect_chain[0][0])
+        tool.refresh_from_db()
+        self.assertEqual(tool.quantity, qty_before + 2)
+        ret = StockMovement.objects.get(parent_issue=issue, movement_type="restock")
+        self.assertEqual(ret.quantity, 2)
+
+    def test_history_inline_writeoff_without_date_field(self):
+        tool, issue = self._make_issued_drill(stock_qty=10, issue_qty=4)
+        qty_before = tool.quantity
+        resp = self.client.post(
+            self.inv_url,
+            {
+                "action": "process_issue_outcome",
+                "from_panel": "history",
+                "issue_id": issue.id,
+                "outcome_qty": 1,
+                "outcome_kind": "writeoff",
+                "comment": "износ из истории",
+                "employee_name": "Тестов Т.",
+            },
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("panel=history", resp.redirect_chain[0][0])
+        tool.refresh_from_db()
+        self.assertEqual(tool.quantity, qty_before)
+        wo = StockMovement.objects.get(parent_issue=issue, movement_type="writeoff")
+        self.assertEqual(wo.quantity, 1)

@@ -10,6 +10,7 @@ from . import discipline_views
 from . import hours_views
 from . import employee_payroll_views
 from . import inventory_views
+from . import inventory_ai_archive_views
 from . import inventory_chat_views
 from . import inventory_types_views
 from . import payroll_views
@@ -53,6 +54,16 @@ urlpatterns = [
         "inventory/chat/",
         inventory_chat_views.inventory_chat_api,
         name="inventory_chat_api",
+    ),
+    path(
+        "cabinet/ai-archive/",
+        inventory_ai_archive_views.inventory_ai_archive_view,
+        name="inventory_ai_archive",
+    ),
+    path(
+        "cabinet/ai-archive/session/<str:session_key>/",
+        inventory_ai_archive_views.inventory_ai_archive_session_view,
+        name="inventory_ai_archive_session",
     ),
     path(
         "inventory/api/arrival-matches/",

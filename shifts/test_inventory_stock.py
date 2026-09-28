@@ -180,3 +180,86 @@ class InventoryViewTests(TestCase):
         self.assertIn("Выдача", issue_html)
         self.assertNotIn("inv-history-card--restock", issue_html)
         self.assertNotIn("inv-history-card--writeoff", issue_html)
+        self.assertIn("inv-hist-list", all_html)
+        self.assertIn("Сегодня", all_html)
+
+
+class HistoryDayGroupTests(TestCase):
+    def test_groups_today_and_kind_labels(self):
+        import os
+
+        os.environ["BIOTA_INVENTORY_NOTIFY"] = "0"
+        from shifts.inventory_views import _history_day_groups
+
+        tool = ToolItem.objects.create(category="drill", name="d-day", quantity=10)
+        m = StockMovement.objects.create(
+            movement_type="issue",
+            tool=tool,
+            quantity=2,
+            employee_name="Иванов",
+            movement_date=date.today(),
+        )
+        groups = _history_day_groups(
+            [
+                {
+                    "kind": "movement",
+                    "ts": m.created_at,
+                    "tid": m.id,
+                    "movement": m,
+                    "show_rollback": False,
+                    "account_label": "",
+                }
+            ]
+        )
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0]["label"], "Сегодня")
+        self.assertEqual(groups[0]["rows"][0]["kind_label"], "Выдача")
+        self.assertEqual(groups[0]["rows"][0]["who"], "Иванов")
+        self.assertEqual(groups[0]["rows"][0]["issued_by"], "")
+
+        groups2 = _history_day_groups(
+            [
+                {
+                    "kind": "movement",
+                    "ts": m.created_at,
+                    "tid": m.id,
+                    "movement": m,
+                    "show_rollback": False,
+                    "account_label": "Админ",
+                }
+            ]
+        )
+        self.assertEqual(groups2[0]["rows"][0]["who"], "Иванов")
+        self.assertEqual(groups2[0]["rows"][0]["issued_by"], "Админ")
+
+    def test_edit_event_shows_short_kind_and_address(self):
+        from shifts.inventory_views import _history_day_groups
+        from shifts.models import InventoryStockEvent
+
+        tool = ToolItem.objects.create(category="center_drill", name="ТЕСТ центровка #03", quantity=1)
+        event = InventoryStockEvent.objects.create(
+            actor_username="admin",
+            event_type=InventoryStockEvent.EVENT_TOOL_EDIT,
+            tool=tool,
+            summary="edit",
+            details={"field": "warehouse_address", "value": "A-01-01"},
+        )
+        groups = _history_day_groups(
+            [
+                {
+                    "kind": "event",
+                    "ts": event.created_at,
+                    "tid": event.id,
+                    "event": event,
+                    "event_title": tool.name,
+                    "event_subtitle": "Центровки",
+                    "event_note": "Адрес: A-01-01",
+                    "actor_label": "admin",
+                }
+            ]
+        )
+        row = groups[0]["rows"][0]
+        self.assertEqual(row["kind_label"], "Правка")
+        self.assertEqual(row["kind_label_full"], "Редактирование позиции")
+        self.assertEqual(row["line_note"], "Адрес: A-01-01")
+        self.assertFalse(row["has_more"])

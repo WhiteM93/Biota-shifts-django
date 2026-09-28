@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+<style>
+.ai-arch-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+.ai-arch-filters a, .ai-arch-filters button {
+  padding: 6px 12px; border-radius: 6px; border: 1px solid var(--bio-filter-border);
+  text-decoration: none; font-size: 12px; background: transparent; color: inherit; cursor: pointer;
+}
+.ai-arch-filters a.active { background: var(--bio-tab-pill-active-bg); color: #fff; border-color: transparent; }
+.ai-arch-filters input { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--bio-filter-border); background: var(--bio-input-bg, transparent); color: inherit; font-size: 13px; }
+.ai-arch-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ai-arch-table th, .ai-arch-table td { padding: 8px 10px; border-bottom: 1px solid var(--bio-surface-item-border); vertical-align: top; text-align: left; }
+.ai-arch-table tbody tr:hover { background: var(--bio-surface-item); }
+.ai-arch-q, .ai-arch-a { white-space: pre-wrap; word-break: break-word; max-width: 420px; }
+.ai-arch-a { color: var(--bio-muted); font-size: 12px; }
+.ai-arch-err { color: #fecaca; }
+.ai-arch-meta { font-size: 11px; color: var(--bio-muted); }
+.ai-arch-kind { white-space: nowrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cabinet-page">
+  <header class="cabinet-hero">
+    <p class="cabinet-hero__eyebrow">Администрирование</p>
+    <h1>Архив диалогов ИИ</h1>
+    <p class="cabinet-hero__meta muted">Все вопросы к чату склада и ИИ-анализу наладки. Нужно, чтобы разбирать ответы на тестах.</p>
+  </header>
+
+  <form class="ai-arch-filters" method="get" action="{% url 'inventory_ai_archive' %}">
+    <a href="{% url 'inventory_ai_archive' %}" class="{% if not kind_filter %}active{% endif %}">Все</a>
+    <a href="{% url 'inventory_ai_archive' %}?kind=inv_chat" class="{% if kind_filter == 'inv_chat' %}active{% endif %}">Чат склада</a>
+    <a href="{% url 'inventory_ai_archive' %}?kind=setup_ai" class="{% if kind_filter == 'setup_ai' %}active{% endif %}">Наладка</a>
+    <input type="hidden" name="kind" value="{{ kind_filter }}">
+    <input type="search" name="user" value="{{ user_filter }}" placeholder="Фильтр по логину" list="ai-arch-users">
+    <datalist id="ai-arch-users">
+      {% for u in users %}<option value="{{ u }}"></option>{% endfor %}
+    </datalist>
+    <button type="submit">Показать</button>
+  </form>
+
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="ai-arch-table">
+      <thead>
+        <tr>
+          <th>Когда</th>
+          <th>Кто</th>
+          <th>Тип</th>
+          <th>Вопрос / ответ</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="ai-arch-meta">{{ row.created_at|date:"d.m.Y H:i:s" }}</td>
+          <td>{{ row.username|default:"—" }}</td>
+          <td class="ai-arch-kind">{{ row.get_kind_display }}{% if not row.ok %}<br><span class="ai-arch-err">ошибка</span>{% endif %}</td>
+          <td>
+            <div class="ai-arch-q">{{ row.question|truncatechars:280 }}</div>
+            {% if row.error %}<div class="ai-arch-err">{{ row.error }}</div>{% endif %}
+            {% if row.reply %}<div class="ai-arch-a">{{ row.reply|truncatechars:360 }}</div>{% endif %}
+            {% if row.used_tools %}<div class="ai-arch-meta">tools: {{ row.used_tools|join:", " }}</div>{% endif %}
+          </td>
+          <td>
+            {% if row.session_key %}
+            <a href="{% url 'inventory_ai_archive_session' row.session_key %}">диалог</a>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Пока записей нет — спросите что-нибудь в чате склада или нажмите «ИИ-анализ» на установке.</p>
+  {% endif %}
+
+  <p style="margin-top:20px;"><a href="{% url 'cabinet' %}">← Личный кабинет</a></p>
+</div>
+{% endblock %}

@@ -7,6 +7,39 @@
   var url = root.getAttribute("data-url") || "";
   var csrf = root.getAttribute("data-csrf") || "";
   var storageKey = "biota_inv_chat_v1";
+  var sessionStorageKey = "biota_inv_chat_session_v1";
+
+  function loadSessionKey() {
+    try {
+      var k = sessionStorage.getItem(sessionStorageKey);
+      if (k && k.length >= 8) return k;
+    } catch (e) {
+      /* ignore */
+    }
+    var fresh = "";
+    try {
+      fresh = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+    } catch (e2) {
+      fresh = String(Date.now());
+    }
+    try {
+      sessionStorage.setItem(sessionStorageKey, fresh);
+    } catch (e3) {
+      /* ignore */
+    }
+    return fresh;
+  }
+
+  function resetSessionKey() {
+    try {
+      sessionStorage.removeItem(sessionStorageKey);
+    } catch (e) {
+      /* ignore */
+    }
+    return loadSessionKey();
+  }
+
+  var chatSessionKey = loadSessionKey();
 
   var fab = root.querySelector(".js-inv-chat-fab");
   var panel = root.querySelector(".js-inv-chat-panel");
@@ -16,6 +49,140 @@
   var sendBtn = root.querySelector(".js-inv-chat-send");
   var closeBtn = root.querySelector(".js-inv-chat-close");
   var clearBtn = root.querySelector(".js-inv-chat-clear");
+  var hintsEl = root.querySelector(".js-inv-chat-hints");
+  var pageHintEl = root.querySelector(".js-inv-chat-page-hint");
+
+  function detectPageContext() {
+    var path = (location.pathname || "").replace(/\/+$/, "") || "/";
+    var params = new URLSearchParams(location.search || "");
+    var panelName = (params.get("panel") || "").trim();
+    if (/visual-warehouse/.test(path)) {
+      return { page: "visual_warehouse", panel: "" };
+    }
+    if (/\/inventory(\/|$)/.test(path) || path.indexOf("/inventory") !== -1) {
+      return { page: "inventory", panel: panelName || "stock" };
+    }
+    if (/\/products|\/osnast/.test(path)) return { page: "products", panel: "" };
+    if (/\/machines/.test(path)) return { page: "machines", panel: "" };
+    if (/\/home/.test(path)) return { page: "home", panel: "" };
+    if (/\/hours/.test(path)) return { page: "hours", panel: "" };
+    if (/\/skud|\/discipline/.test(path)) return { page: "skud", panel: "" };
+    if (/\/graph|\/regulations/.test(path)) return { page: "graph", panel: "" };
+    if (/\/cabinet/.test(path)) return { page: "cabinet", panel: "" };
+    if (/\/calculator/.test(path)) return { page: "calculator", panel: "" };
+    if (/\/contracts/.test(path)) return { page: "contracts", panel: "" };
+    if (/\/forms/.test(path)) return { page: "forms", panel: "" };
+    return { page: "other", panel: "" };
+  }
+
+  var HINTS = {
+    analysis: [
+      { q: "Какие выдачи просрочены больше 14 дней?", t: "Просрочки" },
+      { q: "Что в контроле остатков ниже минимума?", t: "Контроль" },
+      { q: "Какой инструмент давно не двигался?", t: "Залежь" }
+    ],
+    issue_outcome: [
+      { q: "Кто держит инструмент на руках и не вернул?", t: "На руках" },
+      { q: "Какие выдачи просрочены?", t: "Просрочки" },
+      { q: "Что выдавали чаще всего за последние 30 дней?", t: "Топ выдач" }
+    ],
+    issue: [
+      { q: "Кто держит инструмент на руках?", t: "На руках" },
+      { q: "Кто последний брал сверло 2.5?", t: "Кто брал сверло" },
+      { q: "Какие выдачи просрочены?", t: "Просрочки" }
+    ],
+    stock: [
+      { q: "Где лежит сверло 2.5?", t: "Где лежит" },
+      { q: "Какой позиции на складе больше всего по остатку?", t: "Топ остатков" },
+      { q: "Какие позиции без адреса ячейки?", t: "Без адреса" }
+    ],
+    arrival: [
+      { q: "Где лежит сверло 2.5?", t: "Где лежит" },
+      { q: "Что в контроле остатков ниже минимума?", t: "Контроль" },
+      { q: "Какие позиции без адреса ячейки?", t: "Без адреса" }
+    ],
+    purchases: [
+      { q: "Что в контроле остатков ниже минимума?", t: "Контроль" },
+      { q: "Какой инструмент давно не двигался?", t: "Залежь" },
+      { q: "Что выдавали чаще всего за последние 30 дней?", t: "Топ выдач" }
+    ],
+    history: [
+      { q: "Какие последние движения склада?", t: "Движения" },
+      { q: "Какие выдачи просрочены?", t: "Просрочки" },
+      { q: "Кто держит инструмент на руках?", t: "На руках" }
+    ]
+  };
+  var HINTS_VISUAL = [
+    { q: "Где лежит сверло 2.5?", t: "Где лежит" },
+    { q: "Какие позиции без адреса ячейки?", t: "Без адреса" },
+    { q: "Какой позиции на складе больше всего по остатку?", t: "Топ остатков" }
+  ];
+  var HINTS_DEFAULT = [
+    { q: "Какие выдачи просрочены больше 14 дней?", t: "Просрочки" },
+    { q: "Кто последний брал сверло 2.5?", t: "Кто брал сверло" },
+    { q: "Где лежит сверло 2.5?", t: "Где лежит" }
+  ];
+  var PAGE_HINTS = {
+    analysis: "Вкладка «Анализ»: просрочки, контроль, залежь.",
+    issue_outcome: "Возврат: кто не вернул и просрочки.",
+    issue: "Выдача: кто брал и что на руках.",
+    stock: "Остатки: адрес ячейки и топ по количеству.",
+    arrival: "Приход: где лежит и что без адреса.",
+    purchases: "Закупки: что ниже минимума в контроле.",
+    history: "История: свежие движения и открытые выдачи.",
+    visual_warehouse: "Ячейки: адрес и позиции без адреса."
+  };
+
+  function currentHints() {
+    var ctx = detectPageContext();
+    if (ctx.page === "visual_warehouse") return HINTS_VISUAL;
+    if (ctx.page === "inventory" && HINTS[ctx.panel]) return HINTS[ctx.panel];
+    return HINTS_DEFAULT;
+  }
+
+  function bindHintButtons() {
+    if (!hintsEl) return;
+    hintsEl.querySelectorAll(".js-inv-chat-hint").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var t = btn.getAttribute("data-q") || btn.textContent || "";
+        if (input) input.value = t;
+        sendQuestion(t);
+      });
+    });
+  }
+
+  function applyPageUi() {
+    var ctx = detectPageContext();
+    var list = currentHints();
+    if (hintsEl) {
+      hintsEl.innerHTML = "";
+      list.forEach(function (item) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "inv-chat-hint js-inv-chat-hint";
+        btn.setAttribute("data-q", item.q);
+        btn.textContent = item.t;
+        hintsEl.appendChild(btn);
+      });
+      bindHintButtons();
+    }
+    if (pageHintEl) {
+      var msg = "";
+      if (ctx.page === "visual_warehouse") msg = PAGE_HINTS.visual_warehouse;
+      else if (ctx.page === "inventory") msg = PAGE_HINTS[ctx.panel] || "";
+      pageHintEl.textContent = msg;
+      pageHintEl.hidden = !msg;
+    }
+    if (input) {
+      if (ctx.panel === "issue_outcome" || ctx.panel === "analysis") {
+        input.placeholder = "Например: какие выдачи просрочены?";
+      } else if (ctx.panel === "stock" || ctx.page === "visual_warehouse") {
+        input.placeholder = "Например: где лежит сверло 2.5?";
+      } else {
+        input.placeholder = "Например: кто держит инструмент на руках?";
+      }
+    }
+  }
 
   function loadHistory() {
     try {
@@ -51,7 +218,7 @@
     if (!history.length) {
       appendBubble(
         "meta",
-        "Спросите про выдачи, остатки или топ инструмента. Не чаще 1 раза в минуту (админ — без лимита).",
+        "Спросите про просрочки, кто на руках, где лежит инструмент. Не чаще 1 раза в минуту (админ — без лимита).",
         "inv-chat-msg--meta"
       );
       return;
@@ -108,7 +275,12 @@
         "Content-Type": "application/json",
         "X-CSRFToken": csrfToken(),
       },
-      body: JSON.stringify({ question: q, history: payloadHistory }),
+      body: JSON.stringify({
+        question: q,
+        history: payloadHistory,
+        session_key: chatSessionKey,
+        page_context: detectPageContext()
+      }),
     })
       .then(function (resp) {
         return resp.json().then(function (data) {
@@ -155,16 +327,11 @@
     clearBtn.addEventListener("click", function () {
       history = [];
       saveHistory(history);
+      chatSessionKey = resetSessionKey();
       renderHistory();
     });
   }
-  root.querySelectorAll(".js-inv-chat-hint").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var t = btn.getAttribute("data-q") || btn.textContent || "";
-      if (input) input.value = t;
-      sendQuestion(t);
-    });
-  });
+  applyPageUi();
   if (form) {
     form.addEventListener("submit", function (e) {
       e.preventDefault();

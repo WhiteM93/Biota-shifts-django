@@ -1,0 +1,185 @@
+{% if row.kind == "movement" %}
+{% with m=row.movement %}
+<li class="inv-hist-row inv-hist-row--{{ row.kind_mod }} inv-history-card--{{ m.movement_type }}{% if m.is_reverted %} is-reverted{% endif %}{% if row.open_remaining %} is-open-issue{% endif %}">
+  <div class="inv-hist-row__line">
+    <time class="inv-hist-row__time" datetime="{{ m.created_at|date:'c' }}">{{ row.clock }}</time>
+    <span class="inv-hist-row__kind" title="{{ row.kind_label_full|default:row.kind_label }}">{{ row.kind_label }}</span>
+    <div class="inv-hist-row__main" title="{{ row.tool_title }}">
+      <span class="inv-hist-row__title">{{ row.tool_title }}{% if m.tool.is_deleted %} <span class="muted">(удалено)</span>{% endif %}</span>
+      {% if row.tool_cat and row.tool_cat not in row.tool_title %}
+      <span class="inv-hist-row__cat">{{ row.tool_cat }}</span>
+      {% endif %}
+    </div>
+    {% if row.open_remaining %}
+    <span class="inv-hist-row__qty" title="Выдано {{ m.quantity }} шт., на руках {{ row.open_remaining }}">
+      <span>{{ m.quantity }} шт.</span>
+      <em>на руках {{ row.open_remaining }}</em>
+    </span>
+    {% else %}
+    <span class="inv-hist-row__qty">{{ m.quantity }} шт.</span>
+    {% endif %}
+    {% if m.movement_type == "issue" %}
+    <span class="inv-hist-row__people">
+      {% if row.who %}<span class="inv-hist-row__to" title="Кому выдано">{{ row.who }}</span>{% endif %}
+      {% if row.issued_by %}<span class="inv-hist-row__from" title="Кто выдал">выдал {{ row.issued_by }}</span>{% endif %}
+    </span>
+    {% elif row.who %}
+    <span class="inv-hist-row__people">
+      <span class="inv-hist-row__to" title="Сотрудник">{{ row.who }}</span>
+    </span>
+    {% elif row.account_label %}
+    <span class="inv-hist-row__people">
+      <span class="inv-hist-row__from" title="Аккаунт">{{ row.account_label }}</span>
+    </span>
+    {% else %}
+    <span class="inv-hist-row__people"></span>
+    {% endif %}
+    <div class="inv-hist-row__act">
+      {% include "shifts/includes/inventory_history_outcome_form.html" with issue_id=m.id remaining=row.open_remaining employee_name=m.employee_name tool_title=row.tool_title %}
+      {% if row.has_more or m.is_reverted or row.show_rollback %}
+      <details class="inv-hist-row__more">
+        <summary>ещё</summary>
+        <div class="inv-hist-row__details">
+        <p class="inv-hist-row__meta">Дата операции {{ m.movement_date|date:"d.m.Y" }}</p>
+        {% if m.is_reverted %}
+        <p class="inv-hist-row__meta inv-hist-row__meta--warn">Откат{% if m.reverted_at %}: {{ m.reverted_at|date:"d.m.Y H:i" }}{% endif %}{% if row.reverted_by_label %} · {{ row.reverted_by_label }}{% endif %}</p>
+        {% endif %}
+        {% if m.comment %}
+        <p class="inv-hist-row__note">{{ m.comment|linebreaksbr }}</p>
+        {% endif %}
+        {% if can_rollback_stock and row.show_rollback %}
+        <form method="post" action="{% url 'inventory' %}" class="inv-history-rollback-form" onsubmit="return confirm('Откатить это движение? Склад будет скорректирован.');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="rollback_stock_movement">
+          {% if filters.history_movement_type %}<input type="hidden" name="history_movement_type" value="{{ filters.history_movement_type }}">{% endif %}
+          {% if filters.history_employee %}<input type="hidden" name="history_employee" value="{{ filters.history_employee }}">{% endif %}
+          <input type="hidden" name="movement_id" value="{{ m.id }}">
+          <button type="submit" class="btn btn-sm">Откатить</button>
+        </form>
+        {% endif %}
+      </div>
+    </details>
+    {% endif %}
+    </div>
+  </div>
+</li>
+{% endwith %}
+{% else %}
+{% with e=row.event %}
+<li class="inv-hist-row inv-hist-row--event inv-hist-row--{{ row.kind_mod }} inv-history-card--evt-{{ e.event_type }}">
+  <div class="inv-hist-row__line">
+    <time class="inv-hist-row__time" datetime="{{ e.created_at|date:'c' }}">{{ row.clock }}</time>
+    <span class="inv-hist-row__kind" title="{{ row.kind_label_full|default:row.kind_label }}">{{ row.kind_label }}</span>
+    <div class="inv-hist-row__main" title="{{ row.tool_title }}">
+      <span class="inv-hist-row__title">{{ row.tool_title }}</span>
+      {% if row.tool_cat and row.tool_cat not in row.tool_title %}
+      <span class="inv-hist-row__cat">{{ row.tool_cat }}</span>
+      {% endif %}
+    </div>
+    {% if row.line_note %}
+    <span class="inv-hist-row__qty inv-hist-row__qty--note" title="{{ row.line_note }}">{{ row.line_note }}</span>
+    {% else %}
+    <span class="inv-hist-row__qty"></span>
+    {% endif %}
+    <span class="inv-hist-row__people">
+      {% if row.who %}<span class="inv-hist-row__from">{{ row.who }}</span>{% endif %}
+    </span>
+    <div class="inv-hist-row__act">
+    {% if row.has_more %}
+    <details class="inv-hist-row__more">
+      <summary>ещё</summary>
+    <div class="inv-hist-row__details">
+      {% if row.event_note and not row.line_note %}
+      <p class="inv-hist-row__note">{{ row.event_note }}</p>
+      {% endif %}
+      {% if e.event_type == "container_audit" and row.audit_details %}
+        {% with ad=row.audit_details %}
+        {% if ad.label %}<p class="inv-hist-row__meta">Ящик: {{ ad.label }}</p>{% endif %}
+        {% if ad.notes %}<p class="inv-hist-row__note">{{ ad.notes }}</p>{% endif %}
+        {% if ad.new_tools_count %}<p class="inv-hist-row__meta">Новых позиций: {{ ad.new_tools_count }}</p>{% endif %}
+        {% if ad.change_rows %}
+        <ul class="inv-audit-changes">
+          {% for ch in ad.change_rows %}
+          <li class="inv-audit-change inv-audit-change--{{ ch.kind }}">
+            <div class="inv-audit-change__name">{{ ch.tool_name }}</div>
+            <div class="inv-audit-change__qty">
+              {% if ch.expected is not None and ch.counted is not None %}
+              было <strong>{{ ch.expected }}</strong> → факт <strong>{{ ch.counted }}</strong>
+              <span class="inv-audit-change__delta">{% if ch.delta > 0 %}+{% endif %}{{ ch.delta }}</span>
+              {% elif ch.legacy_text %}
+              {{ ch.legacy_text }}
+              {% endif %}
+            </div>
+            {% if ch.kind == "surplus" %}
+              <details class="inv-audit-takers"{% if ch.can_link_return %} open{% endif %}>
+                <summary class="inv-audit-takers__summary">
+                  {% if ch.surplus_left <= 0 and ch.takers %}
+                    Излишек распределён · кто брал ({{ ch.takers|length }})
+                  {% elif ch.open_issues %}
+                    Кто брал этот инструмент
+                    <span class="inv-audit-takers__left">открытых выдач: {{ ch.open_issues|length }}{% if ch.surplus_left %} · ещё {{ ch.surplus_left }} шт.{% endif %}</span>
+                  {% elif ch.takers %}
+                    Кто брал · {{ ch.takers|length }} (открытых выдач нет)
+                  {% else %}
+                    Никто не брал по журналу выдач
+                  {% endif %}
+                </summary>
+                {% if ch.takers %}
+                <ul class="inv-audit-takers-list">
+                  {% for iss in ch.takers %}
+                  <li class="inv-audit-taker{% if not iss.is_open %} is-closed{% endif %}">
+                    <div class="inv-audit-taker__main">
+                      <div class="inv-audit-taker__who">{{ iss.employee_name }}</div>
+                      <div class="inv-audit-taker__meta">
+                        выдача #{{ iss.id }}
+                        {% if iss.date %} · {{ iss.date }}{% endif %}
+                        · взял {{ iss.issued }} шт.
+                        · {% if iss.is_open %}осталось <strong>{{ iss.remaining }}</strong>{% else %}закрыта{% endif %}
+                      </div>
+                      {% if iss.comment %}<div class="inv-audit-taker__comment">{{ iss.comment }}</div>{% endif %}
+                    </div>
+                    {% if iss.is_open and ch.surplus_left > 0 %}
+                    <form method="post" action="{% url 'inventory' %}" class="inv-audit-taker__form">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="link_audit_surplus_return">
+                      <input type="hidden" name="tool_id" value="{{ ch.tool_id }}">
+                      <input type="hidden" name="issue_id" value="{{ iss.id }}">
+                      <label class="inv-audit-taker__qty">
+                        <span>шт.</span>
+                        <input type="number" name="returned_qty" min="1" max="{{ iss.remaining }}"
+                               value="{% if iss.remaining < ch.surplus_left %}{{ iss.remaining }}{% else %}{{ ch.surplus_left }}{% endif %}"
+                               required>
+                      </label>
+                      <button type="submit" class="btn btn-sm">Вернуть</button>
+                    </form>
+                    {% elif not iss.is_open %}
+                    <span class="inv-audit-taker__badge">Закрыта</span>
+                    {% endif %}
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% else %}
+                <p class="inv-audit-change__hint">В журнале нет выдач по этой позиции.</p>
+                {% endif %}
+              </details>
+            {% elif ch.kind == "deficit" %}
+            <p class="inv-audit-change__hint">Недостача списана со склада</p>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% elif not ad.changes_count %}
+        <p class="inv-hist-row__meta muted">Расхождений нет</p>
+        {% endif %}
+        {% endwith %}
+      {% elif row.show_raw_details and e.details %}
+      <pre class="inv-history-card__details">{{ e.details }}</pre>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+    </div>
+  </div>
+</li>
+{% endwith %}
+{% endif %}

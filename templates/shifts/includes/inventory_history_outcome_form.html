@@ -1,0 +1,22 @@
+{% if biota_can_edit and remaining %}
+<div class="inv-hist-outcome">
+  <button
+    type="button"
+    class="btn btn-sm inv-hist-outcome__btn js-hist-outcome-open"
+    data-kind="return"
+    data-issue-id="{{ issue_id }}"
+    data-remaining="{{ remaining }}"
+    data-employee="{{ employee_name|default:'' }}"
+    data-tool="{{ tool_title|default:'' }}"
+  >Вернуть</button>
+  <button
+    type="button"
+    class="btn btn-sm inv-hist-outcome__btn inv-hist-outcome__btn--wo js-hist-outcome-open"
+    data-kind="writeoff"
+    data-issue-id="{{ issue_id }}"
+    data-remaining="{{ remaining }}"
+    data-employee="{{ employee_name|default:'' }}"
+    data-tool="{{ tool_title|default:'' }}"
+  >Списать</button>
+</div>
+{% endif %}

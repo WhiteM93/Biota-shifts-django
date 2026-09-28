@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 import json
 import re
@@ -236,6 +236,120 @@ _HISTORY_FILTER_CHOICES = [
     (InventoryStockEvent.EVENT_CONTAINER_AUDIT, "Инвентаризация ящика"),
     (InventoryStockEvent.EVENT_PRIVILEGE, "Право на склад"),
 ]
+_HISTORY_EVENT_KIND_SHORT = {
+    InventoryStockEvent.EVENT_TOOL_EDIT: "Правка",
+    InventoryStockEvent.EVENT_TOOL_DELETE: "Удаление",
+    InventoryStockEvent.EVENT_ROLLBACK: "Откат",
+    InventoryStockEvent.EVENT_PRIVILEGE: "Права",
+    InventoryStockEvent.EVENT_CONTAINER_AUDIT: "Инвент.",
+}
+
+
+def _history_tool_title(tool) -> str:
+    if not tool:
+        return "—"
+    try:
+        from .inventory_chat_tools import _tool_label
+
+        return (_tool_label(tool) or tool.name or "—").strip() or "—"
+    except Exception:
+        return (getattr(tool, "name", None) or "—").strip() or "—"
+
+
+def _history_movement_kind(m: StockMovement) -> tuple[str, str]:
+    mt = (m.movement_type or "").strip()
+    if mt == "issue":
+        return "issue", "Выдача"
+    if mt == "writeoff":
+        return "writeoff", "Списание"
+    if mt == "restock":
+        if getattr(m, "parent_issue_id", None):
+            return "return", "Возврат"
+        return "restock", "Пополнение"
+    return mt or "move", m.get_movement_type_display()
+
+
+def _history_open_remaining(m: StockMovement) -> int | None:
+    if (m.movement_type or "") != "issue" or m.is_reverted:
+        return None
+    left = int(_issue_remaining_qty(m) or 0)
+    return left if left > 0 else None
+
+
+def _enrich_history_timeline_row(row: dict) -> dict:
+    ts = row.get("ts")
+    if ts is not None:
+        local_ts = timezone.localtime(ts) if timezone.is_aware(ts) else ts
+        row["clock"] = local_ts.strftime("%H:%M")
+        row["day"] = local_ts.date()
+    else:
+        row["clock"] = "—"
+        row["day"] = timezone.localdate()
+    if row.get("kind") == "movement":
+        m = row["movement"]
+        kind_mod, kind_label = _history_movement_kind(m)
+        row["kind_mod"] = kind_mod
+        row["kind_label"] = kind_label
+        row["kind_label_full"] = kind_label
+        row["tool_title"] = _history_tool_title(m.tool)
+        row["tool_cat"] = m.tool.get_category_display() if m.tool_id else ""
+        row["who"] = (m.employee_name or "").strip()
+        row["issued_by"] = (row.get("account_label") or "").strip()
+        row["open_remaining"] = _history_open_remaining(m)
+        comment = (m.comment or "").strip()
+        is_issue = (m.movement_type or "") == "issue"
+        # Комментарий выдачи не в основной строке — иначе путается с названием и сбивает колонки.
+        row["line_note"] = "" if is_issue else (comment if comment and len(comment) <= 80 else "")
+        row["has_more"] = bool(
+            m.is_reverted
+            or row.get("show_rollback")
+            or comment
+        )
+    else:
+        e = row["event"]
+        full_kind = e.get_event_type_display()
+        row["kind_mod"] = f"evt-{e.event_type}"
+        row["kind_label"] = _HISTORY_EVENT_KIND_SHORT.get(e.event_type, full_kind)
+        row["kind_label_full"] = full_kind
+        row["tool_title"] = row.get("event_title") or e.summary or full_kind
+        row["tool_cat"] = row.get("event_subtitle") or ""
+        row["who"] = (row.get("actor_label") or e.actor_username or "").strip()
+        row["open_remaining"] = None
+        note = (row.get("event_note") or "").strip()
+        row["line_note"] = note if note and len(note) <= 80 else ""
+        row["has_more"] = bool(
+            row.get("audit_details")
+            or (row.get("show_raw_details") and e.details)
+            or (note and not row["line_note"])
+        )
+    return row
+
+
+def _history_day_groups(timeline: list[dict], *, today: date | None = None) -> list[dict]:
+    day_today = today or timezone.localdate()
+    groups: list[dict] = []
+    current_key = None
+    current: dict | None = None
+    for row in timeline:
+        _enrich_history_timeline_row(row)
+        day = row.get("day") or day_today
+        key = day.isoformat()
+        if key != current_key:
+            if current:
+                groups.append(current)
+            if day == day_today:
+                label = "Сегодня"
+            elif day == day_today - timedelta(days=1):
+                label = "Вчера"
+            else:
+                label = day.strftime("%d.%m.%Y")
+            current = {"key": key, "date": day, "label": label, "count": 0, "rows": []}
+            current_key = key
+        current["rows"].append(row)
+        current["count"] += 1
+    if current:
+        groups.append(current)
+    return groups
 
 
 def _analysis_panel_redirect(request, **extra: str) -> redirect:
@@ -3427,29 +3541,46 @@ def inventory_view(request):
         return JsonResponse({"ok": True, "name": saved})
 
     if action == "process_issue_outcome":
+        from_history = (request.POST.get("from_panel") or "").strip() == "history"
+
+        def _outcome_redirect():
+            if from_history:
+                return _history_panel_redirect(request)
+            return _issue_outcome_redirect(request)
+
         issue_id = _to_int(request.POST.get("issue_id"), 0)
         returned_qty = _to_int(request.POST.get("returned_qty"), 0)
         writeoff_qty = _to_int(request.POST.get("writeoff_qty"), 0)
+        outcome_kind = (request.POST.get("outcome_kind") or "").strip()
+        if outcome_kind in {"return", "writeoff"}:
+            qty = _to_int(request.POST.get("outcome_qty"), 0)
+            if outcome_kind == "return":
+                returned_qty, writeoff_qty = qty, 0
+            else:
+                returned_qty, writeoff_qty = 0, qty
         movement_date_raw = (request.POST.get("movement_date") or "").strip()
+        if not movement_date_raw:
+            movement_date_raw = date.today().isoformat()
         comment = (request.POST.get("comment") or "").strip()
         employee_name = (request.POST.get("employee_name") or "").strip()
         if issue_id <= 0 or (returned_qty <= 0 and writeoff_qty <= 0):
             messages.error(request, "Выберите выдачу и укажите количество на возврат/списание.")
-            return _issue_outcome_redirect(request)
+            return _outcome_redirect()
         if not comment:
             messages.error(request, "Комментарий обязателен: укажите причину списания/возврата.")
-            return _issue_outcome_redirect(request)
+            return _outcome_redirect()
         if employee_name and employee_options:
             matched = _match_skud_employee(employee_name, employee_options)
-            if not matched:
+            if not matched and not from_history:
                 messages.error(request, "Выберите сотрудника из списка СКУД.")
-                return _issue_outcome_redirect(request)
-            employee_name = matched
+                return _outcome_redirect()
+            if matched:
+                employee_name = matched
         try:
             movement_date = date.fromisoformat(movement_date_raw)
         except ValueError:
             messages.error(request, "Введите корректную дату операции.")
-            return _issue_outcome_redirect(request)
+            return _outcome_redirect()
 
         with transaction.atomic():
             issue = StockMovement.objects.select_for_update().select_related("tool").filter(
@@ -3457,7 +3588,7 @@ def inventory_view(request):
             ).first()
             if not issue:
                 messages.error(request, "Исходная выдача не найдена.")
-                return _issue_outcome_redirect(request)
+                return _outcome_redirect()
 
             processed = (
                 StockMovement.objects.filter(parent_issue=issue, movement_type__in=["restock", "writeoff"])
@@ -3468,7 +3599,7 @@ def inventory_view(request):
             requested = returned_qty + writeoff_qty
             if requested > remaining:
                 messages.error(request, f"По этой выдаче осталось обработать только {remaining} шт.")
-                return _issue_outcome_redirect(request)
+                return _outcome_redirect()
 
             if returned_qty > 0:
                 issue.tool.quantity += returned_qty
@@ -3495,7 +3626,7 @@ def inventory_view(request):
                     created_by_account=username,
                 )
         messages.success(request, "Операция по выданному инструменту сохранена.")
-        return _issue_outcome_redirect(request)
+        return _outcome_redirect()
 
     if action == "link_audit_surplus_return":
         tool_id = _to_int(request.POST.get("tool_id"), 0)
@@ -5051,6 +5182,7 @@ def inventory_view(request):
         )
     timeline.sort(key=lambda x: (x["ts"], x["tid"]), reverse=True)
     inventory_history = timeline[:120]
+    inventory_history_days = _history_day_groups(inventory_history)
 
     tool_extension_brands = _distinct_text_values(
         _opt_qs("tool_extension", "ext_brand"), "tool_extension_spec__brand"
@@ -5097,6 +5229,7 @@ def inventory_view(request):
         ).order_by("category", "name"),
         "movements": mv_hist[:50],
         "inventory_history": inventory_history,
+        "inventory_history_days": inventory_history_days,
         "thread_standards": THREAD_STANDARDS,
         "thread_kinds": THREAD_KINDS,
         "tap_hole_types": TAP_HOLE_TYPES,
