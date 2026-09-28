@@ -1803,7 +1803,7 @@ var INV = (function () {
         if (!cutterVal) {
           if (cutEl) cutEl.classList.add("is-invalid");
           issues.push({
-            msg: "Строка " + (i + 1) + ": укажите вид фрезы.",
+            msg: "Строка " + (i + 1) + ": укажите вид корпусного инструмента.",
             el: cutEl,
           });
         }

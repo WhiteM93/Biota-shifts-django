@@ -13,6 +13,7 @@ from . import inventory_views
 from . import inventory_ai_archive_views
 from . import inventory_chat_views
 from . import inventory_types_views
+from . import site_notebook_views
 from . import payroll_views
 from . import product_views
 from . import setup_ai_views
@@ -64,6 +65,16 @@ urlpatterns = [
         "cabinet/ai-archive/session/<str:session_key>/",
         inventory_ai_archive_views.inventory_ai_archive_session_view,
         name="inventory_ai_archive_session",
+    ),
+    path(
+        "cabinet/site-notebook/",
+        site_notebook_views.site_notebook_view,
+        name="site_notebook",
+    ),
+    path(
+        "cabinet/site-notebook/<int:pk>/mark/",
+        site_notebook_views.site_notebook_mark_api,
+        name="site_notebook_mark",
     ),
     path(
         "inventory/api/arrival-matches/",

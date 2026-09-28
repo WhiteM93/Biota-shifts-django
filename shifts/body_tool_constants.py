@@ -16,7 +16,7 @@ BODY_TOOL_FAMILIES = [
 BODY_TOOL_FAMILY_VALUES = frozenset(k for k, _ in BODY_TOOL_FAMILIES)
 BODY_TOOL_FAMILY_LABELS = dict(BODY_TOOL_FAMILIES)
 
-# Виды фрезы (единый шаблон корпусного инструмента)
+# Виды корпусного инструмента (единый шаблон)
 BODY_TOOL_KIND_TYPES = [
     ("end", "Концевая"),
     ("chamfer", "Фасочная"),
@@ -24,6 +24,7 @@ BODY_TOOL_KIND_TYPES = [
     ("disc", "Т-образная"),
     ("ball", "Сферическая"),
     ("thread", "Резьбовая"),
+    ("drill", "Сверло"),
 ]
 
 # Полный список choices модели (включая устаревшие ключи для старых записей)
@@ -75,13 +76,17 @@ BODY_TOOL_MOUNT_VALUES = frozenset(k for k, _ in BODY_TOOL_MOUNT_TYPES if k)
 
 # Для концевых — без насадного отверстия и Морзе; для фасочных — все;
 # для высокоскоростных — отверстие или цилиндр;
-# для сферических — Морзе / Weldon / цилиндр.
+# для сферических — Морзе / Weldon / цилиндр;
+# для сверла — как концевые + Морзе.
 END_MILL_SHANK_TYPES = [x for x in BODY_TOOL_SHANK_TYPES if x[0] in ("", "weldon", "cylindrical")]
 CHAMFER_MILL_SHANK_TYPES = list(BODY_TOOL_SHANK_TYPES)
 HIGH_SPEED_SHANK_TYPES = [x for x in BODY_TOOL_SHANK_TYPES if x[0] in ("", "bore", "cylindrical")]
 ROUND_INSERT_SHANK_TYPES = list(BODY_TOOL_SHANK_TYPES)
 BALL_MILL_SHANK_TYPES = [
     x for x in BODY_TOOL_SHANK_TYPES if x[0] in ("", "mt3", "mt4", "weldon", "cylindrical")
+]
+DRILL_SHANK_TYPES = [
+    x for x in BODY_TOOL_SHANK_TYPES if x[0] in ("", "weldon", "cylindrical", "mt3", "mt4")
 ]
 
 # Резьба крепления фрезерных головок с пластинами
@@ -164,6 +169,11 @@ def normalize_indexable_mill_cutter(raw) -> str:
         "резьбовой": "thread",
         "threading": "thread",
         "thread_mill": "thread",
+        "drill": "drill",
+        "сверло": "drill",
+        "сверла": "drill",
+        "indexable_drill": "drill",
+        "korpusnoe_sverlo": "drill",
     }
     v = aliases.get(v, v)
     if v in INDEXABLE_MILL_CUTTER_VALUES:

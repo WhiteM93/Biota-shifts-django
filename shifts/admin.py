@@ -11,6 +11,7 @@ from .models import (
     ProductFile,
     ProductSetup,
     ProductSetupPhoto,
+    SiteNotebookTask,
     WorkContract,
     WorkContractPosition,
     WorkPositionOperation,
@@ -170,3 +171,35 @@ class InventoryAiTurnAdmin(admin.ModelAdmin):
     @admin.display(description="Вопрос")
     def question_short(self, obj: InventoryAiTurn) -> str:
         return (obj.question or "")[:80]
+
+
+@admin.register(SiteNotebookTask)
+class SiteNotebookTaskAdmin(admin.ModelAdmin):
+    list_display = ("id", "created_at", "status", "author_username", "title_short", "done_by")
+    list_filter = ("status",)
+    search_fields = ("title", "body", "author_username", "source_question")
+    readonly_fields = ("created_at", "done_at")
+    date_hierarchy = "created_at"
+    actions = ("mark_done", "mark_open")
+
+    @admin.display(description="Кратко")
+    def title_short(self, obj: SiteNotebookTask) -> str:
+        return (obj.title or "")[:80]
+
+    @admin.action(description="Отметить выполненными")
+    def mark_done(self, request, queryset):
+        from django.utils import timezone
+
+        queryset.filter(status=SiteNotebookTask.STATUS_OPEN).update(
+            status=SiteNotebookTask.STATUS_DONE,
+            done_at=timezone.now(),
+            done_by=(getattr(request.user, "username", "") or "admin")[:120],
+        )
+
+    @admin.action(description="Вернуть в открытые")
+    def mark_open(self, request, queryset):
+        queryset.filter(status=SiteNotebookTask.STATUS_DONE).update(
+            status=SiteNotebookTask.STATUS_OPEN,
+            done_at=None,
+            done_by="",
+        )

@@ -12,9 +12,13 @@ from .yandex_gpt import YandexGptError, complete, yandex_gpt_configured
 
 SYSTEM_PROMPT = """Склад Biota. Отвечай кратко по-русски.
 Факты только из tools (search_issues и др.) — это те же выдачи, что вкладка История.
-Не выдумывай цифры и не подменяй ø2.3 вместо ø3.5. Даты ДД.ММ.ГГГГ. Только чтение.
+Не выдумывай цифры и не подменяй ø2.3 вместо ø3.5. Даты ДД.ММ.ГГГГ. Только чтение склада.
 
 Типы не путать: сверло ⌀2.5 ≠ метчик M2.5 / M5.
+
+Если пользователь просит ДОБАВИТЬ / ИЗМЕНИТЬ / ИСПРАВИТЬ что-то на САЙТЕ
+(кнопка, вкладка, фильтр, форма, удобство) — вызывай add_site_note{title,body}.
+Это пишется в блокнот админа. Не путай с вопросами про складской остаток.
 
 Вызывай tool JSON сам (не проси пользователя):
 - «кто брал …» / «а сверла 3.5» → search_issues;
@@ -25,7 +29,8 @@ SYSTEM_PROMPT = """Склад Biota. Отвечай кратко по-русск
 - «контроль / кончается / ниже минимума» → watch_alerts;
 - «залежь / давно не двигался» → dead_stock;
 - «чаще используют / топ выдач» → top_issued_tools (НЕ остатки);
-- «больше всего на складе» → top_stock_tools.
+- «больше всего на складе» → top_stock_tools;
+- «добавь на сайт / нужно сделать / исправь интерфейс / запиши в блокнот» → add_site_note.
 На «проводи / точнее» — снова тот же класс tool.
 Формат только: {"tool":"имя","args":{...}} если нужен tool."""
 
@@ -92,6 +97,17 @@ _RECENT_RE = re.compile(
 )
 _SUMMARY_RE = re.compile(
     r"^(?:сводка|что\s+тут|что\s+важно|что\s+критичн|покажи\s+контроль)\b",
+    re.IGNORECASE,
+)
+_NOTEBOOK_RE = re.compile(
+    r"запиши\s+(?:в\s+)?блокнот|в\s+блокнот|"
+    r"добав\w*\s+(?:на\s+сайт|в\s+сайт|кнопк|вкладк|фильтр|поле|функци)|"
+    r"нужно\s+(?:добавить|сделать|доработать|исправить|улучшить)|"
+    r"хочу\s+(?:чтобы|чтоб)\s+(?:на\s+сайте\s+)?(?:добав|сделал|доработ|исправ)|"
+    r"доработк\w*\s+сайт|улучш\w*\s+сайт|исправ\w*\s+(?:на\s+сайте|в\s+интерфейс|ux)|"
+    r"можно\s+ли\s+добавить|добавьте\s+(?:кнопк|вкладк|фильтр|поле)|"
+    r"задача\s+для\s+админ|предложени\w*\s+(?:по\s+)?(?:сайт|доработ|улучшен)|"
+    r"feature\s*request|сделай\s+(?:чтобы|чтоб)\s+(?:на\s+сайте|в\s+кабинет|в\s+складе)",
     re.IGNORECASE,
 )
 _REFUSAL_RE = re.compile(
@@ -209,6 +225,7 @@ _FORCED_KEEP = frozenset(
         "top_issued_tools",
         "top_stock_tools",
         "recent_movements",
+        "add_site_note",
     }
 )
 
@@ -300,7 +317,10 @@ def forced_tool_call(
     dead = bool(_DEAD_RE.search(q) or (_FOLLOW_RE.search(q) and _DEAD_RE.search(blob)))
     no_addr = bool(_NO_ADDR_RE.search(q) or (_FOLLOW_RE.search(q) and _NO_ADDR_RE.search(blob)))
     recent = bool(_RECENT_RE.search(q) or (_FOLLOW_RE.search(q) and _RECENT_RE.search(blob)))
+    notebook = bool(_NOTEBOOK_RE.search(q))
 
+    if notebook:
+        return {"tool": "add_site_note", "args": {"title": q[:120], "body": q[:2000]}}
     if who and not hold:
         src = q if _WHO_RE.search(q) else blob
         tool_q = _strip_prefix(
@@ -478,9 +498,28 @@ def ask_inventory_chat(
     tool_result = run_tool(
         tool_name,
         call.get("args") or {},
-        context={"username": username or ""},
+        context={
+            "username": username or "",
+            "source_question": q,
+            "page_context": page_ctx,
+        },
     )
     used_tools.append(tool_name)
+
+    if tool_name == "add_site_note":
+        if tool_result.get("ok"):
+            return {
+                "ok": True,
+                "reply": tool_result.get("reply")
+                or "Записал в блокнот для администратора.",
+                "used_tools": used_tools,
+                "notebook_id": tool_result.get("id"),
+            }
+        return {
+            "ok": False,
+            "error": tool_result.get("error") or "Не удалось записать в блокнот.",
+            "used_tools": used_tools,
+        }
 
     if tool_name in _FACT_REPLY_TOOLS:
         return {

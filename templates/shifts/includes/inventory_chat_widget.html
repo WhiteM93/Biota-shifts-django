@@ -4,7 +4,7 @@
   class="inv-chat"
   data-url="{% url 'inventory_chat_api' %}"
   data-csrf="{{ csrf_token }}"
-  {% if biota_is_admin %}data-archive-url="{% url 'inventory_ai_archive' %}"{% endif %}
+  {% if biota_is_admin %}data-archive-url="{% url 'inventory_ai_archive' %}" data-notebook-url="{% url 'site_notebook' %}"{% endif %}
 >
   <button type="button" class="inv-chat-fab js-inv-chat-fab" aria-expanded="false" aria-controls="inv-chat-panel" title="Чат склада">AI</button>
   <div id="inv-chat-panel" class="inv-chat-panel js-inv-chat-panel" hidden role="dialog" aria-label="Чат склада">
@@ -12,6 +12,7 @@
       <h3>Чат склада</h3>
       <div class="inv-chat-head-actions">
         {% if biota_is_admin %}
+        <a class="inv-chat-icon-btn" href="{% url 'site_notebook' %}" title="Блокнот доработок">✎</a>
         <a class="inv-chat-icon-btn" href="{% url 'inventory_ai_archive' %}" title="Архив диалогов">⧉</a>
         {% endif %}
         <button type="button" class="inv-chat-icon-btn js-inv-chat-clear" title="Очистить">⌫</button>
@@ -23,7 +24,7 @@
     <div class="inv-chat-hints js-inv-chat-hints"></div>
     <div class="inv-chat-messages js-inv-chat-messages" aria-live="polite"></div>
     <form class="inv-chat-form js-inv-chat-form">
-      <textarea class="js-inv-chat-input" rows="2" maxlength="1500" placeholder="Например: кто брал сверла 2.5?"></textarea>
+      <textarea class="js-inv-chat-input" rows="2" maxlength="1500" placeholder="Склад или «запиши в блокнот: …»"></textarea>
       <button type="submit" class="js-inv-chat-send">Спросить</button>
     </form>
   </div>

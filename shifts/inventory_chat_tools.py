@@ -10,7 +10,7 @@ from django.db.models import Count, F, IntegerField, Max, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from .models import StockMovement, ToolItem
+from .models import SiteNotebookTask, StockMovement, ToolItem
 from .size_label_normalize import size_label_match_variants
 
 MAX_ROWS = 50
@@ -1096,6 +1096,44 @@ def build_warehouse_context(
     return text
 
 
+def add_site_note(
+    *,
+    title: str = "",
+    body: str = "",
+    username: str = "",
+    source_question: str = "",
+    page: str = "",
+    panel: str = "",
+) -> dict[str, Any]:
+    text = (body or title or source_question or "").strip()
+    if not text:
+        return {"ok": False, "error": "Пустая заявка — укажите, что добавить или изменить."}
+    head = (title or text).strip().replace("\n", " ")
+    if len(head) > 200:
+        head = head[:199] + "…"
+    note_body = (body or text).strip()
+    if len(note_body) > 4000:
+        note_body = note_body[:3999] + "…"
+    row = SiteNotebookTask.objects.create(
+        author_username=(username or "").strip()[:120] or "unknown",
+        title=head,
+        body=note_body,
+        source_question=(source_question or "").strip()[:2000],
+        page=(page or "").strip()[:40],
+        panel=(panel or "").strip()[:40],
+        status=SiteNotebookTask.STATUS_OPEN,
+    )
+    return {
+        "ok": True,
+        "id": row.id,
+        "title": row.title,
+        "reply": (
+            f"Записал в блокнот для администратора (№{row.id}): {row.title}. "
+            "Админ увидит задачу и отметит, когда сделает."
+        ),
+    }
+
+
 TOOL_SPECS: dict[str, dict[str, Any]] = {
     "search_issues": {
         "description": (
@@ -1228,6 +1266,19 @@ TOOL_SPECS: dict[str, dict[str, Any]] = {
         },
         "fn": watch_alerts,
     },
+    "add_site_note": {
+        "description": (
+            "Записать в блокнот админа заявку на ДОРАБОТКУ САЙТА "
+            "(добавить функцию, исправить UX, изменить фильтр и т.п.). "
+            "НЕ для складских вопросов. Пользователь просит что-то сделать на сайте — "
+            "сразу вызывай этот tool."
+        ),
+        "args": {
+            "title": "краткий заголовок (до 120 символов)",
+            "body": "что именно нужно добавить или изменить",
+        },
+        "fn": add_site_note,
+    },
 }
 
 
@@ -1245,7 +1296,8 @@ def tools_schema_for_prompt() -> str:
         "top_stock_tools — топ остатков; "
         "tool_stock_search{query}; "
         "issues_by_employee{name}; "
-        "recent_movements{movement_type?}. "
+        "recent_movements{movement_type?}; "
+        "add_site_note{title,body} — заявка на доработку сайта в блокнот админа. "
         'Формат: {"tool":"имя","args":{...}}'
     )
 
@@ -1263,9 +1315,17 @@ def run_tool(
     raw = args if isinstance(args, dict) else {}
     allowed = set(spec["args"].keys())
     clean = {k: v for k, v in raw.items() if k in allowed}
+    ctx = context if isinstance(context, dict) else {}
     if name == "watch_alerts":
-        ctx = context if isinstance(context, dict) else {}
         clean["username"] = str(ctx.get("username") or "")[:120]
+    if name == "add_site_note":
+        clean["username"] = str(ctx.get("username") or "")[:120]
+        clean["source_question"] = str(ctx.get("source_question") or "")[:2000]
+        pc = ctx.get("page_context") if isinstance(ctx.get("page_context"), dict) else {}
+        if not clean.get("page"):
+            clean["page"] = str(pc.get("page") or "")[:40]
+        if not clean.get("panel"):
+            clean["panel"] = str(pc.get("panel") or "")[:40]
     try:
         return fn(**clean)
     except Exception as exc:  # noqa: BLE001 — отдаём модели текст ошибки

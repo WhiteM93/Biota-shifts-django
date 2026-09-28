@@ -66,6 +66,11 @@
       <span class="cabinet-quick-card__title">Архив диалогов ИИ</span>
       <p class="cabinet-quick-card__desc">Чат склада и анализ наладки — для разбора тестов</p>
     </a>
+    <a class="cabinet-quick-card" href="{% url 'site_notebook' %}">
+      <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "nav.inventory" %}</span>
+      <span class="cabinet-quick-card__title">Блокнот доработок</span>
+      <p class="cabinet-quick-card__desc">Заявки из чата ИИ: что добавить или исправить на сайте</p>
+    </a>
     <a class="cabinet-quick-card" href="{% url 'perf_diagnostics' %}">
       <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "cabinet.perf_diagnostics" %}</span>
       <span class="cabinet-quick-card__title">Медленные загрузки</span>

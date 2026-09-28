@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+<style>
+.nb-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+.nb-filters a {
+  padding: 6px 12px; border-radius: 6px; border: 1px solid var(--bio-filter-border);
+  text-decoration: none; font-size: 12px; background: transparent; color: inherit;
+}
+.nb-filters a.active { background: var(--bio-tab-pill-active-bg); color: #fff; border-color: transparent; }
+.nb-badge {
+  display: inline-block; min-width: 1.4em; padding: 0 6px; margin-left: 4px;
+  border-radius: 999px; font-size: 11px; font-weight: 600;
+  background: var(--bio-emp-code-bg); border: 1px solid var(--bio-emp-code-border);
+}
+.nb-list { display: flex; flex-direction: column; gap: 12px; }
+.nb-card {
+  padding: 14px 16px; border-radius: 8px;
+  border: 1px solid var(--bio-surface-item-border);
+  background: var(--bio-surface-item);
+}
+.nb-card--done { opacity: 0.72; }
+.nb-card__head {
+  display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline;
+  margin-bottom: 8px;
+}
+.nb-card__title { margin: 0; font-size: 15px; font-weight: 650; color: var(--bio-heading-accent); }
+.nb-card__meta { font-size: 12px; color: var(--bio-muted); }
+.nb-card__body { white-space: pre-wrap; word-break: break-word; font-size: 13px; margin: 0 0 10px; }
+.nb-card__source { font-size: 12px; color: var(--bio-muted); margin: 0 0 12px; }
+.nb-card__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.nb-card__actions button {
+  padding: 6px 12px; border-radius: 6px; border: 1px solid var(--bio-filter-border);
+  background: var(--bio-tab-pill-active-bg); color: #fff; font-size: 12px; cursor: pointer;
+}
+.nb-card__actions button.secondary {
+  background: transparent; color: inherit;
+}
+.nb-status-open { color: #86efac; font-weight: 600; }
+.nb-status-done { color: var(--bio-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cabinet-page">
+  <header class="cabinet-hero">
+    <p class="cabinet-hero__eyebrow">Администрирование</p>
+    <h1>Блокнот доработок</h1>
+    <p class="cabinet-hero__meta muted">
+      Заявки из чата ИИ: что добавить или изменить на сайте. Видно только админу.
+      {% if open_count %}<span>· открытых: <strong>{{ open_count }}</strong></span>{% endif %}
+    </p>
+  </header>
+
+  <nav class="nb-filters" aria-label="Фильтр">
+    <a href="{% url 'site_notebook' %}?status=open" class="{% if status_filter == 'open' %}active{% endif %}">
+      Открытые{% if open_count %}<span class="nb-badge">{{ open_count }}</span>{% endif %}
+    </a>
+    <a href="{% url 'site_notebook' %}?status=done" class="{% if status_filter == 'done' %}active{% endif %}">Выполненные</a>
+    <a href="{% url 'site_notebook' %}?status=all" class="{% if status_filter == 'all' %}active{% endif %}">Все</a>
+    <a href="{% url 'inventory_ai_archive' %}">Архив диалогов ИИ</a>
+  </nav>
+
+  {% if rows %}
+  <div class="nb-list">
+    {% for row in rows %}
+    <article class="nb-card {% if row.status == 'done' %}nb-card--done{% endif %}">
+      <div class="nb-card__head">
+        <h2 class="nb-card__title">№{{ row.id }} · {{ row.title }}</h2>
+        {% if row.status == 'open' %}
+        <span class="nb-status-open">открыта</span>
+        {% else %}
+        <span class="nb-status-done">выполнено</span>
+        {% endif %}
+      </div>
+      <p class="nb-card__meta">
+        {{ row.created_at|date:"d.m.Y H:i" }}
+        · {{ row.author_username|default:"—" }}
+        {% if row.page %} · {{ row.page }}{% if row.panel %}/{{ row.panel }}{% endif %}{% endif %}
+        {% if row.status == 'done' and row.done_at %}
+        · закрыл {{ row.done_by|default:"—" }} {{ row.done_at|date:"d.m.Y H:i" }}
+        {% endif %}
+      </p>
+      <p class="nb-card__body">{{ row.body }}</p>
+      {% if row.source_question and row.source_question != row.body %}
+      <p class="nb-card__source">Исходный вопрос: {{ row.source_question|truncatechars:400 }}</p>
+      {% endif %}
+      <form class="nb-card__actions" method="post" action="{% url 'site_notebook' %}">
+        {% csrf_token %}
+        <input type="hidden" name="id" value="{{ row.id }}">
+        <input type="hidden" name="status" value="{{ status_filter }}">
+        {% if row.status == 'open' %}
+        <button type="submit" name="action" value="done">Выполнено</button>
+        {% else %}
+        <button type="submit" name="action" value="reopen" class="secondary">Вернуть в открытые</button>
+        {% endif %}
+      </form>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">Пока пусто. Напишите в чат склада, например: «запиши в блокнот: добавь фильтр по …».</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -462,7 +462,7 @@ class ToolItem(models.Model):
                 (
                     bt.get_shank_type_display()
                     if bt and (bt.shank_type or "").strip()
-                    else ("—" if bt and bt.cutter_type in ("end", "chamfer", "high_speed", "round_insert") else "")
+                    else ("—" if bt and bt.cutter_type in ("end", "chamfer", "high_speed", "round_insert", "drill", "thread", "ball") else "")
                 ),
                 (f"L {fmt_mm(bt.overall_length_mm)}" if bt and bt.overall_length_mm is not None else ""),
                 (
@@ -1568,6 +1568,8 @@ class BodyToolSpec(models.Model):
             self.coupling = derived
         elif self.cutter_type == "end" and not self.coupling:
             self.coupling = "shank"
+        elif self.cutter_type == "drill" and not self.coupling:
+            self.coupling = "shank"
         elif self.cutter_type == "modular_head":
             self.coupling = "modular"
         if self.variable_angle:
@@ -1776,6 +1778,45 @@ class InventoryAiTurn(models.Model):
     def __str__(self) -> str:
         q = (self.question or "").replace("\n", " ")[:60]
         return f"{self.username} · {self.get_kind_display()} · {q}"
+
+
+class SiteNotebookTask(models.Model):
+    """Заявка на доработку сайта из чата ИИ — видит и закрывает только админ."""
+
+    STATUS_OPEN = "open"
+    STATUS_DONE = "done"
+    STATUS_CHOICES = [
+        (STATUS_OPEN, "Открыта"),
+        (STATUS_DONE, "Выполнено"),
+    ]
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Когда")
+    author_username = models.CharField(max_length=120, db_index=True, verbose_name="Кто попросил")
+    title = models.CharField(max_length=200, verbose_name="Кратко")
+    body = models.TextField(verbose_name="Что сделать")
+    source_question = models.TextField(blank=True, default="", verbose_name="Исходный вопрос")
+    page = models.CharField(max_length=40, blank=True, default="", verbose_name="Страница")
+    panel = models.CharField(max_length=40, blank=True, default="", verbose_name="Вкладка")
+    status = models.CharField(
+        max_length=12,
+        choices=STATUS_CHOICES,
+        default=STATUS_OPEN,
+        db_index=True,
+        verbose_name="Статус",
+    )
+    done_at = models.DateTimeField(null=True, blank=True, verbose_name="Когда закрыто")
+    done_by = models.CharField(max_length=120, blank=True, default="", verbose_name="Кто закрыл")
+
+    class Meta:
+        ordering = ("status", "-created_at", "-id")
+        verbose_name = "Задача блокнота сайта"
+        verbose_name_plural = "Блокнот доработок сайта"
+        indexes = [
+            models.Index(fields=("status", "-created_at"), name="site_nb_status_created"),
+        ]
+
+    def __str__(self) -> str:
+        return f"[{self.get_status_display()}] {self.title[:60]}"
 
 
 class PurchaseRequest(models.Model):
