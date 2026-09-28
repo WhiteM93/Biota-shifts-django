@@ -29,7 +29,7 @@
     <div class="biota-site-bg__grain"></div>
   </div>
   {% if not hide_nav %}
-  <div class="nav">
+  <div class="nav" id="biota-nav">
     {% include "shifts/includes/biota_nav_fragment.html" %}
   </div>
   {% endif %}
@@ -47,35 +47,74 @@
   <script>
     (function () {
       var KEY = "biotaSiteTheme";
+      function themeButtons() {
+        return document.querySelectorAll("#biota-theme-toggle, #biota-theme-toggle-mobile");
+      }
       function apply(name) {
         var v = name === "dawn" ? "dawn" : "night";
         document.documentElement.setAttribute("data-theme", v);
         try {
           localStorage.setItem(KEY, v);
         } catch (_e) {}
-        var btn = document.getElementById("biota-theme-toggle");
-        if (btn) {
+        themeButtons().forEach(function (btn) {
           btn.setAttribute("aria-pressed", v === "dawn" ? "true" : "false");
           btn.title = v === "dawn" ? "Переключить на ночную тему" : "Тема «Рассвет» (светлая)";
-        }
+        });
         try {
           window.dispatchEvent(new CustomEvent("biota-theme-change", { detail: { theme: v } }));
         } catch (_e2) {}
       }
       window.biotaSetSiteTheme = apply;
-      var btnInit = document.getElementById("biota-theme-toggle");
-      if (btnInit) {
-        var cur = document.documentElement.getAttribute("data-theme") || "night";
-        btnInit.setAttribute("aria-pressed", cur === "dawn" ? "true" : "false");
-        btnInit.title =
+      var cur = document.documentElement.getAttribute("data-theme") || "night";
+      themeButtons().forEach(function (btn) {
+        btn.setAttribute("aria-pressed", cur === "dawn" ? "true" : "false");
+        btn.title =
           cur === "dawn"
             ? "Переключить на ночную тему"
             : "Тема «Рассвет» (светлая)";
-        btnInit.addEventListener("click", function () {
+        btn.addEventListener("click", function () {
           var c = document.documentElement.getAttribute("data-theme") || "night";
           apply(c === "dawn" ? "night" : "dawn");
         });
+      });
+    })();
+    (function () {
+      var nav = document.getElementById("biota-nav") || document.querySelector(".nav");
+      var burger = document.getElementById("biota-nav-burger");
+      var panel = document.getElementById("biota-nav-panel");
+      if (!nav || !burger || !panel) return;
+
+      function setOpen(open) {
+        nav.classList.toggle("is-open", open);
+        burger.setAttribute("aria-expanded", open ? "true" : "false");
+        burger.setAttribute("aria-label", open ? "Закрыть меню" : "Открыть меню");
+        burger.title = open ? "Закрыть" : "Меню";
       }
+
+      burger.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(!nav.classList.contains("is-open"));
+      });
+
+      document.addEventListener("click", function (ev) {
+        if (!nav.classList.contains("is-open")) return;
+        if (nav.contains(ev.target)) return;
+        setOpen(false);
+      });
+
+      document.addEventListener("keydown", function (ev) {
+        if (ev.key === "Escape" && nav.classList.contains("is-open")) setOpen(false);
+      });
+
+      panel.addEventListener("click", function (ev) {
+        var a = ev.target && ev.target.closest ? ev.target.closest("a") : null;
+        if (a && a.getAttribute("href")) setOpen(false);
+      });
+
+      window.addEventListener("resize", function () {
+        if (window.matchMedia("(min-width: 721px)").matches) setOpen(false);
+      });
     })();
     (function () {
       var canEdit = document.body && document.body.getAttribute("data-biota-can-edit") === "1";

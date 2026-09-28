@@ -1,4 +1,17 @@
 {% load biota_icons %}
+<button
+  type="button"
+  class="nav-burger"
+  id="biota-nav-burger"
+  aria-expanded="false"
+  aria-controls="biota-nav-panel"
+  aria-label="Открыть меню"
+  title="Меню"
+>
+  <span class="nav-burger__bars" aria-hidden="true"></span>
+</button>
+
+<div class="nav-panel" id="biota-nav-panel">
 {% if biota_username and biota_can_edit %}
 <form method="post" action="{% url 'refresh_cache' %}" class="nav-refresh-form">
   {% csrf_token %}
@@ -28,6 +41,7 @@
 {% if biota_nav.inventory %}
 <a href="{% url 'inventory' %}" class="nav-inventory-link nav-inventory-link--icon-only {% if request.resolver_match.url_name == 'inventory' and request.GET.panel != 'defects' and request.GET.panel != 'payroll' and request.GET.panel != 'employees' or request.resolver_match.url_name == 'visual_warehouse' %}active{% endif %}" title="Склад" aria-label="Склад">
   {% biota_icon "nav.inventory" %}
+  <span class="nav-link-text">Склад</span>
 </a>
 {% endif %}
 {% if biota_nav.defects or biota_nav.payroll or biota_nav.employees %}
@@ -66,11 +80,13 @@
 {% if biota_username %}
 <a href="{% url 'cabinet' %}" class="nav-user nav-ctl {% if request.resolver_match.url_name == 'cabinet' %}active{% endif %}" title="Кабинет: {{ biota_username }}" aria-label="Кабинет: {{ biota_username }}">
   {% biota_icon "nav.user" %}
+  <span class="nav-link-text">Кабинет</span>
 </a>
 {% endif %}
 {% if biota_nav.forms %}
 <a href="{% url 'forms' %}" class="nav-icon-btn nav-ctl {% if request.resolver_match.url_name == 'forms' %}active{% endif %}" title="Формы" aria-label="Формы">
   {% biota_icon "nav.forms" %}
+  <span class="nav-link-text">Формы</span>
 </a>
 {% endif %}
 {% if biota_nav.contracts %}
@@ -79,18 +95,20 @@
 {% if biota_nav.calculator %}
 <a href="{% url 'calculator' %}" class="nav-icon-btn nav-ctl {% if request.resolver_match.url_name == 'calculator' %}active{% endif %}" title="Калькулятор" aria-label="Калькулятор">
   {% biota_icon "nav.calculator" %}
+  <span class="nav-link-text">Калькулятор</span>
 </a>
 {% endif %}
 {% if biota_username %}
 <a href="{% url 'site_updates' %}" class="nav-icon-btn nav-ctl nav-updates-link {% if request.resolver_match.url_name == 'site_updates' %}active{% endif %}" title="Обновления сайта" aria-label="Обновления сайта">
   {% biota_icon "nav.updates" %}
+  <span class="nav-link-text">Обновления</span>
   {% if site_updates_unread %}
   <span class="nav-updates-badge">{% if site_updates_unread > 9 %}9+{% else %}{{ site_updates_unread }}{% endif %}</span>
   {% endif %}
 </a>
 {% endif %}
 <div class="nav-theme-wrap">
-  <button type="button" class="nav-theme-btn nav-ctl" id="biota-theme-toggle" aria-pressed="false" title="Тема «Рассвет» (светлая)">{% include "shifts/includes/m_logo_svg.html" %}</button>
+  <button type="button" class="nav-theme-btn nav-ctl" id="biota-theme-toggle" aria-pressed="false" title="Тема «Рассвет» (светлая)">{% include "shifts/includes/m_logo_svg.html" %}<span class="nav-link-text">Тема</span></button>
 </div>
 {% if biota_username %}
 <a href="{% url 'logout' %}" class="nav-logout nav-ctl" aria-label="Выйти из аккаунта" title="Выйти">
@@ -109,7 +127,31 @@
     <polyline points="16 17 21 12 16 7" />
     <line x1="21" y1="12" x2="9" y2="12" />
   </svg>
+  <span class="nav-link-text">Выйти</span>
 </a>
 {% else %}
 <a href="{% url 'login' %}">Войти</a>
 {% endif %}
+</div>
+
+<div class="nav-mobile-quick" aria-label="Быстрые действия">
+  {% if biota_username %}
+  <a href="{% url 'cabinet' %}" class="nav-ctl nav-mobile-quick__btn {% if request.resolver_match.url_name == 'cabinet' %}active{% endif %}" title="Кабинет" aria-label="Кабинет">{% biota_icon "nav.user" %}</a>
+  <a href="{% url 'site_updates' %}" class="nav-ctl nav-mobile-quick__btn nav-updates-link {% if request.resolver_match.url_name == 'site_updates' %}active{% endif %}" title="Обновления" aria-label="Обновления сайта">
+    {% biota_icon "nav.updates" %}
+    {% if site_updates_unread %}
+    <span class="nav-updates-badge">{% if site_updates_unread > 9 %}9+{% else %}{{ site_updates_unread }}{% endif %}</span>
+    {% endif %}
+  </a>
+  {% endif %}
+  <button type="button" class="nav-theme-btn nav-ctl nav-mobile-quick__btn" id="biota-theme-toggle-mobile" aria-pressed="false" title="Тема">{% include "shifts/includes/m_logo_svg.html" %}</button>
+  {% if biota_username %}
+  <a href="{% url 'logout' %}" class="nav-logout nav-ctl nav-mobile-quick__btn" aria-label="Выйти" title="Выйти">
+    <svg class="nav-logout-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  </a>
+  {% endif %}
+</div>

@@ -573,47 +573,48 @@ html[data-theme="dawn"] .nav {
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
-.nav > * {
+.nav > *,
+.nav-panel > * {
   animation: navItemReveal 0.44s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
-.nav > *:nth-child(1) {
+.nav-panel > *:nth-child(1) {
   animation-delay: 0.02s;
 }
-.nav > *:nth-child(2) {
+.nav-panel > *:nth-child(2) {
   animation-delay: 0.05s;
 }
-.nav > *:nth-child(3) {
+.nav-panel > *:nth-child(3) {
   animation-delay: 0.08s;
 }
-.nav > *:nth-child(4) {
+.nav-panel > *:nth-child(4) {
   animation-delay: 0.11s;
 }
-.nav > *:nth-child(5) {
+.nav-panel > *:nth-child(5) {
   animation-delay: 0.14s;
 }
-.nav > *:nth-child(6) {
+.nav-panel > *:nth-child(6) {
   animation-delay: 0.17s;
 }
-.nav > *:nth-child(7) {
+.nav-panel > *:nth-child(7) {
   animation-delay: 0.2s;
 }
-.nav > *:nth-child(8) {
+.nav-panel > *:nth-child(8) {
   animation-delay: 0.23s;
 }
-.nav > *:nth-child(9) {
+.nav-panel > *:nth-child(9) {
   animation-delay: 0.26s;
 }
-.nav > *:nth-child(10) {
+.nav-panel > *:nth-child(10) {
   animation-delay: 0.29s;
 }
-.nav > *:nth-child(11) {
+.nav-panel > *:nth-child(11) {
   animation-delay: 0.32s;
 }
-.nav > *:nth-child(12) {
+.nav-panel > *:nth-child(12) {
   animation-delay: 0.35s;
 }
-.nav > *:nth-child(n + 13) {
+.nav-panel > *:nth-child(n + 13) {
   animation-delay: 0.38s;
 }
 
@@ -1504,6 +1505,24 @@ html[data-theme="dawn"] .nav-dropdown-menu a:hover {
   margin-left: auto;
 }
 
+.nav-burger,
+.nav-mobile-quick {
+  display: none;
+}
+
+.nav-link-text {
+  display: none;
+}
+
+.nav-panel {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .nav .nav-refresh-form {
   margin: 0;
 }
@@ -2209,74 +2228,253 @@ html[data-theme="dawn"] .chk {
   }
 
   .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
     padding: 8px 10px;
-    gap: 6px;
-    overflow-x: visible;
-    flex-wrap: wrap;
-    align-items: stretch;
+    overflow: visible;
   }
 
-  .nav a,
-  .nav-dropdown > summary {
-    font-size: 12px;
-    padding: 7px 9px;
-    line-height: 1.2;
+  .nav-burger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--bio-nav-border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--bio-nav-user-bg) 70%, transparent);
+    color: var(--bio-nav-link);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .nav .nav-ctl,
-  .nav a[class*="--icon-only"],
-  .nav-dropdown > summary[class*="--icon-only"] {
+  .nav-burger__bars,
+  .nav-burger__bars::before,
+  .nav-burger__bars::after {
+    display: block;
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+
+  .nav-burger__bars {
+    position: relative;
+  }
+
+  .nav-burger__bars::before,
+  .nav-burger__bars::after {
+    content: "";
+    position: absolute;
+    left: 0;
+  }
+
+  .nav-burger__bars::before {
+    top: -6px;
+  }
+
+  .nav-burger__bars::after {
+    top: 6px;
+  }
+
+  .nav.is-open .nav-burger__bars {
+    background: transparent;
+  }
+
+  .nav.is-open .nav-burger__bars::before {
+    top: 0;
+    transform: rotate(45deg);
+  }
+
+  .nav.is-open .nav-burger__bars::after {
+    top: 0;
+    transform: rotate(-45deg);
+  }
+
+  .nav-mobile-quick {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    flex: 0 0 auto;
+  }
+
+  .nav-mobile-quick__btn {
     width: 38px;
     min-width: 38px;
     height: 38px;
     padding: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
   }
 
-  .nav .nav-ctl svg,
-  .nav .nav-ctl img.biota-icon,
-  .nav .nav-ctl svg.biota-icon,
-  .nav a[class*="--icon-only"] svg,
-  .nav a[class*="--icon-only"] img.biota-icon,
-  .nav a[class*="--icon-only"] svg.biota-icon,
-  .nav-dropdown > summary[class*="--icon-only"] svg,
-  .nav-dropdown > summary[class*="--icon-only"] img.biota-icon,
-  .nav-dropdown > summary[class*="--icon-only"] svg.biota-icon,
-  .nav .nav-ctl .m-logo {
+  .nav-mobile-quick__btn svg,
+  .nav-mobile-quick__btn img.biota-icon,
+  .nav-mobile-quick__btn svg.biota-icon,
+  .nav-mobile-quick__btn .m-logo,
+  .nav-mobile-quick__btn .nav-logout-icon {
     width: var(--bio-nav-icon-size);
     height: var(--bio-nav-icon-size);
   }
 
-  .nav .nav-ctl .m-logo {
+  .nav-mobile-quick__btn .m-logo {
     width: var(--bio-nav-logo-size);
     height: var(--bio-nav-logo-size);
   }
 
-  .nav a[class*="--icon-only"] [class$="__icon"],
-  .nav-dropdown > summary[class*="--icon-only"] [class$="__icon"] {
-    width: var(--bio-nav-icon-size);
-    height: var(--bio-nav-icon-size);
+  .nav-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 1px);
+    left: 0;
+    right: 0;
+    z-index: 120;
+    max-height: min(78vh, calc(100dvh - 64px));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 10px 10px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--bio-nav-bg);
+    border-bottom: 1px solid var(--bio-nav-border);
+    box-shadow: 0 16px 28px rgba(0, 0, 0, 0.28);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav.is-open .nav-panel {
+    display: flex;
+  }
+
+  .nav-panel > * {
+    animation: none;
   }
 
   .nav .nav-spacer {
-    flex-basis: 100%;
+    display: none;
+  }
+
+  .nav-panel > a,
+  .nav-panel > .nav-dropdown > summary,
+  .nav-panel > .nav-theme-wrap > .nav-theme-btn,
+  .nav-panel > form.nav-role-preview {
     width: 100%;
-    margin-left: 0;
+    box-sizing: border-box;
   }
 
-  .nav .nav-refresh-form {
-    align-self: center;
-  }
-
-  .nav .nav-refresh-btn {
-    width: 32px;
-    height: 32px;
+  .nav-panel > a,
+  .nav-panel > .nav-dropdown > summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 10px 12px;
     font-size: 15px;
+    line-height: 1.25;
+    border-radius: 10px;
   }
 
-  .nav-dropdown-menu {
-    left: 0;
+  .nav-panel > a.nav-ctl,
+  .nav-panel > a[class*="--icon-only"],
+  .nav-panel > .nav-theme-wrap > .nav-theme-btn {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 44px;
+    padding: 10px 12px !important;
+    justify-content: flex-start;
+  }
+
+  .nav-panel .nav-link-text {
+    display: inline;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .nav-panel > a[class*="--icon-only"] {
+    width: 100%;
+  }
+
+  .nav-panel .nav-dropdown {
+    width: 100%;
+  }
+
+  .nav-panel .nav-dropdown-menu {
+    position: static;
+    left: auto;
     right: auto;
-    min-width: min(260px, calc(100vw - 24px));
+    min-width: 0;
+    width: 100%;
+    margin: 4px 0 6px;
+    box-shadow: none;
+    border: 1px solid var(--bio-nav-border);
+    border-radius: 10px;
+    padding: 4px;
+  }
+
+  .nav-panel .nav-dropdown-menu a {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+
+  .nav-panel .nav-role-preview {
+    width: 100%;
+    justify-content: stretch;
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .nav-panel .nav-role-preview__label {
+    display: none;
+  }
+
+  .nav-panel .nav-role-preview__btn {
+    flex: 1 1 0;
+    min-height: 40px;
+    font-size: 13px;
+    padding: 10px 8px;
+  }
+
+  .nav-panel .nav-refresh-form {
+    align-self: stretch;
+    width: 100%;
+  }
+
+  .nav-panel .nav-refresh-btn {
+    width: 100%;
+    height: 44px;
+    border-radius: 10px;
+    font-size: 15px;
+    gap: 8px;
+  }
+
+  .nav-panel .nav-theme-wrap {
+    width: 100%;
+  }
+
+  .nav-panel .nav-updates-badge {
+    position: static;
+    margin-left: auto;
+  }
+
+  /* Быстрые кнопки уже в шапке — в выпадающем списке не дублируем */
+  .nav-panel > .nav-theme-wrap,
+  .nav-panel > a.nav-logout {
+    display: none;
   }
 
   .filter-panel {
