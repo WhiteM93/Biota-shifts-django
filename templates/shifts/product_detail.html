@@ -743,7 +743,7 @@
   </div>
 </div>
 {% for setup in setups %}
-{% if setup.share_qr_svg %}
+{% if setup.share_url %}
 <template class="js-setup-share-qr-tpl" data-setup-id="{{ setup.pk }}" data-url="{{ setup.share_url }}" data-local="{% if setup.share_qr_localhost %}1{% else %}0{% endif %}">{{ setup.share_qr_svg|safe }}</template>
 {% endif %}
 {% endfor %}

@@ -4229,6 +4229,16 @@ function saveSetupToolNoteEditor() {
           : null;
         if (!tpl) return;
         codeEl.innerHTML = tpl.innerHTML;
+        if (!codeEl.querySelector("svg, img")) {
+          var url = tpl.getAttribute("data-url") || "";
+          codeEl.replaceChildren();
+          if (url) {
+            var line = document.createElement("p");
+            line.className = "setup-share-qr-modal-url";
+            line.textContent = url;
+            codeEl.appendChild(line);
+          }
+        }
         if (hintEl) hintEl.hidden = tpl.getAttribute("data-local") !== "1";
         modal.hidden = false;
         modal.setAttribute("aria-hidden", "false");

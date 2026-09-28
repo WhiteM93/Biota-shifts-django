@@ -130,7 +130,11 @@ def _nav_key_for_internal_path(path: str, query: str) -> str | None:
 
 
 def post_login_redirect(username: str | None, next_path: str | None = None) -> str:
-    """Куда отправить пользователя после входа / при отказе в nav-правах."""
+    """Куда отправить пользователя после входа / при отказе в nav-правах.
+
+    По умолчанию — личный кабинет. Если передан безопасный next — туда
+    (при доступе по nav). Если next недоступен — первая доступная страница из меню.
+    """
     u = (username or "").strip()
     perms = nav_permissions_for_user(u) if u else {k: True for k in NAV_KEYS}
 
@@ -143,37 +147,38 @@ def post_login_redirect(username: str | None, next_path: str | None = None) -> s
                 nk = _nav_key_for_internal_path(parsed.path, parsed.query)
                 if nk is None or perms.get(nk, True):
                     return raw
+            # next недоступен — ниже fallback по правам, не сразу кабинет
+            order = (
+                "graph",
+                "hours",
+                "skud",
+                "inventory",
+                "inventory_types",
+                "defects",
+                "payroll",
+                "employees",
+                "regulations",
+                "products",
+                "machines",
+                "forms",
+                "calculator",
+                "visual_warehouse",
+                "contracts",
+            )
+            for k in order:
+                if not perms.get(k, True):
+                    continue
+                try:
+                    if k == "defects":
+                        return f"{reverse('inventory')}?panel=defects"
+                    if k == "payroll":
+                        return f"{reverse('inventory')}?panel=payroll"
+                    if k == "employees":
+                        return f"{reverse('inventory')}?panel=employees"
+                    return reverse(k)
+                except NoReverseMatch:
+                    continue
 
-    order = (
-        "graph",
-        "hours",
-        "skud",
-        "inventory",
-        "inventory_types",
-        "defects",
-        "payroll",
-        "employees",
-        "regulations",
-        "products",
-        "machines",
-        "forms",
-        "calculator",
-        "visual_warehouse",
-        "contracts",
-    )
-    for k in order:
-        if not perms.get(k, True):
-            continue
-        try:
-            if k == "defects":
-                return f"{reverse('inventory')}?panel=defects"
-            if k == "payroll":
-                return f"{reverse('inventory')}?panel=payroll"
-            if k == "employees":
-                return f"{reverse('inventory')}?panel=employees"
-            return reverse(k)
-        except NoReverseMatch:
-            continue
     return reverse("cabinet")
 
 

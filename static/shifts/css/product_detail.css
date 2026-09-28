@@ -931,6 +931,16 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     height: 200px;
     display: block;
   }
+  .setup-share-qr-modal-url {
+    margin: 0;
+    padding: 8px 4px;
+    width: 100%;
+    height: auto;
+    font-size: 12px;
+    line-height: 1.4;
+    word-break: break-all;
+    color: #333;
+  }
   .setup-share-qr-modal-hint {
     margin: 0;
     font-size: 12px;
@@ -4872,18 +4882,36 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     background: #0a0c12;
   }
   .setup-photo-modal-close {
-    flex: 0 0 auto;
-    align-self: flex-end;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    margin: 0 0 4px 0;
-    padding: 4px 9px;
+    position: absolute;
+    top: max(10px, env(safe-area-inset-top, 0px));
+    right: max(10px, env(safe-area-inset-right, 0px));
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 999px;
+    background: rgba(10, 12, 18, 0.78);
+    color: #fff;
+    font-size: 26px;
+    font-weight: 500;
     line-height: 1;
-    font-size: 20px;
-    min-width: 34px;
-    background: rgba(17, 24, 39, 0.92);
-    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .setup-photo-modal-close:hover,
+  .setup-photo-modal-close:focus {
+    background: rgba(20, 24, 34, 0.92);
+    border-color: rgba(255, 255, 255, 0.45);
+    outline: none;
+  }
+  .setup-photo-modal-close:active {
+    transform: scale(0.96);
   }
   .setup-photo-modal-dialog #setup-photo-modal-caption {
     flex: 0 0 auto;
