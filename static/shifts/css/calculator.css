@@ -256,6 +256,89 @@ html[data-theme="dawn"] .calc-page {
   gap: 5px;
   min-width: 0;
 }
+.calc-product-combo {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  z-index: 1;
+}
+.calc-product-combo.is-open {
+  z-index: 40;
+}
+.calc-product-combo-native {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  clip-path: inset(50%) !important;
+}
+.calc-product-search {
+  padding-right: 12px;
+}
+.calc-product-suggest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: min(280px, 48vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--bio-input-border);
+  border-radius: 10px;
+  background: var(--bio-input-bg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  z-index: 50;
+}
+.calc-product-suggest.opens-up {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+.calc-product-suggest[hidden] {
+  display: none !important;
+}
+.calc-product-suggest-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  border: 0;
+  border-bottom: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--bio-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.calc-product-suggest-item:last-child {
+  border-bottom: 0;
+}
+.calc-product-suggest-item:hover,
+.calc-product-suggest-item:focus {
+  background: color-mix(in srgb, var(--ca) 16%, var(--bio-input-bg));
+  outline: none;
+}
+.calc-product-suggest-clear {
+  font-weight: 600;
+  color: var(--bio-text-muted);
+}
+.calc-product-suggest-empty {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--bio-text-muted);
+}
 .calc-piece-save-bar__row--grow { min-width: 0; }
 .calc-piece-save-bar__actions {
   display: flex;

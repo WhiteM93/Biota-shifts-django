@@ -5,6 +5,7 @@
   var apiListUrl = root.getAttribute("data-api-list-url") || "";
   var apiDetailTpl = root.getAttribute("data-api-detail-tpl") || "";
   var apiUploadUrl = root.getAttribute("data-api-upload-url") || "";
+  var apiLayoutTpl = root.getAttribute("data-api-layout-tpl") || "";
   var canEdit = (root.getAttribute("data-can-edit") || "") === "1";
 
   var emptyEl = root.querySelector(".js-forms-empty");
@@ -18,6 +19,14 @@
   var sheetInnerEl = root.querySelector(".js-forms-sheet-inner");
   var printRoot = root.querySelector(".js-forms-print-root");
   var printBtn = root.querySelector(".js-forms-print");
+  var aiBtn = root.querySelector(".js-forms-ai");
+  var dialogAi = root.querySelector(".js-forms-dialog-ai");
+  var aiForm = root.querySelector(".js-forms-ai-form");
+  var aiSource = root.querySelector(".js-forms-ai-source");
+  var aiInstruction = root.querySelector(".js-forms-ai-instruction");
+  var aiMsg = root.querySelector(".js-forms-ai-msg");
+  var aiSubmit = root.querySelector(".js-forms-ai-submit");
+  var aiCancel = root.querySelector(".js-forms-ai-cancel");
 
   var nameInput = root.querySelector(".js-forms-name");
   var orientationSelect = root.querySelector(".js-forms-orientation");
@@ -1733,6 +1742,10 @@
     return apiDetailTpl.replace(/\/0\/?$/, "/" + id + "/");
   }
 
+  function apiLayoutUrl(id) {
+    return apiLayoutTpl.replace(/\/0\/layout\/?$/, "/" + id + "/layout/");
+  }
+
   function getCookie(name) {
     var parts = ("; " + document.cookie).split("; " + name + "=");
     if (parts.length === 2) return parts.pop().split(";").shift() || "";
@@ -1947,6 +1960,7 @@
       setPanelVisible(editorEl, false);
       setPanelVisible(propsPanel, false);
       if (printBtn) printBtn.disabled = true;
+      if (aiBtn) aiBtn.disabled = true;
       renderList();
       return;
     }
@@ -1959,6 +1973,7 @@
     setPanelVisible(editorEl, true);
     setPanelVisible(propsPanel, true);
     if (printBtn) printBtn.disabled = false;
+    if (aiBtn) aiBtn.disabled = !canEdit;
 
     if (nameInput) nameInput.value = form.name || "";
     if (orientationSelect) orientationSelect.value = form.orientation || "portrait";
@@ -2767,6 +2782,71 @@
       if (promptResolver) promptResolver(true);
       promptResolver = null;
       dialogPrompt.close();
+    });
+  }
+
+  function setAiBusy(busy) {
+    if (aiSubmit) aiSubmit.disabled = !!busy;
+    if (aiSource) aiSource.disabled = !!busy;
+    if (aiInstruction) aiInstruction.disabled = !!busy;
+    if (aiSubmit) aiSubmit.textContent = busy ? "Оформляю…" : "Оформить";
+  }
+
+  function showAiMsg(text) {
+    if (!aiMsg) return;
+    if (!text) {
+      aiMsg.hidden = true;
+      aiMsg.textContent = "";
+      return;
+    }
+    aiMsg.hidden = false;
+    aiMsg.textContent = text;
+  }
+
+  if (aiBtn && dialogAi) {
+    aiBtn.addEventListener("click", function () {
+      if (!canEdit || !currentForm()) return;
+      showAiMsg("");
+      if (aiSource) aiSource.value = "";
+      if (aiInstruction) aiInstruction.value = "";
+      setAiBusy(false);
+      dialogAi.showModal();
+      setTimeout(function () { if (aiSource) aiSource.focus(); }, 50);
+    });
+  }
+  if (aiCancel && dialogAi) {
+    aiCancel.addEventListener("click", function () {
+      dialogAi.close();
+    });
+  }
+  if (aiForm && dialogAi) {
+    aiForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (!canEdit || !currentId) return;
+      var source = aiSource ? (aiSource.value || "").trim() : "";
+      if (!source) {
+        showAiMsg("Вставьте текст.");
+        return;
+      }
+      showAiMsg("");
+      setAiBusy(true);
+      fetchJson(apiLayoutUrl(currentId), {
+        method: "POST",
+        body: {
+          source: source,
+          instruction: aiInstruction ? (aiInstruction.value || "").trim() : "",
+        },
+      }).then(function (data) {
+        applySavedForm(data.form, true);
+        renderCanvas();
+        renderList();
+        applySheetOrientation(currentForm());
+        dialogAi.close();
+      }).catch(function (err) {
+        showAiMsg(err.message || "Не удалось оформить бланк.");
+      }).then(function () {
+        setAiBusy(false);
+      });
     });
   }
 

@@ -764,9 +764,12 @@ function saveSetupToolNoteEditor() {
       var isSetupTab = /^setup-\d+$/.test(tabName || "");
       var exportSpecsBtn = document.getElementById("setup-export-specs-btn");
       var exportPhotosBtn = document.getElementById("setup-export-photos-btn");
+      var exportToolsBtn = document.getElementById("setup-export-tools-btn");
       var loadMachineBtn = document.getElementById("setup-load-to-machine-btn");
+      var shareQrBtn = document.getElementById("setup-share-qr-btn");
       if (exportSpecsBtn) exportSpecsBtn.hidden = !isSetupTab;
       if (exportPhotosBtn) exportPhotosBtn.hidden = !isSetupTab;
+      if (exportToolsBtn) exportToolsBtn.hidden = !isSetupTab;
       if (loadMachineBtn) loadMachineBtn.hidden = !isSetupTab;
       if (isSetupTab) {
         var m = (tabName || "").match(/^setup-(\d+)$/);
@@ -774,8 +777,29 @@ function saveSetupToolNoteEditor() {
         if (setupId) {
           var specsPattern = PD.pdf_url_specs;
           var photosPattern = PD.pdf_url_photos;
+          var toolsPattern = PD.pdf_url_tools;
           if (exportSpecsBtn) exportSpecsBtn.href = specsPattern.replace("/0/pdf/specs/", "/" + setupId + "/pdf/specs/");
           if (exportPhotosBtn) exportPhotosBtn.href = photosPattern.replace("/0/pdf/photos/", "/" + setupId + "/pdf/photos/");
+          if (exportToolsBtn && toolsPattern) {
+            exportToolsBtn.href = toolsPattern.replace("/0/pdf/tools/", "/" + setupId + "/pdf/tools/");
+          }
+        }
+      }
+      if (shareQrBtn) {
+        var hasQr = false;
+        if (isSetupTab) {
+          var qrMatch = (tabName || "").match(/^setup-(\d+)$/);
+          var qrSetupId = qrMatch ? qrMatch[1] : "";
+          hasQr = !!(qrSetupId && document.querySelector('.js-setup-share-qr-tpl[data-setup-id="' + qrSetupId + '"]'));
+        }
+        shareQrBtn.hidden = !hasQr;
+        if (!hasQr) {
+          var qrModal = document.getElementById("setup-share-qr-modal");
+          if (qrModal && !qrModal.hidden) {
+            qrModal.hidden = true;
+            qrModal.setAttribute("aria-hidden", "true");
+            shareQrBtn.setAttribute("aria-expanded", "false");
+          }
         }
       }
       updateSetupNormBadge(tabName);
@@ -3384,9 +3408,12 @@ function saveSetupToolNoteEditor() {
         if (setupIndex) setupTab.textContent = "Уст. " + setupIndex;
         var setupOption = document.querySelector('#setup-tab-select option[value="' + tabName + '"]');
         if (setupOption) {
-          // Только название (и ● если в работе) — без «Уст. N», иначе номер расходится с именем/порядком
-          var inWork = setupOption.getAttribute("data-setup-in-work") === "1";
-          setupOption.textContent = (inWork ? "● " : "") + setupName;
+          // Только название (и ● / ▶ если статус) — без «Уст. N», иначе номер расходится с именем/порядком
+          setupOption.textContent =
+            setupRunPrefix({
+              in_work: setupOption.getAttribute("data-setup-in-work") === "1",
+              needs_start: setupOption.getAttribute("data-setup-needs-start") === "1",
+            }) + setupName;
         }
       }
     }
@@ -4180,6 +4207,55 @@ function saveSetupToolNoteEditor() {
       });
     })();
 
+    (function initSetupShareQr() {
+      var btn = document.getElementById("setup-share-qr-btn");
+      var modal = document.getElementById("setup-share-qr-modal");
+      var codeEl = document.getElementById("setup-share-qr-code");
+      var hintEl = document.getElementById("setup-share-qr-hint");
+      if (!btn || !modal || !codeEl) return;
+
+      function closeShareQrModal() {
+        modal.hidden = true;
+        modal.setAttribute("aria-hidden", "true");
+        btn.setAttribute("aria-expanded", "false");
+      }
+
+      function openShareQrModal() {
+        var tabName = getCurrentTabName();
+        var m = (tabName || "").match(/^setup-(\d+)$/);
+        var setupId = m ? m[1] : "";
+        var tpl = setupId
+          ? document.querySelector('.js-setup-share-qr-tpl[data-setup-id="' + setupId + '"]')
+          : null;
+        if (!tpl) return;
+        codeEl.innerHTML = tpl.innerHTML;
+        if (hintEl) hintEl.hidden = tpl.getAttribute("data-local") !== "1";
+        modal.hidden = false;
+        modal.setAttribute("aria-hidden", "false");
+        btn.setAttribute("aria-expanded", "true");
+      }
+
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        if (!modal.hidden) {
+          closeShareQrModal();
+          return;
+        }
+        openShareQrModal();
+      });
+      modal.addEventListener("click", function (e) {
+        var t = e.target;
+        if (t && t.getAttribute("data-close-setup-share-qr") === "1") {
+          closeShareQrModal();
+        }
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && modal && !modal.hidden) {
+          closeShareQrModal();
+        }
+      });
+    })();
+
     document.addEventListener("click", function (e) {
       var photoPin = e.target && e.target.closest && e.target.closest(".js-setup-tool-photo-pin");
       if (photoPin) {
@@ -4591,37 +4667,45 @@ function saveSetupToolNoteEditor() {
     });
 
     root.querySelectorAll(".setup-inline-toolbar-block").forEach(function (tb) {
+      function restoreNotesRange(panel) {
+        var notesEl = panel && panel.querySelector('[data-field-text="setup_notes"]');
+        if (!notesEl) return null;
+        notesEl.focus();
+        if (notesSelection) {
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(notesSelection);
+        }
+        return notesEl;
+      }
       tb.querySelectorAll(".js-notes-cmd").forEach(function (btn) {
+        btn.addEventListener("mousedown", function (e) { e.preventDefault(); });
         btn.addEventListener("click", function () {
-          var panel = btn.closest(".product-tab-panel");
-          if (!panel) return;
-          var notesEl = panel.querySelector('[data-field-text="setup_notes"]');
-          if (!notesEl) return;
-          notesEl.focus();
-          if (notesSelection) {
-            var sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(notesSelection);
-          }
+          if (!restoreNotesRange(btn.closest(".product-tab-panel"))) return;
           document.execCommand(btn.getAttribute("data-cmd"), false, null);
         });
       });
       var fontSel = tb.querySelector(".js-notes-fontsize");
       if (fontSel) {
         fontSel.addEventListener("change", function () {
-          var panel = fontSel.closest(".product-tab-panel");
-          if (!panel) return;
-          var notesEl = panel.querySelector('[data-field-text="setup_notes"]');
-          if (!notesEl) return;
-          notesEl.focus();
-          if (notesSelection) {
-            var sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(notesSelection);
-          }
+          if (!restoreNotesRange(fontSel.closest(".product-tab-panel"))) return;
           document.execCommand("fontSize", false, fontSel.value);
         });
       }
+      tb.querySelectorAll(".js-notes-color").forEach(function (btn) {
+        btn.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        btn.addEventListener("click", function () {
+          var notesEl = restoreNotesRange(btn.closest(".product-tab-panel"));
+          if (!notesEl) return;
+          var raw = (btn.getAttribute("data-color") || "").trim();
+          var color = raw === "default"
+            ? (window.getComputedStyle(notesEl).color || "#dce3ee")
+            : raw;
+          if (!color) return;
+          try { document.execCommand("styleWithCSS", false, true); } catch (errStyle) { /* ignore */ }
+          document.execCommand("foreColor", false, color);
+        });
+      });
     });
 
     document.addEventListener("click", async function (e) {
@@ -6370,13 +6454,30 @@ function saveSetupToolNoteEditor() {
       );
     })();
 
-    function applySetupInWorkToggleUi(toggles, inWork) {
-      toggles.forEach(function (b) {
-        b.classList.toggle("is-on", !!inWork);
-        b.setAttribute("aria-pressed", inWork ? "true" : "false");
-        b.title = inWork
-          ? "В работе — нажмите, чтобы снять"
-          : "Не в работе — нажмите, чтобы включить";
+    function setupRunPrefix(item) {
+      if (item && item.in_work) return "● ";
+      if (item && item.needs_start) return "▶ ";
+      return "";
+    }
+
+    function applySetupRunStatusUi(setupId, inWork, needsStart) {
+      var buttons = document.querySelectorAll(
+        '.product-setup-inwork-toggle[data-setup-id="' + setupId + '"]'
+      );
+      buttons.forEach(function (b) {
+        var kind = b.getAttribute("data-run-status") || "in_work";
+        var on = kind === "needs_start" ? !!needsStart : !!inWork;
+        b.classList.toggle("is-on", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+        if (kind === "needs_start") {
+          b.title = on
+            ? "Надо запускать — нажмите, чтобы снять"
+            : "Не в очереди запуска — нажмите, чтобы включить";
+        } else {
+          b.title = on
+            ? "В работе — нажмите, чтобы снять"
+            : "Не в работе — нажмите, чтобы включить";
+        }
       });
     }
 
@@ -6406,8 +6507,9 @@ function saveSetupToolNoteEditor() {
       setupOrder.forEach(function (item) {
         var opt = select.querySelector('option[value="' + item.tab_slug + '"]');
         if (!opt) return;
-        opt.textContent = (item.in_work ? "● " : "") + item.name;
+        opt.textContent = setupRunPrefix(item) + item.name;
         opt.setAttribute("data-setup-in-work", item.in_work ? "1" : "0");
+        opt.setAttribute("data-setup-needs-start", item.needs_start ? "1" : "0");
         select.appendChild(opt);
       });
       select.setAttribute("data-setup-order-ids", nextIds);
@@ -6422,17 +6524,22 @@ function saveSetupToolNoteEditor() {
       );
       if (!setupOpts.length) return;
       setupOpts.sort(function (a, b) {
-        var ai = a.getAttribute("data-setup-in-work") === "1" ? 1 : 0;
-        var bi = b.getAttribute("data-setup-in-work") === "1" ? 1 : 0;
-        if (ai !== bi) return bi - ai;
-        return 0;
+        function rank(opt) {
+          if (opt.getAttribute("data-setup-in-work") === "1") return 2;
+          if (opt.getAttribute("data-setup-needs-start") === "1") return 1;
+          return 0;
+        }
+        return rank(b) - rank(a);
       });
       setupOpts.forEach(function (opt) {
         // Сбрасываем возможный устаревший «Уст. N — …» после прошлого сохранения
-        var raw = (opt.textContent || "").replace(/^\s*●\s*/, "").trim();
+        var raw = (opt.textContent || "").replace(/^\s*[●▶]\s*/, "").trim();
         var stripped = raw.replace(/^Уст\.\s*\d+\s*[—\-–]\s*/i, "").trim();
-        var inWork = opt.getAttribute("data-setup-in-work") === "1";
-        opt.textContent = (inWork ? "● " : "") + (stripped || raw || "без названия");
+        opt.textContent =
+          setupRunPrefix({
+            in_work: opt.getAttribute("data-setup-in-work") === "1",
+            needs_start: opt.getAttribute("data-setup-needs-start") === "1",
+          }) + (stripped || raw || "без названия");
         select.appendChild(opt);
       });
       select.setAttribute(
@@ -6451,17 +6558,31 @@ function saveSetupToolNoteEditor() {
 
     document.addEventListener("click", function (e) {
       var btn = e.target && e.target.closest ? e.target.closest(".product-setup-inwork-toggle") : null;
-      if (!btn || btn.disabled || btn.classList.contains("is-busy")) return;
+      if (!btn || btn.disabled || btn.classList.contains("is-busy") || btn.classList.contains("is-readonly")) return;
+      if (document.body.getAttribute("data-biota-can-edit") !== "1") return;
       e.preventDefault();
       e.stopPropagation();
 
       var setupId = btn.getAttribute("data-setup-id");
       if (!setupId) return;
+      var statusKind = btn.getAttribute("data-run-status") || "in_work";
       var nextOn = !btn.classList.contains("is-on");
-      var toggles = document.querySelectorAll('.product-setup-inwork-toggle[data-setup-id="' + setupId + '"]');
-      var prevOn = btn.classList.contains("is-on");
+      var toggles = document.querySelectorAll(
+        '.product-setup-inwork-toggle[data-setup-id="' + setupId + '"]'
+      );
+      var prevInWork = false;
+      var prevNeedsStart = false;
+      toggles.forEach(function (b) {
+        var kind = b.getAttribute("data-run-status") || "in_work";
+        if (kind === "needs_start") prevNeedsStart = b.classList.contains("is-on");
+        else prevInWork = b.classList.contains("is-on");
+      });
 
-      applySetupInWorkToggleUi(toggles, nextOn);
+      applySetupRunStatusUi(
+        setupId,
+        statusKind === "in_work" ? nextOn : false,
+        statusKind === "needs_start" ? nextOn : false
+      );
       toggles.forEach(function (b) {
         b.classList.add("is-busy");
         b.disabled = true;
@@ -6470,7 +6591,8 @@ function saveSetupToolNoteEditor() {
       var fd = new FormData();
       fd.append("action", "inline_toggle_setup_in_work");
       fd.append("setup_id", setupId);
-      fd.append("in_work", nextOn ? "1" : "0");
+      fd.append("status", statusKind);
+      fd.append("value", nextOn ? "1" : "0");
       var csrf = getCookie("csrftoken");
       if (csrf) fd.append("csrfmiddlewaretoken", csrf);
 
@@ -6499,11 +6621,11 @@ function saveSetupToolNoteEditor() {
           });
         })
         .then(function (data) {
-          applySetupInWorkToggleUi(toggles, !!data.in_work);
+          applySetupRunStatusUi(setupId, !!data.in_work, !!data.needs_start);
           if (data.setup_order) reorderSetupSelectInWork(data.setup_order);
         })
         .catch(function (err) {
-          applySetupInWorkToggleUi(toggles, prevOn);
+          applySetupRunStatusUi(setupId, prevInWork, prevNeedsStart);
           alert(err && err.message ? err.message : "Ошибка сети при смене статуса.");
         })
         .finally(function () {

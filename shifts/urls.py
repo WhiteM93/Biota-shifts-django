@@ -14,6 +14,7 @@ from . import inventory_ai_archive_views
 from . import inventory_chat_views
 from . import inventory_types_views
 from . import site_notebook_views
+from . import site_updates_views
 from . import payroll_views
 from . import product_views
 from . import setup_ai_views
@@ -71,6 +72,7 @@ urlpatterns = [
         site_notebook_views.site_notebook_view,
         name="site_notebook",
     ),
+    path("updates/", site_updates_views.site_updates_view, name="site_updates"),
     path(
         "cabinet/site-notebook/<int:pk>/mark/",
         site_notebook_views.site_notebook_mark_api,
@@ -132,6 +134,7 @@ urlpatterns = [
     path("forms/", forms_views.forms_view, name="forms"),
     path("forms/api/", forms_views.forms_api_list, name="forms_api_list"),
     path("forms/api/upload/", forms_views.forms_api_upload, name="forms_api_upload"),
+    path("forms/api/<int:pk>/layout/", forms_views.forms_api_layout, name="forms_api_layout"),
     path("forms/api/<int:pk>/", forms_views.forms_api_detail, name="forms_api_detail"),
     path("contracts/", contract_views.contracts_view, name="contracts"),
     path("contracts/api/", contract_views.contracts_api_list, name="contracts_api_list"),
@@ -272,4 +275,5 @@ urlpatterns = [
     path("accounts/register/pending/", views.register_pending_view, name="register_pending"),
     path("accounts/verify-email/<str:token>/", views.verify_email_view, name="verify_email"),
     path("accounts/logout/", views.logout_view, name="logout"),
+    path("accounts/preview-role/", views.preview_role_view, name="preview_role"),
 ]

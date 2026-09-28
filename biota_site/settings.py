@@ -192,7 +192,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # Увеличивайте после правок CSS/JS, чтобы браузер и nginx не отдавали старые файлы.
-STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "447").strip() or "447"
+STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "460").strip() or "460"
 
 # YandexGPT (чат склада / анализ наладок). Ключи — в .env.secrets.
 # Модели: yandexgpt-5-lite (дешевле), yandexgpt-5.1 / yandexgpt-5-pro (дороже).
@@ -254,7 +254,7 @@ SERVE_MEDIA_FROM_DJANGO = (os.getenv("DJANGO_SERVE_MEDIA") or "").strip().lower(
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/home/"
+LOGIN_REDIRECT_URL = "/graph/"
 
 # Табель графика: много полей (сотрудники × дни месяца)
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000

@@ -102,12 +102,6 @@ DEFAULT_ICON_REGISTRY: dict[str, dict] = {
         "value": "fi fi-rr-picture",
     },
     # —— Навигация (SVG-шаблоны) ——
-    "nav.home": {
-        "label": "Главная",
-        "group": "Навигация",
-        "kind": "partial",
-        "value": "shifts/includes/nav_home_icon.html",
-    },
     "nav.inventory": {
         "label": "Склад",
         "group": "Навигация",
@@ -162,6 +156,12 @@ DEFAULT_ICON_REGISTRY: dict[str, dict] = {
         "kind": "partial",
         "value": "shifts/includes/nav_calculator_icon.html",
     },
+    "nav.updates": {
+        "label": "Обновления сайта",
+        "group": "Навигация",
+        "kind": "partial",
+        "value": "shifts/includes/nav_updates_icon.html",
+    },
     # —— Прочие SVG ——
     "action.delete": {
         "label": "Удалить",
@@ -192,6 +192,18 @@ DEFAULT_ICON_REGISTRY: dict[str, dict] = {
         "group": "PDF",
         "kind": "partial",
         "value": "shifts/includes/pdf_export_photos_icon.html",
+    },
+    "pdf.export_tools": {
+        "label": "Печать списка инструмента А4",
+        "group": "PDF",
+        "kind": "partial",
+        "value": "shifts/includes/pdf_export_tools_icon.html",
+    },
+    "setup.share_qr": {
+        "label": "QR установки",
+        "group": "Наладка",
+        "kind": "partial",
+        "value": "shifts/includes/setup_share_qr_icon.html",
     },
     "setup.load_to_machine": {
         "label": "Загрузить инструмент в станок",

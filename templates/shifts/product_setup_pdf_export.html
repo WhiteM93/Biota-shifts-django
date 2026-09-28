@@ -6,8 +6,8 @@
   <title>{{ product.name }} — {{ setup.name }} — PDF</title>
   <style>
     @page {
-      size: A4 landscape;
-      margin: 8mm;
+      size: {% if mode == "tools" %}A4 portrait{% else %}A4 landscape{% endif %};
+      margin: {% if mode == "tools" %}18mm 16mm{% else %}8mm{% endif %};
     }
     html, body {
       margin: 0;
@@ -227,11 +227,157 @@
       max-width: 4ch;
       white-space: nowrap;
     }
-    .col-type { width: 22%; }
+    .col-corr { width: 3.2em; }
+    .tools-only-page {
+      box-sizing: border-box;
+      border: 1.75px solid #111;
+      padding: 9mm 8mm 11mm;
+      min-height: calc(100vh - 36mm);
+    }
+    .tools-only-page .page-title {
+      margin-bottom: 10px;
+    }
+    .tools-only-page .page-sub {
+      margin: -6px 0 10px 0;
+      font-size: 11px;
+    }
+    table.tools-table.tools-table--portrait {
+      font-size: 12px;
+    }
+    table.tools-table.tools-table--portrait th,
+    table.tools-table.tools-table--portrait td {
+      padding: 5px 6px;
+    }
+    table.tools-table.tools-table--portrait.many-rows {
+      font-size: 10px;
+    }
+    table.tools-table.tools-table--portrait.many-rows th,
+    table.tools-table.tools-table--portrait.many-rows td {
+      padding: 3px 4px;
+    }
     .col-note { width: 32%; text-align: left !important; }
     th.col-diameter {
       font-size: 13px;
       line-height: 1;
+    }
+
+    .tools-print-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 8px 16px;
+      margin: 0 0 14px 0;
+      padding: 0 0 10px 0;
+      border-bottom: 2.5px solid #111;
+    }
+    .tools-print-kicker {
+      margin: 0 0 3px 0;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #555;
+    }
+    .tools-only-page .page-title {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+    .tools-print-meta {
+      margin: 0;
+      font-size: 12px;
+      color: #333;
+      text-align: right;
+    }
+    .tools-print-meta strong {
+      font-weight: 700;
+    }
+    .tools-print-empty {
+      margin: 24px 0 0;
+      padding: 16px;
+      border: 1px dashed #999;
+      text-align: center;
+      color: #555;
+      font-size: 13px;
+    }
+    table.tools-print-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: auto;
+      font-size: 12.5px;
+      line-height: 1.3;
+    }
+    table.tools-print-table thead {
+      display: table-header-group;
+    }
+    table.tools-print-table th {
+      padding: 8px 9px;
+      border: 0;
+      border-bottom: 1.5px solid #111;
+      background: #f2f2f2;
+      color: #111;
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-align: left;
+      vertical-align: bottom;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    table.tools-print-table td {
+      padding: 9px 9px;
+      border: 0;
+      border-bottom: 1px solid #cfcfcf;
+      text-align: left;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
+    table.tools-print-table tbody tr:nth-child(even) td {
+      background: #f7f7f7;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    table.tools-print-table .tp-num {
+      width: 1%;
+      white-space: nowrap;
+      font-size: 14px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
+    table.tools-print-table .tp-type {
+      font-weight: 600;
+      min-width: 8em;
+    }
+    table.tools-print-table .tp-spec {
+      width: 1%;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    table.tools-print-table .tp-corr {
+      width: 1%;
+      white-space: nowrap;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    table.tools-print-table .tp-note {
+      color: #222;
+    }
+    table.tools-print-table .is-override {
+      font-weight: 800;
+      text-decoration: underline;
+    }
+    table.tools-print-table.many-rows {
+      font-size: 11px;
+    }
+    table.tools-print-table.many-rows th,
+    table.tools-print-table.many-rows td {
+      padding: 5px 7px;
+    }
+    table.tools-print-table.many-rows .tp-num {
+      font-size: 12px;
     }
 
     /* ── Фото (photos mode) ── */
@@ -277,6 +423,16 @@
     }
     @media screen {
       body { padding: 10px; }
+      body:has(.tools-only-page) {
+        padding: 18mm 16mm;
+        background: #ececec;
+      }
+      .tools-only-page {
+        background: #fff;
+        max-width: 178mm;
+        margin: 0 auto;
+        min-height: 261mm;
+      }
     }
     @media print {
       .specs-page { min-height: auto; }
@@ -285,6 +441,10 @@
       }
       .bindings-grid {
         grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      }
+      html, body { height: 100%; }
+      .tools-only-page {
+        min-height: 100%;
       }
     }
   </style>
@@ -304,6 +464,51 @@
           {% endif %}
         </div>
       {% endfor %}
+    </div>
+  {% elif mode == "tools" %}
+    <div class="tools-only-page">
+      <header class="tools-print-head">
+        <div>
+          <p class="tools-print-kicker">Список инструмента</p>
+          <h1 class="page-title">{{ product.name }}</h1>
+        </div>
+        <p class="tools-print-meta">
+          <strong>{{ setup.name }}</strong>
+          {% if tool_rows %} · {{ tool_rows|length }} поз.{% endif %}
+        </p>
+      </header>
+      {% if not tool_rows %}
+        <p class="tools-print-empty">Нет заполненных строк инструмента.</p>
+      {% else %}
+      <table class="tools-print-table{% if tool_rows|length > 22 %} many-rows{% endif %}">
+        <thead>
+          <tr>
+            <th class="tp-num">№</th>
+            {% if tools_print_cols.type %}<th class="tp-type">Тип</th>{% endif %}
+            {% if tools_print_cols.diameter %}<th class="tp-spec">Диаметр</th>{% endif %}
+            {% if tools_print_cols.overhang %}<th class="tp-spec">Вылет</th>{% endif %}
+            {% if tools_print_cols.h %}<th class="tp-spec">H</th>{% endif %}
+            {% if tools_print_cols.d %}<th class="tp-spec">D</th>{% endif %}
+            {% if tools_print_cols.corr %}<th class="tp-corr">Корректор</th>{% endif %}
+            {% if tools_print_cols.note %}<th class="tp-note">Примечание</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in tool_rows %}
+          <tr>
+            <td class="tp-num">{{ row.tool_number }}</td>
+            {% if tools_print_cols.type %}<td class="tp-type">{{ row.tool_type }}</td>{% endif %}
+            {% if tools_print_cols.diameter %}<td class="tp-spec">{{ row.diameter }}</td>{% endif %}
+            {% if tools_print_cols.overhang %}<td class="tp-spec">{{ row.overhang }}</td>{% endif %}
+            {% if tools_print_cols.h %}<td class="tp-spec{% if row.kor_n_override %} is-override{% endif %}">{{ row.kor_n }}</td>{% endif %}
+            {% if tools_print_cols.d %}<td class="tp-spec{% if row.kor_d_override %} is-override{% endif %}">{{ row.kor_d }}</td>{% endif %}
+            {% if tools_print_cols.corr %}<td class="tp-corr">{% if row.correction_enabled %}да{% endif %}</td>{% endif %}
+            {% if tools_print_cols.note %}<td class="tp-note">{{ row.note }}</td>{% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
     </div>
   {% else %}
     <div class="specs-page">

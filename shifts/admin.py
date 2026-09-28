@@ -12,6 +12,7 @@ from .models import (
     ProductSetup,
     ProductSetupPhoto,
     SiteNotebookTask,
+    SiteUpdate,
     WorkContract,
     WorkContractPosition,
     WorkPositionOperation,
@@ -203,3 +204,11 @@ class SiteNotebookTaskAdmin(admin.ModelAdmin):
             done_at=None,
             done_by="",
         )
+
+
+@admin.register(SiteUpdate)
+class SiteUpdateAdmin(admin.ModelAdmin):
+    list_display = ("id", "created_at", "title", "author_username")
+    search_fields = ("title", "body", "author_username")
+    date_hierarchy = "created_at"
+    readonly_fields = ("created_at",)

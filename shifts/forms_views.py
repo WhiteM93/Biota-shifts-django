@@ -419,3 +419,74 @@ def forms_api_upload(request):
         url = "/media/" + saved_path.replace("\\", "/").lstrip("/")
 
     return JsonResponse({"ok": True, "url": url})
+
+
+@biota_login_required
+@nav_permission_required("forms")
+@write_permission_required
+@require_http_methods(["POST"])
+def forms_api_layout(request, pk: int):
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return JsonResponse({"ok": False, "error": "Ожидается AJAX."}, status=400)
+    try:
+        form = PrintForm.objects.get(pk=pk)
+    except PrintForm.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "Форма не найдена."}, status=404)
+
+    username = biota_user(request) or ""
+    from .gpt_rate_limit import gpt_rate_limit_allow
+
+    ok_rl, retry = gpt_rate_limit_allow(username, scope="forms_ai", cooldown_sec=60)
+    if not ok_rl:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": f"Не чаще 1 раза в минуту. Подождите ~{retry} сек.",
+                "retry_after": retry,
+            },
+            status=429,
+        )
+
+    try:
+        data = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Некорректный JSON."}, status=400)
+
+    from .forms_ai import layout_form_from_text
+    from .yandex_gpt import yandex_gpt_configured
+
+    source = str(data.get("source") or "")
+    instruction = str(data.get("instruction") or "")
+    result = layout_form_from_text(source, instruction)
+    try:
+        from .inventory_ai_log import record_ai_turn
+        from .models import InventoryAiTurn
+
+        record_ai_turn(
+            username=username,
+            kind=InventoryAiTurn.KIND_INV_CHAT,
+            question="Оформить бланк из текста",
+            result={"ok": result.get("ok"), "error": result.get("error") or "", "reply": ""},
+            extra={"form_id": form.pk, "source": "forms_layout"},
+        )
+    except Exception:
+        pass
+    if not result.get("ok"):
+        status = 503 if (not yandex_gpt_configured() or "не настроен" in (result.get("error") or "").lower()) else 400
+        return JsonResponse({"ok": False, "error": result.get("error") or "Ошибка ИИ."}, status=status)
+
+    prepared = []
+    for item in result.get("elements") or []:
+        if not isinstance(item, dict):
+            continue
+        row = dict(item)
+        row["id"] = "el-" + uuid.uuid4().hex[:12]
+        row.pop("page", None)
+        prepared.append(row)
+    elements = _norm_elements(prepared)
+    if not elements:
+        return JsonResponse({"ok": False, "error": "Не получилось собрать элементы бланка."}, status=400)
+    form.elements = elements
+    form.page_settings = _sync_page_count(form.page_settings, elements)
+    form.save()
+    return JsonResponse({"ok": True, "form": _form_to_dict(form)})

@@ -1819,6 +1819,23 @@ class SiteNotebookTask(models.Model):
         return f"[{self.get_status_display()}] {self.title[:60]}"
 
 
+class SiteUpdate(models.Model):
+    """Публичные заметки об изменениях сайта. Пишет админ, видят все вошедшие."""
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Когда")
+    author_username = models.CharField(max_length=120, blank=True, default="", verbose_name="Кто опубликовал")
+    title = models.CharField(max_length=200, verbose_name="Заголовок")
+    body = models.TextField(verbose_name="Что изменилось")
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = "Обновление сайта"
+        verbose_name_plural = "Обновления сайта"
+
+    def __str__(self) -> str:
+        return (self.title or "")[:80]
+
+
 class PurchaseRequest(models.Model):
     requested_item = models.CharField(max_length=255, verbose_name="Что закупить")
     store_name = models.CharField(max_length=120, blank=True, default="", verbose_name="Магазин")
@@ -2652,6 +2669,7 @@ class ProductSetup(models.Model):
     )
     sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
     in_work = models.BooleanField(default=False, verbose_name="В работе")
+    needs_start = models.BooleanField(default=False, verbose_name="Надо запускать")
     READINESS_NOT_READY = "not_ready"
     READINESS_READY = "ready"
     READINESS_WORKED = "worked"
@@ -2670,7 +2688,7 @@ class ProductSetup(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
 
     class Meta:
-        ordering = ("-in_work", "sort_order", "id")
+        ordering = ("-in_work", "-needs_start", "sort_order", "id")
         verbose_name = "Установка изделия"
         verbose_name_plural = "Установки изделий"
 

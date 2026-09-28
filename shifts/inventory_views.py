@@ -18,7 +18,6 @@ from django.utils import timezone
 from biota_shifts import db as biota_db
 from biota_shifts import export as biota_export
 from biota_shifts.auth import (
-    _is_admin,
     account_label_for_username,
     employees_df_for_nav,
     inventory_stock_manage_for_user,
@@ -31,6 +30,8 @@ from .auth_utils import (
     biota_login_required,
     biota_user,
     inventory_route_nav_access_required,
+    is_real_admin,
+    request_is_admin_ui,
     write_permission_required,
 )
 from .drill_constants import (
@@ -2495,8 +2496,10 @@ def inventory_view(request):
         panel = "stock"
 
     username = biota_user(request) or "Неизвестный пользователь"
-    is_admin_user = _is_admin(username)
-    can_manage_stock = is_admin_user or inventory_stock_manage_for_user(username)
+    is_admin_user = request_is_admin_ui(request)
+    can_manage_stock = is_admin_user or (
+        inventory_stock_manage_for_user(username) and not is_real_admin(request)
+    )
     perms = nav_permissions_for_user(username)
     can_defects = perms.get("defects", True)
     can_payroll = perms.get("payroll", True)

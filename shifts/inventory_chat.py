@@ -166,7 +166,6 @@ _ALLOWED_PAGES = frozenset(
         "visual_warehouse",
         "products",
         "machines",
-        "home",
         "hours",
         "skud",
         "graph",

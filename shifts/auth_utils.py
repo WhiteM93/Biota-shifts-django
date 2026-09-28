@@ -10,6 +10,9 @@ from django.urls import NoReverseMatch, resolve, reverse
 
 from biota_shifts.auth import (
     NAV_KEYS,
+    USER_ROLE_CHOICES,
+    USER_ROLE_EXECUTOR,
+    USER_ROLE_MANAGER,
     _is_admin,
     _resolve_registered_user,
     inventory_stock_manage_for_user,
@@ -17,14 +20,16 @@ from biota_shifts.auth import (
     user_is_executor,
 )
 
+PREVIEW_ROLE_SESSION_KEY = "biota_preview_role"
+
 # POST-действия, разрешённые роли «исполнитель» (остальное — только просмотр/скачивание).
 EXECUTOR_ALLOWED_POST_ACTIONS = frozenset(
     {
         "add_product_note",
         "delete_product_note",
         "refresh_google",
-        "inline_toggle_setup_in_work",
         "list_piece_norms",
+        "assign_setup_to_machine",
     }
 )
 
@@ -33,12 +38,43 @@ def biota_user(request):
     return (request.session.get("biota_username") or "").strip() or None
 
 
+def is_real_admin(request) -> bool:
+    return _is_admin(biota_user(request) or "")
+
+
+def preview_role(request) -> str | None:
+    """Сессия «смотреть как»: только у настоящего администратора."""
+    if not is_real_admin(request):
+        return None
+    role = (request.session.get(PREVIEW_ROLE_SESSION_KEY) or "").strip().lower()
+    if role in USER_ROLE_CHOICES:
+        return role
+    return None
+
+
+def request_is_executor(request) -> bool:
+    role = preview_role(request)
+    if role == USER_ROLE_EXECUTOR:
+        return True
+    if role == USER_ROLE_MANAGER:
+        return False
+    u = biota_user(request)
+    return bool(u) and user_is_executor(u) and not _is_admin(u)
+
+
+def request_can_edit(request) -> bool:
+    return not request_is_executor(request)
+
+
+def request_is_admin_ui(request) -> bool:
+    """Админские кнопки в интерфейсе. В превью исполнителя — как у обычного пользователя."""
+    return is_real_admin(request) and preview_role(request) != USER_ROLE_EXECUTOR
+
+
 def _nav_key_for_url_name(url_name: str) -> str | None:
     n = (url_name or "").strip()
     if not n:
         return None
-    if n == "home":
-        return "home"
     if n.startswith("graph"):
         return "graph"
     if n.startswith("hours"):
@@ -94,7 +130,7 @@ def _nav_key_for_internal_path(path: str, query: str) -> str | None:
 
 
 def post_login_redirect(username: str | None, next_path: str | None = None) -> str:
-    """Куда отправить пользователя после входа / при отказе в nav-правах (если «Главная» выключена — не зацикливаться на /home/)."""
+    """Куда отправить пользователя после входа / при отказе в nav-правах."""
     u = (username or "").strip()
     perms = nav_permissions_for_user(u) if u else {k: True for k in NAV_KEYS}
 
@@ -102,12 +138,13 @@ def post_login_redirect(username: str | None, next_path: str | None = None) -> s
         raw = str(next_path).strip()
         if raw.startswith("/") and not raw.startswith("//"):
             parsed = urlparse(raw)
-            nk = _nav_key_for_internal_path(parsed.path, parsed.query)
-            if nk is None or perms.get(nk, True):
-                return raw
+            path = (parsed.path or "").rstrip("/") or "/"
+            if path != "/home":
+                nk = _nav_key_for_internal_path(parsed.path, parsed.query)
+                if nk is None or perms.get(nk, True):
+                    return raw
 
     order = (
-        "home",
         "graph",
         "hours",
         "skud",
@@ -221,10 +258,15 @@ def write_permission_required(view_func):
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
         u = biota_user(request)
-        if request.method not in {"GET", "HEAD", "OPTIONS"} and not _is_admin(u) and user_is_executor(u):
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and request_is_executor(request):
             action = (request.POST.get("action") or "").strip() if request.method == "POST" else ""
             rm = getattr(request, "resolver_match", None)
-            if rm and rm.url_name == "inventory" and inventory_stock_manage_for_user(u):
+            if (
+                rm
+                and rm.url_name == "inventory"
+                and inventory_stock_manage_for_user(u)
+                and not is_real_admin(request)
+            ):
                 return view_func(request, *args, **kwargs)
             if action in EXECUTOR_ALLOWED_POST_ACTIONS:
                 return view_func(request, *args, **kwargs)

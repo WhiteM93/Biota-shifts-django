@@ -47,7 +47,7 @@
 
 <div class="products-tiles">
   {% for p in products_page %}
-  <article class="product-tile{% if p.in_work_count %} product-tile--has-in-work{% endif %}">
+  <article class="product-tile{% if p.in_work_count %} product-tile--has-in-work{% elif p.needs_start_count %} product-tile--has-needs-start{% endif %}">
     <a href="{% url 'osnastka_detail' p.pk %}" class="product-tile-title" title="{{ p.name }}">{{ p.name }}</a>
     <div class="product-tile-preview">
       {% if p.in_work_count %}
@@ -55,6 +55,13 @@
         <span class="product-tile-in-work-dot" aria-hidden="true"></span>
         <span class="product-tile-in-work-text">В работе</span>
         <span class="product-tile-in-work-count">{{ p.in_work_count }}</span>
+      </div>
+      {% endif %}
+      {% if p.needs_start_count %}
+      <div class="product-tile-in-work product-tile-needs-start{% if p.in_work_count %} product-tile-needs-start--stacked{% endif %}" aria-label="Установок надо запускать: {{ p.needs_start_count }}">
+        <span class="product-tile-in-work-dot" aria-hidden="true"></span>
+        <span class="product-tile-in-work-text">Надо запускать</span>
+        <span class="product-tile-in-work-count">{{ p.needs_start_count }}</span>
       </div>
       {% endif %}
       {% if p.list_preview_image %}

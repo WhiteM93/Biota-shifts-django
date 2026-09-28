@@ -645,11 +645,9 @@ NAV_KEYS_NO_DEPT_FILTER = (
     "calculator",
     "forms",
     "contracts",
-    "home",
 )
 
 NAV_KEYS = (
-    "home",
     "graph",
     "hours",
     "skud",
@@ -670,7 +668,6 @@ USER_ROLE_MANAGER = "manager"
 USER_ROLE_EXECUTOR = "executor"
 USER_ROLE_CHOICES = (USER_ROLE_MANAGER, USER_ROLE_EXECUTOR)
 NAV_LABELS_RU = {
-    "home": "Главная (сводка)",
     "graph": "График",
     "hours": "Часы по дням",
     "skud": "СКУД",
@@ -688,7 +685,6 @@ NAV_LABELS_RU = {
     "contracts": "Контракты",
 }
 NAV_LABELS_SHORT = {
-    "home": "Главная",
     "graph": "График",
     "hours": "Часы",
     "skud": "СКУД",

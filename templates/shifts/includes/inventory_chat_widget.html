@@ -6,10 +6,10 @@
   data-csrf="{{ csrf_token }}"
   {% if biota_is_admin %}data-archive-url="{% url 'inventory_ai_archive' %}" data-notebook-url="{% url 'site_notebook' %}"{% endif %}
 >
-  <button type="button" class="inv-chat-fab js-inv-chat-fab" aria-expanded="false" aria-controls="inv-chat-panel" title="Чат склада">AI</button>
-  <div id="inv-chat-panel" class="inv-chat-panel js-inv-chat-panel" hidden role="dialog" aria-label="Чат склада">
+  <button type="button" class="inv-chat-fab js-inv-chat-fab" aria-expanded="false" aria-controls="inv-chat-panel" title="MetaGPT" aria-label="MetaGPT">MetaGPT</button>
+  <div id="inv-chat-panel" class="inv-chat-panel js-inv-chat-panel" hidden role="dialog" aria-label="MetaGPT">
     <div class="inv-chat-head">
-      <h3>Чат склада</h3>
+      <h3>MetaGPT</h3>
       <div class="inv-chat-head-actions">
         {% if biota_is_admin %}
         <a class="inv-chat-icon-btn" href="{% url 'site_notebook' %}" title="Блокнот доработок">✎</a>

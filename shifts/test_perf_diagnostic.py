@@ -43,7 +43,7 @@ class PerfDiagnosticIngestTests(TestCase):
         session.save()
         resp = self.client.post(
             "/perf-diagnostic/ingest/",
-            data=json.dumps({"ttfb_ms": 100, "load_ms": 200, "path": "/home/"}),
+            data=json.dumps({"ttfb_ms": 100, "load_ms": 200, "path": "/graph/"}),
             content_type="application/json",
         )
         self.assertEqual(resp.status_code, 200)
@@ -62,7 +62,7 @@ class PerfDiagnosticIngestTests(TestCase):
                     "ttfb_ms": 3200,
                     "load_ms": 7100,
                     "dom_ms": 4500,
-                    "path": "/home/",
+                    "path": "/graph/",
                     "connection": {"effectiveType": "4g"},
                     "slow_resources": [{"name": "inventory.js", "dur_ms": 1500}],
                 }

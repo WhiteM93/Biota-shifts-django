@@ -64,7 +64,6 @@
     }
     if (/\/products|\/osnast/.test(path)) return { page: "products", panel: "" };
     if (/\/machines/.test(path)) return { page: "machines", panel: "" };
-    if (/\/home/.test(path)) return { page: "home", panel: "" };
     if (/\/hours/.test(path)) return { page: "hours", panel: "" };
     if (/\/skud|\/discipline/.test(path)) return { page: "skud", panel: "" };
     if (/\/graph|\/regulations/.test(path)) return { page: "graph", panel: "" };

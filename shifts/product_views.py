@@ -19,9 +19,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
-from biota_shifts.auth import _is_admin
-
-from .auth_utils import biota_login_required, biota_user, nav_permission_required, write_permission_required
+from .auth_utils import (
+    biota_login_required,
+    biota_user,
+    nav_permission_required,
+    request_can_edit,
+    request_is_admin_ui,
+    write_permission_required,
+)
 from .models import (
     Product,
     ProductFile,
@@ -45,8 +50,9 @@ from .product_plan_sync import (
     plan_inline_state_payload,
     validate_product_plan_post,
 )
+from .setup_share import qr_svg_markup, setup_tab_absolute_url, setup_url_is_localhost
 
-SETUP_LIST_ORDER = ("-in_work", "sort_order", "id")
+SETUP_LIST_ORDER = ("-in_work", "-needs_start", "sort_order", "id")
 
 # Стандартный магазин новой установки: T00–T24 и T99; T20 — датчик привязки.
 DEFAULT_SETUP_MAGAZINE_SLOTS: tuple[str, ...] = tuple(f"T{i:02d}" for i in range(0, 25)) + ("T99",)
@@ -115,8 +121,11 @@ def _latest_piece_norms_by_setup(setup_ids: list[int]) -> dict[int, dict]:
 def _products_qs_for_catalog(catalog_section: str):
     return (
         Product.objects.filter(catalog_section=catalog_section)
-        .annotate(in_work_count=Count("setups", filter=Q(setups__in_work=True)))
-        .order_by("-in_work_count", "-updated_at", "-id")
+        .annotate(
+            in_work_count=Count("setups", filter=Q(setups__in_work=True)),
+            needs_start_count=Count("setups", filter=Q(setups__needs_start=True)),
+        )
+        .order_by("-in_work_count", "-needs_start_count", "-updated_at", "-id")
     )
 
 
@@ -1152,8 +1161,7 @@ def osnastka_list_view(request):
 @require_http_methods(["POST"])
 def product_delete_view(request, pk: int):
     """Удаление карточки наладки — только администратор (Biota)."""
-    u = biota_user(request)
-    if not _is_admin(u):
+    if not request_is_admin_ui(request):
         messages.error(request, "Удалять наладки может только администратор.")
         return redirect("products_list")
     product = get_object_or_404(Product, pk=pk)
@@ -1178,9 +1186,43 @@ def product_setup_pdf_export_view(request, pk: int, setup_pk: int, mode: str):
         product=product,
     )
     export_mode = (mode or "").strip().lower()
-    if export_mode not in {"specs", "photos"}:
+    if export_mode not in {"specs", "photos", "tools"}:
         export_mode = "specs"
     tool_rows = _build_display_tool_rows(list(setup.tools.all()))
+    tools_print_cols = {
+        "corr": False,
+        "h": False,
+        "d": False,
+        "type": False,
+        "diameter": False,
+        "overhang": False,
+        "note": False,
+    }
+    if export_mode == "tools":
+        tool_rows = [
+            row
+            for row in tool_rows
+            if (row.get("tool_type") or "").strip()
+            or (row.get("diameter") or "").strip()
+            or (row.get("overhang") or "").strip()
+            or (row.get("note") or "").strip()
+            or row.get("correction_enabled")
+            or (row.get("kor_n") or "").strip()
+            or (row.get("kor_d") or "").strip()
+        ]
+
+        def _col_has(key):
+            return any((str(row.get(key) or "")).strip() for row in tool_rows)
+
+        tools_print_cols = {
+            "corr": any(bool(row.get("correction_enabled")) for row in tool_rows),
+            "h": _col_has("kor_n"),
+            "d": _col_has("kor_d"),
+            "type": _col_has("tool_type"),
+            "diameter": _col_has("diameter"),
+            "overhang": _col_has("overhang"),
+            "note": _col_has("note"),
+        }
     pfs = list(setup.program_files.order_by("sort_order", "id"))
     if pfs:
         setup_program_line = ", ".join(p.display_name for p in pfs if p.display_name)
@@ -1205,6 +1247,7 @@ def product_setup_pdf_export_view(request, pk: int, setup_pk: int, mode: str):
             "product": product,
             "setup": setup,
             "tool_rows": tool_rows,
+            "tools_print_cols": tools_print_cols,
             "photos": photos,
             "photo_slots": photo_slots,
             "mode": export_mode,
@@ -1593,7 +1636,7 @@ def product_detail_view(request, pk: int):
             note = ProductNote.objects.filter(pk=note_id, product=product).first()
             if not note:
                 return JsonResponse({"ok": False, "error": "Заметка не найдена."}, status=404)
-            if not _is_admin(who) and (note.author_username or "").strip() != who:
+            if not request_is_admin_ui(request) and (note.author_username or "").strip() != who:
                 return JsonResponse({"ok": False, "error": "Нет прав на удаление."}, status=403)
             note.delete()
             return JsonResponse({"ok": True})
@@ -1965,28 +2008,51 @@ def product_detail_view(request, pk: int):
                 )
 
         if action == "inline_toggle_setup_in_work":
+            if not request_can_edit(request):
+                return JsonResponse(
+                    {"ok": False, "error": "Статус установки может менять только руководитель."},
+                    status=403,
+                )
             setup_id_raw = (request.POST.get("setup_id") or "").strip()
             setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
             setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
             if not setup:
                 return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
-            if "in_work" in request.POST:
-                setup.in_work = _post_bool(request.POST.get("in_work"))
+            status_kind = (request.POST.get("status") or "").strip()
+            if not status_kind:
+                status_kind = "in_work"
+            if status_kind not in ("in_work", "needs_start"):
+                return JsonResponse({"ok": False, "error": "Неизвестный статус установки."}, status=400)
+            value_raw = request.POST.get("value")
+            if value_raw is None and status_kind == "in_work" and "in_work" in request.POST:
+                value_raw = request.POST.get("in_work")
+            if value_raw is None:
+                want_on = not (setup.in_work if status_kind == "in_work" else setup.needs_start)
             else:
-                setup.in_work = not setup.in_work
-            setup.save(update_fields=["in_work", "updated_at"])
+                want_on = _post_bool(value_raw)
+            if status_kind == "in_work":
+                setup.in_work = want_on
+                if want_on:
+                    setup.needs_start = False
+            else:
+                setup.needs_start = want_on
+                if want_on:
+                    setup.in_work = False
+            setup.save(update_fields=["in_work", "needs_start", "updated_at"])
             setups = list(_product_setups_qs(product))
             return JsonResponse(
                 {
                     "ok": True,
                     "setup_id": setup.pk,
                     "in_work": setup.in_work,
+                    "needs_start": setup.needs_start,
                     "setup_order": [
                         {
                             "pk": s.pk,
                             "tab_slug": f"setup-{s.pk}",
                             "name": (s.name or "").strip() or "без названия",
                             "in_work": s.in_work,
+                            "needs_start": s.needs_start,
                             "readiness_status": s.readiness_status,
                         }
                         for s in setups
@@ -2132,6 +2198,9 @@ def product_detail_view(request, pk: int):
         setup.tool_rows = list(setup.tools.all())
         setup.tool_display_rows = _build_display_tool_rows(setup.tool_rows)
         setup.binding_extra_blocks_tpl = _binding_extra_blocks_template_rows(setup)
+        setup.share_url = setup_tab_absolute_url(request, product, setup)
+        setup.share_qr_svg = qr_svg_markup(setup.share_url)
+        setup.share_qr_localhost = setup_url_is_localhost(setup.share_url)
     piece_norms_latest = _latest_piece_norms_by_setup([s.pk for s in setups])
     for setup in setups:
         setup.latest_piece_norm = piece_norms_latest.get(setup.pk)

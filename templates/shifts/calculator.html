@@ -96,10 +96,26 @@
 
     <div class="calc-piece-save-bar">
       <div class="calc-piece-save-bar__row">
-        <label class="calc-label" for="t-product">Наладка</label>
-        <select id="t-product" class="calc-inp calc-select" aria-label="Наладка">
-          <option value="">— выберите наладку —</option>
-        </select>
+        <label class="calc-label" for="t-product-search">Наладка</label>
+        <div class="calc-product-combo" id="t-product-combo">
+          <select id="t-product" class="calc-product-combo-native" tabindex="-1" aria-hidden="true">
+            <option value="">— выберите наладку —</option>
+          </select>
+          <input
+            type="text"
+            id="t-product-search"
+            class="calc-inp calc-inp--plain calc-product-search"
+            placeholder="Поиск наладки…"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Поиск наладки"
+            aria-autocomplete="list"
+            aria-controls="t-product-suggest"
+            aria-expanded="false"
+            role="combobox"
+          />
+          <div id="t-product-suggest" class="calc-product-suggest" hidden role="listbox" aria-label="Наладки"></div>
+        </div>
       </div>
       <div class="calc-piece-save-bar__row">
         <label class="calc-label" for="t-setup">Установка</label>
@@ -1073,6 +1089,9 @@
   /* ── Сохранение Тшт в наладку ── */
   (function initPieceNormSave() {
     var productSel = document.getElementById("t-product");
+    var productCombo = document.getElementById("t-product-combo");
+    var productSearch = document.getElementById("t-product-search");
+    var productSuggest = document.getElementById("t-product-suggest");
     var setupSel = document.getElementById("t-setup");
     var commentInp = document.getElementById("t-norm-comment");
     var saveBtn = document.getElementById("t-save-norm");
@@ -1084,6 +1103,84 @@
       return m ? decodeURIComponent(m[1]) : "";
     }
 
+    function productNameById(id) {
+      var sid = String(id || "");
+      for (var i = 0; i < PRODUCTS.length; i++) {
+        if (String(PRODUCTS[i].id) === sid) {
+          return PRODUCTS[i].name || ("#" + PRODUCTS[i].id);
+        }
+      }
+      return "";
+    }
+
+    function syncProductSearchLabel() {
+      if (!productSearch) return;
+      var id = (productSel.value || "").trim();
+      productSearch.value = id ? productNameById(id) : "";
+    }
+
+    function closeProductSuggest() {
+      if (productSuggest) productSuggest.hidden = true;
+      if (productCombo) productCombo.classList.remove("is-open");
+      if (productSearch) productSearch.setAttribute("aria-expanded", "false");
+    }
+
+    function renderProductSuggest(query) {
+      if (!productSuggest || !productCombo) return;
+      var q = (query || "").trim().toLowerCase();
+      var max = 200;
+      var hits = [];
+      if (!q) {
+        hits = (PRODUCTS || []).slice(0, max);
+      } else {
+        for (var i = 0; i < PRODUCTS.length && hits.length < max; i++) {
+          var p = PRODUCTS[i];
+          var nm = (p.name || "").toLowerCase();
+          var idStr = String(p.id);
+          if (nm.indexOf(q) !== -1 || idStr.indexOf(q) !== -1) hits.push(p);
+        }
+      }
+      productSuggest.textContent = "";
+      var clearBtn = document.createElement("button");
+      clearBtn.type = "button";
+      clearBtn.className = "calc-product-suggest-item calc-product-suggest-clear";
+      clearBtn.setAttribute("role", "option");
+      clearBtn.dataset.productId = "";
+      clearBtn.textContent = "— выберите наладку —";
+      productSuggest.appendChild(clearBtn);
+      hits.forEach(function (p) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "calc-product-suggest-item";
+        b.setAttribute("role", "option");
+        b.dataset.productId = String(p.id);
+        b.textContent = p.name || ("#" + p.id);
+        productSuggest.appendChild(b);
+      });
+      if (hits.length === 0 && q) {
+        var empty = document.createElement("div");
+        empty.className = "calc-product-suggest-empty";
+        empty.textContent = "Ничего не найдено";
+        productSuggest.appendChild(empty);
+      }
+      productSuggest.hidden = false;
+      productSuggest.classList.remove("opens-up");
+      var searchRect = productSearch.getBoundingClientRect();
+      var panelHeight = productSuggest.offsetHeight || 240;
+      if (searchRect.bottom + panelHeight + 4 > window.innerHeight - 8) {
+        productSuggest.classList.add("opens-up");
+      }
+      productCombo.classList.add("is-open");
+      productSearch.setAttribute("aria-expanded", "true");
+    }
+
+    function pickProduct(id) {
+      productSel.value = id || "";
+      try { productSel.dispatchEvent(new Event("change", { bubbles: true })); } catch (eCh) {}
+      syncProductSearchLabel();
+      closeProductSuggest();
+    }
+
     function fillProducts() {
       productSel.innerHTML = '<option value="">— выберите наладку —</option>';
       (PRODUCTS || []).forEach(function (p) {
@@ -1092,6 +1189,7 @@
         o.textContent = p.name || ("#" + p.id);
         productSel.appendChild(o);
       });
+      syncProductSearchLabel();
     }
 
     function fillSetups(productId) {
@@ -1164,8 +1262,47 @@
     fillSetups("");
     productSel.addEventListener("change", function () {
       fillSetups(productSel.value);
+      syncProductSearchLabel();
       setMsg("", "");
     });
+    if (productSearch && productSuggest && productCombo) {
+      var suggestTimer = 0;
+      productSearch.addEventListener("input", function () {
+        clearTimeout(suggestTimer);
+        suggestTimer = setTimeout(function () {
+          renderProductSuggest(productSearch.value);
+        }, 80);
+      });
+      productSearch.addEventListener("focus", function () {
+        renderProductSuggest(productSearch.value);
+      });
+      productSearch.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          closeProductSuggest();
+          syncProductSearchLabel();
+        }
+      });
+      productSearch.addEventListener("blur", function () {
+        setTimeout(function () {
+          if (productCombo.contains(document.activeElement)) return;
+          closeProductSuggest();
+          syncProductSearchLabel();
+        }, 120);
+      });
+      productSuggest.addEventListener("mousedown", function (e) {
+        var item = e.target.closest("button.calc-product-suggest-item");
+        if (!item || !productSuggest.contains(item)) return;
+        e.preventDefault();
+        pickProduct(item.getAttribute("data-product-id") || "");
+      });
+      document.addEventListener("click", function (e) {
+        if (!productCombo.classList.contains("is-open")) return;
+        if (productCombo.contains(e.target)) return;
+        closeProductSuggest();
+        syncProductSearchLabel();
+      });
+    }
     setupSel.addEventListener("change", function () {
       syncSaveEnabled();
       setMsg("", "");

@@ -11,6 +11,7 @@
   data-api-list-url="{% url 'forms_api_list' %}"
   data-api-detail-tpl="{% url 'forms_api_detail' 0 %}"
   data-api-upload-url="{% url 'forms_api_upload' %}"
+  data-api-layout-tpl="{% url 'forms_api_layout' 0 %}"
   data-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}"
 >
   <header class="forms-topbar">
@@ -18,7 +19,10 @@
       <h1 class="forms-title">Формы</h1>
       <p class="forms-subtitle">Конструктор печатных бланков A4</p>
     </div>
-    <button type="button" class="forms-btn-print js-forms-print" disabled title="Печать">Печать</button>
+    <div class="forms-topbar-actions">
+      <button type="button" class="forms-btn-secondary js-forms-ai" disabled title="Вставить текст и оформить бланк">Оформить из текста</button>
+      <button type="button" class="forms-btn-print js-forms-print" disabled title="Печать">Печать</button>
+    </div>
   </header>
 
   <nav class="forms-mobile-nav js-forms-mobile-nav" aria-label="Разделы конструктора">
@@ -210,6 +214,26 @@
       <div class="forms-dialog-actions">
         <button type="button" class="forms-btn-secondary js-forms-prompt-cancel">Отмена</button>
         <button type="submit" class="forms-btn-primary">Добавить</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="forms-dialog forms-dialog--wide js-forms-dialog-ai" aria-labelledby="forms-dialog-ai-title">
+    <form class="forms-dialog-body js-forms-ai-form">
+      <h2 id="forms-dialog-ai-title" class="forms-dialog-title">Оформить из текста</h2>
+      <p class="forms-ai-lead">Вставьте текст (можно из другого ИИ) и напишите, как сверстать бланк. Текущие элементы листа будут заменены.</p>
+      <label class="forms-row">
+        <span class="forms-row-label">Текст</span>
+        <textarea class="forms-control js-forms-ai-source" rows="10" required placeholder="Вставьте сюда сырой текст…"></textarea>
+      </label>
+      <label class="forms-row">
+        <span class="forms-row-label">Как оформить</span>
+        <input type="text" class="forms-control js-forms-ai-instruction" maxlength="500" autocomplete="off" placeholder="Например: заголовок по центру, чек-лист галочками, внизу ФИО и дата">
+      </label>
+      <p class="forms-ai-msg js-forms-ai-msg" hidden></p>
+      <div class="forms-dialog-actions">
+        <button type="button" class="forms-btn-secondary js-forms-ai-cancel">Отмена</button>
+        <button type="submit" class="forms-btn-primary js-forms-ai-submit">Оформить</button>
       </div>
     </form>
   </dialog>

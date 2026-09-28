@@ -1,6 +1,5 @@
-from datetime import date, datetime
+from datetime import datetime
 
-import pandas as pd
 from django.conf import settings
 from django.contrib import messages
 from django.http import JsonResponse
@@ -9,50 +8,31 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from biota_shifts import db as biota_db
-from biota_shifts import logic as biota_logic
 from biota_shifts.auth import (
     ADMIN_USERNAME,
+    USER_ROLE_CHOICES,
     _credentials_match,
-    employees_df_for_nav,
     _is_admin,
     _register_user,
     _resolve_registered_user,
-    nav_permissions_for_user,
 )
-from biota_shifts.config import APP_DIR
-from biota_shifts.constants import MONTH_NAMES_RU
-from biota_shifts import schedule as biota_schedule
-from biota_shifts.schedule import employee_label_row
 
-from .auth_utils import biota_login_required, biota_user, post_login_redirect, write_permission_required
+from .auth_utils import (
+    PREVIEW_ROLE_SESSION_KEY,
+    biota_login_required,
+    biota_user,
+    is_real_admin,
+    post_login_redirect,
+    request_can_edit,
+    request_is_executor,
+    write_permission_required,
+)
 from .email_verification import (
     email_uses_console_backend,
     login_block_reason,
     send_verification_email,
     verify_email_token,
 )
-
-
-def _df_columns_rows(df: pd.DataFrame):
-    if df is None or df.empty:
-        return [], []
-    cols = [str(c) for c in df.columns]
-    rows = []
-    for _, r in df.iterrows():
-        rows.append(["" if pd.isna(r[c]) else str(r[c]) for c in df.columns])
-    return cols, rows
-
-
-def _fmt_minutes_human(v) -> str:
-    """Минуты -> человекочитаемый формат для главной."""
-    try:
-        mins = int(v)
-    except (TypeError, ValueError):
-        mins = 0
-    mins = max(0, mins)
-    if mins < 60:
-        return f"{mins} мин"
-    return f"{mins // 60} ч {mins % 60} мин"
 
 
 @require_http_methods(["GET", "HEAD", "POST"])
@@ -197,136 +177,30 @@ def logout_view(request):
 
 
 @biota_login_required
+@require_POST
+def preview_role_view(request):
+    """Админ может смотреть сайт как руководитель или как исполнитель, не выходя из аккаунта."""
+    if not is_real_admin(request):
+        messages.warning(request, "Переключение роли доступно только администратору.")
+        return redirect(request.META.get("HTTP_REFERER") or post_login_redirect(biota_user(request)))
+    role = (request.POST.get("role") or "").strip().lower()
+    if role not in USER_ROLE_CHOICES:
+        messages.warning(request, "Неизвестная роль.")
+        return redirect(request.META.get("HTTP_REFERER") or "/")
+    request.session[PREVIEW_ROLE_SESSION_KEY] = role
+    nxt = (request.POST.get("next") or "").strip()
+    if nxt.startswith("/") and not nxt.startswith("//"):
+        return redirect(nxt)
+    ref = (request.META.get("HTTP_REFERER") or "").strip()
+    if ref:
+        return redirect(ref)
+    return redirect("/")
+
+
+@biota_login_required
 def home_view(request):
-    user = biota_user(request)
-    if user and not nav_permissions_for_user(user).get("home", True):
-        messages.warning(request, "У вас нет доступа к разделу «Главная (сводка)».")
-        return redirect(post_login_redirect(user))
-
-    cfg = biota_db.db_config()
-    try:
-        employees_df = biota_db.load_employees(cfg)
-    except Exception as exc:
-        return render(
-            request,
-            "shifts/error.html",
-            {"title": "Ошибка БД", "message": str(exc)},
-        )
-    employees_df = employees_df_for_nav(user, "home", employees_df)
-
-    ctx = {
-        "username": user,
-        "emp_count": len(employees_df),
-        "app_dir": str(APP_DIR),
-        "dashboard_error": None,
-        "by_area_columns": [],
-        "by_area_rows": [],
-        "top10_columns": [],
-        "top10_rows": [],
-        "month_name": "",
-        "dash_year": datetime.now().year,
-        "dash_month": datetime.now().month,
-        "year_options": [],
-        "month_choices": [(mm, MONTH_NAMES_RU[mm]) for mm in range(1, 13)],
-    }
-
-    def _render_home():
-        return render(request, "shifts/home.html", ctx)
-
-    if employees_df.empty:
-        ctx["dashboard_error"] = (
-            "Нет сотрудников для сводки — проверьте права доступа или справочник в БД."
-        )
-        return _render_home()
-
-    ref_emp = biota_logic.normalize_emp_code(employees_df.iloc[0]["emp_code"]) or str(
-        employees_df.iloc[0]["emp_code"]
-    ).strip()
-    year_options = biota_db.merged_year_options(cfg, ref_emp)
-    if not year_options:
-        ctx["dashboard_error"] = "Не удалось получить список годов (графики и БД)."
-        return _render_home()
-
-    now = datetime.now()
-    try:
-        y = int(request.GET.get("year") or now.year)
-    except (TypeError, ValueError):
-        y = now.year
-    try:
-        m = int(request.GET.get("month") or now.month)
-    except (TypeError, ValueError):
-        m = now.month
-    y = max(2000, min(2100, y))
-    m = max(1, min(12, m))
-    if y not in year_options:
-        y = year_options[0]
-
-    ctx["year_options"] = year_options
-    ctx["dash_year"] = y
-    ctx["dash_month"] = m
-    ctx["month_name"] = MONTH_NAMES_RU[m]
-
-    if not nav_permissions_for_user(user or "").get("skud", True):
-        return _render_home()
-
-    _month_home = date(y, m, 1)
-    _sd_h, _ed_h = biota_schedule.month_bounds(_month_home)
-    try:
-        _sched_home = biota_schedule.load_schedule_table(employees_df, y, m)
-    except Exception as exc:
-        ctx["dashboard_error"] = f"Не удалось загрузить график: {exc}"
-        return _render_home()
-
-    _emp_m = employees_df.copy()
-    _emp_m["emp_code"] = _emp_m["emp_code"].map(biota_logic.normalize_emp_code)
-    _emp_m = _emp_m[_emp_m["emp_code"] != ""].drop_duplicates(subset=["emp_code"], keep="first")
-    _emp_m["label"] = _emp_m.apply(employee_label_row, axis=1)
-    _codes_all = _emp_m["emp_code"].tolist()
-    if not _codes_all:
-        ctx["dashboard_error"] = "Нет ни одного кода сотрудника после нормализации — проверьте emp_code в БД."
-        return _render_home()
-
-    try:
-        _per_emp = biota_logic.late_early_minutes_per_employee_month(
-            cfg, _codes_all, _sched_home, _sd_h, _ed_h
-        )
-    except Exception as exc:
-        ctx["dashboard_error"] = f"Не удалось построить сводку: {exc}"
-        return _render_home()
-
-    _merged = _emp_m.merge(_per_emp, on="emp_code", how="left")
-    _merged["Опоздания (мин)"] = _merged["Опоздания (мин)"].fillna(0).astype(int)
-    _merged["Ранний уход (мин)"] = _merged["Ранний уход (мин)"].fillna(0).astype(int)
-    _by_area = (
-        _merged.groupby("department_name", as_index=False)
-        .agg({"Опоздания (мин)": "sum", "Ранний уход (мин)": "sum"})
-        .rename(columns={"department_name": "Отдел"})
-        .sort_values("Отдел")
-        .reset_index(drop=True)
-    )
-    _by_area["Всего (мин)"] = _by_area["Опоздания (мин)"] + _by_area["Ранний уход (мин)"]
-    _merged["Всего (мин)"] = _merged["Опоздания (мин)"] + _merged["Ранний уход (мин)"]
-    _top_src = _merged[_merged["Всего (мин)"] > 0]
-    _top10 = (
-        _top_src.nlargest(10, "Всего (мин)")[
-            ["label", "emp_code", "Опоздания (мин)", "Ранний уход (мин)", "Всего (мин)"]
-        ]
-        .rename(columns={"label": "Сотрудник", "emp_code": "Код"})
-        .reset_index(drop=True)
-    )
-    for _c in ("Опоздания (мин)", "Ранний уход (мин)", "Всего (мин)"):
-        _by_area[_c] = _by_area[_c].map(_fmt_minutes_human)
-        _top10[_c] = _top10[_c].map(_fmt_minutes_human)
-
-    ac, ar = _df_columns_rows(_by_area)
-    tc, tr = _df_columns_rows(_top10)
-    ctx["by_area_columns"] = ac
-    ctx["by_area_rows"] = ar
-    ctx["top10_columns"] = tc
-    ctx["top10_rows"] = tr
-    ctx["top10_empty"] = _top10.empty
-
-    return _render_home()
+    """Старый адрес сводки: сразу в первый доступный раздел."""
+    return redirect(post_login_redirect(biota_user(request)))
 
 
 @biota_login_required
@@ -385,12 +259,10 @@ def _calculator_shared_modes_payload() -> dict:
 def _calculator_save_cutting_modes(request):
     import json as _json
 
-    from biota_shifts.auth import user_is_executor
-
     from .models import CalculatorModesState
 
     u = biota_user(request)
-    if u and not _is_admin(u) and user_is_executor(u):
+    if request_is_executor(request):
         return JsonResponse(
             {"ok": False, "error": "У вас роль «исполнитель»: изменение общей базы режимов недоступно."},
             status=403,
@@ -492,12 +364,10 @@ def _calculator_parse_json_body(request):
 def _calculator_save_leveling_card(request):
     from decimal import Decimal, InvalidOperation
 
-    from biota_shifts.auth import user_is_executor
-
     from .models import MachineLevelingCard
 
     u = biota_user(request)
-    if u and not _is_admin(u) and user_is_executor(u):
+    if request_is_executor(request):
         return JsonResponse(
             {"ok": False, "error": "У вас роль «исполнитель»: сохранение карточки станка недоступно."},
             status=403,
@@ -599,12 +469,10 @@ def _calculator_save_leveling_card(request):
 
 
 def _calculator_delete_leveling_card(request):
-    from biota_shifts.auth import user_is_executor
-
     from .models import MachineLevelingCard
 
     u = biota_user(request)
-    if u and not _is_admin(u) and user_is_executor(u):
+    if request_is_executor(request):
         return JsonResponse(
             {"ok": False, "error": "У вас роль «исполнитель»: удаление карточки недоступно."},
             status=403,
@@ -627,12 +495,10 @@ def _calculator_delete_leveling_card(request):
 def _calculator_save_leveling_measurement(request):
     from datetime import datetime
 
-    from biota_shifts.auth import user_is_executor
-
     from .models import MachineLevelingCard
 
     u = biota_user(request)
-    if u and not _is_admin(u) and user_is_executor(u):
+    if request_is_executor(request):
         return JsonResponse(
             {"ok": False, "error": "У вас роль «исполнитель»: сохранение замера недоступно."},
             status=403,
@@ -708,10 +574,7 @@ def calculator_view(request):
             return _calculator_save_leveling_measurement(request)
         if action != "save_piece_norm":
             return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
-        u = biota_user(request)
-        from biota_shifts.auth import user_is_executor
-
-        if u and not _is_admin(u) and user_is_executor(u):
+        if request_is_executor(request):
             return JsonResponse(
                 {"ok": False, "error": "У вас роль «исполнитель»: сохранение нормы недоступно."},
                 status=403,
@@ -827,12 +690,10 @@ def calculator_view(request):
             for s in p["setups"]:
                 s["latest_norm"] = latest_by_setup.get(s["id"])
 
-    from biota_shifts.auth import user_is_executor
-
     from .calculator_modes import cutting_modes_payload
 
     u = biota_user(request)
-    can_edit_modes = bool(u) and (_is_admin(u) or not user_is_executor(u))
+    can_edit_modes = bool(u) and request_can_edit(request)
     shared_modes = _calculator_shared_modes_payload()
     leveling_cards = _calculator_leveling_cards_payload()
 

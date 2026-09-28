@@ -5,41 +5,23 @@
   <button class="nav-refresh-btn" type="submit" title="Обновить кэш данных из БД" aria-label="Обновить кэш данных из БД">{% biota_icon "ui.refresh" "nav-refresh-icon" %}</button>
 </form>
 {% endif %}
-{% if biota_nav.home %}
-<a href="{% url 'home' %}" class="nav-home-link nav-home-link--icon-only {% if request.resolver_match.url_name == 'home' %}active{% endif %}" title="Главная" aria-label="Главная">
-    {% biota_icon "nav.home" %}
-  </a>
-{% endif %}
-{% if biota_nav.graph and biota_nav.regulations %}
+{% if biota_nav.graph or biota_nav.regulations or biota_nav.hours or biota_nav.skud %}
 <details class="nav-dropdown">
-  <summary class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' or request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">График и регламенты</summary>
+  <summary class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' or request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' or request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' or request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' or request.resolver_match.url_name == 'discipline' or request.resolver_match.url_name == 'discipline_print' %}active{% endif %}">График и регламенты</summary>
   <div class="nav-dropdown-menu">
+    {% if biota_nav.graph %}
     <a href="{% url 'graph' %}" class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' %}active{% endif %}">График</a>
+    {% endif %}
+    {% if biota_nav.regulations %}
     <a href="{% url 'regulations_page' %}" class="{% if request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">Регламенты</a>
-  </div>
-</details>
-{% elif biota_nav.graph %}
-<a href="{% url 'graph' %}" class="{% if request.resolver_match.url_name == 'graph' or request.resolver_match.url_name == 'graph_download' %}active{% endif %}">График</a>
-{% elif biota_nav.regulations %}
-<a href="{% url 'regulations_page' %}" class="{% if request.resolver_match.url_name == 'regulations_page' or request.resolver_match.url_name == 'regulations_api_save' or request.resolver_match.url_name == 'regulations_api_meta' or request.resolver_match.url_name == 'regulations_excel' or request.resolver_match.url_name == 'regulations_pdf' %}active{% endif %}">Регламенты</a>
-{% endif %}
-{% if biota_nav.hours and biota_nav.skud %}
-<details class="nav-dropdown">
-  <summary class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' or request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' or request.resolver_match.url_name == 'discipline' or request.resolver_match.url_name == 'discipline_print' %}active{% endif %}">Часы и СКУД</summary>
-  <div class="nav-dropdown-menu">
+    {% endif %}
+    {% if biota_nav.hours %}
     <a href="{% url 'hours' %}" class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' %}active{% endif %}">Часы по дням</a>
+    {% endif %}
+    {% if biota_nav.skud %}
     <a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
     <a href="{% url 'discipline' %}" class="{% if request.resolver_match.url_name == 'discipline' or request.resolver_match.url_name == 'discipline_print' %}active{% endif %}">Нарушение дисциплины</a>
-  </div>
-</details>
-{% elif biota_nav.hours %}
-<a href="{% url 'hours' %}" class="{% if request.resolver_match.url_name == 'hours' or request.resolver_match.url_name == 'hours_excel' or request.resolver_match.url_name == 'hours_pdf' %}active{% endif %}">Часы по дням</a>
-{% elif biota_nav.skud %}
-<details class="nav-dropdown">
-  <summary class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' or request.resolver_match.url_name == 'discipline' or request.resolver_match.url_name == 'discipline_print' %}active{% endif %}">СКУД</summary>
-  <div class="nav-dropdown-menu">
-    <a href="{% url 'skud' %}" class="{% if request.resolver_match.url_name == 'skud' or request.resolver_match.url_name == 'skud_punches_csv' or request.resolver_match.url_name == 'skud_stats_excel' or request.resolver_match.url_name == 'skud_stats_csv' or request.resolver_match.url_name == 'skud_stats_pdf' %}active{% endif %}">СКУД</a>
-    <a href="{% url 'discipline' %}" class="{% if request.resolver_match.url_name == 'discipline' or request.resolver_match.url_name == 'discipline_print' %}active{% endif %}">Нарушение дисциплины</a>
+    {% endif %}
   </div>
 </details>
 {% endif %}
@@ -72,6 +54,15 @@
 <a href="{% url 'machines' %}" class="{% if request.resolver_match.url_name == 'machines' %}active{% endif %}">Станки</a>
 {% endif %}
 <span class="nav-spacer"></span>
+{% if biota_is_real_admin %}
+<form method="post" action="{% url 'preview_role' %}" class="nav-role-preview biota-exempt-global-readonly-form" title="Как видит сайт другая роль. Только для администратора.">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+  <span class="nav-role-preview__label">Роль</span>
+  <button type="submit" name="role" value="manager" class="nav-role-preview__btn{% if not biota_is_executor %} is-on{% endif %}" {% if not biota_is_executor %}aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>Руководитель</button>
+  <button type="submit" name="role" value="executor" class="nav-role-preview__btn{% if biota_is_executor %} is-on{% endif %}" {% if biota_is_executor %}aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>Исполнитель</button>
+</form>
+{% endif %}
 {% if biota_username %}
 <a href="{% url 'cabinet' %}" class="nav-user nav-ctl {% if request.resolver_match.url_name == 'cabinet' %}active{% endif %}" title="Кабинет: {{ biota_username }}" aria-label="Кабинет: {{ biota_username }}">
   {% biota_icon "nav.user" %}
@@ -88,6 +79,14 @@
 {% if biota_nav.calculator %}
 <a href="{% url 'calculator' %}" class="nav-icon-btn nav-ctl {% if request.resolver_match.url_name == 'calculator' %}active{% endif %}" title="Калькулятор" aria-label="Калькулятор">
   {% biota_icon "nav.calculator" %}
+</a>
+{% endif %}
+{% if biota_username %}
+<a href="{% url 'site_updates' %}" class="nav-icon-btn nav-ctl nav-updates-link {% if request.resolver_match.url_name == 'site_updates' %}active{% endif %}" title="Обновления сайта" aria-label="Обновления сайта">
+  {% biota_icon "nav.updates" %}
+  {% if site_updates_unread %}
+  <span class="nav-updates-badge">{% if site_updates_unread > 9 %}9+{% else %}{{ site_updates_unread }}{% endif %}</span>
+  {% endif %}
 </a>
 {% endif %}
 <div class="nav-theme-wrap">

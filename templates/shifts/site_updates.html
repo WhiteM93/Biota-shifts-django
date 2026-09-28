@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% static 'shifts/css/site_updates.css' %}?v={{ static_asset_version }}">
+{% endblock %}
+
+{% block content %}
+<div class="cabinet-page su-page">
+  <header class="cabinet-hero">
+    <p class="cabinet-hero__eyebrow">Сайт</p>
+    <h1>Обновления</h1>
+    <p class="cabinet-hero__meta muted">Что изменилось на сайте и как этим пользоваться.</p>
+  </header>
+
+  {% if rows %}
+  <div class="su-list">
+    {% for row in rows %}
+    <article class="su-card">
+      <div class="su-card__head">
+        <h2 class="su-card__title">{{ row.title }}</h2>
+        <time class="su-card__date" datetime="{{ row.created_at|date:'Y-m-d' }}">{{ row.created_at|date:"d.m.Y" }}</time>
+      </div>
+      <p class="su-card__body">{{ row.body|linebreaksbr }}</p>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">Пока нет опубликованных обновлений.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,72 @@
+.su-compose {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 22px;
+  padding: 14px 16px;
+  border: 1px solid var(--bio-filter-border);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+}
+.su-compose__label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--bio-muted);
+}
+.su-compose input,
+.su-compose textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-weight: 400;
+  color: var(--bio-input-fg);
+  background: var(--bio-input-bg);
+  border: 1px solid var(--bio-input-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.su-compose textarea {
+  resize: vertical;
+  min-height: 88px;
+}
+.su-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.su-card {
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--bio-surface-item-border);
+  background: var(--bio-surface-item);
+}
+.su-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.su-card__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--bio-heading-accent);
+}
+.su-card__date {
+  font-size: 12px;
+  color: var(--bio-muted);
+  white-space: nowrap;
+}
+.su-card__body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.su-card__actions {
+  margin-top: 10px;
+}

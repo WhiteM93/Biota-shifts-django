@@ -176,6 +176,18 @@ html[data-theme="dawn"] .products-search__clear:hover {
       0 8px 20px var(--bio-shadow-card),
       inset 3px 0 0 #1faa66;
   }
+  .product-tile--has-needs-start {
+    border-color: rgba(232, 176, 64, 0.5);
+    box-shadow:
+      0 8px 20px var(--bio-shadow-card),
+      inset 3px 0 0 #e8b040;
+  }
+  html[data-theme="dawn"] .product-tile--has-needs-start {
+    border-color: rgba(176, 118, 12, 0.42);
+    box-shadow:
+      0 8px 20px var(--bio-shadow-card),
+      inset 3px 0 0 #c48412;
+  }
   .product-tile-title {
     color: var(--bio-body-fg);
     text-decoration: none;
@@ -270,6 +282,50 @@ html[data-theme="dawn"] .products-search__clear:hover {
     color: #fff;
     background: rgba(13, 140, 84, 0.72);
     border-color: rgba(13, 140, 84, 0.4);
+  }
+  .product-tile-needs-start {
+    background: linear-gradient(
+      135deg,
+      rgba(72, 48, 16, 0.92) 0%,
+      rgba(58, 42, 18, 0.88) 100%
+    );
+    border-color: rgba(232, 176, 64, 0.55);
+  }
+  .product-tile-needs-start .product-tile-in-work-dot {
+    background: #ffd56a;
+    box-shadow: 0 0 6px rgba(255, 213, 106, 0.75);
+  }
+  .product-tile-needs-start .product-tile-in-work-text {
+    color: #fff6dc;
+  }
+  .product-tile-needs-start .product-tile-in-work-count {
+    color: #3a2808;
+    background: #ffd56a;
+    border-color: rgba(255, 230, 160, 0.55);
+  }
+  .product-tile-needs-start--stacked {
+    top: 38px;
+  }
+  html[data-theme="dawn"] .product-tile-needs-start {
+    background: linear-gradient(
+      135deg,
+      rgba(196, 130, 16, 0.16) 0%,
+      rgba(196, 130, 16, 0.06) 100%
+    );
+    border-color: rgba(176, 118, 12, 0.35);
+    box-shadow: 0 1px 4px rgba(196, 130, 16, 0.1);
+  }
+  html[data-theme="dawn"] .product-tile-needs-start .product-tile-in-work-text {
+    color: #a36a08;
+  }
+  html[data-theme="dawn"] .product-tile-needs-start .product-tile-in-work-dot {
+    background: #c48412;
+    box-shadow: 0 0 5px rgba(196, 130, 16, 0.5);
+  }
+  html[data-theme="dawn"] .product-tile-needs-start .product-tile-in-work-count {
+    color: #fff;
+    background: rgba(176, 118, 12, 0.72);
+    border-color: rgba(176, 118, 12, 0.4);
   }
   .product-tile-3d {
     height: 100%;

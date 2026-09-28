@@ -52,6 +52,15 @@ html[data-theme="dawn"] .forms-page {
   color: var(--fp-ui-muted);
 }
 
+.forms-topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .forms-btn-print,
 .forms-btn-primary {
   padding: 8px 16px;
@@ -95,6 +104,15 @@ html[data-theme="dawn"] .forms-btn-primary {
 
 .forms-btn-secondary:hover {
   background: var(--fp-ui-hover);
+}
+
+.forms-btn-secondary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.forms-btn-secondary:disabled:hover {
+  background: transparent;
 }
 
 .forms-btn-icon {
@@ -1100,6 +1118,28 @@ body.forms-table-resizing--row * {
   font-weight: 600;
 }
 
+.forms-dialog--wide {
+  max-width: 560px;
+}
+
+.forms-ai-lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fp-ui-muted);
+}
+
+.forms-ai-msg {
+  margin: 0;
+  font-size: 13px;
+  color: #b45309;
+}
+
+.forms-dialog--wide .js-forms-ai-source {
+  min-height: 160px;
+  resize: vertical;
+}
+
 .forms-dialog-actions {
   display: flex;
   justify-content: flex-end;
@@ -1114,7 +1154,8 @@ body.forms-table-resizing--row * {
 .forms-page.is-readonly .forms-props-block input,
 .forms-page.is-readonly .forms-props-block select,
 .forms-page.is-readonly .forms-el-toolbar,
-.forms-page.is-readonly .forms-pages-actions {
+.forms-page.is-readonly .forms-pages-actions,
+.forms-page.is-readonly .js-forms-ai {
   display: none;
 }
 

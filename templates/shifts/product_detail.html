@@ -4,28 +4,10 @@
 {% block content %}
 <link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v={{ static_asset_version }}">
 <style id="pd-meta-view-fix">
-  /* Непрозрачный фон только у inner — иначе квадратный aside даёт «уголки» снаружи radius */
   #product-detail-meta {
     background: transparent !important;
     background-image: none !important;
   }
-  #product-detail-meta .product-detail-meta-inner {
-    background: #101520 !important;
-    background-image: none !important;
-    isolation: isolate;
-    overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--bio-filter-border, #2a3550) 80%, transparent) !important;
-    border-radius: 14px !important;
-    box-shadow: none !important;
-  }
-  html[data-theme="dawn"] #product-detail-meta .product-detail-meta-inner {
-    background: #ffffff !important;
-    background-image: none !important;
-    border-color: rgba(40, 32, 24, 0.1) !important;
-  }
-  #product-detail-meta .product-detail-meta-plan,
-  #product-detail-meta .product-detail-description-block,
-  #product-detail-meta .product-detail-meta-norms,
   #product-detail-meta .plan-unified-specs-card,
   #product-detail-meta .plan-cascade-form-container,
   #product-detail-meta .plan-cascade-form-container .form-field,
@@ -137,7 +119,7 @@
         <select id="setup-tab-select" data-setup-order-ids="{% for setup in setups %}{{ setup.pk }}{% if not forloop.last %},{% endif %}{% endfor %}">
           <option value="drawing" {% if tab_default == 'drawing' %}selected{% endif %}>Изделие</option>
           {% for setup in setups %}
-          <option value="{{ setup.tab_slug }}" data-setup-option-for="{{ setup.tab_slug }}" data-setup-in-work="{% if setup.in_work %}1{% else %}0{% endif %}" data-setup-readiness="{{ setup.readiness_status }}" {% if tab_default == setup.tab_slug %}selected{% endif %}>{% if setup.in_work %}● {% endif %}{% if setup.name %}{{ setup.name }}{% else %}без названия{% endif %}</option>
+          <option value="{{ setup.tab_slug }}" data-setup-option-for="{{ setup.tab_slug }}" data-setup-in-work="{% if setup.in_work %}1{% else %}0{% endif %}" data-setup-needs-start="{% if setup.needs_start %}1{% else %}0{% endif %}" data-setup-readiness="{{ setup.readiness_status }}" {% if tab_default == setup.tab_slug %}selected{% endif %}>{% if setup.in_work %}● {% elif setup.needs_start %}▶ {% endif %}{% if setup.name %}{{ setup.name }}{% else %}без названия{% endif %}</option>
           {% endfor %}
         </select>
       </label>
@@ -168,8 +150,21 @@
       </div>
       {% if setups %}
       <span class="nav-spacer" style="flex:1 1 auto;"></span>
-      {% endif %}
-      {% if biota_can_edit and setups %}
+      <button
+        type="button"
+        class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only"
+        id="setup-share-qr-btn"
+        hidden
+        aria-expanded="false"
+        aria-controls="setup-share-qr-modal"
+        aria-label="QR этой установки"
+        title="QR этой установки"
+      >
+        {% biota_icon "setup.share_qr" %}
+      </button>
+      <a href="#" class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only" id="setup-export-tools-btn" target="_blank" rel="noopener" hidden aria-label="Печать списка инструмента А4" title="Печать списка инструмента (А4 вертикально)">
+        <span class="product-pdf-export-btn__icon" aria-hidden="true">{% biota_icon "pdf.export_tools" "pdf-export-icon pdf-export-icon--tools" %}</span>
+      </a>
       <button
         type="button"
         class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only"
@@ -188,6 +183,8 @@
       <a href="#" class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only" id="setup-export-photos-btn" target="_blank" rel="noopener" hidden aria-label="PDF фото 3×5" title="PDF фото 3×5">
         <span class="product-pdf-export-btn__icon" aria-hidden="true">{% biota_icon "pdf.export_photos" "pdf-export-icon pdf-export-icon--photos" %}</span>
       </a>
+      {% endif %}
+      {% if biota_can_edit and setups %}
       <button type="button" class="btn product-btn-edit-mode product-btn-edit-mode--icon-only" id="setup-inline-edit-btn" aria-pressed="false" aria-label="Быстрое редактирование" title="Быстрое редактирование">
         <span class="product-btn-edit-mode__icon" aria-hidden="true">
           <span class="qe-icon-glow"></span>
@@ -238,19 +235,38 @@
                 data-out="#setup-ai-out-{{ setup.pk }}"
                 title="Анализ инструмента и наличия на складе"
               >ИИ-анализ</button>
+              <div class="product-setup-run-toggles">
               <button
                 type="button"
-                class="product-setup-inwork-toggle{% if setup.in_work %} is-on{% endif %}"
+                class="product-setup-inwork-toggle{% if setup.in_work %} is-on{% endif %}{% if not biota_can_edit %} is-readonly{% endif %}"
                 data-setup-id="{{ setup.pk }}"
                 data-tab-slug="{{ setup.tab_slug }}"
+                data-run-status="in_work"
                 aria-pressed="{% if setup.in_work %}true{% else %}false{% endif %}"
-                title="{% if setup.in_work %}В работе — нажмите, чтобы снять{% else %}Не в работе — нажмите, чтобы включить{% endif %}"
+                {% if not biota_can_edit %}disabled{% endif %}
+                title="{% if not biota_can_edit %}Только руководитель может менять статус{% elif setup.in_work %}В работе — нажмите, чтобы снять{% else %}Не в работе — нажмите, чтобы включить{% endif %}"
               >
                 <span class="product-setup-inwork-toggle__track" aria-hidden="true">
                   <span class="product-setup-inwork-toggle__thumb"></span>
                 </span>
                 <span class="product-setup-inwork-toggle__label">В работе</span>
               </button>
+              <button
+                type="button"
+                class="product-setup-inwork-toggle is-launch{% if setup.needs_start %} is-on{% endif %}{% if not biota_can_edit %} is-readonly{% endif %}"
+                data-setup-id="{{ setup.pk }}"
+                data-tab-slug="{{ setup.tab_slug }}"
+                data-run-status="needs_start"
+                aria-pressed="{% if setup.needs_start %}true{% else %}false{% endif %}"
+                {% if not biota_can_edit %}disabled{% endif %}
+                title="{% if not biota_can_edit %}Только руководитель может менять статус{% elif setup.needs_start %}Надо запускать — нажмите, чтобы снять{% else %}Не в очереди запуска — нажмите, чтобы включить{% endif %}"
+              >
+                <span class="product-setup-inwork-toggle__track" aria-hidden="true">
+                  <span class="product-setup-inwork-toggle__thumb"></span>
+                </span>
+                <span class="product-setup-inwork-toggle__label">Надо запускать</span>
+              </button>
+              </div>
             </div>
             <div class="product-setup-ai-out js-setup-ai-out" id="setup-ai-out-{{ setup.pk }}" hidden></div>
             <div class="product-setup-spec-group">
@@ -452,6 +468,17 @@
                     <option value="6">24</option>
                   </select>
                 </label>
+                <span class="setup-inline-toolbar-colors" role="group" aria-label="Цвет текста">
+                  <button type="button" class="setup-notes-color is-default js-notes-color" data-color="default" title="Цвет по умолчанию" aria-label="Цвет по умолчанию"></button>
+                  <button type="button" class="setup-notes-color js-notes-color" data-color="#e74c3c" title="Красный" aria-label="Красный" style="background:#e74c3c"></button>
+                  <button type="button" class="setup-notes-color js-notes-color" data-color="#e67e22" title="Оранжевый" aria-label="Оранжевый" style="background:#e67e22"></button>
+                  <button type="button" class="setup-notes-color js-notes-color" data-color="#f1c40f" title="Жёлтый" aria-label="Жёлтый" style="background:#f1c40f"></button>
+                  <button type="button" class="setup-notes-color js-notes-color" data-color="#2ecc71" title="Зелёный" aria-label="Зелёный" style="background:#2ecc71"></button>
+                  <button type="button" class="setup-notes-color js-notes-color" data-color="#3498db" title="Синий" aria-label="Синий" style="background:#3498db"></button>
+                  <button type="button" class="setup-notes-color js-notes-color" data-color="#9b59b6" title="Фиолетовый" aria-label="Фиолетовый" style="background:#9b59b6"></button>
+                  <button type="button" class="setup-notes-color js-notes-color" data-color="#ffffff" title="Белый" aria-label="Белый" style="background:#ffffff"></button>
+                  <button type="button" class="setup-notes-color js-notes-color" data-color="#111111" title="Чёрный" aria-label="Чёрный" style="background:#111111"></button>
+                </span>
               </div>
             </div>
             {% endif %}
@@ -607,17 +634,17 @@
 
   <aside class="product-detail-meta" id="product-detail-meta" aria-label="Параметры и описание изделия"{% if tab_default != 'drawing' %} hidden{% endif %}>
     <div class="product-detail-meta-inner">
-      <header class="product-detail-header product-detail-meta-header">
+      <header class="product-detail-header product-detail-meta-header product-detail-meta-card">
         <div class="product-detail-header-name">
           <span class="product-detail-name" data-field-text="product_name" spellcheck="false">{{ product.name }}</span>
         </div>
       </header>
       <div class="product-detail-meta-split">
-        <section class="product-detail-meta-plan" aria-label="Параметры изделия">
+        <section class="product-detail-meta-plan product-detail-meta-card" aria-label="Параметры изделия">
           <h3 class="product-detail-meta-section-title">Параметры</h3>
           {% include "shifts/includes/plan_card_specs_unified.html" with plan_specs_variant="product" %}
         </section>
-        <section class="product-detail-description-block" aria-label="Описание изделия">
+        <section class="product-detail-description-block product-detail-meta-card" aria-label="Описание изделия">
           <h3 class="product-detail-meta-section-title">Описание</h3>
           <div class="form-field form-field--always-visible product-description-toolbar-field">
             <div class="description-toolbar" hidden>
@@ -649,7 +676,7 @@
         </section>
       </div>
       {% if setups %}
-      <section class="product-detail-meta-norms" aria-label="Нормы времени по установкам">
+      <section class="product-detail-meta-norms product-detail-meta-card" aria-label="Нормы времени по установкам">
         <h3 class="product-detail-meta-section-title">Нормы по установкам</h3>
         <div class="product-setup-norms-list" id="product-setup-norms-list">
           {% for setup in setups %}
@@ -715,6 +742,11 @@
     </div>
   </div>
 </div>
+{% for setup in setups %}
+{% if setup.share_qr_svg %}
+<template class="js-setup-share-qr-tpl" data-setup-id="{{ setup.pk }}" data-url="{{ setup.share_url }}" data-local="{% if setup.share_qr_localhost %}1{% else %}0{% endif %}">{{ setup.share_qr_svg|safe }}</template>
+{% endif %}
+{% endfor %}
 {% include "shifts/_product_detail_modals.html" %}
 
 
@@ -725,6 +757,7 @@
   "product_name": "{{ product.name|default:''|escapejs }}",
   "pdf_url_specs": "{% url 'product_setup_pdf_export' product.pk 0 'specs' %}",
   "pdf_url_photos": "{% url 'product_setup_pdf_export' product.pk 0 'photos' %}",
+  "pdf_url_tools": "{% url 'product_setup_pdf_export' product.pk 0 'tools' %}",
   "stl_preview_url": "{{ preview_stl_url|default:'' }}",
   "save_list_preview_url": "{% url 'product_save_list_preview' product.pk %}",
   "machines_url": "{% url 'machines' %}",

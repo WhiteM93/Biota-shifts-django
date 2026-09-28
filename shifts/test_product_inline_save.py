@@ -2,7 +2,7 @@
 
 from django.test import Client, TestCase
 
-from shifts.models import Product, ProductSetup
+from shifts.models import Product, ProductSetup, ProductSetupToolRow
 from shifts.product_views import create_product_with_defaults
 
 
@@ -93,6 +93,52 @@ class ProductInlineSaveTests(TestCase):
         second.refresh_from_db()
         self.assertTrue(second.in_work)
 
+    def test_toggle_setup_needs_start_clears_in_work(self):
+        setup = self.product.setups.first()
+        setup.in_work = True
+        setup.save(update_fields=["in_work"])
+        res = self.client.post(
+            f"/products/{self.product.pk}/",
+            {
+                "action": "inline_toggle_setup_in_work",
+                "setup_id": str(setup.pk),
+                "status": "needs_start",
+                "value": "1",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(res.status_code, 200, res.content[:500])
+        body = res.json()
+        self.assertTrue(body.get("ok"), body)
+        self.assertTrue(body.get("needs_start"))
+        self.assertFalse(body.get("in_work"))
+        setup.refresh_from_db()
+        self.assertTrue(setup.needs_start)
+        self.assertFalse(setup.in_work)
+
+    def test_toggle_setup_in_work_clears_needs_start(self):
+        setup = self.product.setups.first()
+        setup.needs_start = True
+        setup.save(update_fields=["needs_start"])
+        res = self.client.post(
+            f"/products/{self.product.pk}/",
+            {
+                "action": "inline_toggle_setup_in_work",
+                "setup_id": str(setup.pk),
+                "status": "in_work",
+                "value": "1",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(res.status_code, 200, res.content[:500])
+        body = res.json()
+        self.assertTrue(body.get("ok"), body)
+        self.assertTrue(body.get("in_work"))
+        self.assertFalse(body.get("needs_start"))
+        setup.refresh_from_db()
+        self.assertTrue(setup.in_work)
+        self.assertFalse(setup.needs_start)
+
     def test_product_detail_renders_in_work_setups_first(self):
         second = ProductSetup.objects.create(
             product=self.product,
@@ -121,6 +167,15 @@ class ProductInlineSaveTests(TestCase):
         self.assertNotEqual(pos_other, -1)
         self.assertNotEqual(pos_self, -1)
         self.assertLess(pos_other, pos_self)
+
+    def test_setup_page_has_qr_for_that_setup(self):
+        res = self.client.get(f"/products/{self.product.pk}/?tab=setup-{self.setup.pk}")
+        self.assertEqual(res.status_code, 200, res.content[:400])
+        html = res.content.decode()
+        self.assertIn("setup-share-qr-btn", html)
+        self.assertIn("js-setup-share-qr-tpl", html)
+        self.assertIn(f"tab=setup-{self.setup.pk}", html)
+        self.assertIn("<svg", html)
 
     def test_empty_product_type_returns_clear_error(self):
         res = self.client.post(
@@ -176,3 +231,28 @@ class ProductInlineSaveTests(TestCase):
         self.assertEqual(self.product.card_material, "40Х")
         self.setup.refresh_from_db()
         self.assertEqual(self.setup.material, "40Х")
+
+    def test_setup_tools_print_page_is_a4_portrait(self):
+        ProductSetupToolRow.objects.create(
+            setup=self.setup,
+            tool_number="T01",
+            tool_type="Центровка",
+            diameter="5",
+            sort_order=0,
+        )
+        ProductSetupToolRow.objects.create(
+            setup=self.setup,
+            tool_number="T02",
+            sort_order=1,
+        )
+        res = self.client.get(f"/products/{self.product.pk}/setups/{self.setup.pk}/pdf/tools/")
+        self.assertEqual(res.status_code, 200, res.content[:400])
+        html = res.content.decode()
+        self.assertIn("A4 portrait", html)
+        self.assertIn("18mm 16mm", html)
+        self.assertIn("Список инструмента", html)
+        self.assertIn("Центровка", html)
+        self.assertIn("tools-print-table", html)
+        self.assertIn("Диаметр", html)
+        self.assertNotIn("Корректор", html)
+        self.assertNotIn(">T02<", html)

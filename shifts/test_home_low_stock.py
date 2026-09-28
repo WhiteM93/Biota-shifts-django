@@ -46,7 +46,7 @@ class HomeLowStockPrefsTests(TestCase):
 class HomeLowStockContextTests(TestCase):
     def test_apply_persists_on_get(self):
         factory = RequestFactory()
-        request = factory.get("/home/?stock_category=end_mill&stock_max_qty=7&stock_apply=1")
+        request = factory.get("/inventory/?stock_category=end_mill&stock_max_qty=7&stock_apply=1")
         ctx = {"low_stock_items": []}
         apply_home_low_stock_context(ctx, username="carol", query=request.GET, can_inventory=True)
         row = UserHomeLowStockPrefs.objects.get(username="carol")

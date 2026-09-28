@@ -1,11 +1,26 @@
 from biota_shifts.auth import (
     NAV_KEYS,
-    _is_admin,
     account_label_for_username,
     machines_quick_edit_for_user,
     nav_permissions_for_user,
-    user_is_executor,
 )
+from shifts.auth_utils import (
+    is_real_admin,
+    preview_role,
+    request_can_edit,
+    request_is_admin_ui,
+    request_is_executor,
+)
+from shifts.site_updates import unread_site_updates_count
+from shifts.site_updates_views import SITE_UPDATES_SEEN_SESSION_KEY
+
+
+def _site_updates_unread(request) -> int:
+    try:
+        seen = int(request.session.get(SITE_UPDATES_SEEN_SESSION_KEY) or 0)
+        return unread_site_updates_count(seen)
+    except Exception:
+        return 0
 
 
 def biota_session(request):
@@ -45,6 +60,9 @@ def biota_session(request):
             "biota_is_executor": False,
             "biota_can_edit": True,
             "biota_is_admin": False,
+            "biota_is_real_admin": False,
+            "biota_preview_role": "",
+            "site_updates_unread": 0,
             "biota_machines_quick_edit": False,
             "static_asset_version": static_asset_version,
             "perf_defer_scripts": perf_defer_scripts,
@@ -56,21 +74,24 @@ def biota_session(request):
         }
     nav = nav_permissions_for_user(u)
     adn = (request.session.get("admin_display_name") or "").strip()
-    is_admin = _is_admin(u)
-    is_executor = user_is_executor(u) and not is_admin
+    real_admin = is_real_admin(request)
+    is_executor = request_is_executor(request)
     payload = {
         "biota_nav": nav,
         "biota_is_executor": is_executor,
-        "biota_can_edit": is_admin or not is_executor,
-        "biota_is_admin": is_admin,
-        "biota_machines_quick_edit": machines_quick_edit_for_user(u),
+        "biota_can_edit": request_can_edit(request),
+        "biota_is_admin": request_is_admin_ui(request),
+        "biota_is_real_admin": real_admin,
+        "biota_preview_role": preview_role(request) or "",
+        "biota_machines_quick_edit": machines_quick_edit_for_user(u) and not is_executor,
+        "site_updates_unread": _site_updates_unread(request),
     }
     payload["static_asset_version"] = static_asset_version
     payload["perf_defer_scripts"] = perf_defer_scripts
     payload["perf_diagnostics"] = perf_diagnostics
     payload["perf_diag_ttfb_ms"] = perf_diag_ttfb_ms
     payload["perf_diag_load_ms"] = perf_diag_load_ms
-    if is_admin and adn:
+    if real_admin and adn:
         display = adn
     else:
         try:
