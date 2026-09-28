@@ -214,13 +214,13 @@ try:
 except ValueError:
     YANDEX_GPT_MAX_TOKENS_SETUP = 900
 try:
-    YANDEX_GPT_CONTEXT_CHARS = int(os.getenv("YANDEX_GPT_CONTEXT_CHARS") or "7000")
+    YANDEX_GPT_CONTEXT_CHARS = int(os.getenv("YANDEX_GPT_CONTEXT_CHARS") or "10000")
 except ValueError:
-    YANDEX_GPT_CONTEXT_CHARS = 7000
+    YANDEX_GPT_CONTEXT_CHARS = 10000
 try:
-    YANDEX_GPT_RECENT_ISSUES = int(os.getenv("YANDEX_GPT_RECENT_ISSUES") or "20")
+    YANDEX_GPT_RECENT_ISSUES = int(os.getenv("YANDEX_GPT_RECENT_ISSUES") or "60")
 except ValueError:
-    YANDEX_GPT_RECENT_ISSUES = 20
+    YANDEX_GPT_RECENT_ISSUES = 60
 try:
     YANDEX_GPT_TIMEOUT = float(os.getenv("YANDEX_GPT_TIMEOUT") or "45")
 except ValueError:

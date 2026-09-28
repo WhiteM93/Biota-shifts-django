@@ -11,12 +11,13 @@ from .inventory_chat_tools import build_warehouse_context, run_tool, tools_schem
 from .yandex_gpt import YandexGptError, complete, yandex_gpt_configured
 
 SYSTEM_PROMPT = """Склад Biota. Отвечай кратко по-русски.
-Данные: СНИМОК + tools. Не выдумывай цифры. Даты ДД.ММ.ГГГГ. Только чтение.
+Факты только из tools (search_issues и др.) — это те же выдачи, что вкладка История.
+Не выдумывай цифры и не подменяй ø2.3 вместо ø3.5. Даты ДД.ММ.ГГГГ. Только чтение.
 
 Типы не путать: сверло ⌀2.5 ≠ метчик M2.5 / M5.
 
 Вызывай tool JSON сам (не проси пользователя):
-- «кто брал …» → search_issues (история выдач, не «на руках»);
+- «кто брал …» / «а сверла 3.5» → search_issues;
 - «на руках / не вернул / кто держит» → open_issues;
 - «просрочено / давно не вернули» → overdue_open_issues;
 - «где лежит / ячейка / адрес» → locate_tool;
@@ -45,6 +46,12 @@ _FOLLOW_RE = re.compile(
     r"^(проведи|проводи|сделай|давай|точнее|анализ|посчитай|выполни|ну\s*давай)\b",
     re.IGNORECASE,
 )
+_TOOLISH_RE = re.compile(
+    r"сверл|метчик|раскат|резьб|фрез|пластин|зенкер|цанг|разверт|apkt|rpmt|"
+    r"[mм]\s*\d|[dø⌀]\s*\d|\d+[.,]\d+|\b\d{1,2}\b",
+    re.IGNORECASE,
+)
+_SHORT_FOLLOW_RE = re.compile(r"^(?:а|и|ещё|еще|ну)\s+", re.IGNORECASE)
 _WHO_RE = re.compile(
     r"кто\s+(?:последн\w*\s+)?брал|кто\s+выдавал|последн\w*\s+брал",
     re.IGNORECASE,
@@ -90,6 +97,10 @@ _SUMMARY_RE = re.compile(
 _REFUSAL_RE = re.compile(
     r"не\s+могу\s+выполнить|вам\s+нужно|используйте\s+инструмент|запросить\s+этот\s+инструмент|"
     r"в\s+рамках\s+текущего\s+доступа",
+    re.IGNORECASE,
+)
+_EMPTYISH_RE = re.compile(
+    r"не\s+найден|ничего\s+не\s+найден|нет\s+выдач|выдач\w*\s+не\s+найден",
     re.IGNORECASE,
 )
 
@@ -177,6 +188,15 @@ _PANEL_LABELS = {
     "payroll": "зарплата",
     "employees": "сотрудники",
 }
+_FACT_REPLY_TOOLS = frozenset(
+    {
+        "search_issues",
+        "open_issues",
+        "locate_tool",
+        "issues_by_employee",
+        "overdue_open_issues",
+    }
+)
 _FORCED_KEEP = frozenset(
     {
         "search_issues",
@@ -349,6 +369,18 @@ def forced_tool_call(
         return {"tool": "top_issued_tools", "args": {"limit": 15}}
     if stock_top:
         return {"tool": "top_stock_tools", "args": {"limit": 15}}
+    if _TOOLISH_RE.search(q):
+        tool_q = _strip_prefix(
+            q,
+            [
+                r"^(?:а|и|ещё|еще|ну)\s+",
+                r"^(?:скажи|подскажи)?\s*кто\s+(?:последн\w*\s+)?брал\s+",
+                r"^кто\s+выдавал\s+",
+            ],
+        )
+        if not tool_q or len(tool_q) < 2:
+            tool_q = q
+        return {"tool": "search_issues", "args": {"query": tool_q[:120], "limit": 20}}
     return None
 
 
@@ -450,6 +482,13 @@ def ask_inventory_chat(
     )
     used_tools.append(tool_name)
 
+    if tool_name in _FACT_REPLY_TOOLS:
+        return {
+            "ok": True,
+            "reply": _fallback_reply(tool_result),
+            "used_tools": used_tools,
+        }
+
     empty_msg = "Если rows пустой — скажи, что по этому смыслу ничего не найдено (не подменяй сверло метчиком)."
     messages.append({"role": "assistant", "text": json.dumps(call, ensure_ascii=False)})
     messages.append(
@@ -474,7 +513,9 @@ def ask_inventory_chat(
         }
 
     call2 = _extract_tool_call(second)
-    if call2 or _REFUSAL_RE.search(second or ""):
+    rows = tool_result.get("rows") if isinstance(tool_result, dict) else None
+    has_rows = isinstance(rows, list) and bool(rows)
+    if call2 or _REFUSAL_RE.search(second or "") or (has_rows and _EMPTYISH_RE.search(second or "")):
         return {
             "ok": True,
             "reply": _fallback_reply(tool_result),

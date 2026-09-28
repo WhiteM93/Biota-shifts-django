@@ -166,6 +166,46 @@ class InventoryChatToolsTests(TestCase):
         data_blind = search_issues(query="метчик M3 глухой")
         self.assertEqual(data_blind["count"], 0)
 
+    def test_search_issues_cyrillic_m_matches_latin_size(self):
+        tap = ToolItem.objects.create(category="tap", name="Режущий метчик", quantity=2)
+        TapSpec.objects.create(
+            tool=tap,
+            size_label="M3",
+            hole_type="through",
+            tap_type="cutting",
+        )
+        tap30 = ToolItem.objects.create(category="tap", name="Метчик M30", quantity=1)
+        TapSpec.objects.create(
+            tool=tap30,
+            size_label="M30",
+            hole_type="through",
+            tap_type="cutting",
+        )
+        StockMovement.objects.create(
+            movement_type="issue",
+            tool=tap,
+            quantity=1,
+            employee_name="Владимиров Д.",
+            movement_date=timezone.localdate(),
+        )
+        StockMovement.objects.create(
+            movement_type="issue",
+            tool=tap30,
+            quantity=1,
+            employee_name="Чужой M30",
+            movement_date=timezone.localdate(),
+        )
+        data = search_issues(query="метчик М3")
+        self.assertGreaterEqual(data["count"], 1)
+        joined = " ".join(r["employee"] + r["tool"] for r in data["rows"])
+        self.assertIn("Владимиров", joined)
+        self.assertNotIn("Чужой", joined)
+
+    def test_who_last_took_tap_keeps_cyrillic_size_in_query(self):
+        call = forced_tool_call("кто последний брал метчик М3")
+        self.assertEqual(call["tool"], "search_issues")
+        self.assertIn("М3", call["args"]["query"])
+
     def test_search_issues_drill_25_does_not_match_tap(self):
         tap = ToolItem.objects.create(category="tap", name="Метчик M5 режущий", quantity=3)
         TapSpec.objects.create(
@@ -216,6 +256,42 @@ class InventoryChatToolsTests(TestCase):
         empty = search_issues(query="сверла 2.5")
         self.assertEqual(empty["count"], 0)
         self.assertIn("сверл", (empty.get("hint") or "").lower())
+
+    def test_search_issues_drill_35_ignores_23_and_followup_a(self):
+        d23 = ToolItem.objects.create(category="drill", name="Сверло D2.3 / L38", quantity=1)
+        DrillSpec.objects.create(tool=d23, diameter_mm="2.30")
+        d35 = ToolItem.objects.create(category="drill", name="Сверло D3.5 / L65 / Lc42 / 118°", quantity=1)
+        DrillSpec.objects.create(tool=d35, diameter_mm="3.50")
+        StockMovement.objects.create(
+            movement_type="issue",
+            tool=d23,
+            quantity=1,
+            employee_name="Масличенко И.",
+            movement_date=timezone.localdate(),
+        )
+        StockMovement.objects.create(
+            movement_type="issue",
+            tool=d35,
+            quantity=1,
+            employee_name="Владимиров Д.",
+            movement_date=timezone.localdate(),
+        )
+        data = search_issues(query="а сверла 3.5")
+        self.assertGreaterEqual(data["count"], 1)
+        joined = " ".join(r["employee"] + r["tool"] for r in data["rows"])
+        self.assertIn("Владимиров", joined)
+        self.assertNotIn("Масличенко", joined)
+        data25 = search_issues(query="сверло 2.5")
+        people = " ".join(r["employee"] for r in data25["rows"])
+        self.assertNotIn("Масличенко", people)
+        self.assertNotIn("Владимиров", people)
+
+    def test_followup_a_drill_uses_search_issues(self):
+        hist = [{"role": "user", "text": "кто последний брал сверло 2.5"}]
+        call = forced_tool_call("а сверла 3.5", hist)
+        self.assertEqual(call["tool"], "search_issues")
+        self.assertIn("3.5", call["args"]["query"])
+        self.assertNotIn("2.5", call["args"]["query"])
 
     def test_warehouse_context_contains_stock_and_issues(self):
         text = build_warehouse_context()
@@ -360,5 +436,5 @@ class InventoryChatOpsToolsTests(TestCase):
             result = ask_inventory_chat("какие выдачи просрочены?")
         self.assertTrue(result["ok"])
         self.assertEqual(result["used_tools"], ["overdue_open_issues"])
-        self.assertEqual(complete_mock.call_count, 1)
+        self.assertEqual(complete_mock.call_count, 0)
         self.assertIn("Долгов", result["reply"])

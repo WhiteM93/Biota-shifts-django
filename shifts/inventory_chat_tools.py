@@ -11,10 +11,12 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from .models import StockMovement, ToolItem
+from .size_label_normalize import size_label_match_variants
 
 MAX_ROWS = 50
 MAX_QUERY_LEN = 120
 MAX_NAME_LEN = 120
+SCAN_LIMIT = 400
 
 
 def _parse_date(value: Any, *, default: date | None = None) -> date | None:
@@ -138,6 +140,202 @@ def _query_wants_category(q_low: str) -> str:
     return ""
 
 
+_TYPE_WORD_RE = re.compile(r"сверл|метчик|раскат|фрез|пластин|drill|tap|insert", re.IGNORECASE)
+_STOP_TOKENS = frozenset(
+    {
+        "а",
+        "и",
+        "или",
+        "но",
+        "же",
+        "ли",
+        "про",
+        "для",
+        "как",
+        "какой",
+        "какая",
+        "какие",
+        "что",
+        "это",
+        "этот",
+        "эта",
+        "то",
+        "тот",
+        "также",
+        "ещё",
+        "еще",
+        "да",
+        "нет",
+        "ну",
+        "вот",
+        "там",
+        "тут",
+        "бы",
+        "у",
+        "в",
+        "на",
+        "с",
+        "со",
+        "к",
+        "по",
+        "о",
+        "об",
+        "от",
+        "до",
+        "из",
+        "за",
+        "под",
+        "над",
+        "при",
+        "скажи",
+        "подскажи",
+        "покажи",
+        "найди",
+        "последний",
+        "последние",
+        "последнее",
+        "брал",
+        "брали",
+        "взял",
+        "взяли",
+        "кто",
+    }
+)
+
+
+def _is_stop_token(tok: str) -> bool:
+    t = (tok or "").strip().lower().replace("ё", "е")
+    if not t:
+        return True
+    if _parse_diameter_token(tok) is not None:
+        return False
+    if _is_metric_size_token(tok, "tap"):
+        return False
+    if t in _STOP_TOKENS:
+        return True
+    return len(t) == 1 and not t.isdigit()
+
+
+def _diameter_token_q(diam: Decimal, *, name_field: str, comment_field: str | None, drill_field: str, mill_field: str) -> Q:
+    """⌀3.5 / D3.5 / 3,5 — не цеплять 2.3 и 13.5."""
+    s = format(diam, "f").rstrip("0").rstrip(".")
+    esc = re.escape(s).replace(r"\.", r"[.,]")
+    boundary = rf"(^|[^0-9]){esc}($|[^0-9])"
+    q = Q(**{drill_field: diam}) | Q(**{mill_field: diam})
+    q |= Q(**{f"{name_field}__iregex": boundary})
+    if comment_field:
+        q |= Q(**{f"{comment_field}__iregex": boundary})
+    return q
+
+
+def _is_metric_size_token(tok: str, want_cat: str = "") -> bool:
+    t = (tok or "").strip()
+    if re.match(r"^[mм]\s*\d", t, re.IGNORECASE):
+        return True
+    if want_cat == "tap" and re.fullmatch(r"\d+(?:[.,]\d+)?", t.replace(",", ".")):
+        return True
+    return False
+
+
+def _metric_size_q(
+    tok: str,
+    *,
+    size_field: str,
+    name_field: str,
+    comment_field: str | None = None,
+) -> Q:
+    """M3 / М3 / m3 — один размер; не путать с M30."""
+    q = Q()
+    if comment_field:
+        q |= Q(**{f"{comment_field}__icontains": tok})
+    variants = size_label_match_variants(tok)
+    if not variants:
+        q |= Q(**{f"{name_field}__icontains": tok})
+        q |= Q(**{f"{size_field}__icontains": tok})
+        return q
+    for v in variants:
+        q |= Q(**{f"{size_field}__iexact": v})
+        if v and re.match(r"^[MmМм]\d", v):
+            esc = re.escape(v)
+            q |= Q(**{f"{name_field}__iregex": rf"(^|[^0-9]){esc}($|[^0-9])"})
+    return q
+
+
+def _norm_hay(s: str) -> str:
+    t = (s or "").lower().replace("ё", "е").replace("й", "и")
+    t = t.replace("м", "m").replace(",", ".")
+    for ch in ("ø", "⌀", "Ø"):
+        t = t.replace(ch, "d")
+    t = re.sub(r"[·|/]+", " ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def _tool_haystack(tool: ToolItem | None) -> str:
+    if tool is None:
+        return ""
+    parts: list[str] = [_tool_label(tool), tool.name or "", tool.get_category_display()]
+    tp = getattr(tool, "tap_spec", None)
+    if tp is not None:
+        size = (getattr(tp, "size_label", None) or "").strip()
+        if size:
+            parts.extend(size_label_match_variants(size))
+            parts.append(size)
+        try:
+            parts.append(str(tp.get_hole_type_display() or ""))
+        except Exception:
+            pass
+        try:
+            parts.append(str(tp.get_tap_type_display() or ""))
+        except Exception:
+            pass
+    dr = getattr(tool, "drill_spec", None)
+    if dr is not None and getattr(dr, "diameter_mm", None) is not None:
+        d = format(dr.diameter_mm, "f").rstrip("0").rstrip(".")
+        parts.extend([d, f"d{d}", f"ø{d}"])
+    mill = getattr(tool, "end_mill_spec", None)
+    if mill is not None and getattr(mill, "diameter_mm", None) is not None:
+        d = format(mill.diameter_mm, "f").rstrip("0").rstrip(".")
+        parts.extend([d, f"d{d}"])
+    ins = getattr(tool, "insert_spec", None)
+    if ins is not None:
+        parts.append(getattr(ins, "item_name", None) or "")
+        parts.append(getattr(ins, "brand", None) or "")
+    return _norm_hay(" ".join(p for p in parts if p))
+
+
+def _movement_haystack(m: StockMovement) -> str:
+    extra = f"{m.employee_name or ''} {m.comment or ''}"
+    return (_tool_haystack(m.tool) + " " + _norm_hay(extra)).strip()
+
+
+def _token_matches_hay(hay: str, tok: str, want_cat: str) -> bool:
+    low = tok.lower().replace("ё", "е")
+    if _TYPE_WORD_RE.search(low) or _is_stop_token(tok):
+        return True
+    diam = _parse_diameter_token(tok)
+    if diam is not None and want_cat != "tap":
+        s = format(diam, "f").rstrip("0").rstrip(".")
+        return bool(re.search(rf"(^|[^0-9]){re.escape(s)}($|[^0-9])", hay))
+    if _is_metric_size_token(tok, want_cat):
+        for v in size_label_match_variants(tok):
+            nv = _norm_hay(v)
+            if not nv:
+                continue
+            if re.fullmatch(r"m?\d+(?:\.\d+)?", nv):
+                if re.search(rf"(^|[^0-9a-z]){re.escape(nv)}($|[^0-9])", hay):
+                    return True
+            elif nv in hay:
+                return True
+        return False
+    nt = _norm_hay(tok)
+    return bool(nt) and nt in hay
+
+
+def _hay_matches(hay: str, tokens: list[str], want_cat: str) -> bool:
+    return all(_token_matches_hay(hay, tok, want_cat) for tok in tokens)
+
+
 def search_issues(
     query: str = "",
     date_from: Any = None,
@@ -204,31 +402,10 @@ def search_issues(
     if hole_codes and want_cat != "drill":
         qs = qs.filter(tool__tap_spec__hole_type__in=list(set(hole_codes)))
 
-    for tok in search_tokens:
-        low = tok.lower().replace("ё", "е")
-        if re.search(r"сверл|метчик|раскат|фрез|пластин|drill|tap|insert", low):
-            # Тип уже учтён want_cat — не фильтровать по слову в имени.
-            continue
-        diam = _parse_diameter_token(tok)
-        is_metric_size = bool(re.match(r"^[mм]\d", tok, re.IGNORECASE))
-        tok_q = Q(tool__name__icontains=tok) | Q(comment__icontains=tok)
-        if diam is not None and not is_metric_size:
-            tok_q |= Q(tool__drill_spec__diameter_mm=diam)
-            tok_q |= Q(tool__end_mill_spec__diameter_mm=diam)
-            tok_q |= Q(tool__name__icontains=str(diam).replace(".", ","))
-            tok_q |= Q(tool__name__icontains=str(diam))
-            # Голое «2.5» не должно цеплять метчик M2.5 / M5.
-            if want_cat == "tap" or is_metric_size:
-                tok_q |= Q(tool__tap_spec__size_label__icontains=tok)
-        else:
-            tok_q |= Q(tool__tap_spec__size_label__icontains=tok)
-            tok_q |= Q(tool__insert_spec__item_name__icontains=tok)
-            tok_q |= Q(tool__insert_spec__brand__icontains=tok)
-            tok_q |= Q(tool__collet_spec__size_label__icontains=tok)
-        qs = qs.filter(tok_q)
-
     rows = []
-    for m in qs[:lim]:
+    for m in qs[:SCAN_LIMIT]:
+        if not _hay_matches(_movement_haystack(m), search_tokens, want_cat):
+            continue
         rows.append(
             {
                 "date": m.movement_date.strftime("%d.%m.%Y"),
@@ -239,9 +416,13 @@ def search_issues(
                 "comment": _clip(m.comment, 60),
             }
         )
+        if len(rows) >= lim:
+            break
     empty_hint = ""
     if not rows and want_cat == "drill":
         empty_hint = "Выдач сверла по этому запросу не найдено (метрический метчик сюда не входит)."
+    elif not rows and want_cat == "tap":
+        empty_hint = f"Выдач метчика по запросу «{q}» с {d_from.strftime('%d.%m.%Y')} по {d_to.strftime('%d.%m.%Y')} не найдено."
     return {
         "query": q,
         "from": d_from.strftime("%d.%m.%Y"),
@@ -551,30 +732,35 @@ def open_issues(employee: str = "", query: str = "", limit: int = 20) -> dict[st
         qs = qs.filter(tool__category="insert")
     if q:
         tokens = [t for t in re.split(r"[\s,/|]+", q) if t]
-        for tok in tokens:
-            low = tok.lower().replace("ё", "е")
-            if re.search(r"сверл|метчик|раскат|фрез|пластин|drill|tap|insert", low):
+        rows = []
+        for iss in qs[:SCAN_LIMIT]:
+            if not _hay_matches(_movement_haystack(iss), tokens, want_cat):
                 continue
-            diam = _parse_diameter_token(tok)
-            tok_q = Q(tool__name__icontains=tok) | Q(comment__icontains=tok)
-            if diam is not None and not re.match(r"^[mм]\d", tok, re.IGNORECASE):
-                tok_q |= Q(tool__drill_spec__diameter_mm=diam)
-                tok_q |= Q(tool__end_mill_spec__diameter_mm=diam)
-            else:
-                tok_q |= Q(tool__tap_spec__size_label__icontains=tok)
-            qs = qs.filter(tok_q)
-    rows = []
-    for iss in qs[:lim]:
-        emp_name = (iss.employee_name or "").strip() or "—"
-        rows.append(
-            {
-                "date": iss.movement_date.strftime("%d.%m.%Y"),
-                "employee": _clip(emp_name, 80),
-                "tool": _clip(_tool_label(iss.tool), 180),
-                "remaining": int(iss.remaining_qty or 0),
-                "issued": int(iss.quantity or 0),
-            }
-        )
+            emp_name = (iss.employee_name or "").strip() or "—"
+            rows.append(
+                {
+                    "date": iss.movement_date.strftime("%d.%m.%Y"),
+                    "employee": _clip(emp_name, 80),
+                    "tool": _clip(_tool_label(iss.tool), 180),
+                    "remaining": int(iss.remaining_qty or 0),
+                    "issued": int(iss.quantity or 0),
+                }
+            )
+            if len(rows) >= lim:
+                break
+    else:
+        rows = []
+        for iss in qs[:lim]:
+            emp_name = (iss.employee_name or "").strip() or "—"
+            rows.append(
+                {
+                    "date": iss.movement_date.strftime("%d.%m.%Y"),
+                    "employee": _clip(emp_name, 80),
+                    "tool": _clip(_tool_label(iss.tool), 180),
+                    "remaining": int(iss.remaining_qty or 0),
+                    "issued": int(iss.quantity or 0),
+                }
+            )
     hint = "На руках — остаток по выдаче (выдано минус возврат/списание)."
     if not rows:
         hint = "Открытых выдач по запросу нет (всё вернули или списали)."
@@ -616,30 +802,19 @@ def locate_tool(query: str = "", limit: int = 20) -> dict[str, Any]:
     if looks_addr:
         addr = q.replace(" ", "")
         qs = qs.filter(warehouse_address__icontains=addr)
+        picked = list(qs.order_by("-quantity", "warehouse_address", "name")[:lim])
     else:
         tokens = [t for t in re.split(r"[\s,/|]+", q) if t]
-        for tok in tokens:
-            low = tok.lower().replace("ё", "е")
-            if re.search(r"сверл|метчик|раскат|фрез|пластин|drill|tap|insert", low):
+        picked = []
+        for t in qs.order_by("-quantity", "warehouse_address", "name")[:SCAN_LIMIT]:
+            hay = _tool_haystack(t) + " " + _norm_hay(t.warehouse_address or "")
+            if not _hay_matches(hay, tokens, want_cat):
                 continue
-            diam = _parse_diameter_token(tok)
-            is_metric = bool(re.match(r"^[mм]\d", tok, re.IGNORECASE))
-            tok_q = (
-                Q(name__icontains=tok)
-                | Q(warehouse_address__icontains=tok)
-                | Q(insert_spec__item_name__icontains=tok)
-                | Q(insert_spec__brand__icontains=tok)
-            )
-            if diam is not None and not is_metric:
-                tok_q |= Q(drill_spec__diameter_mm=diam)
-                tok_q |= Q(end_mill_spec__diameter_mm=diam)
-            else:
-                tok_q |= Q(tap_spec__size_label__icontains=tok)
-            qs = qs.filter(tok_q)
-
-    qs = qs.order_by("-quantity", "warehouse_address", "name")[:lim]
+            picked.append(t)
+            if len(picked) >= lim:
+                break
     rows = []
-    for t in qs:
+    for t in picked:
         addr = (t.warehouse_address or "").strip()
         rows.append(
             {
@@ -837,13 +1012,46 @@ def build_warehouse_context(
     if recent_issues is None:
         recent_issues = int(getattr(settings, "YANDEX_GPT_RECENT_ISSUES", 20) or 20)
     max_chars = max(2000, min(int(max_chars), 14000))
-    recent_issues = max(5, min(int(recent_issues), MAX_ROWS))
+    recent_issues = max(5, min(int(recent_issues), 80))
     parts: list[str] = []
+    used = 0
     try:
-        parts.append(build_control_digest(username=username))
+        digest = build_control_digest(username=username)
+        parts.append(digest)
         parts.append("")
+        used += len(digest) + 1
     except Exception:
         pass
+
+    lim = recent_issues
+    issues = (
+        StockMovement.objects.filter(movement_type="issue", is_reverted=False)
+        .select_related(
+            "tool",
+            "tool__insert_spec",
+            "tool__tap_spec",
+            "tool__drill_spec",
+        )
+        .order_by("-movement_date", "-id")[:lim]
+    )
+    parts.append(f"=== ПОСЛЕДНИЕ ВЫДАЧИ (до {lim}, свежие сверху; как вкладка История) ===")
+    parts.append("Формат: дата | сотрудник | инструмент | qty")
+    iss_n = 0
+    for m in issues:
+        line = (
+            f"{m.movement_date.strftime('%d.%m.%Y')} | "
+            f"{_clip(m.employee_name, 40) or '—'} | "
+            f"{_clip(_tool_label(m.tool), 120)} | "
+            f"{m.quantity}"
+        )
+        parts.append(line)
+        used += len(line) + 1
+        iss_n += 1
+    if iss_n == 0:
+        parts.append("(выдач нет)")
+    parts.append("Точный поиск выдач — tool search_issues, не выдумывай из этого списка.")
+    parts.append("")
+
     qs = (
         ToolItem.objects.filter(is_deleted=False, quantity__gt=0)
         .select_related("insert_spec", "tap_spec", "drill_spec")
@@ -870,43 +1078,17 @@ def build_warehouse_context(
     parts.append(f"Всего позиций: {len(stock_lines)}, суммарно штук: {total_qty}")
     parts.append("Формат: остаток <TAB> позиция [<адрес>]")
 
-    budget = max_chars - 800
-    used = 0
     shown = 0
     for line in stock_lines:
         add = len(line) + 1
-        if used + add > budget:
-            parts.append(f"… ещё {len(stock_lines) - shown} позиций не влезло в снимок (зови tool_stock_search / top_stock_tools).")
+        if used + add > max_chars - 80:
+            parts.append(
+                f"… ещё {len(stock_lines) - shown} позиций не влезло (tool_stock_search / top_stock_tools)."
+            )
             break
         parts.append(line)
         used += add
         shown += 1
-
-    lim = max(1, min(int(recent_issues or 40), MAX_ROWS))
-    issues = (
-        StockMovement.objects.filter(movement_type="issue", is_reverted=False)
-        .select_related("tool", "tool__insert_spec", "tool__tap_spec")
-        .order_by("-movement_date", "-id")[:lim]
-    )
-    parts.append("")
-    parts.append(f"=== ПОСЛЕДНИЕ ВЫДАЧИ (до {lim}, свежие сверху) ===")
-    parts.append("Формат: дата | сотрудник | инструмент | qty")
-    iss_n = 0
-    for m in issues:
-        line = (
-            f"{m.movement_date.strftime('%d.%m.%Y')} | "
-            f"{_clip(m.employee_name, 40) or '—'} | "
-            f"{_clip(_tool_label(m.tool), 120)} | "
-            f"{m.quantity}"
-        )
-        if used + len(line) + 1 > max_chars:
-            parts.append("… список выдач обрезан по размеру контекста.")
-            break
-        parts.append(line)
-        used += len(line) + 1
-        iss_n += 1
-    if iss_n == 0:
-        parts.append("(выдач нет)")
 
     text = "\n".join(parts)
     if len(text) > max_chars:
