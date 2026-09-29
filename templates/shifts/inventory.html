@@ -218,9 +218,28 @@
 <div class="inv-stock-layout">
   <div class="inv-stock-main">
     <header class="inv-stock-toolbar">
-      <span class="inv-stock-footer__count">Показано <strong>{{ stock_filtered_count }}</strong> из {{ stock_category_total }}</span>
+      <span class="inv-stock-footer__count">
+        Показано <strong>{{ stock_filtered_count }}</strong> из {{ stock_category_total }}
+        {% if stock_filtered_qty %}<span class="inv-stock-footer__qty">· всего <strong>{{ stock_filtered_qty }}</strong> шт.</span>{% endif %}
+      </span>
       <span class="inv-stock-footer__actions">
-        {% if can_manage_stock %}
+        <span class="inv-stock-view-toggle" role="group" aria-label="Вид склада">
+          <a class="inv-stock-view-toggle__btn{% if stock_view != 'summary' %} is-active{% endif %}"
+             href="{{ stock_positions_url }}"{% if stock_view != 'summary' %} aria-current="page"{% endif %}>Позиции</a>
+          <a class="inv-stock-view-toggle__btn{% if stock_view == 'summary' %} is-active{% endif %}"
+             href="{{ stock_summary_url }}"{% if stock_view == 'summary' %} aria-current="page"{% endif %}>Сводка</a>
+        </span>
+        {% if stock_view == "summary" and stock_group_choices %}
+        <label class="inv-stock-group-by">
+          <span class="inv-stock-group-by__label">Группировать</span>
+          <select name="stock_group_by" form="inventory-stock-filter-form" class="inv-stock-group-by__select js-stock-group-by" onchange="this.form.submit()" aria-label="Поле группировки">
+            {% for key, label in stock_group_choices %}
+            <option value="{{ key }}" {% if stock_group_by == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% endif %}
+        {% if stock_view != "summary" and can_manage_stock %}
         <button type="button" class="btn btn-sm btn-ghost js-stock-select-toggle" aria-pressed="false">Выделить</button>
         <span class="inv-stock-select-bar js-stock-select-bar" hidden>
           <span class="inv-stock-select-count js-stock-select-count">Выбрано: 0</span>
@@ -230,10 +249,36 @@
           <button type="button" class="btn btn-sm btn-ghost js-stock-select-cancel">Отмена</button>
         </span>
         {% endif %}
+        {% if stock_view != "summary" %}
         <button type="button" class="btn btn-sm btn-ghost" id="inv-stock-export-csv">Экспорт CSV</button>
+        {% endif %}
       </span>
     </header>
     <div class="table-wrap inv-stock-table-wrap">
+  {% if stock_view == "summary" %}
+  <table class="data-grid inv-stock-grid inv-stock-grid--summary js-sortable-table">
+    <thead>
+      <tr>
+        <th class="sortable">{{ stock_group_label|default:"Группа" }}</th>
+        <th class="sortable hint-cell" data-hint="Сумма остатков по всем позициям группы">Всего, шт.</th>
+        <th class="sortable hint-cell" data-hint="Число отдельных позиций на складе">Позиций</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in stock_summary_rows %}
+      <tr>
+        <td data-sort="{{ row.group_value }}">{{ row.group_value }}</td>
+        <td data-sort="{{ row.total_qty }}"><strong>{{ row.total_qty }}</strong></td>
+        <td data-sort="{{ row.sku_count }}">{{ row.sku_count }}</td>
+        <td><a class="btn btn-sm btn-ghost inv-stock-summary-open" href="{{ row.stock_url }}">Позиции</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="inv-stock-empty">Нет данных по текущему фильтру</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
   {% if not filters.category %}
   <table class="data-grid inv-stock-grid js-sortable-table inv-stock-grid--all">
     <thead>
@@ -778,6 +823,86 @@
       {% endfor %}
     </tbody>
   </table>
+
+  {% elif is_measuring_category %}
+  <table class="data-grid inv-stock-grid js-sortable-table">
+    <thead>
+      <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
+        {% if filters.category != "gauge_smooth" %}
+        <th class="sortable hint-cell" data-hint="Вид инструмента">Вид</th>
+        {% endif %}
+        {% if filters.category == "gauge_thread" %}
+        <th class="sortable hint-cell" data-hint="Размер резьбы, например M10">Резьба</th>
+        <th class="sortable hint-cell" data-hint="Шаг резьбы, мм">Шаг</th>
+        <th class="sortable hint-cell" data-hint="Проходной / непроходной / комплект">П/НП</th>
+        {% endif %}
+        <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
+        {% if filters.category == "measure_univ" %}
+        <th class="sortable hint-cell" data-hint="Диапазон измерения">Диапазон</th>
+        <th class="sortable hint-cell" data-hint="Точность">Точность</th>
+        <th class="sortable hint-cell" data-hint="Степень защиты IP">IP</th>
+        {% endif %}
+        {% if filters.category == "measure_check" %}
+        <th class="sortable hint-cell" data-hint="Размер (мм или габарит)">Размер</th>
+        <th class="sortable hint-cell" data-hint="Класс точности">Класс</th>
+        {% endif %}
+        {% if filters.category == "measure_mark" %}
+        <th class="sortable hint-cell" data-hint="Длина, мм">L, мм</th>
+        {% endif %}
+        <th class="sortable hint-cell inv-stock-notes-text-col" data-hint="Описание позиции">Описание</th>
+        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
+        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tool_items %}
+      {% with m=t.measuring_tool_spec %}
+      <tr>
+        <td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
+        {% if filters.category != "gauge_smooth" %}
+        <td data-sort="{% if m %}{{ m.kind|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_kind" data-type="select" data-value="{{ m.kind|default:'' }}"{% endif %}>{% if m %}{{ m.get_kind_display|default:"-" }}{% else %}-{% endif %}</td>
+        {% endif %}
+        {% if filters.category == "gauge_thread" %}
+        <td data-sort="{% if m %}{{ m.thread_size_label|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_thread_size" data-type="text" data-value="{{ m.thread_size_label|default:'' }}"{% endif %}>{% if m %}{{ m.thread_size_label|default:"-" }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if m and m.pitch_mm is not None %}{{ m.pitch_mm }}{% else %}-1{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_pitch_mm" data-type="number" data-value="{{ m.pitch_mm|default:'' }}"{% endif %}>{% if m and m.pitch_mm is not None %}{{ m.pitch_mm|dotformat:"-3" }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if m %}{{ m.go_nogo|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_go_nogo" data-type="select" data-value="{{ m.go_nogo|default:'' }}"{% endif %}>{% if m %}{{ m.get_go_nogo_display|default:"-" }}{% else %}-{% endif %}</td>
+        {% endif %}
+        <td data-sort="{% if m %}{{ m.brand|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_brand" data-type="text" data-value="{{ m.brand|default:'' }}"{% endif %}>{% if m %}{{ m.brand|default:"-" }}{% else %}-{% endif %}</td>
+        {% if filters.category == "measure_univ" %}
+        <td data-sort="{% if m %}{{ m.measure_range|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_range" data-type="text" data-value="{{ m.measure_range|default:'' }}"{% endif %}>{% if m %}{{ m.measure_range|default:"-" }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if m %}{{ m.accuracy|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_accuracy" data-type="text" data-value="{{ m.accuracy|default:'' }}"{% endif %}>{% if m %}{{ m.accuracy|default:"-" }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if m %}{{ m.ip_rating|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_ip" data-type="text" data-value="{{ m.ip_rating|default:'' }}"{% endif %}>{% if m %}{{ m.ip_rating|default:"-" }}{% else %}-{% endif %}</td>
+        {% endif %}
+        {% if filters.category == "measure_check" %}
+        <td data-sort="{% if m %}{{ m.check_size|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_check_size" data-type="text" data-value="{{ m.check_size|default:'' }}"{% endif %}>{% if m %}{{ m.check_size|default:"-" }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if m %}{{ m.check_accuracy_class|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_check_class" data-type="text" data-value="{{ m.check_accuracy_class|default:'' }}"{% endif %}>{% if m %}{{ m.check_accuracy_class|default:"-" }}{% else %}-{% endif %}</td>
+        {% endif %}
+        {% if filters.category == "measure_mark" %}
+        <td data-sort="{% if m and m.length_mm is not None %}{{ m.length_mm }}{% else %}-1{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_length_mm" data-type="number" data-value="{{ m.length_mm|default:'' }}"{% endif %}>{% if m and m.length_mm is not None %}{{ m.length_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
+        {% endif %}
+        <td class="inv-stock-notes-text-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}>{{ t.notes|default:"-" }}</td>
+        <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
+        {% if can_manage_stock %}
+        <td class="inv-stock-col-delete">
+          <form method="post" class="inv-stock-delete-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_tool_item">
+            <input type="hidden" name="tool_id" value="{{ t.id }}">
+            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
+              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            </button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% endwith %}
+      {% empty %}
+      <tr><td colspan="{% if can_manage_stock %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
   {% endif %}
 
     </div>
@@ -806,10 +931,100 @@
     </div>
   </div>
   {% endif %}
+  <div class="inv-addr-hint-modal js-addr-hint-modal" hidden>
+    <button type="button" class="inv-addr-hint-modal__backdrop js-addr-hint-close" aria-label="Закрыть"></button>
+    <div class="inv-addr-hint-modal__card" role="dialog" aria-modal="true" aria-labelledby="inv-addr-hint-title">
+      <header class="inv-addr-hint-modal__head">
+        <div>
+          <h2 id="inv-addr-hint-title" class="inv-addr-hint-modal__title">Подсказка по адресам</h2>
+          <p class="inv-addr-hint-modal__lead">Адрес и наименование ячейки. Можно править название{% if can_manage_stock %} прямо здесь{% endif %} и распечатать список по выбранной мебели.</p>
+        </div>
+        <button type="button" class="btn btn-sm btn-ghost js-addr-hint-close" aria-label="Закрыть">Закрыть</button>
+      </header>
+      <div class="inv-addr-hint-modal__tools">
+        <label class="inv-addr-hint-modal__search">
+          <input type="search" class="js-addr-hint-search" placeholder="Поиск: A-01-01, метчик, фреза…" autocomplete="off" aria-label="Поиск по адресам">
+        </label>
+        <label class="inv-addr-hint-modal__print-furn">
+          <span>Печать</span>
+          <select class="js-addr-hint-print-furn" aria-label="Мебель для печати">
+            <option value="">Вся мебель</option>
+            {% for f in stock_address_furniture %}
+            <option value="{{ f.id }}">{% if f.code %}{{ f.code }} — {% endif %}{{ f.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="button" class="btn btn-sm btn-ghost js-addr-hint-print">Распечатать</button>
+      </div>
+      <div class="inv-addr-hint-modal__table-wrap">
+        <table class="inv-addr-hint-table">
+          <thead>
+            <tr>
+              <th>Адрес</th>
+              <th>Наименование</th>
+              <th>Мебель</th>
+            </tr>
+          </thead>
+          <tbody class="js-addr-hint-body">
+            {% for row in stock_address_hints %}
+            <tr
+              data-addr="{{ row.address }}"
+              data-furn-id="{{ row.furniture_id|default:0 }}"
+              data-container-id="{{ row.container_id|default:0 }}"
+              data-search="{{ row.address }} {{ row.name }} {{ row.editable_label }} {{ row.furniture }} {{ row.furniture_code }} {{ row.stock }}"
+            >
+              <td class="inv-addr-hint-table__addr"><code>{{ row.address }}</code></td>
+              <td class="inv-addr-hint-table__name">
+                {% if can_manage_stock and row.container_id %}
+                <button
+                  type="button"
+                  class="inv-addr-hint-table__edit js-addr-hint-edit"
+                  data-container-id="{{ row.container_id }}"
+                  data-address="{{ row.address }}"
+                  data-label="{{ row.editable_label }}"
+                  data-stock="{{ row.stock }}"
+                  data-placeholder="{% if row.stock %}{{ row.stock }}{% else %}Например: метчики М2 глухие{% endif %}"
+                  title="Нажмите, чтобы изменить наименование"
+                >
+                  <span class="js-addr-hint-name-text">{% if row.editable_label %}{{ row.editable_label }}{% elif row.stock %}{{ row.stock }}{% else %}Нажмите, чтобы задать{% endif %}</span>
+                </button>
+                <span class="inv-addr-hint-table__status js-addr-hint-status" hidden></span>
+                {% else %}
+                <span class="js-addr-hint-name-text">{{ row.name }}</span>
+                {% if can_manage_stock and not row.container_id %}
+                <span class="inv-addr-hint-table__note">Нет ячейки на визуальном складе — подпись не задать</span>
+                {% endif %}
+                {% endif %}
+              </td>
+              <td class="inv-addr-hint-table__furn">{% if row.furniture_code %}<span class="inv-addr-hint-table__code">{{ row.furniture_code }}</span>{% endif %}{% if row.furniture %} {{ row.furniture }}{% elif not row.furniture_code %}—{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr class="js-addr-hint-empty-static"><td colspan="3" class="inv-addr-hint-table__empty">Пока нет адресов. Задайте места на визуальном складе или проставьте адреса позициям.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="inv-addr-hint-modal__foot js-addr-hint-count" hidden></p>
+    </div>
+  </div>
   <aside class="inv-stock-sidebar">
     <form method="get" class="inv-stock-filter" id="inventory-stock-filter-form">
   <input type="hidden" name="panel" value="stock">
-  <h2 class="inv-stock-filter__title">Фильтр</h2>
+  <input type="hidden" name="stock_view" value="{{ stock_view|default:'positions' }}">
+  {% if stock_view == "summary" and stock_group_by and not stock_group_choices %}
+  <input type="hidden" name="stock_group_by" value="{{ stock_group_by }}">
+  {% endif %}
+  <div class="inv-stock-filter__head">
+    <h2 class="inv-stock-filter__title">Фильтр</h2>
+    <label class="inv-stock-zero-switch" title="Показывать позиции с нулевым остатком">
+      <span class="inv-stock-zero-switch__text" id="stock-show-zeros-label">Нули</span>
+      <span class="inv-stock-zero-switch__ctrl">
+        <input type="hidden" name="show_all" value="{% if filters.show_all %}1{% else %}0{% endif %}" class="js-stock-show-all">
+        <input type="checkbox" class="js-stock-show-all-toggle" {% if filters.show_all %}checked{% endif %} aria-labelledby="stock-show-zeros-label">
+        <span class="inv-stock-zero-switch__track" aria-hidden="true"><span class="inv-stock-zero-switch__thumb"></span></span>
+      </span>
+    </label>
+  </div>
   <div class="inv-filter-list">
     <label class="field inv-stock-filter__category">
       <span>Тип инструмента</span>
@@ -992,12 +1207,6 @@
       </select>
     </label>
     {% endif %}
-    <label class="field"><span>Показывать нулевые остатки</span>
-      <select name="show_all">
-        <option value="0" {% if not filters.show_all %}selected{% endif %}>Нет</option>
-        <option value="1" {% if filters.show_all %}selected{% endif %}>Да</option>
-      </select>
-    </label>
     <label class="field"><span>Адрес</span>
       <select name="no_address">
         <option value="" {% if not filters.no_address %}selected{% endif %}>Все</option>
@@ -1286,7 +1495,7 @@
       </select>
     </label>
     {% endif %}
-    {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "insert" and filters.category != "tool_extension" %}
+    {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "insert" and filters.category != "tool_extension" and not is_measuring_category %}
     <label class="field"><span>Материал инструмента</span>
       <select name="tool_material" class="js-stock-filter-tool-material">
         <option value="">Все</option>
@@ -1301,7 +1510,7 @@
       <input type="text" name="tool_material_custom" maxlength="80" class="js-stock-filter-tool-material-custom" placeholder="Свой вариант, до 80 символов" value="{{ filters.tool_material_custom }}" autocomplete="off" {% if filters.tool_material_select != tool_material_filter_other %}style="display:none;margin-top:6px;max-width:100%;"{% else %}style="margin-top:6px;max-width:100%;"{% endif %} />
     </label>
     {% endif %}
-    {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "tool_extension" %}
+    {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "tool_extension" and not is_measuring_category %}
     <div class="field">
       <span{% if filters.category == "insert" %} title="{{ insert_column_tooltips.coating }}"{% endif %}>Материал покрытия</span>
       <div class="coating-picker"{% if filters.category == "insert" %} title="{{ insert_column_tooltips.coating }}"{% endif %}>
@@ -1640,13 +1849,37 @@
           </div>
           <div class="inv-arrival-field inv-arrival-field--add">
             <span class="inv-arrival-label inv-arrival-label--ghost">Строка</span>
-            <button type="button" class="inv-arrival-add-btn" id="arrival-bulk-add-row" title="Добавить строку">
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <line x1="10" y1="4" x2="10" y2="16"/>
-                <line x1="4" y1="10" x2="16" y2="10"/>
-              </svg>
-              <span>Добавить</span>
-            </button>
+            <div class="inv-arrival-add-wrap">
+              <button type="button" class="inv-arrival-add-btn" id="arrival-bulk-add-row" title="Добавить строку">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <line x1="10" y1="4" x2="10" y2="16"/>
+                  <line x1="4" y1="10" x2="16" y2="10"/>
+                </svg>
+                <span>Добавить</span>
+              </button>
+              <div class="inv-arrival-addr-hint">
+                <button type="button" class="inv-arrival-addr-hint__btn" aria-label="Подсказка по адресам" title="Адреса склада">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <circle cx="10" cy="10" r="7.5"/>
+                    <path d="M10 9v5" stroke-linecap="round"/>
+                    <circle cx="10" cy="6.2" r="1" fill="currentColor" stroke="none"/>
+                  </svg>
+                </button>
+                <div class="inv-arrival-addr-hint__pop" role="tooltip">
+                  <div class="inv-arrival-addr-hint__head">Адреса</div>
+                  <div class="inv-arrival-addr-hint__list">
+                    {% for row in stock_address_hints %}
+                    <div class="inv-arrival-addr-hint__row">
+                      <code>{{ row.address }}</code>
+                      <span>{% if row.editable_label %}{{ row.editable_label }}{% elif row.name and row.name != "—" %}{{ row.name }}{% else %}—{% endif %}</span>
+                    </div>
+                    {% empty %}
+                    <div class="inv-arrival-addr-hint__empty">Пока нет адресов с подписями. Задайте их на складе в «Подсказка по адресам».</div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2750,6 +2983,9 @@
   "tool_extension_inner_diameter_clamps": [{% for k in tool_extension_inner_diameter_clamps %}"{{ k|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
   "tool_extension_compat_placeholders": { {% for k, v in tool_extension_compat_placeholders.items %}"{{ k|escapejs }}":"{{ v|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %} },
   "tool_extension_compat_labels": { {% for k, v in tool_extension_compat_labels.items %}"{{ k|escapejs }}":"{{ v|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %} },
+  "measuring_kinds_by_category": {{ measuring_kinds_by_category_json|default:"{}"|safe }},
+  "measuring_category_keys": [{% for k in measuring_category_keys %}"{{ k|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+  "thread_gauge_go_nogo": [{% for key, label in thread_gauge_go_nogo %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "body_tool_couplings": [{% for key, label in body_tool_couplings %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "thread_standards": [{% for key, label in thread_standards %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "thread_kinds": [{% for key, label in thread_kinds %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
@@ -2803,7 +3039,9 @@
   "collet_threading_series": [{% for key, label in collet_threading_series %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "collet_threading_use": [{% for key, label in collet_threading_use %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "warehouse_locations_url": "{% url 'inventory_api_warehouse_locations' %}",
+  "warehouse_address_label_url": "{% url 'inventory_api_warehouse_address_label' %}",
   "warehouse_address_titles": { {% for addr, label in warehouse_address_titles.items %}"{{ addr|escapejs }}":"{{ label|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %} },
+  "can_manage_stock": {% if can_manage_stock %}true{% else %}false{% endif %},
   "arrival_matches_url": "{% url 'inventory_api_arrival_matches' %}"
 }</script>
 

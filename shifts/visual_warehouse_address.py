@@ -589,3 +589,88 @@ def address_container_titles() -> dict[str, str]:
         if label:
             out[addr] = label
     return out
+
+
+def build_address_hint_rows(*, include_stock: bool = True) -> list[dict]:
+    """Справка «адрес → наименование» для склада.
+
+    Подпись контейнера из визуального склада; если её нет — кратко, что лежит сейчас.
+    """
+    from collections import defaultdict
+
+    from django.db.models import Q
+
+    from shifts.models import ToolItem
+
+    kind_fallbacks = set(_KIND_LABELS.values())
+    stock_by_addr: dict[str, list[tuple[str, int]]] = defaultdict(list)
+    if include_stock:
+        qs = (
+            ToolItem.objects.filter(is_deleted=False, quantity__gt=0)
+            .exclude(Q(warehouse_address="") | Q(warehouse_address__isnull=True))
+            .values_list("warehouse_address", "name", "quantity")
+        )
+        for raw_addr, name, qty in qs:
+            addr = normalize_address(raw_addr or "")
+            if not addr:
+                continue
+            nm = (name or "").strip() or "—"
+            stock_by_addr[addr].append((nm, int(qty or 0)))
+
+    def _stock_summary(addr: str) -> str:
+        bits = stock_by_addr.get(addr) or []
+        if not bits:
+            return ""
+        bits = sorted(bits, key=lambda x: (-x[1], x[0].casefold()))
+        parts = [n for n, _ in bits[:4]]
+        text = ", ".join(parts)
+        if len(bits) > 4:
+            text += "…"
+        return text
+
+    rows: list[dict] = []
+    seen: set[str] = set()
+    for p in build_location_catalog().get("places") or []:
+        addr = normalize_address(p.get("address") or "")
+        if not addr or addr in seen:
+            continue
+        seen.add(addr)
+        raw_label = (p.get("label") or "").strip()
+        kind_lab = (p.get("kind_label") or "").strip()
+        custom = raw_label if raw_label and raw_label not in kind_fallbacks else ""
+        stock = _stock_summary(addr)
+        name = custom or stock or raw_label or "—"
+        rows.append(
+            {
+                "address": addr,
+                "name": name,
+                "label": custom,
+                "editable_label": custom,
+                "stock": stock,
+                "furniture": (p.get("furniture_name") or "").strip(),
+                "furniture_code": (p.get("furniture_code") or "").strip(),
+                "furniture_id": int(p.get("furniture_id") or 0),
+                "container_id": int(p.get("container_id") or 0),
+            }
+        )
+
+    for addr, bits in sorted(stock_by_addr.items()):
+        if addr in seen:
+            continue
+        stock = _stock_summary(addr)
+        rows.append(
+            {
+                "address": addr,
+                "name": stock or "—",
+                "label": "",
+                "editable_label": "",
+                "stock": stock,
+                "furniture": "",
+                "furniture_code": "",
+                "furniture_id": 0,
+                "container_id": 0,
+            }
+        )
+
+    rows.sort(key=lambda r: (r.get("address") or ""))
+    return rows

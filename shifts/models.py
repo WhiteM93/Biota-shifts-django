@@ -147,6 +147,7 @@ from .collet_constants import (
     COLLET_TYPE_TOOLTIPS,
 )
 from .tool_extension_constants import TOOL_EXTENSION_CLAMP_TYPES
+from .measuring_constants import MEASURING_KIND_CHOICES, THREAD_GAUGE_GO_NOGO
 from .body_tool_constants import (
     BODY_TOOL_COUPLINGS,
     BODY_TOOL_FAMILIES,
@@ -204,6 +205,12 @@ TOOL_ITEM_CATEGORY_CHOICES = [
     ("collet", "Цанги"),
     ("body_tool", "Корпусной инструмент"),
     ("tool_extension", "Удлинители"),
+    ("gauge_smooth", "Гладкие калибры"),
+    ("gauge_thread", "Резьбовые калибры"),
+    ("measure_univ", "Универсальный измерительный"),
+    ("measure_surf", "Шероховатость и твёрдость"),
+    ("measure_check", "Поверочная оснастка"),
+    ("measure_mark", "Разметочный инструмент"),
 ]
 
 # Только UI / справочник «Типы склада». В БД ToolItem.category остаётся плоским ключом.
@@ -217,6 +224,18 @@ STOCK_CATEGORY_GROUPS = [
         "tooling",
         "Оснастка",
         ("collet", "body_tool", "tool_extension"),
+    ),
+    (
+        "measuring",
+        "Измерительный инструмент",
+        (
+            "gauge_smooth",
+            "gauge_thread",
+            "measure_univ",
+            "measure_surf",
+            "measure_check",
+            "measure_mark",
+        ),
     ),
 ]
 
@@ -528,6 +547,44 @@ class ToolItem(models.Model):
                 (ex.compatible_parts if ex and ex.compatible_parts else "—"),
                 f"ост {self.quantity}",
             ]
+        elif cat in (
+            "gauge_smooth",
+            "gauge_thread",
+            "measure_univ",
+            "measure_surf",
+            "measure_check",
+            "measure_mark",
+        ):
+            ms = getattr(self, "measuring_tool_spec", None)
+            segs = [
+                self.get_category_display(),
+                (ms.brand if ms and ms.brand else "—"),
+                (ms.get_kind_display() if ms and (ms.kind or "").strip() else ""),
+            ]
+            if cat == "gauge_thread" and ms:
+                size = (ms.thread_size_label or "").strip()
+                if size and ms.pitch_mm is not None:
+                    segs.append(f"{size}×{fmt_mm(ms.pitch_mm)}")
+                elif size:
+                    segs.append(size)
+                if (ms.go_nogo or "").strip():
+                    segs.append(ms.get_go_nogo_display())
+            if cat == "measure_univ" and ms:
+                if (ms.measure_range or "").strip():
+                    segs.append(ms.measure_range.strip())
+                if (ms.accuracy or "").strip():
+                    segs.append(ms.accuracy.strip())
+                if (ms.ip_rating or "").strip():
+                    segs.append(ms.ip_rating.strip())
+            if cat == "measure_check" and ms:
+                if (ms.check_size or "").strip():
+                    segs.append(ms.check_size.strip())
+                if (ms.check_accuracy_class or "").strip():
+                    segs.append(ms.check_accuracy_class.strip())
+            if cat == "measure_mark" and ms and ms.length_mm is not None:
+                segs.append(f"L {fmt_mm(ms.length_mm)}")
+            segs.append(((self.notes or "").strip() or ""))
+            segs.append(f"ост {self.quantity}")
         else:
             segs = [self.get_category_display(), self.name, f"ост {self.quantity}"]
 
@@ -750,6 +807,46 @@ class ToolItem(models.Model):
                     specs_parts.append(f"Dвн={ex.inner_diameter.strip()}")
                 if (ex.compatible_parts or "").strip():
                     specs_parts.append(ex.compatible_parts.strip())
+        elif cat in (
+            "gauge_smooth",
+            "gauge_thread",
+            "measure_univ",
+            "measure_surf",
+            "measure_check",
+            "measure_mark",
+        ):
+            ms = getattr(self, "measuring_tool_spec", None)
+            if ms and (ms.kind or "").strip():
+                tool_type = f"{self.get_category_display()} · {ms.get_kind_display()}"
+            else:
+                tool_type = self.get_category_display()
+            if ms and (ms.brand or "").strip():
+                specs_parts.append(ms.brand.strip())
+            if cat == "gauge_thread" and ms:
+                size = (ms.thread_size_label or "").strip()
+                if size and ms.pitch_mm is not None:
+                    specs_parts.append(f"{size}×{fmt_mm(ms.pitch_mm)}")
+                elif size:
+                    specs_parts.append(size)
+                if (ms.go_nogo or "").strip():
+                    specs_parts.append(ms.get_go_nogo_display())
+            if cat == "measure_univ" and ms:
+                if (ms.measure_range or "").strip():
+                    specs_parts.append(ms.measure_range.strip())
+                if (ms.accuracy or "").strip():
+                    specs_parts.append(ms.accuracy.strip())
+                if (ms.ip_rating or "").strip():
+                    specs_parts.append(ms.ip_rating.strip())
+            if cat == "measure_check" and ms:
+                if (ms.check_size or "").strip():
+                    specs_parts.append(ms.check_size.strip())
+                if (ms.check_accuracy_class or "").strip():
+                    specs_parts.append(ms.check_accuracy_class.strip())
+            if cat == "measure_mark" and ms and ms.length_mm is not None:
+                specs_parts.append(f"L={fmt_mm(ms.length_mm)} мм")
+            notes = (self.notes or "").strip()
+            if notes:
+                specs_parts.append(notes)
         else:
             tool_type = self.get_category_display()
             specs_parts = [self.name] if (self.name or "").strip() else []
@@ -1399,6 +1496,120 @@ class ToolExtensionSpec(models.Model):
         self.clamp_type = normalize_tool_extension_clamp(self.clamp_type) or "collet"
         self.compatible_parts = (self.compatible_parts or "").strip()[:120]
         self.inner_diameter = normalize_tool_extension_inner_diameter(self.inner_diameter)
+        super().save(*args, **kwargs)
+
+
+class MeasuringToolSpec(models.Model):
+    """Измерительный инструмент: бренд, вид и поля по подтипам."""
+
+    tool = models.OneToOneField(
+        ToolItem, on_delete=models.CASCADE, related_name="measuring_tool_spec"
+    )
+    brand = models.CharField(max_length=80, blank=True, default="", verbose_name="Бренд")
+    kind = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        choices=MEASURING_KIND_CHOICES,
+        verbose_name="Вид",
+    )
+    # Резьбовые калибры
+    thread_size_label = models.CharField(
+        max_length=32, blank=True, default="", verbose_name="Размер резьбы"
+    )
+    pitch_mm = models.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        verbose_name="Шаг, мм",
+    )
+    go_nogo = models.CharField(
+        max_length=8,
+        blank=True,
+        default="",
+        choices=THREAD_GAUGE_GO_NOGO,
+        verbose_name="Проходной / непроходной",
+    )
+    # Универсальный измерительный
+    measure_range = models.CharField(
+        max_length=64, blank=True, default="", verbose_name="Диапазон"
+    )
+    ip_rating = models.CharField(
+        max_length=16, blank=True, default="", verbose_name="Степень защиты IP"
+    )
+    accuracy = models.CharField(
+        max_length=40, blank=True, default="", verbose_name="Точность"
+    )
+    # Поверочная оснастка
+    check_size = models.CharField(
+        max_length=64, blank=True, default="", verbose_name="Размер"
+    )
+    check_accuracy_class = models.CharField(
+        max_length=32, blank=True, default="", verbose_name="Класс точности"
+    )
+    # Разметочный инструмент
+    length_mm = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Длина, мм",
+    )
+
+    class Meta:
+        verbose_name = "Параметры измерительного"
+        verbose_name_plural = "Параметры измерительного"
+
+    def __str__(self):
+        from .measuring_constants import build_measuring_display_name
+
+        cat = self.tool.category if self.tool_id else ""
+        return build_measuring_display_name(
+            category=cat,
+            brand=self.brand,
+            kind=self.kind,
+            notes=self.tool.notes if self.tool_id else "",
+            thread_size_label=self.thread_size_label,
+            pitch_mm=self.pitch_mm,
+            go_nogo=self.go_nogo,
+            measure_range=self.measure_range,
+            accuracy=self.accuracy,
+            ip_rating=self.ip_rating,
+            check_size=self.check_size,
+            check_accuracy_class=self.check_accuracy_class,
+            length_mm=self.length_mm,
+        )
+
+    def save(self, *args, **kwargs):
+        from .measuring_constants import (
+            normalize_measuring_kind,
+            normalize_thread_gauge_go_nogo,
+        )
+
+        self.brand = (self.brand or "").strip()[:80]
+        cat = self.tool.category if self.tool_id else ""
+        self.kind = normalize_measuring_kind(cat, self.kind)
+        self.thread_size_label = (self.thread_size_label or "").strip()[:32]
+        self.go_nogo = normalize_thread_gauge_go_nogo(self.go_nogo)
+        self.measure_range = (self.measure_range or "").strip()[:64]
+        self.ip_rating = (self.ip_rating or "").strip().upper()[:16]
+        self.accuracy = (self.accuracy or "").strip()[:40]
+        self.check_size = (self.check_size or "").strip()[:64]
+        self.check_accuracy_class = (self.check_accuracy_class or "").strip()[:32]
+        if cat != "gauge_thread":
+            self.thread_size_label = ""
+            self.pitch_mm = None
+            self.go_nogo = ""
+        if cat != "measure_univ":
+            self.measure_range = ""
+            self.ip_rating = ""
+            self.accuracy = ""
+        if cat != "measure_check":
+            self.check_size = ""
+            self.check_accuracy_class = ""
+        if cat != "measure_mark":
+            self.length_mm = None
         super().save(*args, **kwargs)
 
 

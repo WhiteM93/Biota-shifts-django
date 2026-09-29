@@ -87,7 +87,13 @@ from .collet_constants import (
     normalize_er_clamp_range,
     normalize_er_collet_size,
 )
-from .inventory_analysis import analysis_context, normalize_group_field
+from .inventory_analysis import (
+    analysis_context,
+    aggregate_queryset_by_group,
+    group_field_choices,
+    normalize_group_field,
+    GROUP_FIELD_LABELS,
+)
 from .insert_constants import (
     INSERT_EDGE_LENGTH_CODES,
     INSERT_NOSE_RADIUS_CODES,
@@ -137,6 +143,18 @@ from .tool_extension_constants import (
     normalize_tool_extension_inner_diameter,
     tool_extension_needs_inner_diameter,
 )
+from .measuring_constants import (
+    MEASURING_CATEGORIES,
+    MEASURING_CATEGORY_SET,
+    MEASURING_KINDS_BY_CATEGORY,
+    THREAD_GAUGE_GO_NOGO,
+    build_measuring_display_name,
+    measuring_category_needs_kind,
+    normalize_measuring_kind,
+    normalize_measuring_length,
+    normalize_measuring_pitch,
+    normalize_thread_gauge_go_nogo,
+)
 from .models import (
     CENTER_DRILL_ANGLES,
     CENTER_DRILL_ANGLE_OTHER,
@@ -151,6 +169,7 @@ from .models import (
     EndMillSpec,
     ColletSpec,
     InsertSpec,
+    MeasuringToolSpec,
     ToolExtensionSpec,
     InventoryStockEvent,
     InventoryWatchTemplate,
@@ -214,7 +233,19 @@ def _center_drill_angle_choices():
 
 _TOOL_MATERIAL_STD_KEYS = frozenset(k for k, _ in TOOL_MATERIAL_TYPES)
 _INVENTORY_CATEGORIES = frozenset(
-    {"end_mill", "body_tool", "tap", "center_drill", "countersink", "drill", "reamer", "insert", "collet", "tool_extension"}
+    {
+        "end_mill",
+        "body_tool",
+        "tap",
+        "center_drill",
+        "countersink",
+        "drill",
+        "reamer",
+        "insert",
+        "collet",
+        "tool_extension",
+        *MEASURING_CATEGORIES,
+    }
 )
 _HISTORY_MOVEMENT_TYPES = frozenset({"issue", "restock", "writeoff"})
 _HISTORY_EVENT_TYPES = frozenset(
@@ -497,6 +528,31 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
                     f"Строка {idx}: укажите внутренний диаметр Dвн (мм, 1/2, G1/8…) для термо/боковой фиксации."
                 )
         return errs
+    if category in MEASURING_CATEGORY_SET:
+        if measuring_category_needs_kind(category):
+            if not normalize_measuring_kind(category, row.get("ms_kind")):
+                errs.append(f"Строка {idx}: укажите вид измерительного инструмента.")
+        if category == "gauge_thread":
+            if not (row.get("ms_thread_size") or "").strip():
+                errs.append(f"Строка {idx}: укажите размер резьбы (например M10).")
+            if normalize_measuring_pitch(row.get("ms_pitch_mm")) is None:
+                errs.append(f"Строка {idx}: укажите шаг резьбы, мм.")
+            if not normalize_thread_gauge_go_nogo(row.get("ms_go_nogo")):
+                errs.append(f"Строка {idx}: укажите проходной / непроходной.")
+        if category == "measure_univ":
+            if not (row.get("ms_range") or "").strip():
+                errs.append(f"Строка {idx}: укажите диапазон измерения.")
+            if not (row.get("ms_accuracy") or "").strip():
+                errs.append(f"Строка {idx}: укажите точность.")
+        if category == "measure_check":
+            if not (row.get("ms_check_size") or "").strip():
+                errs.append(f"Строка {idx}: укажите размер поверочной оснастки.")
+            if not (row.get("ms_check_class") or "").strip():
+                errs.append(f"Строка {idx}: укажите класс точности.")
+        if category == "measure_mark":
+            if normalize_measuring_length(row.get("ms_length_mm")) is None:
+                errs.append(f"Строка {idx}: укажите длину, мм.")
+        return errs
     if category == "drill":
         if _to_decimal_or_none(row.get("dr_diameter_mm")) is None:
             errs.append(f"Строка {idx}: укажите диаметр D (мм) для сверла.")
@@ -542,6 +598,31 @@ def _arrival_search_ready(row: dict) -> bool:
         if ready and tool_extension_needs_inner_diameter(clamp):
             ready = bool(normalize_tool_extension_inner_diameter(row.get("ext_inner_diameter")))
         return ready
+    if category in MEASURING_CATEGORY_SET:
+        if measuring_category_needs_kind(category) and not normalize_measuring_kind(
+            category, row.get("ms_kind")
+        ):
+            return False
+        if category == "gauge_thread":
+            return bool(
+                (row.get("ms_thread_size") or "").strip()
+                and normalize_measuring_pitch(row.get("ms_pitch_mm")) is not None
+                and normalize_thread_gauge_go_nogo(row.get("ms_go_nogo"))
+            )
+        if category == "measure_univ":
+            return bool(
+                (row.get("ms_range") or "").strip()
+                or (row.get("ms_accuracy") or "").strip()
+                or (row.get("ms_brand") or "").strip()
+            )
+        if category == "measure_check":
+            return bool(
+                (row.get("ms_check_size") or "").strip()
+                or (row.get("ms_check_class") or "").strip()
+            )
+        if category == "measure_mark":
+            return normalize_measuring_length(row.get("ms_length_mm")) is not None
+        return bool((row.get("ms_brand") or "").strip() or (row.get("notes") or "").strip())
     if category == "tap":
         return bool((row.get("size_label") or "").strip())
     if category == "center_drill":
@@ -821,6 +902,48 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
         inner_d = normalize_tool_extension_inner_diameter(row.get("ext_inner_diameter"))
         if inner_d:
             qs = qs.filter(tool_extension_spec__inner_diameter__iexact=inner_d)
+        notes = (row.get("notes") or "").strip()[:300]
+        if notes:
+            qs = qs.filter(notes=notes)
+    elif category in MEASURING_CATEGORY_SET:
+        qs = qs.select_related("measuring_tool_spec")
+        brand = (row.get("ms_brand") or "").strip()[:80]
+        if brand:
+            qs = qs.filter(measuring_tool_spec__brand__iexact=brand)
+        kind = normalize_measuring_kind(category, row.get("ms_kind"))
+        if kind:
+            qs = qs.filter(measuring_tool_spec__kind=kind)
+        if category == "gauge_thread":
+            size = (row.get("ms_thread_size") or "").strip()[:32]
+            if size:
+                qs = qs.filter(measuring_tool_spec__thread_size_label__iexact=size)
+            pitch = normalize_measuring_pitch(row.get("ms_pitch_mm"))
+            if pitch is not None:
+                qs = qs.filter(measuring_tool_spec__pitch_mm=pitch)
+            go = normalize_thread_gauge_go_nogo(row.get("ms_go_nogo"))
+            if go:
+                qs = qs.filter(measuring_tool_spec__go_nogo=go)
+        if category == "measure_univ":
+            rng = (row.get("ms_range") or "").strip()[:64]
+            if rng:
+                qs = qs.filter(measuring_tool_spec__measure_range__iexact=rng)
+            acc = (row.get("ms_accuracy") or "").strip()[:40]
+            if acc:
+                qs = qs.filter(measuring_tool_spec__accuracy__iexact=acc)
+            ip = (row.get("ms_ip") or "").strip().upper()[:16]
+            if ip:
+                qs = qs.filter(measuring_tool_spec__ip_rating__iexact=ip)
+        if category == "measure_check":
+            csize = (row.get("ms_check_size") or "").strip()[:64]
+            if csize:
+                qs = qs.filter(measuring_tool_spec__check_size__iexact=csize)
+            cclass = (row.get("ms_check_class") or "").strip()[:32]
+            if cclass:
+                qs = qs.filter(measuring_tool_spec__check_accuracy_class__iexact=cclass)
+        if category == "measure_mark":
+            length = normalize_measuring_length(row.get("ms_length_mm"))
+            if length is not None:
+                qs = qs.filter(measuring_tool_spec__length_mm=length)
         notes = (row.get("notes") or "").strip()[:300]
         if notes:
             qs = qs.filter(notes=notes)
@@ -1553,6 +1676,17 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "ext_main_diameter_mm",
         "ext_overall_length_mm",
         "ext_inner_diameter",
+        "ms_brand",
+        "ms_kind",
+        "ms_thread_size",
+        "ms_pitch_mm",
+        "ms_go_nogo",
+        "ms_range",
+        "ms_ip",
+        "ms_accuracy",
+        "ms_check_size",
+        "ms_check_class",
+        "ms_length_mm",
     }
 )
 
@@ -1724,6 +1858,12 @@ _STOCK_KEYS_BY_CATEGORY = {
             "ext_inner_diameter",
         }
     ),
+    "gauge_smooth": frozenset({"ms_brand"}),
+    "gauge_thread": frozenset({"ms_brand", "ms_kind", "ms_thread_size", "ms_pitch_mm", "ms_go_nogo"}),
+    "measure_univ": frozenset({"ms_brand", "ms_kind", "ms_range", "ms_ip", "ms_accuracy"}),
+    "measure_surf": frozenset({"ms_brand", "ms_kind"}),
+    "measure_check": frozenset({"ms_brand", "ms_kind", "ms_check_size", "ms_check_class"}),
+    "measure_mark": frozenset({"ms_brand", "ms_kind", "ms_length_mm"}),
 }
 _STOCK_DECIMAL_PARAM_KEYS = frozenset(
     {
@@ -2068,11 +2208,53 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         if ext_inner:
             qs = qs.filter(tool_extension_spec__inner_diameter__iexact=ext_inner)
 
-    if category not in ("collet", "body_tool", "insert", "tool_extension") and "tool_material" not in ex and "tool_material_custom" not in ex:
+    elif category in MEASURING_CATEGORY_SET:
+        qs = qs.select_related("measuring_tool_spec")
+        ms_brand = (g("ms_brand") or "").strip()
+        if ms_brand:
+            qs = qs.filter(measuring_tool_spec__brand__iexact=ms_brand)
+        ms_kind = normalize_measuring_kind(category, g("ms_kind"))
+        if ms_kind:
+            qs = qs.filter(measuring_tool_spec__kind=ms_kind)
+        if category == "gauge_thread":
+            size = (g("ms_thread_size") or "").strip()
+            if size:
+                qs = qs.filter(measuring_tool_spec__thread_size_label__iexact=size)
+            pitch = normalize_measuring_pitch(g("ms_pitch_mm"))
+            if pitch is not None:
+                qs = qs.filter(measuring_tool_spec__pitch_mm=pitch)
+            go = normalize_thread_gauge_go_nogo(g("ms_go_nogo"))
+            if go:
+                qs = qs.filter(measuring_tool_spec__go_nogo=go)
+        if category == "measure_univ":
+            rng = (g("ms_range") or "").strip()
+            if rng:
+                qs = qs.filter(measuring_tool_spec__measure_range__iexact=rng)
+            acc = (g("ms_accuracy") or "").strip()
+            if acc:
+                qs = qs.filter(measuring_tool_spec__accuracy__iexact=acc)
+            ip = (g("ms_ip") or "").strip().upper()
+            if ip:
+                qs = qs.filter(measuring_tool_spec__ip_rating__iexact=ip)
+        if category == "measure_check":
+            csize = (g("ms_check_size") or "").strip()
+            if csize:
+                qs = qs.filter(measuring_tool_spec__check_size__iexact=csize)
+            cclass = (g("ms_check_class") or "").strip()
+            if cclass:
+                qs = qs.filter(measuring_tool_spec__check_accuracy_class__iexact=cclass)
+        if category == "measure_mark":
+            length = normalize_measuring_length(g("ms_length_mm"))
+            if length is not None:
+                qs = qs.filter(measuring_tool_spec__length_mm=length)
+
+    _no_material_cats = ("collet", "body_tool", "insert", "tool_extension") + tuple(MEASURING_CATEGORIES)
+    if category not in _no_material_cats and "tool_material" not in ex and "tool_material_custom" not in ex:
         tool_material = _resolve_stock_tool_material(params)
         if tool_material:
             qs = qs.filter(tool_material=tool_material)
-    if category not in ("collet", "body_tool", "tool_extension") and "coating_type" not in ex:
+    _no_coating_cats = ("collet", "body_tool", "tool_extension") + tuple(MEASURING_CATEGORIES)
+    if category not in _no_coating_cats and "coating_type" not in ex:
         coating_type = g("coating_type")
         if coating_type:
             qs = qs.filter(coating_type=coating_type)
@@ -2481,6 +2663,101 @@ def _create_tool_extension_tool(quantity, spec_fields: dict) -> ToolItem:
         compatible_parts=spec_fields["compatible_parts"],
         overall_length_mm=spec_fields["overall_length_mm"],
         inner_diameter=spec_fields["inner_diameter"],
+    )
+    return tool
+
+
+def _measuring_fields_from_row(row: dict, category: str) -> dict:
+    fields = {
+        "brand": (row.get("ms_brand") or "").strip()[:80],
+        "kind": normalize_measuring_kind(category, row.get("ms_kind")),
+        "notes": (row.get("notes") or "").strip()[:300],
+        "thread_size_label": "",
+        "pitch_mm": None,
+        "go_nogo": "",
+        "measure_range": "",
+        "ip_rating": "",
+        "accuracy": "",
+        "check_size": "",
+        "check_accuracy_class": "",
+        "length_mm": None,
+    }
+    if category == "gauge_thread":
+        fields["thread_size_label"] = (row.get("ms_thread_size") or "").strip()[:32]
+        fields["pitch_mm"] = normalize_measuring_pitch(row.get("ms_pitch_mm"))
+        fields["go_nogo"] = normalize_thread_gauge_go_nogo(row.get("ms_go_nogo"))
+    if category == "measure_univ":
+        fields["measure_range"] = (row.get("ms_range") or "").strip()[:64]
+        fields["ip_rating"] = (row.get("ms_ip") or "").strip().upper()[:16]
+        fields["accuracy"] = (row.get("ms_accuracy") or "").strip()[:40]
+    if category == "measure_check":
+        fields["check_size"] = (row.get("ms_check_size") or "").strip()[:64]
+        fields["check_accuracy_class"] = (row.get("ms_check_class") or "").strip()[:32]
+    if category == "measure_mark":
+        fields["length_mm"] = normalize_measuring_length(row.get("ms_length_mm"))
+    return fields
+
+
+def _find_measuring_tool_match(category: str, spec_fields: dict):
+    qs = (
+        ToolItem.objects.select_for_update()
+        .filter(
+            category=category,
+            notes=spec_fields["notes"],
+            measuring_tool_spec__brand=spec_fields["brand"],
+            measuring_tool_spec__kind=spec_fields["kind"],
+            measuring_tool_spec__thread_size_label=spec_fields["thread_size_label"],
+            measuring_tool_spec__pitch_mm=spec_fields["pitch_mm"],
+            measuring_tool_spec__go_nogo=spec_fields["go_nogo"],
+            measuring_tool_spec__measure_range=spec_fields["measure_range"],
+            measuring_tool_spec__ip_rating=spec_fields["ip_rating"],
+            measuring_tool_spec__accuracy=spec_fields["accuracy"],
+            measuring_tool_spec__check_size=spec_fields["check_size"],
+            measuring_tool_spec__check_accuracy_class=spec_fields["check_accuracy_class"],
+            measuring_tool_spec__length_mm=spec_fields["length_mm"],
+        )
+        .select_related("measuring_tool_spec")
+    )
+    return qs.first()
+
+
+def _create_measuring_tool(category: str, quantity, spec_fields: dict) -> ToolItem:
+    name = build_measuring_display_name(
+        category=category,
+        brand=spec_fields["brand"],
+        kind=spec_fields["kind"],
+        notes=spec_fields["notes"],
+        thread_size_label=spec_fields["thread_size_label"],
+        pitch_mm=spec_fields["pitch_mm"],
+        go_nogo=spec_fields["go_nogo"],
+        measure_range=spec_fields["measure_range"],
+        accuracy=spec_fields["accuracy"],
+        ip_rating=spec_fields["ip_rating"],
+        check_size=spec_fields["check_size"],
+        check_accuracy_class=spec_fields["check_accuracy_class"],
+        length_mm=spec_fields["length_mm"],
+    )
+    tool = ToolItem.objects.create(
+        category=category,
+        name=name,
+        tool_material="",
+        coating_type="none",
+        notes=spec_fields.get("notes") or "",
+        quantity=quantity,
+    )
+    MeasuringToolSpec.objects.create(
+        tool=tool,
+        brand=spec_fields["brand"],
+        kind=spec_fields["kind"],
+        thread_size_label=spec_fields["thread_size_label"],
+        pitch_mm=spec_fields["pitch_mm"],
+        go_nogo=spec_fields["go_nogo"],
+        measure_range=spec_fields["measure_range"],
+        ip_rating=spec_fields["ip_rating"],
+        accuracy=spec_fields["accuracy"],
+        check_size=spec_fields["check_size"],
+        check_accuracy_class=spec_fields["check_accuracy_class"],
+        length_mm=spec_fields["length_mm"],
     )
     return tool
 
@@ -3096,6 +3373,8 @@ def inventory_view(request):
                 "reamer_spec",
                 "insert_spec",
                 "collet_spec",
+                "tool_extension_spec",
+                "measuring_tool_spec",
             )
             .filter(id=tool_id, is_deleted=False)
             .first()
@@ -3141,7 +3420,26 @@ def inventory_view(request):
             common_ok = True
         elif field == "notes":
             tool.notes = (value_raw or "").strip()[:300]
-            tool.save(update_fields=["notes", "updated_at"])
+            update_fields = ["notes", "updated_at"]
+            if tool.category in MEASURING_CATEGORY_SET and getattr(tool, "measuring_tool_spec", None):
+                ms = tool.measuring_tool_spec
+                tool.name = build_measuring_display_name(
+                    category=tool.category,
+                    brand=ms.brand,
+                    kind=ms.kind,
+                    notes=tool.notes,
+                    thread_size_label=ms.thread_size_label,
+                    pitch_mm=ms.pitch_mm,
+                    go_nogo=ms.go_nogo,
+                    measure_range=ms.measure_range,
+                    accuracy=ms.accuracy,
+                    ip_rating=ms.ip_rating,
+                    check_size=ms.check_size,
+                    check_accuracy_class=ms.check_accuracy_class,
+                    length_mm=ms.length_mm,
+                )
+                update_fields.append("name")
+            tool.save(update_fields=update_fields)
             common_ok = True
 
         if not common_ok:
@@ -3441,6 +3739,91 @@ def inventory_view(request):
                     overall_length_mm=ex.overall_length_mm,
                     inner_diameter=ex.inner_diameter,
                     compatible_parts=ex.compatible_parts,
+                )
+                tool.save(update_fields=["name", "updated_at"])
+            elif cat in MEASURING_CATEGORY_SET and getattr(tool, "measuring_tool_spec", None):
+                ms = tool.measuring_tool_spec
+                if field == "ms_brand":
+                    ms.brand = (value_raw or "").strip()[:80]
+                    ms.save(update_fields=["brand"])
+                elif field == "ms_kind":
+                    if not measuring_category_needs_kind(cat):
+                        return JsonResponse({"ok": False, "error": "У этой категории нет вида."}, status=400)
+                    kind = normalize_measuring_kind(cat, value_raw)
+                    if not kind:
+                        return JsonResponse({"ok": False, "error": "Укажите вид."}, status=400)
+                    ms.kind = kind
+                    ms.save(update_fields=["kind"])
+                elif field == "ms_thread_size":
+                    if cat != "gauge_thread":
+                        return JsonResponse({"ok": False, "error": "Поле только для резьбовых калибров."}, status=400)
+                    ms.thread_size_label = (value_raw or "").strip()[:32]
+                    ms.save(update_fields=["thread_size_label"])
+                elif field == "ms_pitch_mm":
+                    if cat != "gauge_thread":
+                        return JsonResponse({"ok": False, "error": "Поле только для резьбовых калибров."}, status=400)
+                    pitch = normalize_measuring_pitch(value_raw)
+                    if pitch is None:
+                        return JsonResponse({"ok": False, "error": "Укажите шаг резьбы."}, status=400)
+                    ms.pitch_mm = pitch
+                    ms.save(update_fields=["pitch_mm"])
+                elif field == "ms_go_nogo":
+                    if cat != "gauge_thread":
+                        return JsonResponse({"ok": False, "error": "Поле только для резьбовых калибров."}, status=400)
+                    go = normalize_thread_gauge_go_nogo(value_raw)
+                    if not go:
+                        return JsonResponse({"ok": False, "error": "Укажите проходной / непроходной."}, status=400)
+                    ms.go_nogo = go
+                    ms.save(update_fields=["go_nogo"])
+                elif field == "ms_range":
+                    if cat != "measure_univ":
+                        return JsonResponse({"ok": False, "error": "Поле только для универсального."}, status=400)
+                    ms.measure_range = (value_raw or "").strip()[:64]
+                    ms.save(update_fields=["measure_range"])
+                elif field == "ms_ip":
+                    if cat != "measure_univ":
+                        return JsonResponse({"ok": False, "error": "Поле только для универсального."}, status=400)
+                    ms.ip_rating = (value_raw or "").strip().upper()[:16]
+                    ms.save(update_fields=["ip_rating"])
+                elif field == "ms_accuracy":
+                    if cat != "measure_univ":
+                        return JsonResponse({"ok": False, "error": "Поле только для универсального."}, status=400)
+                    ms.accuracy = (value_raw or "").strip()[:40]
+                    ms.save(update_fields=["accuracy"])
+                elif field == "ms_check_size":
+                    if cat != "measure_check":
+                        return JsonResponse({"ok": False, "error": "Поле только для поверочной оснастки."}, status=400)
+                    ms.check_size = (value_raw or "").strip()[:64]
+                    ms.save(update_fields=["check_size"])
+                elif field == "ms_check_class":
+                    if cat != "measure_check":
+                        return JsonResponse({"ok": False, "error": "Поле только для поверочной оснастки."}, status=400)
+                    ms.check_accuracy_class = (value_raw or "").strip()[:32]
+                    ms.save(update_fields=["check_accuracy_class"])
+                elif field == "ms_length_mm":
+                    if cat != "measure_mark":
+                        return JsonResponse({"ok": False, "error": "Поле только для разметочного."}, status=400)
+                    length = normalize_measuring_length(value_raw)
+                    if length is None:
+                        return JsonResponse({"ok": False, "error": "Укажите длину, мм."}, status=400)
+                    ms.length_mm = length
+                    ms.save(update_fields=["length_mm"])
+                else:
+                    return JsonResponse({"ok": False, "error": "Поле не поддерживается."}, status=400)
+                tool.name = build_measuring_display_name(
+                    category=cat,
+                    brand=ms.brand,
+                    kind=ms.kind,
+                    notes=tool.notes,
+                    thread_size_label=ms.thread_size_label,
+                    pitch_mm=ms.pitch_mm,
+                    go_nogo=ms.go_nogo,
+                    measure_range=ms.measure_range,
+                    accuracy=ms.accuracy,
+                    ip_rating=ms.ip_rating,
+                    check_size=ms.check_size,
+                    check_accuracy_class=ms.check_accuracy_class,
+                    length_mm=ms.length_mm,
                 )
                 tool.save(update_fields=["name", "updated_at"])
             elif cat == "collet" and tool.collet_spec:
@@ -4312,17 +4695,45 @@ def inventory_view(request):
                         tool.save(update_fields=["quantity", "updated_at"])
                     else:
                         tool = _create_tool_extension_tool(quantity, spec_fields)
+                elif category in MEASURING_CATEGORY_SET:
+                    spec_fields = _measuring_fields_from_row(row, category)
+                    if measuring_category_needs_kind(category) and not spec_fields["kind"]:
+                        continue
+                    tool = _find_measuring_tool_match(category, spec_fields)
+                    if tool:
+                        tool.quantity += quantity
+                        tool.save(update_fields=["quantity", "updated_at"])
+                    else:
+                        tool = _create_measuring_tool(category, quantity, spec_fields)
                 else:
                     continue
                 addr = normalize_address(row.get("warehouse_address") or "")
                 if addr and (tool.warehouse_address or "") != addr:
                     tool.warehouse_address = addr
                     tool.save(update_fields=["warehouse_address", "updated_at"])
-                if category in ("insert", "body_tool"):
+                if category in ("insert", "body_tool") or category in MEASURING_CATEGORY_SET:
                     notes = (row.get("notes") or "").strip()[:300]
                     if notes and (tool.notes or "") != notes:
                         tool.notes = notes
                         tool.save(update_fields=["notes", "updated_at"])
+                        if category in MEASURING_CATEGORY_SET and getattr(tool, "measuring_tool_spec", None):
+                            ms = tool.measuring_tool_spec
+                            tool.name = build_measuring_display_name(
+                                category=category,
+                                brand=ms.brand,
+                                kind=ms.kind,
+                                notes=tool.notes,
+                                thread_size_label=ms.thread_size_label,
+                                pitch_mm=ms.pitch_mm,
+                                go_nogo=ms.go_nogo,
+                                measure_range=ms.measure_range,
+                                accuracy=ms.accuracy,
+                                ip_rating=ms.ip_rating,
+                                check_size=ms.check_size,
+                                check_accuracy_class=ms.check_accuracy_class,
+                                length_mm=ms.length_mm,
+                            )
+                            tool.save(update_fields=["name", "updated_at"])
                 StockMovement.objects.create(
                     movement_type="restock",
                     tool=tool,
@@ -4672,6 +5083,12 @@ def inventory_view(request):
 
     stock_category_total = 0
     stock_filtered_count = 0
+    stock_filtered_qty = 0
+    stock_view = "positions"
+    stock_group_by = ""
+    stock_group_choices: list[tuple[str, str]] = []
+    stock_group_label = ""
+    stock_summary_rows: list[dict] = []
     if panel == "stock":
         stock_category_qs = ToolItem.objects.filter(is_deleted=False)
         if filter_category:
@@ -4680,6 +5097,48 @@ def inventory_view(request):
             stock_category_qs = stock_category_qs.filter(quantity__gt=0)
         stock_category_total = stock_category_qs.count()
         stock_filtered_count = qs.count()
+        stock_filtered_qty = int(qs.aggregate(total=Sum("quantity"))["total"] or 0)
+        raw_view = (stock_req.get("stock_view") or request.GET.get("stock_view") or "").strip().lower()
+        stock_view = "summary" if raw_view == "summary" else "positions"
+        stock_group_choices = group_field_choices(filter_category) if filter_category else []
+        raw_group = (stock_req.get("stock_group_by") or request.GET.get("stock_group_by") or "").strip()
+        if filter_category:
+            stock_group_by = normalize_group_field(filter_category, raw_group)
+            stock_group_label = GROUP_FIELD_LABELS.get(filter_category, {}).get(stock_group_by, stock_group_by)
+        else:
+            stock_group_by = "category"
+            stock_group_label = "Категория"
+        if stock_view == "summary":
+            stock_summary_rows = aggregate_queryset_by_group(qs, filter_category, stock_group_by)
+
+    stock_view_toggle_q = {}
+    if panel == "stock":
+        stock_view_toggle_q = {
+            k: (stock_req.get(k) or "").strip()
+            for k in _STOCK_FILTER_PARAM_KEYS
+            if (stock_req.get(k) or "").strip()
+        }
+        stock_view_toggle_q["panel"] = "stock"
+        if filter_category:
+            stock_view_toggle_q["category"] = filter_category
+        else:
+            stock_view_toggle_q.pop("category", None)
+        if show_all:
+            stock_view_toggle_q["show_all"] = "1"
+        else:
+            stock_view_toggle_q["show_all"] = "0"
+        if stock_group_by and stock_group_by != "category":
+            stock_view_toggle_q["stock_group_by"] = stock_group_by
+
+    def _stock_view_url(view_name: str) -> str:
+        q = dict(stock_view_toggle_q)
+        q["stock_view"] = view_name
+        if view_name != "summary":
+            q.pop("stock_group_by", None)
+        return f"{reverse('inventory')}?{urlencode(q)}"
+
+    stock_positions_url = _stock_view_url("positions") if panel == "stock" else ""
+    stock_summary_url = _stock_view_url("summary") if panel == "stock" else ""
 
     option_base = ToolItem.objects.filter(is_deleted=False)
     if not show_all:
@@ -5217,19 +5676,27 @@ def inventory_view(request):
         _opt_qs("tool_extension", "ext_inner_diameter"), "tool_extension_spec__inner_diameter"
     )
 
+    stock_address_hints = _stock_address_hint_rows(panel)
+    stock_address_furniture = _stock_address_furniture_options(stock_address_hints)
+
     ctx = {
-        "tool_items": qs.select_related(
-            "end_mill_spec",
-            "body_tool_spec",
-            "tap_spec",
-            "center_drill_spec",
-            "countersink_spec",
-            "drill_spec",
-            "reamer_spec",
-            "insert_spec",
-            "collet_spec",
-            "tool_extension_spec",
-        ).order_by("category", "name"),
+        "tool_items": (
+            []
+            if panel == "stock" and stock_view == "summary"
+            else qs.select_related(
+                "end_mill_spec",
+                "body_tool_spec",
+                "tap_spec",
+                "center_drill_spec",
+                "countersink_spec",
+                "drill_spec",
+                "reamer_spec",
+                "insert_spec",
+                "collet_spec",
+                "tool_extension_spec",
+                "measuring_tool_spec",
+            ).order_by("category", "name")
+        ),
         "movements": mv_hist[:50],
         "inventory_history": inventory_history,
         "inventory_history_days": inventory_history_days,
@@ -5487,12 +5954,30 @@ def inventory_view(request):
             "overall_lengths": tool_extension_lengths,
             "inner_diameters": tool_extension_inner_diameters,
         },
+        "is_measuring_category": filter_category in MEASURING_CATEGORY_SET,
+        "measuring_kinds_by_category": {
+            cat: [{"value": k, "label": lab} for k, lab in pairs]
+            for cat, pairs in MEASURING_KINDS_BY_CATEGORY.items()
+            if pairs
+        },
+        "measuring_kinds_by_category_json": json.dumps(
+            {
+                cat: [{"value": k, "label": lab} for k, lab in pairs]
+                for cat, pairs in MEASURING_KINDS_BY_CATEGORY.items()
+                if pairs
+            },
+            ensure_ascii=False,
+        ),
+        "measuring_category_keys": list(MEASURING_CATEGORIES),
+        "thread_gauge_go_nogo": THREAD_GAUGE_GO_NOGO,
         "tool_material_types": TOOL_MATERIAL_TYPES,
         "tool_material_legacy_labels": TOOL_MATERIAL_LEGACY_LABELS,
         "tool_material_extra_options": tool_material_extra_options,
         "tool_material_filter_other": TOOL_MATERIAL_FILTER_OTHER,
         "stock_tool_material_extra_json": stock_tool_material_extra_json,
         "warehouse_address_titles": _warehouse_address_titles_for_stock(panel),
+        "stock_address_hints": stock_address_hints,
+        "stock_address_furniture": stock_address_furniture,
         "coating_types": COATING_TYPES,
         "today": date.today().isoformat(),
         "movement_tool_options": ToolItem.objects.select_related(
@@ -5506,6 +5991,7 @@ def inventory_view(request):
             "insert_spec",
             "collet_spec",
             "tool_extension_spec",
+            "measuring_tool_spec",
         ).filter(is_deleted=False).order_by("category", "name"),
         "issue_candidates": issue_candidates,
         "purchase_requests": purchase_qs[:300],
@@ -5523,7 +6009,15 @@ def inventory_view(request):
         "can_manage_stock": can_manage_stock,
         "can_rollback_stock": is_admin_user,
         "stock_filtered_count": stock_filtered_count,
+        "stock_filtered_qty": stock_filtered_qty,
         "stock_category_total": stock_category_total,
+        "stock_view": stock_view,
+        "stock_group_by": stock_group_by,
+        "stock_group_choices": stock_group_choices,
+        "stock_group_label": stock_group_label,
+        "stock_summary_rows": stock_summary_rows,
+        "stock_positions_url": stock_positions_url,
+        "stock_summary_url": stock_summary_url,
         "stock_category_groups": stock_category_grouped_choices(),
         "panel": panel,
         "employee_options": employee_options,
@@ -5642,9 +6136,100 @@ def inventory_api_warehouse_locations(request):
     })
 
 
+@biota_login_required
+@inventory_route_nav_access_required
+@require_http_methods(["POST"])
+def inventory_api_warehouse_address_label(request):
+    """Подпись ячейки (наименование) для подсказки по адресам на складе."""
+    username = biota_user(request)
+    is_admin_user = request_is_admin_ui(request)
+    can_manage = is_admin_user or (
+        inventory_stock_manage_for_user(username) and not is_real_admin(request)
+    )
+    if not can_manage:
+        return JsonResponse({"ok": False, "error": "Недостаточно прав."}, status=403)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        payload = {
+            "container_id": request.POST.get("container_id"),
+            "label": request.POST.get("label"),
+        }
+
+    try:
+        container_id = int(payload.get("container_id") or 0)
+    except (TypeError, ValueError):
+        container_id = 0
+    if container_id <= 0:
+        return JsonResponse({"ok": False, "error": "Не указана ячейка."}, status=400)
+
+    label_raw = str(payload.get("label") or "")
+    label = "\n".join(
+        line.rstrip() for line in label_raw.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    )
+    label = label.strip("\n").strip()[:120]
+    if not label:
+        return JsonResponse({"ok": False, "error": "Укажите наименование."}, status=400)
+
+    from .models import VisualContainer
+    from .visual_warehouse_address import normalize_address, repair_container_address_if_stale
+
+    cont = (
+        VisualContainer.objects.select_related("cabinet", "level", "level__section")
+        .filter(pk=container_id, parent__isnull=True)
+        .first()
+    )
+    if cont is None:
+        return JsonResponse({"ok": False, "error": "Ячейка не найдена."}, status=404)
+
+    cont.label = label
+    cont.save(update_fields=["label", "updated_at"])
+    addr = repair_container_address_if_stale(cont) or normalize_address(cont.address or "")
+    return JsonResponse(
+        {
+            "ok": True,
+            "container_id": cont.id,
+            "address": addr,
+            "label": cont.label,
+        }
+    )
+
+
 def _warehouse_address_titles_for_stock(panel: str) -> dict:
     if panel != "stock":
         return {}
     from .visual_warehouse_address import address_container_titles
 
     return address_container_titles()
+
+
+def _stock_address_hint_rows(panel: str) -> list[dict]:
+    if panel not in ("stock", "arrival"):
+        return []
+    from .visual_warehouse_address import build_address_hint_rows
+
+    # В приходе достаточно подписей ячеек; остаток на складе не тянем.
+    return build_address_hint_rows(include_stock=(panel == "stock"))
+
+
+def _stock_address_furniture_options(rows: list[dict]) -> list[dict]:
+    seen: set[int] = set()
+    out: list[dict] = []
+    for row in rows or []:
+        try:
+            fid = int(row.get("furniture_id") or 0)
+        except (TypeError, ValueError):
+            fid = 0
+        if fid <= 0 or fid in seen:
+            continue
+        seen.add(fid)
+        out.append(
+            {
+                "id": fid,
+                "code": (row.get("furniture_code") or "").strip(),
+                "name": (row.get("furniture") or "").strip() or f"Мебель {fid}",
+            }
+        )
+    out.sort(key=lambda x: ((x.get("code") or ""), (x.get("name") or "").casefold()))
+    return out

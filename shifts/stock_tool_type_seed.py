@@ -538,10 +538,23 @@ def seed_stock_tool_types(*, replace_fields: bool = False) -> dict[str, int]:
 
 def ensure_extra_stock_tool_types() -> dict[str, int]:
     """Создаёт/обновляет дополнительные типы склада (абразивы, СИЗ и т.п.)."""
-    stats = {"types": 0}
+    stats = {"types": 0, "subtypes": 0}
     for code, name, sort_order in EXTRA_STOCK_TOOL_TYPES:
         _upsert_type(code=code, name=name, sort_order=sort_order)
         stats["types"] += 1
+    measuring = StockToolType.objects.filter(code="measuring").first()
+    if measuring:
+        measuring_subtypes = [
+            ("gauge-smooth", "Гладкие калибры", 10),
+            ("gauge-thread", "Резьбовые калибры", 20),
+            ("measure-univ", "Универсальный измерительный", 30),
+            ("measure-surf", "Шероховатость и твёрдость", 40),
+            ("measure-check", "Поверочная оснастка", 50),
+            ("measure-mark", "Разметочный инструмент", 60),
+        ]
+        for code, name, order in measuring_subtypes:
+            _upsert_subtype(measuring, code=code, name=name, sort_order=order)
+            stats["subtypes"] += 1
     return stats
 
 

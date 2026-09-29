@@ -6,7 +6,28 @@
   data-csrf="{{ csrf_token }}"
   {% if biota_is_admin %}data-archive-url="{% url 'inventory_ai_archive' %}" data-notebook-url="{% url 'site_notebook' %}"{% endif %}
 >
-  <button type="button" class="inv-chat-fab js-inv-chat-fab" aria-expanded="false" aria-controls="inv-chat-panel" title="MetaGPT" aria-label="MetaGPT">MetaGPT</button>
+  <div class="inv-chat-dock">
+    {% if panel == "stock" %}
+    <div class="inv-stock-addr-fab js-stock-addr-fab" aria-label="Подсказка по адресам">
+      <button type="button" class="inv-chat-fab inv-stock-addr-fab__btn js-stock-addr-hint-open" title="Адреса склада" aria-label="Адреса склада">Адреса</button>
+      <div class="inv-stock-addr-fab__pop" role="tooltip">
+        <div class="inv-stock-addr-fab__head">Адреса</div>
+        <div class="inv-stock-addr-fab__list">
+          {% for row in stock_address_hints %}
+          <div class="inv-stock-addr-fab__row">
+            <code>{{ row.address }}</code>
+            <span>{% if row.editable_label %}{{ row.editable_label }}{% elif row.name and row.name != "—" %}{{ row.name }}{% else %}—{% endif %}</span>
+          </div>
+          {% empty %}
+          <div class="inv-stock-addr-fab__empty">Пока нет адресов. Откройте подсказку и задайте наименования.</div>
+          {% endfor %}
+        </div>
+        <div class="inv-stock-addr-fab__foot">Клик — полный список и правка</div>
+      </div>
+    </div>
+    {% endif %}
+    <button type="button" class="inv-chat-fab js-inv-chat-fab" aria-expanded="false" aria-controls="inv-chat-panel" title="MetaGPT" aria-label="MetaGPT">MetaGPT</button>
+  </div>
   <div id="inv-chat-panel" class="inv-chat-panel js-inv-chat-panel" hidden role="dialog" aria-label="MetaGPT">
     <div class="inv-chat-head">
       <h3>MetaGPT</h3>

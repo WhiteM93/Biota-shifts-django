@@ -11,13 +11,18 @@ from shifts.auth_utils import (
     request_is_admin_ui,
     request_is_executor,
 )
-from shifts.site_updates import unread_site_updates_count
+from shifts.site_updates import effective_site_updates_seen_id, unread_site_updates_count
 from shifts.site_updates_views import SITE_UPDATES_SEEN_SESSION_KEY
 
 
 def _site_updates_unread(request) -> int:
     try:
-        seen = int(request.session.get(SITE_UPDATES_SEEN_SESSION_KEY) or 0)
+        url_name = getattr(getattr(request, "resolver_match", None), "url_name", "") or ""
+        if url_name == "site_updates":
+            return 0
+        u = (request.session.get("biota_username") or "").strip()
+        session_seen = int(request.session.get(SITE_UPDATES_SEEN_SESSION_KEY) or 0)
+        seen = effective_site_updates_seen_id(u, session_seen)
         return unread_site_updates_count(seen)
     except Exception:
         return 0

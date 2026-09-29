@@ -89,6 +89,11 @@ urlpatterns = [
         name="inventory_api_warehouse_locations",
     ),
     path(
+        "inventory/api/warehouse-address-label/",
+        inventory_views.inventory_api_warehouse_address_label,
+        name="inventory_api_warehouse_address_label",
+    ),
+    path(
         "inventory/history/open.pdf",
         inventory_views.inventory_history_open_pdf,
         name="inventory_history_open_pdf",

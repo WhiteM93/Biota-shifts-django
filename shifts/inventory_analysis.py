@@ -97,6 +97,39 @@ GROUP_FIELD_PATHS: dict[str, dict[str, str]] = {
         "clamp_range": "collet_spec__clamp_range",
         "inner_diameter": "collet_spec__inner_diameter",
     },
+    "tool_extension": {
+        "clamp_type": "tool_extension_spec__clamp_type",
+        "brand": "tool_extension_spec__brand",
+    },
+    "gauge_smooth": {
+        "brand": "measuring_tool_spec__brand",
+    },
+    "gauge_thread": {
+        "kind": "measuring_tool_spec__kind",
+        "thread_size_label": "measuring_tool_spec__thread_size_label",
+        "go_nogo": "measuring_tool_spec__go_nogo",
+        "brand": "measuring_tool_spec__brand",
+    },
+    "measure_univ": {
+        "kind": "measuring_tool_spec__kind",
+        "brand": "measuring_tool_spec__brand",
+        "measure_range": "measuring_tool_spec__measure_range",
+    },
+    "measure_surf": {
+        "kind": "measuring_tool_spec__kind",
+        "brand": "measuring_tool_spec__brand",
+    },
+    "measure_check": {
+        "kind": "measuring_tool_spec__kind",
+        "check_size": "measuring_tool_spec__check_size",
+        "check_accuracy_class": "measuring_tool_spec__check_accuracy_class",
+        "brand": "measuring_tool_spec__brand",
+    },
+    "measure_mark": {
+        "kind": "measuring_tool_spec__kind",
+        "length_mm": "measuring_tool_spec__length_mm",
+        "brand": "measuring_tool_spec__brand",
+    },
 }
 
 GROUP_FIELD_LABELS: dict[str, dict[str, str]] = {
@@ -178,6 +211,44 @@ GROUP_FIELD_LABELS["collet"].update(
         "inner_diameter": "Внутр. Ø",
     }
 )
+GROUP_FIELD_LABELS["tool_extension"].update(
+    {
+        "clamp_type": "Зажим",
+        "brand": "Бренд",
+    }
+)
+GROUP_FIELD_LABELS["gauge_smooth"].update({"brand": "Бренд"})
+GROUP_FIELD_LABELS["gauge_thread"].update(
+    {
+        "kind": "Вид",
+        "thread_size_label": "Резьба",
+        "go_nogo": "П/НП",
+        "brand": "Бренд",
+    }
+)
+GROUP_FIELD_LABELS["measure_univ"].update(
+    {
+        "kind": "Вид",
+        "brand": "Бренд",
+        "measure_range": "Диапазон",
+    }
+)
+GROUP_FIELD_LABELS["measure_surf"].update({"kind": "Вид", "brand": "Бренд"})
+GROUP_FIELD_LABELS["measure_check"].update(
+    {
+        "kind": "Вид",
+        "check_size": "Размер",
+        "check_accuracy_class": "Класс",
+        "brand": "Бренд",
+    }
+)
+GROUP_FIELD_LABELS["measure_mark"].update(
+    {
+        "kind": "Вид",
+        "length_mm": "Длина, мм",
+        "brand": "Бренд",
+    }
+)
 
 DEFAULT_GROUP_FIELD: dict[str, str] = {
     "end_mill": "diameter_mm",
@@ -189,6 +260,13 @@ DEFAULT_GROUP_FIELD: dict[str, str] = {
     "reamer": "diameter_mm",
     "insert": "insert_shape",
     "collet": "collet_type",
+    "tool_extension": "clamp_type",
+    "gauge_smooth": "brand",
+    "gauge_thread": "thread_size_label",
+    "measure_univ": "kind",
+    "measure_surf": "kind",
+    "measure_check": "kind",
+    "measure_mark": "kind",
 }
 
 # group_field → GET-параметр вкладки «Склад»
@@ -257,6 +335,39 @@ STOCK_FILTER_PARAMS: dict[str, dict[str, str]] = {
         "clamp_range": "collet_clamp_range",
         "inner_diameter": "collet_inner_diameter",
     },
+    "tool_extension": {
+        "clamp_type": "ext_clamp_type",
+        "brand": "ext_brand",
+    },
+    "gauge_smooth": {
+        "brand": "ms_brand",
+    },
+    "gauge_thread": {
+        "kind": "ms_kind",
+        "thread_size_label": "ms_thread_size",
+        "go_nogo": "ms_go_nogo",
+        "brand": "ms_brand",
+    },
+    "measure_univ": {
+        "kind": "ms_kind",
+        "brand": "ms_brand",
+        "measure_range": "ms_range",
+    },
+    "measure_surf": {
+        "kind": "ms_kind",
+        "brand": "ms_brand",
+    },
+    "measure_check": {
+        "kind": "ms_kind",
+        "check_size": "ms_check_size",
+        "check_accuracy_class": "ms_check_class",
+        "brand": "ms_brand",
+    },
+    "measure_mark": {
+        "kind": "ms_kind",
+        "length_mm": "ms_length_mm",
+        "brand": "ms_brand",
+    },
 }
 
 try:
@@ -268,6 +379,8 @@ try:
         INDEXABLE_MILL_CUTTER_TYPES,
     )
     from shifts.insert_constants import MILLING_INSERT_FAMILIES
+    from shifts.measuring_constants import MEASURING_KIND_LABELS, THREAD_GAUGE_GO_NOGO_LABELS
+    from shifts.tool_extension_constants import TOOL_EXTENSION_CLAMP_LABELS
     from shifts.models import END_MILL_TYPES, COUNTERSINK_TYPES, COLLET_TYPES, REAMER_ACCURACY_CLASSES, THREAD_STANDARDS, TAP_TOOL_TYPES
 
     CHOICE_LABELS: dict[str, dict[str, str]] = {
@@ -285,6 +398,9 @@ try:
         "thread_standard": dict(THREAD_STANDARDS),
         "tap_type": dict(TAP_TOOL_TYPES),
         "accuracy_class": dict(REAMER_ACCURACY_CLASSES),
+        "kind": dict(MEASURING_KIND_LABELS),
+        "go_nogo": dict(THREAD_GAUGE_GO_NOGO_LABELS),
+        "clamp_type": dict(TOOL_EXTENSION_CLAMP_LABELS),
     }
 except Exception:
     CHOICE_LABELS = {}
@@ -355,27 +471,71 @@ def aggregate_by_group(
         return []
 
     qs = _base_qs(include_zero=include_zero).filter(category=category)
+    return aggregate_queryset_by_group(qs, category, group_field, search=search)
+
+
+def aggregate_queryset_by_group(
+    qs,
+    category: str,
+    group_field: str,
+    *,
+    search: str = "",
+) -> list[dict]:
+    """Сводка по уже отфильтрованному queryset склада (позиции не меняются)."""
+    needle = (search or "").strip().casefold()
+
+    if not category:
+        rows = (
+            qs.values("category")
+            .annotate(total_qty=Sum("quantity"), sku_count=Count("id"))
+            .order_by("category")
+        )
+        cat_labels = dict(ToolItem._meta.get_field("category").choices)
+        out: list[dict] = []
+        for row in rows:
+            raw = row.get("category") or ""
+            label = cat_labels.get(raw, raw or "—")
+            if needle and needle not in label.casefold():
+                continue
+            query = {"panel": "stock", "category": raw, "stock_view": "positions"}
+            out.append(
+                {
+                    "group_value": label,
+                    "group_raw": raw,
+                    "total_qty": int(row["total_qty"] or 0),
+                    "sku_count": int(row["sku_count"] or 0),
+                    "stock_query": query,
+                    "stock_url": f"{reverse('inventory')}?{urlencode(query)}",
+                }
+            )
+        return out
+
+    path = GROUP_FIELD_PATHS.get(category, {}).get(group_field)
+    if not path:
+        return []
+
     rows = (
         qs.values(path)
         .annotate(total_qty=Sum("quantity"), sku_count=Count("id"))
         .order_by(path)
     )
 
-    out: list[dict] = []
-    needle = (search or "").strip().casefold()
+    out = []
     for row in rows:
         raw = row.get(path)
         label = fmt_group_value(raw, group_field)
         if needle and needle not in label.casefold():
             continue
+        query = stock_filter_query(category, group_field, label)
+        query["stock_view"] = "positions"
         out.append(
             {
                 "group_value": label,
                 "group_raw": raw,
                 "total_qty": int(row["total_qty"] or 0),
                 "sku_count": int(row["sku_count"] or 0),
-                "stock_query": stock_filter_query(category, group_field, label),
-                "stock_url": f"{reverse('inventory')}?{urlencode(stock_filter_query(category, group_field, label))}",
+                "stock_query": query,
+                "stock_url": f"{reverse('inventory')}?{urlencode(query)}",
             }
         )
     return out
