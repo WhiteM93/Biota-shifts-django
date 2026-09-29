@@ -5,6 +5,7 @@ from biota_shifts.auth import (
     nav_permissions_for_user,
 )
 from shifts.auth_utils import (
+    can_preview_role,
     is_real_admin,
     preview_role,
     request_can_edit,
@@ -66,6 +67,7 @@ def biota_session(request):
             "biota_can_edit": True,
             "biota_is_admin": False,
             "biota_is_real_admin": False,
+            "biota_can_preview_role": False,
             "biota_preview_role": "",
             "site_updates_unread": 0,
             "biota_machines_quick_edit": False,
@@ -87,6 +89,7 @@ def biota_session(request):
         "biota_can_edit": request_can_edit(request),
         "biota_is_admin": request_is_admin_ui(request),
         "biota_is_real_admin": real_admin,
+        "biota_can_preview_role": can_preview_role(request),
         "biota_preview_role": preview_role(request) or "",
         "biota_machines_quick_edit": machines_quick_edit_for_user(u) and not is_executor,
         "site_updates_unread": _site_updates_unread(request),

@@ -12,9 +12,10 @@ class ProductInlineSaveTests(TestCase):
         session = self.client.session
         session["biota_username"] = "admin"
         session.save()
-        self.product = create_product_with_defaults()
+        self.product = create_product_with_defaults(created_by="admin")
         self.setup = ProductSetup.objects.filter(product=self.product).order_by("sort_order", "id").first()
         self.assertIsNotNone(self.setup)
+        self.assertEqual(self.product.created_by, "admin")
 
     def _post_inline(self, extra=None):
         data = {
@@ -54,6 +55,31 @@ class ProductInlineSaveTests(TestCase):
         self.assertEqual(res["Content-Type"], "application/json")
         body = res.json()
         self.assertTrue(body.get("ok"), body)
+
+    def test_author_and_editors_on_inline_save(self):
+        from shifts.product_views import record_product_editor
+
+        self.assertEqual(self.product.created_by, "admin")
+        self.assertEqual(self.product.editors, [])
+        res = self._post_inline()
+        self.assertTrue(res.json().get("ok"), res.json())
+        product_payload = res.json().get("product") or {}
+        self.assertEqual(product_payload.get("created_by"), "admin")
+        self.assertEqual(product_payload.get("editors"), [])
+
+        info = record_product_editor(self.product, "ivan")
+        self.assertEqual(info["created_by"], "admin")
+        self.assertEqual(info["editors"], ["ivan"])
+        info2 = record_product_editor(self.product, "ivan")
+        self.assertEqual(info2["editors"], ["ivan"])
+        info3 = record_product_editor(self.product, "admin")
+        self.assertEqual(info3["editors"], ["ivan"])
+
+        page = self.client.get(f"/products/{self.product.pk}/")
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "product-side-authorship")
+        self.assertContains(page, "Автор: admin")
+        self.assertContains(page, "ivan")
 
     def test_inline_update_setup_persists_card_specs(self):
         self._post_inline()

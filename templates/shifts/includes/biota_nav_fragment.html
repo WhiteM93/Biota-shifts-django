@@ -68,8 +68,8 @@
 <a href="{% url 'machines' %}" class="{% if request.resolver_match.url_name == 'machines' %}active{% endif %}">Станки</a>
 {% endif %}
 <span class="nav-spacer"></span>
-{% if biota_is_real_admin %}
-<form method="post" action="{% url 'preview_role' %}" class="nav-role-preview biota-exempt-global-readonly-form" title="Как видит сайт другая роль. Только для администратора.">
+{% if biota_can_preview_role %}
+<form method="post" action="{% url 'preview_role' %}" class="nav-role-preview biota-exempt-global-readonly-form" title="Как видит сайт другая роль. Для руководителей.">
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ request.get_full_path }}" />
   <span class="nav-role-preview__label">Роль</span>

@@ -68,3 +68,41 @@ class SiteUpdatesTests(TestCase):
         page = self.client.get(reverse("site_updates"))
         self.assertEqual(page.status_code, 200)
         self.assertNotContains(page, "nav-updates-badge")
+
+    def test_ack_once_and_list_users(self):
+        from shifts.models import SiteUpdateAck
+
+        latest = latest_site_update_id()
+        self.assertGreater(latest, 0)
+        page = self.client.get(reverse("site_updates"))
+        self.assertContains(page, "js-su-ack")
+        self.assertContains(page, "js-su-ack-chip")
+
+        url = reverse("site_update_ack", kwargs={"update_id": latest})
+        first = self.client.post(url)
+        self.assertEqual(first.status_code, 200)
+        data = first.json()
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["created"])
+        self.assertEqual(data["ack_count"], 1)
+        self.assertIn("admin", data["ack_users"])
+        self.assertEqual(SiteUpdateAck.objects.filter(update_id=latest, username="admin").count(), 1)
+
+        second = self.client.post(url)
+        self.assertEqual(second.status_code, 200)
+        data2 = second.json()
+        self.assertTrue(data2["ok"])
+        self.assertFalse(data2["created"])
+        self.assertEqual(data2["ack_count"], 1)
+        self.assertEqual(SiteUpdateAck.objects.filter(update_id=latest).count(), 1)
+
+        SiteUpdateAck.objects.create(update_id=latest, username="ivan")
+        page2 = self.client.get(reverse("site_updates"))
+        self.assertContains(page2, 'data-acked="1"')
+        self.assertContains(page2, "admin|ivan")
+        self.assertContains(page2, ">2</span>")
+
+    def test_ack_unknown_update_404(self):
+        res = self.client.post(reverse("site_update_ack", kwargs={"update_id": 999999}))
+        self.assertEqual(res.status_code, 404)
+        self.assertFalse(res.json().get("ok"))

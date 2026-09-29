@@ -2047,6 +2047,28 @@ class SiteUpdate(models.Model):
         return (self.title or "")[:80]
 
 
+class SiteUpdateAck(models.Model):
+    """Отметка «ознакомился» по записи из site_updates.json (id в файле)."""
+
+    update_id = models.PositiveIntegerField(db_index=True, verbose_name="Id обновления")
+    username = models.CharField(max_length=120, db_index=True, verbose_name="Кто ознакомился")
+    acknowledged_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Когда")
+
+    class Meta:
+        ordering = ("acknowledged_at", "id")
+        verbose_name = "Ознакомление с обновлением"
+        verbose_name_plural = "Ознакомления с обновлениями"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("update_id", "username"),
+                name="site_update_ack_unique_user",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"#{self.update_id} · {self.username}"
+
+
 class PurchaseRequest(models.Model):
     requested_item = models.CharField(max_length=255, verbose_name="Что закупить")
     store_name = models.CharField(max_length=120, blank=True, default="", verbose_name="Магазин")
@@ -2497,6 +2519,19 @@ class Product(models.Model):
         upload_to="products/programs/",
         blank=True,
         verbose_name="Программа (G/M, любой файл)",
+    )
+    created_by = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        db_index=True,
+        verbose_name="Автор наладки",
+    )
+    editors = models.JSONField(
+        blank=True,
+        default=list,
+        verbose_name="Редакторы",
+        help_text="Логины тех, кто правил карточку после автора.",
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")

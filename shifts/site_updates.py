@@ -186,3 +186,47 @@ def effective_site_updates_seen_id(username: str, session_seen: int) -> int:
         session_val = 0
     account_val = account_site_updates_seen_id(username) if username else 0
     return max(session_val, account_val)
+
+
+def acks_by_update_id(update_ids: list[int] | set[int]) -> dict[int, list[str]]:
+    """update_id → имена аккаунтов в порядке ознакомления."""
+    ids = sorted({int(x) for x in update_ids if int(x) > 0})
+    if not ids:
+        return {}
+    from .models import SiteUpdateAck
+
+    out: dict[int, list[str]] = {i: [] for i in ids}
+    for row in (
+        SiteUpdateAck.objects.filter(update_id__in=ids)
+        .order_by("acknowledged_at", "id")
+        .only("update_id", "username")
+    ):
+        name = (row.username or "").strip()
+        if name:
+            out.setdefault(int(row.update_id), []).append(name)
+    return out
+
+
+def acknowledge_site_update(update_id: int, username: str) -> tuple[bool, list[str]]:
+    """
+    Отметить ознакомление один раз.
+    Возвращает (created, актуальный список имён).
+    """
+    try:
+        uid = int(update_id)
+    except (TypeError, ValueError):
+        return False, []
+    who = (username or "").strip()
+    if uid <= 0 or not who:
+        return False, []
+    known = {r.id for r in load_site_updates()}
+    if uid not in known:
+        return False, []
+    from .models import SiteUpdateAck
+
+    _, created = SiteUpdateAck.objects.get_or_create(
+        update_id=uid,
+        username=who[:120],
+    )
+    names = acks_by_update_id([uid]).get(uid, [])
+    return created, names

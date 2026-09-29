@@ -7,7 +7,8 @@
 {% endblock %}
 
 {% block content %}
-<div class="cabinet-page su-page">
+<div class="cabinet-page su-page" data-su-ack-url-template="{% url 'site_update_ack' 0 %}">
+  {% csrf_token %}
   <header class="cabinet-hero">
     <p class="cabinet-hero__eyebrow">Сайт</p>
     <h1>Обновления</h1>
@@ -17,17 +18,36 @@
   {% if rows %}
   <div class="su-list">
     {% for row in rows %}
-    <article class="su-card">
+    <article class="su-card" data-update-id="{{ row.id }}">
       <div class="su-card__head">
         <h2 class="su-card__title">{{ row.title }}</h2>
         <time class="su-card__date" datetime="{{ row.created_at|date:'Y-m-d' }}">{{ row.created_at|date:"d.m.Y" }}</time>
       </div>
       <p class="su-card__body">{{ row.body|linebreaksbr }}</p>
+      <div class="su-card__ack">
+        <button
+          type="button"
+          class="btn btn-sm {% if row.i_acked %}btn-ghost su-ack-btn--done{% else %}btn-primary{% endif %} js-su-ack"
+          {% if row.i_acked %}disabled aria-disabled="true"{% endif %}
+          data-acked="{% if row.i_acked %}1{% else %}0{% endif %}"
+        >Ознакомился</button>
+        <span
+          class="su-ack-chip js-su-ack-chip{% if not row.ack_count %} is-empty{% endif %}"
+          tabindex="0"
+          data-users="{{ row.ack_users|join:'|'|escape }}"
+          aria-label="{% if row.ack_count %}Кто ознакомился{% else %}Пока никто не ознакомился{% endif %}"
+        >
+          <span class="js-su-ack-count">{{ row.ack_count }}</span>
+          <span class="su-ack-chip__label">{% if row.ack_count == 1 %}ознакомился{% else %}ознакомились{% endif %}</span>
+        </span>
+      </div>
     </article>
     {% endfor %}
   </div>
+  <div class="su-ack-tip" id="su-ack-tip" hidden role="tooltip"></div>
   {% else %}
   <p class="muted">Пока нет опубликованных обновлений.</p>
   {% endif %}
 </div>
+<script src="{% static 'shifts/js/site_updates.js' %}?v={{ static_asset_version }}" defer></script>
 {% endblock %}

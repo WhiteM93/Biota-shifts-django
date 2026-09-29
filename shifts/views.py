@@ -21,6 +21,7 @@ from .auth_utils import (
     PREVIEW_ROLE_SESSION_KEY,
     biota_login_required,
     biota_user,
+    can_preview_role,
     is_real_admin,
     post_login_redirect,
     request_can_edit,
@@ -179,9 +180,9 @@ def logout_view(request):
 @biota_login_required
 @require_POST
 def preview_role_view(request):
-    """Админ может смотреть сайт как руководитель или как исполнитель, не выходя из аккаунта."""
-    if not is_real_admin(request):
-        messages.warning(request, "Переключение роли доступно только администратору.")
+    """Админ и руководители могут смотреть сайт как исполнитель, не выходя из аккаунта."""
+    if not can_preview_role(request):
+        messages.warning(request, "Переключение роли доступно руководителям.")
         return redirect(request.META.get("HTTP_REFERER") or post_login_redirect(biota_user(request)))
     role = (request.POST.get("role") or "").strip().lower()
     if role not in USER_ROLE_CHOICES:

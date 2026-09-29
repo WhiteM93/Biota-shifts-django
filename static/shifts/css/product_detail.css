@@ -3813,36 +3813,44 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   #product-cad-block {
     position: relative;
   }
+  .product-cad-stage {
+    position: relative;
+  }
   .product-cad-fullscreen-btn {
     position: absolute;
-    top: 42px;
+    top: 8px;
     right: 8px;
     z-index: 7;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     padding: 0;
-    border-radius: 6px;
-    border: 1px solid var(--bio-filter-border);
-    background: color-mix(in srgb, var(--bio-table-bg) 88%, transparent);
-    color: var(--bio-body-fg);
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--bio-filter-border) 70%, transparent);
+    background: color-mix(in srgb, var(--bio-table-bg, #fff) 86%, transparent);
+    color: var(--bio-muted, var(--bio-body-fg));
     cursor: pointer;
-    backdrop-filter: blur(4px);
-    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
   }
   .product-cad-fullscreen-btn:hover {
-    background: var(--bio-surface-item);
-    border-color: var(--bio-input-focus-border);
-    transform: translateY(-1px);
+    background: var(--bio-surface-item, var(--bio-table-bg));
+    border-color: var(--bio-input-focus-border, var(--bio-filter-border));
+    color: var(--bio-body-fg);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+    transform: scale(1.04);
   }
   .product-cad-fullscreen-btn[hidden] {
     display: none !important;
   }
   .product-cad-fullscreen-btn.is-active {
-    background: var(--bio-surface-item);
-    border-color: var(--bio-input-focus-border);
+    background: var(--bio-surface-item, var(--bio-table-bg));
+    border-color: var(--bio-input-focus-border, var(--bio-filter-border));
+    color: var(--bio-body-fg);
   }
   #product-cad-block:fullscreen,
   #product-cad-block.is-cad-fullscreen-fallback {
@@ -3874,8 +3882,8 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   }
   #product-cad-block:fullscreen .product-cad-fullscreen-btn,
   #product-cad-block.is-cad-fullscreen-fallback .product-cad-fullscreen-btn {
-    top: 16px;
-    right: 16px;
+    top: 12px;
+    right: 12px;
   }
   #product-cad-block:fullscreen #product-save-preview-block,
   #product-cad-block.is-cad-fullscreen-fallback #product-save-preview-block {
@@ -5616,12 +5624,45 @@ body.setup-inline-edit-enabled #product-detail-meta .product-drawing-description
   transition: border-color 0.22s ease, background 0.28s ease, box-shadow 0.25s ease;
 }
 
+#product-detail-side .product-side-preview {
+  background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+  border: 1px solid var(--bio-filter-border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: var(--bio-filter-shadow);
+  box-sizing: border-box;
+  transition: border-color 0.22s ease, background 0.28s ease, box-shadow 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+
+#product-detail-side #product-cad-block {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 html[data-theme="dawn"] #product-detail-side #product-cad-block,
 html[data-theme="dawn"] #product-detail-side #product-downloads-block,
 html[data-theme="dawn"] #product-detail-side #product-osnastka-block,
 html[data-theme="dawn"] #product-detail-side .product-side-program-files,
 html[data-theme="dawn"] #product-detail-side .product-side-notes-panel {
   background: linear-gradient(180deg, #fffefb 0%, #f4ebe0 100%);
+}
+
+html[data-theme="dawn"] #product-detail-side .product-side-preview {
+  background: linear-gradient(180deg, #fffefb 0%, #f4ebe0 100%);
+}
+
+html[data-theme="dawn"] #product-detail-side #product-cad-block {
+  background: transparent;
 }
 
 #product-detail-side #product-cad-block:hover,
@@ -5633,8 +5674,17 @@ html[data-theme="dawn"] #product-detail-side .product-side-notes-panel {
   box-shadow: var(--bio-filter-shadow);
 }
 
+#product-detail-side .product-side-preview:hover {
+  border-color: var(--bio-input-hover-border);
+}
+
+#product-detail-side #product-cad-block:hover {
+  border-color: transparent;
+  box-shadow: none;
+}
+
 #product-detail-side #product-save-preview-block {
-  margin-top: 12px;
+  margin-top: 0;
   padding: 0;
   background: transparent;
   border: none;
@@ -5644,24 +5694,124 @@ html[data-theme="dawn"] #product-detail-side .product-side-notes-panel {
   box-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
 }
 
+#product-detail-side .product-side-preview__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
 #product-detail-side #product-side-name {
-  margin: 0 0 10px;
+  margin: 0;
   padding: 0;
   font-size: 15px;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.3;
   color: var(--bio-body-fg);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+#product-detail-side .product-side-authorship {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--bio-muted);
+  cursor: default;
+  user-select: none;
+}
+#product-detail-side .product-side-authorship.is-empty {
+  opacity: 0.7;
+}
+#product-detail-side .product-side-authorship:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--bio-heading-accent, #8f9cff) 55%, transparent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+#product-detail-side .product-side-authorship__author {
+  font-weight: 550;
+  color: var(--bio-field-label, var(--bio-muted));
+}
+#product-detail-side .product-side-authorship__editors {
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--bio-surface-item-border, var(--bio-input-border)) 85%, transparent);
+  background: color-mix(in srgb, var(--bio-surface-item, transparent) 90%, var(--bio-heading-accent, #8f9cff) 10%);
+  font-weight: 650;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+#product-detail-side .product-side-authorship__editors.is-empty,
+#product-detail-side .product-side-authorship__editors[hidden] {
+  display: none !important;
+}
+.product-side-authorship-tip {
+  position: fixed;
+  z-index: 10050;
+  min-width: 140px;
+  max-width: min(280px, calc(100vw - 24px));
+  max-height: min(240px, 45vh);
+  overflow-y: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--bio-surface-item-border, var(--bio-input-border));
+  background: var(--bio-surface-item, var(--bio-input-bg));
+  color: var(--bio-body-fg, inherit);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-line;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+}
+.product-side-authorship-tip[hidden] {
+  display: none !important;
 }
 
 #product-detail-side .product-cad-viewport {
   height: min(280px, 36vh);
-  border-radius: 4px;
-  border: 1px solid var(--bio-input-border);
-  background: var(--bio-input-bg);
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--bio-input-border) 88%, transparent);
+  background:
+    radial-gradient(circle at 28% 18%, color-mix(in srgb, var(--bio-schedule-alt-col2, #dfe6ff) 55%, transparent) 0%, transparent 52%),
+    var(--bio-input-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+#product-detail-side .product-cad-save-preview-btn {
+  width: 100%;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 8px 12px;
+  border-radius: 7px;
+  color: var(--bio-field-label, var(--bio-muted));
+  background: color-mix(in srgb, var(--bio-input-bg, #fff) 72%, transparent);
+  border-color: color-mix(in srgb, var(--bio-input-border) 90%, transparent);
+  box-shadow: none;
+}
+#product-detail-side .product-cad-save-preview-btn:hover,
+#product-detail-side .product-cad-save-preview-btn:focus-visible {
+  color: var(--bio-body-fg);
+  border-color: var(--bio-input-hover-border, var(--bio-input-border));
+  background: var(--bio-input-bg, #fff);
+}
+
+#product-detail-side .product-side-preview__empty {
+  margin: 0;
+  padding: 18px 10px;
+  text-align: center;
+  border-radius: 8px;
+  border: 1px dashed color-mix(in srgb, var(--bio-input-border) 80%, transparent);
+  background: color-mix(in srgb, var(--bio-input-bg, #fff) 55%, transparent);
 }
 
 #product-detail-side #product-downloads-block::before {

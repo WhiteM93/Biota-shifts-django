@@ -1266,6 +1266,47 @@ NEW_OSNASTKA_NAME_BASE = "Новая оснастка"
 NEW_PRODUCT_DEFAULT_WORKPIECE = "preparatory"
 
 
+def _normalize_product_editors(raw) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        name = str(item or "").strip()[:200]
+        if not name:
+            continue
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(name)
+    return out
+
+
+def record_product_editor(product: Product, username: str | None) -> dict:
+    """
+    Запомнить автора (если пусто) или добавить редактора (не автора).
+    Возвращает {created_by, editors}.
+    """
+    who = (username or "").strip()[:200]
+    created_by = (product.created_by or "").strip()
+    editors = _normalize_product_editors(getattr(product, "editors", None))
+    if not who:
+        return {"created_by": created_by, "editors": editors}
+    if not created_by:
+        product.created_by = who
+        product.save(update_fields=["created_by"])
+        return {"created_by": who, "editors": editors}
+    if who.casefold() == created_by.casefold():
+        return {"created_by": created_by, "editors": editors}
+    if any(e.casefold() == who.casefold() for e in editors):
+        return {"created_by": created_by, "editors": editors}
+    editors = editors + [who]
+    product.editors = editors
+    product.save(update_fields=["editors", "updated_at"])
+    return {"created_by": created_by, "editors": editors}
+
+
 def _allocate_new_product_name(base: str = NEW_PRODUCT_NAME_BASE) -> str:
     name = base
     n = 2
@@ -1275,10 +1316,15 @@ def _allocate_new_product_name(base: str = NEW_PRODUCT_NAME_BASE) -> str:
     return name
 
 
-def create_product_with_defaults(*, catalog_section: str | None = None) -> Product:
+def create_product_with_defaults(
+    *,
+    catalog_section: str | None = None,
+    created_by: str = "",
+) -> Product:
     """Новая карточка: изделие в «Наладках» или «Оснастках», первая установка."""
     section = catalog_section or Product.CATALOG_NALADKI
     name_base = NEW_OSNASTKA_NAME_BASE if section == Product.CATALOG_OSNASTKA else NEW_PRODUCT_NAME_BASE
+    author = (created_by or "").strip()[:200]
     with transaction.atomic():
         product = Product.objects.create(
             name=_allocate_new_product_name(name_base),
@@ -1288,6 +1334,8 @@ def create_product_with_defaults(*, catalog_section: str | None = None) -> Produ
             card_product_type="made",
             card_workpiece_type=NEW_PRODUCT_DEFAULT_WORKPIECE,
             catalog_section=section,
+            created_by=author,
+            editors=[],
         )
         setup = ProductSetup.objects.create(
             product=product,
@@ -1303,7 +1351,7 @@ def create_product_with_defaults(*, catalog_section: str | None = None) -> Produ
 @write_permission_required
 @require_http_methods(["GET", "POST"])
 def product_create_view(request):
-    product = create_product_with_defaults()
+    product = create_product_with_defaults(created_by=biota_user(request) or "")
     messages.success(request, "Создана новая наладка — заполните карточку изделия.")
     base = _product_detail_url(product)
     return redirect(f"{base}?{urlencode({'tab': 'drawing', 'quick_edit': '1'})}")
@@ -1314,7 +1362,10 @@ def product_create_view(request):
 @write_permission_required
 @require_http_methods(["GET", "POST"])
 def osnastka_create_view(request):
-    product = create_product_with_defaults(catalog_section=Product.CATALOG_OSNASTKA)
+    product = create_product_with_defaults(
+        catalog_section=Product.CATALOG_OSNASTKA,
+        created_by=biota_user(request) or "",
+    )
     messages.success(request, "Создана новая оснастка — заполните карточку.")
     base = _product_detail_url(product)
     return redirect(f"{base}?{urlencode({'tab': 'drawing', 'quick_edit': '1'})}")
@@ -1531,6 +1582,9 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
                         pass
                 orphan.delete()
             out_tool_rows = True
+    authorship = {"created_by": (product.created_by or "").strip(), "editors": _normalize_product_editors(product.editors)}
+    if changed_setup_fields or product_update_fields or out_tool_rows:
+        authorship = record_product_editor(product, biota_user(request))
     out: dict = {
         "ok": True,
         "setup": {
@@ -1555,6 +1609,8 @@ def _product_inline_update_setup(request, product: Product) -> JsonResponse:
         "product": {
             "name": (product.name or "").strip(),
             "description": (product.description or "").strip(),
+            "created_by": authorship["created_by"],
+            "editors": authorship["editors"],
         },
     }
     if out_tool_rows:
@@ -1600,6 +1656,7 @@ def product_detail_view(request, pk: int):
                 sort_order=next_order,
             )
             seed_setup_tool_magazine(setup)
+            record_product_editor(product, biota_user(request))
             messages.success(request, "Добавлена установка — заполните данные во вкладке.")
             tab_slug = f"setup-{setup.pk}"
             return redirect(f"{_product_detail_url(product)}?{urlencode({'tab': tab_slug})}")

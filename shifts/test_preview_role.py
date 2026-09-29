@@ -1,5 +1,8 @@
+from unittest.mock import patch
+
 from django.test import Client, TestCase
 
+from biota_shifts.auth import USER_ROLE_EXECUTOR, USER_ROLE_MANAGER
 from shifts.auth_utils import PREVIEW_ROLE_SESSION_KEY
 from shifts.models import ProductSetup
 from shifts.product_views import create_product_with_defaults
@@ -70,12 +73,92 @@ class AdminPreviewRoleTests(TestCase):
         page = self.client.get(f"/products/{self.product.pk}/")
         self.assertContains(page, 'data-biota-can-edit="1"')
 
-    def test_non_admin_cannot_switch_role(self):
+    def test_executor_cannot_switch_role(self):
         session = self.client.session
-        session["biota_username"] = "not-admin"
+        session["biota_username"] = "worker1"
         session.save()
-        res = self.client.post("/accounts/preview-role/", {"role": "executor", "next": "/"})
-        self.assertEqual(res.status_code, 302)
-        self.assertNotEqual(self.client.session.get(PREVIEW_ROLE_SESSION_KEY), "executor")
-        page = self.client.get("/accounts/login/")
-        self.assertNotContains(page, "nav-role-preview")
+        with patch(
+            "shifts.auth_utils.user_role_for_username",
+            return_value=USER_ROLE_EXECUTOR,
+        ), patch(
+            "shifts.auth_utils._resolve_registered_user",
+            return_value={"approved": True, "role": USER_ROLE_EXECUTOR},
+        ), patch(
+            "biota_shifts.auth._resolve_registered_user",
+            return_value={"approved": True, "role": USER_ROLE_EXECUTOR},
+        ), patch(
+            "biota_shifts.auth.user_is_executor",
+            return_value=True,
+        ), patch(
+            "shifts.middleware.user_is_executor",
+            return_value=True,
+        ), patch(
+            "biota_shifts.auth.nav_permissions_for_user",
+            return_value={
+                "graph": True,
+                "hours": True,
+                "skud": True,
+                "inventory": True,
+                "inventory_types": True,
+                "defects": True,
+                "payroll": True,
+                "employees": True,
+                "regulations": True,
+                "products": True,
+                "machines": True,
+                "forms": True,
+                "calculator": True,
+                "visual_warehouse": True,
+                "contracts": True,
+            },
+        ):
+            res = self.client.post("/accounts/preview-role/", {"role": "executor", "next": "/"})
+            self.assertIn(res.status_code, (302, 403))
+            self.assertNotEqual(self.client.session.get(PREVIEW_ROLE_SESSION_KEY), "executor")
+            page = self.client.get(f"/products/{self.product.pk}/")
+            self.assertEqual(page.status_code, 200)
+            self.assertNotContains(page, "nav-role-preview")
+
+    def test_manager_can_switch_role(self):
+        session = self.client.session
+        session["biota_username"] = "boss1"
+        session.save()
+        with patch(
+            "shifts.auth_utils.user_role_for_username",
+            return_value=USER_ROLE_MANAGER,
+        ), patch(
+            "shifts.auth_utils._resolve_registered_user",
+            return_value={"approved": True, "role": USER_ROLE_MANAGER},
+        ), patch(
+            "biota_shifts.auth._resolve_registered_user",
+            return_value={"approved": True, "role": USER_ROLE_MANAGER},
+        ), patch(
+            "biota_shifts.auth.nav_permissions_for_user",
+            return_value={
+                "graph": True,
+                "hours": True,
+                "skud": True,
+                "inventory": True,
+                "inventory_types": True,
+                "defects": True,
+                "payroll": True,
+                "employees": True,
+                "regulations": True,
+                "products": True,
+                "machines": True,
+                "forms": True,
+                "calculator": True,
+                "visual_warehouse": True,
+                "contracts": True,
+            },
+        ):
+            res = self.client.post(
+                "/accounts/preview-role/",
+                {"role": "executor", "next": f"/products/{self.product.pk}/"},
+            )
+            self.assertEqual(res.status_code, 302)
+            self.assertEqual(self.client.session.get(PREVIEW_ROLE_SESSION_KEY), "executor")
+            page = self.client.get(f"/products/{self.product.pk}/")
+            self.assertEqual(page.status_code, 200)
+            self.assertContains(page, "nav-role-preview")
+            self.assertContains(page, 'data-biota-can-edit="0"')

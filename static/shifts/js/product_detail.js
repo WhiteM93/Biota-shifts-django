@@ -3334,7 +3334,91 @@ function saveSetupToolNoteEditor() {
           descEl.innerHTML = descVal || emptyLabel;
         }
       }
+      if (
+        Object.prototype.hasOwnProperty.call(productData, "created_by") ||
+        Object.prototype.hasOwnProperty.call(productData, "editors")
+      ) {
+        applyProductAuthorshipToDom(productData);
+      }
     }
+
+    function applyProductAuthorshipToDom(productData) {
+      var box = document.getElementById("product-side-authorship");
+      if (!box) return;
+      var createdBy = Object.prototype.hasOwnProperty.call(productData, "created_by")
+        ? String(productData.created_by || "").trim()
+        : (box.getAttribute("data-created-by") || "").trim();
+      var editors = Object.prototype.hasOwnProperty.call(productData, "editors")
+        ? (Array.isArray(productData.editors) ? productData.editors : [])
+            .map(function (x) { return String(x || "").trim(); })
+            .filter(Boolean)
+        : (box.getAttribute("data-editors") || "")
+            .split("|")
+            .map(function (s) { return s.trim(); })
+            .filter(Boolean);
+      box.setAttribute("data-created-by", createdBy);
+      box.setAttribute("data-editors", editors.join("|"));
+      box.classList.toggle("is-empty", !createdBy && !editors.length);
+      var authorEl = box.querySelector(".js-pd-author-label");
+      if (authorEl) {
+        authorEl.textContent = createdBy ? ("Автор: " + createdBy) : "Автор не указан";
+      }
+      var chip = box.querySelector(".js-pd-editors-chip");
+      if (chip) {
+        chip.textContent = "ред. " + String(editors.length);
+        chip.classList.toggle("is-empty", !editors.length);
+        if (editors.length) chip.removeAttribute("hidden");
+        else chip.setAttribute("hidden", "hidden");
+      }
+    }
+
+    (function bindProductAuthorshipTip() {
+      var box = document.getElementById("product-side-authorship");
+      var tip = document.getElementById("product-side-authorship-tip");
+      if (!box || !tip) return;
+
+      function hideTip() {
+        tip.hidden = true;
+        tip.textContent = "";
+      }
+
+      function showTip() {
+        var createdBy = (box.getAttribute("data-created-by") || "").trim();
+        var editors = (box.getAttribute("data-editors") || "")
+          .split("|")
+          .map(function (s) { return s.trim(); })
+          .filter(Boolean);
+        var lines = [];
+        if (createdBy) lines.push("Автор: " + createdBy);
+        if (editors.length) {
+          lines.push("Редакторы:");
+          editors.forEach(function (name) { lines.push("· " + name); });
+        } else {
+          lines.push("Пока без других редакторов");
+        }
+        tip.textContent = lines.join("\n");
+        tip.hidden = false;
+        var rect = box.getBoundingClientRect();
+        var tipW = tip.offsetWidth || 180;
+        var left = Math.min(
+          Math.max(8, rect.left + rect.width / 2 - tipW / 2),
+          window.innerWidth - tipW - 8
+        );
+        var top = rect.bottom + 8;
+        if (top + tip.offsetHeight > window.innerHeight - 8) {
+          top = Math.max(8, rect.top - tip.offsetHeight - 8);
+        }
+        tip.style.left = left + "px";
+        tip.style.top = top + "px";
+      }
+
+      box.addEventListener("mouseenter", showTip);
+      box.addEventListener("mouseleave", hideTip);
+      box.addEventListener("focus", showTip);
+      box.addEventListener("blur", hideTip);
+      window.addEventListener("scroll", hideTip, { passive: true });
+      window.addEventListener("resize", hideTip);
+    })();
 
     function applyToolRowsResponseToDom(panel, toolRows) {
       if (!panel || !toolRows || !toolRows.length) return;

@@ -18,6 +18,7 @@ from biota_shifts.auth import (
     inventory_stock_manage_for_user,
     nav_permissions_for_user,
     user_is_executor,
+    user_role_for_username,
 )
 
 PREVIEW_ROLE_SESSION_KEY = "biota_preview_role"
@@ -42,9 +43,19 @@ def is_real_admin(request) -> bool:
     return _is_admin(biota_user(request) or "")
 
 
+def can_preview_role(request) -> bool:
+    """Переключатель «руководитель / исполнитель»: админ и руководители (не исполнители)."""
+    u = biota_user(request)
+    if not u:
+        return False
+    if _is_admin(u):
+        return True
+    return user_role_for_username(u) == USER_ROLE_MANAGER
+
+
 def preview_role(request) -> str | None:
-    """Сессия «смотреть как»: только у настоящего администратора."""
-    if not is_real_admin(request):
+    """Сессия «смотреть как»: у админа и руководителей."""
+    if not can_preview_role(request):
         return None
     role = (request.session.get(PREVIEW_ROLE_SESSION_KEY) or "").strip().lower()
     if role in USER_ROLE_CHOICES:

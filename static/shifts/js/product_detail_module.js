@@ -247,7 +247,12 @@ const PD = (function () {
   }
 
   function showCadFullscreenBtn() {
-    if (typeof window.showProductCadFullscreenBtn === "function") window.showProductCadFullscreenBtn();
+    if (typeof window.showProductCadFullscreenBtn === "function") {
+      window.showProductCadFullscreenBtn();
+      return;
+    }
+    var btn = document.getElementById("product-cad-fullscreen-btn");
+    if (btn) btn.hidden = false;
   }
 
   /** Контур граней + flat shading на меше */
@@ -545,6 +550,7 @@ const PD = (function () {
     });
   }
   const side = document.getElementById("product-detail-side");
+  bindCadFullscreen();
   if (!side || !side.hidden) {
     startCadViewerWhenVisible();
   }
@@ -553,7 +559,6 @@ const PD = (function () {
     if (miniUrl) mountMiniStlViewer(mini, miniUrl);
   });
   refreshSetupCadButton();
-  bindCadFullscreen();
 
   function getCookie(name) {
     const m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));

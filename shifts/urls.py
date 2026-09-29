@@ -74,6 +74,11 @@ urlpatterns = [
     ),
     path("updates/", site_updates_views.site_updates_view, name="site_updates"),
     path(
+        "updates/<int:update_id>/ack/",
+        site_updates_views.site_update_ack_api,
+        name="site_update_ack",
+    ),
+    path(
         "cabinet/site-notebook/<int:pk>/mark/",
         site_notebook_views.site_notebook_mark_api,
         name="site_notebook_mark",
