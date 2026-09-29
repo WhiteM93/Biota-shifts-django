@@ -7,7 +7,7 @@ from shifts.inventory_backup import (
     payload_to_json_bytes,
     restore_inventory_from_payload,
 )
-from shifts.models import ToolItem
+from shifts.models import BodyToolSpec, ToolItem
 
 
 class InventoryBackupRoundtripTests(TestCase):
@@ -31,3 +31,18 @@ class InventoryBackupRoundtripTests(TestCase):
         restored = ToolItem.objects.get(pk=tool.pk)
         self.assertEqual(restored.name, "Тестовое сверло")
         self.assertEqual(restored.quantity, 3)
+
+    def test_body_tool_photo_field_is_json_serializable(self):
+        tool = ToolItem.objects.create(
+            category="body",
+            name="Корпус тест",
+            quantity=1,
+        )
+        BodyToolSpec.objects.create(tool=tool)
+        payload = export_inventory_payload()
+        row = next(r for r in payload["body_tool_specs"] if r.get("tool_id") == tool.pk)
+        self.assertIsInstance(row.get("photo"), str)
+        raw = payload_to_json_bytes(payload)
+        self.assertTrue(raw)
+        restore_inventory_from_payload(parse_inventory_backup_bytes(raw))
+        self.assertEqual(BodyToolSpec.objects.filter(tool_id=tool.pk).count(), 1)

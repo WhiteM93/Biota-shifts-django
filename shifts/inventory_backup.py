@@ -43,6 +43,9 @@ def _json_value(val: Any) -> Any:
         if isinstance(val, datetime):
             return val.isoformat()
         return val.isoformat()
+    # FileField / ImageField → имя в storage (строка), иначе json.dumps падает.
+    if hasattr(val, "name") and hasattr(val, "storage") and hasattr(val, "field"):
+        return (val.name or "") if val else ""
     return val
 
 
@@ -143,6 +146,9 @@ def _coerce_row(model_cls, row: dict[str, Any]) -> dict[str, Any]:
             continue
         if field.get_internal_type() == "JSONField":
             out[name] = val if isinstance(val, (dict, list)) else {}
+            continue
+        if field.get_internal_type() in {"FileField", "ImageField"}:
+            out[name] = (str(val).strip() if val is not None else "") or ""
             continue
         out[name] = val
     return out
