@@ -22,6 +22,9 @@ from shifts.models import (
     StockMovement,
     TapSpec,
     ToolItem,
+    VisualContainerAudit,
+    VisualContainerAuditLine,
+    VisualContainerItem,
 )
 
 BACKUP_FORMAT_VERSION = 1
@@ -160,7 +163,16 @@ def settings_use_tz() -> bool:
     return bool(getattr(settings, "USE_TZ", True))
 
 
-def _clear_inventory_tables() -> None:
+def _clear_inventory_tables() -> list[tuple[int, int]]:
+    """Очистить таблицы склада. Возвращает (placement_id, tool_id) для восстановления ссылок визуального склада."""
+    # PROTECT на ToolItem — иначе delete ToolItem падает.
+    VisualContainerAuditLine.objects.all().delete()
+    VisualContainerAudit.objects.all().delete()
+
+    placement_links = list(
+        VisualContainerItem.objects.exclude(tool_item_id=None).values_list("id", "tool_item_id")
+    )
+
     InventoryStockEvent.objects.all().delete()
     StockMovement.objects.all().delete()
     EndMillSpec.objects.all().delete()
@@ -172,6 +184,19 @@ def _clear_inventory_tables() -> None:
     ReamerSpec.objects.all().delete()
     ToolItem.objects.all().delete()
     PurchaseRequest.objects.all().delete()
+    return placement_links
+
+
+def _restore_visual_placement_links(placement_links: list[tuple[int, int]]) -> None:
+    """Вернуть привязки ячеек визуального склада к тем же pk инструмента, если они снова есть."""
+    if not placement_links:
+        return
+    existing_tool_ids = set(
+        ToolItem.objects.filter(pk__in={tid for _, tid in placement_links}).values_list("id", flat=True)
+    )
+    for placement_id, tool_id in placement_links:
+        if tool_id in existing_tool_ids:
+            VisualContainerItem.objects.filter(pk=placement_id).update(tool_item_id=tool_id)
 
 
 def _bulk_create(model_cls, rows: list[dict[str, Any]]) -> None:
@@ -214,7 +239,7 @@ def restore_inventory_from_payload(payload: dict[str, Any]) -> dict[str, int]:
     """Полная замена данных склада содержимым резервной копии."""
     data = validate_inventory_payload(payload)
 
-    _clear_inventory_tables()
+    placement_links = _clear_inventory_tables()
 
     _bulk_create(ToolItem, data["tool_items"])
     _bulk_create(EndMillSpec, data["end_mill_specs"])
@@ -228,6 +253,7 @@ def restore_inventory_from_payload(payload: dict[str, Any]) -> dict[str, int]:
     _bulk_create(PurchaseRequest, data["purchase_requests"])
     _bulk_create(InventoryStockEvent, data["inventory_stock_events"])
 
+    _restore_visual_placement_links(placement_links)
     _reset_sequences()
 
     return {

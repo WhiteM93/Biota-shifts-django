@@ -7,7 +7,15 @@ from shifts.inventory_backup import (
     payload_to_json_bytes,
     restore_inventory_from_payload,
 )
-from shifts.models import BodyToolSpec, ToolItem
+from shifts.models import (
+    BodyToolSpec,
+    ToolItem,
+    VisualCabinet,
+    VisualContainer,
+    VisualContainerAudit,
+    VisualContainerAuditLine,
+    VisualContainerItem,
+)
 
 
 class InventoryBackupRoundtripTests(TestCase):
@@ -46,3 +54,31 @@ class InventoryBackupRoundtripTests(TestCase):
         self.assertTrue(raw)
         restore_inventory_from_payload(parse_inventory_backup_bytes(raw))
         self.assertEqual(BodyToolSpec.objects.filter(tool_id=tool.pk).count(), 1)
+
+    def test_restore_clears_visual_audit_protect_and_keeps_placement(self):
+        tool = ToolItem.objects.create(category="drill", name="Сверло", quantity=2)
+        cab = VisualCabinet.objects.create(code="Z", name="Шкаф", shelves=2, columns=2)
+        cont = VisualContainer.objects.create(
+            cabinet=cab, shelf=1, stack=1, column=1, label="Ящик", address="Z-01-01"
+        )
+        placement = VisualContainerItem.objects.create(
+            container=cont, title="Сверло", tool_item=tool, sort_order=0
+        )
+        audit = VisualContainerAudit.objects.create(container=cont, audited_by="admin", changes_count=1)
+        VisualContainerAuditLine.objects.create(
+            audit=audit,
+            tool=tool,
+            expected_qty=1,
+            counted_qty=2,
+            delta=1,
+            status=VisualContainerAuditLine.STATUS_ADJUSTED,
+        )
+
+        payload = export_inventory_payload()
+        restore_inventory_from_payload(payload)
+
+        self.assertEqual(ToolItem.objects.filter(pk=tool.pk).count(), 1)
+        self.assertEqual(VisualContainerAudit.objects.count(), 0)
+        self.assertEqual(VisualContainerAuditLine.objects.count(), 0)
+        placement.refresh_from_db()
+        self.assertEqual(placement.tool_item_id, tool.pk)
