@@ -72,11 +72,24 @@ for _pairs in MEASURING_KINDS_BY_CATEGORY.values():
 MEASURING_KIND_LABELS = dict(MEASURING_KIND_CHOICES)
 
 THREAD_GAUGE_GO_NOGO = (
-    ("go", "Проходной"),
-    ("nogo", "Непроходной"),
-    ("set", "Комплект"),
+    ("go", "ПР"),
+    ("nogo", "НЕ"),
+    ("set", "ПР-НЕ"),
 )
 THREAD_GAUGE_GO_NOGO_LABELS = dict(THREAD_GAUGE_GO_NOGO)
+
+# Частые классы допуска резьбы (подсказка в приходе; значение свободное).
+THREAD_GAUGE_TOLERANCE_PRESETS = (
+    "4H",
+    "5H",
+    "6H",
+    "7H",
+    "4g",
+    "5g",
+    "6g",
+    "6e",
+    "8g",
+)
 
 
 def measuring_category_needs_kind(category: str) -> bool:
@@ -97,10 +110,39 @@ def measuring_kind_label(kind: str) -> str:
 
 
 def normalize_thread_gauge_go_nogo(raw) -> str:
-    v = str(raw or "").strip().lower()
+    v = str(raw or "").strip().lower().replace("ё", "е")
+    v = v.replace(" ", "").replace("_", "-")
+    aliases = {
+        "go": "go",
+        "пр": "go",
+        "проходной": "go",
+        "проход": "go",
+        "nogo": "nogo",
+        "no-go": "nogo",
+        "не": "nogo",
+        "непроходной": "nogo",
+        "непроход": "nogo",
+        "set": "set",
+        "пр-не": "set",
+        "пр/не": "set",
+        "прне": "set",
+        "комплект": "set",
+        "go-nogo": "set",
+        "go/nogo": "set",
+    }
+    mapped = aliases.get(v)
+    if mapped:
+        return mapped
     if v in THREAD_GAUGE_GO_NOGO_LABELS:
         return v
     return ""
+
+
+def normalize_thread_gauge_tolerance(raw) -> str:
+    text = str(raw or "").strip().replace(" ", "")
+    if not text:
+        return ""
+    return text[:16]
 
 
 def normalize_measuring_pitch(raw) -> Decimal | None:
@@ -125,6 +167,7 @@ def build_measuring_display_name(
     thread_size_label: str = "",
     pitch_mm=None,
     go_nogo: str = "",
+    thread_tolerance: str = "",
     measure_range: str = "",
     accuracy: str = "",
     ip_rating: str = "",
@@ -150,6 +193,9 @@ def build_measuring_display_name(
             except (InvalidOperation, TypeError, ValueError):
                 pitch_s = ""
         parts.append(f"{size_s}×{pitch_s}" if pitch_s else size_s)
+    tol_s = normalize_thread_gauge_tolerance(thread_tolerance)
+    if tol_s:
+        parts.append(tol_s)
     go_lab = THREAD_GAUGE_GO_NOGO_LABELS.get((go_nogo or "").strip())
     if go_lab:
         parts.append(go_lab)

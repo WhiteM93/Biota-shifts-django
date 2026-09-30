@@ -569,6 +569,8 @@ class ToolItem(models.Model):
                     segs.append(size)
                 if (ms.go_nogo or "").strip():
                     segs.append(ms.get_go_nogo_display())
+                if (ms.thread_tolerance or "").strip():
+                    segs.append(ms.thread_tolerance.strip())
             if cat == "measure_univ" and ms:
                 if (ms.measure_range or "").strip():
                     segs.append(ms.measure_range.strip())
@@ -830,6 +832,8 @@ class ToolItem(models.Model):
                     specs_parts.append(size)
                 if (ms.go_nogo or "").strip():
                     specs_parts.append(ms.get_go_nogo_display())
+                if (ms.thread_tolerance or "").strip():
+                    specs_parts.append(ms.thread_tolerance.strip())
             if cat == "measure_univ" and ms:
                 if (ms.measure_range or "").strip():
                     specs_parts.append(ms.measure_range.strip())
@@ -1529,7 +1533,13 @@ class MeasuringToolSpec(models.Model):
         blank=True,
         default="",
         choices=THREAD_GAUGE_GO_NOGO,
-        verbose_name="Проходной / непроходной",
+        verbose_name="ПР / НЕ",
+    )
+    thread_tolerance = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        verbose_name="Допуск резьбы",
     )
     # Универсальный измерительный
     measure_range = models.CharField(
@@ -1573,6 +1583,7 @@ class MeasuringToolSpec(models.Model):
             thread_size_label=self.thread_size_label,
             pitch_mm=self.pitch_mm,
             go_nogo=self.go_nogo,
+            thread_tolerance=self.thread_tolerance,
             measure_range=self.measure_range,
             accuracy=self.accuracy,
             ip_rating=self.ip_rating,
@@ -1585,6 +1596,7 @@ class MeasuringToolSpec(models.Model):
         from .measuring_constants import (
             normalize_measuring_kind,
             normalize_thread_gauge_go_nogo,
+            normalize_thread_gauge_tolerance,
         )
 
         self.brand = (self.brand or "").strip()[:80]
@@ -1592,6 +1604,7 @@ class MeasuringToolSpec(models.Model):
         self.kind = normalize_measuring_kind(cat, self.kind)
         self.thread_size_label = (self.thread_size_label or "").strip()[:32]
         self.go_nogo = normalize_thread_gauge_go_nogo(self.go_nogo)
+        self.thread_tolerance = normalize_thread_gauge_tolerance(self.thread_tolerance)
         self.measure_range = (self.measure_range or "").strip()[:64]
         self.ip_rating = (self.ip_rating or "").strip().upper()[:16]
         self.accuracy = (self.accuracy or "").strip()[:40]
@@ -1601,6 +1614,7 @@ class MeasuringToolSpec(models.Model):
             self.thread_size_label = ""
             self.pitch_mm = None
             self.go_nogo = ""
+            self.thread_tolerance = ""
         if cat != "measure_univ":
             self.measure_range = ""
             self.ip_rating = ""

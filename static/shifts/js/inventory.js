@@ -2873,6 +2873,7 @@ var INV = (function () {
       { key: "ms_thread_size", label: "Резьба" },
       { key: "ms_pitch_mm", label: "Шаг", cls: "short-col" },
       { key: "ms_go_nogo", label: "П/НП" },
+      { key: "ms_tolerance", label: "Допуск", cls: "short-col" },
       { key: "brand", label: "Бренд" },
       { key: "notes", label: "Описание" },
       { key: "quantity", label: "Кол-во", cls: "qty-col" },
@@ -3155,6 +3156,9 @@ var INV = (function () {
           '<td><select data-k="ms_go_nogo" required><option value="">—</option>' +
             buildOptionsHtml(INV.thread_gauge_go_nogo || []) +
             "</select></td>"
+        );
+        cells.push(
+          '<td class="short-col"><input type="text" data-k="ms_tolerance" maxlength="16" placeholder="6H" list="arrival-thread-tol-list" required autocomplete="off" spellcheck="false"></td>'
         );
       }
       cells.push('<td><input type="text" data-k="ms_brand" maxlength="80" placeholder="Бренд" autocomplete="off" spellcheck="false"></td>');

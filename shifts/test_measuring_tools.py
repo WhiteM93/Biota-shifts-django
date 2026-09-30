@@ -29,6 +29,9 @@ class MeasuringToolTests(TestCase):
         self.assertEqual(normalize_measuring_kind("measure_univ", "caliper"), "caliper")
         self.assertEqual(normalize_measuring_kind("measure_univ", "nope"), "")
         self.assertEqual(normalize_thread_gauge_go_nogo("go"), "go")
+        self.assertEqual(normalize_thread_gauge_go_nogo("ПР"), "go")
+        self.assertEqual(normalize_thread_gauge_go_nogo("не"), "nogo")
+        self.assertEqual(normalize_thread_gauge_go_nogo("пр-не"), "set")
         self.assertEqual(normalize_measuring_pitch("1,5"), normalize_measuring_pitch("1.5"))
 
     def test_create_thread_gauge(self):
@@ -44,11 +47,13 @@ class MeasuringToolTests(TestCase):
             thread_size_label="M10",
             pitch_mm=normalize_measuring_pitch("1.5"),
             go_nogo="go",
+            thread_tolerance="6H",
         )
         tool.refresh_from_db()
         self.assertEqual(tool.measuring_tool_spec.go_nogo, "go")
+        self.assertEqual(tool.measuring_tool_spec.thread_tolerance, "6H")
         self.assertIn(
-            "M10×1.5",
+            "6H",
             build_measuring_display_name(
                 category="gauge_thread",
                 brand="ГОСТ",
@@ -56,6 +61,19 @@ class MeasuringToolTests(TestCase):
                 thread_size_label="M10",
                 pitch_mm=normalize_measuring_pitch("1.5"),
                 go_nogo="go",
+                thread_tolerance="6H",
+            ),
+        )
+        self.assertIn(
+            "ПР",
+            build_measuring_display_name(
+                category="gauge_thread",
+                brand="ГОСТ",
+                kind="plug",
+                thread_size_label="M10",
+                pitch_mm=normalize_measuring_pitch("1.5"),
+                go_nogo="go",
+                thread_tolerance="6H",
             ),
         )
 

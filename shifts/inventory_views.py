@@ -148,12 +148,14 @@ from .measuring_constants import (
     MEASURING_CATEGORY_SET,
     MEASURING_KINDS_BY_CATEGORY,
     THREAD_GAUGE_GO_NOGO,
+    THREAD_GAUGE_TOLERANCE_PRESETS,
     build_measuring_display_name,
     measuring_category_needs_kind,
     normalize_measuring_kind,
     normalize_measuring_length,
     normalize_measuring_pitch,
     normalize_thread_gauge_go_nogo,
+    normalize_thread_gauge_tolerance,
 )
 from .models import (
     CENTER_DRILL_ANGLES,
@@ -538,7 +540,9 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
             if normalize_measuring_pitch(row.get("ms_pitch_mm")) is None:
                 errs.append(f"Строка {idx}: укажите шаг резьбы, мм.")
             if not normalize_thread_gauge_go_nogo(row.get("ms_go_nogo")):
-                errs.append(f"Строка {idx}: укажите проходной / непроходной.")
+                errs.append(f"Строка {idx}: укажите ПР / НЕ / ПР-НЕ.")
+            if not normalize_thread_gauge_tolerance(row.get("ms_tolerance")):
+                errs.append(f"Строка {idx}: укажите допуск (например 6g или 6H).")
         if category == "measure_univ":
             if not (row.get("ms_range") or "").strip():
                 errs.append(f"Строка {idx}: укажите диапазон измерения.")
@@ -608,6 +612,7 @@ def _arrival_search_ready(row: dict) -> bool:
                 (row.get("ms_thread_size") or "").strip()
                 and normalize_measuring_pitch(row.get("ms_pitch_mm")) is not None
                 and normalize_thread_gauge_go_nogo(row.get("ms_go_nogo"))
+                and normalize_thread_gauge_tolerance(row.get("ms_tolerance"))
             )
         if category == "measure_univ":
             return bool(
@@ -923,6 +928,9 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
             go = normalize_thread_gauge_go_nogo(row.get("ms_go_nogo"))
             if go:
                 qs = qs.filter(measuring_tool_spec__go_nogo=go)
+            tol = normalize_thread_gauge_tolerance(row.get("ms_tolerance"))
+            if tol:
+                qs = qs.filter(measuring_tool_spec__thread_tolerance__iexact=tol)
         if category == "measure_univ":
             rng = (row.get("ms_range") or "").strip()[:64]
             if rng:
@@ -1681,6 +1689,7 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "ms_thread_size",
         "ms_pitch_mm",
         "ms_go_nogo",
+        "ms_tolerance",
         "ms_range",
         "ms_ip",
         "ms_accuracy",
@@ -1859,7 +1868,7 @@ _STOCK_KEYS_BY_CATEGORY = {
         }
     ),
     "gauge_smooth": frozenset({"ms_brand"}),
-    "gauge_thread": frozenset({"ms_brand", "ms_kind", "ms_thread_size", "ms_pitch_mm", "ms_go_nogo"}),
+    "gauge_thread": frozenset({"ms_brand", "ms_kind", "ms_thread_size", "ms_pitch_mm", "ms_go_nogo", "ms_tolerance"}),
     "measure_univ": frozenset({"ms_brand", "ms_kind", "ms_range", "ms_ip", "ms_accuracy"}),
     "measure_surf": frozenset({"ms_brand", "ms_kind"}),
     "measure_check": frozenset({"ms_brand", "ms_kind", "ms_check_size", "ms_check_class"}),
@@ -2226,6 +2235,9 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
             go = normalize_thread_gauge_go_nogo(g("ms_go_nogo"))
             if go:
                 qs = qs.filter(measuring_tool_spec__go_nogo=go)
+            tol = normalize_thread_gauge_tolerance(g("ms_tolerance"))
+            if tol:
+                qs = qs.filter(measuring_tool_spec__thread_tolerance__iexact=tol)
         if category == "measure_univ":
             rng = (g("ms_range") or "").strip()
             if rng:
@@ -2675,6 +2687,7 @@ def _measuring_fields_from_row(row: dict, category: str) -> dict:
         "thread_size_label": "",
         "pitch_mm": None,
         "go_nogo": "",
+        "thread_tolerance": "",
         "measure_range": "",
         "ip_rating": "",
         "accuracy": "",
@@ -2686,6 +2699,7 @@ def _measuring_fields_from_row(row: dict, category: str) -> dict:
         fields["thread_size_label"] = (row.get("ms_thread_size") or "").strip()[:32]
         fields["pitch_mm"] = normalize_measuring_pitch(row.get("ms_pitch_mm"))
         fields["go_nogo"] = normalize_thread_gauge_go_nogo(row.get("ms_go_nogo"))
+        fields["thread_tolerance"] = normalize_thread_gauge_tolerance(row.get("ms_tolerance"))
     if category == "measure_univ":
         fields["measure_range"] = (row.get("ms_range") or "").strip()[:64]
         fields["ip_rating"] = (row.get("ms_ip") or "").strip().upper()[:16]
@@ -2709,6 +2723,7 @@ def _find_measuring_tool_match(category: str, spec_fields: dict):
             measuring_tool_spec__thread_size_label=spec_fields["thread_size_label"],
             measuring_tool_spec__pitch_mm=spec_fields["pitch_mm"],
             measuring_tool_spec__go_nogo=spec_fields["go_nogo"],
+            measuring_tool_spec__thread_tolerance=spec_fields["thread_tolerance"],
             measuring_tool_spec__measure_range=spec_fields["measure_range"],
             measuring_tool_spec__ip_rating=spec_fields["ip_rating"],
             measuring_tool_spec__accuracy=spec_fields["accuracy"],
@@ -2730,6 +2745,7 @@ def _create_measuring_tool(category: str, quantity, spec_fields: dict) -> ToolIt
         thread_size_label=spec_fields["thread_size_label"],
         pitch_mm=spec_fields["pitch_mm"],
         go_nogo=spec_fields["go_nogo"],
+        thread_tolerance=spec_fields["thread_tolerance"],
         measure_range=spec_fields["measure_range"],
         accuracy=spec_fields["accuracy"],
         ip_rating=spec_fields["ip_rating"],
@@ -2752,6 +2768,7 @@ def _create_measuring_tool(category: str, quantity, spec_fields: dict) -> ToolIt
         thread_size_label=spec_fields["thread_size_label"],
         pitch_mm=spec_fields["pitch_mm"],
         go_nogo=spec_fields["go_nogo"],
+        thread_tolerance=spec_fields["thread_tolerance"],
         measure_range=spec_fields["measure_range"],
         ip_rating=spec_fields["ip_rating"],
         accuracy=spec_fields["accuracy"],
@@ -3431,6 +3448,7 @@ def inventory_view(request):
                     thread_size_label=ms.thread_size_label,
                     pitch_mm=ms.pitch_mm,
                     go_nogo=ms.go_nogo,
+                    thread_tolerance=ms.thread_tolerance,
                     measure_range=ms.measure_range,
                     accuracy=ms.accuracy,
                     ip_rating=ms.ip_rating,
@@ -3772,9 +3790,17 @@ def inventory_view(request):
                         return JsonResponse({"ok": False, "error": "Поле только для резьбовых калибров."}, status=400)
                     go = normalize_thread_gauge_go_nogo(value_raw)
                     if not go:
-                        return JsonResponse({"ok": False, "error": "Укажите проходной / непроходной."}, status=400)
+                        return JsonResponse({"ok": False, "error": "Укажите ПР / НЕ / ПР-НЕ."}, status=400)
                     ms.go_nogo = go
                     ms.save(update_fields=["go_nogo"])
+                elif field == "ms_tolerance":
+                    if cat != "gauge_thread":
+                        return JsonResponse({"ok": False, "error": "Поле только для резьбовых калибров."}, status=400)
+                    tol = normalize_thread_gauge_tolerance(value_raw)
+                    if not tol:
+                        return JsonResponse({"ok": False, "error": "Укажите допуск (например 6g или 6H)."}, status=400)
+                    ms.thread_tolerance = tol
+                    ms.save(update_fields=["thread_tolerance"])
                 elif field == "ms_range":
                     if cat != "measure_univ":
                         return JsonResponse({"ok": False, "error": "Поле только для универсального."}, status=400)
@@ -3818,6 +3844,7 @@ def inventory_view(request):
                     thread_size_label=ms.thread_size_label,
                     pitch_mm=ms.pitch_mm,
                     go_nogo=ms.go_nogo,
+                    thread_tolerance=ms.thread_tolerance,
                     measure_range=ms.measure_range,
                     accuracy=ms.accuracy,
                     ip_rating=ms.ip_rating,
@@ -4726,6 +4753,7 @@ def inventory_view(request):
                                 thread_size_label=ms.thread_size_label,
                                 pitch_mm=ms.pitch_mm,
                                 go_nogo=ms.go_nogo,
+                                thread_tolerance=ms.thread_tolerance,
                                 measure_range=ms.measure_range,
                                 accuracy=ms.accuracy,
                                 ip_rating=ms.ip_rating,
@@ -5970,6 +5998,7 @@ def inventory_view(request):
         ),
         "measuring_category_keys": list(MEASURING_CATEGORIES),
         "thread_gauge_go_nogo": THREAD_GAUGE_GO_NOGO,
+        "thread_gauge_tolerance_presets": THREAD_GAUGE_TOLERANCE_PRESETS,
         "tool_material_types": TOOL_MATERIAL_TYPES,
         "tool_material_legacy_labels": TOOL_MATERIAL_LEGACY_LABELS,
         "tool_material_extra_options": tool_material_extra_options,

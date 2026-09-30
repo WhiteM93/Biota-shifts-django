@@ -835,7 +835,8 @@
         {% if filters.category == "gauge_thread" %}
         <th class="sortable hint-cell" data-hint="Размер резьбы, например M10">Резьба</th>
         <th class="sortable hint-cell" data-hint="Шаг резьбы, мм">Шаг</th>
-        <th class="sortable hint-cell" data-hint="Проходной / непроходной / комплект">П/НП</th>
+        <th class="sortable hint-cell" data-hint="ПР / НЕ / ПР-НЕ">П/НП</th>
+        <th class="sortable hint-cell" data-hint="Класс допуска, например 6g или 6H">Допуск</th>
         {% endif %}
         <th class="sortable hint-cell" data-hint="Производитель / торговая марка">Бренд</th>
         {% if filters.category == "measure_univ" %}
@@ -867,6 +868,7 @@
         <td data-sort="{% if m %}{{ m.thread_size_label|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_thread_size" data-type="text" data-value="{{ m.thread_size_label|default:'' }}"{% endif %}>{% if m %}{{ m.thread_size_label|default:"-" }}{% else %}-{% endif %}</td>
         <td data-sort="{% if m and m.pitch_mm is not None %}{{ m.pitch_mm }}{% else %}-1{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_pitch_mm" data-type="number" data-value="{{ m.pitch_mm|default:'' }}"{% endif %}>{% if m and m.pitch_mm is not None %}{{ m.pitch_mm|dotformat:"-3" }}{% else %}-{% endif %}</td>
         <td data-sort="{% if m %}{{ m.go_nogo|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_go_nogo" data-type="select" data-value="{{ m.go_nogo|default:'' }}"{% endif %}>{% if m %}{{ m.get_go_nogo_display|default:"-" }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if m %}{{ m.thread_tolerance|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_tolerance" data-type="text" data-value="{{ m.thread_tolerance|default:'' }}"{% endif %}>{% if m %}{{ m.thread_tolerance|default:"-" }}{% else %}-{% endif %}</td>
         {% endif %}
         <td data-sort="{% if m %}{{ m.brand|default:'-' }}{% else %}-{% endif %}" {% if can_manage_stock and m %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="ms_brand" data-type="text" data-value="{{ m.brand|default:'' }}"{% endif %}>{% if m %}{{ m.brand|default:"-" }}{% else %}-{% endif %}</td>
         {% if filters.category == "measure_univ" %}
@@ -1886,6 +1888,12 @@
     </section>
 
     <div class="inv-arrival-errors" id="arrival-bulk-errors" hidden role="alert"></div>
+
+    <datalist id="arrival-thread-tol-list">
+      {% for t in thread_gauge_tolerance_presets %}
+      <option value="{{ t }}"></option>
+      {% endfor %}
+    </datalist>
 
     <div id="arrival-bulk-groups" class="inv-arrival-groups"></div>
 
@@ -2986,6 +2994,7 @@
   "measuring_kinds_by_category": {{ measuring_kinds_by_category_json|default:"{}"|safe }},
   "measuring_category_keys": [{% for k in measuring_category_keys %}"{{ k|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
   "thread_gauge_go_nogo": [{% for key, label in thread_gauge_go_nogo %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
+  "thread_gauge_tolerance_presets": [{% for t in thread_gauge_tolerance_presets %}"{{ t|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
   "body_tool_couplings": [{% for key, label in body_tool_couplings %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "thread_standards": [{% for key, label in thread_standards %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "thread_kinds": [{% for key, label in thread_kinds %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],

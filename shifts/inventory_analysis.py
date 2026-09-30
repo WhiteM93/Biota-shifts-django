@@ -108,6 +108,7 @@ GROUP_FIELD_PATHS: dict[str, dict[str, str]] = {
         "kind": "measuring_tool_spec__kind",
         "thread_size_label": "measuring_tool_spec__thread_size_label",
         "go_nogo": "measuring_tool_spec__go_nogo",
+        "thread_tolerance": "measuring_tool_spec__thread_tolerance",
         "brand": "measuring_tool_spec__brand",
     },
     "measure_univ": {
@@ -223,6 +224,7 @@ GROUP_FIELD_LABELS["gauge_thread"].update(
         "kind": "Вид",
         "thread_size_label": "Резьба",
         "go_nogo": "П/НП",
+        "thread_tolerance": "Допуск",
         "brand": "Бренд",
     }
 )
@@ -346,6 +348,7 @@ STOCK_FILTER_PARAMS: dict[str, dict[str, str]] = {
         "kind": "ms_kind",
         "thread_size_label": "ms_thread_size",
         "go_nogo": "ms_go_nogo",
+        "thread_tolerance": "ms_tolerance",
         "brand": "ms_brand",
     },
     "measure_univ": {
