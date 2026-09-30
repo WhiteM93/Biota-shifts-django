@@ -101,7 +101,7 @@
             <button type="button" class="vw-btn-ghost vw-btn-compact js-vw-cab-add-section">+ секция</button>
           </div>
           <div class="js-vw-cab-sections vw-cab-sections-editor"></div>
-          <p class="vw-hint-inline">В каждой секции сверху вниз: полки и/или ящики. Адрес при нескольких секциях: буква-секция-уровень-место.</p>
+          <p class="vw-hint-inline">В секции: «Уровней» — сколько полок/ящиков сверху вниз; «Мест в ряд» — сколько ячеек на уровне. Адрес при 2+ секциях: буква-секция-уровень-место.</p>
         </div>
         <p class="vw-hint-inline js-vw-cab-kind-hint">Шкаф — с дверцами. Стеллаж — открытый. Тумба — ящики с ячейками. Полки нумеруются снизу вверх: 01… Адрес: буква-полка-место.</p>
         <label class="vw-row">
@@ -139,21 +139,14 @@
         <input type="hidden" class="js-vw-cont-notes" value="">
 
         <section class="vw-form-section">
-          <h3 class="vw-form-section-title">Этикетка</h3>
+          <h3 class="vw-form-section-title">Место</h3>
           <label class="vw-row js-vw-cont-cabinet-row">
             <span class="vw-row-label">Мебель</span>
             <select class="vw-control js-vw-cont-cabinet"></select>
           </label>
-          <p class="vw-hint-inline js-vw-cont-cabinet-hint">Можно перенести контейнер в другой шкаф или стеллаж. Адрес обновится по букве мебели.</p>
-          <label class="vw-row js-vw-cont-kind-row">
-            <span class="vw-row-label">Тип</span>
-            <select class="vw-control js-vw-cont-kind">
-              <option value="bin">Контейнер</option>
-              <option value="shelf_slot">На полке</option>
-              <option value="drawer_cell">Ячейка ящика</option>
-              <option value="organizer">Органайзер (ярусы + разделители)</option>
-            </select>
-          </label>
+          <p class="vw-hint-inline js-vw-cont-cabinet-hint">Можно перенести место в другую мебель. Адрес обновится по букве.</p>
+          <input type="hidden" class="js-vw-cont-kind" value="bin">
+          <input type="hidden" class="js-vw-cont-label" value="">
           <div class="vw-row-pair js-vw-cont-organizer-row" hidden>
             <label class="vw-row">
               <span class="vw-row-label">Ярусов</span>
@@ -164,20 +157,13 @@
               <input type="number" class="vw-control js-vw-cont-inner-cols" min="1" max="6" value="2">
             </label>
           </div>
-          <p class="vw-hint-inline js-vw-cont-organizer-hint" hidden>Например 3×2. Подписи ячеек можно сменить отдельно.</p>
-          <label class="vw-row">
-            <span class="vw-row-label">Подпись</span>
-            <textarea class="vw-control js-vw-cont-label" maxlength="120" rows="2" autocomplete="off" placeholder="Фрезы 0–1"></textarea>
-          </label>
-          <p class="vw-hint-inline">Enter — новая строка. Без Enter — одна строка, шрифт подгонится.</p>
           <label class="vw-row">
             <span class="vw-row-label">Адрес</span>
             <div class="vw-address-row">
-              <input type="text" class="vw-control js-vw-cont-address" maxlength="32" autocomplete="off" placeholder="A-01-02">
-              <button type="button" class="vw-btn-ghost js-vw-cont-address-suggest" title="Подставить буква+полка+место">Авто</button>
+              <input type="text" class="vw-control js-vw-cont-address" maxlength="32" autocomplete="off" placeholder="A-01-02" readonly>
             </div>
           </label>
-          <p class="vw-hint-inline js-vw-cont-address-hint">Одна секция: буква-уровень-место (A-01-02). Несколько секций: буква-секция-уровень-место (A-1-01-02). Уровень снизу вверх (01 — низ), место сверху вниз и слева направо.</p>
+          <p class="vw-hint-inline js-vw-cont-address-hint">Адрес считается сам по полке и месту (и секции, если их несколько). Наименование ячейки задаётся на складе в «Подсказка по адресам».</p>
           <div class="vw-row">
             <span class="vw-row-label">Цвет</span>
             <div class="vw-color-row">
@@ -310,295 +296,10 @@
             </div>
             <ul class="vw-items js-vw-stock-tools" role="list"></ul>
             <p class="vw-hint-inline">Состав места задаётся на складе: у позиции выберите мебель / полку / место. Здесь — просмотр и инвентаризация.</p>
-            <div class="vw-rules-block js-vw-rules-block" hidden>
-              <h3 class="vw-props-heading">Правила содержимого</h3>
-              <ul class="vw-items js-vw-items" role="list"></ul>
-            </div>
-            {% if biota_can_edit %}
-            <div class="vw-item-form js-vw-item-form" hidden>
-              <h3 class="vw-props-heading js-vw-item-form-heading">Добавить содержимое</h3>
-              <p class="vw-hint-inline js-vw-item-form-hint">Как фильтры на складе: выберите категорию и заполните только нужные поля (пустые = «все»). Можно добавить несколько правил.</p>
-              <label class="vw-row">
-                <span class="vw-row-label">Режим</span>
-                <select class="vw-control js-vw-item-rule-kind">
-                  <option value="include">Учитывать</option>
-                  <option value="exclude">Исключить</option>
-                </select>
-              </label>
-              <label class="vw-row">
-                <span class="vw-row-label js-vw-item-title-label">Что лежит</span>
-                <input type="text" class="vw-control js-vw-item-title" maxlength="200" autocomplete="off" placeholder="Режущие нестандарт / Головки APKT">
-              </label>
-              <label class="vw-row">
-                <span class="vw-row-label">Категория склада</span>
-                <select class="vw-control js-vw-item-category">
-                  <option value="">— выберите —</option>
-                  {% include "shifts/includes/stock_category_optgroups_dict.html" with selected_category="" %}
-                </select>
-              </label>
-
-              <div class="js-vw-item-panel" data-cat="end_mill" hidden>
-                <label class="vw-row">
-                  <span class="vw-row-label">Тип фрезы</span>
-                  <select class="vw-control js-vw-f-mill_type">
-                    <option value="">Все</option>
-                    {% for mt in end_mill_types %}
-                    <option value="{{ mt.value }}">{{ mt.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <div class="vw-row-pair">
-                  <label class="vw-row">
-                    <span class="vw-row-label">Кромки Z</span>
-                    <input type="number" class="vw-control js-vw-f-flutes" min="1" step="1" placeholder="все">
-                  </label>
-                  <label class="vw-row">
-                    <span class="vw-row-label">R, мм</span>
-                    <input type="number" class="vw-control js-vw-f-corner-r" min="0" step="0.01" placeholder="все">
-                  </label>
-                </div>
-              </div>
-
-              <div class="js-vw-item-panel" data-cat="body_tool" hidden>
-                <label class="vw-row">
-                  <span class="vw-row-label">Тип корпусной</span>
-                  <select class="vw-control js-vw-f-body_cutter">
-                    <option value="">Все</option>
-                    {% for mt in indexable_mill_cutter_types %}
-                    <option value="{{ mt.value }}">{{ mt.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label class="vw-row">
-                  <span class="vw-row-label">Семейство</span>
-                  <select class="vw-control js-vw-f-body_family">
-                    <option value="">Все</option>
-                    {% for f in body_tool_families %}
-                    <option value="{{ f.value }}">{{ f.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label class="vw-row">
-                  <span class="vw-row-label">Бренд</span>
-                  <input type="text" class="vw-control js-vw-f-brand" maxlength="80" placeholder="все">
-                </label>
-                <label class="vw-row">
-                  <span class="vw-row-label">Хвостовик</span>
-                  <select class="vw-control js-vw-f-shank">
-                    <option value="">Все</option>
-                    {% for s in body_tool_shank_types %}
-                    <option value="{{ s.value }}">{{ s.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label class="vw-row">
-                  <span class="vw-row-label">Резьба крепления</span>
-                  <select class="vw-control js-vw-f-mount_thread">
-                    <option value="">Все</option>
-                    {% for t in modular_head_threads %}
-                    <option value="{{ t.value }}">{{ t.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <div class="vw-row-pair">
-                  <label class="vw-row">
-                    <span class="vw-row-label">Z</span>
-                    <input type="number" class="vw-control js-vw-f-teeth" min="1" step="1" placeholder="все">
-                  </label>
-                  <label class="vw-row">
-                    <span class="vw-row-label">СОЖ</span>
-                    <select class="vw-control js-vw-f-coolant">
-                      <option value="">Все</option>
-                      <option value="1">Есть</option>
-                      <option value="0">Нет</option>
-                    </select>
-                  </label>
-                </div>
-                <label class="vw-row">
-                  <span class="vw-row-label">Подходящие пластины</span>
-                  <input type="text" class="vw-control js-vw-f-insert_compat" maxlength="80" placeholder="APKT / RCKT…">
-                </label>
-              </div>
-
-              <div class="js-vw-item-panel" data-cat="tap" hidden>
-                <label class="vw-row">
-                  <span class="vw-row-label">Тип инструмента</span>
-                  <select class="vw-control js-vw-f-tap_type">
-                    <option value="">Все</option>
-                    {% for tt in tap_types %}
-                    <option value="{{ tt.value }}">{{ tt.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label class="vw-row">
-                  <span class="vw-row-label">Тип резьбы</span>
-                  <select class="vw-control js-vw-f-thread_kind">
-                    <option value="">Все</option>
-                    {% for tk in thread_kinds %}
-                    <option value="{{ tk.value }}">{{ tk.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label class="vw-row">
-                  <span class="vw-row-label">Стандарт</span>
-                  <select class="vw-control js-vw-f-thread_standard">
-                    <option value="">Все</option>
-                    {% for ts in thread_standards %}
-                    <option value="{{ ts.value }}">{{ ts.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label class="vw-row">
-                  <span class="vw-row-label">Отверстие</span>
-                  <select class="vw-control js-vw-f-hole_type">
-                    <option value="">Все</option>
-                    {% for ht in tap_hole_types %}
-                    <option value="{{ ht.value }}">{{ ht.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <div class="vw-row-pair">
-                  <label class="vw-row">
-                    <span class="vw-row-label">Размер</span>
-                    <input type="text" class="vw-control js-vw-f-size" maxlength="32" placeholder="M6">
-                  </label>
-                  <label class="vw-row">
-                    <span class="vw-row-label">Шаг, мм</span>
-                    <input type="number" class="vw-control js-vw-f-pitch" min="0" step="0.001" placeholder="все">
-                  </label>
-                </div>
-              </div>
-
-              <div class="js-vw-item-panel" data-cat="insert" hidden>
-                <label class="vw-row">
-                  <span class="vw-row-label">Семейство</span>
-                  <select class="vw-control js-vw-f-ins_family">
-                    <option value="">Все</option>
-                    {% for f in milling_insert_families %}
-                    <option value="{{ f.value }}">{{ f.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label class="vw-row">
-                  <span class="vw-row-label">Форма</span>
-                  <select class="vw-control js-vw-f-ins_shape">
-                    <option value="">Все</option>
-                    {% for s in insert_shapes %}
-                    <option value="{{ s.value }}">{{ s.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-              </div>
-
-              <div class="js-vw-item-panel" data-cat="collet" hidden>
-                <label class="vw-row">
-                  <span class="vw-row-label">Тип цанги</span>
-                  <select class="vw-control js-vw-f-collet_type">
-                    <option value="">Все</option>
-                    {% for ct in collet_types %}
-                    <option value="{{ ct.value }}">{{ ct.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label class="vw-row">
-                  <span class="vw-row-label">Размер ER</span>
-                  <select class="vw-control js-vw-f-er_size">
-                    <option value="">Все</option>
-                    {% for er in er_collet_sizes %}
-                    <option value="{{ er.value }}">{{ er.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-              </div>
-
-              <div class="js-vw-item-panel" data-cat="countersink" hidden>
-                <label class="vw-row">
-                  <span class="vw-row-label">Тип зенкера</span>
-                  <select class="vw-control js-vw-f-countersink_type">
-                    <option value="">Все</option>
-                    {% for ct in countersink_types %}
-                    <option value="{{ ct.value }}">{{ ct.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label class="vw-row">
-                  <span class="vw-row-label">Размер</span>
-                  <input type="text" class="vw-control js-vw-f-cs_size" maxlength="32" placeholder="все">
-                </label>
-                <div class="vw-row-pair">
-                  <label class="vw-row">
-                    <span class="vw-row-label">Угол</span>
-                    <select class="vw-control js-vw-f-cs_angle">
-                      <option value="">Все</option>
-                      {% for a in countersink_angles %}
-                      <option value="{{ a.value }}">{{ a.label }}°</option>
-                      {% endfor %}
-                    </select>
-                  </label>
-                  <label class="vw-row">
-                    <span class="vw-row-label">Кромки</span>
-                    <input type="number" class="vw-control js-vw-f-cs_flutes" min="1" step="1" placeholder="все">
-                  </label>
-                </div>
-              </div>
-
-              <div class="js-vw-item-panel" data-cat="center_drill" hidden>
-                <label class="vw-row">
-                  <span class="vw-row-label">Угол</span>
-                  <select class="vw-control js-vw-f-cd_angle">
-                    <option value="">Все</option>
-                    {% for a in center_drill_angles %}
-                    <option value="{{ a.value }}">{{ a.label }}°</option>
-                    {% endfor %}
-                  </select>
-                </label>
-              </div>
-
-              <div class="js-vw-item-panel" data-cat="drill" hidden>
-                <label class="vw-row">
-                  <span class="vw-row-label">Угол, °</span>
-                  <input type="number" class="vw-control js-vw-f-drill_angle" min="0" step="0.1" placeholder="все">
-                </label>
-              </div>
-
-              <div class="js-vw-item-panel" data-cat="reamer" hidden>
-                <label class="vw-row">
-                  <span class="vw-row-label">Квалитет</span>
-                  <select class="vw-control js-vw-f-reamer_accuracy">
-                    <option value="">Все</option>
-                    {% for a in reamer_accuracy_classes %}
-                    <option value="{{ a.value }}">{{ a.label }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label class="vw-row">
-                  <span class="vw-row-label">Z</span>
-                  <input type="number" class="vw-control js-vw-f-reamer_flutes" min="1" step="1" placeholder="все">
-                </label>
-              </div>
-
-              <div class="vw-row-pair js-vw-item-diam-row" hidden>
-                <label class="vw-row">
-                  <span class="vw-row-label">Ø от, мм</span>
-                  <input type="number" class="vw-control js-vw-item-dfrom" min="0" step="0.01">
-                </label>
-                <label class="vw-row">
-                  <span class="vw-row-label">Ø до, мм</span>
-                  <input type="number" class="vw-control js-vw-item-dto" min="0" step="0.01">
-                </label>
-              </div>
-              <label class="vw-row">
-                <span class="vw-row-label">Кол-во (заметка)</span>
-                <input type="text" class="vw-control js-vw-item-qty" maxlength="80" autocomplete="off">
-              </label>
-              <div class="vw-dialog-actions">
-                <button type="button" class="vw-btn-primary js-vw-item-save">Добавить</button>
-              </div>
-            </div>
-            {% endif %}
           </div>
         </div>
       </div>
+
 
       {% if biota_can_edit %}
       <div class="js-vw-audit-pane vw-contents-audit" hidden>

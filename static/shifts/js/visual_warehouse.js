@@ -773,10 +773,72 @@
   }
 
   function containerKindLabel(kind) {
-    if (kind === "shelf_slot") return "На полке";
-    if (kind === "drawer_cell") return "Ячейка";
-    if (kind === "organizer") return "Органайзер";
-    return "Контейнер";
+    return "Место";
+  }
+
+  function placeKindFor(cab, levelKind, isChild, existingKind) {
+    if (isChild) return "drawer_cell";
+    // Старые органайзеры оставляем как есть при редактировании
+    if (existingKind === "organizer") return "organizer";
+    if (cabinetKindOf(cab) === "drawer_chest" || levelKind === "drawer") return "drawer_cell";
+    if (cabinetKindOf(cab) === "rack") return "shelf_slot";
+    return "bin";
+  }
+
+  function syncPlaceAddressFromForm() {
+    if (!contForm) return "";
+    var cabinetId = parseInt((contForm.querySelector(".js-vw-cont-cabinet") || {}).value, 10);
+    var cab = cabinets.find(function (c) { return c.id === cabinetId; });
+    if (!cab) return "";
+    var levelIdEl = contForm.querySelector(".js-vw-cont-level-id");
+    var levelId = levelIdEl && levelIdEl.value ? parseInt(levelIdEl.value, 10) : 0;
+    var lvl = levelById(cab, levelId);
+    var parentId = contForm.dataset.parentId;
+    var shelfFormVal = parseInt((contForm.querySelector(".js-vw-cont-shelf") || {}).value, 10) || 1;
+    var column = parseInt((contForm.querySelector(".js-vw-cont-column") || {}).value, 10) || 1;
+    var levelsTotal = lvl
+      ? (function () {
+          var secs = cabinetSections(cab);
+          for (var si = 0; si < secs.length; si++) {
+            var levels = secs[si].levels || [];
+            for (var li = 0; li < levels.length; li++) {
+              if (lvl.id && levels[li].id === lvl.id) return levels.length;
+            }
+          }
+          return cab.shelves || 1;
+        })()
+      : (cab.shelves || 1);
+    var sectionIndex = null;
+    if (lvl && cab) {
+      var secs = cabinetSections(cab);
+      for (var si = 0; si < secs.length; si++) {
+        var levels = secs[si].levels || [];
+        for (var li = 0; li < levels.length; li++) {
+          if (lvl.id && levels[li].id === lvl.id) {
+            sectionIndex = secs[si].index || (si + 1);
+            break;
+          }
+        }
+        if (sectionIndex != null) break;
+      }
+    }
+    var shelfTop = parentId
+      ? shelfFormVal
+      : (lvl && lvl.index
+        ? lvl.index
+        : shelfDisplayToTop(cab, shelfFormVal, levelsTotal));
+    var addr = suggestAddress(cab, shelfTop, column, null, sectionIndex, levelsTotal);
+    var addressEl = contForm.querySelector(".js-vw-cont-address");
+    if (addressEl) addressEl.value = addr || "";
+    var labelEl = contForm.querySelector(".js-vw-cont-label");
+    if (labelEl) labelEl.value = addr || "";
+    var kindEl = contForm.querySelector(".js-vw-cont-kind");
+    if (kindEl && !parentId) {
+      var levelKind = (lvl && lvl.kind) || "";
+      var existing = kindEl.value === "organizer" ? "organizer" : "";
+      kindEl.value = placeKindFor(cab, levelKind, !!parentId, existing);
+    }
+    return addr || "";
   }
 
   function buildCabinetCard(cab) {
@@ -1238,7 +1300,7 @@
     var text = document.createElement("span");
     text.className = "vw-bin-text";
     // Keep user newlines; no auto-wrap (CSS white-space: pre)
-    text.textContent = cont.label || containerKindLabel(cont.kind);
+    text.textContent = cont.address || cont.label || "Место";
     labelWrap.appendChild(text);
     btn.appendChild(labelWrap);
 
@@ -1253,7 +1315,7 @@
     footer.appendChild(stamp);
     btn.appendChild(footer);
 
-    var titleBase = cont.label || containerKindLabel(cont.kind);
+    var titleBase = cont.address || cont.label || "Место";
     btn.title = editMode
       ? (titleBase + " · место " + placeLab + " — изменить")
       : (titleBase + " · место " + placeLab + " — список инструментов" + (auditDate ? ("; инв. " + auditDate) : ""));
@@ -1350,6 +1412,108 @@
 
     var levelsBox = document.createElement("div");
     levelsBox.className = "js-vw-sec-levels vw-cab-levels-editor";
+
+    function currentLevelRows() {
+      return levelsBox.querySelectorAll(".vw-cab-level-row");
+    }
+    function defaultCols() {
+      var first = levelsBox.querySelector(".js-vw-lvl-columns");
+      if (first) return Math.max(1, Math.min(12, parseInt(first.value, 10) || 4));
+      var levels0 = (sec.levels && sec.levels[0]) || null;
+      return Math.max(1, Math.min(12, parseInt(levels0 && levels0.columns, 10) || 4));
+    }
+    function syncLevelsCountInput() {
+      levelsCountInp.value = String(currentLevelRows().length || 1);
+    }
+
+    var levelsCountRow = document.createElement("div");
+    levelsCountRow.className = "vw-cab-section-levels-count";
+    var levelsCountLab = document.createElement("span");
+    levelsCountLab.className = "vw-row-label";
+    levelsCountLab.textContent = "Уровней (рядов сверху вниз)";
+    var levelsCountInp = document.createElement("input");
+    levelsCountInp.type = "number";
+    levelsCountInp.min = "1";
+    levelsCountInp.max = "20";
+    levelsCountInp.className = "vw-control js-vw-sec-levels-count";
+    levelsCountInp.value = String(Math.max(1, (sec.levels || []).length || 1));
+    levelsCountInp.title = "Сколько полок и ящиков в секции";
+    levelsCountInp.setAttribute("aria-label", "Число уровней в секции");
+    var levelsCountBtn = document.createElement("button");
+    levelsCountBtn.type = "button";
+    levelsCountBtn.className = "vw-btn-ghost vw-btn-compact";
+    levelsCountBtn.textContent = "Применить";
+    levelsCountBtn.addEventListener("click", function () {
+      var want = Math.max(1, Math.min(20, parseInt(levelsCountInp.value, 10) || 1));
+      levelsCountInp.value = String(want);
+      var rows = [].slice.call(currentLevelRows());
+      var cols = defaultCols();
+      while (rows.length > want) {
+        var last = rows[rows.length - 1];
+        if (last && last.dataset.levelId) {
+          // существующий уровень — только если пользователь подтвердит через удаление ×
+          // здесь просто удаляем из редактора; сервер не даст снести занятые
+        }
+        last.remove();
+        rows.pop();
+      }
+      while (rows.length < want) {
+        var added = buildLevelEditorRow({ kind: "shelf", columns: cols });
+        levelsBox.appendChild(added);
+        rows.push(added);
+      }
+      syncLevelsCountInput();
+    });
+    levelsCountRow.appendChild(levelsCountLab);
+    levelsCountRow.appendChild(levelsCountInp);
+    levelsCountRow.appendChild(levelsCountBtn);
+    card.appendChild(levelsCountRow);
+
+    var colsAll = document.createElement("div");
+    colsAll.className = "vw-cab-section-cols-all";
+    var colsAllLabel = document.createElement("span");
+    colsAllLabel.className = "vw-row-label";
+    colsAllLabel.textContent = "Мест в ряд (для всех уровней)";
+    var colsAllInp = document.createElement("input");
+    colsAllInp.type = "number";
+    colsAllInp.min = "1";
+    colsAllInp.max = "12";
+    colsAllInp.className = "vw-control js-vw-sec-columns-all";
+    var levels0 = (sec.levels && sec.levels[0]) || null;
+    colsAllInp.value = String((levels0 && levels0.columns) || 4);
+    colsAllInp.title = "Задать число мест / ячеек сразу всем полкам и ящикам секции";
+    colsAllInp.setAttribute("aria-label", "Мест в ряд для всех уровней секции");
+    var colsAllBtn = document.createElement("button");
+    colsAllBtn.type = "button";
+    colsAllBtn.className = "vw-btn-ghost vw-btn-compact";
+    colsAllBtn.textContent = "Применить";
+    colsAllBtn.addEventListener("click", function () {
+      var n = Math.max(1, Math.min(12, parseInt(colsAllInp.value, 10) || 1));
+      colsAllInp.value = String(n);
+      [].forEach.call(levelsBox.querySelectorAll(".js-vw-lvl-columns"), function (inp) {
+        inp.value = String(n);
+      });
+    });
+    colsAll.appendChild(colsAllLabel);
+    colsAll.appendChild(colsAllInp);
+    colsAll.appendChild(colsAllBtn);
+    card.appendChild(colsAll);
+
+    var levelsHead = document.createElement("div");
+    levelsHead.className = "vw-cab-level-row vw-cab-level-row--head";
+    levelsHead.setAttribute("aria-hidden", "true");
+    var hKind = document.createElement("span");
+    hKind.className = "vw-row-label";
+    hKind.textContent = "Тип";
+    var hCols = document.createElement("span");
+    hCols.className = "vw-row-label";
+    hCols.textContent = "Мест в ряд";
+    var hPad = document.createElement("span");
+    levelsHead.appendChild(hKind);
+    levelsHead.appendChild(hCols);
+    levelsHead.appendChild(hPad);
+    card.appendChild(levelsHead);
+
     (sec.levels || []).forEach(function (lvl) {
       levelsBox.appendChild(buildLevelEditorRow(lvl));
     });
@@ -1362,14 +1526,18 @@
     addShelf.className = "vw-btn-ghost vw-btn-compact";
     addShelf.textContent = "+ полка";
     addShelf.addEventListener("click", function () {
-      levelsBox.appendChild(buildLevelEditorRow({ kind: "shelf", columns: 4 }));
+      var n = Math.max(1, Math.min(12, parseInt(colsAllInp.value, 10) || defaultCols()));
+      levelsBox.appendChild(buildLevelEditorRow({ kind: "shelf", columns: n }));
+      syncLevelsCountInput();
     });
     var addDrawer = document.createElement("button");
     addDrawer.type = "button";
     addDrawer.className = "vw-btn-ghost vw-btn-compact";
     addDrawer.textContent = "+ ящик";
     addDrawer.addEventListener("click", function () {
-      levelsBox.appendChild(buildLevelEditorRow({ kind: "drawer", columns: 4 }));
+      var n = Math.max(1, Math.min(12, parseInt(colsAllInp.value, 10) || defaultCols()));
+      levelsBox.appendChild(buildLevelEditorRow({ kind: "drawer", columns: n }));
+      syncLevelsCountInput();
     });
     actions.appendChild(addShelf);
     actions.appendChild(addDrawer);
@@ -1391,6 +1559,7 @@
     row.dataset.levelId = lvl.id ? String(lvl.id) : "";
     var kindSel = document.createElement("select");
     kindSel.className = "vw-control js-vw-lvl-kind";
+    kindSel.setAttribute("aria-label", "Тип уровня");
     [["shelf", "Полка"], ["drawer", "Ящик"]].forEach(function (pair) {
       var opt = document.createElement("option");
       opt.value = pair[0];
@@ -1398,27 +1567,44 @@
       if ((lvl.kind || "shelf") === pair[0]) opt.selected = true;
       kindSel.appendChild(opt);
     });
+    var colsWrap = document.createElement("label");
+    colsWrap.className = "vw-cab-lvl-cols";
+    var colsLab = document.createElement("span");
+    colsLab.className = "vw-cab-lvl-cols__lab";
+    colsLab.textContent = "мест";
     var cols = document.createElement("input");
     cols.type = "number";
     cols.min = "1";
     cols.max = "12";
     cols.className = "vw-control js-vw-lvl-columns";
     cols.value = String(lvl.columns || 4);
-    cols.title = "Мест / ячеек";
+    cols.title = "Сколько мест (ячеек) в ряд на этом уровне";
+    cols.setAttribute("aria-label", "Мест в ряд на уровне");
+    colsWrap.appendChild(colsLab);
+    colsWrap.appendChild(cols);
     var rm = document.createElement("button");
     rm.type = "button";
     rm.className = "vw-btn-ghost vw-btn-compact";
     rm.textContent = "×";
+    rm.title = "Удалить уровень";
+    rm.setAttribute("aria-label", "Удалить уровень");
     rm.addEventListener("click", function () {
       var parent = row.parentElement;
       if (parent && parent.querySelectorAll(".vw-cab-level-row").length <= 1) {
         window.alert("В секции нужен хотя бы один уровень");
         return;
       }
+      var cardEl = row.closest(".vw-cab-section-card");
       row.remove();
+      if (cardEl) {
+        var countInp = cardEl.querySelector(".js-vw-sec-levels-count");
+        if (countInp && parent) {
+          countInp.value = String(parent.querySelectorAll(".vw-cab-level-row").length || 1);
+        }
+      }
     });
     row.appendChild(kindSel);
-    row.appendChild(cols);
+    row.appendChild(colsWrap);
     row.appendChild(rm);
     return row;
   }
@@ -1428,7 +1614,7 @@
     var out = [];
     [].forEach.call(cards, function (card) {
       var levels = [];
-      [].forEach.call(card.querySelectorAll(".vw-cab-level-row"), function (row) {
+      [].forEach.call(card.querySelectorAll(".js-vw-sec-levels .vw-cab-level-row"), function (row) {
         var kindEl = row.querySelector(".js-vw-lvl-kind");
         var colsEl = row.querySelector(".js-vw-lvl-columns");
         var item = {
@@ -1508,35 +1694,19 @@
 
   function syncContainerKindOptions(cabKind, selected, isChild, levelKind) {
     var kindSel = contForm.querySelector(".js-vw-cont-kind");
-    if (!kindSel) return selected || "bin";
-    var allowed;
-    if (isChild) allowed = ["drawer_cell"];
-    else if (cabKind === "rack") allowed = ["shelf_slot", "bin", "organizer"];
-    else if (cabKind === "drawer_chest" || levelKind === "drawer") allowed = ["drawer_cell", "bin"];
-    else allowed = ["bin", "organizer", "drawer_cell"];
-    [].forEach.call(kindSel.options, function (opt) {
-      var ok = allowed.indexOf(opt.value) >= 0;
-      opt.hidden = !ok;
-      opt.disabled = !ok;
-    });
-    var value = selected && allowed.indexOf(selected) >= 0
-      ? selected
-      : allowed[0];
-    kindSel.value = value;
-    if (kindSel.value !== value) {
-      [].forEach.call(kindSel.options, function (opt) {
-        if (opt.value === value) opt.selected = true;
-      });
-    }
+    var value = placeKindFor(
+      { kind: cabKind },
+      levelKind,
+      isChild,
+      selected === "organizer" ? "organizer" : ""
+    );
+    if (kindSel) kindSel.value = value;
     return value;
   }
 
   function syncOrganizerFields(contKind, cont) {
     var orgRow = contForm.querySelector(".js-vw-cont-organizer-row");
-    var orgHint = contForm.querySelector(".js-vw-cont-organizer-hint");
-    var show = contKind === "organizer";
-    setVisible(orgRow, show);
-    setVisible(orgHint, show);
+    setVisible(orgRow, false);
     var tiersEl = contForm.querySelector(".js-vw-cont-inner-tiers");
     var colsEl = contForm.querySelector(".js-vw-cont-inner-cols");
     if (tiersEl) tiersEl.value = String(cont && cont.inner_tiers ? cont.inner_tiers : 3);
@@ -1548,19 +1718,10 @@
     var isChild = !!(cont && cont.parent_id);
     var lvl = level || levelById(cab, cont && cont.level_id) || null;
     var levelKind = (lvl && lvl.kind) || (cont && cont.level_kind) || "";
-    var contKind = cont
-      ? (cont.kind === "shelf_slot"
-        ? "shelf_slot"
-        : (cont.kind === "organizer"
-          ? "organizer"
-          : (cont.kind === "drawer_cell" || isChild ? "drawer_cell" : "bin")))
-      : (cabKind === "rack" ? "shelf_slot"
-        : (cabKind === "drawer_chest" || levelKind === "drawer" ? "drawer_cell" : "bin"));
+    var contKind = placeKindFor(cab, levelKind, isChild, cont && cont.kind);
     contForm.querySelector(".js-vw-cont-form-title").textContent = cont
-      ? (isChild ? "Ячейка органайзера" : containerKindLabel(contKind))
-      : (cabKind === "drawer_chest" || levelKind === "drawer"
-        ? "Новая ячейка"
-        : (cabKind === "rack" ? "Новое место" : "Новый контейнер"));
+      ? "Место"
+      : "Новое место";
     contForm.querySelector(".js-vw-cont-id").value = cont ? String(cont.id) : "";
     var levelIdEl = contForm.querySelector(".js-vw-cont-level-id");
     if (levelIdEl) {
@@ -1569,15 +1730,9 @@
         : (lvl && lvl.id ? String(lvl.id) : "");
     }
     fillContainerCabinetSelect(cab.id, isChild);
-    var kindRow = contForm.querySelector(".js-vw-cont-kind-row");
     var kindSel = contForm.querySelector(".js-vw-cont-kind");
-    if (kindRow && kindSel) {
-      setVisible(kindRow, true);
-      contKind = syncContainerKindOptions(cabKind, contKind, isChild, levelKind);
-      kindSel.disabled = isChild;
-    }
+    if (kindSel) kindSel.value = contKind;
     syncOrganizerFields(contKind, cont);
-    contForm.querySelector(".js-vw-cont-label").value = cont ? cont.label : "";
     contForm.querySelector(".js-vw-cont-color").value = (cont && cont.color) || "#e74c3c";
     var shelfTop = cont ? cont.shelf : (shelf || 1);
     var levelsTotal = (lvl && cab)
@@ -1613,26 +1768,12 @@
     var stackEl = contForm.querySelector(".js-vw-cont-stack");
     var stackRow = contForm.querySelector(".js-vw-cont-stack-row");
     var stackHint = contForm.querySelector(".js-vw-cont-stack-hint");
-    var hideStack = isChild || cabKind === "drawer_chest" || levelKind === "drawer" || contKind === "shelf_slot" || contKind === "drawer_cell" || contKind === "organizer";
-    if (stackEl) stackEl.value = String(hideStack ? 1 : (cont ? (cont.stack || 1) : stack || 1));
-    if (stackRow) setVisible(stackRow, !hideStack);
+    var hideStack = true;
+    if (stackEl) stackEl.value = "1";
+    if (stackRow) setVisible(stackRow, false);
     if (stackHint) {
-      if (contKind === "organizer") {
-        stackHint.textContent = "Органайзер может занимать несколько мест по ширине — так подписи ячеек читаются нормально.";
-        setVisible(stackHint, true);
-      } else if (isChild) {
-        stackHint.textContent = "Подпись ячейки (например «M2 СК»). Ярус и место — внутри органайзера.";
-        setVisible(stackHint, true);
-      } else if (cabKind === "drawer_chest" || levelKind === "drawer") {
-        stackHint.textContent = "В ящике ячейки в одном ряду; стопки не используются.";
-        setVisible(stackHint, true);
-      } else if (hideStack) {
-        stackHint.textContent = "Для этого типа ярус всегда 1.";
-        setVisible(stackHint, true);
-      } else {
-        stackHint.textContent = "Полка 1 — нижняя (как в адресе). Ярус 1 на полке, ярус 2 — поверх. Номер места: сверху вниз, слева направо.";
-        setVisible(stackHint, true);
-      }
+      stackHint.textContent = "Полка 1 — нижняя (как в адресе). Место: сверху вниз, слева направо. Адрес подставится сам.";
+      setVisible(stackHint, true);
     }
     contForm.querySelector(".js-vw-cont-column").value = String(cont ? cont.column : col || 1);
     var addressEl = contForm.querySelector(".js-vw-cont-address");
@@ -1649,17 +1790,12 @@
         );
       addressEl.value = addr || "";
     }
-    var spanSel = contForm.querySelector(".js-vw-cont-colspan");
-    var preferredSpan = 1;
-    if (contKind === "organizer") {
-      var innerCols = cont
-        ? Math.max(1, parseInt(cont.inner_columns, 10) || 1)
-        : Math.max(1, parseInt((contForm.querySelector(".js-vw-cont-inner-cols") || {}).value, 10) || 2);
-      preferredSpan = Math.max(cont ? (cont.col_span || 1) : 2, Math.min(innerCols, 3));
-      if (!cont) preferredSpan = Math.max(2, Math.min(innerCols, 3));
-    } else if (cont) {
-      preferredSpan = cont.col_span || 1;
+    var labelEl = contForm.querySelector(".js-vw-cont-label");
+    if (labelEl) {
+      labelEl.value = (addressEl && addressEl.value) || (cont && cont.address) || "";
     }
+    var spanSel = contForm.querySelector(".js-vw-cont-colspan");
+    var preferredSpan = cont ? (cont.col_span || 1) : 1;
     var spanVal = String(preferredSpan);
     if (spanSel && spanSel.tagName === "SELECT") {
       if (![].some.call(spanSel.options, function (o) { return o.value === spanVal; })) {
@@ -1698,31 +1834,40 @@
       shelfInpForHint.addEventListener("input", function () {
         var cabId = parseInt(contForm.querySelector(".js-vw-cont-cabinet").value, 10);
         var currentCab = cabinets.find(function (c) { return c.id === cabId; }) || cab;
-        var labelEl = shelfInpForHint.closest(".vw-row") &&
+        var labelEl2 = shelfInpForHint.closest(".vw-row") &&
           shelfInpForHint.closest(".vw-row").querySelector(".vw-row-label");
-        if (!labelEl) return;
+        if (!labelEl2) return;
         var parentId = contForm.dataset.parentId;
         if (parentId) {
-          labelEl.textContent = "Ярус внутри";
+          labelEl2.textContent = "Ярус внутри";
           return;
         }
         var kindNow = cabinetKindOf(currentCab);
-        labelEl.textContent = kindNow === "drawer_chest"
+        labelEl2.textContent = kindNow === "drawer_chest"
           ? "Ящик (1 — нижний, как на экране)"
           : "Полка (1 — нижняя, как на экране)";
+        syncPlaceAddressFromForm();
+      });
+    }
+    var colInp = contForm.querySelector(".js-vw-cont-column");
+    if (colInp && !colInp._vwAddrBound) {
+      colInp._vwAddrBound = true;
+      colInp.addEventListener("input", function () {
+        syncPlaceAddressFromForm();
       });
     }
     var colLabel = contForm.querySelector(".js-vw-cont-column") &&
       contForm.querySelector(".js-vw-cont-column").closest(".vw-row") &&
       contForm.querySelector(".js-vw-cont-column").closest(".vw-row").querySelector(".vw-row-label");
     if (colLabel) {
-      colLabel.textContent = isChild ? "Ячейка слева" : "Место слева";
+      colLabel.textContent = isChild ? "Ячейка слева" : "Место";
     }
     // parent id for child cells
     contForm.dataset.parentId = cont && cont.parent_id ? String(cont.parent_id) : "";
     setVisible(btnDelCont, !!cont);
     setVisible(btnOpenContents, !!cont && contKind !== "organizer");
     syncPaletteActive();
+    if (!cont || !cont.address) syncPlaceAddressFromForm();
     openDialog(dlgCont);
   }
 
@@ -1821,33 +1966,8 @@
     });
   }
   var contKindSelect = document.querySelector(".js-vw-cont-kind");
-  if (contKindSelect) {
-    contKindSelect.addEventListener("change", function () {
-      var cabId = parseInt(contForm.querySelector(".js-vw-cont-cabinet").value, 10);
-      var cab = cabinets.find(function (c) { return c.id === cabId; });
-      var kind = contKindSelect.value;
-      syncOrganizerFields(kind, null);
-      var hideStack = kind === "shelf_slot" || kind === "drawer_cell" || kind === "organizer" || cabinetKindOf(cab) === "drawer_chest";
-      var stackRow = contForm.querySelector(".js-vw-cont-stack-row");
-      if (stackRow) setVisible(stackRow, !hideStack);
-      var spanSel = contForm.querySelector(".js-vw-cont-colspan");
-      if (spanSel) {
-        spanSel.disabled = false;
-        if (kind === "organizer") {
-          var colsEl = contForm.querySelector(".js-vw-cont-inner-cols");
-          var innerCols = Math.max(1, parseInt(colsEl && colsEl.value, 10) || 2);
-          var prefer = String(Math.max(2, Math.min(innerCols, 3)));
-          if (![].some.call(spanSel.options, function (o) { return o.value === prefer; })) {
-            var opt = document.createElement("option");
-            opt.value = prefer;
-            opt.textContent = prefer + " места";
-            spanSel.appendChild(opt);
-          }
-          if (parseInt(spanSel.value, 10) < 2) spanSel.value = prefer;
-        }
-      }
-    });
-  }
+  // Тип места выбирается автоматически по мебели — ручного переключения больше нет.
+  void contKindSelect;
 
   var contCabinetSelect = document.querySelector(".js-vw-cont-cabinet");
   if (contCabinetSelect && !contCabinetSelect._vwCabChangeBound) {
@@ -1857,23 +1977,8 @@
       var cabId = parseInt(contCabinetSelect.value, 10);
       var cab = cabinets.find(function (c) { return c.id === cabId; });
       if (!cab) return;
-      var kindSel = contForm.querySelector(".js-vw-cont-kind");
-      var curKind = kindSel ? kindSel.value : "bin";
-      syncContainerKindOptions(cabinetKindOf(cab), curKind, false);
-      if (kindSel) kindSel.dispatchEvent(new Event("change"));
+      syncPlaceAddressFromForm();
       var shelfInp = contForm.querySelector(".js-vw-cont-shelf");
-      var colInp = contForm.querySelector(".js-vw-cont-column");
-      var shelfDisp = parseInt(shelfInp && shelfInp.value, 10) || 1;
-      var column = parseInt(colInp && colInp.value, 10) || 1;
-      var total = Math.max(1, parseInt(cab.shelves, 10) || 1);
-      if (shelfDisp > total) {
-        shelfDisp = total;
-        if (shelfInp) shelfInp.value = String(total);
-      }
-      var addressEl = contForm.querySelector(".js-vw-cont-address");
-      if (addressEl) {
-        addressEl.value = suggestAddress(cab, shelfDisplayToTop(cab, shelfDisp), column);
-      }
       var labelEl = shelfInp && shelfInp.closest(".vw-row") &&
         shelfInp.closest(".vw-row").querySelector(".vw-row-label");
       if (labelEl) {
@@ -1932,15 +2037,13 @@
   function saveContainer() {
     if (!contForm || savingContainer) return;
     var cabinetId = parseInt(contForm.querySelector(".js-vw-cont-cabinet").value, 10);
-    var label = (contForm.querySelector(".js-vw-cont-label").value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    label = label.replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").replace(/^\n+|\n+$/g, "");
     if (!cabinetId) {
       window.alert("Не выбран шкаф — закройте окно и нажмите «+» на полке ещё раз");
       return;
     }
-    if (!label.trim()) {
-      window.alert("Напишите подпись на этикетке");
-      contForm.querySelector(".js-vw-cont-label").focus();
+    var addr = syncPlaceAddressFromForm();
+    if (!addr) {
+      window.alert("Не удалось вычислить адрес — проверьте полку и место");
       return;
     }
     savingContainer = true;
@@ -1949,30 +2052,15 @@
     var kindSel = contForm.querySelector(".js-vw-cont-kind");
     var cab = cabinets.find(function (c) { return c.id === cabinetId; });
     var cabKind = cabinetKindOf(cab);
-    var rawKind = kindSel ? kindSel.value : "bin";
     var parentId = parseInt(contForm.dataset.parentId || "", 10) || 0;
-    var contKind = "bin";
-    if (parentId) {
-      contKind = "drawer_cell";
-    } else if (rawKind === "organizer") {
-      contKind = "organizer";
-    } else if (cabKind === "rack") {
-      contKind = rawKind === "shelf_slot" ? "shelf_slot" : (rawKind === "organizer" ? "organizer" : "bin");
-    } else if (cabKind === "drawer_chest") {
-      contKind = rawKind === "bin" ? "bin" : "drawer_cell";
-    } else if (rawKind === "drawer_cell") {
-      contKind = "drawer_cell";
-    } else {
-      contKind = rawKind === "organizer" ? "organizer" : "bin";
-    }
     var levelIdEl = contForm.querySelector(".js-vw-cont-level-id");
     var levelId = levelIdEl && levelIdEl.value ? parseInt(levelIdEl.value, 10) : 0;
     var lvl = levelById(cab, levelId);
     var levelKind = (lvl && lvl.kind) || "";
-    var stackVal = parseInt(contForm.querySelector(".js-vw-cont-stack").value, 10) || 1;
-    if (contKind === "shelf_slot" || contKind === "drawer_cell" || contKind === "organizer" || cabKind === "drawer_chest" || levelKind === "drawer") {
-      stackVal = 1;
-    }
+    var existingKind = kindSel ? kindSel.value : "";
+    var contKind = placeKindFor(cab, levelKind, !!parentId, existingKind);
+    if (kindSel) kindSel.value = contKind;
+    var stackVal = 1;
     var tiersEl = contForm.querySelector(".js-vw-cont-inner-tiers");
     var colsEl = contForm.querySelector(".js-vw-cont-inner-cols");
     var shelfFormVal = parseInt(contForm.querySelector(".js-vw-cont-shelf").value, 10) || 1;
@@ -2001,14 +2089,13 @@
       stack: stackVal,
       column: parseInt(contForm.querySelector(".js-vw-cont-column").value, 10) || 1,
       col_span: parseInt(contForm.querySelector(".js-vw-cont-colspan").value, 10) || 1,
-      label: label,
+      label: addr,
       color: contForm.querySelector(".js-vw-cont-color").value || "#e74c3c",
       notes: notesEl ? notesEl.value : "",
+      address: addr,
       inner_tiers: tiersEl ? parseInt(tiersEl.value, 10) || 3 : 3,
       inner_columns: colsEl ? parseInt(colsEl.value, 10) || 2 : 2,
     };
-    var addressEl = contForm.querySelector(".js-vw-cont-address");
-    if (addressEl) body.address = (addressEl.value || "").trim();
     if (parentId) body.parent_id = parentId;
     if (idVal) body.id = parseInt(idVal, 10);
     var saveBtn = document.querySelector(".js-vw-cont-save");
@@ -2833,7 +2920,7 @@
 
   function applyContentsView(cont) {
     var titleEl = document.querySelector(".js-vw-contents-title");
-    if (titleEl) titleEl.textContent = cont.label;
+    if (titleEl) titleEl.textContent = cont.address || cont.label || "Место";
     renderContentsHeadInfo(cont);
     renderPhotos(cont);
     syncPhotoUploadLabel();

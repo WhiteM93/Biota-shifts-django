@@ -22,6 +22,18 @@
       {% if biota_can_edit %}
       <div class="plan-cascade-form-container is-plan-readonly" data-plan-cascade-form>
 
+        <!-- Тип карточки: наладка ↔ оснастка (раздел каталога) -->
+        <div class="form-field form-field--always-visible">
+          <label class="form-label muted">Тип карточки</label>
+          <div class="plan-cascade-control">
+            <span class="plan-cascade-value" data-plan-value>{% if product.is_osnastka %}Оснастка{% else %}Наладка{% endif %}</span>
+            <select class="js-product-catalog-section" autocomplete="off" aria-label="Тип карточки: наладка или оснастка">
+              <option value="naladki" {% if not product.is_osnastka %}selected{% endif %}>Наладка</option>
+              <option value="osnastka" {% if product.is_osnastka %}selected{% endif %}>Оснастка</option>
+            </select>
+          </div>
+        </div>
+
         <!-- Поле 1: Тип изделия (всегда видимо) -->
         <div class="form-field form-field--always-visible" data-field="product_type">
           <label class="form-label muted">Тип изделия</label>
@@ -118,6 +130,12 @@
       <div class="setup-meta-plan-block">
         <div class="setup-plan-summary-wrap" data-product-plan-summary>
           <div class="setup-plan-quick-readonly">
+            <div class="setup-plan-summary-line">
+              <span class="muted">Тип карточки:</span>
+              <div class="setup-plan-summary-cell">
+                <span class="setup-plan-summary-value">{% if product.is_osnastka %}Оснастка{% else %}Наладка{% endif %}</span>
+              </div>
+            </div>
             <div class="setup-plan-summary-line setup-plan-line--position-type">
               <span class="muted">Тип изделия:</span>
               <div class="setup-plan-summary-cell">

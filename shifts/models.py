@@ -4286,6 +4286,24 @@ class VisualContainerPhoto(models.Model):
         return f"Фото {self.container_id} @ {self.photo_date}"
 
 
+class WarehouseAddress(models.Model):
+    """Справочник адресов склада: подпись можно задать до размещения ячейки на плане."""
+
+    address = models.CharField(max_length=32, unique=True, db_index=True, verbose_name="Адрес")
+    label = models.CharField(max_length=120, blank=True, default="", verbose_name="Наименование")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("address",)
+        verbose_name = "Адрес склада"
+        verbose_name_plural = "Адреса склада"
+
+    def __str__(self) -> str:
+        lab = (self.label or "").strip()
+        return f"{self.address}" + (f" · {lab}" if lab else "")
+
+
 STOCK_TOOL_FIELD_KINDS = [
     ("text", "Текст"),
     ("number", "Число"),

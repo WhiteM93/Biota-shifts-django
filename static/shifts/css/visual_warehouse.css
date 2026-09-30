@@ -715,11 +715,56 @@ html[data-theme="dawn"] .vw-floor {
   gap: 0.35rem;
 }
 
-.vw-cab-level-row {
+.vw-cab-section-cols-all,
+.vw-cab-section-levels-count {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr) auto;
+  grid-template-columns: minmax(0, 1fr) 72px auto;
   gap: 0.35rem;
   align-items: center;
+  margin: 0 0 0.45rem;
+}
+
+.vw-cab-section-cols-all .vw-row-label,
+.vw-cab-section-levels-count .vw-row-label {
+  margin: 0;
+  font-size: 12px;
+}
+
+.vw-cab-level-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(110px, 1fr) auto;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.vw-cab-level-row--head {
+  margin-bottom: 0.15rem;
+}
+
+.vw-cab-level-row--head .vw-row-label {
+  margin: 0;
+  font-size: 11px;
+}
+
+.vw-cab-lvl-cols {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.vw-cab-lvl-cols__lab {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--vw-muted, #9a9a9a);
+  white-space: nowrap;
+}
+
+.vw-cab-lvl-cols .js-vw-lvl-columns {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
 }
 
 .vw-cab-level-actions {

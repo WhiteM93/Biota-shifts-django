@@ -86,6 +86,55 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
         obj.refresh_from_db()
         self.assertEqual(obj.address, "A-01-01")
 
+    def test_code_change_persists_when_sections_sent(self):
+        """UI шкафа всегда шлёт sections — буква не должна откатываться после layout."""
+        res = self._post_json(
+            self.cabinets_url,
+            {
+                "name": "Шкаф F",
+                "kind": "cabinet",
+                "code": "A",
+                "sections": [
+                    {
+                        "levels": [
+                            {"kind": "shelf", "columns": 4},
+                            {"kind": "shelf", "columns": 4},
+                        ]
+                    }
+                ],
+            },
+        )
+        self.assertEqual(res.status_code, 201, res.content[:400])
+        cab = res.json()["cabinet"]
+        self.assertEqual(cab["code"], "A")
+        sections = cab.get("sections") or []
+        self.assertTrue(sections)
+        detail = reverse("visual_warehouse_api_cabinet_detail", args=[cab["id"]])
+        payload_sections = []
+        for sec in sections:
+            payload_sections.append(
+                {
+                    "id": sec["id"],
+                    "name": sec.get("name") or "",
+                    "levels": [
+                        {
+                            "id": lvl["id"],
+                            "kind": lvl["kind"],
+                            "columns": lvl["columns"],
+                        }
+                        for lvl in (sec.get("levels") or [])
+                    ],
+                }
+            )
+        res2 = self._patch_json(
+            detail,
+            {"name": "Шкаф F", "code": "C", "kind": "cabinet", "sections": payload_sections},
+        )
+        self.assertEqual(res2.status_code, 200, res2.content[:400])
+        self.assertEqual(res2.json()["cabinet"]["code"], "C")
+        cab_obj = VisualCabinet.objects.get(pk=cab["id"])
+        self.assertEqual(cab_obj.code, "C")
+
     def test_custom_address_kept_on_code_change(self):
         cab = VisualCabinet.objects.create(
             name="Шкаф",

@@ -62,3 +62,38 @@ class ProductOsnastkaUsageTests(TestCase):
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
         self.assertEqual(res.status_code, 404)
+
+    def test_change_catalog_section_naladka_to_osnastka(self):
+        ProductOsnastkaUsage.objects.create(product=self.naladka, osnastka=self.osnastka)
+        res = self.client.post(
+            f"/products/{self.naladka.pk}/",
+            {"action": "change_product_catalog_section", "catalog_section": "osnastka"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(res.status_code, 200, res.content[:400])
+        body = res.json()
+        self.assertTrue(body.get("ok"), body)
+        self.assertEqual(body.get("catalog_section"), "osnastka")
+        self.assertIn("/osnastki/", body.get("redirect_url") or "")
+        self.naladka.refresh_from_db()
+        self.assertTrue(self.naladka.is_osnastka)
+        self.assertFalse(
+            ProductOsnastkaUsage.objects.filter(product=self.naladka).exists()
+        )
+
+    def test_change_catalog_section_osnastka_to_naladka(self):
+        ProductOsnastkaUsage.objects.create(product=self.naladka, osnastka=self.osnastka)
+        res = self.client.post(
+            f"/osnastki/{self.osnastka.pk}/",
+            {"action": "change_product_catalog_section", "catalog_section": "naladki"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(res.status_code, 200, res.content[:400])
+        body = res.json()
+        self.assertTrue(body.get("ok"), body)
+        self.assertIn("/products/", body.get("redirect_url") or "")
+        self.osnastka.refresh_from_db()
+        self.assertFalse(self.osnastka.is_osnastka)
+        self.assertFalse(
+            ProductOsnastkaUsage.objects.filter(osnastka=self.osnastka).exists()
+        )

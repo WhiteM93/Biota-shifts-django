@@ -7204,3 +7204,69 @@ function saveSetupToolNoteEditor() {
       });
     });
   })();
+
+(function initProductCatalogSection() {
+  var sel = document.querySelector(".js-product-catalog-section");
+  if (!sel || sel._catalogBound) return;
+  sel._catalogBound = true;
+  function csrfToken() {
+    var m = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/);
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+  var initial = String(sel.value || "");
+  sel.addEventListener("change", function () {
+    var next = String(sel.value || "");
+    if (!next || next === initial) return;
+    var label = next === "osnastka" ? "Оснастка" : "Наладка";
+    var msg =
+      "Сменить тип карточки на «" +
+      label +
+      "»?\nКарточка перейдёт в другой каталог. Связи оснастки с наладками для этого типа будут сброшены.";
+    if (!window.confirm(msg)) {
+      sel.value = initial;
+      return;
+    }
+    sel.disabled = true;
+    var fd = new FormData();
+    fd.append("action", "change_product_catalog_section");
+    fd.append("catalog_section", next);
+    var csrf = csrfToken();
+    if (csrf) fd.append("csrfmiddlewaretoken", csrf);
+    fetch(window.location.href, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "X-CSRFToken": csrf || "",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: fd,
+    })
+      .then(function (r) {
+        return r.text().then(function (text) {
+          var data = {};
+          try {
+            data = text ? JSON.parse(text) : {};
+          } catch (e) {
+            data = {};
+          }
+          return { okHttp: r.ok, data: data };
+        });
+      })
+      .then(function (res) {
+        if (!res.okHttp || !res.data.ok) {
+          sel.value = initial;
+          sel.disabled = false;
+          window.alert((res.data && res.data.error) || "Не удалось сменить тип.");
+          return;
+        }
+        var url = res.data.redirect_url || window.location.pathname;
+        window.location.href = url;
+      })
+      .catch(function () {
+        sel.value = initial;
+        sel.disabled = false;
+        window.alert("Сеть / ошибка сохранения.");
+      });
+  });
+})();
+

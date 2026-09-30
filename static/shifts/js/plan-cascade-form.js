@@ -66,8 +66,11 @@ class PlanCascadeFormManager {
     this.container.querySelectorAll(".plan-cascade-control").forEach(function (wrap) {
       var valueEl = wrap.querySelector("[data-plan-value]");
       if (!valueEl) return;
-      var select = wrap.querySelector("select[data-field]");
-      var input = wrap.querySelector("input[data-field]");
+      // data-field — поля плана; без него тоже (напр. тип карточки Наладка/Оснастка)
+      var select = wrap.querySelector("select[data-field]") || wrap.querySelector("select");
+      var input =
+        wrap.querySelector("input[data-field]") ||
+        wrap.querySelector('input:not([type="hidden"])');
       var text = "—";
       if (select) {
         var opt = select.options[select.selectedIndex];

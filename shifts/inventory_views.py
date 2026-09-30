@@ -32,6 +32,7 @@ from .auth_utils import (
     inventory_route_nav_access_required,
     is_real_admin,
     request_is_admin_ui,
+    request_is_executor,
     write_permission_required,
 )
 from .drill_constants import (
@@ -2810,9 +2811,9 @@ def inventory_view(request):
         messages.warning(request, "У вас нет доступа к разделу «Сотрудники».")
         return redirect(reverse("inventory"))
 
-    if panel == "employees" and not can_employees:
-        messages.warning(request, "У вас нет доступа к разделу «Сотрудники».")
-        return redirect(reverse("inventory"))
+    if panel == "history" and request_is_executor(request):
+        messages.warning(request, "У вас нет доступа к разделу «История».")
+        return redirect(f"{reverse('inventory')}?panel=stock")
 
     if action == "save_watch_template":
         name = (request.POST.get("watch_name") or "").strip()[:120]
@@ -3430,10 +3431,12 @@ def inventory_view(request):
             tool.save(update_fields=["quantity", "updated_at"])
             common_ok = True
         elif field == "warehouse_address":
-            from .visual_warehouse_address import normalize_address
+            from .visual_warehouse_address import ensure_warehouse_address, normalize_address
 
             tool.warehouse_address = normalize_address(value_raw or "")
             tool.save(update_fields=["warehouse_address", "updated_at"])
+            if tool.warehouse_address:
+                ensure_warehouse_address(tool.warehouse_address)
             common_ok = True
         elif field == "notes":
             tool.notes = (value_raw or "").strip()[:300]
@@ -3901,7 +3904,7 @@ def inventory_view(request):
     if action == "bulk_assign_warehouse_address":
         if not can_manage_stock:
             return JsonResponse({"ok": False, "error": "Недостаточно прав."}, status=403)
-        from .visual_warehouse_address import normalize_address
+        from .visual_warehouse_address import ensure_warehouse_address, normalize_address
         from .models import VisualContainer
 
         raw_ids = request.POST.getlist("tool_ids")
@@ -3935,6 +3938,7 @@ def inventory_view(request):
         if not addr:
             return JsonResponse({"ok": False, "error": "Выберите контейнер (адрес)."}, status=400)
 
+        ensure_warehouse_address(addr)
         updated = ToolItem.objects.filter(id__in=tool_ids, is_deleted=False).update(
             warehouse_address=addr
         )
@@ -4289,7 +4293,7 @@ def inventory_view(request):
             return redirect(f"{request.path}?panel=arrival")
 
         created_count = 0
-        from .visual_warehouse_address import normalize_address
+        from .visual_warehouse_address import ensure_warehouse_address, normalize_address
 
         with transaction.atomic():
             for row in rows:
@@ -4325,6 +4329,7 @@ def inventory_view(request):
                     if addr and (tool.warehouse_address or "") != addr:
                         tool.warehouse_address = addr
                         update_fields.append("warehouse_address")
+                        ensure_warehouse_address(addr)
                     tool.save(update_fields=update_fields)
                     StockMovement.objects.create(
                         movement_type="restock",
@@ -4741,6 +4746,7 @@ def inventory_view(request):
                 if addr and (tool.warehouse_address or "") != addr:
                     tool.warehouse_address = addr
                     tool.save(update_fields=["warehouse_address", "updated_at"])
+                    ensure_warehouse_address(addr)
                 if category in ("insert", "body_tool") or category in MEASURING_CATEGORY_SET:
                     notes = (row.get("notes") or "").strip()[:300]
                     if notes and (tool.notes or "") != notes:
@@ -6195,7 +6201,7 @@ def inventory_api_warehouse_locations(request):
 @inventory_route_nav_access_required
 @require_http_methods(["POST"])
 def inventory_api_warehouse_address_label(request):
-    """Подпись ячейки (наименование) для подсказки по адресам на складе."""
+    """Наименование адреса склада (подсказка по адресам)."""
     username = biota_user(request)
     is_admin_user = request_is_admin_ui(request)
     can_manage = is_admin_user or (
@@ -6208,45 +6214,55 @@ def inventory_api_warehouse_address_label(request):
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except (TypeError, ValueError, json.JSONDecodeError):
         payload = {
+            "address": request.POST.get("address"),
             "container_id": request.POST.get("container_id"),
             "label": request.POST.get("label"),
         }
-
-    try:
-        container_id = int(payload.get("container_id") or 0)
-    except (TypeError, ValueError):
-        container_id = 0
-    if container_id <= 0:
-        return JsonResponse({"ok": False, "error": "Не указана ячейка."}, status=400)
 
     label_raw = str(payload.get("label") or "")
     label = "\n".join(
         line.rstrip() for line in label_raw.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     )
     label = label.strip("\n").strip()[:120]
-    if not label:
-        return JsonResponse({"ok": False, "error": "Укажите наименование."}, status=400)
 
-    from .models import VisualContainer
-    from .visual_warehouse_address import normalize_address, repair_container_address_if_stale
-
-    cont = (
-        VisualContainer.objects.select_related("cabinet", "level", "level__section")
-        .filter(pk=container_id, parent__isnull=True)
-        .first()
+    from .visual_warehouse_address import (
+        normalize_address,
+        repair_container_address_if_stale,
+        set_warehouse_address_label,
     )
-    if cont is None:
-        return JsonResponse({"ok": False, "error": "Ячейка не найдена."}, status=404)
 
-    cont.label = label
-    cont.save(update_fields=["label", "updated_at"])
-    addr = repair_container_address_if_stale(cont) or normalize_address(cont.address or "")
+    addr = normalize_address(str(payload.get("address") or ""))
+    if not addr:
+        try:
+            container_id = int(payload.get("container_id") or 0)
+        except (TypeError, ValueError):
+            container_id = 0
+        if container_id > 0:
+            from .models import VisualContainer
+
+            cont = (
+                VisualContainer.objects.select_related("cabinet", "level", "level__section")
+                .filter(pk=container_id, parent__isnull=True)
+                .first()
+            )
+            if cont is None:
+                return JsonResponse({"ok": False, "error": "Ячейка не найдена."}, status=404)
+            addr = repair_container_address_if_stale(cont) or normalize_address(cont.address or "")
+
+    if not addr:
+        return JsonResponse({"ok": False, "error": "Не указан адрес."}, status=400)
+
+    try:
+        result = set_warehouse_address_label(addr, label)
+    except ValueError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
     return JsonResponse(
         {
             "ok": True,
-            "container_id": cont.id,
-            "address": addr,
-            "label": cont.label,
+            "container_id": int(result.get("container_id") or 0),
+            "address": result.get("address") or addr,
+            "label": result.get("label") or label,
         }
     )
 
@@ -6260,12 +6276,12 @@ def _warehouse_address_titles_for_stock(panel: str) -> dict:
 
 
 def _stock_address_hint_rows(panel: str) -> list[dict]:
-    if panel not in ("stock", "arrival"):
+    if panel in ("defects", "payroll", "employees"):
         return []
     from .visual_warehouse_address import build_address_hint_rows
 
     # В приходе достаточно подписей ячеек; остаток на складе не тянем.
-    return build_address_hint_rows(include_stock=(panel == "stock"))
+    return build_address_hint_rows(include_stock=(panel != "arrival"))
 
 
 def _stock_address_furniture_options(rows: list[dict]) -> list[dict]:

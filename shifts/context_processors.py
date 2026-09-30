@@ -6,6 +6,7 @@ from biota_shifts.auth import (
 )
 from shifts.auth_utils import (
     can_preview_role,
+    inventory_stock_manage_for_user,
     is_real_admin,
     preview_role,
     request_can_edit,
@@ -14,6 +15,8 @@ from shifts.auth_utils import (
 )
 from shifts.site_updates import effective_site_updates_seen_id, unread_site_updates_count
 from shifts.site_updates_views import SITE_UPDATES_SEEN_SESSION_KEY
+
+_NON_WAREHOUSE_PANELS = frozenset({"defects", "payroll", "employees"})
 
 
 def _site_updates_unread(request) -> int:
@@ -27,6 +30,68 @@ def _site_updates_unread(request) -> int:
         return unread_site_updates_count(seen)
     except Exception:
         return 0
+
+
+def _stock_addr_fab_context(request, *, username: str) -> dict:
+    """Кнопка «Адреса» на всех вкладках склада и на визуальном складе."""
+    empty = {
+        "show_stock_addr_fab": False,
+        "stock_address_hints": [],
+        "stock_address_furniture": [],
+        "can_manage_stock": False,
+    }
+    try:
+        url_name = getattr(getattr(request, "resolver_match", None), "url_name", "") or ""
+        panel = (request.GET.get("panel") or "").strip()
+        if url_name == "visual_warehouse":
+            show = True
+            include_stock = True
+        elif url_name == "inventory":
+            if not panel:
+                panel = "stock"
+            if panel in _NON_WAREHOUSE_PANELS:
+                return empty
+            show = True
+            include_stock = panel != "arrival"
+        else:
+            return empty
+        if not show:
+            return empty
+
+        from shifts.visual_warehouse_address import build_address_hint_rows
+
+        hints = build_address_hint_rows(include_stock=include_stock)
+        furniture = []
+        seen: set[int] = set()
+        for row in hints:
+            try:
+                fid = int(row.get("furniture_id") or 0)
+            except (TypeError, ValueError):
+                fid = 0
+            if fid <= 0 or fid in seen:
+                continue
+            seen.add(fid)
+            furniture.append(
+                {
+                    "id": fid,
+                    "code": (row.get("furniture_code") or "").strip(),
+                    "name": (row.get("furniture") or "").strip() or f"Мебель {fid}",
+                }
+            )
+        furniture.sort(key=lambda x: ((x.get("code") or ""), (x.get("name") or "").casefold()))
+
+        is_admin_user = request_is_admin_ui(request)
+        can_manage = is_admin_user or (
+            inventory_stock_manage_for_user(username) and not is_real_admin(request)
+        )
+        return {
+            "show_stock_addr_fab": True,
+            "stock_address_hints": hints,
+            "stock_address_furniture": furniture,
+            "can_manage_stock": can_manage,
+        }
+    except Exception:
+        return empty
 
 
 def biota_session(request):
@@ -77,6 +142,10 @@ def biota_session(request):
             "perf_diag_ttfb_ms": perf_diag_ttfb_ms,
             "perf_diag_load_ms": perf_diag_load_ms,
             "biota_icons_json": icons_json,
+            "show_stock_addr_fab": False,
+            "stock_address_hints": [],
+            "stock_address_furniture": [],
+            "can_manage_stock": False,
             **icon_ctx,
         }
     nav = nav_permissions_for_user(u)
@@ -106,9 +175,20 @@ def biota_session(request):
             display = account_label_for_username(u) or u
         except Exception:
             display = u
+    addr_fab = (
+        _stock_addr_fab_context(request, username=u)
+        if nav.get("inventory")
+        else {
+            "show_stock_addr_fab": False,
+            "stock_address_hints": [],
+            "stock_address_furniture": [],
+            "can_manage_stock": False,
+        }
+    )
     return {
         "biota_username": display,
         **payload,
         "biota_icons_json": icons_json,
         **icon_ctx,
+        **addr_fab,
     }

@@ -1661,6 +1661,28 @@ def product_detail_view(request, pk: int):
             tab_slug = f"setup-{setup.pk}"
             return redirect(f"{_product_detail_url(product)}?{urlencode({'tab': tab_slug})}")
 
+        if action == "change_product_catalog_section":
+            section = (request.POST.get("catalog_section") or "").strip()
+            if section not in (Product.CATALOG_NALADKI, Product.CATALOG_OSNASTKA):
+                return JsonResponse({"ok": False, "error": "Некорректный тип карточки."}, status=400)
+            if product.catalog_section != section:
+                product.catalog_section = section
+                product.save(update_fields=["catalog_section", "updated_at"])
+                if section == Product.CATALOG_OSNASTKA:
+                    # Оснастка больше не «использует» другие оснастки
+                    ProductOsnastkaUsage.objects.filter(product=product).delete()
+                else:
+                    # Карточка больше не числится оснасткой у других наладок
+                    ProductOsnastkaUsage.objects.filter(osnastka=product).delete()
+                record_product_editor(product, biota_user(request))
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "catalog_section": product.catalog_section,
+                    "redirect_url": _product_detail_url(product),
+                }
+            )
+
         if action == "add_product_note":
             body = (request.POST.get("body") or "").strip()
             if not body:

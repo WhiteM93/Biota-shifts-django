@@ -2,7 +2,9 @@
 <nav class="inv-tabs" aria-label="Разделы склада">
   <a class="inv-tab {% if active_tab == 'analysis' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=analysis">Главная</a>
   <a class="inv-tab {% if active_tab == 'stock' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=stock">Склад</a>
+  {% if not biota_is_executor %}
   <a class="inv-tab {% if active_tab == 'history' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=history">История</a>
+  {% endif %}
   {% if biota_can_edit %}
   <a class="inv-tab {% if active_tab == 'issue' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=issue">Выдать</a>
   <a class="inv-tab {% if active_tab == 'issue_outcome' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=issue_outcome">Списание/Возврат</a>

@@ -579,28 +579,107 @@ def build_location_catalog() -> dict:
 
 
 def address_container_titles() -> dict[str, str]:
-    """Адрес → название контейнера (для title в таблице склада)."""
+    """Адрес → наименование (справочник адресов, иначе подпись контейнера)."""
+    from shifts.models import WarehouseAddress
+
     out: dict[str, str] = {}
+    for row in WarehouseAddress.objects.exclude(label="").values_list("address", "label"):
+        addr = normalize_address(row[0] or "")
+        lab = (row[1] or "").strip()
+        if addr and lab:
+            out[addr] = lab
     for p in build_location_catalog().get("places") or []:
         addr = normalize_address(p.get("address") or "")
-        if not addr:
+        if not addr or addr in out:
             continue
-        label = (p.get("label") or "").strip() or (p.get("kind_label") or "").strip()
-        if label:
+        label = (p.get("label") or "").strip()
+        kind_lab = (p.get("kind_label") or "").strip()
+        if label and label not in _KIND_LABELS.values():
             out[addr] = label
+        elif kind_lab:
+            out[addr] = kind_lab
     return out
 
 
-def build_address_hint_rows(*, include_stock: bool = True) -> list[dict]:
-    """Справка «адрес → наименование» для склада.
+def ensure_warehouse_address(raw_address: str, *, label: str | None = None):
+    """Создать/получить адрес в справочнике. label=None — не трогать подпись."""
+    from shifts.models import WarehouseAddress
 
-    Подпись контейнера из визуального склада; если её нет — кратко, что лежит сейчас.
-    """
+    addr = normalize_address(raw_address or "")
+    if not addr:
+        return None
+    row, _created = WarehouseAddress.objects.get_or_create(
+        address=addr,
+        defaults={"label": (label or "").strip()[:120]},
+    )
+    if label is not None:
+        new_lab = (label or "").strip()[:120]
+        if (row.label or "") != new_lab:
+            row.label = new_lab
+            row.save(update_fields=["label", "updated_at"])
+    return row
+
+
+def set_warehouse_address_label(raw_address: str, label: str) -> dict:
+    """Задать наименование адреса; на этикетке ячейки остаётся адрес."""
+    from shifts.models import VisualContainer
+
+    addr = normalize_address(raw_address or "")
+    if not addr:
+        raise ValueError("Укажите адрес.")
+    lab = (label or "").strip()[:120]
+    if not lab:
+        raise ValueError("Укажите наименование.")
+    row = ensure_warehouse_address(addr, label=lab)
+    cont = (
+        VisualContainer.objects.select_related("cabinet", "level", "level__section")
+        .filter(parent__isnull=True, address__iexact=addr)
+        .order_by("id")
+        .first()
+    )
+    # Этикетка на плане = адрес; наименование живёт в справочнике.
+    if cont is not None:
+        want = addr
+        if (cont.label or "").strip() != want:
+            cont.label = want
+            cont.save(update_fields=["label", "updated_at"])
+    return {
+        "address": addr,
+        "label": row.label if row else lab,
+        "container_id": int(cont.id) if cont is not None else 0,
+    }
+
+
+def sync_container_with_warehouse_address(cont) -> None:
+    """После размещения ячейки: адрес в справочнике; подпись из справочника, если у ячейки пусто."""
+    if cont is None or getattr(cont, "parent_id", None):
+        return
+    addr = normalize_address(resolve_container_address(cont, prefer_stored=True))
+    if not addr:
+        return
+    raw_label = (getattr(cont, "label", None) or "").strip()
+    # На этикетке теперь адрес — это не «наименование» справочника.
+    if raw_label and normalize_address(raw_label) == addr:
+        ensure_warehouse_address(addr)
+        return
+    custom = raw_label if raw_label and raw_label not in _KIND_LABELS.values() else ""
+    if custom:
+        ensure_warehouse_address(addr, label=custom)
+        return
+    row = ensure_warehouse_address(addr)
+    reg_lab = (getattr(row, "label", None) or "").strip() if row else ""
+    if reg_lab and raw_label != reg_lab and normalize_address(reg_lab) != addr:
+        # Не подставляем наименование справочника на этикетку — там адрес.
+        return
+
+
+def build_address_hint_rows(*, include_stock: bool = True) -> list[dict]:
+    """Справка «адрес → наименование»: одна редактируемая подпись на адрес."""
     from collections import defaultdict
 
     from django.db.models import Q
 
-    from shifts.models import ToolItem
+    from shifts.models import ToolItem, WarehouseAddress
 
     kind_fallbacks = set(_KIND_LABELS.values())
     stock_by_addr: dict[str, list[tuple[str, int]]] = defaultdict(list)
@@ -628,49 +707,56 @@ def build_address_hint_rows(*, include_stock: bool = True) -> list[dict]:
             text += "…"
         return text
 
-    rows: list[dict] = []
-    seen: set[str] = set()
+    label_by_addr: dict[str, str] = {}
+    for a, lab in WarehouseAddress.objects.values_list("address", "label"):
+        addr = normalize_address(a or "")
+        if not addr:
+            continue
+        lab_s = (lab or "").strip()
+        if lab_s and normalize_address(lab_s) != addr:
+            label_by_addr[addr] = lab_s
+
+    rows_by_addr: dict[str, dict] = {}
     for p in build_location_catalog().get("places") or []:
         addr = normalize_address(p.get("address") or "")
-        if not addr or addr in seen:
+        if not addr:
             continue
-        seen.add(addr)
         raw_label = (p.get("label") or "").strip()
-        kind_lab = (p.get("kind_label") or "").strip()
         custom = raw_label if raw_label and raw_label not in kind_fallbacks else ""
+        if custom and normalize_address(custom) == addr:
+            custom = ""
+        # Подпись ячейки на плане — запасной вариант, пока нет записи в справочнике.
+        editable = (label_by_addr.get(addr) or custom or "").strip()
         stock = _stock_summary(addr)
-        name = custom or stock or raw_label or "—"
-        rows.append(
-            {
-                "address": addr,
-                "name": name,
-                "label": custom,
-                "editable_label": custom,
-                "stock": stock,
-                "furniture": (p.get("furniture_name") or "").strip(),
-                "furniture_code": (p.get("furniture_code") or "").strip(),
-                "furniture_id": int(p.get("furniture_id") or 0),
-                "container_id": int(p.get("container_id") or 0),
-            }
-        )
+        rows_by_addr[addr] = {
+            "address": addr,
+            "name": editable or "—",
+            "label": editable,
+            "editable_label": editable,
+            "stock": stock,
+            "furniture": (p.get("furniture_name") or "").strip(),
+            "furniture_code": (p.get("furniture_code") or "").strip(),
+            "furniture_id": int(p.get("furniture_id") or 0),
+            "container_id": int(p.get("container_id") or 0),
+        }
 
-    for addr, bits in sorted(stock_by_addr.items()):
-        if addr in seen:
+    for addr in set(stock_by_addr) | set(label_by_addr):
+        if addr in rows_by_addr:
             continue
         stock = _stock_summary(addr)
-        rows.append(
-            {
-                "address": addr,
-                "name": stock or "—",
-                "label": "",
-                "editable_label": "",
-                "stock": stock,
-                "furniture": "",
-                "furniture_code": "",
-                "furniture_id": 0,
-                "container_id": 0,
-            }
-        )
+        editable = (label_by_addr.get(addr) or "").strip()
+        rows_by_addr[addr] = {
+            "address": addr,
+            "name": editable or "—",
+            "label": editable,
+            "editable_label": editable,
+            "stock": stock,
+            "furniture": "",
+            "furniture_code": "",
+            "furniture_id": 0,
+            "container_id": 0,
+        }
 
+    rows = list(rows_by_addr.values())
     rows.sort(key=lambda r: (r.get("address") or ""))
     return rows

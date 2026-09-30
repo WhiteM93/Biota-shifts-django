@@ -66,6 +66,7 @@ from .visual_warehouse_address import (
     cabinet_code_of,
     cabinet_section_count,
     ensure_cabinet_layout,
+    ensure_warehouse_address,
     level_total_in_section,
     normalize_address,
     normalize_furniture_code,
@@ -81,6 +82,7 @@ from .visual_warehouse_address import (
     suggested_address,
     suggested_address_for_container,
     sync_cabinet_grid_from_layout,
+    sync_container_with_warehouse_address,
 )
 
 MAX_CABINETS = 40
@@ -1380,6 +1382,9 @@ def _cabinet_mutate(request, cab: VisualCabinet):
         cab.notes = str(body.get("notes") or "").strip()[:300]
     layout_changed = False
     if "sections" in body and isinstance(body.get("sections"), list):
+        # Сохраняем скаляры до раскладки: sync/refresh внутри layout
+        # иначе откатит несохранённые name/code/kind/notes.
+        cab.save()
         _, err = apply_cabinet_sections_layout(
             cab,
             body["sections"],
@@ -1497,6 +1502,11 @@ def visual_warehouse_api_container_upsert(request):
     label_raw = str(body.get("label") or "")
     label = "\n".join(line.rstrip() for line in label_raw.replace("\r\n", "\n").replace("\r", "\n").split("\n"))
     label = label.strip("\n")[:120]
+    address_raw = body.get("address")
+    address = normalize_address(address_raw) if address_raw is not None else None
+    if not label.strip():
+        # Подпись = адрес, если отдельное имя не передали (форма «место»)
+        label = (address or "")[:120]
     if not label.strip():
         return _err("Укажите подпись контейнера")
     color = str(body.get("color") or "#e74c3c").strip()
@@ -1505,8 +1515,6 @@ def visual_warehouse_api_container_upsert(request):
     notes = str(body.get("notes") or "").strip()[:300]
     cont_kind = _normalize_container_kind(body.get("kind"))
     cab_kind = _normalize_cabinet_kind(cab.kind)
-    address_raw = body.get("address")
-    address = normalize_address(address_raw) if address_raw is not None else None
     parent_id = body.get("parent_id")
     parent = None
     if parent_id:
@@ -1719,6 +1727,7 @@ def visual_warehouse_api_container_upsert(request):
             else:
                 resync_shelf_place_addresses(cab, shelf, move_tools=_move_tools_address)
             cont.refresh_from_db()
+    sync_container_with_warehouse_address(cont)
     cont = (
         VisualContainer.objects.select_related("cabinet", "level", "level__section")
         .annotate(items_count=Count("items"))
@@ -2182,6 +2191,7 @@ def _link_tool_to_container(cont: VisualContainer, tool: ToolItem) -> None:
         return
     tool.warehouse_address = addr
     tool.save(update_fields=["warehouse_address", "updated_at"])
+    ensure_warehouse_address(addr)
 
 
 @write_permission_required

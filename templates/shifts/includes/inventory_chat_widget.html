@@ -4,10 +4,11 @@
   class="inv-chat"
   data-url="{% url 'inventory_chat_api' %}"
   data-csrf="{{ csrf_token }}"
+  {% if show_stock_addr_fab %}data-addr-label-url="{% url 'inventory_api_warehouse_address_label' %}"{% endif %}
   {% if biota_is_admin %}data-archive-url="{% url 'inventory_ai_archive' %}" data-notebook-url="{% url 'site_notebook' %}"{% endif %}
 >
   <div class="inv-chat-dock">
-    {% if panel == "stock" %}
+    {% if show_stock_addr_fab %}
     <div class="inv-stock-addr-fab js-stock-addr-fab" aria-label="Подсказка по адресам">
       <button type="button" class="inv-chat-fab inv-stock-addr-fab__btn js-stock-addr-hint-open" title="Адреса склада" aria-label="Адреса склада">Адреса</button>
       <div class="inv-stock-addr-fab__pop" role="tooltip">
@@ -50,4 +51,9 @@
     </form>
   </div>
 </div>
+{% if show_stock_addr_fab %}
+{% include "shifts/includes/inventory_addr_hint_modal.html" %}
+<link rel="stylesheet" href="{% static 'shifts/css/inventory.css' %}?v={{ static_asset_version }}">
+<script src="{% static 'shifts/js/inventory_addr_hint.js' %}?v={{ static_asset_version }}" defer></script>
+{% endif %}
 <script src="{% static 'shifts/js/inventory_chat.js' %}?v={{ static_asset_version }}" defer></script>

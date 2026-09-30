@@ -1,0 +1,72 @@
+<div class="inv-addr-hint-modal js-addr-hint-modal" hidden>
+  <button type="button" class="inv-addr-hint-modal__backdrop js-addr-hint-close" aria-label="Закрыть"></button>
+  <div class="inv-addr-hint-modal__card" role="dialog" aria-modal="true" aria-labelledby="inv-addr-hint-title">
+    <header class="inv-addr-hint-modal__head">
+      <div>
+        <h2 id="inv-addr-hint-title" class="inv-addr-hint-modal__title">Подсказка по адресам</h2>
+        <p class="inv-addr-hint-modal__lead">Адрес и наименование ячейки. Можно править название{% if can_manage_stock %} прямо здесь{% endif %} и распечатать список по выбранной мебели. Адрес без ячейки на плане тоже можно подписать — потом разместите место на визуальном складе.</p>
+      </div>
+      <button type="button" class="btn btn-sm btn-ghost js-addr-hint-close" aria-label="Закрыть">Закрыть</button>
+    </header>
+    <div class="inv-addr-hint-modal__tools">
+      <label class="inv-addr-hint-modal__search">
+        <input type="search" class="js-addr-hint-search" placeholder="Поиск: A-01-01, метчик, фреза…" autocomplete="off" aria-label="Поиск по адресам">
+      </label>
+      <label class="inv-addr-hint-modal__print-furn">
+        <span>Печать</span>
+        <select class="js-addr-hint-print-furn" aria-label="Мебель для печати">
+          <option value="">Вся мебель</option>
+          {% for f in stock_address_furniture %}
+          <option value="{{ f.id }}">{% if f.code %}{{ f.code }} — {% endif %}{{ f.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="button" class="btn btn-sm btn-ghost js-addr-hint-print">Распечатать</button>
+    </div>
+    <div class="inv-addr-hint-modal__table-wrap">
+      <table class="inv-addr-hint-table">
+        <thead>
+          <tr>
+            <th>Адрес</th>
+            <th>Наименование</th>
+            <th>Мебель</th>
+          </tr>
+        </thead>
+        <tbody class="js-addr-hint-body">
+          {% for row in stock_address_hints %}
+          <tr
+            data-addr="{{ row.address }}"
+            data-furn-id="{{ row.furniture_id|default:0 }}"
+            data-container-id="{{ row.container_id|default:0 }}"
+            data-search="{{ row.address }} {{ row.name }} {{ row.editable_label }} {{ row.furniture }} {{ row.furniture_code }} {{ row.stock }}"
+          >
+            <td class="inv-addr-hint-table__addr"><code>{{ row.address }}</code></td>
+            <td class="inv-addr-hint-table__name">
+              {% if can_manage_stock %}
+              <button
+                type="button"
+                class="inv-addr-hint-table__edit js-addr-hint-edit"
+                data-container-id="{{ row.container_id|default:0 }}"
+                data-address="{{ row.address }}"
+                data-label="{{ row.editable_label }}"
+                data-placeholder="Например: метчики М2 глухие"
+                title="Нажмите, чтобы изменить наименование"
+              >
+                <span class="js-addr-hint-name-text">{% if row.editable_label %}{{ row.editable_label }}{% else %}Нажмите, чтобы задать{% endif %}</span>
+              </button>
+              <span class="inv-addr-hint-table__status js-addr-hint-status" hidden></span>
+              {% else %}
+              <span class="js-addr-hint-name-text">{% if row.editable_label %}{{ row.editable_label }}{% else %}—{% endif %}</span>
+              {% endif %}
+            </td>
+            <td class="inv-addr-hint-table__furn">{% if row.furniture_code %}<span class="inv-addr-hint-table__code">{{ row.furniture_code }}</span>{% endif %}{% if row.furniture %} {{ row.furniture }}{% elif not row.furniture_code %}—{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr class="js-addr-hint-empty-static"><td colspan="3" class="inv-addr-hint-table__empty">Пока нет адресов. Задайте места на визуальном складе или проставьте адреса позициям.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="inv-addr-hint-modal__foot js-addr-hint-count" hidden></p>
+  </div>
+</div>
