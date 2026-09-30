@@ -1894,6 +1894,16 @@
       <option value="{{ t }}"></option>
       {% endfor %}
     </datalist>
+    <datalist id="arrival-ms-brand-list">
+      {% for b in measuring_brands %}
+      <option value="{{ b }}"></option>
+      {% endfor %}
+    </datalist>
+    <datalist id="arrival-ms-thread-size-list">
+      {% for s in gauge_thread_sizes %}
+      <option value="{{ s }}"></option>
+      {% endfor %}
+    </datalist>
 
     <div id="arrival-bulk-groups" class="inv-arrival-groups"></div>
 
@@ -2993,6 +3003,8 @@
   "tool_extension_compat_labels": { {% for k, v in tool_extension_compat_labels.items %}"{{ k|escapejs }}":"{{ v|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %} },
   "measuring_kinds_by_category": {{ measuring_kinds_by_category_json|default:"{}"|safe }},
   "measuring_category_keys": [{% for k in measuring_category_keys %}"{{ k|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+  "measuring_brands": [{% for b in measuring_brands %}"{{ b|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+  "gauge_thread_sizes": [{% for s in gauge_thread_sizes %}"{{ s|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
   "thread_gauge_go_nogo": [{% for key, label in thread_gauge_go_nogo %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],
   "thread_gauge_tolerance_presets": [{% for t in thread_gauge_tolerance_presets %}"{{ t|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
   "body_tool_couplings": [{% for key, label in body_tool_couplings %}{"value":"{{ key|escapejs }}","label":"{{ label|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}],

@@ -1599,10 +1599,12 @@ class MeasuringToolSpec(models.Model):
             normalize_thread_gauge_tolerance,
         )
 
-        self.brand = (self.brand or "").strip()[:80]
+        self.brand = (self.brand or "").strip().upper()[:80]
         cat = self.tool.category if self.tool_id else ""
         self.kind = normalize_measuring_kind(cat, self.kind)
-        self.thread_size_label = (self.thread_size_label or "").strip()[:32]
+        from .size_label_normalize import normalize_cutting_size_label
+
+        self.thread_size_label = normalize_cutting_size_label(self.thread_size_label)[:32]
         self.go_nogo = normalize_thread_gauge_go_nogo(self.go_nogo)
         self.thread_tolerance = normalize_thread_gauge_tolerance(self.thread_tolerance)
         self.measure_range = (self.measure_range or "").strip()[:64]

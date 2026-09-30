@@ -3192,6 +3192,11 @@ html[data-theme="dawn"] .inv-addr-hint-table th {
     text-align-last: center;
     min-width: 0;
   }
+  #arrival-group-gauge_thread .arrival-bulk-table td.tol-col input[data-k="ms_tolerance"] {
+    text-align: center;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
   #arrival-group-gauge_smooth .arrival-bulk-table select,
   #arrival-group-gauge_thread .arrival-bulk-table select,
   #arrival-group-measure_univ .arrival-bulk-table select,
@@ -3264,6 +3269,52 @@ html[data-theme="dawn"] .inv-addr-hint-table th {
     min-width: 5ch;
     max-width: 5.5ch;
     text-align: center;
+  }
+
+  .arrival-bulk-table th.tol-col,
+  .arrival-bulk-table td.tol-col {
+    width: 4.5rem;
+    min-width: 4.5rem;
+    max-width: 5rem;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .arrival-bulk-table td.tol-col input[data-k="ms_tolerance"] {
+    min-width: 0 !important;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  /* Стрелка datalist съедает место в узкой ячейке — скрываем, подсказки остаются при вводе */
+  .arrival-bulk-table td.tol-col input[data-k="ms_tolerance"]::-webkit-calendar-picker-indicator {
+    display: none;
+    -webkit-appearance: none;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .arrival-bulk-table th.arrival-row-remove-cell,
+  .arrival-bulk-table td.arrival-row-remove-cell {
+    width: 2.4rem;
+    min-width: 2.4rem;
+    max-width: 2.6rem;
+    text-align: center;
+    vertical-align: middle;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .arrival-bulk-table td.arrival-row-remove-cell .js-arrival-row-remove.btn-inv-delete {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    margin: 0 auto;
   }
 
   /* Угол центровки / зенковки */

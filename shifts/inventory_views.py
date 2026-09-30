@@ -535,7 +535,7 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
             if not normalize_measuring_kind(category, row.get("ms_kind")):
                 errs.append(f"Строка {idx}: укажите вид измерительного инструмента.")
         if category == "gauge_thread":
-            if not (row.get("ms_thread_size") or "").strip():
+            if not normalize_cutting_size_label(row.get("ms_thread_size")):
                 errs.append(f"Строка {idx}: укажите размер резьбы (например M10).")
             if normalize_measuring_pitch(row.get("ms_pitch_mm")) is None:
                 errs.append(f"Строка {idx}: укажите шаг резьбы, мм.")
@@ -609,7 +609,7 @@ def _arrival_search_ready(row: dict) -> bool:
             return False
         if category == "gauge_thread":
             return bool(
-                (row.get("ms_thread_size") or "").strip()
+                normalize_cutting_size_label(row.get("ms_thread_size"))
                 and normalize_measuring_pitch(row.get("ms_pitch_mm")) is not None
                 and normalize_thread_gauge_go_nogo(row.get("ms_go_nogo"))
                 and normalize_thread_gauge_tolerance(row.get("ms_tolerance"))
@@ -919,7 +919,7 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
         if kind:
             qs = qs.filter(measuring_tool_spec__kind=kind)
         if category == "gauge_thread":
-            size = (row.get("ms_thread_size") or "").strip()[:32]
+            size = normalize_cutting_size_label(row.get("ms_thread_size"))[:32]
             if size:
                 qs = qs.filter(measuring_tool_spec__thread_size_label__iexact=size)
             pitch = normalize_measuring_pitch(row.get("ms_pitch_mm"))
@@ -2226,7 +2226,7 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         if ms_kind:
             qs = qs.filter(measuring_tool_spec__kind=ms_kind)
         if category == "gauge_thread":
-            size = (g("ms_thread_size") or "").strip()
+            size = normalize_cutting_size_label(g("ms_thread_size"))[:32]
             if size:
                 qs = qs.filter(measuring_tool_spec__thread_size_label__iexact=size)
             pitch = normalize_measuring_pitch(g("ms_pitch_mm"))
@@ -2681,7 +2681,7 @@ def _create_tool_extension_tool(quantity, spec_fields: dict) -> ToolItem:
 
 def _measuring_fields_from_row(row: dict, category: str) -> dict:
     fields = {
-        "brand": (row.get("ms_brand") or "").strip()[:80],
+        "brand": (row.get("ms_brand") or "").strip().upper()[:80],
         "kind": normalize_measuring_kind(category, row.get("ms_kind")),
         "notes": (row.get("notes") or "").strip()[:300],
         "thread_size_label": "",
@@ -2696,7 +2696,7 @@ def _measuring_fields_from_row(row: dict, category: str) -> dict:
         "length_mm": None,
     }
     if category == "gauge_thread":
-        fields["thread_size_label"] = (row.get("ms_thread_size") or "").strip()[:32]
+        fields["thread_size_label"] = normalize_cutting_size_label(row.get("ms_thread_size"))[:32]
         fields["pitch_mm"] = normalize_measuring_pitch(row.get("ms_pitch_mm"))
         fields["go_nogo"] = normalize_thread_gauge_go_nogo(row.get("ms_go_nogo"))
         fields["thread_tolerance"] = normalize_thread_gauge_tolerance(row.get("ms_tolerance"))
@@ -3762,7 +3762,7 @@ def inventory_view(request):
             elif cat in MEASURING_CATEGORY_SET and getattr(tool, "measuring_tool_spec", None):
                 ms = tool.measuring_tool_spec
                 if field == "ms_brand":
-                    ms.brand = (value_raw or "").strip()[:80]
+                    ms.brand = (value_raw or "").strip().upper()[:80]
                     ms.save(update_fields=["brand"])
                 elif field == "ms_kind":
                     if not measuring_category_needs_kind(cat):
@@ -3775,7 +3775,10 @@ def inventory_view(request):
                 elif field == "ms_thread_size":
                     if cat != "gauge_thread":
                         return JsonResponse({"ok": False, "error": "Поле только для резьбовых калибров."}, status=400)
-                    ms.thread_size_label = (value_raw or "").strip()[:32]
+                    size = normalize_cutting_size_label(value_raw)[:32]
+                    if not size:
+                        return JsonResponse({"ok": False, "error": "Укажите размер резьбы."}, status=400)
+                    ms.thread_size_label = size
                     ms.save(update_fields=["thread_size_label"])
                 elif field == "ms_pitch_mm":
                     if cat != "gauge_thread":
@@ -5703,6 +5706,27 @@ def inventory_view(request):
     tool_extension_inner_diameters = _distinct_text_values(
         _opt_qs("tool_extension", "ext_inner_diameter"), "tool_extension_spec__inner_diameter"
     )
+    measuring_brands = sorted(
+        {
+            (b or "").strip().upper()
+            for b in ToolItem.objects.filter(category__in=MEASURING_CATEGORIES)
+            .exclude(measuring_tool_spec__brand="")
+            .values_list("measuring_tool_spec__brand", flat=True)
+            .distinct()
+            if (b or "").strip()
+        }
+    )
+    gauge_thread_sizes = sorted(
+        {
+            normalize_cutting_size_label(s)
+            for s in ToolItem.objects.filter(category="gauge_thread")
+            .exclude(measuring_tool_spec__thread_size_label="")
+            .values_list("measuring_tool_spec__thread_size_label", flat=True)
+            .distinct()
+            if normalize_cutting_size_label(s)
+        },
+        key=lambda x: (len(x), x),
+    )
 
     stock_address_hints = _stock_address_hint_rows(panel)
     stock_address_furniture = _stock_address_furniture_options(stock_address_hints)
@@ -5997,6 +6021,8 @@ def inventory_view(request):
             ensure_ascii=False,
         ),
         "measuring_category_keys": list(MEASURING_CATEGORIES),
+        "measuring_brands": measuring_brands,
+        "gauge_thread_sizes": gauge_thread_sizes,
         "thread_gauge_go_nogo": THREAD_GAUGE_GO_NOGO,
         "thread_gauge_tolerance_presets": THREAD_GAUGE_TOLERANCE_PRESETS,
         "tool_material_types": TOOL_MATERIAL_TYPES,

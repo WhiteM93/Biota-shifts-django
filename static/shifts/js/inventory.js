@@ -1941,9 +1941,9 @@ var INV = (function () {
         row.bt_insert_family = normalizeInsertFamilyValue(el.value || "");
       } else if (k === "bt_insert_size") {
         row.bt_insert_size = (el.value || "").trim().toUpperCase().replace(/\s+/g, "").replace(",", ".");
-      } else if (k === "ins_brand" || k === "ins_name" || k === "ext_brand") {
+      } else if (k === "ins_brand" || k === "ins_name" || k === "ext_brand" || k === "ms_brand") {
         row[k] = String(el.value || "").trim().toUpperCase();
-      } else if (k === "size_label" || k === "cs_size_label") {
+      } else if (k === "size_label" || k === "cs_size_label" || k === "ms_thread_size") {
         row[k] = normalizeMetricSizeLabel(el.value);
       } else {
         var rawVal = (el.value || "").trim();
@@ -2401,7 +2401,9 @@ var INV = (function () {
       "<tr>" +
       list
         .map(function (col) {
-          return arrivalTh(col.key, col.label, col.cls || "");
+          var cls = col.cls || "";
+          if (col.key === "row_remove" && !cls) cls = "arrival-row-remove-cell";
+          return arrivalTh(col.key, col.label, cls);
         })
         .join("") +
       "</tr>"
@@ -2873,7 +2875,7 @@ var INV = (function () {
       { key: "ms_thread_size", label: "Резьба" },
       { key: "ms_pitch_mm", label: "Шаг", cls: "short-col" },
       { key: "ms_go_nogo", label: "П/НП" },
-      { key: "ms_tolerance", label: "Допуск", cls: "short-col" },
+      { key: "ms_tolerance", label: "Допуск", cls: "tol-col" },
       { key: "brand", label: "Бренд" },
       { key: "notes", label: "Описание" },
       { key: "quantity", label: "Кол-во", cls: "qty-col" },
@@ -2921,7 +2923,7 @@ var INV = (function () {
       insertArrivalTh("notes", "Заметка") +
       insertArrivalTh("warehouse_address", "Адрес", "address-col") +
       insertArrivalTh("quantity", "Кол-во", "qty-col") +
-      insertArrivalTh("row_remove", "×") +
+      insertArrivalTh("row_remove", "", "arrival-row-remove-cell") +
       "</tr>",
   };
 
@@ -3150,7 +3152,9 @@ var INV = (function () {
         );
       }
       if (cat === "gauge_thread") {
-        cells.push('<td><input type="text" data-k="ms_thread_size" maxlength="32" placeholder="M10" required autocomplete="off" spellcheck="false"></td>');
+        cells.push(
+          '<td><input type="text" data-k="ms_thread_size" maxlength="32" placeholder="M10" list="arrival-ms-thread-size-list" required autocomplete="off" spellcheck="false" class="js-metric-size-input"></td>'
+        );
         cells.push('<td class="short-col"><input type="text" data-k="ms_pitch_mm" maxlength="8" placeholder="1.5" inputmode="decimal" required autocomplete="off" spellcheck="false"></td>');
         cells.push(
           '<td><select data-k="ms_go_nogo" required><option value="">—</option>' +
@@ -3158,10 +3162,12 @@ var INV = (function () {
             "</select></td>"
         );
         cells.push(
-          '<td class="short-col"><input type="text" data-k="ms_tolerance" maxlength="16" placeholder="6H" list="arrival-thread-tol-list" required autocomplete="off" spellcheck="false"></td>'
+          '<td class="tol-col"><input type="text" data-k="ms_tolerance" maxlength="16" placeholder="6H" list="arrival-thread-tol-list" required autocomplete="off" spellcheck="false" inputmode="text"></td>'
         );
       }
-      cells.push('<td><input type="text" data-k="ms_brand" maxlength="80" placeholder="Бренд" autocomplete="off" spellcheck="false"></td>');
+      cells.push(
+        '<td><input type="text" data-k="ms_brand" maxlength="80" placeholder="БРЕНД" list="arrival-ms-brand-list" autocomplete="off" spellcheck="false" class="js-insert-upper"></td>'
+      );
       if (cat === "measure_univ") {
         cells.push('<td><input type="text" data-k="ms_range" maxlength="64" placeholder="0–150 мм" required autocomplete="off" spellcheck="false"></td>');
         cells.push('<td><input type="text" data-k="ms_accuracy" maxlength="40" placeholder="0,01 мм" required autocomplete="off" spellcheck="false"></td>');
@@ -3178,8 +3184,16 @@ var INV = (function () {
       cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     }
-    cells.push('<td><button type="button" class="btn btn-ghost js-arrival-row-remove">×</button></td>');
+    cells.push(
+      '<td class="arrival-row-remove-cell">' +
+        '<button type="button" class="btn btn-inv-delete btn-inv-delete--s0 js-arrival-row-remove" data-step="0" title="Удалить строку" aria-label="Удалить строку"></button>' +
+        "</td>"
+    );
     tr.innerHTML = cells.join("");
+    var rmBtn = tr.querySelector(".js-arrival-row-remove");
+    if (rmBtn && window.BiotaDeleteBtn && window.BiotaDeleteBtn.init) {
+      window.BiotaDeleteBtn.init(rmBtn);
+    }
     if (cat === "collet") {
       attachArrivalMatchRow(tr, body);
       return;
@@ -3277,6 +3291,23 @@ var INV = (function () {
         }
       }
     }
+    if (t && t.classList && t.classList.contains("js-metric-size-input")) {
+      var s0 = t.selectionStart;
+      var s1 = t.selectionEnd;
+      var live = String(t.value || "")
+        .replace(/\u041c/g, "M")
+        .replace(/\u043c/g, "M")
+        .replace(/,/g, ".")
+        .toUpperCase();
+      if (t.value !== live) {
+        t.value = live;
+        if (typeof s0 === "number" && typeof s1 === "number") {
+          try {
+            t.setSelectionRange(s0, s1);
+          } catch (err2) {}
+        }
+      }
+    }
     if (t && t.classList && t.classList.contains("is-invalid") && isPositiveNumberField(t)) {
       t.classList.remove("is-invalid");
     }
@@ -3329,6 +3360,57 @@ var INV = (function () {
     scheduleArrivalMatchSearch(tr);
   });
 
+  var ARRIVAL_MS_BRAND_LS_KEY = "biota_arrival_ms_brands_v1";
+
+  function readRememberedMsBrands() {
+    var out = [];
+    try {
+      var raw = localStorage.getItem(ARRIVAL_MS_BRAND_LS_KEY);
+      var parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) {
+        parsed.forEach(function (b) {
+          var v = String(b || "").trim().toUpperCase();
+          if (v && out.indexOf(v) === -1) out.push(v);
+        });
+      }
+    } catch (err) {}
+    return out;
+  }
+
+  function rememberMsBrand(brand) {
+    var v = String(brand || "").trim().toUpperCase();
+    if (!v) return;
+    var list = readRememberedMsBrands();
+    if (list.indexOf(v) === -1) list.unshift(v);
+    list = list.slice(0, 40);
+    try {
+      localStorage.setItem(ARRIVAL_MS_BRAND_LS_KEY, JSON.stringify(list));
+    } catch (err2) {}
+    refreshMsBrandDatalist();
+  }
+
+  function refreshMsBrandDatalist() {
+    var dl = document.getElementById("arrival-ms-brand-list");
+    if (!dl) return;
+    var seen = {};
+    var merged = [];
+    function add(v) {
+      var x = String(v || "").trim().toUpperCase();
+      if (!x || seen[x]) return;
+      seen[x] = 1;
+      merged.push(x);
+    }
+    (INV.measuring_brands || []).forEach(add);
+    readRememberedMsBrands().forEach(add);
+    dl.innerHTML = merged
+      .map(function (b) {
+        return '<option value="' + String(b).replace(/"/g, "&quot;") + '"></option>';
+      })
+      .join("");
+  }
+
+  refreshMsBrandDatalist();
+
   groupsWrap.addEventListener("blur", function (e) {
     var t = e.target;
     if (!t || !t.getAttribute) return;
@@ -3341,9 +3423,30 @@ var INV = (function () {
       scheduleArrivalMatchSearch(trAng);
       return;
     }
-    if (dk !== "size_label" && dk !== "cs_size_label") return;
-    var normSize = normalizeMetricSizeLabel(t.value);
-    if (t.value !== normSize) t.value = normSize;
+    if (dk === "ms_brand") {
+      var brandUp = String(t.value || "").trim().toUpperCase();
+      if (t.value !== brandUp) t.value = brandUp;
+      rememberMsBrand(brandUp);
+      return;
+    }
+    if (dk === "size_label" || dk === "cs_size_label" || dk === "ms_thread_size") {
+      var normSize = normalizeMetricSizeLabel(t.value);
+      if (t.value !== normSize) t.value = normSize;
+      if (dk === "ms_thread_size" && normSize) {
+        var sizeDl = document.getElementById("arrival-ms-thread-size-list");
+        if (sizeDl) {
+          var hasSize = false;
+          sizeDl.querySelectorAll("option").forEach(function (o) {
+            if ((o.value || "") === normSize) hasSize = true;
+          });
+          if (!hasSize) {
+            var opt = document.createElement("option");
+            opt.value = normSize;
+            sizeDl.appendChild(opt);
+          }
+        }
+      }
+    }
   }, true);
 
   form.addEventListener("submit", function (e) {
@@ -3369,6 +3472,9 @@ var INV = (function () {
     }
     rowsJsonInput.value = JSON.stringify(rows);
     showArrivalBulkError("");
+    rows.forEach(function (r) {
+      if (r && r.ms_brand) rememberMsBrand(r.ms_brand);
+    });
   });
 
   form.addEventListener("submit", function () {
@@ -3424,6 +3530,23 @@ var INV = (function () {
     }
     var rm = e.target.closest(".js-arrival-row-remove");
     if (!rm) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var ARRIVAL_REMOVE_STEPS = 3;
+    var BDB = window.BiotaDeleteBtn;
+    var step = parseInt(rm.getAttribute("data-step") || "0", 10) + 1;
+    if (step < ARRIVAL_REMOVE_STEPS) {
+      if (BDB && BDB.setStep) {
+        BDB.setStep(rm, step);
+        rm.title = "Удалить: ещё " + (ARRIVAL_REMOVE_STEPS - step) + " наж.";
+        rm.setAttribute("aria-label", "Удалить: " + step + " из " + ARRIVAL_REMOVE_STEPS);
+      } else {
+        rm.setAttribute("data-step", String(step));
+        rm.classList.add("btn-inv-delete--s" + step);
+      }
+      return;
+    }
+    if (BDB && BDB.reset) BDB.reset(rm);
     var row = rm.closest("tr[data-arrival-row]");
     if (row) {
       var next = row.nextElementSibling;
