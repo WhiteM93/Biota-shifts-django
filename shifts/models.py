@@ -3869,6 +3869,11 @@ class VisualCabinetLevel(models.Model):
         verbose_name="Тип уровня",
     )
     columns = models.PositiveSmallIntegerField(default=3, verbose_name="Мест / ячеек")
+    rows = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Рядов на полке",
+        help_text="Сколько рядов тары друг на друге (1–4). Место = коробка/контейнер.",
+    )
 
     class Meta:
         ordering = ("index", "id")

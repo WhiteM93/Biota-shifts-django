@@ -55,7 +55,7 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
         self.assertEqual(cab["code"], "B")
         cab_id = cab["id"]
 
-        # shelf top=3 (bottom) → display 01; единственный контейнер на полке → место 01 → B-01-01
+        # shelf top=3 (bottom) → display 01; колонка 2 при 2 местах → место 02 → B-01-02
         res2 = self._post_json(
             self.upsert_url,
             {
@@ -71,12 +71,12 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
         self.assertEqual(res2.status_code, 200, res2.content[:400])
         cont = res2.json()["container"]
         self.assertEqual(cont["shelf_label"], "01")
-        self.assertEqual(cont["place_label"], "01")
-        self.assertEqual(cont["address"], "B-01-01")
-        self.assertEqual(cont["suggested_address"], "B-01-01")
+        self.assertEqual(cont["place_label"], "02")
+        self.assertEqual(cont["address"], "B-01-02")
+        self.assertEqual(cont["suggested_address"], "B-01-02")
 
         obj = VisualContainer.objects.get(pk=cont["id"])
-        self.assertEqual(obj.address, "B-01-01")
+        self.assertEqual(obj.address, "B-01-02")
 
         # change furniture code → auto address refreshes
         detail = reverse("visual_warehouse_api_cabinet_detail", args=[cab_id])
@@ -84,7 +84,7 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
         self.assertEqual(res3.status_code, 200, res3.content[:400])
         self.assertEqual(res3.json()["cabinet"]["code"], "A")
         obj.refresh_from_db()
-        self.assertEqual(obj.address, "A-01-01")
+        self.assertEqual(obj.address, "A-01-02")
 
     def test_code_change_persists_when_sections_sent(self):
         """UI шкафа всегда шлёт sections — буква не должна откатываться после layout."""

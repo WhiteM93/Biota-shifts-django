@@ -732,7 +732,7 @@ html[data-theme="dawn"] .vw-floor {
 
 .vw-cab-level-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(110px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, 0.9fr) minmax(90px, 0.9fr) auto;
   gap: 0.35rem;
   align-items: center;
 }

@@ -407,20 +407,37 @@
     return pad2(Math.max(1, parseInt(col, 10) || 1));
   }
 
+  function placeNumFromPosition(stack, column, columns, rows) {
+    var cols = Math.max(1, Math.min(12, parseInt(columns, 10) || 1));
+    var rowsN = Math.max(1, Math.min(4, parseInt(rows, 10) || 1));
+    var st = Math.max(1, Math.min(parseInt(stack, 10) || 1, rowsN));
+    var col = Math.max(1, Math.min(parseInt(column, 10) || 1, cols));
+    return (rowsN - st) * cols + col;
+  }
+
+  function levelRowsOf(level) {
+    if (level && level.kind === "drawer") return 1;
+    return Math.max(1, Math.min(4, parseInt(level && level.rows, 10) || 1));
+  }
+
   function shelfPlaceLabels(cab, shelf, level) {
     var peers = level
       ? containersOnLevel(cab, level)
       : (cab.containers || []).filter(function (c) {
           return !c.parent_id && Number(c.shelf) === Number(shelf);
         });
-    peers.sort(function (a, b) {
-      return (b.stack || 1) - (a.stack || 1)
-        || (a.column || 1) - (b.column || 1)
-        || (a.id || 0) - (b.id || 0);
-    });
+    var cols = Math.max(1, parseInt(level && level.columns, 10) || parseInt(cab.columns, 10) || 1);
+    var rowsN = level ? levelRowsOf(level) : 1;
+    if (!level) {
+      peers.forEach(function (c) {
+        rowsN = Math.max(rowsN, parseInt(c.stack, 10) || 1);
+      });
+    }
     var map = {};
-    peers.forEach(function (c, i) {
-      if (c && c.id != null) map[c.id] = pad2(i + 1);
+    peers.forEach(function (c) {
+      if (c && c.id != null) {
+        map[c.id] = placeDisplayLabel(placeNumFromPosition(c.stack || 1, c.column || 1, cols, rowsN));
+      }
     });
     return map;
   }
@@ -474,11 +491,16 @@
 
   function findFreeOnLevel(cab, level) {
     var cols = Math.max(1, parseInt(level && level.columns, 10) || parseInt(cab.columns, 10) || 1);
+    var rowsN = levelRowsOf(level);
     var occ = occupiedMap(cab, level);
     var keyShelf = level && level.id ? ("L" + level.id) : String(level.index);
-    for (var c = 1; c <= cols; c++) {
-      if (!occ[keyShelf + ":1:" + c]) {
-        return { shelf: level.index, stack: 1, column: c, level_id: level.id || null };
+    var capacity = cols * rowsN;
+    for (var place = 1; place <= capacity; place++) {
+      var rowFromTop = Math.floor((place - 1) / cols);
+      var stack = rowsN - rowFromTop;
+      var column = ((place - 1) % cols) + 1;
+      if (!occ[keyShelf + ":" + stack + ":" + column]) {
+        return { shelf: level.index, stack: stack, column: column, level_id: level.id || null };
       }
     }
     return { shelf: level.index, stack: 1, column: cols + 1, level_id: level.id || null };
@@ -1025,17 +1047,17 @@
     if (level.id) bay.dataset.levelId = String(level.id);
 
     var cols = Math.max(1, parseInt(level.columns, 10) || parseInt(cab.columns, 10) || 1);
+    var rowsN = levelRowsOf(level);
     var space = document.createElement("div");
     space.className = "vw-bay-space";
     space.style.gridTemplateColumns = "repeat(" + cols + ", minmax(0, 1fr))";
     space.style.gridAutoFlow = "row dense";
 
     var onShelf = containersOnLevel(cab, level);
-    var piles = {};
+    var byCell = {};
     onShelf.forEach(function (cont) {
-      var key = String(cont.column);
-      if (!piles[key]) piles[key] = [];
-      piles[key].push(cont);
+      var key = String(cont.stack || 1) + ":" + String(cont.column);
+      byCell[key] = cont;
     });
 
     var occupied = occupiedMap(cab, level);
@@ -1043,31 +1065,29 @@
     var keyShelf = level.id ? ("L" + level.id) : String(shelf);
 
     for (var col = 1; col <= cols; col++) {
-      var list = (piles[String(col)] || []).slice().sort(function (a, b) {
-        return (a.stack || 1) - (b.stack || 1);
-      });
-      if (list.length) {
-        var span = 1;
-        list.forEach(function (cont) { span = Math.max(span, cont.col_span || 1); });
-        span = Math.min(span, cols - col + 1);
-        var pile = document.createElement("div");
-        pile.className = "vw-pile";
-        pile.style.gridColumn = col + " / span " + span;
-        list.forEach(function (cont) {
+      var pile = document.createElement("div");
+      pile.className = "vw-pile";
+      pile.style.gridColumn = String(col);
+      var hasAny = false;
+      for (var st = 1; st <= rowsN; st++) {
+        var cont = byCell[String(st) + ":" + String(col)];
+        if (cont) {
+          var span = Math.min(cont.col_span || 1, cols - col + 1);
+          if (span > 1) pile.style.gridColumn = col + " / span " + span;
           pile.appendChild(buildBin(cab, cont, placeLabels, section, level));
-        });
-        space.appendChild(pile);
-      } else if (!occupied[keyShelf + ":1:" + col]) {
-        space.appendChild(buildEmptyShelfCell(cab, shelf, col, section, level, levelsTotal));
+          hasAny = true;
+        } else if (!occupied[keyShelf + ":" + st + ":" + col]) {
+          pile.appendChild(buildEmptyShelfCell(cab, shelf, col, section, level, levelsTotal, st));
+          hasAny = true;
+        }
       }
+      if (hasAny) space.appendChild(pile);
     }
 
     if (editMode) {
-      var freeCol = null;
-      for (var c = 1; c <= cols; c++) {
-        if (!occupied[keyShelf + ":1:" + c]) { freeCol = c; break; }
-      }
-      if (freeCol === null) {
+      var free = findFreeOnLevel(cab, level);
+      var freeTaken = free.column > cols;
+      if (freeTaken) {
         var addBtn = document.createElement("button");
         addBtn.type = "button";
         addBtn.className = "vw-bay-add";
@@ -1079,8 +1099,8 @@
         addBtn.addEventListener("click", function (ev) {
           ev.preventDefault();
           ev.stopPropagation();
-          var free = findFreeOnLevel(cab, level);
-          openContainerForm(cab, null, free.shelf, free.stack, free.column, level);
+          var next = findFreeOnLevel(cab, level);
+          openContainerForm(cab, null, next.shelf, next.stack, next.column, level);
         });
         space.appendChild(addBtn);
       }
@@ -1094,12 +1114,14 @@
     return bay;
   }
 
-  function buildEmptyShelfCell(cab, shelf, col, section, level, levelsTotal) {
+  function buildEmptyShelfCell(cab, shelf, col, section, level, levelsTotal, stack) {
+    var st = Math.max(1, parseInt(stack, 10) || 1);
     var btn = document.createElement("button");
     btn.type = "button";
     btn.className = "vw-shelf-empty";
-    btn.style.gridColumn = String(col);
-    var placeLab = placeDisplayLabel(col);
+    var cols = Math.max(1, parseInt(level && level.columns, 10) || parseInt(cab.columns, 10) || 1);
+    var rowsN = levelRowsOf(level);
+    var placeLab = placeDisplayLabel(placeNumFromPosition(st, col, cols, rowsN));
     var num = document.createElement("span");
     num.className = "vw-place-num";
     num.textContent = placeLab;
@@ -1116,9 +1138,9 @@
     btn.addEventListener("click", function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
-      if (editMode && canEdit) openContainerForm(cab, null, shelf, 1, col, level);
+      if (editMode && canEdit) openContainerForm(cab, null, shelf, st, col, level);
     });
-    if (!editMode || !canEdit) btn.disabled = true;
+    if (!editMode) btn.disabled = true;
     return btn;
   }
 
@@ -1508,9 +1530,13 @@
     var hCols = document.createElement("span");
     hCols.className = "vw-row-label";
     hCols.textContent = "Мест в ряд";
+    var hRows = document.createElement("span");
+    hRows.className = "vw-row-label";
+    hRows.textContent = "Рядов тары";
     var hPad = document.createElement("span");
     levelsHead.appendChild(hKind);
     levelsHead.appendChild(hCols);
+    levelsHead.appendChild(hRows);
     levelsHead.appendChild(hPad);
     card.appendChild(levelsHead);
 
@@ -1578,10 +1604,32 @@
     cols.max = "12";
     cols.className = "vw-control js-vw-lvl-columns";
     cols.value = String(lvl.columns || 4);
-    cols.title = "Сколько мест (ячеек) в ряд на этом уровне";
+    cols.title = "Сколько мест (тары) в ряд на этом уровне";
     cols.setAttribute("aria-label", "Мест в ряд на уровне");
     colsWrap.appendChild(colsLab);
     colsWrap.appendChild(cols);
+    var rowsWrap = document.createElement("label");
+    rowsWrap.className = "vw-cab-lvl-cols";
+    var rowsLab = document.createElement("span");
+    rowsLab.className = "vw-cab-lvl-cols__lab";
+    rowsLab.textContent = "рядов";
+    var rowsInp = document.createElement("input");
+    rowsInp.type = "number";
+    rowsInp.min = "1";
+    rowsInp.max = "4";
+    rowsInp.className = "vw-control js-vw-lvl-rows";
+    rowsInp.value = String(Math.max(1, Math.min(4, parseInt(lvl.rows, 10) || 1)));
+    rowsInp.title = "Рядов тары друг на друге (место = коробка/контейнер)";
+    rowsInp.setAttribute("aria-label", "Рядов тары на полке");
+    rowsWrap.appendChild(rowsLab);
+    rowsWrap.appendChild(rowsInp);
+    function syncRowsForKind() {
+      var isDrawer = kindSel.value === "drawer";
+      rowsInp.disabled = isDrawer;
+      if (isDrawer) rowsInp.value = "1";
+    }
+    kindSel.addEventListener("change", syncRowsForKind);
+    syncRowsForKind();
     var rm = document.createElement("button");
     rm.type = "button";
     rm.className = "vw-btn-ghost vw-btn-compact";
@@ -1605,6 +1653,7 @@
     });
     row.appendChild(kindSel);
     row.appendChild(colsWrap);
+    row.appendChild(rowsWrap);
     row.appendChild(rm);
     return row;
   }
@@ -1617,9 +1666,12 @@
       [].forEach.call(card.querySelectorAll(".js-vw-sec-levels .vw-cab-level-row"), function (row) {
         var kindEl = row.querySelector(".js-vw-lvl-kind");
         var colsEl = row.querySelector(".js-vw-lvl-columns");
+        var rowsEl = row.querySelector(".js-vw-lvl-rows");
+        var kind = kindEl ? kindEl.value : "shelf";
         var item = {
-          kind: kindEl ? kindEl.value : "shelf",
-          columns: colsEl ? parseInt(colsEl.value, 10) || 1 : 1
+          kind: kind,
+          columns: colsEl ? parseInt(colsEl.value, 10) || 1 : 1,
+          rows: kind === "drawer" ? 1 : (rowsEl ? Math.max(1, Math.min(4, parseInt(rowsEl.value, 10) || 1)) : 1)
         };
         if (row.dataset.levelId) item.id = parseInt(row.dataset.levelId, 10);
         levels.push(item);

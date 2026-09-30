@@ -66,6 +66,7 @@ from .visual_warehouse_address import (
     cabinet_code_of,
     cabinet_section_count,
     ensure_cabinet_layout,
+    ensure_places_from_warehouse_addresses,
     ensure_warehouse_address,
     level_total_in_section,
     normalize_address,
@@ -1024,6 +1025,7 @@ def _serialize_level(
         "index": level.index,
         "kind": level.kind,
         "columns": level.columns,
+        "rows": max(1, min(4, int(getattr(level, "rows", 1) or 1))),
         "containers": [
             _serialize_container(
                 c,
@@ -1038,6 +1040,8 @@ def _serialize_level(
 
 def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> dict:
     ensure_cabinet_layout(cab)
+    if with_containers:
+        ensure_places_from_warehouse_addresses(cab)
     sections_qs = list(
         cab.sections.prefetch_related("levels").order_by("index", "id")
     )
@@ -1144,6 +1148,7 @@ def _serialize_cabinet(cab: VisualCabinet, *, with_containers: bool = True) -> d
                         "index": lvl.index,
                         "kind": lvl.kind,
                         "columns": lvl.columns,
+                        "rows": max(1, min(4, int(getattr(lvl, "rows", 1) or 1))),
                         "containers": [],
                     }
                     for lvl in sorted(sec.levels.all(), key=lambda x: (x.index, x.id))

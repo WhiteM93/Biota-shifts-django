@@ -85,3 +85,60 @@ class WarehouseAddressRegistryTests(TestCase):
         # На этикетке остаётся адрес; наименование — в справочнике
         self.assertEqual(cont.label, "E-01-01")
         self.assertEqual(WarehouseAddress.objects.get(address="E-01-01").label, "Головки")
+
+    def test_ensure_places_from_addresses_creates_only_known(self):
+        from shifts.visual_warehouse_address import (
+            ensure_cabinet_layout,
+            ensure_places_from_warehouse_addresses,
+            place_to_stack_column,
+        )
+
+        cab = VisualCabinet.objects.create(
+            name="Стеллаж F",
+            kind=VisualCabinet.KIND_RACK,
+            shelves=2,
+            columns=2,
+            code="F",
+        )
+        ensure_cabinet_layout(cab, sections=1, shelves_per_section=2, columns=2)
+        level = cab.sections.get().levels.get(index=2)  # display 01 (низ)
+        level.rows = 2
+        level.save(update_fields=["rows"])
+
+        ToolItem.objects.create(
+            category="drill",
+            name="Сверло",
+            quantity=1,
+            warehouse_address="F-01-01",
+        )
+        ensure_warehouse_address("F-01-03", label="Коробка 3")
+        # F-01-02 нет — слот должен остаться пустым
+
+        n = ensure_places_from_warehouse_addresses(cab)
+        self.assertEqual(n, 2)
+        addrs = set(
+            VisualContainer.objects.filter(cabinet=cab).values_list("address", flat=True)
+        )
+        self.assertEqual(addrs, {"F-01-01", "F-01-03"})
+        self.assertFalse(
+            VisualContainer.objects.filter(cabinet=cab, address="F-01-02").exists()
+        )
+
+        st, col, _ = place_to_stack_column(3, columns=2, rows=2)
+        cont3 = VisualContainer.objects.get(cabinet=cab, address="F-01-03")
+        self.assertEqual(cont3.stack, st)
+        self.assertEqual(cont3.column, col)
+        self.assertEqual(cont3.level_id, level.id)
+
+        # повторный вызов не дублирует
+        self.assertEqual(ensure_places_from_warehouse_addresses(cab), 0)
+
+    def test_place_to_stack_column_two_rows(self):
+        from shifts.visual_warehouse_address import place_num_from_position, place_to_stack_column
+
+        self.assertEqual(place_to_stack_column(1, columns=2, rows=2), (2, 1, 2))
+        self.assertEqual(place_to_stack_column(2, columns=2, rows=2), (2, 2, 2))
+        self.assertEqual(place_to_stack_column(3, columns=2, rows=2), (1, 1, 2))
+        self.assertEqual(place_to_stack_column(4, columns=2, rows=2), (1, 2, 2))
+        self.assertEqual(place_num_from_position(stack=2, column=1, columns=2, rows=2), 1)
+        self.assertEqual(place_num_from_position(stack=1, column=2, columns=2, rows=2), 4)

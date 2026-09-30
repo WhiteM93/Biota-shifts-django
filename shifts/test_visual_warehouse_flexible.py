@@ -181,7 +181,7 @@ class FlexibleCabinetLayoutTests(TestCase):
         self.assertEqual(cont["level_id"], drawer_level_id)
         self.assertEqual(cont["level_kind"], "drawer")
         self.assertEqual(cont["section_index"], 1)
-        self.assertEqual(cont["address"], "G-1-01-01")
+        self.assertEqual(cont["address"], "G-1-01-02")
         obj = VisualContainer.objects.get(pk=cont["id"])
         self.assertEqual(obj.level_id, drawer_level_id)
         self.assertEqual(obj.shelf, 2)
