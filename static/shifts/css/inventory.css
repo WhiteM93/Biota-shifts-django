@@ -2180,6 +2180,7 @@ html[data-theme="dawn"] .inv-page--stock .inv-stock-grid tr.inv-stock-row-hl > t
 .inv-addr-hint-modal__tools .js-addr-hint-print {
   height: 36px;
 }
+
 .inv-addr-hint-modal__table-wrap {
   flex: 1 1 auto;
   min-height: 0;

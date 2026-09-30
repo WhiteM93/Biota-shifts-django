@@ -4956,7 +4956,7 @@ var INV = (function () {
         .replace(/"/g, "&quot;");
     }
 
-    function printRows() {
+    function collectPrintLines() {
       var furnId = printFurnSel ? String(printFurnSel.value || "") : "";
       var furnTitle = "Вся мебель";
       if (printFurnSel && printFurnSel.selectedIndex >= 0) {
@@ -4989,8 +4989,15 @@ var INV = (function () {
           furniture: furn || "—",
         });
       });
+      return { lines: lines, furnId: furnId, furnTitle: furnTitle };
+    }
+
+    function printRows() {
+      var payload = collectPrintLines();
+      var lines = payload.lines;
+      var furnTitle = payload.furnTitle;
       if (!lines.length) {
-        window.alert(furnId ? "Нет адресов для выбранной мебели." : "Нет адресов для печати.");
+        window.alert(payload.furnId ? "Нет адресов для выбранной мебели." : "Нет адресов для печати.");
         return;
       }
       var w = window.open("", "_blank");

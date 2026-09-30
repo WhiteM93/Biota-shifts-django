@@ -129,10 +129,32 @@
             <button type="button" class="forms-align-btn js-forms-heading-align" data-align="right" title="Справа">Справа</button>
           </div>
         </div>
+      </section>
+
+      <section class="forms-props-block js-forms-font-props forms-is-hidden" hidden>
+        <h2 class="forms-props-heading">Шрифт</h2>
         <label class="forms-row">
           <span class="forms-row-label">Размер, pt</span>
-          <input type="number" class="forms-control forms-control--num js-forms-heading-size" min="8" max="48" step="1" value="16">
+          <input type="number" class="forms-control forms-control--num js-forms-font-size" min="8" max="500" step="1" value="12">
         </label>
+        <div class="forms-row">
+          <span class="forms-row-label">Начертание</span>
+          <div class="forms-fmt-group" role="group" aria-label="Начертание текста">
+            <button type="button" class="forms-fmt-btn js-forms-font-bold" title="Жирный">B</button>
+            <button type="button" class="forms-fmt-btn forms-fmt-btn--italic js-forms-font-italic" title="Курсив">I</button>
+            <button type="button" class="forms-fmt-btn forms-fmt-btn--underline js-forms-font-underline" title="Подчёркивание">U</button>
+            <button type="button" class="forms-fmt-btn forms-fmt-btn--strike js-forms-font-strike" title="Зачёркивание">S</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="forms-props-block js-forms-layout-props forms-is-hidden" hidden>
+        <h2 class="forms-props-heading">Ширина в ряду</h2>
+        <label class="forms-row">
+          <span class="forms-row-label">Ширина, %</span>
+          <input type="number" class="forms-control forms-control--num js-forms-col-pct" min="10" max="100" step="1" value="100">
+        </label>
+        <p class="forms-props-hint">Меньше 100% — элемент встаёт в ряд с соседними, пока хватает ширины. У блока ширина задаётся в мм.</p>
       </section>
 
       <section class="forms-props-block js-forms-image-props forms-is-hidden" hidden>
@@ -164,11 +186,37 @@
         <button type="button" class="forms-add-btn js-forms-image-replace" style="width:100%;margin-top:4px">Заменить файл</button>
       </section>
 
+      <section class="forms-props-block js-forms-box-props forms-is-hidden" hidden>
+        <h2 class="forms-props-heading">Блок</h2>
+        <label class="forms-row">
+          <span class="forms-row-label">Ширина, мм</span>
+          <input type="number" class="forms-control forms-control--num js-forms-box-width" min="10" max="200" step="1" value="60">
+        </label>
+        <label class="forms-row">
+          <span class="forms-row-label">Высота, мм</span>
+          <input type="number" class="forms-control forms-control--num js-forms-box-height" min="10" max="280" step="1" value="40">
+        </label>
+        <label class="forms-row">
+          <span class="forms-row-label">Толщина рамки, мм</span>
+          <input type="number" class="forms-control forms-control--num js-forms-box-border" min="0" max="5" step="0.1" value="0.5">
+        </label>
+        <div class="forms-row">
+          <span class="forms-row-label">Текст</span>
+          <div class="forms-align-group" role="group" aria-label="Выравнивание текста в блоке">
+            <button type="button" class="forms-align-btn js-forms-box-align" data-align="left" title="Слева">Слева</button>
+            <button type="button" class="forms-align-btn js-forms-box-align" data-align="center" title="По центру">Центр</button>
+            <button type="button" class="forms-align-btn js-forms-box-align" data-align="right" title="Справа">Справа</button>
+          </div>
+        </div>
+        <p class="forms-props-hint">Несколько блоков подряд встают в ряд, пока хватает ширины листа.</p>
+      </section>
+
       <section class="forms-props-block">
         <h2 class="forms-props-heading">Элементы</h2>
         <div class="forms-add-grid" role="toolbar" aria-label="Добавить элемент">
           <button type="button" class="forms-add-btn js-forms-add" data-type="heading">Заголовок</button>
           <button type="button" class="forms-add-btn js-forms-add" data-type="text">Текст</button>
+          <button type="button" class="forms-add-btn js-forms-add" data-type="box">Блок</button>
           <button type="button" class="forms-add-btn js-forms-add" data-type="image">Картинка</button>
           <button type="button" class="forms-add-btn js-forms-add" data-type="table">Таблица</button>
           <button type="button" class="forms-add-btn js-forms-add" data-type="list">Список</button>

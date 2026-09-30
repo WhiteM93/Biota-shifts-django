@@ -17,7 +17,7 @@ MAX_ELEMENTS = 200
 MAX_PAGES = 20
 MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024
 VALID_ORIENTATIONS = {PrintForm.ORIENTATION_PORTRAIT, PrintForm.ORIENTATION_LANDSCAPE}
-VALID_ELEMENT_TYPES = {"heading", "text", "table", "checkbox", "list", "line", "date", "fio", "item", "image"}
+VALID_ELEMENT_TYPES = {"heading", "text", "box", "table", "checkbox", "list", "line", "date", "fio", "item", "image"}
 _HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _BORDER_STYLES = {"solid", "dashed", "dotted", "double"}
 _HEADING_ALIGNS = {"left", "center", "right"}
@@ -65,21 +65,28 @@ def _norm_page_settings(raw) -> dict:
     }
 
 
+def _norm_font_fmt(item, *, default_font_size: int = 12) -> dict:
+    try:
+        font_size = int(item.get("font_size") or default_font_size)
+    except (TypeError, ValueError):
+        font_size = default_font_size
+    return {
+        "font_size": max(8, min(500, font_size)),
+        "bold": bool(item.get("bold")),
+        "italic": bool(item.get("italic")),
+        "underline": bool(item.get("underline")),
+        "strike": bool(item.get("strike")),
+    }
+
+
 def _norm_cell(raw, *, default_hidden: bool = False) -> dict:
     def _cell_text_fmt(item: dict) -> dict:
         align = str(item.get("align") or "left").strip().lower()
         if align not in _HEADING_ALIGNS:
             align = "left"
-        try:
-            font_size = int(item.get("font_size") or 12)
-        except (TypeError, ValueError):
-            font_size = 12
         return {
             "align": align,
-            "font_size": max(8, min(48, font_size)),
-            "bold": bool(item.get("bold")),
-            "italic": bool(item.get("italic")),
-            "underline": bool(item.get("underline")),
+            **_norm_font_fmt(item, default_font_size=12),
         }
 
     if isinstance(raw, str):
@@ -145,11 +152,7 @@ def _norm_elements(raw) -> list[dict]:
             if align not in _HEADING_ALIGNS:
                 align = "left"
             el["align"] = align
-            try:
-                font_size = int(item.get("font_size") or 16)
-            except (TypeError, ValueError):
-                font_size = 16
-            el["font_size"] = max(8, min(48, font_size))
+            el.update(_norm_font_fmt(item, default_font_size=16))
         elif t == "text":
             el["text"] = str(item.get("text") or "")[:4000]
             try:
@@ -157,6 +160,29 @@ def _norm_elements(raw) -> list[dict]:
             except (TypeError, ValueError):
                 height_px = 0
             el["height_px"] = max(0, min(2000, height_px))
+            el.update(_norm_font_fmt(item, default_font_size=12))
+        elif t == "box":
+            el["text"] = str(item.get("text") or "")[:2000]
+            try:
+                width_mm = float(item.get("width_mm", 60))
+            except (TypeError, ValueError):
+                width_mm = 60.0
+            try:
+                height_mm = float(item.get("height_mm", 40))
+            except (TypeError, ValueError):
+                height_mm = 40.0
+            el["width_mm"] = round(max(10.0, min(200.0, width_mm)), 1)
+            el["height_mm"] = round(max(10.0, min(280.0, height_mm)), 1)
+            try:
+                border_width = float(item.get("border_width_mm", 0.5))
+            except (TypeError, ValueError):
+                border_width = 0.5
+            el["border_width_mm"] = round(max(0.0, min(5.0, border_width)), 1)
+            align = str(item.get("align") or "center").strip().lower()
+            if align not in _HEADING_ALIGNS:
+                align = "center"
+            el["align"] = align
+            el.update(_norm_font_fmt(item, default_font_size=11))
         elif t == "table":
             el["rows"] = max(1, min(50, int(item.get("rows") or 1)))
             el["cols"] = max(1, min(20, int(item.get("cols") or 1)))
@@ -259,6 +285,13 @@ def _norm_elements(raw) -> list[dict]:
         except (TypeError, ValueError):
             page = 0
         el["page"] = max(0, min(MAX_PAGES - 1, page))
+        if t != "box":
+            # Доля ширины листа для ряда (блоки задают мм отдельно).
+            try:
+                col_pct = float(item.get("col_pct", 100))
+            except (TypeError, ValueError):
+                col_pct = 100.0
+            el["col_pct"] = round(max(10.0, min(100.0, col_pct)), 1)
         if not el.get("id"):
             continue
         out.append(el)

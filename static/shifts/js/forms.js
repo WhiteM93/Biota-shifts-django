@@ -38,8 +38,18 @@
   var borderStyleSelect = root.querySelector(".js-forms-border-style");
   var headingPropsBlock = root.querySelector(".js-forms-heading-props");
   var headingAlignBtns = root.querySelectorAll(".js-forms-heading-align");
-  var headingSizeInput = root.querySelector(".js-forms-heading-size");
   var activeHeadingId = null;
+  var fontPropsBlock = root.querySelector(".js-forms-font-props");
+  var fontSizeInput = root.querySelector(".js-forms-font-size");
+  var fontBoldBtn = root.querySelector(".js-forms-font-bold");
+  var fontItalicBtn = root.querySelector(".js-forms-font-italic");
+  var fontUnderlineBtn = root.querySelector(".js-forms-font-underline");
+  var fontStrikeBtn = root.querySelector(".js-forms-font-strike");
+  var activeTextId = null;
+  var layoutPropsBlock = root.querySelector(".js-forms-layout-props");
+  var colPctInput = root.querySelector(".js-forms-col-pct");
+  var selectedElId = null;
+  var elementClipboard = null;
   var imagePropsBlock = root.querySelector(".js-forms-image-props");
   var imageFrameColorInput = root.querySelector(".js-forms-image-frame-color");
   var imageFrameWidthInput = root.querySelector(".js-forms-image-frame-width");
@@ -48,6 +58,12 @@
   var imageReplaceBtn = root.querySelector(".js-forms-image-replace");
   var imageCaptionInput = root.querySelector(".js-forms-image-caption");
   var activeImageId = null;
+  var boxPropsBlock = root.querySelector(".js-forms-box-props");
+  var boxWidthInput = root.querySelector(".js-forms-box-width");
+  var boxHeightInput = root.querySelector(".js-forms-box-height");
+  var boxBorderInput = root.querySelector(".js-forms-box-border");
+  var boxAlignBtns = root.querySelectorAll(".js-forms-box-align");
+  var activeBoxId = null;
   var tablePropsBlock = root.querySelector(".js-forms-table-props");
   var tableToolbarHost = root.querySelector(".js-forms-table-toolbar-host");
   var activeTableId = null;
@@ -100,8 +116,12 @@
       ".forms-print-sheet[data-orientation=\"landscape\"] { width: 297mm; height: 210mm; }" +
       ".forms-print-frame { position: absolute; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }" +
       ".forms-print-inner { position: absolute; top: 0; left: 0; right: 0; bottom: 0; box-sizing: border-box; overflow: visible; }" +
-      ".forms-print-body { position: static; overflow: visible; height: auto; }" +
-      ".forms-el { position: relative; margin-bottom: 8px; overflow: visible; }" +
+      ".forms-print-body { position: static; overflow: visible; height: auto; display: flex; flex-wrap: wrap; align-content: flex-start; align-items: flex-start; column-gap: 2mm; row-gap: 0; }" +
+      ".forms-el { position: relative; flex: 0 0 100%; width: 100%; max-width: 100%; box-sizing: border-box; margin-bottom: 8px; overflow: visible; }" +
+      ".forms-el--box, .forms-el--col { flex: 0 0 auto; width: auto; max-width: 100%; }" +
+      ".forms-el--box { margin-bottom: 2mm; flex-shrink: 0; }" +
+      ".forms-el-box { position: relative; display: block; width: 100%; height: 100%; box-sizing: border-box; background: #fff; padding: 1.5mm; overflow: hidden; border: 0.5mm solid #000; }" +
+      ".forms-print-box-text { position: absolute; left: 1.5mm; right: 1.5mm; top: 50%; transform: translateY(-50%); box-sizing: border-box; margin: 0; padding: 0; font-size: 11pt; line-height: 1; color: #000; white-space: pre-wrap; word-wrap: break-word; overflow: hidden; text-align: center; }" +
       ".forms-print-heading { display: block; width: 100%; font-weight: 700; line-height: 1.2; margin: 0; padding: 2px 0; overflow: visible; }" +
       ".forms-print-text { display: block; width: 100%; min-height: 48px; line-height: 1.35; margin: 0; padding: 2px 0; overflow: visible; }" +
       ".forms-print-static-text { overflow: visible !important; height: auto !important; min-height: 0 !important; max-height: none !important; color: #000; background: transparent; padding: 0; margin: 0; }" +
@@ -193,6 +213,8 @@
     currentPageIndex = next;
     setActiveHeading(null);
     setActiveImage(null);
+    setActiveBox(null);
+    setActiveText(null);
     syncTableToolbar(null);
     renderPagesBar();
     renderCanvas({ skipCapture: true });
@@ -240,6 +262,8 @@
     currentPageIndex = count;
     setActiveHeading(null);
     setActiveImage(null);
+    setActiveBox(null);
+    setActiveText(null);
     syncTableToolbar(null);
     renderPagesBar();
     renderCanvas({ skipCapture: true });
@@ -266,6 +290,8 @@
     }
     setActiveHeading(null);
     setActiveImage(null);
+    setActiveBox(null);
+    setActiveText(null);
     syncTableToolbar(null);
     renderPagesBar();
     renderCanvas({ skipCapture: true });
@@ -296,20 +322,227 @@
   function normHeadingFontSize(size) {
     var fs = parseInt(size, 10);
     if (isNaN(fs)) fs = 16;
-    return Math.max(8, Math.min(48, fs));
+    return Math.max(8, Math.min(500, fs));
+  }
+
+  function textDecorationCss(fmt) {
+    var parts = [];
+    if (fmt && fmt.underline) parts.push("underline");
+    if (fmt && fmt.strike) parts.push("line-through");
+    return parts.length ? parts.join(" ") : "none";
+  }
+
+  function defaultFontSizeForType(type) {
+    if (type === "heading") return 16;
+    if (type === "box") return 11;
+    return 12;
+  }
+
+  function ensureColPct(elData) {
+    if (!elData || elData.type === "box") return;
+    var p = parseFloat(elData.col_pct);
+    if (isNaN(p)) p = 100;
+    elData.col_pct = Math.round(Math.max(10, Math.min(100, p)) * 10) / 10;
+  }
+
+  function applyElementColLayout(wrap, elData) {
+    if (!wrap || !elData) return;
+    if (elData.type === "box") return;
+    ensureColPct(elData);
+    if (elData.col_pct >= 99.5) {
+      wrap.classList.remove("forms-el--col");
+      wrap.style.flex = "";
+      wrap.style.width = "";
+      wrap.style.maxWidth = "";
+      return;
+    }
+    wrap.classList.add("forms-el--col");
+    wrap.style.flex = "0 0 " + elData.col_pct + "%";
+    wrap.style.width = elData.col_pct + "%";
+    wrap.style.maxWidth = "100%";
+  }
+
+  function syncLayoutPropsUi(elData) {
+    if (!layoutPropsBlock) return;
+    if (!canEdit || !elData || elData.type === "box") {
+      setPanelVisible(layoutPropsBlock, false);
+      return;
+    }
+    ensureColPct(elData);
+    setPanelVisible(layoutPropsBlock, true);
+    if (colPctInput) colPctInput.value = String(elData.col_pct);
+  }
+
+  function setSelectedElement(elData) {
+    selectedElId = elData && elData.id ? elData.id : null;
+    syncLayoutPropsUi(elData && elData.type !== "box" ? elData : null);
+  }
+
+  function getSelectedElement() {
+    return findElementById(selectedElId);
+  }
+
+  function cloneElementData(elData) {
+    if (!elData) return null;
+    try {
+      return JSON.parse(JSON.stringify(elData));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function copyElementToClipboard(elData) {
+    if (!elData) return false;
+    captureEditorState();
+    var fresh = findElementById(elData.id) || elData;
+    elementClipboard = cloneElementData(fresh);
+    return !!elementClipboard;
+  }
+
+  function pasteElementFromClipboard(afterElData) {
+    if (!canEdit || !elementClipboard) return null;
+    var form = currentForm();
+    if (!form) return null;
+    captureEditorState();
+    var el = cloneElementData(elementClipboard);
+    if (!el) return null;
+    el.id = uid();
+    el.page = getCurrentPageIndex(form);
+    var idx = -1;
+    var afterId = afterElData && afterElData.id ? afterElData.id : selectedElId;
+    if (afterId) {
+      for (var i = 0; i < form.elements.length; i++) {
+        if (form.elements[i].id === afterId) {
+          idx = i;
+          break;
+        }
+      }
+    }
+    if (idx >= 0) form.elements.splice(idx + 1, 0, el);
+    else form.elements.push(el);
+    selectedElId = el.id;
+    renderCanvas();
+    scheduleSave();
+    return el;
+  }
+
+  function swapElementOnPage(elData, index, direction) {
+    var form = currentForm();
+    if (!form) return;
+    var page = ensureElementPage(elData);
+    var target = -1;
+    if (direction < 0) {
+      for (var i = index - 1; i >= 0; i--) {
+        if (ensureElementPage(form.elements[i]) === page) {
+          target = i;
+          break;
+        }
+      }
+    } else {
+      for (var j = index + 1; j < form.elements.length; j++) {
+        if (ensureElementPage(form.elements[j]) === page) {
+          target = j;
+          break;
+        }
+      }
+    }
+    if (target < 0) return;
+    var tmp = form.elements[target];
+    form.elements[target] = form.elements[index];
+    form.elements[index] = tmp;
+    renderCanvas();
+    scheduleSave();
+  }
+
+  function ensureFontFields(elData) {
+    if (!elData) return;
+    var def = defaultFontSizeForType(elData.type);
+    var fs = parseInt(elData.font_size, 10);
+    if (isNaN(fs)) fs = def;
+    elData.font_size = Math.max(8, Math.min(500, fs));
+    elData.bold = !!elData.bold;
+    elData.italic = !!elData.italic;
+    elData.underline = !!elData.underline;
+    elData.strike = !!elData.strike;
+  }
+
+  function applyFontStylesToInput(input, elData) {
+    if (!input || !elData) return;
+    ensureFontFields(elData);
+    input.style.fontSize = elData.font_size + "pt";
+    input.style.fontWeight = elData.bold ? "700" : "normal";
+    input.style.fontStyle = elData.italic ? "italic" : "normal";
+    input.style.textDecoration = textDecorationCss(elData);
+  }
+
+  function getActiveFontTarget() {
+    var heading = getActiveHeading();
+    if (heading) return heading;
+    var box = getActiveBox();
+    if (box) return box;
+    var textEl = findElementById(activeTextId);
+    if (textEl && textEl.type === "text") return textEl;
+    return null;
+  }
+
+  function updateFontTargetDom(elData) {
+    if (!elData || !sheetInnerEl) return;
+    var wrap = sheetInnerEl.querySelector('.forms-el[data-el-id="' + elData.id + '"]');
+    if (!wrap) return;
+    if (elData.type === "heading") {
+      var h = wrap.querySelector(".forms-el-heading");
+      if (h) {
+        applyHeadingStyles(h, elData);
+        autoGrowTextarea(h);
+      }
+    } else if (elData.type === "text") {
+      var ta = wrap.querySelector(".forms-el-text");
+      if (ta) applyFontStylesToInput(ta, elData);
+    } else if (elData.type === "box") {
+      applyBoxStyles(wrap, elData);
+    }
+  }
+
+  function syncFontPropsUi(elData) {
+    if (!fontPropsBlock) return;
+    if (!canEdit || !elData || ["heading", "text", "box"].indexOf(elData.type) < 0) {
+      setPanelVisible(fontPropsBlock, false);
+      return;
+    }
+    ensureFontFields(elData);
+    setPanelVisible(fontPropsBlock, true);
+    if (fontSizeInput) fontSizeInput.value = String(elData.font_size);
+    if (fontBoldBtn) fontBoldBtn.classList.toggle("is-active", !!elData.bold);
+    if (fontItalicBtn) fontItalicBtn.classList.toggle("is-active", !!elData.italic);
+    if (fontUnderlineBtn) fontUnderlineBtn.classList.toggle("is-active", !!elData.underline);
+    if (fontStrikeBtn) fontStrikeBtn.classList.toggle("is-active", !!elData.strike);
+  }
+
+  function setActiveText(elData) {
+    if (elData && elData.type === "text") {
+      activeTextId = elData.id;
+      activeHeadingId = null;
+      activeBoxId = null;
+      setPanelVisible(headingPropsBlock, false);
+      setPanelVisible(boxPropsBlock, false);
+      syncFontPropsUi(elData);
+    } else {
+      activeTextId = null;
+      if (!getActiveHeading() && !getActiveBox()) syncFontPropsUi(null);
+    }
   }
 
   function ensureHeadingFields(elData) {
     if (!elData || elData.type !== "heading") return;
     elData.align = normHeadingAlign(elData.align);
-    elData.font_size = normHeadingFontSize(elData.font_size);
+    ensureFontFields(elData);
   }
 
   function applyHeadingStyles(input, elData) {
     if (!input || !elData) return;
     ensureHeadingFields(elData);
-    input.style.fontSize = elData.font_size + "pt";
     input.style.textAlign = elData.align;
+    applyFontStylesToInput(input, elData);
   }
 
   function syncHeadingPropsUi(elData) {
@@ -320,19 +553,23 @@
     }
     ensureHeadingFields(elData);
     setPanelVisible(headingPropsBlock, true);
-    if (headingSizeInput) headingSizeInput.value = String(elData.font_size);
     headingAlignBtns.forEach(function (btn) {
       btn.classList.toggle("is-active", btn.getAttribute("data-align") === elData.align);
     });
+    syncFontPropsUi(elData);
   }
 
   function setActiveHeading(elData) {
     if (elData && elData.type === "heading") {
       activeHeadingId = elData.id;
+      activeTextId = null;
+      activeBoxId = null;
+      setPanelVisible(boxPropsBlock, false);
       syncHeadingPropsUi(elData);
     } else {
       activeHeadingId = null;
-      syncHeadingPropsUi(null);
+      setPanelVisible(headingPropsBlock, false);
+      if (!getActiveBox() && !findElementById(activeTextId)) syncFontPropsUi(null);
     }
   }
 
@@ -407,6 +644,105 @@
     imageAlignBtns.forEach(function (btn) {
       btn.classList.toggle("is-active", btn.getAttribute("data-align") === elData.align);
     });
+  }
+
+  function ensureBoxFields(elData) {
+    if (!elData || elData.type !== "box") return;
+    elData.text = String(elData.text || "");
+    var w = parseFloat(elData.width_mm);
+    if (isNaN(w)) w = 60;
+    elData.width_mm = Math.round(Math.max(10, Math.min(200, w)) * 10) / 10;
+    var h = parseFloat(elData.height_mm);
+    if (isNaN(h)) h = 40;
+    elData.height_mm = Math.round(Math.max(10, Math.min(280, h)) * 10) / 10;
+    var bw = parseFloat(elData.border_width_mm);
+    if (isNaN(bw)) bw = 0.5;
+    elData.border_width_mm = Math.round(Math.max(0, Math.min(5, bw)) * 10) / 10;
+    elData.align = normHeadingAlign(elData.align || "center");
+    ensureFontFields(elData);
+  }
+
+  function applyBoxStyles(wrap, elData) {
+    if (!wrap || !elData) return;
+    ensureBoxFields(elData);
+    wrap.style.flex = "0 0 " + elData.width_mm + "mm";
+    wrap.style.width = elData.width_mm + "mm";
+    wrap.style.height = elData.height_mm + "mm";
+    wrap.style.maxWidth = "100%";
+    wrap.style.flexShrink = "0";
+    var box = wrap.querySelector(".forms-el-box");
+    if (box) {
+      if (elData.border_width_mm > 0) {
+        box.style.border = elData.border_width_mm + "mm solid #000";
+      } else {
+        box.style.border = "none";
+      }
+      box.style.position = "relative";
+      box.style.display = "block";
+      box.style.width = "100%";
+      box.style.height = "100%";
+      box.style.boxSizing = "border-box";
+      box.style.padding = "1.5mm";
+      box.style.overflow = "hidden";
+    }
+    var boxTa = wrap.querySelector(".forms-el-box-text");
+    if (boxTa) {
+      boxTa.style.position = "absolute";
+      boxTa.style.left = "1.5mm";
+      boxTa.style.right = "1.5mm";
+      boxTa.style.top = "50%";
+      boxTa.style.transform = "translateY(-50%)";
+      boxTa.style.margin = "0";
+      boxTa.style.padding = "0";
+      boxTa.style.lineHeight = "1";
+      boxTa.style.width = "auto";
+      boxTa.style.height = "auto";
+      boxTa.style.textAlign = elData.align;
+      applyFontStylesToInput(boxTa, elData);
+      autoGrowTextarea(boxTa);
+    }
+  }
+
+  function syncBoxPropsUi(elData) {
+    if (!boxPropsBlock) return;
+    if (!canEdit || !elData || elData.type !== "box") {
+      setPanelVisible(boxPropsBlock, false);
+      return;
+    }
+    ensureBoxFields(elData);
+    setPanelVisible(boxPropsBlock, true);
+    if (boxWidthInput) boxWidthInput.value = String(elData.width_mm);
+    if (boxHeightInput) boxHeightInput.value = String(elData.height_mm);
+    if (boxBorderInput) boxBorderInput.value = String(elData.border_width_mm);
+    boxAlignBtns.forEach(function (btn) {
+      btn.classList.toggle("is-active", btn.getAttribute("data-align") === elData.align);
+    });
+    syncFontPropsUi(elData);
+  }
+
+  function setActiveBox(elData) {
+    if (elData && elData.type === "box") {
+      activeBoxId = elData.id;
+      activeTextId = null;
+      activeHeadingId = null;
+      setPanelVisible(headingPropsBlock, false);
+      syncBoxPropsUi(elData);
+    } else {
+      activeBoxId = null;
+      setPanelVisible(boxPropsBlock, false);
+      if (!getActiveHeading() && !findElementById(activeTextId)) syncFontPropsUi(null);
+    }
+  }
+
+  function getActiveBox() {
+    var elData = findElementById(activeBoxId);
+    return elData && elData.type === "box" ? elData : null;
+  }
+
+  function updateActiveBoxDom(elData) {
+    if (!elData || !sheetInnerEl) return;
+    var wrap = sheetInnerEl.querySelector('.forms-el[data-el-id="' + elData.id + '"]');
+    if (wrap) applyBoxStyles(wrap, elData);
   }
 
   function setActiveImage(elData) {
@@ -809,6 +1145,7 @@
       bold: false,
       italic: false,
       underline: false,
+      strike: false,
     };
   }
 
@@ -820,7 +1157,7 @@
   function normCellFontSize(size) {
     var fs = parseInt(size, 10);
     if (isNaN(fs)) fs = 12;
-    return Math.max(8, Math.min(48, fs));
+    return Math.max(8, Math.min(500, fs));
   }
 
   function ensureCellFormat(cell) {
@@ -830,6 +1167,7 @@
     cell.bold = !!cell.bold;
     cell.italic = !!cell.italic;
     cell.underline = !!cell.underline;
+    cell.strike = !!cell.strike;
   }
 
   function applyCellTextStyles(inp, cellData) {
@@ -839,7 +1177,7 @@
     inp.style.fontSize = cellData.font_size + "pt";
     inp.style.fontWeight = cellData.bold ? "700" : "normal";
     inp.style.fontStyle = cellData.italic ? "italic" : "normal";
-    inp.style.textDecoration = cellData.underline ? "underline" : "none";
+    inp.style.textDecoration = textDecorationCss(cellData);
   }
 
   function forEachSelectedMasterCell(elData, fn) {
@@ -950,6 +1288,7 @@
             bold: raw.bold,
             italic: raw.italic,
             underline: raw.underline,
+            strike: raw.strike,
           };
           ensureCellFormat(elData.cells[r][c]);
         }
@@ -1334,6 +1673,7 @@
     to.bold = from.bold;
     to.italic = from.italic;
     to.underline = from.underline;
+    to.strike = from.strike;
     ensureCellFormat(to);
   }
 
@@ -1571,6 +1911,12 @@
       forEachSelectedMasterCell(elData, function (cell) { cell.underline = next; });
     }));
 
+    fmtGroup.appendChild(mkFmtBtn("S", "Зачёркивание", "js-forms-cell-strike forms-table-fmt-btn--strike", function () {
+      var primary = primarySelectedCell(elData);
+      var next = primary ? !primary.cell.strike : true;
+      forEachSelectedMasterCell(elData, function (cell) { cell.strike = next; });
+    }));
+
     var fontSizeLabel = document.createElement("label");
     fontSizeLabel.className = "forms-table-size-field";
     fontSizeLabel.title = "Размер шрифта выбранной ячейки, pt";
@@ -1580,7 +1926,7 @@
     fontSizeInput.type = "number";
     fontSizeInput.className = "forms-table-size-input js-forms-cell-font-size";
     fontSizeInput.min = "8";
-    fontSizeInput.max = "48";
+    fontSizeInput.max = "500";
     fontSizeInput.step = "1";
     function applyFontSizeFromInput() {
       var fs = normCellFontSize(fontSizeInput.value);
@@ -1635,12 +1981,14 @@
       var boldBtn = tableToolbarHost.querySelector(".js-forms-cell-bold");
       var italicBtn = tableToolbarHost.querySelector(".js-forms-cell-italic");
       var underlineBtn = tableToolbarHost.querySelector(".js-forms-cell-underline");
+      var strikeBtn = tableToolbarHost.querySelector(".js-forms-cell-strike");
       if (boldBtn) boldBtn.classList.toggle("is-active", !!primary.cell.bold);
       if (italicBtn) italicBtn.classList.toggle("is-active", !!primary.cell.italic);
       if (underlineBtn) underlineBtn.classList.toggle("is-active", !!primary.cell.underline);
+      if (strikeBtn) strikeBtn.classList.toggle("is-active", !!primary.cell.strike);
     } else {
       if (fontInput) fontInput.value = "";
-      tableToolbarHost.querySelectorAll(".js-forms-cell-align, .js-forms-cell-bold, .js-forms-cell-italic, .js-forms-cell-underline").forEach(function (btn) {
+      tableToolbarHost.querySelectorAll(".js-forms-cell-align, .js-forms-cell-bold, .js-forms-cell-italic, .js-forms-cell-underline, .js-forms-cell-strike").forEach(function (btn) {
         btn.classList.remove("is-active");
       });
     }
@@ -1805,6 +2153,9 @@
           elData.text = ta.value;
           elData.height_px = Math.max(0, Math.min(2000, Math.round(ta.offsetHeight || 0)));
         }
+      } else if (elData.type === "box") {
+        var boxTa = wrap.querySelector(".forms-el-box-text");
+        if (boxTa) elData.text = boxTa.value;
       } else if (elData.type === "checkbox") {
         var lbl = wrap.querySelector(".forms-el-checkbox-label");
         var box = wrap.querySelector(".forms-el-checkbox-box");
@@ -1955,6 +2306,8 @@
     if (!form) {
       setActiveHeading(null);
       setActiveImage(null);
+      setActiveBox(null);
+      setActiveText(null);
       syncTableToolbar(null);
       setPanelVisible(emptyEl, true);
       setPanelVisible(editorEl, false);
@@ -1966,6 +2319,8 @@
     }
     setActiveHeading(null);
     setActiveImage(null);
+    setActiveBox(null);
+    setActiveText(null);
     syncTableToolbar(null);
     currentPageIndex = 0;
     syncFormPageCount(form);
@@ -2017,49 +2372,34 @@
       b.className = "forms-el-btn";
       b.textContent = label;
       b.title = title;
-      b.addEventListener("click", fn);
+      b.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        fn();
+      });
       return b;
     }
 
-    bar.appendChild(mkBtn("↑", "Выше", function () {
-      var form = currentForm();
-      if (!form) return;
-      var page = ensureElementPage(elData);
-      var prev = -1;
-      for (var i = index - 1; i >= 0; i--) {
-        if (ensureElementPage(form.elements[i]) === page) {
-          prev = i;
-          break;
-        }
-      }
-      if (prev < 0) return;
-      var tmp = form.elements[prev];
-      form.elements[prev] = form.elements[index];
-      form.elements[index] = tmp;
-      renderCanvas();
-      scheduleSave();
+    bar.appendChild(mkBtn("←", "Левее / выше", function () {
+      swapElementOnPage(elData, index, -1);
     }));
-    bar.appendChild(mkBtn("↓", "Ниже", function () {
-      var form = currentForm();
-      if (!form) return;
-      var page = ensureElementPage(elData);
-      var next = -1;
-      for (var i = index + 1; i < form.elements.length; i++) {
-        if (ensureElementPage(form.elements[i]) === page) {
-          next = i;
-          break;
-        }
-      }
-      if (next < 0) return;
-      var tmp = form.elements[next];
-      form.elements[next] = form.elements[index];
-      form.elements[index] = tmp;
-      renderCanvas();
-      scheduleSave();
+    bar.appendChild(mkBtn("→", "Правее / ниже", function () {
+      swapElementOnPage(elData, index, 1);
+    }));
+    bar.appendChild(mkBtn("⧉", "Копировать", function () {
+      setSelectedElement(elData);
+      copyElementToClipboard(elData);
+    }));
+    bar.appendChild(mkBtn("＋", "Дублировать", function () {
+      setSelectedElement(elData);
+      if (!copyElementToClipboard(elData)) return;
+      pasteElementFromClipboard(elData);
     }));
     bar.appendChild(mkBtn("×", "Удалить", function () {
       var form = currentForm();
+      if (!form) return;
       form.elements.splice(index, 1);
+      if (selectedElId === elData.id) selectedElId = null;
       renderCanvas();
       scheduleSave();
     }));
@@ -2187,6 +2527,7 @@
     if (cls.indexOf("forms-el-checkbox-label") >= 0) return "forms-print-checkbox-text forms-print-static-text";
     if (cls.indexOf("forms-el-table-cell") >= 0) return "forms-print-table-cell forms-print-static-text";
     if (cls.indexOf("forms-el-heading") >= 0) return "forms-print-heading forms-print-static-text";
+    if (cls.indexOf("forms-el-box-text") >= 0) return "forms-print-box-text";
     if (cls.indexOf("forms-el-text") >= 0) return "forms-print-text forms-print-static-text";
     return "forms-print-static-text";
   }
@@ -2301,6 +2642,44 @@
           div.style.overflow = "hidden";
         }
       }
+      if (ta.classList.contains("forms-el-box-text")) {
+        var boxFrame = ta.parentNode;
+        if (boxFrame && boxFrame.classList && boxFrame.classList.contains("forms-el-box")) {
+          boxFrame.style.position = "relative";
+          boxFrame.style.display = "block";
+          boxFrame.style.width = "100%";
+          boxFrame.style.height = "100%";
+          boxFrame.style.boxSizing = "border-box";
+          boxFrame.style.padding = "1.5mm";
+          boxFrame.style.overflow = "hidden";
+        }
+        var elWrap = ta.closest(".forms-el");
+        if (elWrap) {
+          elWrap.style.flexShrink = "0";
+          elWrap.style.marginBottom = "2mm";
+        }
+        div.style.position = "absolute";
+        div.style.left = "1.5mm";
+        div.style.right = "1.5mm";
+        div.style.top = "50%";
+        div.style.transform = "translateY(-50%)";
+        div.style.width = "auto";
+        div.style.height = "auto";
+        div.style.maxHeight = "calc(100% - 3mm)";
+        div.style.margin = "0";
+        div.style.padding = "0";
+        div.style.overflow = "hidden";
+        div.style.lineHeight = "1";
+        var liveBoxTa = findLiveTextarea(ta, liveRoot);
+        if (liveBoxTa) {
+          if (liveBoxTa.style.textAlign) div.style.textAlign = liveBoxTa.style.textAlign;
+          if (liveBoxTa.style.fontSize) div.style.fontSize = liveBoxTa.style.fontSize;
+          if (liveBoxTa.style.fontWeight) div.style.fontWeight = liveBoxTa.style.fontWeight;
+          if (liveBoxTa.style.fontStyle) div.style.fontStyle = liveBoxTa.style.fontStyle;
+          if (liveBoxTa.style.textDecoration) div.style.textDecoration = liveBoxTa.style.textDecoration;
+        }
+        if (!div.style.textAlign) div.style.textAlign = "center";
+      }
       ta.parentNode.replaceChild(div, ta);
     });
     root.querySelectorAll(".forms-el-checkbox").forEach(function (row) {
@@ -2334,6 +2713,7 @@
     wrap.className = "forms-el";
     wrap.dataset.elId = elData.id;
     wrap.appendChild(elToolbar(elData, index));
+    if (elData.type !== "box") applyElementColLayout(wrap, elData);
 
     if (elData.type === "heading") {
       ensureHeadingFields(elData);
@@ -2358,6 +2738,8 @@
       if (!isNaN(savedH) && savedH > 0) {
         ta.style.height = savedH + "px";
       }
+      ensureFontFields(elData);
+      applyFontStylesToInput(ta, elData);
       bindTextInput(ta, elData, "text");
       if (canEdit) {
         var lastTextH = Math.round(ta.offsetHeight || 0);
@@ -2376,6 +2758,23 @@
         });
       }
       wrap.appendChild(ta);
+    } else if (elData.type === "box") {
+      ensureBoxFields(elData);
+      wrap.classList.add("forms-el--box");
+      var box = document.createElement("div");
+      box.className = "forms-el-box";
+      var boxTa = document.createElement("textarea");
+      boxTa.className = "forms-el-box-text";
+      boxTa.rows = 1;
+      boxTa.value = elData.text || "";
+      boxTa.placeholder = "Текст";
+      if (!canEdit) boxTa.readOnly = true;
+      bindTextInput(boxTa, elData, "text");
+      boxTa.addEventListener("input", function () { autoGrowTextarea(boxTa); });
+      box.appendChild(boxTa);
+      wrap.appendChild(box);
+      applyBoxStyles(wrap, elData);
+      autoGrowTextarea(boxTa);
     } else if (elData.type === "table") {
       renderTableElement(elData, wrap);
     } else if (elData.type === "checkbox") {
@@ -2511,6 +2910,8 @@
     }
     syncHeadingPropsUi(getActiveHeading());
     syncImagePropsUi(getActiveImage());
+    syncBoxPropsUi(getActiveBox());
+    syncFontPropsUi(getActiveFontTarget());
     renderPagesBar();
     scheduleSheetFitScale();
   }
@@ -2546,6 +2947,36 @@
         form.elements.push(el);
         renderCanvas();
         scheduleSave();
+      });
+      return;
+    }
+
+    if (type === "box") {
+      openPrompt("Блок", (
+        '<label class="forms-row"><span class="forms-row-label">Ширина, мм</span>' +
+        '<input type="number" class="forms-control forms-control--num js-prompt-box-w" min="10" max="200" step="1" value="60" required></label>' +
+        '<label class="forms-row"><span class="forms-row-label">Высота, мм</span>' +
+        '<input type="number" class="forms-control forms-control--num js-prompt-box-h" min="10" max="280" step="1" value="40" required></label>'
+      )).then(function (ok) {
+        if (!ok) return;
+        var bw = parseFloat(promptFields.querySelector(".js-prompt-box-w").value);
+        var bh = parseFloat(promptFields.querySelector(".js-prompt-box-h").value);
+        if (isNaN(bw)) bw = 60;
+        if (isNaN(bh)) bh = 40;
+        el.text = "";
+        el.width_mm = Math.round(Math.max(10, Math.min(200, bw)) * 10) / 10;
+        el.height_mm = Math.round(Math.max(10, Math.min(280, bh)) * 10) / 10;
+        el.border_width_mm = 0.5;
+        el.align = "center";
+        el.font_size = 11;
+        el.bold = false;
+        el.italic = false;
+        el.underline = false;
+        el.strike = false;
+        form.elements.push(el);
+        renderCanvas();
+        scheduleSave();
+        setActiveBox(el);
       });
       return;
     }
@@ -2590,9 +3021,18 @@
       el.text = "";
       el.align = "left";
       el.font_size = 16;
+      el.bold = false;
+      el.italic = false;
+      el.underline = false;
+      el.strike = false;
     } else if (type === "text") {
       el.text = "";
       el.height_px = 0;
+      el.font_size = 12;
+      el.bold = false;
+      el.italic = false;
+      el.underline = false;
+      el.strike = false;
     } else if (type === "image") {
       el.src = "";
       el.frame_color = DEFAULT_IMAGE_FRAME_COLOR;
@@ -2858,31 +3298,71 @@
 
   root.addEventListener("focusin", function (e) {
     if (headingPropsBlock && headingPropsBlock.contains(e.target)) return;
+    if (fontPropsBlock && fontPropsBlock.contains(e.target)) return;
+    if (layoutPropsBlock && layoutPropsBlock.contains(e.target)) return;
     if (imagePropsBlock && imagePropsBlock.contains(e.target)) return;
+    if (boxPropsBlock && boxPropsBlock.contains(e.target)) return;
     if (tablePropsBlock && tablePropsBlock.contains(e.target)) return;
     var wrap = e.target.closest(".forms-el");
     if (!wrap || !sheetInnerEl || !sheetInnerEl.contains(wrap)) {
       setActiveHeading(null);
       setActiveImage(null);
+      setActiveBox(null);
+      setActiveText(null);
+      setSelectedElement(null);
       syncTableToolbar(null);
       return;
     }
     var elData = findElementById(wrap.getAttribute("data-el-id") || "");
+    setSelectedElement(elData);
     if (elData && elData.type === "heading") setActiveHeading(elData);
     else setActiveHeading(null);
     if (elData && elData.type === "image") setActiveImage(elData);
     else setActiveImage(null);
+    if (elData && elData.type === "box") setActiveBox(elData);
+    else setActiveBox(null);
+    if (elData && elData.type === "text") setActiveText(elData);
+    else setActiveText(null);
     if (!elData || elData.type !== "table") syncTableToolbar(null);
+    else if (elData.type === "table") syncLayoutPropsUi(elData);
   });
 
   root.addEventListener("click", function (e) {
     if (imagePropsBlock && imagePropsBlock.contains(e.target)) return;
+    if (boxPropsBlock && boxPropsBlock.contains(e.target)) return;
+    if (fontPropsBlock && fontPropsBlock.contains(e.target)) return;
+    if (layoutPropsBlock && layoutPropsBlock.contains(e.target)) return;
     var wrap = e.target.closest(".forms-el");
     if (!wrap || !sheetInnerEl || !sheetInnerEl.contains(wrap)) return;
     var elData = findElementById(wrap.getAttribute("data-el-id") || "");
-    if (elData && elData.type === "image") {
+    if (!elData) return;
+    setSelectedElement(elData);
+    if (elData.type === "image") {
       setActiveHeading(null);
+      setActiveBox(null);
+      setActiveText(null);
       setActiveImage(elData);
+    } else if (elData.type === "box") {
+      setActiveHeading(null);
+      setActiveImage(null);
+      setActiveText(null);
+      setActiveBox(elData);
+    } else if (elData.type === "text") {
+      setActiveHeading(null);
+      setActiveImage(null);
+      setActiveBox(null);
+      setActiveText(elData);
+    } else if (elData.type === "heading") {
+      setActiveImage(null);
+      setActiveBox(null);
+      setActiveText(null);
+      setActiveHeading(elData);
+    } else {
+      setActiveHeading(null);
+      setActiveImage(null);
+      setActiveBox(null);
+      setActiveText(null);
+      syncLayoutPropsUi(elData.type === "box" ? null : elData);
     }
   });
 
@@ -2897,23 +3377,144 @@
     });
   });
 
-  if (headingSizeInput) {
-    headingSizeInput.addEventListener("input", function () {
-      var elData = getActiveHeading();
+  if (fontSizeInput) {
+    fontSizeInput.addEventListener("input", function () {
+      var elData = getActiveFontTarget();
       if (!elData) return;
-      elData.font_size = normHeadingFontSize(headingSizeInput.value);
-      updateActiveHeadingDom(elData);
+      elData.font_size = Math.max(8, Math.min(500, parseInt(fontSizeInput.value, 10) || defaultFontSizeForType(elData.type)));
+      updateFontTargetDom(elData);
       scheduleSave();
     });
-    headingSizeInput.addEventListener("change", function () {
-      var elData = getActiveHeading();
+    fontSizeInput.addEventListener("change", function () {
+      var elData = getActiveFontTarget();
       if (!elData) return;
-      elData.font_size = normHeadingFontSize(headingSizeInput.value);
-      headingSizeInput.value = String(elData.font_size);
-      updateActiveHeadingDom(elData);
+      ensureFontFields(elData);
+      elData.font_size = Math.max(8, Math.min(500, parseInt(fontSizeInput.value, 10) || defaultFontSizeForType(elData.type)));
+      fontSizeInput.value = String(elData.font_size);
+      updateFontTargetDom(elData);
       flushSave();
     });
   }
+
+  function bindFontToggle(btn, key) {
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      var elData = getActiveFontTarget();
+      if (!elData) return;
+      ensureFontFields(elData);
+      elData[key] = !elData[key];
+      updateFontTargetDom(elData);
+      syncFontPropsUi(elData);
+      scheduleSave();
+    });
+  }
+
+  bindFontToggle(fontBoldBtn, "bold");
+  bindFontToggle(fontItalicBtn, "italic");
+  bindFontToggle(fontUnderlineBtn, "underline");
+  bindFontToggle(fontStrikeBtn, "strike");
+
+  if (colPctInput) {
+    colPctInput.addEventListener("input", function () {
+      var elData = getSelectedElement();
+      if (!elData || elData.type === "box") return;
+      var val = parseFloat(colPctInput.value);
+      if (isNaN(val)) return;
+      elData.col_pct = Math.round(Math.max(10, Math.min(100, val)) * 10) / 10;
+      var wrap = sheetInnerEl && sheetInnerEl.querySelector('.forms-el[data-el-id="' + elData.id + '"]');
+      if (wrap) applyElementColLayout(wrap, elData);
+      scheduleSave();
+    });
+    colPctInput.addEventListener("change", function () {
+      var elData = getSelectedElement();
+      if (!elData || elData.type === "box") return;
+      ensureColPct(elData);
+      var val = parseFloat(colPctInput.value);
+      if (isNaN(val)) val = 100;
+      elData.col_pct = Math.round(Math.max(10, Math.min(100, val)) * 10) / 10;
+      colPctInput.value = String(elData.col_pct);
+      var wrap = sheetInnerEl && sheetInnerEl.querySelector('.forms-el[data-el-id="' + elData.id + '"]');
+      if (wrap) applyElementColLayout(wrap, elData);
+      flushSave();
+    });
+  }
+
+  root.addEventListener("keydown", function (e) {
+    if (!canEdit || !currentForm()) return;
+    var mod = e.ctrlKey || e.metaKey;
+    if (!mod || !e.shiftKey) return;
+    var key = String(e.key || "").toLowerCase();
+    if (key !== "c" && key !== "v" && key !== "с" && key !== "м") return;
+    e.preventDefault();
+    if (key === "c" || key === "с") {
+      var src = getSelectedElement();
+      if (src) copyElementToClipboard(src);
+      return;
+    }
+    pasteElementFromClipboard(getSelectedElement());
+  });
+
+  function bindBoxSizeInput(input, key) {
+    if (!input) return;
+    input.addEventListener("input", function () {
+      var elData = getActiveBox();
+      if (!elData) return;
+      var val = parseFloat(input.value);
+      if (isNaN(val)) return;
+      if (key === "width_mm") elData.width_mm = Math.round(Math.max(10, Math.min(200, val)) * 10) / 10;
+      else elData.height_mm = Math.round(Math.max(10, Math.min(280, val)) * 10) / 10;
+      updateActiveBoxDom(elData);
+      scheduleSave();
+    });
+    input.addEventListener("change", function () {
+      var elData = getActiveBox();
+      if (!elData) return;
+      ensureBoxFields(elData);
+      var val = parseFloat(input.value);
+      if (isNaN(val)) val = key === "width_mm" ? 60 : 40;
+      if (key === "width_mm") elData.width_mm = Math.round(Math.max(10, Math.min(200, val)) * 10) / 10;
+      else elData.height_mm = Math.round(Math.max(10, Math.min(280, val)) * 10) / 10;
+      input.value = String(elData[key]);
+      updateActiveBoxDom(elData);
+      flushSave();
+    });
+  }
+
+  bindBoxSizeInput(boxWidthInput, "width_mm");
+  bindBoxSizeInput(boxHeightInput, "height_mm");
+
+  if (boxBorderInput) {
+    boxBorderInput.addEventListener("input", function () {
+      var elData = getActiveBox();
+      if (!elData) return;
+      var val = parseFloat(boxBorderInput.value);
+      if (isNaN(val)) return;
+      elData.border_width_mm = Math.round(Math.max(0, Math.min(5, val)) * 10) / 10;
+      updateActiveBoxDom(elData);
+      scheduleSave();
+    });
+    boxBorderInput.addEventListener("change", function () {
+      var elData = getActiveBox();
+      if (!elData) return;
+      var val = parseFloat(boxBorderInput.value);
+      if (isNaN(val)) val = 0.5;
+      elData.border_width_mm = Math.round(Math.max(0, Math.min(5, val)) * 10) / 10;
+      boxBorderInput.value = String(elData.border_width_mm);
+      updateActiveBoxDom(elData);
+      flushSave();
+    });
+  }
+
+  boxAlignBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var elData = getActiveBox();
+      if (!elData) return;
+      elData.align = normHeadingAlign(btn.getAttribute("data-align"));
+      updateActiveBoxDom(elData);
+      syncBoxPropsUi(elData);
+      scheduleSave();
+    });
+  });
 
   if (imageFrameColorInput) {
     imageFrameColorInput.addEventListener("input", function () {
@@ -3051,7 +3652,13 @@
     scheduleSave();
   });
 
-  if (borderCheck) borderCheck.addEventListener("change", readPageSettingsFromUi);
+  if (borderCheck) {
+    borderCheck.addEventListener("change", function () {
+      var form = currentForm();
+      if (!form) return;
+      readPageSettingsFromUi(form);
+    });
+  }
 
   [borderInsetInput, marginMmInput, borderWidthInput, borderStyleSelect].forEach(function (el) {
     if (!el) return;

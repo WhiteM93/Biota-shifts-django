@@ -358,6 +358,12 @@ html[data-theme="dawn"] .forms-btn-primary {
   bottom: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: flex-start;
+  column-gap: 2mm;
+  row-gap: 0;
 }
 
 /* Лист A4: всегда светлый, без глобальных тёмных input:focus */
@@ -418,6 +424,13 @@ html[data-theme="dawn"] .forms-btn-primary {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  color: var(--fp-ui-muted);
+}
+
+.forms-props-hint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
   color: var(--fp-ui-muted);
 }
 
@@ -545,7 +558,65 @@ html[data-theme="dawn"] .forms-control {
 /* ── Form elements on sheet (print B&W) ── */
 .forms-el {
   position: relative;
+  flex: 0 0 100%;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   margin-bottom: 8px;
+}
+
+.forms-el--box,
+.forms-el--col {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 100%;
+  margin-bottom: 8px;
+}
+
+.forms-el--box {
+  flex-shrink: 0;
+  margin-bottom: 2mm;
+}
+
+.forms-el-box {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border: 0.5mm solid #000;
+  background: #fff;
+  padding: 1.5mm;
+  overflow: hidden;
+}
+
+.forms-el-box-text {
+  position: absolute;
+  left: 1.5mm;
+  right: 1.5mm;
+  top: 50%;
+  transform: translateY(-50%);
+  display: block;
+  width: auto;
+  height: auto;
+  max-height: calc(100% - 3mm);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #000;
+  font: inherit;
+  font-size: 11pt;
+  line-height: 1;
+  text-align: center;
+  resize: none;
+  overflow: hidden;
+  field-sizing: content;
+}
+
+.forms-el-box-text:focus {
+  outline: none;
 }
 
 .forms-el-toolbar {
@@ -572,8 +643,9 @@ html[data-theme="dawn"] .forms-control {
   background: #f5f5f5;
   color: #333;
   border-radius: 2px;
-  width: 22px;
+  min-width: 22px;
   height: 20px;
+  padding: 0 4px;
   cursor: pointer;
   font-size: 11px;
   line-height: 1;
@@ -737,6 +809,11 @@ html[data-theme="dawn"] .forms-control {
   text-decoration: underline;
 }
 
+.forms-table-fmt-btn--strike {
+  font-weight: 400;
+  text-decoration: line-through;
+}
+
 .forms-table-fmt-btn:hover {
   background: #eee;
 }
@@ -745,6 +822,53 @@ html[data-theme="dawn"] .forms-control {
   background: #000;
   color: #fff;
   border-color: #000;
+}
+
+.forms-fmt-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.forms-fmt-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid var(--fp-ui-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fp-ui-text);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.forms-fmt-btn--italic {
+  font-style: italic;
+  font-weight: 400;
+}
+
+.forms-fmt-btn--underline {
+  font-weight: 400;
+  text-decoration: underline;
+}
+
+.forms-fmt-btn--strike {
+  font-weight: 400;
+  text-decoration: line-through;
+}
+
+.forms-fmt-btn:hover {
+  background: var(--fp-ui-hover);
+}
+
+.forms-fmt-btn.is-active {
+  background: var(--fp-ui-text);
+  color: var(--fp-ui-bg);
+  border-color: var(--fp-ui-text);
 }
 
 body.forms-table-resizing {
@@ -1380,6 +1504,12 @@ body.forms-table-resizing--row * {
   overflow: visible;
   height: auto;
   box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: flex-start;
+  column-gap: 2mm;
+  row-gap: 0;
 }
 
 /* ── Print ── */
