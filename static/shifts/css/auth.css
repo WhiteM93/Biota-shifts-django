@@ -387,6 +387,78 @@ html[data-theme="dawn"] .auth-alert {
   font-size: 0.9rem;
 }
 
+.auth-qr {
+  margin-top: 1.1rem;
+}
+
+.auth-qr__divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 0.85rem;
+  color: var(--au-text-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.auth-qr__divider::before,
+.auth-qr__divider::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--au-glass-border);
+}
+
+.auth-qr__frame {
+  width: min(188px, 70vw);
+  margin: 0 auto;
+  padding: 10px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+
+.auth-qr__frame svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.auth-qr__status {
+  margin: 0.7rem 0 0.25rem;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--au-text);
+}
+
+.auth-qr__hint,
+.auth-qr-lead {
+  margin: 0.35rem 0 0;
+  text-align: center;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--au-text-muted);
+}
+
+.auth-qr-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--au-text);
+}
+
+.auth-ok {
+  margin: 0 0 0.75rem;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #22c55e 16%, transparent);
+  color: var(--au-text);
+  line-height: 1.4;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .auth-shell {
     animation: none;

@@ -1,10 +1,11 @@
 """Адрес ячейки визуального склада.
 
-Одна секция: CODE-LEVEL-PLACE (A-01-02).
-Несколько секций: CODE-SECTION-LEVEL-PLACE (A-1-01-02).
+Формат: CODE-LEVEL-PLACE (A-01-02).
 
-Уровень в БД: index сверху = 1. В адресе — снизу вверх (01 = низ секции).
-Места на уровне — сверху вниз по стопке, слева направо.
+Уровень в БД и в адресе: index сверху = 1 (01 = верх).
+Места на полке — слева направо по всем секциям ряда (разделённая полка
+нумеруется как одна: 01… слева, дальше справа). Сверху вниз по стопке.
+Старый формат CODE-SECTION-LEVEL-PLACE ещё разбирается при импорте.
 """
 from __future__ import annotations
 
@@ -17,9 +18,15 @@ from shifts.models import (
     VisualContainer,
 )
 
-_ADDR_RE_3 = re.compile(r"^[A-Za-zА-Яа-яЁё0-9]{1,8}-\d{2}-\d{2}$")
-_ADDR_RE_4 = re.compile(r"^[A-Za-zА-Яа-яЁё0-9]{1,8}-\d{1,2}-\d{2}-\d{2}$")
-_CODE_RE = re.compile(r"^[A-Za-zА-Яа-яЁё]{1,8}$")
+FURNITURE_CODE_MAX_LEN = 3
+
+_ADDR_RE_3 = re.compile(
+    rf"^[A-Za-zА-Яа-яЁё0-9]{{1,{FURNITURE_CODE_MAX_LEN}}}-\d{{2}}-\d{{2}}$"
+)
+_ADDR_RE_4 = re.compile(
+    rf"^[A-Za-zА-Яа-яЁё0-9]{{1,{FURNITURE_CODE_MAX_LEN}}}-\d{{1,2}}-\d{{2}}-\d{{2}}$"
+)
+_CODE_RE = re.compile(rf"^[A-Za-zА-Яа-яЁё0-9]{{1,{FURNITURE_CODE_MAX_LEN}}}$")
 
 LATIN_CODES = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 CYRILLIC_CODES = list("АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЭЮЯ")
@@ -30,10 +37,10 @@ def pad2(n: int) -> str:
 
 
 def shelf_display_num(*, shelves: int, shelf_top1: int) -> str:
-    """Отображаемый номер полки/уровня снизу вверх (01 = низ)."""
+    """Отображаемый номер полки/уровня сверху вниз (01 = верх)."""
     total = max(1, int(shelves or 1))
     top = max(1, min(int(shelf_top1 or 1), total))
-    return pad2(total - top + 1)
+    return pad2(top)
 
 
 def place_display_num(place_num: int) -> str:
@@ -136,7 +143,7 @@ def normalize_furniture_code(raw: str) -> str:
     text = (raw or "").strip().upper().replace(" ", "")
     if not text or not _CODE_RE.match(text):
         return ""
-    return text[:8]
+    return text[:FURNITURE_CODE_MAX_LEN]
 
 
 def cabinet_code_of(cab: VisualCabinet | None) -> str:
@@ -152,15 +159,89 @@ def next_available_furniture_code(exclude_id: int | None = None) -> str:
         qs = qs.exclude(pk=exclude_id)
     used = {normalize_furniture_code(c) for c in qs.values_list("code", flat=True)}
     used.discard("")
-    for ch in LATIN_CODES + CYRILLIC_CODES:
+    charset = LATIN_CODES + CYRILLIC_CODES + list("0123456789")
+    for ch in charset:
         if ch not in used:
             return ch
-    for a in LATIN_CODES:
-        for b in LATIN_CODES:
+    for a in charset:
+        for b in charset:
             cand = f"{a}{b}"
             if cand not in used:
                 return cand
+    for a in charset:
+        for b in charset:
+            for c in charset:
+                cand = f"{a}{b}{c}"
+                if cand not in used:
+                    return cand
     return "X"
+
+
+def cabinet_max_level_count(cab: VisualCabinet | None) -> int:
+    """Сколько полок сверху вниз (по самой высокой секции)."""
+    if cab is None:
+        return 1
+    max_n = 0
+    for sec in cab.sections.all():
+        max_n = max(max_n, sec.levels.count())
+    if max_n < 1:
+        max_n = max(1, int(cab.shelves or 1))
+    return max_n
+
+
+def level_capacity(level: VisualCabinetLevel | None) -> int:
+    if level is None:
+        return 0
+    cols = max(0, int(getattr(level, "columns", 0) or 0))
+    if cols < 1:
+        return 0
+    if getattr(level, "kind", None) == VisualCabinetLevel.KIND_DRAWER:
+        return cols
+    rows = max(1, min(4, int(getattr(level, "rows", 1) or 1)))
+    return cols * rows
+
+
+def place_offset_before_section(
+    cab: VisualCabinet,
+    *,
+    section_index: int,
+    shelf_top1: int,
+) -> int:
+    """Сколько мест левее данной секции на том же ряду полок."""
+    offset = 0
+    want_shelf = int(shelf_top1)
+    want_sec = int(section_index)
+    for sec in cab.sections.order_by("index", "id"):
+        if int(sec.index or 0) >= want_sec:
+            break
+        lv = next(
+            (x for x in sec.levels.all() if int(x.index or 0) == want_shelf),
+            None,
+        )
+        offset += level_capacity(lv)
+    return offset
+
+
+def place_index_across_shelf_row(
+    cont: VisualContainer,
+    cab: VisualCabinet | None = None,
+    peers: list | None = None,
+) -> int:
+    """Номер места на ряду полок слева направо по секциям (1…)."""
+    cabinet = cab or getattr(cont, "cabinet", None)
+    local = place_index_on_shelf(cont, peers=peers)
+    level = getattr(cont, "level", None)
+    if cabinet is None or level is None:
+        return local
+    section = getattr(level, "section", None)
+    if section is None:
+        return local
+    offset = place_offset_before_section(
+        cabinet,
+        section_index=int(section.index or 1),
+        shelf_top1=int(level.index or cont.shelf or 1),
+    )
+    return offset + local
 
 
 def suggested_address(
@@ -175,12 +256,17 @@ def suggested_address(
 ) -> str:
     code = (furniture_code or cabinet_code_of(cab) or "?").strip().upper() or "?"
     place = place_num if place_num is not None else column
-    total_levels = max(1, int(levels_in_section or cab.shelves or 1))
+    # section_index больше не входит в адрес: места на разделённой полке сквозные.
+    total_levels = max(
+        1,
+        int(
+            levels_in_section
+            if levels_in_section is not None
+            else cabinet_max_level_count(cab)
+        ),
+    )
     level_lab = shelf_display_num(shelves=total_levels, shelf_top1=shelf)
     place_lab = place_display_num(place)
-    sec_count = cabinet_section_count(cab)
-    if sec_count > 1 and section_index is not None:
-        return f"{code}-{int(section_index)}-{level_lab}-{place_lab}"
     return f"{code}-{level_lab}-{place_lab}"
 
 
@@ -192,24 +278,18 @@ def suggested_address_for_container(
     cabinet = cab or getattr(cont, "cabinet", None)
     if cabinet is None:
         return ""
-    place = place_index_on_shelf(cont, peers=peers)
+    place = place_index_across_shelf_row(cont, cab=cabinet, peers=peers)
     level = getattr(cont, "level", None)
-    section_index = None
-    levels_in_section = None
     shelf_top1 = int(cont.shelf or 1)
+    levels_total = cabinet_max_level_count(cabinet)
     if level is not None:
         shelf_top1 = int(level.index or shelf_top1)
-        section = getattr(level, "section", None)
-        if section is not None:
-            section_index = int(section.index or 1)
-            levels_in_section = level_total_in_section(level, section)
     return suggested_address(
         cabinet,
         shelf=shelf_top1,
         column=cont.column,
         place_num=place,
-        section_index=section_index,
-        levels_in_section=levels_in_section,
+        levels_in_section=levels_total,
     )
 
 
@@ -251,10 +331,9 @@ def parse_address_parts(raw: str) -> dict | None:
 
 
 def shelf_top1_from_display(*, shelves: int, display: int) -> int:
-    """Обратно к shelf_display_num: display 01 (низ) → index = shelves."""
+    """Обратно к shelf_display_num: display 01 (верх) → index = 1."""
     total = max(1, int(shelves or 1))
-    d = max(1, min(int(display or 1), total))
-    return total - d + 1
+    return max(1, min(int(display or 1), total))
 
 
 def place_to_stack_column(
@@ -356,25 +435,18 @@ def resync_level_place_addresses(
 
 def _resync_peers(cab: VisualCabinet, peers: list, *, move_tools=None) -> None:
     for cont in ordered_shelf_containers(peers):
-        place = place_index_on_shelf(cont, peers=peers)
+        place = place_index_across_shelf_row(cont, cab=cab, peers=peers)
         level = getattr(cont, "level", None)
-        section_index = None
-        levels_in_section = None
         shelf_top1 = int(cont.shelf or 1)
         if level is not None:
             shelf_top1 = int(level.index or shelf_top1)
-            section = getattr(level, "section", None)
-            if section is not None:
-                section_index = int(section.index or 1)
-                levels_in_section = level_total_in_section(level, section)
         new_addr = normalize_address(
             suggested_address(
                 cab,
                 shelf=shelf_top1,
                 column=cont.column,
                 place_num=place,
-                section_index=section_index,
-                levels_in_section=levels_in_section,
+                levels_in_section=cabinet_max_level_count(cab),
             )
         )
         old = normalize_address(cont.address or "")
@@ -431,7 +503,7 @@ def sync_cabinet_grid_from_layout(cab: VisualCabinet) -> None:
         levels = list(sec.levels.all())
         max_levels = max(max_levels, len(levels) or 1)
         for lvl in levels:
-            max_cols = max(max_cols, int(lvl.columns or 1))
+            max_cols = max(max_cols, max(0, int(lvl.columns or 0)))
     if cab.shelves == max_levels and cab.columns == max_cols:
         return
     cab.shelves = max_levels
@@ -459,6 +531,13 @@ def apply_cabinet_sections_layout(
     keep_level_ids: set[int] = set()
     created_sections: list[VisualCabinetSection] = []
 
+    # Сдвиг индексов секций — иначе UNIQUE (cabinet, index) при перестановке.
+    for sec in cab.sections.all():
+        if int(sec.index or 0) < 1000:
+            VisualCabinetSection.objects.filter(pk=sec.pk).update(index=int(sec.index) + 1000)
+
+    existing_sections = {s.id: s for s in cab.sections.prefetch_related("levels").all()}
+
     for si, sec_raw in enumerate(sections_payload, start=1):
         if not isinstance(sec_raw, dict):
             return [], "Некорректная секция"
@@ -481,6 +560,7 @@ def apply_cabinet_sections_layout(
                 name=str(sec_raw.get("name") or "").strip()[:80],
                 sort_order=si - 1,
             )
+            existing_sections[section.id] = section
         else:
             section.index = si
             section.name = str(sec_raw.get("name") or "").strip()[:80]
@@ -489,7 +569,19 @@ def apply_cabinet_sections_layout(
         keep_section_ids.add(section.id)
         created_sections.append(section)
 
+        # Сдвиг индексов, чтобы не ловить UNIQUE (section, index) при перестановке/создании.
+        for lv in section.levels.all():
+            if int(lv.index or 0) < 1000:
+                VisualCabinetLevel.objects.filter(pk=lv.pk).update(index=int(lv.index) + 1000)
+
         existing_levels = {lv.id: lv for lv in section.levels.all()}
+        levels_by_old_index = {
+            int(lv.index) - 1000: lv
+            for lv in existing_levels.values()
+            if int(lv.index or 0) >= 1000
+        }
+        claimed_level_ids: set[int] = set()
+
         for li, lvl_raw in enumerate(levels_raw, start=1):
             if not isinstance(lvl_raw, dict):
                 return [], "Некорректный уровень"
@@ -500,7 +592,8 @@ def apply_cabinet_sections_layout(
                 cols = int(lvl_raw.get("columns", default_cols))
             except (TypeError, ValueError):
                 cols = default_cols
-            cols = max(1, min(12, cols))
+            # 0 = пустой ряд в секции (полка разделена только на другом уровне)
+            cols = max(0, min(12, cols))
             lvl_id = lvl_raw.get("id")
             level = None
             if lvl_id:
@@ -510,6 +603,35 @@ def apply_cabinet_sections_layout(
                     level = None
                 if level is None:
                     return [], f"Уровень id={lvl_id} не найден"
+            if level is None:
+                # Клиент мог не прислать id (новые/пустые ряды) — берём уровень с тем же номером.
+                cand = levels_by_old_index.get(li)
+                if cand is not None and cand.id not in claimed_level_ids:
+                    level = cand
+            if level is not None:
+                claimed_level_ids.add(level.id)
+            if cols < 1:
+                # Пустой ряд: выравнивание полок между секциями, без мест.
+                if level is not None and level.containers.filter(parent__isnull=True).exists():
+                    return [], (
+                        f"Уровень {li} секции {si}: нельзя очистить — на нём есть контейнеры"
+                    )
+                if level is None:
+                    level = VisualCabinetLevel.objects.create(
+                        section=section,
+                        index=li,
+                        kind=VisualCabinetLevel.KIND_SHELF,
+                        columns=0,
+                        rows=1,
+                    )
+                else:
+                    level.index = li
+                    level.kind = VisualCabinetLevel.KIND_SHELF
+                    level.columns = 0
+                    level.rows = 1
+                    level.save(update_fields=["index", "kind", "columns", "rows"])
+                keep_level_ids.add(level.id)
+                continue
             try:
                 rows = int(
                     lvl_raw.get(
@@ -580,6 +702,43 @@ _KIND_LABELS = {
 }
 
 
+def _is_generic_place_label(label: str, addr: str = "") -> bool:
+    """Подпись-заглушка: тип места или копия адреса — не годится как подсказка."""
+    text = (label or "").strip()
+    if not text:
+        return True
+    if text in _KIND_LABELS.values():
+        return True
+    if addr and normalize_address(text) == normalize_address(addr):
+        return True
+    return False
+
+
+def place_hover_title(place: dict) -> str:
+    """Подсказка при наведении на адрес: наименование / полка·место / примечание."""
+    addr = normalize_address(place.get("address") or "")
+    note = (place.get("notes") or "").strip()
+    custom = (place.get("label") or "").strip()
+    if custom and not _is_generic_place_label(custom, addr):
+        base = custom
+    else:
+        fname = (place.get("furniture_name") or place.get("furniture_code") or "").strip()
+        shelf = (place.get("shelf_label") or "").strip()
+        place_lab = (place.get("place_label") or "").strip()
+        level_kind = (place.get("level_kind") or "shelf").strip()
+        bits: list[str] = []
+        if fname:
+            bits.append(fname)
+        if shelf:
+            bits.append(("ящик " if level_kind == "drawer" else "полка ") + shelf)
+        if place_lab:
+            bits.append("место " + place_lab)
+        base = " · ".join(bits)
+    if note:
+        return f"{base} · {note}" if base else note
+    return base
+
+
 def build_location_catalog() -> dict:
     """Мебель / полки / места для выбора адреса на складе."""
     furniture = []
@@ -607,24 +766,20 @@ def build_location_catalog() -> dict:
         )
         tops = [c for c in cab.containers.all() if not getattr(c, "parent_id", None)]
         place_labels = place_labels_by_container_id(tops)
+        levels_total = cabinet_max_level_count(cab)
         for cont in tops:
             level = getattr(cont, "level", None)
             section = getattr(level, "section", None) if level else None
-            levels_total = (
-                level_total_in_section(level, section)
-                if level
-                else max(1, int(cab.shelves or 1))
-            )
             shelf_top1 = int(level.index if level else cont.shelf)
             shelf_lab = shelf_display_num(shelves=levels_total, shelf_top1=shelf_top1)
-            place_lab = place_labels.get(cont.id) or place_display_num(
-                place_index_on_shelf(cont, peers=tops)
-            )
+            place_n = place_index_across_shelf_row(cont, cab=cab, peers=tops)
+            place_lab = place_display_num(place_n)
             addr = repair_container_address_if_stale(cont) or normalize_address(
                 suggested_address_for_container(cont, cab=cab, peers=tops)
             )
             kind = cont.kind or "bin"
-            label = (cont.label or "").strip() or _KIND_LABELS.get(kind, "Место")
+            raw_label = (cont.label or "").strip()
+            label = raw_label or _KIND_LABELS.get(kind, "Место")
             sec_idx = int(section.index) if section is not None else 1
             places.append(
                 {
@@ -642,6 +797,7 @@ def build_location_catalog() -> dict:
                     "place_label": place_lab,
                     "container_id": cont.id,
                     "label": label,
+                    "notes": (getattr(cont, "notes", None) or "").strip(),
                     "kind": kind,
                     "kind_label": _KIND_LABELS.get(kind, "Место"),
                 }
@@ -669,25 +825,22 @@ def build_location_catalog() -> dict:
 
 
 def address_container_titles() -> dict[str, str]:
-    """Адрес → наименование (справочник адресов, иначе подпись контейнера)."""
+    """Адрес → подсказка при наведении (справочник, иначе полка/место/примечание)."""
     from shifts.models import WarehouseAddress
 
     out: dict[str, str] = {}
     for row in WarehouseAddress.objects.exclude(label="").values_list("address", "label"):
         addr = normalize_address(row[0] or "")
         lab = (row[1] or "").strip()
-        if addr and lab:
+        if addr and lab and not _is_generic_place_label(lab, addr):
             out[addr] = lab
     for p in build_location_catalog().get("places") or []:
         addr = normalize_address(p.get("address") or "")
         if not addr or addr in out:
             continue
-        label = (p.get("label") or "").strip()
-        kind_lab = (p.get("kind_label") or "").strip()
-        if label and label not in _KIND_LABELS.values():
-            out[addr] = label
-        elif kind_lab:
-            out[addr] = kind_lab
+        title = place_hover_title(p)
+        if title and not _is_generic_place_label(title, addr):
+            out[addr] = title
     return out
 
 
@@ -930,15 +1083,35 @@ def _ensure_places_for_cabinet(
     sec_by_index = {int(s.index): s for s in sections}
 
     by_slot: dict[tuple[int, int], list[tuple[str, int]]] = {}
+    max_levels = max((len(list(s.levels.all())) for s in sections), default=1) or 1
     for addr, parts in items:
-        sec_idx = parts.get("section")
-        if sec_idx is None:
-            sec_idx = 1
-        sec_idx = int(sec_idx)
-        if sec_idx not in sec_by_index:
-            continue
         shelf_disp = int(parts["shelf_display"])
         place = int(parts["place"])
+        sec_idx = parts.get("section")
+        if sec_idx is None:
+            # Сквозное место на ряду: найти секцию слева направо.
+            shelf_top1 = shelf_top1_from_display(shelves=max_levels, display=shelf_disp)
+            remaining = place
+            resolved = None
+            for sec in sections:
+                lv = next(
+                    (x for x in sec.levels.all() if int(x.index or 0) == shelf_top1),
+                    None,
+                )
+                cap = level_capacity(lv)
+                if cap < 1:
+                    continue
+                if remaining <= cap:
+                    resolved = (int(sec.index), remaining)
+                    break
+                remaining -= cap
+            if resolved is None:
+                continue
+            sec_idx, place = resolved
+        else:
+            sec_idx = int(sec_idx)
+        if sec_idx not in sec_by_index:
+            continue
         by_slot.setdefault((sec_idx, shelf_disp), []).append((addr, place))
 
     existing_addrs = {
@@ -964,7 +1137,9 @@ def _ensure_places_for_cabinet(
             continue
 
         is_drawer = level.kind == VisualCabinetLevel.KIND_DRAWER
-        cols = max(1, min(12, int(level.columns or 1)))
+        cols = max(0, min(12, int(level.columns or 0)))
+        if cols < 1:
+            continue
         rows = 1 if is_drawer else max(1, min(4, int(getattr(level, "rows", 1) or 1)))
         max_place = max(p for _, p in place_items)
         capacity = cols * rows

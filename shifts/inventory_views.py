@@ -1906,6 +1906,8 @@ _STOCK_DECIMAL_PARAM_KEYS = frozenset(
         "bt_corner_radius_mm",
         "ext_main_diameter_mm",
         "ext_overall_length_mm",
+        "ms_pitch_mm",
+        "ms_length_mm",
     }
 )
 _STOCK_INT_PARAM_KEYS = frozenset({"mill_flutes_count", "countersink_flutes_count", "reamer_flutes_count", "bt_teeth_count"})
@@ -5106,6 +5108,18 @@ def inventory_view(request):
     ext_main_diameter_raw = _sq("ext_main_diameter_mm")
     ext_overall_length_raw = _sq("ext_overall_length_mm")
     ext_inner_diameter_raw = _sq("ext_inner_diameter")
+    ms_brand_raw = _sq("ms_brand")
+    ms_kind_raw = normalize_measuring_kind(filter_category, _sq("ms_kind")) if filter_category in MEASURING_CATEGORY_SET else ""
+    ms_thread_size_raw = normalize_cutting_size_label(_sq("ms_thread_size"))[:32]
+    ms_pitch_raw = _sq("ms_pitch_mm")
+    ms_go_nogo_raw = normalize_thread_gauge_go_nogo(_sq("ms_go_nogo"))
+    ms_tolerance_raw = normalize_thread_gauge_tolerance(_sq("ms_tolerance"))
+    ms_range_raw = _sq("ms_range")
+    ms_ip_raw = (_sq("ms_ip") or "").strip().upper()
+    ms_accuracy_raw = _sq("ms_accuracy")
+    ms_check_size_raw = _sq("ms_check_size")
+    ms_check_class_raw = _sq("ms_check_class")
+    ms_length_raw = _sq("ms_length_mm")
 
     tm_param = _sq("tool_material")
     tm_custom_param = (_sq("tool_material_custom") or "")[:80]
@@ -5734,6 +5748,74 @@ def inventory_view(request):
         key=lambda x: (len(x), x),
     )
 
+    def _ms_brands(cat: str) -> list[str]:
+        return [
+            (b or "").strip().upper()
+            for b in _distinct_text_values(_opt_qs(cat, "ms_brand"), "measuring_tool_spec__brand")
+            if (b or "").strip()
+        ]
+
+    def _ms_kinds_present(cat: str) -> list[str]:
+        return _distinct_text_values(_opt_qs(cat, "ms_kind"), "measuring_tool_spec__kind")
+
+    measuring_filter_options = {
+        "gauge_smooth": {
+            "brands": _ms_brands("gauge_smooth"),
+        },
+        "gauge_thread": {
+            "kinds": _ms_kinds_present("gauge_thread"),
+            "brands": _ms_brands("gauge_thread"),
+            "thread_sizes": _distinct_size_labels(
+                _opt_qs("gauge_thread", "ms_thread_size"), "measuring_tool_spec__thread_size_label"
+            ),
+            "pitches": _sorted_unique_decimal_strings(
+                _opt_qs("gauge_thread", "ms_pitch_mm")
+                .exclude(measuring_tool_spec__pitch_mm__isnull=True)
+                .values_list("measuring_tool_spec__pitch_mm", flat=True)
+            ),
+            "go_nogos": _distinct_text_values(_opt_qs("gauge_thread", "ms_go_nogo"), "measuring_tool_spec__go_nogo"),
+            "tolerances": _distinct_text_values(
+                _opt_qs("gauge_thread", "ms_tolerance"), "measuring_tool_spec__thread_tolerance"
+            ),
+        },
+        "measure_univ": {
+            "kinds": _ms_kinds_present("measure_univ"),
+            "brands": _ms_brands("measure_univ"),
+            "ranges": _distinct_text_values(_opt_qs("measure_univ", "ms_range"), "measuring_tool_spec__measure_range"),
+            "accuracies": _distinct_text_values(
+                _opt_qs("measure_univ", "ms_accuracy"), "measuring_tool_spec__accuracy"
+            ),
+            "ips": [
+                (v or "").strip().upper()
+                for v in _distinct_text_values(_opt_qs("measure_univ", "ms_ip"), "measuring_tool_spec__ip_rating")
+                if (v or "").strip()
+            ],
+        },
+        "measure_surf": {
+            "kinds": _ms_kinds_present("measure_surf"),
+            "brands": _ms_brands("measure_surf"),
+        },
+        "measure_check": {
+            "kinds": _ms_kinds_present("measure_check"),
+            "brands": _ms_brands("measure_check"),
+            "check_sizes": _distinct_text_values(
+                _opt_qs("measure_check", "ms_check_size"), "measuring_tool_spec__check_size"
+            ),
+            "check_classes": _distinct_text_values(
+                _opt_qs("measure_check", "ms_check_class"), "measuring_tool_spec__check_accuracy_class"
+            ),
+        },
+        "measure_mark": {
+            "kinds": _ms_kinds_present("measure_mark"),
+            "brands": _ms_brands("measure_mark"),
+            "lengths": _sorted_unique_decimal_strings(
+                _opt_qs("measure_mark", "ms_length_mm")
+                .exclude(measuring_tool_spec__length_mm__isnull=True)
+                .values_list("measuring_tool_spec__length_mm", flat=True)
+            ),
+        },
+    }
+
     stock_address_hints = _stock_address_hint_rows(panel)
     stock_address_furniture = _stock_address_furniture_options(stock_address_hints)
 
@@ -5849,6 +5931,18 @@ def inventory_view(request):
             "ext_main_diameter_mm": _norm_stock_decimal_str(ext_main_diameter_raw),
             "ext_overall_length_mm": _norm_stock_decimal_str(ext_overall_length_raw),
             "ext_inner_diameter": normalize_tool_extension_inner_diameter(ext_inner_diameter_raw),
+            "ms_brand": ms_brand_raw,
+            "ms_kind": ms_kind_raw,
+            "ms_thread_size": ms_thread_size_raw,
+            "ms_pitch_mm": _norm_stock_decimal_str(ms_pitch_raw),
+            "ms_go_nogo": ms_go_nogo_raw,
+            "ms_tolerance": ms_tolerance_raw,
+            "ms_range": ms_range_raw,
+            "ms_ip": ms_ip_raw,
+            "ms_accuracy": ms_accuracy_raw,
+            "ms_check_size": ms_check_size_raw,
+            "ms_check_class": ms_check_class_raw,
+            "ms_length_mm": _norm_stock_decimal_str(ms_length_raw),
             "tool_material": tool_material,
             "tool_material_custom": tm_custom_input,
             "tool_material_select": tool_material_select,
@@ -6029,6 +6123,8 @@ def inventory_view(request):
         "measuring_category_keys": list(MEASURING_CATEGORIES),
         "measuring_brands": measuring_brands,
         "gauge_thread_sizes": gauge_thread_sizes,
+        "measuring_filter_options": measuring_filter_options.get(filter_category, {}),
+        "measuring_kind_choices": list(MEASURING_KINDS_BY_CATEGORY.get(filter_category, ())),
         "thread_gauge_go_nogo": THREAD_GAUGE_GO_NOGO,
         "thread_gauge_tolerance_presets": THREAD_GAUGE_TOLERANCE_PRESETS,
         "tool_material_types": TOOL_MATERIAL_TYPES,

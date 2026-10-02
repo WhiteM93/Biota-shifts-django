@@ -1350,6 +1350,17 @@ html[data-theme="dawn"] .inv-history-open-block {
   box-shadow: var(--bio-filter-shadow);
 }
 
+.inv-page--stock .inv-tabs {
+  position: sticky;
+  top: var(--inv-nav-sticky-top, 0px);
+  z-index: 30;
+  margin-top: 0;
+  /* не просвечивать таблицу при прокрутке */
+  background: color-mix(in srgb, var(--bio-surface-item) 92%, var(--bio-body-bg, #0f1420));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
 .inv-tab {
   display: inline-flex;
   align-items: center;
@@ -1425,7 +1436,7 @@ html[data-theme="dawn"] .inv-history-open-block {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 292px;
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
   width: 100%;
   min-width: 0;
 }
@@ -1442,6 +1453,8 @@ html[data-theme="dawn"] .inv-history-open-block {
 
 .inv-stock-sidebar {
   min-width: 0;
+  /* тянется на высоту таблицы — иначе sticky у фильтра не к чему «прилипать» */
+  align-self: stretch;
 }
 
 .inv-stock-filter {
@@ -1450,6 +1463,13 @@ html[data-theme="dawn"] .inv-history-open-block {
   border-radius: 8px;
   background: var(--bio-surface-panel);
   box-shadow: var(--bio-filter-shadow);
+  position: sticky;
+  top: var(--inv-sticky-top, 64px);
+  z-index: 20;
+  max-height: calc(100vh - var(--inv-sticky-top, 64px) - 12px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .inv-stock-filter__head {
@@ -2675,6 +2695,13 @@ html[data-theme="dawn"] .inv-addr-hint-table th {
 
   .inv-stock-sidebar {
     order: -1;
+  }
+
+  .inv-stock-filter {
+    position: static;
+    top: auto;
+    max-height: none;
+    overflow: visible;
   }
 
   .inv-stock-group-by {

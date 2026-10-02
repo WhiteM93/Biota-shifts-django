@@ -69,10 +69,10 @@
       <div class="vw-form-scroll">
         <input type="hidden" class="js-vw-cab-id" value="">
         <label class="vw-row">
-          <span class="vw-row-label">Буква</span>
-          <input type="text" class="vw-control js-vw-cab-code" maxlength="8" autocomplete="off" placeholder="A или А">
+          <span class="vw-row-label">Код</span>
+          <input type="text" class="vw-control js-vw-cab-code" maxlength="3" autocomplete="off" placeholder="A, A1, 12">
         </label>
-        <p class="vw-hint-inline">Буква латиницей или кириллицей; входит в адрес как A-01-02</p>
+        <p class="vw-hint-inline">До 3 символов — буквы или цифры; в адресе, например A1-01-02</p>
         <label class="vw-row">
           <span class="vw-row-label">Тип</span>
           <select class="vw-control js-vw-cab-kind">
@@ -85,25 +85,17 @@
           <span class="vw-row-label">Название</span>
           <input type="text" class="vw-control js-vw-cab-name" maxlength="120" autocomplete="off" placeholder="Шкаф №1">
         </label>
-        <div class="vw-row-pair js-vw-cab-simple-grid">
-          <label class="vw-row">
-            <span class="vw-row-label js-vw-cab-shelves-label">Полок</span>
-            <input type="number" class="vw-control js-vw-cab-shelves" min="1" max="20" value="5">
-          </label>
-          <label class="vw-row">
-            <span class="vw-row-label js-vw-cab-columns-label">Мест в ряд</span>
-            <input type="number" class="vw-control js-vw-cab-columns" min="1" max="12" value="4">
-          </label>
-        </div>
-        <div class="js-vw-cab-layout vw-cab-layout" hidden>
-          <div class="vw-row" style="align-items:center;justify-content:space-between;gap:.5rem">
-            <span class="vw-row-label" style="margin:0">Секции</span>
-            <button type="button" class="vw-btn-ghost vw-btn-compact js-vw-cab-add-section">+ секция</button>
+        <input type="hidden" class="js-vw-cab-shelves" value="4">
+        <input type="hidden" class="js-vw-cab-columns" value="3">
+        <div class="vw-cab-builder js-vw-cab-builder" aria-label="Схема полок и мест">
+          <div class="vw-cab-builder__toolbar">
+            <span class="vw-cab-builder__title js-vw-cab-builder-title">Схема</span>
+            <span class="vw-cab-builder__meta js-vw-cab-builder-meta"></span>
           </div>
-          <div class="js-vw-cab-sections vw-cab-sections-editor"></div>
-          <p class="vw-hint-inline">В секции: «Уровней» — сколько полок/ящиков сверху вниз; «Мест в ряд» — сколько ячеек на уровне. Адрес при 2+ секциях: буква-секция-уровень-место.</p>
+          <div class="vw-cab-builder__canvas js-vw-cab-builder-canvas"></div>
+          <p class="vw-hint-inline js-vw-cab-kind-hint">Квадрат на полке — место; ПКМ по квадрату — ящик. ПКМ по полке — разделить только её (остальные на всю ширину).</p>
         </div>
-        <p class="vw-hint-inline js-vw-cab-kind-hint">Шкаф — с дверцами. Стеллаж — открытый. Тумба — ящики с ячейками. Полки нумеруются снизу вверх: 01… Адрес: буква-полка-место.</p>
+        <div class="vw-cab-ctx js-vw-cab-ctx" hidden role="menu"></div>
         <label class="vw-row">
           <span class="vw-row-label">Примечание</span>
           <input type="text" class="vw-control js-vw-cab-notes" maxlength="300" autocomplete="off">
@@ -136,7 +128,6 @@
       <div class="vw-form-scroll">
         <input type="hidden" class="js-vw-cont-id" value="">
         <input type="hidden" class="js-vw-cont-level-id" value="">
-        <input type="hidden" class="js-vw-cont-notes" value="">
 
         <section class="vw-form-section">
           <h3 class="vw-form-section-title">Место</h3>
@@ -164,6 +155,11 @@
             </div>
           </label>
           <p class="vw-hint-inline js-vw-cont-address-hint">Адрес считается сам по полке и месту (и секции, если их несколько). Наименование ячейки задаётся на складе в «Подсказка по адресам».</p>
+          <label class="vw-row">
+            <span class="vw-row-label">Примечание</span>
+            <input type="text" class="vw-control js-vw-cont-notes" maxlength="80" autocomplete="off" placeholder="Коротко: что здесь, для чего">
+          </label>
+          <p class="vw-hint-inline">Показывается на этикетке места под адресом (до 80 символов).</p>
           <div class="vw-row">
             <span class="vw-row-label">Цвет</span>
             <div class="vw-color-row">
@@ -225,7 +221,7 @@
               <input type="number" class="vw-control js-vw-cont-stack" min="1" value="1" inputmode="numeric">
             </label>
           </div>
-          <p class="vw-hint-inline js-vw-cont-stack-hint">Полка 1 — нижняя (как в адресе и на экране). Ярус 1 — на полке, 2 — поверх другого ящика.</p>
+          <p class="vw-hint-inline js-vw-cont-stack-hint">Полка 1 — верхняя (как в адресе и на экране). Ярус 1 — на полке, 2 — поверх другого ящика.</p>
         </section>
       </div>
       <footer class="vw-form-footer">

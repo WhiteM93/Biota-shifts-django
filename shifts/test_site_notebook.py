@@ -79,3 +79,54 @@ class SiteNotebookViewTests(TestCase):
         self.assertEqual(self.task.status, SiteNotebookTask.STATUS_DONE)
         self.assertEqual(self.task.done_by, "admin")
         self.assertIsNotNone(self.task.done_at)
+
+    def test_admin_rejects_with_reason(self):
+        session = self.client.session
+        session["biota_username"] = "admin"
+        session.save()
+        res = self.client.post(
+            reverse("site_notebook"),
+            {
+                "action": "reject",
+                "id": str(self.task.id),
+                "status": "open",
+                "reject_reason": "Уже есть на вкладке фильтров",
+            },
+        )
+        self.assertEqual(res.status_code, 302)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, SiteNotebookTask.STATUS_REJECTED)
+        self.assertEqual(self.task.reject_reason, "Уже есть на вкладке фильтров")
+        self.assertEqual(self.task.done_by, "admin")
+        self.assertIsNotNone(self.task.done_at)
+
+    def test_reject_without_reason_keeps_open(self):
+        session = self.client.session
+        session["biota_username"] = "admin"
+        session.save()
+        res = self.client.post(
+            reverse("site_notebook"),
+            {"action": "reject", "id": str(self.task.id), "status": "open", "reject_reason": "  "},
+        )
+        self.assertEqual(res.status_code, 302)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, SiteNotebookTask.STATUS_OPEN)
+        self.assertEqual(self.task.reject_reason, "")
+
+    def test_reopen_rejected(self):
+        self.task.status = SiteNotebookTask.STATUS_REJECTED
+        self.task.reject_reason = "не нужно"
+        self.task.done_by = "admin"
+        self.task.save(update_fields=["status", "reject_reason", "done_by"])
+        session = self.client.session
+        session["biota_username"] = "admin"
+        session.save()
+        res = self.client.post(
+            reverse("site_notebook"),
+            {"action": "reopen", "id": str(self.task.id), "status": "rejected"},
+        )
+        self.assertEqual(res.status_code, 302)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, SiteNotebookTask.STATUS_OPEN)
+        self.assertEqual(self.task.reject_reason, "")
+        self.assertEqual(self.task.done_by, "")

@@ -4129,13 +4129,48 @@ var INV = (function () {
   }
 
   var warehouseAddressTitles = Object.assign({}, (INV && INV.warehouse_address_titles) || {});
+  var ADDR_KIND_FALLBACKS = {
+    Контейнер: 1,
+    "На полке": 1,
+    Ячейка: 1,
+    Органайзер: 1,
+    Место: 1,
+  };
+
+  function placeHoverTitleFromCatalog(p) {
+    if (!p) return "";
+    var addr = String(p.address || "").trim().toUpperCase();
+    var note = String(p.notes || "").trim();
+    var label = String(p.label || "").trim();
+    var labelUp = label.toUpperCase();
+    var customOk = label && !ADDR_KIND_FALLBACKS[label] && labelUp !== addr;
+    var base = "";
+    if (customOk) {
+      base = label;
+    } else {
+      var bits = [];
+      var fname = String(p.furniture_name || p.furniture_code || "").trim();
+      if (fname) bits.push(fname);
+      var shelf = String(p.shelf_label || "").trim();
+      if (shelf) {
+        bits.push((String(p.level_kind || "shelf") === "drawer" ? "ящик " : "полка ") + shelf);
+      }
+      var placeLab = String(p.place_label || "").trim();
+      if (placeLab) bits.push("место " + placeLab);
+      base = bits.join(" · ");
+    }
+    if (note) return base ? base + " · " + note : note;
+    return base;
+  }
 
   function syncWarehouseAddressTitlesFromCatalog(catalog) {
     ((catalog && catalog.places) || []).forEach(function (p) {
       var addr = String((p && p.address) || "").trim().toUpperCase();
       if (!addr) return;
-      var label = String((p && (p.label || p.kind_label)) || "").trim();
-      if (label) warehouseAddressTitles[addr] = label;
+      // Не затирать наименование из справочника generic-подписью («На полке» / сам адрес).
+      if (warehouseAddressTitles[addr]) return;
+      var title = placeHoverTitleFromCatalog(p);
+      if (title) warehouseAddressTitles[addr] = title;
     });
   }
 
@@ -4147,8 +4182,11 @@ var INV = (function () {
       return;
     }
     var title = warehouseAddressTitles[a] || "";
-    if (title) cell.setAttribute("title", title);
-    else cell.removeAttribute("title");
+    if (title && title.toUpperCase() !== a && !ADDR_KIND_FALLBACKS[title]) {
+      cell.setAttribute("title", title);
+    } else {
+      cell.removeAttribute("title");
+    }
   }
 
   function applyAddressCellTitles(root) {
@@ -5500,5 +5538,37 @@ var INV = (function () {
     });
   } else {
     requestAnimationFrame(highlightToolFromQuery);
+  }
+})();
+
+/* Фильтр склада: sticky под навбаром и вкладками */
+(function () {
+  function syncInvStickyOffset() {
+    var page = document.querySelector(".inv-page--stock");
+    if (!page) return;
+    var nav = document.querySelector(".nav");
+    var tabs = page.querySelector(".inv-tabs");
+    var navH = nav ? Math.ceil(nav.getBoundingClientRect().height) : 0;
+    var tabsH = tabs ? Math.ceil(tabs.getBoundingClientRect().height) : 0;
+    page.style.setProperty("--inv-nav-sticky-top", navH + "px");
+    /* только блок фильтра — сразу под вкладками */
+    var gap = tabs ? 10 : 8;
+    page.style.setProperty("--inv-sticky-top", Math.max(56, navH + tabsH + gap) + "px");
+  }
+
+  function bind() {
+    syncInvStickyOffset();
+    window.addEventListener("resize", syncInvStickyOffset);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () {
+        syncInvStickyOffset();
+      }).catch(function () {});
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bind);
+  } else {
+    bind();
   }
 })();

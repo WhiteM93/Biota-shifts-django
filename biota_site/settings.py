@@ -122,6 +122,11 @@ CACHES = {
         "LOCATION": BASE_DIR / ".cache" / "ratelimit",
         "OPTIONS": {"MAX_ENTRIES": 10000},
     },
+    "qrlogin": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": BASE_DIR / ".cache" / "qrlogin",
+        "OPTIONS": {"MAX_ENTRIES": 5000},
+    },
 }
 
 
@@ -192,7 +197,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # Увеличивайте после правок CSS/JS, чтобы браузер и nginx не отдавали старые файлы.
-STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "513").strip() or "513"
+STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "532").strip() or "532"
 
 # YandexGPT (чат склада / анализ наладок). Ключи — в .env.secrets.
 # Модели: yandexgpt-5-lite (дешевле), yandexgpt-5.1 / yandexgpt-5-pro (дороже).

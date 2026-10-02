@@ -178,7 +178,7 @@ class InventoryAiTurnAdmin(admin.ModelAdmin):
 class SiteNotebookTaskAdmin(admin.ModelAdmin):
     list_display = ("id", "created_at", "status", "author_username", "title_short", "done_by")
     list_filter = ("status",)
-    search_fields = ("title", "body", "author_username", "source_question")
+    search_fields = ("title", "body", "author_username", "source_question", "reject_reason")
     readonly_fields = ("created_at", "done_at")
     date_hierarchy = "created_at"
     actions = ("mark_done", "mark_open")
@@ -195,14 +195,18 @@ class SiteNotebookTaskAdmin(admin.ModelAdmin):
             status=SiteNotebookTask.STATUS_DONE,
             done_at=timezone.now(),
             done_by=(getattr(request.user, "username", "") or "admin")[:120],
+            reject_reason="",
         )
 
     @admin.action(description="Вернуть в открытые")
     def mark_open(self, request, queryset):
-        queryset.filter(status=SiteNotebookTask.STATUS_DONE).update(
+        queryset.filter(
+            status__in=(SiteNotebookTask.STATUS_DONE, SiteNotebookTask.STATUS_REJECTED)
+        ).update(
             status=SiteNotebookTask.STATUS_OPEN,
             done_at=None,
             done_by="",
+            reject_reason="",
         )
 
 

@@ -75,7 +75,7 @@ class FlexibleCabinetLayoutTests(TestCase):
             code="A",
         )
         ensure_cabinet_layout(cab, sections=1, shelves_per_section=3, columns=2)
-        level = cab.sections.first().levels.get(index=3)  # bottom → display 01
+        level = cab.sections.first().levels.get(index=3)  # низ → display 03
         cont = VisualContainer.objects.create(
             cabinet=cab,
             level=level,
@@ -87,7 +87,7 @@ class FlexibleCabinetLayoutTests(TestCase):
             color="#e74c3c",
         )
         addr = suggested_address_for_container(cont, cab=cab)
-        self.assertEqual(addr, "A-01-01")
+        self.assertEqual(addr, "A-03-01")
 
     def test_multi_section_address_four_parts(self):
         cab = VisualCabinet.objects.create(
@@ -117,7 +117,7 @@ class FlexibleCabinetLayoutTests(TestCase):
         )
         self.assertIsNone(err)
         sec2 = cab.sections.get(index=2)
-        level = sec2.levels.get(index=2)  # bottom of sec2 → display 01
+        level = sec2.levels.get(index=2)  # низ sec2 → display 02
         cont = VisualContainer.objects.create(
             cabinet=cab,
             level=level,
@@ -129,11 +129,11 @@ class FlexibleCabinetLayoutTests(TestCase):
             color="#e74c3c",
         )
         addr = suggested_address_for_container(cont, cab=cab)
-        self.assertEqual(addr, "A-2-01-01")
-        # legacy helper without section stays 3-part
+        # Слева на том же ряду ящик на 3 места → справа место 04
+        self.assertEqual(addr, "A-02-04")
         self.assertEqual(
             suggested_address(cab, shelf=2, column=1, place_num=1),
-            "A-01-01",
+            "A-02-01",
         )
 
     def test_upsert_layout_and_container_by_level_id(self):
@@ -181,7 +181,8 @@ class FlexibleCabinetLayoutTests(TestCase):
         self.assertEqual(cont["level_id"], drawer_level_id)
         self.assertEqual(cont["level_kind"], "drawer")
         self.assertEqual(cont["section_index"], 1)
-        self.assertEqual(cont["address"], "G-1-01-02")
+        # Секция 1, полка 02, место 02 (сквозной адрес без номера секции)
+        self.assertEqual(cont["address"], "G-02-02")
         obj = VisualContainer.objects.get(pk=cont["id"])
         self.assertEqual(obj.level_id, drawer_level_id)
         self.assertEqual(obj.shelf, 2)
@@ -233,3 +234,64 @@ class FlexibleCabinetLayoutTests(TestCase):
         self.assertEqual(levels[1]["kind"], "drawer")
         self.assertEqual(levels[1]["columns"], 4)
         self.assertEqual(VisualCabinetLevel.objects.filter(section_id=sec_id).count(), 3)
+
+    def test_split_one_shelf_keeps_ghost_levels(self):
+        """Разделили только нижнюю полку: справа сверху пустой ряд (columns=0)."""
+        cab = VisualCabinet.objects.create(
+            name="Разделённая полка",
+            kind=VisualCabinet.KIND_CABINET,
+            shelves=2,
+            columns=4,
+            code="S",
+        )
+        _, err = apply_cabinet_sections_layout(
+            cab,
+            [
+                {
+                    "levels": [
+                        {"kind": "shelf", "columns": 4},
+                        {"kind": "shelf", "columns": 2},
+                    ]
+                },
+                {
+                    "levels": [
+                        {"kind": "shelf", "columns": 0},
+                        {"kind": "drawer", "columns": 2},
+                    ]
+                },
+            ],
+            default_columns=4,
+        )
+        self.assertIsNone(err)
+        secs = list(cab.sections.order_by("index").prefetch_related("levels"))
+        self.assertEqual(len(secs), 2)
+        left = list(secs[0].levels.order_by("index"))
+        right = list(secs[1].levels.order_by("index"))
+        self.assertEqual(left[0].columns, 4)
+        self.assertEqual(left[1].columns, 2)
+        self.assertEqual(right[0].columns, 0)
+        self.assertEqual(right[1].kind, VisualCabinetLevel.KIND_DRAWER)
+        self.assertEqual(right[1].columns, 2)
+        cab.refresh_from_db()
+        self.assertEqual(cab.shelves, 2)
+        self.assertEqual(cab.columns, 4)
+
+        # Повторное сохранение без id уровней (как шлёт билдер для пустых рядов).
+        payload = []
+        for sec in secs:
+            payload.append(
+                {
+                    "id": sec.id,
+                    "levels": [
+                        {
+                            "kind": lv.kind,
+                            "columns": lv.columns,
+                            "rows": lv.rows,
+                        }
+                        for lv in sec.levels.order_by("index")
+                    ],
+                }
+            )
+        _, err2 = apply_cabinet_sections_layout(cab, payload, default_columns=4)
+        self.assertIsNone(err2)
+        self.assertEqual(VisualCabinetLevel.objects.filter(section__cabinet=cab).count(), 4)

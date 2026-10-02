@@ -35,9 +35,27 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
 
-    def test_shelf_display_bottom_up(self):
-        self.assertEqual(shelf_display_num(shelves=5, shelf_top1=1), "05")
-        self.assertEqual(shelf_display_num(shelves=5, shelf_top1=5), "01")
+    def test_shelf_display_top_down(self):
+        self.assertEqual(shelf_display_num(shelves=5, shelf_top1=1), "01")
+        self.assertEqual(shelf_display_num(shelves=5, shelf_top1=5), "05")
+
+    def test_furniture_code_alphanumeric_up_to_3(self):
+        from shifts.visual_warehouse_address import (
+            is_plausible_address,
+            normalize_furniture_code,
+            parse_address_parts,
+        )
+
+        self.assertEqual(normalize_furniture_code("a1"), "A1")
+        self.assertEqual(normalize_furniture_code("12"), "12")
+        self.assertEqual(normalize_furniture_code("аб1"), "АБ1")
+        self.assertEqual(normalize_furniture_code("ABCD"), "")
+        self.assertEqual(normalize_furniture_code("A-1"), "")
+        self.assertTrue(is_plausible_address("A1-01-02"))
+        self.assertTrue(is_plausible_address("12-03-04"))
+        parts = parse_address_parts("A1-02-03")
+        self.assertEqual(parts["code"], "A1")
+        self.assertEqual(parts["place"], 3)
 
     def test_create_cabinet_with_code_and_address(self):
         res = self._post_json(
@@ -55,7 +73,7 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
         self.assertEqual(cab["code"], "B")
         cab_id = cab["id"]
 
-        # shelf top=3 (bottom) → display 01; колонка 2 при 2 местах → место 02 → B-01-02
+        # shelf top=3 (низ) → display 03; колонка 2 при 2 местах → место 02 → B-03-02
         res2 = self._post_json(
             self.upsert_url,
             {
@@ -70,13 +88,13 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
         )
         self.assertEqual(res2.status_code, 200, res2.content[:400])
         cont = res2.json()["container"]
-        self.assertEqual(cont["shelf_label"], "01")
+        self.assertEqual(cont["shelf_label"], "03")
         self.assertEqual(cont["place_label"], "02")
-        self.assertEqual(cont["address"], "B-01-02")
-        self.assertEqual(cont["suggested_address"], "B-01-02")
+        self.assertEqual(cont["address"], "B-03-02")
+        self.assertEqual(cont["suggested_address"], "B-03-02")
 
         obj = VisualContainer.objects.get(pk=cont["id"])
-        self.assertEqual(obj.address, "B-01-02")
+        self.assertEqual(obj.address, "B-03-02")
 
         # change furniture code → auto address refreshes
         detail = reverse("visual_warehouse_api_cabinet_detail", args=[cab_id])
@@ -84,7 +102,7 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
         self.assertEqual(res3.status_code, 200, res3.content[:400])
         self.assertEqual(res3.json()["cabinet"]["code"], "A")
         obj.refresh_from_db()
-        self.assertEqual(obj.address, "A-01-02")
+        self.assertEqual(obj.address, "A-03-02")
 
     def test_code_change_persists_when_sections_sent(self):
         """UI шкафа всегда шлёт sections — буква не должна откатываться после layout."""
@@ -157,10 +175,10 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
         cont.refresh_from_db()
         self.assertEqual(cont.address, "CUSTOM-99")
         cab.refresh_from_db()
-        self.assertEqual(suggested_address(cab, shelf=1, column=1), "B-02-01")
+        self.assertEqual(suggested_address(cab, shelf=1, column=1), "B-01-01")
 
     def test_stale_auto_address_follows_shelf_place(self):
-        """В UI полка/место из геометрии; устаревший A-03-02 не должен перебивать A-02-01."""
+        """В UI полка/место из геометрии; устаревший A-03-02 не должен перебивать A-03-01."""
         from shifts.visual_warehouse_address import (
             build_location_catalog,
             repair_container_address_if_stale,
@@ -174,7 +192,7 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
             columns=4,
             code="A",
         )
-        # shelf_top1=3 → display 02, column=1 → 01 → A-02-01
+        # shelf_top1=3 → display 03, column=1 → 01 → A-03-01
         cont = VisualContainer.objects.create(
             cabinet=cab,
             kind=VisualContainer.KIND_BIN,
@@ -183,12 +201,12 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
             label="Метчик М2 глухой",
             address="A-03-02",
         )
-        self.assertEqual(shelf_display_num(shelves=4, shelf_top1=3), "02")
-        self.assertEqual(suggested_address(cab, shelf=3, column=1), "A-02-01")
-        self.assertEqual(resolve_container_address(cont), "A-02-01")
-        self.assertEqual(repair_container_address_if_stale(cont), "A-02-01")
+        self.assertEqual(shelf_display_num(shelves=4, shelf_top1=3), "03")
+        self.assertEqual(suggested_address(cab, shelf=3, column=1), "A-03-01")
+        self.assertEqual(resolve_container_address(cont), "A-03-01")
+        self.assertEqual(repair_container_address_if_stale(cont), "A-03-01")
         cont.refresh_from_db()
-        self.assertEqual(cont.address, "A-02-01")
+        self.assertEqual(cont.address, "A-03-01")
 
         places = [
             p
@@ -196,9 +214,9 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
             if p["container_id"] == cont.id
         ]
         self.assertEqual(len(places), 1)
-        self.assertEqual(places[0]["shelf_label"], "02")
+        self.assertEqual(places[0]["shelf_label"], "03")
         self.assertEqual(places[0]["place_label"], "01")
-        self.assertEqual(places[0]["address"], "A-02-01")
+        self.assertEqual(places[0]["address"], "A-03-01")
 
     def test_stacked_containers_sequential_place_numbers(self):
         """На одной полке стопки: номера мест сверху вниз, слева направо."""
@@ -215,18 +233,18 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
             columns=5,
             code="A",
         )
-        # shelf top=1 (верхняя, display 05)
+        # shelf top=1 (верхняя, display 01)
         top_l = VisualContainer.objects.create(
-            cabinet=cab, kind=VisualContainer.KIND_BIN, shelf=1, stack=2, column=1, label="T1", address="A-05-01"
+            cabinet=cab, kind=VisualContainer.KIND_BIN, shelf=1, stack=2, column=1, label="T1", address="A-01-01"
         )
         top_m = VisualContainer.objects.create(
-            cabinet=cab, kind=VisualContainer.KIND_BIN, shelf=1, stack=2, column=2, label="T2", address="A-05-02"
+            cabinet=cab, kind=VisualContainer.KIND_BIN, shelf=1, stack=2, column=2, label="T2", address="A-01-02"
         )
         bot_l = VisualContainer.objects.create(
-            cabinet=cab, kind=VisualContainer.KIND_BIN, shelf=1, stack=1, column=1, label="B1", address="A-05-01"
+            cabinet=cab, kind=VisualContainer.KIND_BIN, shelf=1, stack=1, column=1, label="B1", address="A-01-01"
         )
         bot_m = VisualContainer.objects.create(
-            cabinet=cab, kind=VisualContainer.KIND_BIN, shelf=1, stack=1, column=2, label="B2", address="A-05-02"
+            cabinet=cab, kind=VisualContainer.KIND_BIN, shelf=1, stack=1, column=2, label="B2", address="A-01-02"
         )
         peers = [top_l, top_m, bot_l, bot_m]
         self.assertEqual(place_index_on_shelf(top_l, peers=peers), 1)
@@ -238,7 +256,7 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
         self.assertEqual(labels[top_m.id], "02")
         self.assertEqual(labels[bot_l.id], "03")
         self.assertEqual(labels[bot_m.id], "04")
-        self.assertEqual(suggested_address_for_container(bot_l, cab=cab, peers=peers), "A-05-03")
+        self.assertEqual(suggested_address_for_container(bot_l, cab=cab, peers=peers), "A-01-03")
 
     def test_move_container_to_another_cabinet(self):
         cab_a = VisualCabinet.objects.create(
@@ -261,7 +279,7 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
             shelf=2,
             column=1,
             label="Коробка",
-            address="A-03-01",
+            address="A-02-01",
         )
         res = self._post_json(
             self.upsert_url,
@@ -274,7 +292,7 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
                 "column": 1,
                 "label": "Коробка",
                 "color": "#5dade2",
-                "address": "A-03-01",
+                "address": "A-02-01",
             },
         )
         self.assertEqual(res.status_code, 200, res.content[:400])
@@ -282,4 +300,4 @@ class VisualWarehouseFurnitureCodeAddressTests(TestCase):
         self.assertEqual(data["cabinet_id"], cab_b.pk)
         cont.refresh_from_db()
         self.assertEqual(cont.cabinet_id, cab_b.pk)
-        self.assertEqual(cont.address, "B-03-01")
+        self.assertEqual(cont.address, "B-02-01")

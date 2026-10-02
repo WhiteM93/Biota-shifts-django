@@ -782,7 +782,7 @@ def locate_tool(query: str = "", limit: int = 20) -> dict[str, Any]:
     lim = _limit_n(limit, 20)
     q_low = q.lower().replace("ё", "е")
     want_cat = _query_wants_category(q_low)
-    looks_addr = bool(re.search(r"[A-Za-zА-Яа-яЁё0-9]{1,8}-\d", q.replace(" ", "")))
+    looks_addr = bool(re.search(r"[A-Za-zА-Яа-яЁё0-9]{1,3}-\d", q.replace(" ", "")))
 
     qs = ToolItem.objects.filter(is_deleted=False).select_related(
         "insert_spec",

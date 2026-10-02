@@ -74,88 +74,55 @@
     return { page: "other", panel: "" };
   }
 
-  var HINTS = {
-    analysis: [
-      { q: "Какие выдачи просрочены больше 14 дней?", t: "Просрочки" },
-      { q: "Что в контроле остатков ниже минимума?", t: "Контроль" },
-      { q: "Какой инструмент давно не двигался?", t: "Залежь" }
-    ],
-    issue_outcome: [
-      { q: "Кто держит инструмент на руках и не вернул?", t: "На руках" },
-      { q: "Какие выдачи просрочены?", t: "Просрочки" },
-      { q: "Что выдавали чаще всего за последние 30 дней?", t: "Топ выдач" }
-    ],
-    issue: [
-      { q: "Кто держит инструмент на руках?", t: "На руках" },
-      { q: "Кто последний брал сверло 2.5?", t: "Кто брал сверло" },
-      { q: "Какие выдачи просрочены?", t: "Просрочки" }
-    ],
-    stock: [
-      { q: "Где лежит сверло 2.5?", t: "Где лежит" },
-      { q: "Какой позиции на складе больше всего по остатку?", t: "Топ остатков" },
-      { q: "запиши в блокнот: ", t: "В блокнот" }
-    ],
-    arrival: [
-      { q: "Где лежит сверло 2.5?", t: "Где лежит" },
-      { q: "Что в контроле остатков ниже минимума?", t: "Контроль" },
-      { q: "Какие позиции без адреса ячейки?", t: "Без адреса" }
-    ],
-    purchases: [
-      { q: "Что в контроле остатков ниже минимума?", t: "Контроль" },
-      { q: "Какой инструмент давно не двигался?", t: "Залежь" },
-      { q: "Что выдавали чаще всего за последние 30 дней?", t: "Топ выдач" }
-    ],
-    history: [
-      { q: "Какие последние движения склада?", t: "Движения" },
-      { q: "Какие выдачи просрочены?", t: "Просрочки" },
-      { q: "Кто держит инструмент на руках?", t: "На руках" }
-    ]
-  };
-  var HINTS_VISUAL = [
-    { q: "Где лежит сверло 2.5?", t: "Где лежит" },
-    { q: "Какие позиции без адреса ячейки?", t: "Без адреса" },
-    { q: "Какой позиции на складе больше всего по остатку?", t: "Топ остатков" }
-  ];
-  var HINTS_DEFAULT = [
-    { q: "Какие выдачи просрочены больше 14 дней?", t: "Просрочки" },
-    { q: "Кто последний брал сверло 2.5?", t: "Кто брал сверло" },
-    { q: "запиши в блокнот: ", t: "В блокнот" }
+  /* Фиксированные подсказки: что умеет чат. fill — только подставить в поле. */
+  var CAPABILITY_HINTS = [
+    {
+      t: "Предложить изменение",
+      q: "Добавь в блокнот: ",
+      mode: "fill",
+      cls: "inv-chat-hint--note"
+    },
+    { t: "Где лежит", q: "Где лежит ", mode: "fill" },
+    { t: "На руках", q: "Кто держит инструмент на руках?" },
+    { t: "Просрочки", q: "Какие выдачи просрочены?" },
+    { t: "Без адреса", q: "Какие позиции без адреса ячейки?" },
+    { t: "Контроль", q: "Что в контроле остатков ниже минимума?" },
+    { t: "Залежь", q: "Какой инструмент давно не двигался?" }
   ];
   var PAGE_HINTS = {
-    analysis: "Вкладка «Анализ»: просрочки, контроль, залежь.",
-    issue_outcome: "Возврат: кто не вернул и просрочки.",
-    issue: "Выдача: кто брал и что на руках.",
-    stock: "Остатки: адрес ячейки и топ по количеству.",
-    arrival: "Приход: где лежит и что без адреса.",
-    purchases: "Закупки: что ниже минимума в контроле.",
-    history: "История: свежие движения и открытые выдачи.",
-    visual_warehouse: "Ячейки: адрес и позиции без адреса."
+    analysis: "Сейчас «Анализ» — удобно спросить про просрочки, контроль, залежь.",
+    issue_outcome: "Сейчас «Возврат» — кто не вернул и просрочки.",
+    issue: "Сейчас «Выдача» — кто брал и что на руках.",
+    stock: "Сейчас «Остатки» — адрес ячейки и топ по количеству.",
+    arrival: "Сейчас «Приход» — где лежит и что без адреса.",
+    purchases: "Сейчас «Закупки» — что ниже минимума в контроле.",
+    history: "Сейчас «История» — свежие движения и открытые выдачи.",
+    visual_warehouse: "Сейчас визуальный склад — адрес и позиции без адреса."
   };
 
-  function currentHints() {
-    var ctx = detectPageContext();
-    if (ctx.page === "visual_warehouse") return HINTS_VISUAL;
-    if (ctx.page === "inventory" && HINTS[ctx.panel]) return HINTS[ctx.panel];
-    return HINTS_DEFAULT;
+  function fillInputPrefix(prefix) {
+    if (!input) return;
+    input.value = prefix;
+    input.focus();
+    try {
+      var n = prefix.length;
+      input.setSelectionRange(n, n);
+    } catch (e) {
+      /* ignore */
+    }
   }
 
   function bindHintButtons() {
     if (!hintsEl) return;
     hintsEl.querySelectorAll(".js-inv-chat-hint").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var t = btn.getAttribute("data-q") || btn.textContent || "";
-        if (input) input.value = t;
-        if (/блокнот:\s*$/i.test(t)) {
-          if (input) {
-            input.focus();
-            try {
-              input.setSelectionRange(t.length, t.length);
-            } catch (e) {
-              /* ignore */
-            }
-          }
+        var t = btn.getAttribute("data-q") || "";
+        var mode = btn.getAttribute("data-mode") || "send";
+        if (mode === "fill") {
+          fillInputPrefix(t);
           return;
         }
+        if (input) input.value = "";
         sendQuestion(t);
       });
     });
@@ -163,14 +130,17 @@
 
   function applyPageUi() {
     var ctx = detectPageContext();
-    var list = currentHints();
     if (hintsEl) {
       hintsEl.innerHTML = "";
-      list.forEach(function (item) {
+      CAPABILITY_HINTS.forEach(function (item) {
         var btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "inv-chat-hint js-inv-chat-hint";
+        btn.className = "inv-chat-hint js-inv-chat-hint" + (item.cls ? " " + item.cls : "");
         btn.setAttribute("data-q", item.q);
+        btn.setAttribute("data-mode", item.mode || "send");
+        btn.title = item.mode === "fill"
+          ? "Подставит начало фразы — допишите и нажмите «Спросить»"
+          : item.q;
         btn.textContent = item.t;
         hintsEl.appendChild(btn);
       });
@@ -184,13 +154,7 @@
       pageHintEl.hidden = !msg;
     }
     if (input) {
-      if (ctx.panel === "issue_outcome" || ctx.panel === "analysis") {
-        input.placeholder = "Например: какие выдачи просрочены?";
-      } else if (ctx.panel === "stock" || ctx.page === "visual_warehouse") {
-        input.placeholder = "Например: где лежит сверло 2.5?";
-      } else {
-        input.placeholder = "Например: кто держит инструмент на руках?";
-      }
+      input.placeholder = "Вопрос по складу или «Добавь в блокнот: …»";
     }
   }
 
@@ -228,7 +192,7 @@
     if (!history.length) {
       appendBubble(
         "meta",
-        "Спросите про просрочки, кто на руках, где лежит инструмент. Не чаще 1 раза в минуту (админ — без лимита).",
+        "Кнопки сверху — что умею: где лежит, кто на руках, просрочки, контроль. «Предложить изменение» — заявка в блокнот админу. Не чаще 1 раза в минуту (админ — без лимита).",
         "inv-chat-msg--meta"
       );
       return;

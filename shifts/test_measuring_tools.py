@@ -1,4 +1,5 @@
-from django.test import TestCase
+from django.test import Client, TestCase
+from django.urls import reverse
 
 from shifts.measuring_constants import (
     MEASURING_CATEGORIES,
@@ -81,3 +82,62 @@ class MeasuringToolTests(TestCase):
         self.assertTrue(
             SiteNotebookTask.objects.filter(title="Измерительный: даты поверки").exists()
         )
+
+
+class MeasuringStockFilterTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        session = self.client.session
+        session["biota_username"] = "admin"
+        session.save()
+        self.keep = ToolItem.objects.create(
+            category="measure_univ",
+            name="Штангенциркуль A",
+            quantity=2,
+        )
+        MeasuringToolSpec.objects.create(
+            tool=self.keep,
+            brand="MITUTOYO",
+            kind="caliper",
+            measure_range="0–150 мм",
+            accuracy="0,01 мм",
+            ip_rating="IP54",
+        )
+        other = ToolItem.objects.create(
+            category="measure_univ",
+            name="Микрометр B",
+            quantity=1,
+        )
+        MeasuringToolSpec.objects.create(
+            tool=other,
+            brand="HOLEX",
+            kind="micrometer",
+            measure_range="0–25 мм",
+            accuracy="0,001 мм",
+        )
+
+    def test_stock_filter_shows_measuring_fields(self):
+        res = self.client.get(
+            reverse("inventory"),
+            {"panel": "stock", "category": "measure_univ", "show_all": "1"},
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'name="ms_kind"')
+        self.assertContains(res, 'name="ms_brand"')
+        self.assertContains(res, 'name="ms_range"')
+        self.assertContains(res, "MITUTOYO")
+
+    def test_stock_filter_by_kind(self):
+        res = self.client.get(
+            reverse("inventory"),
+            {
+                "panel": "stock",
+                "category": "measure_univ",
+                "show_all": "1",
+                "ms_kind": "caliper",
+            },
+        )
+        self.assertEqual(res.status_code, 200)
+        items = list(res.context["tool_items"])
+        self.assertEqual([t.id for t in items], [self.keep.id])
+        self.assertEqual(res.context["filters"]["ms_kind"], "caliper")

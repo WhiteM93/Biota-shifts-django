@@ -240,10 +240,19 @@
   padding: 5px 8px;
   border-radius: 999px;
   cursor: pointer;
+  line-height: 1.25;
 }
 .inv-chat-hint:hover {
   border-color: var(--bio-input-focus-border);
   color: var(--bio-heading-accent, var(--bio-body-fg));
+}
+.inv-chat-hint--note {
+  border-color: color-mix(in srgb, var(--bio-heading-accent, #3d7ea6) 45%, var(--bio-surface-item-border));
+  background: color-mix(in srgb, var(--bio-heading-accent, #3d7ea6) 12%, var(--bio-tab-pill-bg, var(--bio-surface-item)));
+  font-weight: 600;
+}
+.inv-chat-hint--note:hover {
+  border-color: var(--bio-heading-accent, #3d7ea6);
 }
 
 .inv-chat-messages {

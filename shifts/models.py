@@ -2012,9 +2012,11 @@ class SiteNotebookTask(models.Model):
 
     STATUS_OPEN = "open"
     STATUS_DONE = "done"
+    STATUS_REJECTED = "rejected"
     STATUS_CHOICES = [
         (STATUS_OPEN, "Открыта"),
         (STATUS_DONE, "Выполнено"),
+        (STATUS_REJECTED, "Отказано"),
     ]
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Когда")
@@ -2033,6 +2035,7 @@ class SiteNotebookTask(models.Model):
     )
     done_at = models.DateTimeField(null=True, blank=True, verbose_name="Когда закрыто")
     done_by = models.CharField(max_length=120, blank=True, default="", verbose_name="Кто закрыл")
+    reject_reason = models.TextField(blank=True, default="", verbose_name="Причина отказа")
 
     class Meta:
         ordering = ("status", "-created_at", "-id")
@@ -3785,8 +3788,8 @@ class VisualCabinet(models.Model):
         max_length=8,
         blank=True,
         default="",
-        verbose_name="Буква / код",
-        help_text="Буква мебели для адреса: A, B, А, Б…",
+        verbose_name="Код мебели",
+        help_text="До 3 символов (буквы/цифры) в адресе: A1-01-02, 12-03-01…",
     )
     name = models.CharField(max_length=120, verbose_name="Название")
     kind = models.CharField(

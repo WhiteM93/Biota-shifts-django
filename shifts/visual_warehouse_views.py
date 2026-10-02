@@ -67,6 +67,7 @@ from .visual_warehouse_address import (
     cabinet_section_count,
     ensure_cabinet_layout,
     ensure_places_from_warehouse_addresses,
+    cabinet_max_level_count,
     ensure_warehouse_address,
     level_total_in_section,
     normalize_address,
@@ -74,6 +75,7 @@ from .visual_warehouse_address import (
     next_available_furniture_code,
     pad2,
     place_display_num,
+    place_index_across_shelf_row,
     place_index_on_shelf,
     place_labels_by_container_id,
     resolve_container_address,
@@ -777,22 +779,26 @@ def _serialize_container(
     if getattr(c, "parent_id", None) and kind == VisualContainer.KIND_BIN:
         kind = VisualContainer.KIND_DRAWER_CELL
     parent_id = getattr(c, "parent_id", None)
-    if place_labels and c.id in place_labels:
-        place_lab = place_labels[c.id]
-        place_num = int(place_lab)
-    elif parent_id:
+    level = getattr(c, "level", None)
+    section = getattr(level, "section", None) if level else None
+    cab = getattr(c, "cabinet", None)
+    if parent_id:
         place_num = max(1, int(c.column or 1))
         place_lab = place_display_num(place_num)
     else:
-        place_num = place_index_on_shelf(c, peers=shelf_peers)
+        place_num = place_index_across_shelf_row(c, cab=cab, peers=shelf_peers)
         place_lab = place_display_num(place_num)
-    level = getattr(c, "level", None)
-    section = getattr(level, "section", None) if level else None
     levels_total = None
     shelf_top1 = int(c.shelf or 1)
     if level is not None:
         shelf_top1 = int(level.index or shelf_top1)
-        levels_total = level_total_in_section(level, section)
+        from shifts.visual_warehouse_address import cabinet_max_level_count
+
+        levels_total = (
+            cabinet_max_level_count(cab)
+            if cab is not None
+            else level_total_in_section(level, section)
+        )
     data = {
         "id": c.id,
         "cabinet_id": c.cabinet_id,
@@ -975,7 +981,7 @@ def _refresh_container_addresses_for_cabinet(
         peers_by_key.setdefault(key, []).append(cont)
     for cont in tops:
         peers = peers_by_key.get((getattr(cont, "level_id", None), int(cont.shelf)), [])
-        place = place_index_on_shelf(cont, peers=peers)
+        place = place_index_across_shelf_row(cont, cab=cab, peers=peers)
         suggested_new = suggested_address_for_container(cont, cab=cab, peers=peers)
         # rewrite furniture code part if needed
         if old_furniture_code and furniture_code and old_furniture_code != furniture_code:
@@ -994,16 +1000,7 @@ def _refresh_container_addresses_for_cabinet(
                     column=cont.column,
                     furniture_code=old_furniture_code,
                     place_num=place,
-                    section_index=(
-                        int(cont.level.section.index)
-                        if getattr(cont, "level", None) and cont.level.section_id
-                        else None
-                    ),
-                    levels_in_section=(
-                        level_total_in_section(cont.level, cont.level.section)
-                        if getattr(cont, "level", None)
-                        else None
-                    ),
+                    levels_in_section=cabinet_max_level_count(cab),
                 )
             )
             if stored == old_suggested:
@@ -1359,7 +1356,7 @@ def _cabinet_mutate(request, cab: VisualCabinet):
     if "code" in body:
         code = normalize_furniture_code(body.get("code"))
         if not code:
-            return _err("Некорректный код мебели")
+            return _err("Код мебели: 1–3 буквы или цифры (латиница/кириллица)")
         if VisualCabinet.objects.filter(code__iexact=code).exclude(pk=cab.pk).exists():
             return _err("Мебель с таким кодом уже есть")
         if code.upper() != (cab.code or "").strip().upper():
@@ -1517,7 +1514,7 @@ def visual_warehouse_api_container_upsert(request):
     color = str(body.get("color") or "#e74c3c").strip()
     if not _HEX_RE.match(color):
         color = "#e74c3c"
-    notes = str(body.get("notes") or "").strip()[:300]
+    notes = str(body.get("notes") or "").strip()[:80]
     cont_kind = _normalize_container_kind(body.get("kind"))
     cab_kind = _normalize_cabinet_kind(cab.kind)
     parent_id = body.get("parent_id")

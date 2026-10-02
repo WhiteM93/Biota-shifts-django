@@ -1132,6 +1132,72 @@
         {% endfor %}
       </select>
     </label>
+    {% elif is_measuring_category %}
+    {% if measuring_kind_choices %}
+    <label class="field"><span>Вид</span>
+      <select name="ms_kind">
+        <option value="">Все</option>
+        {% for key, label in measuring_kind_choices %}
+          {% if key in measuring_filter_options.kinds %}
+          <option value="{{ key }}" {% if filters.ms_kind == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <label class="field"><span>Бренд</span>
+      <select name="ms_brand">
+        <option value="">Все</option>
+        {% for v in measuring_filter_options.brands %}
+        <option value="{{ v }}" {% if filters.ms_brand == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if filters.category == "gauge_thread" %}
+    <label class="field"><span>Резьба</span>
+      <select name="ms_thread_size">
+        <option value="">Все</option>
+        {% for v in measuring_filter_options.thread_sizes %}
+        <option value="{{ v }}" {% if filters.ms_thread_size == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Шаг, мм</span>
+      <select name="ms_pitch_mm">
+        <option value="">Все</option>
+        {% for v in measuring_filter_options.pitches %}
+        <option value="{{ v }}" {% if filters.ms_pitch_mm == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "measure_univ" %}
+    <label class="field"><span>Диапазон</span>
+      <select name="ms_range">
+        <option value="">Все</option>
+        {% for v in measuring_filter_options.ranges %}
+        <option value="{{ v }}" {% if filters.ms_range == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "measure_check" %}
+    <label class="field"><span>Размер</span>
+      <select name="ms_check_size">
+        <option value="">Все</option>
+        {% for v in measuring_filter_options.check_sizes %}
+        <option value="{{ v }}" {% if filters.ms_check_size == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "measure_mark" %}
+    <label class="field"><span>L, мм</span>
+      <select name="ms_length_mm">
+        <option value="">Все</option>
+        {% for v in measuring_filter_options.lengths %}
+        <option value="{{ v }}" {% if filters.ms_length_mm == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
     {% endif %}
     <label class="field"><span>Адрес</span>
       <select name="no_address">
@@ -1259,6 +1325,14 @@
       </select>
     </label>
     {% elif filters.category == "center_drill" %}
+    <label class="field"><span>Длина, мм</span>
+      <select name="center_overall_length_mm">
+        <option value="">Все</option>
+        {% for v in center_drill_filter_options.overall_lengths %}
+        <option value="{{ v }}" {% if filters.center_overall_length_mm == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <label class="field"><span>Угол, °</span>
       <select name="center_angle_deg">
         <option value="">Все</option>
@@ -1308,6 +1382,14 @@
         <option value="">Все</option>
         {% for v in drill_filter_options.overall_lengths %}
         <option value="{{ v }}" {% if filters.drill_overall_length_mm == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Длина реж. части, мм</span>
+      <select name="drill_cutting_length_mm">
+        <option value="">Все</option>
+        {% for v in drill_filter_options.cutting_lengths %}
+        <option value="{{ v }}" {% if filters.drill_cutting_length_mm == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
@@ -1417,6 +1499,51 @@
         <option value="">Все</option>
         {% for v in tool_extension_filter_options.compats %}
         <option value="{{ v }}" {% if filters.ext_compatible_parts == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "gauge_thread" %}
+    <label class="field"><span>П/НП</span>
+      <select name="ms_go_nogo">
+        <option value="">Все</option>
+        {% for key, label in thread_gauge_go_nogo %}
+          {% if key in measuring_filter_options.go_nogos %}
+          <option value="{{ key }}" {% if filters.ms_go_nogo == key %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Допуск</span>
+      <select name="ms_tolerance">
+        <option value="">Все</option>
+        {% for v in measuring_filter_options.tolerances %}
+        <option value="{{ v }}" {% if filters.ms_tolerance == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "measure_univ" %}
+    <label class="field"><span>Точность</span>
+      <select name="ms_accuracy">
+        <option value="">Все</option>
+        {% for v in measuring_filter_options.accuracies %}
+        <option value="{{ v }}" {% if filters.ms_accuracy == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>IP</span>
+      <select name="ms_ip">
+        <option value="">Все</option>
+        {% for v in measuring_filter_options.ips %}
+        <option value="{{ v }}" {% if filters.ms_ip == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% elif filters.category == "measure_check" %}
+    <label class="field"><span>Класс</span>
+      <select name="ms_check_class">
+        <option value="">Все</option>
+        {% for v in measuring_filter_options.check_classes %}
+        <option value="{{ v }}" {% if filters.ms_check_class == v %}selected{% endif %}>{{ v }}</option>
         {% endfor %}
       </select>
     </label>
