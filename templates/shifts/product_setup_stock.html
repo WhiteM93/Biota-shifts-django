@@ -50,6 +50,17 @@
   .setup-stock-holders__title { font-weight: 600; margin: 0 0 6px; }
   .setup-stock-holders ul { margin: 0; padding-left: 1.2em; }
   .setup-stock-holders li { margin: 2px 0; }
+  .setup-stock-alts {
+    margin: 10px 0 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px dashed #2a7a5a;
+    background: rgba(42, 122, 90, 0.08);
+    font-size: 13px;
+  }
+  .setup-stock-alts__title { font-weight: 600; margin: 0 0 4px; }
+  .setup-stock-alts__hint { margin: 0 0 8px; font-size: 12px; color: var(--muted, #888); }
+  .setup-stock-alts .setup-stock-table { margin-top: 0; }
   .setup-ai-box {
     margin: 0 0 18px;
     border: 1px solid var(--border, #333);
@@ -180,6 +191,35 @@
         </li>
         {% endfor %}
       </ul>
+    </div>
+    {% endif %}
+
+    {% if row.alternatives %}
+    <div class="setup-stock-alts">
+      <p class="setup-stock-alts__title">Чем заменить (со склада)</p>
+      <p class="setup-stock-alts__hint">Близкие позиции в наличии. Метчик — только тот же размер резьбы; сверло/фреза — ближайший ⌀.</p>
+      <table class="setup-stock-table">
+        <thead>
+          <tr>
+            <th>Инструмент</th>
+            <th>Почему</th>
+            <th>Адрес</th>
+            <th>Кол-во</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in row.alternatives %}
+          <tr>
+            <td>{{ a.label }}</td>
+            <td>{{ a.reason }}</td>
+            <td class="setup-stock-addr">{% if a.address %}{{ a.address }}{% else %}<span class="muted">без адреса</span>{% endif %}</td>
+            <td class="setup-stock-qty">{{ a.qty }}</td>
+            <td><a class="btn btn-ghost btn-sm" href="{{ a.inventory_url }}">На склад</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
     {% endif %}
   </section>

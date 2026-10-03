@@ -106,6 +106,7 @@
 
   <div class="product-tabs" id="product-tabs" {% if setups %}data-inline-setup-ids="{% for setup in setups %}{{ setup.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"{% endif %} {% if product.program_file %}data-product-program-url="{{ product.program_file.url }}" data-product-program-filename="{{ product.program_filename|escape }}"{% endif %}>
     <div class="product-tabs-nav" role="tablist" aria-label="Документация и наладка">
+      <div class="product-tabs-nav__main">
       {% if setups %}
       {% if biota_can_edit %}
       <form method="post" action="{{ product_self_url }}" class="product-add-setup-inline" style="display:inline;">
@@ -124,9 +125,6 @@
         </select>
       </label>
       </div>
-      {% if biota_can_edit %}
-      <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-setup-inline-delete-btn js-phased-delete" id="setup-inline-delete-setup-btn" data-step="0" hidden title="Удалить выбранную установку" aria-label="Удалить выбранную установку">{% biota_icon "action.delete" "btn-inv-delete__icon" %}</button>
-      {% endif %}
       {% elif biota_can_edit %}
       <form method="post" action="{{ product_self_url }}" class="product-add-setup-first" style="display:inline;">
         {% csrf_token %}
@@ -148,8 +146,12 @@
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M13 3a9 9 0 00-9 9H1l3.9 3.9L8.8 12H6a7 7 0 117 7 6.9 6.9 0 01-4.9-2l-1.4 1.5A9 9 0 1013 3zm-1 5v5l4.3 2.6.7-1.2-3.5-2.1V8H12z"/></svg>
         </button>
       </div>
+      </div>
       {% if setups %}
-      <span class="nav-spacer" style="flex:1 1 auto;"></span>
+      <div class="product-tabs-nav__actions">
+      {% if biota_can_edit %}
+      <button type="button" class="btn btn-inv-delete btn-inv-delete--s0 product-setup-inline-delete-btn" id="setup-inline-delete-setup-btn" hidden title="Удалить выбранную установку" aria-label="Удалить выбранную установку">{% biota_icon "action.delete" "btn-inv-delete__icon" %}</button>
+      {% endif %}
       <button
         type="button"
         class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only"
@@ -165,26 +167,13 @@
       <a href="#" class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only" id="setup-export-tools-btn" target="_blank" rel="noopener" hidden aria-label="Печать списка инструмента А4" title="Печать списка инструмента (А4 вертикально)">
         <span class="product-pdf-export-btn__icon" aria-hidden="true">{% biota_icon "pdf.export_tools" "pdf-export-icon pdf-export-icon--tools" %}</span>
       </a>
-      <button
-        type="button"
-        class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only"
-        id="setup-load-to-machine-btn"
-        hidden
-        aria-label="Загрузить инструмент в станок"
-        title="Загрузить инструмент в станок"
-      >
-        <span class="product-pdf-export-btn__icon" aria-hidden="true">
-          {% biota_icon "setup.load_to_machine" "setup-load-machine-icon" %}
-        </span>
-      </button>
       <a href="#" class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only" id="setup-export-specs-btn" target="_blank" rel="noopener" hidden aria-label="PDF параметры" title="PDF параметры">
         <span class="product-pdf-export-btn__icon" aria-hidden="true">{% biota_icon "pdf.export_specs" "pdf-export-icon" %}</span>
       </a>
       <a href="#" class="btn btn-ghost product-pdf-export-btn product-pdf-export-btn--icon-only" id="setup-export-photos-btn" target="_blank" rel="noopener" hidden aria-label="PDF фото 3×5" title="PDF фото 3×5">
         <span class="product-pdf-export-btn__icon" aria-hidden="true">{% biota_icon "pdf.export_photos" "pdf-export-icon pdf-export-icon--photos" %}</span>
       </a>
-      {% endif %}
-      {% if biota_can_edit and setups %}
+      {% if biota_can_edit %}
       <button type="button" class="btn product-btn-edit-mode product-btn-edit-mode--icon-only" id="setup-inline-edit-btn" aria-pressed="false" aria-label="Быстрое редактирование" title="Быстрое редактирование">
         <span class="product-btn-edit-mode__icon" aria-hidden="true">
           <span class="qe-icon-glow"></span>
@@ -192,6 +181,8 @@
           {% biota_icon "action.quick_edit_save" "qe-icon qe-icon--save" %}
         </span>
       </button>
+      {% endif %}
+      </div>
       {% endif %}
     </div>
     <div class="product-tab-panels">
@@ -747,8 +738,6 @@
   "pdf_url_tools": "{% url 'product_setup_pdf_export' product.pk 0 'tools' %}",
   "stl_preview_url": "{{ preview_stl_url|default:'' }}",
   "save_list_preview_url": "{% url 'product_save_list_preview' product.pk %}",
-  "machines_url": "{% url 'machines' %}",
-  "machine_codes": [{% for code in machine_codes %}"{{ code|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
   "tool_type_choices": [{% for v, lbl in tool_type_choices %}{"value":"{{ v|escapejs }}","label":"{{ lbl|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
 }</script>
 <script src="{% static 'shifts/js/plan-cascade-form.js' %}?v={{ static_asset_version }}" defer></script>

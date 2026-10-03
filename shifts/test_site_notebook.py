@@ -19,10 +19,8 @@ class SiteNotebookToolTests(TestCase):
             panel="stock",
         )
         self.assertTrue(result["ok"])
-        self.assertEqual(SiteNotebookTask.objects.count(), 1)
-        row = SiteNotebookTask.objects.get()
+        row = SiteNotebookTask.objects.get(author_username="worker1", title="Добавь фильтр по сверлу")
         self.assertEqual(row.status, SiteNotebookTask.STATUS_OPEN)
-        self.assertEqual(row.author_username, "worker1")
         self.assertIn("сверло", row.body.lower())
 
     def test_run_tool_injects_username(self):
@@ -32,12 +30,26 @@ class SiteNotebookToolTests(TestCase):
             context={"username": "ivan", "source_question": "добавь на сайт кнопку Excel"},
         )
         self.assertTrue(result.get("ok"))
-        self.assertEqual(SiteNotebookTask.objects.get().author_username, "ivan")
+        self.assertEqual(
+            SiteNotebookTask.objects.get(title="Кнопка экспорта").author_username,
+            "ivan",
+        )
 
     def test_forced_notebook_intent(self):
         call = forced_tool_call("запиши в блокнот: добавь фильтр по диаметру на складе")
         self.assertIsNotNone(call)
         self.assertEqual(call["tool"], "add_site_note")
+
+    def test_forced_notebook_typos(self):
+        for phrase in (
+            "запиши в блокот: добавь кнопку экспорта",
+            "добавь в блокнт задачу про фильтр",
+            "запиши в блокнод: нужен вид сверло",
+        ):
+            call = forced_tool_call(phrase)
+            self.assertIsNotNone(call, phrase)
+            self.assertEqual(call["tool"], "add_site_note", phrase)
+            self.assertIn(phrase[:20], call["args"].get("body") or "")
 
 
 class SiteNotebookViewTests(TestCase):

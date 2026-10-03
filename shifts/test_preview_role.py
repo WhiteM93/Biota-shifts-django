@@ -29,7 +29,6 @@ class AdminPreviewRoleTests(TestCase):
         self.assertContains(page, 'data-biota-can-edit="0"')
         self.assertContains(page, "nav-role-preview")
         self.assertContains(page, 'id="setup-export-tools-btn"')
-        self.assertContains(page, 'id="setup-load-to-machine-btn"')
         self.assertContains(page, 'id="setup-export-specs-btn"')
         self.assertContains(page, 'id="setup-export-photos-btn"')
         self.assertNotContains(page, 'id="setup-inline-edit-btn"')
@@ -105,7 +104,6 @@ class AdminPreviewRoleTests(TestCase):
                 "employees": True,
                 "regulations": True,
                 "products": True,
-                "machines": True,
                 "forms": True,
                 "calculator": True,
                 "visual_warehouse": True,
@@ -145,7 +143,6 @@ class AdminPreviewRoleTests(TestCase):
                 "employees": True,
                 "regulations": True,
                 "products": True,
-                "machines": True,
                 "forms": True,
                 "calculator": True,
                 "visual_warehouse": True,

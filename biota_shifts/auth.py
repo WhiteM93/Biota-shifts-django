@@ -641,7 +641,6 @@ NAV_KEYS_NO_DEPT_FILTER = (
     "inventory_types",
     "visual_warehouse",
     "products",
-    "machines",
     "calculator",
     "forms",
     "contracts",
@@ -658,7 +657,6 @@ NAV_KEYS = (
     "employees",
     "regulations",
     "products",
-    "machines",
     "calculator",
     "forms",
     "visual_warehouse",
@@ -678,7 +676,6 @@ NAV_LABELS_RU = {
     "employees": "Сотрудники",
     "regulations": "Регламенты",
     "products": "Изделия",
-    "machines": "Станки",
     "calculator": "Калькулятор",
     "forms": "Формы",
     "visual_warehouse": "Визуальный склад",
@@ -695,7 +692,6 @@ NAV_LABELS_SHORT = {
     "employees": "Сотрудники",
     "regulations": "Регламенты",
     "products": "Наладки",
-    "machines": "Станки",
     "calculator": "Калькулятор",
     "forms": "Формы",
     "visual_warehouse": "Виз. склад",
@@ -793,7 +789,7 @@ def _nav_department_filters_map(rec: dict | None) -> dict[str, list[str]]:
 
 
 def _nav_dep_filters_union_departments(rec: dict) -> list[str] | None:
-    """Объединение отделов из nav_dep_filters по всем включённым разделам (кроме products и machines).
+    """Объединение отделов из nav_dep_filters по всем включённым разделам (кроме products).
 
     None — ключа nav_dep_filters нет или словарь пустой (нет явной привязки к отделам в store).
     Пустой список — в store есть ключи, но ни в одном включённом разделе отделы не отмечены.
@@ -808,7 +804,7 @@ def _nav_dep_filters_union_departments(rec: dict) -> list[str] | None:
     out: list[str] = []
     for k, vals in raw.items():
         ks = str(k or "").strip()
-        if ks not in NAV_KEYS or ks in ("products", "machines"):
+        if ks not in NAV_KEYS or ks == "products":
             continue
         if nav is not None and not bool(nav.get(ks, True)):
             continue

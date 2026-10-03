@@ -765,12 +765,10 @@ function saveSetupToolNoteEditor() {
       var exportSpecsBtn = document.getElementById("setup-export-specs-btn");
       var exportPhotosBtn = document.getElementById("setup-export-photos-btn");
       var exportToolsBtn = document.getElementById("setup-export-tools-btn");
-      var loadMachineBtn = document.getElementById("setup-load-to-machine-btn");
       var shareQrBtn = document.getElementById("setup-share-qr-btn");
       if (exportSpecsBtn) exportSpecsBtn.hidden = !isSetupTab;
       if (exportPhotosBtn) exportPhotosBtn.hidden = !isSetupTab;
       if (exportToolsBtn) exportToolsBtn.hidden = !isSetupTab;
-      if (loadMachineBtn) loadMachineBtn.hidden = !isSetupTab;
       if (isSetupTab) {
         var m = (tabName || "").match(/^setup-(\d+)$/);
         var setupId = m ? m[1] : "";
@@ -1557,14 +1555,14 @@ function saveSetupToolNoteEditor() {
     function syncInlineDeleteSetupBtn() {
       var btn = document.getElementById("setup-inline-delete-setup-btn");
       if (!btn) return;
-      var inline = document.body.classList.contains("setup-inline-edit-enabled");
       var sel = document.getElementById("setup-tab-select");
       var val = sel ? sel.value : "";
       var isSetup = /^setup-\d+$/.test(val || "");
-      if (inline && isSetup) btn.removeAttribute("hidden");
+      if (isSetup) btn.removeAttribute("hidden");
       else btn.setAttribute("hidden", "hidden");
     }
     document.addEventListener("biota:setup-tab-changed", syncInlineDeleteSetupBtn);
+    syncInlineDeleteSetupBtn();
 
     function getCookie(name) {
       var m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));
@@ -3627,47 +3625,54 @@ function saveSetupToolNoteEditor() {
 
     var deleteSetupBtn = document.getElementById("setup-inline-delete-setup-btn");
     if (deleteSetupBtn) {
-      phasedDeleteInit(deleteSetupBtn);
       deleteSetupBtn.addEventListener("click", async function () {
-        if (!inlineEditMode) return;
+        if (deleteSetupBtn.disabled) return;
         var sel = document.getElementById("setup-tab-select");
         var val = sel ? sel.value : "";
         var m = /^setup-(\d+)$/.exec(val || "");
         if (!m) return;
-        phasedDeleteHandleClick(
-          deleteSetupBtn,
-          "Удалить эту установку? Все данные вкладки (фото, инструмент, заметки по ней) будут удалены безвозвратно.",
-          async function () {
-            if (!(getCookie("csrftoken") || "").trim()) {
-              alert("Не найден CSRF-токен в cookies (csrftoken). Обновите страницу.");
-              return;
-            }
-            var fd = new FormData();
-            fd.append("action", "inline_delete_setup");
-            fd.append("setup_id", m[1]);
-            try {
-              var res = await fetch(window.location.href, {
-                method: "POST",
-                headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
-                body: fd,
-                credentials: "same-origin",
-              });
-              var data = await readJsonInlineSaveResponse(res);
-              if (!data) return;
-              if (!res.ok || !data.ok) {
-                alert(data.error || "Не удалось удалить установку.");
-                return;
-              }
-              if (data.redirect) {
-                window.location.href = data.redirect;
-                return;
-              }
-              window.location.reload();
-            } catch (_err) {
-              alert("Ошибка сети при удалении установки.");
-            }
+        var setupLabel = "";
+        if (sel && sel.selectedOptions && sel.selectedOptions[0]) {
+          setupLabel = (sel.selectedOptions[0].textContent || "").replace(/^[●▶]\s*/, "").trim();
+        }
+        var confirmText = setupLabel
+          ? "Удалить установку «" + setupLabel + "»? Фото, инструмент и заметки по ней удалятся безвозвратно."
+          : "Удалить эту установку? Фото, инструмент и заметки по ней удалятся безвозвратно.";
+        if (!window.confirm(confirmText)) return;
+        if (!(getCookie("csrftoken") || "").trim()) {
+          alert("Не найден CSRF-токен в cookies (csrftoken). Обновите страницу.");
+          return;
+        }
+        deleteSetupBtn.disabled = true;
+        var fd = new FormData();
+        fd.append("action", "inline_delete_setup");
+        fd.append("setup_id", m[1]);
+        try {
+          var res = await fetch(window.location.href, {
+            method: "POST",
+            headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
+            body: fd,
+            credentials: "same-origin",
+          });
+          var data = await readJsonInlineSaveResponse(res);
+          if (!data) {
+            deleteSetupBtn.disabled = false;
+            return;
           }
-        );
+          if (!res.ok || !data.ok) {
+            alert(data.error || "Не удалось удалить установку.");
+            deleteSetupBtn.disabled = false;
+            return;
+          }
+          if (data.redirect) {
+            window.location.href = data.redirect;
+            return;
+          }
+          window.location.reload();
+        } catch (_err) {
+          alert("Ошибка сети при удалении установки.");
+          deleteSetupBtn.disabled = false;
+        }
       });
     }
 
@@ -4117,177 +4122,6 @@ function saveSetupToolNoteEditor() {
       }
       document.addEventListener("keydown", function (e) {
         if (e.key === "Escape" && modal && !modal.hidden) closeSetupToolsCompareModal();
-      });
-    })();
-
-    (function initLoadSetupToMachine() {
-      var loadBtn = document.getElementById("setup-load-to-machine-btn");
-      var modal = document.getElementById("setup-load-machine-modal");
-      var listEl = document.getElementById("setup-load-machine-list");
-      var emptyEl = document.getElementById("setup-load-machine-empty");
-      var setupLabelEl = document.getElementById("setup-load-machine-setup-label");
-      if (!loadBtn || !modal || !listEl) return;
-      var busy = false;
-
-      function closeLoadMachineModal() {
-        modal.hidden = true;
-        modal.setAttribute("aria-hidden", "true");
-      }
-
-      function currentSetupId() {
-        var tabName = getCurrentTabName();
-        var m = (tabName || "").match(/^setup-(\d+)$/);
-        return m ? m[1] : "";
-      }
-
-      function currentSetupName() {
-        var tabName = getCurrentTabName();
-        var btn = root.querySelector('.product-tab[data-tab="' + tabName + '"]');
-        if (btn) {
-          var nm = (btn.getAttribute("data-setup-name") || "").trim();
-          if (nm) return nm;
-        }
-        var panel = activeSetupPanel();
-        var nameEl = panel && panel.querySelector(".product-setup-name");
-        return nameEl ? (nameEl.textContent || "").trim() : "";
-      }
-
-      function machineCodesFromPd() {
-        var codes = PD && Array.isArray(PD.machine_codes) ? PD.machine_codes.slice() : [];
-        return codes
-          .map(function (c) {
-            return String(c || "").trim();
-          })
-          .filter(Boolean);
-      }
-
-      function renderMachineList(codes) {
-        listEl.innerHTML = "";
-        if (!codes.length) {
-          if (emptyEl) emptyEl.hidden = false;
-          return;
-        }
-        if (emptyEl) emptyEl.hidden = true;
-        codes.forEach(function (code) {
-          var btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "setup-load-machine-item js-setup-load-machine-pick";
-          btn.setAttribute("data-machine-code", code);
-          btn.setAttribute("role", "listitem");
-          btn.innerHTML =
-            '<span class="setup-load-machine-item__code"></span>' +
-            '<span class="setup-load-machine-item__action">Загрузить</span>';
-          btn.querySelector(".setup-load-machine-item__code").textContent = code;
-          listEl.appendChild(btn);
-        });
-      }
-
-      async function refreshMachineCodes() {
-        var codes = machineCodesFromPd();
-        renderMachineList(codes);
-        try {
-          var fd = new FormData();
-          fd.append("action", "list_machine_codes");
-          var res = await fetch(window.location.href, {
-            method: "POST",
-            headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
-            body: fd,
-            credentials: "same-origin",
-          });
-          var data = await res.json();
-          if (res.ok && data && data.ok && Array.isArray(data.machines)) {
-            if (PD) PD.machine_codes = data.machines;
-            renderMachineList(data.machines);
-          }
-        } catch (_err) {}
-      }
-
-      async function openLoadMachineModal() {
-        var setupId = currentSetupId();
-        if (!setupId) {
-          alert("Откройте вкладку установки.");
-          return;
-        }
-        if (setupLabelEl) {
-          var sn = currentSetupName();
-          setupLabelEl.textContent = sn ? "Установка: " + sn : "Установка #" + setupId;
-        }
-        modal.hidden = false;
-        modal.setAttribute("aria-hidden", "false");
-        await refreshMachineCodes();
-      }
-
-      async function assignToMachine(machineCode) {
-        if (busy) return;
-        var setupId = currentSetupId();
-        if (!setupId || !machineCode) return;
-        var confirmMsg =
-          "Загрузить инструмент текущей установки в станок «" +
-          machineCode +
-          "»?\nЗаменятся только совпадающие номера (T01, T02…), остальные позиции в станке останутся.";
-        if (!window.confirm(confirmMsg)) return;
-        busy = true;
-        try {
-          var fd = new FormData();
-          fd.append("action", "assign_setup_to_machine");
-          fd.append("setup_id", setupId);
-          fd.append("machine_code", machineCode);
-          var res = await fetch(window.location.href, {
-            method: "POST",
-            headers: { "X-CSRFToken": getCookie("csrftoken"), "X-Requested-With": "XMLHttpRequest" },
-            body: fd,
-            credentials: "same-origin",
-          });
-          var data = await res.json().catch(function () {
-            return null;
-          });
-          if (!res.ok || !data || !data.ok) {
-            alert((data && data.error) || "Не удалось загрузить в станок.");
-            return;
-          }
-          closeLoadMachineModal();
-          var replaced = data.tools_replaced != null ? data.tools_replaced : 0;
-          var added = data.tools_added != null ? data.tools_added : 0;
-          var total = data.tools_total != null ? data.tools_total : data.tools_count || 0;
-          var codeLabel = data.machine_code || machineCode;
-          var msg =
-            "В магазин «" +
-            codeLabel +
-            "»: обновлено " +
-            replaced +
-            ", добавлено " +
-            added +
-            ", всего " +
-            total +
-            ".";
-          showProductToast(msg, { kind: "ok", ms: 5000 });
-        } catch (_err) {
-          alert("Ошибка сети при загрузке в станок.");
-        } finally {
-          busy = false;
-        }
-      }
-
-      loadBtn.addEventListener("click", function (e) {
-        e.preventDefault();
-        openLoadMachineModal();
-      });
-      modal.addEventListener("click", function (e) {
-        var t = e.target;
-        if (t && t.getAttribute("data-close-setup-load-machine") === "1") {
-          closeLoadMachineModal();
-          return;
-        }
-        var pick = t && t.closest && t.closest(".js-setup-load-machine-pick");
-        if (pick) {
-          e.preventDefault();
-          assignToMachine(pick.getAttribute("data-machine-code") || "");
-        }
-      });
-      document.addEventListener("keydown", function (e) {
-        if (e.key === "Escape" && modal && !modal.hidden) {
-          closeLoadMachineModal();
-        }
       });
     })();
 

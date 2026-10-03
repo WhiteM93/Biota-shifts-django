@@ -117,7 +117,7 @@ html[data-theme="dawn"] .btn-inv-delete--s5 {
   min-width: 24px;
 }
 
-.product-tabs-nav > .product-setup-inline-delete-btn.btn-inv-delete {
+.product-tabs-nav .product-setup-inline-delete-btn.btn-inv-delete {
   width: var(--product-nav-control-h, 32px);
   height: var(--product-nav-control-h, 32px);
   min-width: var(--product-nav-control-h, 32px);

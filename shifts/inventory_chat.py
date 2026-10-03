@@ -110,6 +110,88 @@ _NOTEBOOK_RE = re.compile(
     r"feature\s*request|сделай\s+(?:чтобы|чтоб)\s+(?:на\s+сайте|в\s+кабинет|в\s+складе)",
     re.IGNORECASE,
 )
+_NOTEBOOK_TARGET = "блокнот"
+_WORD_RE = re.compile(r"[A-Za-zА-Яа-яЁё]{4,14}")
+_QUERY_ARG_KEYS = ("query",)
+
+
+def _edit_distance(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    if abs(len(a) - len(b)) > 2:
+        return 99
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def _is_notebook_typo(word: str) -> bool:
+    w = (word or "").strip().lower().replace("ё", "е")
+    if not w or w == _NOTEBOOK_TARGET:
+        return w == _NOTEBOOK_TARGET
+    if w.startswith(_NOTEBOOK_TARGET):
+        return True
+    # «блокот», «блокнт», «блокнод» — 1–2 правки от «блокнот»
+    return 5 <= len(w) <= 10 and _edit_distance(w, _NOTEBOOK_TARGET) <= 2
+
+
+def fix_notebook_typos(text: str) -> str:
+    """«блокот»/«блокнт» → «блокнот», чтобы сработали маршруты и промпт."""
+
+    def repl(m: re.Match[str]) -> str:
+        word = m.group(0)
+        if _is_notebook_typo(word):
+            if word[:1].isupper():
+                return "Блокнот"
+            return _NOTEBOOK_TARGET
+        return word
+
+    return _WORD_RE.sub(repl, text or "")
+
+
+def normalize_inventory_chat_query(text: str) -> str:
+    """Каноника для поиска: 3,5→3.5, М/м→M, d/ø/ф→⌀; сверло≠метчик."""
+    s = (text or "").strip()
+    if not s:
+        return s
+    s = re.sub(r"(?<=\d),(?=\d)", ".", s)
+    s = re.sub(r"(?<![A-Za-zА-Яа-яЁё])[Мм]\s*(?=\d)", "M", s)
+    s = re.sub(r"(?<![A-Za-z])m\s*(?=\d)", "M", s)
+    s = re.sub(r"(?<![A-Za-zА-Яа-яЁё])[dDøØфФ]\s*(?=\d)", "⌀", s)
+    low = s.lower().replace("ё", "е")
+    wants_drill = bool(re.search(r"сверл", low))
+    wants_tap = bool(re.search(r"метчик|раскат|резьбофрез", low))
+    if wants_drill and not wants_tap:
+        s = re.sub(r"(?<![A-Za-zM⌀øØdDмМфФ.\d])(\d+(?:\.\d+)?)(?!\d)", r"⌀\1", s)
+    elif wants_tap and not wants_drill:
+        s = re.sub(r"(?<![A-Za-zM⌀øØdDмМфФ.\d])(\d+(?:\.\d+)?)(?!\d)", r"M\1", s)
+    return s
+
+
+def _normalize_tool_call_args(call: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not call or not isinstance(call, dict):
+        return call
+    args = call.get("args")
+    if not isinstance(args, dict):
+        return call
+    new_args = dict(args)
+    changed = False
+    for key in _QUERY_ARG_KEYS:
+        val = new_args.get(key)
+        if isinstance(val, str) and val.strip():
+            norm = normalize_inventory_chat_query(val)
+            if norm != val:
+                new_args[key] = norm
+                changed = True
+    if not changed:
+        return call
+    out = dict(call)
+    out["args"] = new_args
+    return out
 _REFUSAL_RE = re.compile(
     r"не\s+могу\s+выполнить|вам\s+нужно|используйте\s+инструмент|запросить\s+этот\s+инструмент|"
     r"в\s+рамках\s+текущего\s+доступа",
@@ -165,7 +247,6 @@ _ALLOWED_PAGES = frozenset(
         "inventory",
         "visual_warehouse",
         "products",
-        "machines",
         "hours",
         "skud",
         "graph",
@@ -301,9 +382,12 @@ def forced_tool_call(
     page_context: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
     """Маршрутизатор для Lite: факты считает Python, не снимок."""
-    q = (question or "").strip()
-    if not q:
+    q_raw = (question or "").strip()
+    if not q_raw:
         return None
+    # Опечатки «блокнот» чиним до регэкспа; размеры — в query args.
+    q = fix_notebook_typos(q_raw)
+    q_norm = normalize_inventory_chat_query(q)
     hist = _history_blob(history)
     blob = f"{q}\n{hist}"
     usage = bool(_USAGE_RE.search(q) or (_FOLLOW_RE.search(q) and _USAGE_RE.search(blob)))
@@ -319,9 +403,9 @@ def forced_tool_call(
     notebook = bool(_NOTEBOOK_RE.search(q))
 
     if notebook:
-        return {"tool": "add_site_note", "args": {"title": q[:120], "body": q[:2000]}}
+        return {"tool": "add_site_note", "args": {"title": q_raw[:120], "body": q_raw[:2000]}}
     if who and not hold:
-        src = q if _WHO_RE.search(q) else blob
+        src = q_norm if _WHO_RE.search(q) else normalize_inventory_chat_query(blob)
         tool_q = _strip_prefix(
             src,
             [
@@ -330,14 +414,14 @@ def forced_tool_call(
             ],
         )
         if not tool_q or len(tool_q) < 2:
-            tool_q = q
+            tool_q = q_norm
         return {"tool": "search_issues", "args": {"query": tool_q[:120], "limit": 20}}
     if overdue:
         return {"tool": "overdue_open_issues", "args": {"min_days": 14, "limit": 20}}
     if watch:
         return {"tool": "watch_alerts", "args": {"only_problems": True}}
     if locate:
-        src = q if _LOCATE_RE.search(q) else blob
+        src = q_norm if _LOCATE_RE.search(q) else normalize_inventory_chat_query(blob)
         tool_q = _strip_prefix(
             src,
             [
@@ -345,7 +429,7 @@ def forced_tool_call(
             ],
         )
         if not tool_q or len(tool_q) < 2:
-            tool_q = q
+            tool_q = q_norm
         return {"tool": "locate_tool", "args": {"query": tool_q[:120], "limit": 20}}
     if hold:
         src = q if _HOLD_RE.search(q) else blob
@@ -372,7 +456,7 @@ def forced_tool_call(
                 leftover,
                 re.IGNORECASE,
             ):
-                args["query"] = leftover[:120]
+                args["query"] = normalize_inventory_chat_query(leftover)[:120]
         return {"tool": "open_issues", "args": args}
     if dead:
         return {"tool": "dead_stock", "args": {"idle_days": 90, "limit": 15}}
@@ -388,9 +472,9 @@ def forced_tool_call(
         return {"tool": "top_issued_tools", "args": {"limit": 15}}
     if stock_top:
         return {"tool": "top_stock_tools", "args": {"limit": 15}}
-    if _TOOLISH_RE.search(q):
+    if _TOOLISH_RE.search(q) or _TOOLISH_RE.search(q_norm):
         tool_q = _strip_prefix(
-            q,
+            q_norm,
             [
                 r"^(?:а|и|ещё|еще|ну)\s+",
                 r"^(?:скажи|подскажи)?\s*кто\s+(?:последн\w*\s+)?брал\s+",
@@ -398,7 +482,7 @@ def forced_tool_call(
             ],
         )
         if not tool_q or len(tool_q) < 2:
-            tool_q = q
+            tool_q = q_norm
         return {"tool": "search_issues", "args": {"query": tool_q[:120], "limit": 20}}
     return None
 
@@ -424,7 +508,7 @@ def _pick_tool_call(
     page_context: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
     forced = forced_tool_call(question, history, page_context)
-    call = _extract_tool_call(first)
+    call = _normalize_tool_call_args(_extract_tool_call(first))
     if forced:
         if forced.get("tool") in _FORCED_KEEP:
             return forced
@@ -448,10 +532,10 @@ def ask_inventory_chat(
     page_context: dict[str, str] | None = None,
     username: str = "",
 ) -> dict[str, Any]:
-    q = (question or "").strip()
-    if not q:
+    q_raw = (question or "").strip()
+    if not q_raw:
         return {"ok": False, "error": "Пустой вопрос."}
-    if len(q) > 800:
+    if len(q_raw) > 800:
         return {"ok": False, "error": "Слишком длинный вопрос."}
     if not yandex_gpt_configured():
         return {
@@ -459,6 +543,8 @@ def ask_inventory_chat(
             "error": "Чат не настроен: задайте YANDEX_GPT_API_KEY и YANDEX_GPT_FOLDER_ID в .env.secrets.",
         }
 
+    # Модели отдаём канонику (⌀/M/точка, «блокнот»); в блокнот пишем исходный текст.
+    q = normalize_inventory_chat_query(fix_notebook_typos(q_raw))
     page_ctx = normalize_page_context(page_context)
     used_tools: list[str] = []
     try:
@@ -480,7 +566,7 @@ def ask_inventory_chat(
 
     max_out = int(getattr(settings, "YANDEX_GPT_MAX_TOKENS", 700) or 700)
 
-    forced_first = forced_tool_call(q, history, page_ctx)
+    forced_first = forced_tool_call(q_raw, history, page_ctx)
     first = ""
     if forced_first:
         call = forced_first
@@ -489,17 +575,18 @@ def ask_inventory_chat(
             first = complete(messages, max_tokens=max_out)
         except YandexGptError as exc:
             return {"ok": False, "error": str(exc)}
-        call = _pick_tool_call(first, q, history, page_ctx)
+        call = _pick_tool_call(first, q_raw, history, page_ctx)
         if not call:
             return {"ok": True, "reply": first, "used_tools": used_tools}
 
+    call = _normalize_tool_call_args(call) or call
     tool_name = call["tool"]
     tool_result = run_tool(
         tool_name,
         call.get("args") or {},
         context={
             "username": username or "",
-            "source_question": q,
+            "source_question": q_raw,
             "page_context": page_ctx,
         },
     )

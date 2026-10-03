@@ -279,12 +279,6 @@ def cabinet_view(request):
                     "label": "Редактирование склада",
                     "on": ctx["priv_stock_manage"],
                 }
-            elif k == "machines":
-                extra_toggle = {
-                    "field": "priv_machines_quick_edit",
-                    "label": "Быстрое редактирование",
-                    "on": ctx["priv_machines_quick_edit"],
-                }
             ctx["priv_nav_rows"].append(
                 {
                     "key": k,

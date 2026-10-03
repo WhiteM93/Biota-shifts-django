@@ -132,6 +132,18 @@ class StockCandidate:
 
 
 @dataclass
+class StockAlternative:
+    """Близкая позиция на складе, когда точного совпадения нет (только факты БД)."""
+
+    id: int
+    label: str
+    qty: int
+    address: str
+    inventory_url: str
+    reason: str
+
+
+@dataclass
 class OpenHolder:
     """Незакрытая выдача: инструмент на руках, можно попросить вернуть."""
 
@@ -157,6 +169,7 @@ class SetupStockRowResult:
     category: str = ""
     filter_params: dict[str, str] = field(default_factory=dict)
     candidates: list[StockCandidate] = field(default_factory=list)
+    alternatives: list[StockAlternative] = field(default_factory=list)
     total_qty: int = 0
     filter_url: str = ""
     open_holders: list[OpenHolder] = field(default_factory=list)
@@ -424,6 +437,237 @@ def _holders_summary(holders: list[OpenHolder], *, max_names: int = 3) -> str:
     return text
 
 
+_DIAM_FIELD_BY_CAT = {
+    "drill": "drill_spec__diameter_mm",
+    "end_mill": "end_mill_spec__diameter_mm",
+    "body_tool": "body_tool_spec__diameter_mm",
+    "center_drill": "center_drill_spec__diameter_mm",
+    "countersink": "countersink_spec__diameter_mm",
+    "reamer": "reamer_spec__diameter_mm",
+}
+
+
+def _tool_diameter_mm(tool: ToolItem, category: str) -> Decimal | None:
+    spec = None
+    if category == "drill":
+        spec = getattr(tool, "drill_spec", None)
+    elif category == "end_mill":
+        spec = getattr(tool, "end_mill_spec", None)
+    elif category == "body_tool":
+        spec = getattr(tool, "body_tool_spec", None)
+    elif category == "center_drill":
+        spec = getattr(tool, "center_drill_spec", None)
+    elif category == "countersink":
+        spec = getattr(tool, "countersink_spec", None)
+    elif category == "reamer":
+        spec = getattr(tool, "reamer_spec", None)
+    if spec is None:
+        return None
+    try:
+        val = getattr(spec, "diameter_mm", None)
+    except Exception:
+        return None
+    if val is None:
+        return None
+    try:
+        return Decimal(str(val))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+
+
+def _alt_tolerances(target: Decimal) -> list[Decimal]:
+    """Пороги поиска ближайшего ⌀: сначала узко, потом шире."""
+    if target <= 3:
+        return [Decimal("0.1"), Decimal("0.2")]
+    if target <= 10:
+        return [Decimal("0.2"), Decimal("0.5")]
+    return [Decimal("0.5"), Decimal("1")]
+
+
+def _qs_same_type_in_stock(
+    category: str,
+    mapping: dict[str, str],
+    *,
+    exclude_ids: set[int],
+) -> QuerySet:
+    """Тот же тип/категория, qty>0, без фильтра по размеру."""
+    qs = _base_stock_qs().filter(category=category, quantity__gt=0)
+    mill_type = mapping.get("mill_type") or ""
+    if category == "end_mill" and mill_type:
+        qs = qs.filter(end_mill_spec__mill_type=mill_type)
+    tap_tool_type = mapping.get("tap_tool_type") or ""
+    if category == "tap" and tap_tool_type:
+        qs = qs.filter(tap_spec__tap_type=tap_tool_type)
+    tool_material = mapping.get("tool_material") or ""
+    if tool_material:
+        qs = qs.filter(tool_material=tool_material)
+    if exclude_ids:
+        qs = qs.exclude(pk__in=exclude_ids)
+    return qs
+
+
+def _find_diameter_alternatives(
+    *,
+    category: str,
+    mapping: dict[str, str],
+    target: Decimal,
+    exclude_ids: set[int],
+    limit: int = 5,
+) -> list[StockAlternative]:
+    field = _DIAM_FIELD_BY_CAT.get(category)
+    if not field:
+        return []
+    found: list[tuple[Decimal, ToolItem]] = []
+    seen: set[int] = set(exclude_ids)
+    for tol in _alt_tolerances(target):
+        lo, hi = target - tol, target + tol
+        qs = _qs_same_type_in_stock(category, mapping, exclude_ids=seen)
+        qs = qs.filter(**{f"{field}__gte": lo, f"{field}__lte": hi})
+        # не предлагать ровно тот же ⌀, если он уже искался как точное совпадение
+        qs = qs.exclude(**{field: target})
+        for tool in qs.order_by("warehouse_address", "id")[:40]:
+            if tool.pk in seen:
+                continue
+            d = _tool_diameter_mm(tool, category)
+            if d is None:
+                continue
+            seen.add(tool.pk)
+            found.append((abs(d - target), tool))
+        if found:
+            break
+    found.sort(key=lambda x: (x[0], -(int(x[1].quantity or 0)), x[1].pk))
+    out: list[StockAlternative] = []
+    for delta, tool in found[:limit]:
+        d = _tool_diameter_mm(tool, category)
+        reason = f"ближайший ⌀{_fmt_dec(d)} (нужен ⌀{_fmt_dec(target)}, Δ{_fmt_dec(delta)})"
+        params = {"category": category}
+        mill_type = mapping.get("mill_type") or ""
+        if mill_type:
+            params["mill_type"] = mill_type
+        if d is not None:
+            if category == "drill":
+                params["drill_diameter_mm"] = _fmt_dec(d)
+            elif category == "end_mill":
+                params["diameter_mm"] = _fmt_dec(d)
+            elif category == "body_tool":
+                params["bt_diameter_mm"] = _fmt_dec(d)
+            elif category == "center_drill":
+                params["center_diameter_mm"] = _fmt_dec(d)
+            elif category == "countersink":
+                params["countersink_diameter_mm"] = _fmt_dec(d)
+            elif category == "reamer":
+                params["reamer_diameter_mm"] = _fmt_dec(d)
+        out.append(
+            StockAlternative(
+                id=tool.pk,
+                label=_tool_label(tool),
+                qty=int(tool.quantity or 0),
+                address=(tool.warehouse_address or "").strip(),
+                inventory_url=_inventory_url(params, tool.pk),
+                reason=reason,
+            )
+        )
+    return out
+
+
+def _find_tap_alternatives(
+    *,
+    mapping: dict[str, str],
+    diam: DiameterSpec,
+    hole_type: str,
+    exclude_ids: set[int],
+    limit: int = 5,
+) -> list[StockAlternative]:
+    """Для метчиков не меняем размер резьбы — только тот же M, иной тип отверстия."""
+    size = diam.size_label or (
+        normalize_cutting_size_label(_fmt_dec(diam.diameter)) if diam.diameter else ""
+    )
+    if not size:
+        return []
+    want_hole = _HOLE_MAP.get((hole_type or "").strip(), "")
+    qs = _qs_same_type_in_stock("tap", mapping, exclude_ids=exclude_ids)
+    qs = qs.filter(_size_label_q("tap_spec__size_label", size))
+    out: list[StockAlternative] = []
+    for tool in qs.select_related("tap_spec").order_by("warehouse_address", "id")[:40]:
+        tp = getattr(tool, "tap_spec", None)
+        hole = (getattr(tp, "hole_type", None) or "").strip() if tp else ""
+        if want_hole and hole == want_hole:
+            # точное совпадение уже искали — пропускаем
+            continue
+        if want_hole and hole and hole != want_hole:
+            reason = f"тот же {size}, другой тип отверстия ({hole})"
+        else:
+            reason = f"тот же размер {size} (тип отверстия не указан)"
+        params = {
+            "category": "tap",
+            "tap_size": size,
+            "tap_tool_type": mapping.get("tap_tool_type") or "",
+        }
+        if hole:
+            params["tap_hole_type"] = hole
+        out.append(
+            StockAlternative(
+                id=tool.pk,
+                label=_tool_label(tool),
+                qty=int(tool.quantity or 0),
+                address=(tool.warehouse_address or "").strip(),
+                inventory_url=_inventory_url(params, tool.pk),
+                reason=reason,
+            )
+        )
+        if len(out) >= limit:
+            break
+    return out
+
+
+def find_setup_alternatives(
+    *,
+    category: str,
+    mapping: dict[str, str],
+    diam: DiameterSpec,
+    hole_type: str,
+    exclude_ids: list[int] | None = None,
+    limit: int = 5,
+) -> list[StockAlternative]:
+    """Близкие замены со склада. Без смены типа (сверло≠метчик) и без чужого M-размера."""
+    excl = {int(x) for x in (exclude_ids or []) if x}
+    if category == "tap":
+        return _find_tap_alternatives(
+            mapping=mapping,
+            diam=diam,
+            hole_type=hole_type,
+            exclude_ids=excl,
+            limit=limit,
+        )
+    target = diam.diameter
+    if target is None and diam.diameter_max is not None:
+        target = diam.diameter_max
+    if target is None:
+        return []
+    # Для диапазона (2.7-2.8) ищем вокруг середины
+    if diam.diameter is not None and diam.diameter_max is not None:
+        target = (diam.diameter + diam.diameter_max) / 2
+    # Сначала с тем же материалом (твердосплав и т.п.), потом без жёсткого материала
+    mapping_strict = dict(mapping)
+    alts = _find_diameter_alternatives(
+        category=category,
+        mapping=mapping_strict,
+        target=target,
+        exclude_ids=excl,
+        limit=limit,
+    )
+    if alts or not mapping.get("tool_material"):
+        return alts
+    mapping_loose = {k: v for k, v in mapping.items() if k != "tool_material"}
+    return _find_diameter_alternatives(
+        category=category,
+        mapping=mapping_loose,
+        target=target,
+        exclude_ids=excl,
+        limit=limit,
+    )
+
+
 def match_setup_tool_row(row: Any) -> SetupStockRowResult:
     tool_type = (getattr(row, "tool_type", None) or "").strip()
     diameter_raw = (getattr(row, "diameter", None) or "").strip()
@@ -489,7 +733,7 @@ def match_setup_tool_row(row: Any) -> SetupStockRowResult:
         base.filter_params = filter_params
     base.filter_url = _inventory_url(filter_params) if filter_params else ""
 
-    # Нет на складе (0 шт. или позиций нет) — смотрим, у кого на руках невозврат.
+    # Нет на складе (0 шт. или позиций нет) — кто на руках + близкие замены.
     if base.status in ("empty", "ok") and base.total_qty <= 0:
         holders = _find_open_holders(
             category=category,
@@ -505,6 +749,21 @@ def match_setup_tool_row(row: Any) -> SetupStockRowResult:
                 base.status_label = f"На складе не найдено; на руках: {who}"
             else:
                 base.status_label = f"Остаток 0; на руках: {who}"
+        base.alternatives = find_setup_alternatives(
+            category=category,
+            mapping=mapping,
+            diam=diam,
+            hole_type=hole,
+            exclude_ids=[c.id for c in candidates],
+        )
+        if base.alternatives and base.status == "empty" and not holders:
+            base.status_label = (
+                f"На складе не найдено; близкие замены: {len(base.alternatives)}"
+            )
+        elif base.alternatives and "замен" not in (base.status_label or ""):
+            base.status_label = (base.status_label or "Нет остатка") + (
+                f"; близкие замены: {len(base.alternatives)}"
+            )
     return base
 
 

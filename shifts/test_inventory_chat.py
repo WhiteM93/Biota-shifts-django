@@ -1,7 +1,12 @@
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
-from shifts.inventory_chat import _extract_tool_call, forced_tool_call
+from shifts.inventory_chat import (
+    _extract_tool_call,
+    fix_notebook_typos,
+    forced_tool_call,
+    normalize_inventory_chat_query,
+)
 from shifts.inventory_chat_tools import (
     build_warehouse_context,
     issues_by_employee,
@@ -52,7 +57,30 @@ class ForcedToolCallTests(SimpleTestCase):
         call = forced_tool_call("кто брал сверла 2.5")
         self.assertEqual(call["tool"], "search_issues")
         self.assertIn("сверл", (call["args"].get("query") or "").lower())
+        self.assertIn("⌀2.5", call["args"].get("query") or "")
         self.assertNotIn("метчик", (call["args"].get("query") or "").lower())
+
+    def test_drill_comma_and_d_prefix_normalized(self):
+        call = forced_tool_call("кто брал сверла 3,5")
+        self.assertEqual(call["tool"], "search_issues")
+        q = call["args"].get("query") or ""
+        self.assertIn("⌀3.5", q)
+        self.assertNotIn("M3.5", q)
+        call2 = forced_tool_call("где лежит сверло d2,5")
+        self.assertEqual(call2["tool"], "locate_tool")
+        self.assertIn("⌀2.5", call2["args"].get("query") or "")
+
+    def test_tap_metric_normalized(self):
+        call = forced_tool_call("кто брал метчик м2,5")
+        self.assertEqual(call["tool"], "search_issues")
+        q = call["args"].get("query") or ""
+        self.assertIn("M2.5", q)
+        self.assertNotIn("⌀", q)
+
+    def test_normalize_helpers(self):
+        self.assertEqual(normalize_inventory_chat_query("сверло 3,5"), "сверло ⌀3.5")
+        self.assertEqual(normalize_inventory_chat_query("метчик М3"), "метчик M3")
+        self.assertIn("блокнот", fix_notebook_typos("запиши в блокот пожалуйста").lower())
 
     def test_overdue_question(self):
         self.assertEqual(forced_tool_call("какие выдачи просрочены?")["tool"], "overdue_open_issues")
@@ -201,10 +229,11 @@ class InventoryChatToolsTests(TestCase):
         self.assertIn("Владимиров", joined)
         self.assertNotIn("Чужой", joined)
 
-    def test_who_last_took_tap_keeps_cyrillic_size_in_query(self):
+    def test_who_last_took_tap_normalizes_cyrillic_m_to_latin(self):
         call = forced_tool_call("кто последний брал метчик М3")
         self.assertEqual(call["tool"], "search_issues")
-        self.assertIn("М3", call["args"]["query"])
+        self.assertIn("M3", call["args"]["query"])
+        self.assertNotIn("М3", call["args"]["query"])
 
     def test_search_issues_drill_25_does_not_match_tap(self):
         tap = ToolItem.objects.create(category="tap", name="Метчик M5 режущий", quantity=3)

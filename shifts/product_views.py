@@ -42,7 +42,6 @@ from .models import (
     product_setup_gcode_inline_parts,
 )
 from .plan_naladki_bridge import ensure_plan_piece_for_naladki_product
-from .machines_views import assign_product_setup_to_machine, list_machine_codes
 from .product_plan_sync import (
     apply_product_plan_post,
     plan_card_summary,
@@ -1661,6 +1660,28 @@ def product_detail_view(request, pk: int):
             tab_slug = f"setup-{setup.pk}"
             return redirect(f"{_product_detail_url(product)}?{urlencode({'tab': tab_slug})}")
 
+        if action == "inline_delete_setup":
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            setup = ProductSetup.objects.filter(pk=setup_id, product=product).first()
+            if not setup:
+                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+            setup_name = (setup.name or "").strip() or f"#{setup.pk}"
+            setup.delete()
+            record_product_editor(product, biota_user(request))
+            remaining = product.setups.order_by("sort_order", "id").first()
+            if remaining:
+                redirect_url = f"{_product_detail_url(product)}?{urlencode({'tab': f'setup-{remaining.pk}'})}"
+            else:
+                redirect_url = f"{_product_detail_url(product)}?{urlencode({'tab': 'drawing'})}"
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "redirect": redirect_url,
+                    "message": f"Установка «{setup_name}» удалена.",
+                }
+            )
+
         if action == "change_product_catalog_section":
             section = (request.POST.get("catalog_section") or "").strip()
             if section not in (Product.CATALOG_NALADKI, Product.CATALOG_OSNASTKA):
@@ -2172,9 +2193,6 @@ def product_detail_view(request, pk: int):
             ]
             return JsonResponse({"ok": True, "setup_id": setup.pk, "entries": entries})
 
-        if action == "list_machine_codes":
-            return JsonResponse({"ok": True, "machines": list_machine_codes()})
-
         if action == "search_naladki_for_tools_compare":
             q = (request.POST.get("q") or "").strip()
             qs = Product.objects.filter(catalog_section=Product.CATALOG_NALADKI).order_by("name")
@@ -2236,27 +2254,6 @@ def product_detail_view(request, pk: int):
                     "setups": setups_out,
                 }
             )
-
-        if action == "assign_setup_to_machine":
-            setup_id_raw = (request.POST.get("setup_id") or "").strip()
-            machine_code = (request.POST.get("machine_code") or "").strip()
-            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
-            setup = (
-                ProductSetup.objects.filter(pk=setup_id, product=product)
-                .prefetch_related("tools")
-                .first()
-            )
-            if not setup:
-                return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
-            result = assign_product_setup_to_machine(
-                machine_code=machine_code,
-                product=product,
-                setup=setup,
-            )
-            if not result.get("ok"):
-                return JsonResponse(result, status=400)
-            result["machines_url"] = reverse("machines")
-            return JsonResponse(result)
 
         return JsonResponse({"ok": False, "error": "Неизвестное действие."}, status=400)
     setup_photos = list(product.setup_photos.filter(setup__isnull=True))
@@ -2345,7 +2342,6 @@ def product_detail_view(request, pk: int):
                 if not product.is_osnastka
                 else []
             ),
-            "machine_codes": list_machine_codes(),
         },
     )
 

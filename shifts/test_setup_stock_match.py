@@ -13,6 +13,7 @@ from shifts.models import (
     ProductSetup,
     ProductSetupToolRow,
     StockMovement,
+    TapSpec,
     ToolItem,
 )
 from shifts.setup_stock_match import match_setup_tools, parse_diameter_spec
@@ -131,3 +132,50 @@ class SetupStockMatchTests(TestCase):
         self.assertEqual(row.open_holders[0].employee, "Петров П.")
         self.assertEqual(row.open_holders[0].remaining, 2)
         self.assertIn("на руках", row.status_label)
+
+    def test_drill_alternative_nearby_diameter(self):
+        product = Product.objects.create(name="TEST.SETUP.ALT.DRILL")
+        setup = ProductSetup.objects.create(product=product, name="Уст 1")
+        ProductSetupToolRow.objects.create(
+            setup=setup, sort_order=1, tool_number="T05", tool_type="Сверло", diameter="3.5"
+        )
+        near = ToolItem.objects.create(
+            category="drill", name="Св 3.6", quantity=4, warehouse_address="D-01"
+        )
+        DrillSpec.objects.create(tool=near, diameter_mm=Decimal("3.6"))
+        far = ToolItem.objects.create(category="drill", name="Св 5", quantity=10)
+        DrillSpec.objects.create(tool=far, diameter_mm=Decimal("5"))
+        rows = match_setup_tools(setup.tools.all())
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row.status, "empty")
+        self.assertEqual(len(row.alternatives), 1)
+        self.assertEqual(row.alternatives[0].id, near.pk)
+        self.assertIn("3.6", row.alternatives[0].reason)
+
+    def test_tap_alternative_same_size_other_hole(self):
+        product = Product.objects.create(name="TEST.SETUP.ALT.TAP")
+        setup = ProductSetup.objects.create(product=product, name="Уст 1")
+        ProductSetupToolRow.objects.create(
+            setup=setup,
+            sort_order=1,
+            tool_number="T08",
+            tool_type="Метчик",
+            diameter="M5",
+            tap_hole_type="Сквозной",
+        )
+        other = ToolItem.objects.create(category="tap", name="Метчик M5 глухой", quantity=2)
+        TapSpec.objects.create(
+            tool=other, size_label="M5", hole_type="blind", tap_type="cutting"
+        )
+        wrong = ToolItem.objects.create(category="tap", name="Метчик M6", quantity=5)
+        TapSpec.objects.create(
+            tool=wrong, size_label="M6", hole_type="through", tap_type="cutting"
+        )
+        rows = match_setup_tools(setup.tools.all())
+        self.assertEqual(len(rows), 1)
+        alts = rows[0].alternatives
+        self.assertEqual(len(alts), 1)
+        self.assertEqual(alts[0].id, other.pk)
+        self.assertIn("M5", alts[0].reason)
+        self.assertNotIn("M6", alts[0].label)

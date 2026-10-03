@@ -64,17 +64,16 @@
 <a href="{% url 'products_list' %}" class="{% if request.resolver_match.url_name == 'products_list' or request.resolver_match.url_name == 'product_create' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_setup_edit' %}active{% endif %}">Наладки</a>
 <a href="{% url 'osnastka_list' %}" class="{% if request.resolver_match.url_name == 'osnastka_list' or request.resolver_match.url_name == 'osnastka_create' or request.resolver_match.url_name == 'osnastka_detail' %}active{% endif %}">Оснастки</a>
 {% endif %}
-{% if biota_nav.machines %}
-<a href="{% url 'machines' %}" class="{% if request.resolver_match.url_name == 'machines' %}active{% endif %}">Станки</a>
+{% if biota_nav.contracts %}
+<a href="{% url 'contracts' %}" class="{% if request.resolver_match.url_name == 'contracts' %}active{% endif %}">Контракты</a>
 {% endif %}
 <span class="nav-spacer"></span>
 {% if biota_can_preview_role %}
-<form method="post" action="{% url 'preview_role' %}" class="nav-role-preview biota-exempt-global-readonly-form" title="Как видит сайт другая роль. Для руководителей.">
+<form method="post" action="{% url 'preview_role' %}" class="nav-role-preview biota-exempt-global-readonly-form" title="Просмотр как другая роль: Р — руководитель, И — исполнитель">
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ request.get_full_path }}" />
-  <span class="nav-role-preview__label">Роль</span>
-  <button type="submit" name="role" value="manager" class="nav-role-preview__btn{% if not biota_is_executor %} is-on{% endif %}" {% if not biota_is_executor %}aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>Руководитель</button>
-  <button type="submit" name="role" value="executor" class="nav-role-preview__btn{% if biota_is_executor %} is-on{% endif %}" {% if biota_is_executor %}aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>Исполнитель</button>
+  <button type="submit" name="role" value="manager" class="nav-role-preview__btn{% if not biota_is_executor %} is-on{% endif %}" title="Руководитель" aria-label="Роль: руководитель" {% if not biota_is_executor %}aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>Р</button>
+  <button type="submit" name="role" value="executor" class="nav-role-preview__btn{% if biota_is_executor %} is-on{% endif %}" title="Исполнитель" aria-label="Роль: исполнитель" {% if biota_is_executor %}aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>И</button>
 </form>
 {% endif %}
 {% if biota_username %}
@@ -88,9 +87,6 @@
   {% biota_icon "nav.forms" %}
   <span class="nav-link-text">Формы</span>
 </a>
-{% endif %}
-{% if biota_nav.contracts %}
-<a href="{% url 'contracts' %}" class="{% if request.resolver_match.url_name == 'contracts' %}active{% endif %}">Контракты</a>
 {% endif %}
 {% if biota_nav.calculator %}
 <a href="{% url 'calculator' %}" class="nav-icon-btn nav-ctl {% if request.resolver_match.url_name == 'calculator' %}active{% endif %}" title="Калькулятор" aria-label="Калькулятор">

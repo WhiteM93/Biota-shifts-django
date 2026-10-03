@@ -3,7 +3,7 @@ from django.test import SimpleTestCase, override_settings
 
 from shifts.gpt_rate_limit import gpt_rate_limit_allow
 from shifts.setup_ai import build_setup_analysis_prompt
-from shifts.setup_stock_match import SetupStockRowResult
+from shifts.setup_stock_match import SetupStockRowResult, StockAlternative
 from shifts.yandex_gpt import yandex_gpt_model_uri
 
 
@@ -95,6 +95,16 @@ class SetupAiPromptTests(SimpleTestCase):
             status_label="На складе не найдено",
             total_qty=0,
         )
+        smp.alternatives = [
+            StockAlternative(
+                id=9,
+                label="Корпус ⌀30",
+                qty=1,
+                address="A-1",
+                inventory_url="/inventory/?panel=stock",
+                reason="ближайший ⌀30 (нужен ⌀32, Δ2)",
+            )
+        ]
         text = build_setup_analysis_prompt(product=P(), setup=S(), match_rows=[row, smp], tools=[])
         self.assertIn("Метчик", text)
         self.assertIn("На складе не найдено", text)
@@ -106,6 +116,9 @@ class SetupAiPromptTests(SimpleTestCase):
         self.assertIn("корпусной инструмент", text.lower())
         self.assertIn("Фреза с СМП", text)
         self.assertIn("Сводка слотов", text)
+        self.assertIn("замена", text)
+        self.assertIn("Корпус ⌀30", text)
+        self.assertIn("ближайший ⌀30", text)
 
     def test_empty_match_explains_no_filled_rows(self):
         class P:

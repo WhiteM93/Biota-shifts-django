@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
 from . import notify_api_views
 from . import cabinet_views
@@ -20,7 +21,6 @@ from . import product_views
 from . import setup_ai_views
 from . import skud_views
 from . import forms_views
-from . import machines_views
 from . import visual_warehouse_views
 from . import contract_views
 from . import views
@@ -139,7 +139,8 @@ urlpatterns = [
         inventory_types_views.inventory_types_api_field_delete,
         name="inventory_types_api_field_delete",
     ),
-    path("machines/", machines_views.machines_view, name="machines"),
+    # Раздел «Станки» отключён: старые закладки уводят на наладки.
+    path("machines/", RedirectView.as_view(pattern_name="products_list", permanent=False), name="machines"),
     path("calculator/", views.calculator_view, name="calculator"),
     path("forms/", forms_views.forms_view, name="forms"),
     path("forms/api/", forms_views.forms_api_list, name="forms_api_list"),

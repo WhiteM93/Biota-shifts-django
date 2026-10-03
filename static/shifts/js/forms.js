@@ -129,7 +129,8 @@
       ".forms-el-checkbox-box { width: 14px; height: 14px; border: 1.5px solid #000; margin-top: 2px; display: block; font-size: 11px; line-height: 14px; text-align: center; }" +
       ".forms-el-checkbox-box.is-checked::after { content: \"\\2713\"; }" +
       ".forms-print-checkbox-text { display: block !important; width: 100% !important; white-space: pre-wrap !important; line-height: 1.35; overflow: visible !important; height: auto !important; min-height: 0 !important; max-height: none !important; word-wrap: break-word; overflow-wrap: break-word; }" +
-      ".forms-el-list { margin: 0; padding-left: 1.2em; color: #000; }" +
+      ".forms-el-list { margin: 0; padding-left: 1.6em; color: #000; list-style: decimal; list-style-position: outside; }" +
+      ".forms-el-list > li { list-style: decimal; }" +
       ".forms-el-list-input { width: 100%; border: none; background: transparent; color: #000; font: inherit; padding: 0; }" +
       ".forms-el-field { display: flex; align-items: flex-end; gap: 8px; width: 100%; }" +
       ".forms-el-field-num { flex: 0 0 auto; width: 2.2em; border: none; border-bottom: 1px solid transparent; background: transparent; color: #000; font: inherit; font-size: 14px; padding: 0 0 3px; text-align: right; }" +
@@ -233,7 +234,7 @@
         btn.className = "forms-page-tab" + (pageIdx === currentPageIndex ? " is-active" : "");
         btn.setAttribute("role", "tab");
         btn.setAttribute("aria-selected", pageIdx === currentPageIndex ? "true" : "false");
-        btn.textContent = "Стр. " + (pageIdx + 1);
+        btn.textContent = "Страница " + (pageIdx + 1);
         btn.addEventListener("click", function () {
           if (pageIdx === currentPageIndex) return;
           setCurrentPage(pageIdx);
@@ -300,8 +301,103 @@
 
   function setPanelVisible(el, visible) {
     if (!el) return;
+    var wasHidden = el.hidden || el.classList.contains("forms-is-hidden");
     el.hidden = !visible;
     el.classList.toggle("forms-is-hidden", !visible);
+    if (visible && wasHidden && el.classList.contains("forms-props-block")) {
+      var key = el.getAttribute("data-props-key") || "";
+      if (["table", "heading", "font", "layout", "image", "box"].indexOf(key) >= 0) {
+        setPropsBlockCollapsed(el, false, true);
+      }
+    }
+  }
+
+  var PROPS_COLLAPSE_LS = "forms-props-collapsed-v1";
+
+  function readPropsCollapseState() {
+    try {
+      return JSON.parse(localStorage.getItem(PROPS_COLLAPSE_LS) || "{}") || {};
+    } catch (_e) {
+      return {};
+    }
+  }
+
+  function writePropsCollapseState() {
+    if (!propsPanel) return;
+    var next = {};
+    propsPanel.querySelectorAll(".forms-props-block[data-props-key]").forEach(function (block) {
+      next[block.getAttribute("data-props-key")] = block.classList.contains("is-collapsed") ? 1 : 0;
+    });
+    try {
+      localStorage.setItem(PROPS_COLLAPSE_LS, JSON.stringify(next));
+    } catch (_e) { /* ignore */ }
+  }
+
+  function setPropsBlockCollapsed(block, collapsed, skipPersist) {
+    if (!block) return;
+    block.classList.toggle("is-collapsed", !!collapsed);
+    var btn = block.querySelector(".js-forms-props-collapse");
+    if (btn) btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    if (!skipPersist) writePropsCollapseState();
+  }
+
+  function propsBlockKey(block) {
+    if (block.classList.contains("forms-border-panel")) return "border";
+    if (block.classList.contains("js-forms-table-props")) return "table";
+    if (block.classList.contains("js-forms-heading-props")) return "heading";
+    if (block.classList.contains("js-forms-font-props")) return "font";
+    if (block.classList.contains("js-forms-layout-props")) return "layout";
+    if (block.classList.contains("js-forms-image-props")) return "image";
+    if (block.classList.contains("js-forms-box-props")) return "box";
+    if (block.classList.contains("forms-props-block--add")) return "add";
+    return "sheet";
+  }
+
+  function initPropsCollapse() {
+    if (!propsPanel) return;
+    var state = readPropsCollapseState();
+    propsPanel.querySelectorAll(":scope > .forms-props-block").forEach(function (block) {
+      if (block.dataset.collapseReady === "1") return;
+      var key = propsBlockKey(block);
+      block.setAttribute("data-props-key", key);
+
+      var head = block.querySelector(":scope > .forms-props-block-head");
+      var heading = block.querySelector(":scope > .forms-props-heading");
+      if (!heading && head) heading = head.querySelector(".forms-props-heading");
+      if (!heading) return;
+
+      var title = (heading.textContent || "").trim();
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "forms-props-collapse-btn js-forms-props-collapse";
+      btn.innerHTML =
+        '<span class="forms-props-heading">' + title + "</span>" +
+        '<span class="forms-props-collapse-chev" aria-hidden="true"></span>';
+
+      if (!head) {
+        head = document.createElement("div");
+        head.className = "forms-props-block-head";
+        block.insertBefore(head, block.firstChild);
+      }
+      if (heading.parentNode) heading.parentNode.removeChild(heading);
+      head.insertBefore(btn, head.firstChild);
+
+      var body = document.createElement("div");
+      body.className = "forms-props-block-body";
+      Array.prototype.slice.call(block.children).forEach(function (child) {
+        if (child === head) return;
+        body.appendChild(child);
+      });
+      block.appendChild(body);
+
+      var collapsed = state[key] === 1;
+      block.classList.toggle("is-collapsed", collapsed);
+      btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      btn.addEventListener("click", function () {
+        setPropsBlockCollapsed(block, !block.classList.contains("is-collapsed"));
+      });
+      block.dataset.collapseReady = "1";
+    });
   }
 
   function findElementById(id) {
@@ -375,6 +471,15 @@
 
   function setSelectedElement(elData) {
     selectedElId = elData && elData.id ? elData.id : null;
+    if (sheetInnerEl) {
+      sheetInnerEl.querySelectorAll(".forms-el.is-selected").forEach(function (node) {
+        node.classList.remove("is-selected");
+      });
+      if (selectedElId) {
+        var selectedNode = sheetInnerEl.querySelector('.forms-el[data-el-id="' + selectedElId + '"]');
+        if (selectedNode) selectedNode.classList.add("is-selected");
+      }
+    }
     syncLayoutPropsUi(elData && elData.type !== "box" ? elData : null);
   }
 
@@ -399,14 +504,11 @@
     return !!elementClipboard;
   }
 
-  function pasteElementFromClipboard(afterElData) {
-    if (!canEdit || !elementClipboard) return null;
+  function insertElementAfter(afterElData, el) {
     var form = currentForm();
-    if (!form) return null;
+    if (!form || !el) return null;
     captureEditorState();
-    var el = cloneElementData(elementClipboard);
-    if (!el) return null;
-    el.id = uid();
+    el.id = el.id || uid();
     el.page = getCurrentPageIndex(form);
     var idx = -1;
     var afterId = afterElData && afterElData.id ? afterElData.id : selectedElId;
@@ -424,6 +526,126 @@
     renderCanvas();
     scheduleSave();
     return el;
+  }
+
+  function focusElementField(elId, selector) {
+    requestAnimationFrame(function () {
+      if (!sheetInnerEl || !elId) return;
+      var wrap = sheetInnerEl.querySelector('.forms-el[data-el-id="' + elId + '"]');
+      var field = wrap && wrap.querySelector(selector || "input, textarea");
+      if (field) {
+        field.focus();
+        if (typeof field.select === "function" && field.tagName === "INPUT") field.select();
+      }
+    });
+  }
+
+  function nextItemNumber(numStr) {
+    var s = String(numStr || "1.").trim();
+    var m = s.match(/^(\d+)([\s\S]*)$/);
+    var n = m ? parseInt(m[1], 10) + 1 : 1;
+    var rest = m ? m[2] : ".";
+    if (!rest) rest = ".";
+    return String(n) + rest;
+  }
+
+  function addItemAfter(elData) {
+    if (!canEdit || !elData) return null;
+    var fresh = findElementById(elData.id) || elData;
+    var el = {
+      id: uid(),
+      type: "item",
+      page: ensureElementPage(fresh),
+      num: nextItemNumber(fresh.num || "1."),
+      label: "",
+      value: "",
+      placeholder: fresh.placeholder || "",
+    };
+    if (fresh.col_pct != null) el.col_pct = fresh.col_pct;
+    var created = insertElementAfter(fresh, el);
+    if (created) focusElementField(created.id, ".forms-el-field-label");
+    return created;
+  }
+
+  function addBoxAfter(elData) {
+    if (!canEdit) return null;
+    var fresh = elData ? (findElementById(elData.id) || elData) : null;
+    var el = {
+      id: uid(),
+      type: "box",
+      page: fresh ? ensureElementPage(fresh) : getCurrentPageIndex(currentForm()),
+      text: "",
+      width_mm: fresh && fresh.width_mm != null ? fresh.width_mm : 60,
+      height_mm: fresh && fresh.height_mm != null ? fresh.height_mm : 40,
+      border_width_mm: fresh && fresh.border_width_mm != null ? fresh.border_width_mm : 0.5,
+      align: (fresh && fresh.align) || "center",
+      font_size: fresh && fresh.font_size != null ? fresh.font_size : 11,
+      bold: !!(fresh && fresh.bold),
+      italic: !!(fresh && fresh.italic),
+      underline: !!(fresh && fresh.underline),
+      strike: !!(fresh && fresh.strike),
+    };
+    var created = insertElementAfter(fresh, el);
+    if (created) {
+      setActiveBox(created);
+      focusElementField(created.id, ".forms-el-box-text");
+    }
+    return created;
+  }
+
+  function addCheckboxAfter(elData) {
+    if (!canEdit || !elData) return null;
+    var fresh = findElementById(elData.id) || elData;
+    var el = {
+      id: uid(),
+      type: "checkbox",
+      page: ensureElementPage(fresh),
+      label: "",
+      checked: false,
+    };
+    if (fresh.col_pct != null) el.col_pct = fresh.col_pct;
+    var created = insertElementAfter(fresh, el);
+    if (created) focusElementField(created.id, ".forms-el-checkbox-label");
+    return created;
+  }
+
+  function insertNewlineInTextarea(ta) {
+    if (!ta) return;
+    var start = typeof ta.selectionStart === "number" ? ta.selectionStart : ta.value.length;
+    var end = typeof ta.selectionEnd === "number" ? ta.selectionEnd : start;
+    var v = ta.value || "";
+    ta.value = v.slice(0, start) + "\n" + v.slice(end);
+    var pos = start + 1;
+    try {
+      ta.selectionStart = pos;
+      ta.selectionEnd = pos;
+    } catch (_e) {}
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  function bindEnterCreatesElement(field, onEnterCreate) {
+    if (!field || !canEdit || typeof onEnterCreate !== "function") return;
+    field.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Enter") return;
+      if (ev.ctrlKey || ev.metaKey) {
+        if (field.tagName === "TEXTAREA") {
+          ev.preventDefault();
+          insertNewlineInTextarea(field);
+        }
+        return;
+      }
+      if (ev.shiftKey || ev.altKey) return;
+      ev.preventDefault();
+      onEnterCreate();
+    });
+  }
+
+  function pasteElementFromClipboard(afterElData) {
+    if (!canEdit || !elementClipboard) return null;
+    var el = cloneElementData(elementClipboard);
+    if (!el) return null;
+    el.id = uid();
+    return insertElementAfter(afterElData, el);
   }
 
   function swapElementOnPage(elData, index, direction) {
@@ -1717,6 +1939,125 @@
     normalizeTableCells(elData);
   }
 
+  function promoteColspanMaster(elData, delC, m) {
+    var nextC = delC + 1;
+    if (nextC >= elData.cols) return;
+    var rs = m.cell.rowspan || 1;
+    var cs = m.cell.colspan || 1;
+    var masterCell = elData.cells[m.r][nextC];
+    copyCellContent(m.cell, masterCell);
+    masterCell.colspan = cs - 1;
+    masterCell.rowspan = rs;
+    masterCell.hidden = false;
+    for (var rr = m.r; rr < m.r + rs; rr++) {
+      for (var cc = nextC; cc < nextC + cs - 1; cc++) {
+        if (rr === m.r && cc === nextC) continue;
+        elData.cells[rr][cc] = makeCell("");
+        elData.cells[rr][cc].hidden = true;
+      }
+    }
+  }
+
+  function deleteColAt(elData, delC) {
+    if (elData.cols <= 1) return;
+    normalizeTableCells(elData);
+    var seen = {};
+    for (var r = 0; r < elData.rows; r++) {
+      var m = findMasterCell(elData, r, delC);
+      var key = m.r + "," + m.c;
+      if (seen[key]) continue;
+      seen[key] = true;
+      if (m.c === delC) {
+        if (m.cell.colspan > 1) promoteColspanMaster(elData, delC, m);
+      } else if (m.c < delC && m.c + m.cell.colspan - 1 >= delC) {
+        m.cell.colspan -= 1;
+      }
+    }
+    for (var rr = 0; rr < elData.rows; rr++) {
+      elData.cells[rr].splice(delC, 1);
+    }
+    if (Array.isArray(elData.col_widths)) elData.col_widths.splice(delC, 1);
+    elData.cols -= 1;
+    normalizeTableCells(elData);
+  }
+
+  function insertRowAfter(elData, afterR) {
+    if (elData.rows >= 50) {
+      alert("Не больше 50 строк.");
+      return false;
+    }
+    normalizeTableCells(elData);
+    afterR = Math.max(0, Math.min(afterR, elData.rows - 1));
+    var newR = afterR + 1;
+    var seen = {};
+    var hiddenInNew = {};
+    for (var r = 0; r <= afterR; r++) {
+      for (var c = 0; c < elData.cols; c++) {
+        var cell = elData.cells[r][c];
+        if (!cell || cell.hidden) continue;
+        var key = r + "," + c;
+        if (seen[key]) continue;
+        seen[key] = true;
+        var rs = cell.rowspan || 1;
+        var cs = cell.colspan || 1;
+        if (r <= afterR && r + rs - 1 > afterR) {
+          cell.rowspan = rs + 1;
+          for (var cc = c; cc < c + cs; cc++) hiddenInNew[cc] = true;
+        }
+      }
+    }
+    var newRow = [];
+    for (var c2 = 0; c2 < elData.cols; c2++) {
+      var nc = makeCell("");
+      if (hiddenInNew[c2]) nc.hidden = true;
+      newRow.push(nc);
+    }
+    elData.cells.splice(newR, 0, newRow);
+    if (!Array.isArray(elData.row_heights)) elData.row_heights = [];
+    elData.row_heights.splice(newR, 0, 0);
+    elData.rows += 1;
+    normalizeTableCells(elData);
+    return true;
+  }
+
+  function insertColAfter(elData, afterC) {
+    if (elData.cols >= 20) {
+      alert("Не больше 20 столбцов.");
+      return false;
+    }
+    normalizeTableCells(elData);
+    afterC = Math.max(0, Math.min(afterC, elData.cols - 1));
+    var newC = afterC + 1;
+    var seen = {};
+    var hiddenInNew = {};
+    for (var r = 0; r < elData.rows; r++) {
+      for (var c = 0; c <= afterC; c++) {
+        var cell = elData.cells[r][c];
+        if (!cell || cell.hidden) continue;
+        var key = r + "," + c;
+        if (seen[key]) continue;
+        seen[key] = true;
+        var cs = cell.colspan || 1;
+        var rs = cell.rowspan || 1;
+        if (c <= afterC && c + cs - 1 > afterC) {
+          cell.colspan = cs + 1;
+          for (var rr = r; rr < r + rs; rr++) hiddenInNew[rr] = true;
+        }
+      }
+    }
+    for (var r2 = 0; r2 < elData.rows; r2++) {
+      var nc = makeCell("");
+      if (hiddenInNew[r2]) nc.hidden = true;
+      elData.cells[r2].splice(newC, 0, nc);
+    }
+    if (!Array.isArray(elData.col_widths)) elData.col_widths = [];
+    var insertW = Math.max(5, Math.round((100 / (elData.cols + 1)) * 10) / 10);
+    elData.col_widths.splice(newC, 0, insertW);
+    elData.cols += 1;
+    normalizeTableCells(elData);
+    return true;
+  }
+
   function deleteSelectedRows(elData) {
     var sel = getTableSel(elData);
     if (!sel) return;
@@ -1734,7 +2075,53 @@
     var newR = Math.min(r1, elData.rows - 1);
     tableSelection[elData.id] = { r1: newR, c1: c, r2: newR, c2: c };
     scheduleSave();
-    renderCanvas();
+    renderCanvas({ skipCapture: true });
+  }
+
+  function deleteSelectedCols(elData) {
+    var sel = getTableSel(elData);
+    if (!sel) return;
+    normalizeTableCells(elData);
+    var c1 = Math.min(sel.c1, sel.c2);
+    var c2 = Math.max(sel.c1, sel.c2);
+    var count = c2 - c1 + 1;
+    if (elData.cols - count < 1) {
+      alert("Нельзя удалить все столбцы таблицы.");
+      return;
+    }
+    captureEditorState();
+    for (var c = c2; c >= c1; c--) deleteColAt(elData, c);
+    var r = Math.min(sel.r1, sel.r2);
+    var newC = Math.min(c1, elData.cols - 1);
+    tableSelection[elData.id] = { r1: r, c1: newC, r2: r, c2: newC };
+    scheduleSave();
+    renderCanvas({ skipCapture: true });
+  }
+
+  function addRowBelowSelection(elData) {
+    var sel = getTableSel(elData);
+    if (!sel) return;
+    captureEditorState();
+    var afterR = Math.max(sel.r1, sel.r2);
+    if (!insertRowAfter(elData, afterR)) return;
+    var c = Math.min(sel.c1, sel.c2);
+    var newR = afterR + 1;
+    tableSelection[elData.id] = { r1: newR, c1: c, r2: newR, c2: c };
+    scheduleSave();
+    renderCanvas({ skipCapture: true });
+  }
+
+  function addColRightOfSelection(elData) {
+    var sel = getTableSel(elData);
+    if (!sel) return;
+    captureEditorState();
+    var afterC = Math.max(sel.c1, sel.c2);
+    if (!insertColAfter(elData, afterC)) return;
+    var r = Math.min(sel.r1, sel.r2);
+    var newC = afterC + 1;
+    tableSelection[elData.id] = { r1: r, c1: newC, r2: r, c2: newC };
+    scheduleSave();
+    renderCanvas({ skipCapture: true });
   }
 
   function applyBgToSelection(elData, color) {
@@ -1764,57 +2151,77 @@
     bar.className = "forms-table-toolbar";
     if (!canEdit) return bar;
 
-    var hint = document.createElement("span");
-    hint.className = "forms-table-toolbar-hint";
-    hint.textContent = "Клик — выбор, Shift+клик — диапазон, край ячейки — размер";
+    function makeSection(title) {
+      var sec = document.createElement("div");
+      sec.className = "forms-table-section";
+      var lab = document.createElement("div");
+      lab.className = "forms-add-group-label";
+      lab.textContent = title;
+      sec.appendChild(lab);
+      return sec;
+    }
+
+    function makeBtn(text, className, title, onClick) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "forms-add-btn " + (className || "");
+      b.textContent = text;
+      if (title) b.title = title;
+      b.addEventListener("click", onClick);
+      return b;
+    }
+
+    function makeGrid() {
+      var g = document.createElement("div");
+      g.className = "forms-add-grid";
+      return g;
+    }
+
+    var hint = document.createElement("p");
+    hint.className = "forms-props-hint";
+    hint.textContent = "Клик по ячейке — выбор. Shift+клик — диапазон. Тяните край ячейки, чтобы изменить размер.";
     bar.appendChild(hint);
 
-    var btnMerge = document.createElement("button");
-    btnMerge.type = "button";
-    btnMerge.className = "forms-add-btn js-forms-table-merge";
-    btnMerge.textContent = "Объединить";
-    btnMerge.disabled = !selectionIsRectangle(elData);
-    btnMerge.addEventListener("click", function () { mergeSelectedCells(elData); });
-    bar.appendChild(btnMerge);
-
-    var btnSplit = document.createElement("button");
-    btnSplit.type = "button";
-    btnSplit.className = "forms-add-btn";
-    btnSplit.textContent = "Разъединить";
-    btnSplit.addEventListener("click", function () { splitSelectedCell(elData); });
-    bar.appendChild(btnSplit);
-
-    var btnDelRow = document.createElement("button");
-    btnDelRow.type = "button";
-    btnDelRow.className = "forms-add-btn js-forms-table-del-row";
-    btnDelRow.textContent = "Удалить строку";
-    btnDelRow.title = "Удалить выбранные строки";
-    btnDelRow.addEventListener("click", function () { deleteSelectedRows(elData); });
-    bar.appendChild(btnDelRow);
-
-    var colorLabel = document.createElement("label");
-    colorLabel.title = "Цвет фона выбранных ячеек";
-    var colorText = document.createElement("span");
-    colorText.textContent = "Фон:";
-    var colorInput = document.createElement("input");
-    colorInput.type = "color";
-    colorInput.className = "forms-table-color-input";
-    colorInput.value = TABLE_DEFAULT_BG;
-    colorInput.addEventListener("input", function () {
-      applyBgToSelection(elData, colorInput.value);
+    var secCells = makeSection("Ячейки");
+    var gridCells = makeGrid();
+    var btnMerge = makeBtn("Объединить", "js-forms-table-merge", "Объединить выбранные ячейки", function () {
+      mergeSelectedCells(elData);
     });
-    colorLabel.appendChild(colorText);
-    colorLabel.appendChild(colorInput);
-    bar.appendChild(colorLabel);
+    btnMerge.disabled = !selectionIsRectangle(elData);
+    gridCells.appendChild(btnMerge);
+    gridCells.appendChild(makeBtn("Разъединить", "", "Разъединить объединённую ячейку", function () {
+      splitSelectedCell(elData);
+    }));
+    secCells.appendChild(gridCells);
+    bar.appendChild(secCells);
 
+    var secStruct = makeSection("Строки и столбцы");
+    var gridAdd = makeGrid();
+    gridAdd.appendChild(makeBtn("+ Строка", "js-forms-table-add-row", "Добавить строку ниже", function () {
+      addRowBelowSelection(elData);
+    }));
+    gridAdd.appendChild(makeBtn("+ Столбец", "js-forms-table-add-col", "Добавить столбец справа", function () {
+      addColRightOfSelection(elData);
+    }));
+    secStruct.appendChild(gridAdd);
+    var gridDel = makeGrid();
+    gridDel.appendChild(makeBtn("Удалить строку", "forms-add-btn--danger js-forms-table-del-row", "Удалить выбранные строки", function () {
+      deleteSelectedRows(elData);
+    }));
+    gridDel.appendChild(makeBtn("Удалить столбец", "forms-add-btn--danger js-forms-table-del-col", "Удалить выбранные столбцы", function () {
+      deleteSelectedCols(elData);
+    }));
+    secStruct.appendChild(gridDel);
+    bar.appendChild(secStruct);
+
+    var secSize = makeSection("Размер");
     var colWidthLabel = document.createElement("label");
-    colWidthLabel.className = "forms-table-size-field";
+    colWidthLabel.className = "forms-row";
     colWidthLabel.title = "Ширина выбранного столбца, %";
-    var colWidthText = document.createElement("span");
-    colWidthText.textContent = "Столбец, %:";
+    colWidthLabel.innerHTML = '<span class="forms-row-label">Столбец, %</span>';
     var colWidthInput = document.createElement("input");
     colWidthInput.type = "number";
-    colWidthInput.className = "forms-table-size-input js-forms-table-col-width";
+    colWidthInput.className = "forms-control forms-control--num js-forms-table-col-width";
     colWidthInput.min = "5";
     colWidthInput.max = "95";
     colWidthInput.step = "0.1";
@@ -1829,18 +2236,16 @@
       refreshTableSelectionDom(elData);
       scheduleSave();
     });
-    colWidthLabel.appendChild(colWidthText);
     colWidthLabel.appendChild(colWidthInput);
-    bar.appendChild(colWidthLabel);
+    secSize.appendChild(colWidthLabel);
 
     var rowHeightLabel = document.createElement("label");
-    rowHeightLabel.className = "forms-table-size-field";
+    rowHeightLabel.className = "forms-row";
     rowHeightLabel.title = "Высота выбранной строки, px (пусто — авто)";
-    var rowHeightText = document.createElement("span");
-    rowHeightText.textContent = "Строка, px:";
+    rowHeightLabel.innerHTML = '<span class="forms-row-label">Строка, px</span>';
     var rowHeightInput = document.createElement("input");
     rowHeightInput.type = "number";
-    rowHeightInput.className = "forms-table-size-input js-forms-table-row-height";
+    rowHeightInput.className = "forms-control forms-control--num js-forms-table-row-height";
     rowHeightInput.min = "0";
     rowHeightInput.max = "300";
     rowHeightInput.step = "1";
@@ -1859,72 +2264,32 @@
     }
     rowHeightInput.addEventListener("input", applyRowHeightFromInput);
     rowHeightInput.addEventListener("change", applyRowHeightFromInput);
-    rowHeightLabel.appendChild(rowHeightText);
     rowHeightLabel.appendChild(rowHeightInput);
-    bar.appendChild(rowHeightLabel);
+    secSize.appendChild(rowHeightLabel);
+    bar.appendChild(secSize);
 
-    var fmtGroup = document.createElement("div");
-    fmtGroup.className = "forms-table-fmt-group";
-    fmtGroup.setAttribute("role", "group");
-    fmtGroup.setAttribute("aria-label", "Формат текста ячейки");
-
-    function mkFmtBtn(label, title, className, onClick) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "forms-table-fmt-btn " + className;
-      b.textContent = label;
-      b.title = title;
-      b.addEventListener("click", function () {
-        onClick();
-        updateTableCellFormatDom(elData);
-        refreshTableSelectionDom(elData);
-        scheduleSave();
-      });
-      return b;
-    }
-
-    var alignLabels = { left: "◧", center: "☰", right: "◨" };
-    var alignTitles = { left: "Слева", center: "По центру", right: "Справа" };
-    ["left", "center", "right"].forEach(function (align) {
-      var btn = mkFmtBtn(alignLabels[align], alignTitles[align], "js-forms-cell-align", function () {
-        forEachSelectedMasterCell(elData, function (cell) { cell.align = align; });
-      });
-      btn.setAttribute("data-align", align);
-      fmtGroup.appendChild(btn);
+    var secStyle = makeSection("Оформление");
+    var colorLabel = document.createElement("label");
+    colorLabel.className = "forms-row";
+    colorLabel.title = "Цвет фона выбранных ячеек";
+    colorLabel.innerHTML = '<span class="forms-row-label">Фон ячейки</span>';
+    var colorInput = document.createElement("input");
+    colorInput.type = "color";
+    colorInput.className = "forms-control forms-control--color forms-table-color-input";
+    colorInput.value = TABLE_DEFAULT_BG;
+    colorInput.addEventListener("input", function () {
+      applyBgToSelection(elData, colorInput.value);
     });
-
-    fmtGroup.appendChild(mkFmtBtn("B", "Жирный", "js-forms-cell-bold", function () {
-      var primary = primarySelectedCell(elData);
-      var next = primary ? !primary.cell.bold : true;
-      forEachSelectedMasterCell(elData, function (cell) { cell.bold = next; });
-    }));
-
-    fmtGroup.appendChild(mkFmtBtn("I", "Курсив", "js-forms-cell-italic forms-table-fmt-btn--italic", function () {
-      var primary = primarySelectedCell(elData);
-      var next = primary ? !primary.cell.italic : true;
-      forEachSelectedMasterCell(elData, function (cell) { cell.italic = next; });
-    }));
-
-    fmtGroup.appendChild(mkFmtBtn("U", "Подчёркивание", "js-forms-cell-underline forms-table-fmt-btn--underline", function () {
-      var primary = primarySelectedCell(elData);
-      var next = primary ? !primary.cell.underline : true;
-      forEachSelectedMasterCell(elData, function (cell) { cell.underline = next; });
-    }));
-
-    fmtGroup.appendChild(mkFmtBtn("S", "Зачёркивание", "js-forms-cell-strike forms-table-fmt-btn--strike", function () {
-      var primary = primarySelectedCell(elData);
-      var next = primary ? !primary.cell.strike : true;
-      forEachSelectedMasterCell(elData, function (cell) { cell.strike = next; });
-    }));
+    colorLabel.appendChild(colorInput);
+    secStyle.appendChild(colorLabel);
 
     var fontSizeLabel = document.createElement("label");
-    fontSizeLabel.className = "forms-table-size-field";
-    fontSizeLabel.title = "Размер шрифта выбранной ячейки, pt";
-    var fontSizeText = document.createElement("span");
-    fontSizeText.textContent = "Шрифт, pt:";
+    fontSizeLabel.className = "forms-row";
+    fontSizeLabel.title = "Размер шрифта, pt";
+    fontSizeLabel.innerHTML = '<span class="forms-row-label">Шрифт, pt</span>';
     var fontSizeInput = document.createElement("input");
     fontSizeInput.type = "number";
-    fontSizeInput.className = "forms-table-size-input js-forms-cell-font-size";
+    fontSizeInput.className = "forms-control forms-control--num js-forms-cell-font-size";
     fontSizeInput.min = "8";
     fontSizeInput.max = "500";
     fontSizeInput.step = "1";
@@ -1938,10 +2303,88 @@
     }
     fontSizeInput.addEventListener("input", applyFontSizeFromInput);
     fontSizeInput.addEventListener("change", applyFontSizeFromInput);
-    fontSizeLabel.appendChild(fontSizeText);
     fontSizeLabel.appendChild(fontSizeInput);
-    fmtGroup.appendChild(fontSizeLabel);
-    bar.appendChild(fmtGroup);
+    secStyle.appendChild(fontSizeLabel);
+
+    var alignRow = document.createElement("div");
+    alignRow.className = "forms-row";
+    var alignLab = document.createElement("span");
+    alignLab.className = "forms-row-label";
+    alignLab.textContent = "Выравнивание";
+    alignRow.appendChild(alignLab);
+    var alignGroup = document.createElement("div");
+    alignGroup.className = "forms-align-group forms-table-fmt-group";
+    alignGroup.setAttribute("role", "group");
+    alignGroup.setAttribute("aria-label", "Выравнивание текста ячейки");
+
+    function mkFmtBtn(label, title, className, onClick) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "forms-fmt-btn forms-table-fmt-btn " + className;
+      b.textContent = label;
+      b.title = title;
+      b.addEventListener("click", function () {
+        onClick();
+        updateTableCellFormatDom(elData);
+        refreshTableSelectionDom(elData);
+        scheduleSave();
+      });
+      return b;
+    }
+
+    var alignTitles = { left: "Слева", center: "По центру", right: "Справа" };
+    ["left", "center", "right"].forEach(function (align) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "forms-align-btn js-forms-cell-align";
+      btn.setAttribute("data-align", align);
+      btn.title = alignTitles[align];
+      btn.textContent = align === "left" ? "Слева" : align === "center" ? "Центр" : "Справа";
+      btn.addEventListener("click", function () {
+        forEachSelectedMasterCell(elData, function (cell) { cell.align = align; });
+        updateTableCellFormatDom(elData);
+        refreshTableSelectionDom(elData);
+        scheduleSave();
+      });
+      alignGroup.appendChild(btn);
+    });
+    alignRow.appendChild(alignGroup);
+    secStyle.appendChild(alignRow);
+
+    var fmtRow = document.createElement("div");
+    fmtRow.className = "forms-row";
+    var fmtLab = document.createElement("span");
+    fmtLab.className = "forms-row-label";
+    fmtLab.textContent = "Начертание";
+    fmtRow.appendChild(fmtLab);
+    var fmtGroup = document.createElement("div");
+    fmtGroup.className = "forms-fmt-group forms-table-fmt-group";
+    fmtGroup.setAttribute("role", "group");
+    fmtGroup.setAttribute("aria-label", "Начертание текста ячейки");
+
+    fmtGroup.appendChild(mkFmtBtn("B", "Жирный", "js-forms-cell-bold", function () {
+      var primary = primarySelectedCell(elData);
+      var next = primary ? !primary.cell.bold : true;
+      forEachSelectedMasterCell(elData, function (cell) { cell.bold = next; });
+    }));
+    fmtGroup.appendChild(mkFmtBtn("I", "Курсив", "js-forms-cell-italic forms-fmt-btn--italic forms-table-fmt-btn--italic", function () {
+      var primary = primarySelectedCell(elData);
+      var next = primary ? !primary.cell.italic : true;
+      forEachSelectedMasterCell(elData, function (cell) { cell.italic = next; });
+    }));
+    fmtGroup.appendChild(mkFmtBtn("U", "Подчёркивание", "js-forms-cell-underline forms-fmt-btn--underline forms-table-fmt-btn--underline", function () {
+      var primary = primarySelectedCell(elData);
+      var next = primary ? !primary.cell.underline : true;
+      forEachSelectedMasterCell(elData, function (cell) { cell.underline = next; });
+    }));
+    fmtGroup.appendChild(mkFmtBtn("S", "Зачёркивание", "js-forms-cell-strike forms-fmt-btn--strike forms-table-fmt-btn--strike", function () {
+      var primary = primarySelectedCell(elData);
+      var next = primary ? !primary.cell.strike : true;
+      forEachSelectedMasterCell(elData, function (cell) { cell.strike = next; });
+    }));
+    fmtRow.appendChild(fmtGroup);
+    secStyle.appendChild(fmtRow);
+    bar.appendChild(secStyle);
 
     return bar;
   }
@@ -1951,6 +2394,10 @@
     var mergeBtn = tableToolbarHost.querySelector(".js-forms-table-merge");
     if (mergeBtn) mergeBtn.disabled = !selectionIsRectangle(elData);
     var sel = getTableSel(elData);
+    var addRowBtn = tableToolbarHost.querySelector(".js-forms-table-add-row");
+    var addColBtn = tableToolbarHost.querySelector(".js-forms-table-add-col");
+    if (addRowBtn) addRowBtn.disabled = !sel || elData.rows >= 50;
+    if (addColBtn) addColBtn.disabled = !sel || elData.cols >= 20;
     var delRowBtn = tableToolbarHost.querySelector(".js-forms-table-del-row");
     if (delRowBtn && sel) {
       var dr1 = Math.min(sel.r1, sel.r2);
@@ -1960,6 +2407,16 @@
     } else if (delRowBtn) {
       delRowBtn.disabled = true;
       delRowBtn.textContent = "Удалить строку";
+    }
+    var delColBtn = tableToolbarHost.querySelector(".js-forms-table-del-col");
+    if (delColBtn && sel) {
+      var dc1 = Math.min(sel.c1, sel.c2);
+      var dc2 = Math.max(sel.c1, sel.c2);
+      delColBtn.disabled = elData.cols - (dc2 - dc1 + 1) < 1;
+      delColBtn.textContent = dc2 > dc1 ? "Удалить столбцы" : "Удалить столбец";
+    } else if (delColBtn) {
+      delColBtn.disabled = true;
+      delColBtn.textContent = "Удалить столбец";
     }
     var colInput = tableToolbarHost.querySelector(".js-forms-table-col-width");
     var rowInput = tableToolbarHost.querySelector(".js-forms-table-row-height");
@@ -2288,9 +2745,11 @@
         var del = document.createElement("button");
         del.type = "button";
         del.className = "forms-list-del";
-        del.title = "Удалить";
-        del.setAttribute("aria-label", "Удалить форму");
-        del.textContent = "×";
+        del.title = "Удалить бланк";
+        del.setAttribute("aria-label", "Удалить бланк");
+        del.innerHTML =
+          (window.BiotaDeleteBtn && window.BiotaDeleteBtn.TRASH_SVG) ||
+          '<svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
         del.addEventListener("click", function (e) {
           e.stopPropagation();
           deleteForm(f.id);
@@ -2366,12 +2825,13 @@
     bar.className = "forms-el-toolbar";
     if (!canEdit) return bar;
 
-    function mkBtn(label, title, fn) {
+    function mkBtn(label, title, fn, extraClass) {
       var b = document.createElement("button");
       b.type = "button";
-      b.className = "forms-el-btn";
+      b.className = "forms-el-btn" + (extraClass ? " " + extraClass : "");
       b.textContent = label;
       b.title = title;
+      b.setAttribute("aria-label", title);
       b.addEventListener("click", function (ev) {
         ev.preventDefault();
         ev.stopPropagation();
@@ -2380,29 +2840,29 @@
       return b;
     }
 
-    bar.appendChild(mkBtn("←", "Левее / выше", function () {
+    bar.appendChild(mkBtn("Выше", "Переместить выше / левее", function () {
       swapElementOnPage(elData, index, -1);
     }));
-    bar.appendChild(mkBtn("→", "Правее / ниже", function () {
+    bar.appendChild(mkBtn("Ниже", "Переместить ниже / правее", function () {
       swapElementOnPage(elData, index, 1);
     }));
-    bar.appendChild(mkBtn("⧉", "Копировать", function () {
+    bar.appendChild(mkBtn("Копия", "Скопировать в буфер", function () {
       setSelectedElement(elData);
       copyElementToClipboard(elData);
     }));
-    bar.appendChild(mkBtn("＋", "Дублировать", function () {
+    bar.appendChild(mkBtn("Дубль", "Дублировать элемент", function () {
       setSelectedElement(elData);
       if (!copyElementToClipboard(elData)) return;
       pasteElementFromClipboard(elData);
     }));
-    bar.appendChild(mkBtn("×", "Удалить", function () {
+    bar.appendChild(mkBtn("Удал.", "Удалить элемент", function () {
       var form = currentForm();
       if (!form) return;
       form.elements.splice(index, 1);
       if (selectedElId === elData.id) selectedElId = null;
       renderCanvas();
       scheduleSave();
-    }));
+    }, "forms-el-btn--danger"));
     return bar;
   }
 
@@ -2710,8 +3170,8 @@
 
   function renderElement(elData, index) {
     var wrap = document.createElement("div");
-    wrap.className = "forms-el";
-    wrap.dataset.elId = elData.id;
+    wrap.className = "forms-el" + (elData && elData.id && elData.id === selectedElId ? " is-selected" : "");
+    if (elData && elData.id) wrap.dataset.elId = elData.id;
     wrap.appendChild(elToolbar(elData, index));
     if (elData.type !== "box") applyElementColLayout(wrap, elData);
 
@@ -2767,10 +3227,11 @@
       boxTa.className = "forms-el-box-text";
       boxTa.rows = 1;
       boxTa.value = elData.text || "";
-      boxTa.placeholder = "Текст";
+      boxTa.placeholder = "Текст · Enter — новая рамка · Ctrl+Enter — строка";
       if (!canEdit) boxTa.readOnly = true;
       bindTextInput(boxTa, elData, "text");
       boxTa.addEventListener("input", function () { autoGrowTextarea(boxTa); });
+      bindEnterCreatesElement(boxTa, function () { addBoxAfter(elData); });
       box.appendChild(boxTa);
       wrap.appendChild(box);
       applyBoxStyles(wrap, elData);
@@ -2796,18 +3257,20 @@
       lbl.className = "forms-el-checkbox-label";
       lbl.rows = 1;
       lbl.value = elData.label || "";
-      lbl.placeholder = "Подпись к галочке";
+      lbl.placeholder = "Подпись · Enter — новая галочка · Ctrl+Enter — строка";
       if (!canEdit) lbl.readOnly = true;
       bindTextInput(lbl, elData, "label");
       lbl.addEventListener("input", function () { autoGrowTextarea(lbl); });
+      bindEnterCreatesElement(lbl, function () { addCheckboxAfter(elData); });
       row.appendChild(box);
       row.appendChild(lbl);
       wrap.appendChild(row);
       autoGrowTextarea(lbl);
     } else if (elData.type === "list") {
-      var listTag = elData.ordered ? "ol" : "ul";
-      var listNode = document.createElement(listTag);
+      elData.ordered = true;
+      var listNode = document.createElement("ol");
       listNode.className = "forms-el-list";
+      listNode.start = 1;
       if (!elData.items || !elData.items.length) elData.items = [""];
       elData.items.forEach(function (itemText, ii) {
         var li = document.createElement("li");
@@ -2815,12 +3278,32 @@
         inp.type = "text";
         inp.className = "forms-el-list-input";
         inp.value = itemText || "";
+        inp.placeholder = "Строка списка · Enter — следующая";
         if (!canEdit) inp.readOnly = true;
         (function (idx, input) {
           input.addEventListener("input", function () {
             elData.items[idx] = input.value;
             scheduleSave();
           });
+          if (canEdit) {
+            input.addEventListener("keydown", function (ev) {
+              if (ev.key !== "Enter" || ev.shiftKey || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+              ev.preventDefault();
+              captureEditorState();
+              var fresh = findElementById(elData.id) || elData;
+              if (!fresh.items) fresh.items = [""];
+              fresh.items.splice(idx + 1, 0, "");
+              // skipCapture: иначе повторный захват из старого DOM сотрёт новую строку
+              renderCanvas({ skipCapture: true });
+              scheduleSave();
+              requestAnimationFrame(function () {
+                var wrapNode = sheetInnerEl && sheetInnerEl.querySelector('.forms-el[data-el-id="' + fresh.id + '"]');
+                var inputs = wrapNode ? wrapNode.querySelectorAll(".forms-el-list-input") : [];
+                var next = inputs[idx + 1];
+                if (next) next.focus();
+              });
+            });
+          }
         })(ii, inp);
         li.appendChild(inp);
         listNode.appendChild(li);
@@ -2863,7 +3346,7 @@
       itemLabel.type = "text";
       itemLabel.className = "forms-el-field-label";
       itemLabel.value = elData.label || "";
-      itemLabel.placeholder = "Текст пункта";
+      itemLabel.placeholder = "Текст пункта · Enter — следующий";
       if (!canEdit) itemLabel.readOnly = true;
       bindTextInput(itemLabel, elData, "label");
       var itemValue = document.createElement("input");
@@ -2873,6 +3356,8 @@
       itemValue.placeholder = elData.placeholder || "";
       if (!canEdit) itemValue.readOnly = true;
       bindTextInput(itemValue, elData, "value");
+      bindEnterCreatesElement(itemLabel, function () { addItemAfter(elData); });
+      bindEnterCreatesElement(itemValue, function () { addItemAfter(elData); });
       itemRow.appendChild(itemNum);
       itemRow.appendChild(itemLabel);
       itemRow.appendChild(itemValue);
@@ -2940,64 +3425,46 @@
         '<input type="number" class="forms-control forms-control--num js-prompt-cols" min="1" max="20" value="4" required></label>'
       )).then(function (ok) {
         if (!ok) return;
-        el.rows = parseInt(promptFields.querySelector(".js-prompt-rows").value, 10) || 3;
-        el.cols = parseInt(promptFields.querySelector(".js-prompt-cols").value, 10) || 4;
+        el.rows = Math.max(1, Math.min(50, parseInt(promptFields.querySelector(".js-prompt-rows").value, 10) || 3));
+        el.cols = Math.max(1, Math.min(20, parseInt(promptFields.querySelector(".js-prompt-cols").value, 10) || 4));
         el.cells = [];
         normalizeTableCells(el);
         form.elements.push(el);
+        tableSelection[el.id] = { r1: 0, c1: 0, r2: 0, c2: 0 };
         renderCanvas();
         scheduleSave();
+        syncTableToolbar(el, true);
+        setMobilePane("props");
       });
       return;
     }
 
     if (type === "box") {
-      openPrompt("Блок", (
-        '<label class="forms-row"><span class="forms-row-label">Ширина, мм</span>' +
-        '<input type="number" class="forms-control forms-control--num js-prompt-box-w" min="10" max="200" step="1" value="60" required></label>' +
-        '<label class="forms-row"><span class="forms-row-label">Высота, мм</span>' +
-        '<input type="number" class="forms-control forms-control--num js-prompt-box-h" min="10" max="280" step="1" value="40" required></label>'
-      )).then(function (ok) {
-        if (!ok) return;
-        var bw = parseFloat(promptFields.querySelector(".js-prompt-box-w").value);
-        var bh = parseFloat(promptFields.querySelector(".js-prompt-box-h").value);
-        if (isNaN(bw)) bw = 60;
-        if (isNaN(bh)) bh = 40;
-        el.text = "";
-        el.width_mm = Math.round(Math.max(10, Math.min(200, bw)) * 10) / 10;
-        el.height_mm = Math.round(Math.max(10, Math.min(280, bh)) * 10) / 10;
-        el.border_width_mm = 0.5;
-        el.align = "center";
-        el.font_size = 11;
-        el.bold = false;
-        el.italic = false;
-        el.underline = false;
-        el.strike = false;
-        form.elements.push(el);
-        renderCanvas();
-        scheduleSave();
-        setActiveBox(el);
-      });
+      el.text = "";
+      el.width_mm = 60;
+      el.height_mm = 40;
+      el.border_width_mm = 0.5;
+      el.align = "center";
+      el.font_size = 11;
+      el.bold = false;
+      el.italic = false;
+      el.underline = false;
+      el.strike = false;
+      form.elements.push(el);
+      renderCanvas();
+      scheduleSave();
+      setActiveBox(el);
+      focusElementField(el.id, ".forms-el-box-text");
       return;
     }
 
     if (type === "list") {
-      openPrompt("Список", (
-        '<label class="forms-row"><span class="forms-row-label">Пунктов</span>' +
-        '<input type="number" class="forms-control forms-control--num js-prompt-items" min="1" max="50" value="3" required></label>' +
-        '<label class="forms-toggle forms-toggle--dialog">' +
-        '<input type="checkbox" class="js-prompt-ordered">' +
-        '<span>Нумерованный список</span></label>'
-      )).then(function (ok) {
-        if (!ok) return;
-        var n = parseInt(promptFields.querySelector(".js-prompt-items").value, 10) || 3;
-        el.ordered = !!promptFields.querySelector(".js-prompt-ordered").checked;
-        el.items = [];
-        for (var i = 0; i < n; i++) el.items.push("");
-        form.elements.push(el);
-        renderCanvas();
-        scheduleSave();
-      });
+      el.ordered = true;
+      el.items = [""];
+      form.elements.push(el);
+      renderCanvas();
+      scheduleSave();
+      focusElementField(el.id, ".forms-el-list-input");
       return;
     }
 
@@ -3048,6 +3515,14 @@
     if (type === "image") {
       setActiveImage(el);
       pickImageFile(el);
+    } else if (type === "item") {
+      focusElementField(el.id, ".forms-el-field-label");
+    } else if (type === "checkbox") {
+      focusElementField(el.id, ".forms-el-checkbox-label");
+    } else if (type === "heading") {
+      focusElementField(el.id, ".forms-el-heading");
+    } else if (type === "text") {
+      focusElementField(el.id, ".forms-el-text");
     }
   }
 
@@ -3723,5 +4198,6 @@
     setMobilePane("list");
   }
 
+  initPropsCollapse();
   loadForms();
 })();

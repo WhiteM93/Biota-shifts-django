@@ -1317,24 +1317,13 @@ html[data-theme="dawn"] .nav .nav-updates-badge {
 .nav-role-preview {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex: 0 0 auto;
   margin: 0;
-  padding: 2px 4px 2px 8px;
+  padding: 2px;
   border: 1px solid var(--bio-nav-user-border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--bio-nav-user-bg) 55%, transparent);
-}
-
-.nav-role-preview__label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--bio-nav-link);
-  opacity: 0.72;
-  padding-right: 2px;
-  white-space: nowrap;
 }
 
 .nav-role-preview__btn {
@@ -1343,12 +1332,18 @@ html[data-theme="dawn"] .nav .nav-updates-badge {
   background: transparent;
   color: var(--bio-nav-link);
   font: inherit;
-  font-size: 11px;
-  font-weight: 650;
+  font-size: 12px;
+  font-weight: 700;
   line-height: 1;
-  padding: 6px 8px;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
   border-radius: 6px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   white-space: nowrap;
 }
 
@@ -1360,12 +1355,6 @@ html[data-theme="dawn"] .nav .nav-updates-badge {
 .nav-role-preview__btn.is-on {
   background: var(--bio-nav-user-bg);
   color: var(--bio-nav-user-fg);
-}
-
-@media (max-width: 1100px) {
-  .nav-role-preview__label {
-    display: none;
-  }
 }
 
 .nav a[class*="--icon-only"]:hover svg,
@@ -2432,21 +2421,20 @@ html[data-theme="dawn"] .chk {
   }
 
   .nav-panel .nav-role-preview {
-    width: 100%;
-    justify-content: stretch;
-    padding: 4px;
-    gap: 4px;
-  }
-
-  .nav-panel .nav-role-preview__label {
-    display: none;
+    width: auto;
+    align-self: flex-start;
+    justify-content: flex-start;
+    padding: 2px;
+    gap: 2px;
   }
 
   .nav-panel .nav-role-preview__btn {
-    flex: 1 1 0;
-    min-height: 40px;
+    flex: 0 0 auto;
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
     font-size: 13px;
-    padding: 10px 8px;
+    padding: 0;
   }
 
   .nav-panel .nav-refresh-form {

@@ -17,11 +17,11 @@
   <header class="forms-topbar">
     <div class="forms-topbar-text">
       <h1 class="forms-title">Формы</h1>
-      <p class="forms-subtitle">Конструктор печатных бланков A4</p>
+      <p class="forms-subtitle">Печатные бланки A4: выберите бланк слева, добавляйте блоки справа, наведите на блок для действий</p>
     </div>
     <div class="forms-topbar-actions">
-      <button type="button" class="forms-btn-secondary js-forms-ai" disabled title="Вставить текст и оформить бланк">Оформить из текста</button>
-      <button type="button" class="forms-btn-print js-forms-print" disabled title="Печать">Печать</button>
+      <button type="button" class="forms-btn-secondary js-forms-ai" disabled title="Вставить текст и автоматически сверстать бланк">Из текста</button>
+      <button type="button" class="forms-btn-print js-forms-print" disabled title="Печать бланка">Печать</button>
     </div>
   </header>
 
@@ -42,7 +42,8 @@
 
     <main class="forms-panel forms-panel--canvas" data-forms-pane="canvas" aria-label="Превью листа">
       <div class="forms-empty js-forms-empty">
-        <p>Выберите бланк слева или создайте новый.</p>
+        <p class="forms-empty-title">Бланк не выбран</p>
+        <p>Слева откройте бланк или нажмите «+», чтобы создать новый. Справа добавляйте поля и блоки на лист.</p>
       </div>
 
       <div class="forms-editor js-forms-editor forms-is-hidden" hidden>
@@ -50,7 +51,7 @@
           <div class="forms-pages-tabs js-forms-pages-tabs" role="tablist" aria-label="Страницы бланка"></div>
           <div class="forms-pages-actions">
             <button type="button" class="forms-btn-secondary js-forms-page-add" title="Добавить страницу">+ Страница</button>
-            <button type="button" class="forms-btn-secondary js-forms-page-del" title="Удалить текущую страницу">Удалить</button>
+            <button type="button" class="forms-btn-secondary js-forms-page-del" title="Удалить текущую страницу">Удалить страницу</button>
           </div>
         </div>
         <div class="forms-canvas-stage js-forms-canvas-stage">
@@ -211,20 +212,34 @@
         <p class="forms-props-hint">Несколько блоков подряд встают в ряд, пока хватает ширины листа.</p>
       </section>
 
-      <section class="forms-props-block">
-        <h2 class="forms-props-heading">Элементы</h2>
-        <div class="forms-add-grid" role="toolbar" aria-label="Добавить элемент">
-          <button type="button" class="forms-add-btn js-forms-add" data-type="heading">Заголовок</button>
-          <button type="button" class="forms-add-btn js-forms-add" data-type="text">Текст</button>
-          <button type="button" class="forms-add-btn js-forms-add" data-type="box">Блок</button>
-          <button type="button" class="forms-add-btn js-forms-add" data-type="image">Картинка</button>
-          <button type="button" class="forms-add-btn js-forms-add" data-type="table">Таблица</button>
-          <button type="button" class="forms-add-btn js-forms-add" data-type="list">Список</button>
-          <button type="button" class="forms-add-btn js-forms-add" data-type="checkbox">Галочка</button>
-          <button type="button" class="forms-add-btn js-forms-add" data-type="date">Дата</button>
-          <button type="button" class="forms-add-btn js-forms-add" data-type="fio">ФИО</button>
-          <button type="button" class="forms-add-btn js-forms-add" data-type="item">Пункт</button>
-          <button type="button" class="forms-add-btn js-forms-add" data-type="line">Линия</button>
+      <section class="forms-props-block forms-props-block--add">
+        <h2 class="forms-props-heading">Добавить на лист</h2>
+        <p class="forms-props-hint">Нажмите кнопку — элемент появится на текущей странице. Наведите на блок, чтобы переместить, скопировать или удалить.</p>
+        <div class="forms-add-group">
+          <span class="forms-add-group-label">Текст</span>
+          <div class="forms-add-grid" role="toolbar" aria-label="Текстовые элементы">
+            <button type="button" class="forms-add-btn js-forms-add" data-type="heading">Заголовок</button>
+            <button type="button" class="forms-add-btn js-forms-add" data-type="text">Текст</button>
+            <button type="button" class="forms-add-btn js-forms-add" data-type="list">Список</button>
+            <button type="button" class="forms-add-btn js-forms-add" data-type="item">Пункт</button>
+          </div>
+        </div>
+        <div class="forms-add-group">
+          <span class="forms-add-group-label">Поля</span>
+          <div class="forms-add-grid" role="toolbar" aria-label="Поля бланка">
+            <button type="button" class="forms-add-btn js-forms-add" data-type="checkbox">Галочка</button>
+            <button type="button" class="forms-add-btn js-forms-add" data-type="date">Дата</button>
+            <button type="button" class="forms-add-btn js-forms-add" data-type="fio">ФИО</button>
+            <button type="button" class="forms-add-btn js-forms-add" data-type="line">Линия</button>
+          </div>
+        </div>
+        <div class="forms-add-group">
+          <span class="forms-add-group-label">Блоки</span>
+          <div class="forms-add-grid" role="toolbar" aria-label="Блоки и таблицы">
+            <button type="button" class="forms-add-btn js-forms-add" data-type="box">Рамка</button>
+            <button type="button" class="forms-add-btn js-forms-add" data-type="image">Картинка</button>
+            <button type="button" class="forms-add-btn js-forms-add" data-type="table">Таблица</button>
+          </div>
         </div>
       </section>
     </aside>

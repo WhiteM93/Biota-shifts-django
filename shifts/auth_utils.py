@@ -104,8 +104,6 @@ def _nav_key_for_url_name(url_name: str) -> str | None:
         return "regulations"
     if n.startswith("product"):
         return "products"
-    if n == "machines":
-        return "machines"
     if n == "calculator":
         return "calculator"
     if n == "forms" or n.startswith("forms_api"):
@@ -170,7 +168,6 @@ def post_login_redirect(username: str | None, next_path: str | None = None) -> s
                 "employees",
                 "regulations",
                 "products",
-                "machines",
                 "forms",
                 "calculator",
                 "visual_warehouse",
