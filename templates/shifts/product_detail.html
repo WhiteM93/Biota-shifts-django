@@ -194,31 +194,6 @@
       </button>
       {% endif %}
     </div>
-    {% if setups %}
-    <div
-      class="product-setup-status-bar"
-      id="setup-status-bar"
-      data-setup-id=""
-      data-status="not_ready"
-      hidden
-      aria-label="Статус наладки"
-    >
-      <div class="product-setup-status-bar__track" role="group" aria-label="Выбор статуса наладки">
-        <button type="button" class="product-setup-status-bar__opt" data-status="not_ready" aria-pressed="false" disabled>
-          <span class="product-setup-status-bar__dot" aria-hidden="true"></span>
-          <span class="product-setup-status-bar__text">Наладка не готова</span>
-        </button>
-        <button type="button" class="product-setup-status-bar__opt" data-status="ready" aria-pressed="false" disabled>
-          <span class="product-setup-status-bar__dot" aria-hidden="true"></span>
-          <span class="product-setup-status-bar__text">Наладка готова</span>
-        </button>
-        <button type="button" class="product-setup-status-bar__opt" data-status="worked" aria-pressed="false" disabled>
-          <span class="product-setup-status-bar__dot" aria-hidden="true"></span>
-          <span class="product-setup-status-bar__text">Наладка отработана</span>
-        </button>
-      </div>
-    </div>
-    {% endif %}
     <div class="product-tab-panels">
       <section class="product-tab-panel product-tab-panel--drawing-placeholder" id="panel-drawing" data-panel="drawing" data-inline-edit-mode="0" role="tabpanel" aria-label="Изделие" {% if tab_default != 'drawing' %}hidden{% endif %}></section>
       {% for setup in setups %}
@@ -235,38 +210,7 @@
                 data-out="#setup-ai-out-{{ setup.pk }}"
                 title="Анализ инструмента и наличия на складе"
               >ИИ-анализ</button>
-              <div class="product-setup-run-toggles">
-              <button
-                type="button"
-                class="product-setup-inwork-toggle{% if setup.in_work %} is-on{% endif %}{% if not biota_can_edit %} is-readonly{% endif %}"
-                data-setup-id="{{ setup.pk }}"
-                data-tab-slug="{{ setup.tab_slug }}"
-                data-run-status="in_work"
-                aria-pressed="{% if setup.in_work %}true{% else %}false{% endif %}"
-                {% if not biota_can_edit %}disabled{% endif %}
-                title="{% if not biota_can_edit %}Только руководитель может менять статус{% elif setup.in_work %}В работе — нажмите, чтобы снять{% else %}Не в работе — нажмите, чтобы включить{% endif %}"
-              >
-                <span class="product-setup-inwork-toggle__track" aria-hidden="true">
-                  <span class="product-setup-inwork-toggle__thumb"></span>
-                </span>
-                <span class="product-setup-inwork-toggle__label">В работе</span>
-              </button>
-              <button
-                type="button"
-                class="product-setup-inwork-toggle is-launch{% if setup.needs_start %} is-on{% endif %}{% if not biota_can_edit %} is-readonly{% endif %}"
-                data-setup-id="{{ setup.pk }}"
-                data-tab-slug="{{ setup.tab_slug }}"
-                data-run-status="needs_start"
-                aria-pressed="{% if setup.needs_start %}true{% else %}false{% endif %}"
-                {% if not biota_can_edit %}disabled{% endif %}
-                title="{% if not biota_can_edit %}Только руководитель может менять статус{% elif setup.needs_start %}Надо запускать — нажмите, чтобы снять{% else %}Не в очереди запуска — нажмите, чтобы включить{% endif %}"
-              >
-                <span class="product-setup-inwork-toggle__track" aria-hidden="true">
-                  <span class="product-setup-inwork-toggle__thumb"></span>
-                </span>
-                <span class="product-setup-inwork-toggle__label">Надо запускать</span>
-              </button>
-              </div>
+              {% include "shifts/includes/setup_run_toggles.html" with setup=setup %}
             </div>
             <div class="product-setup-ai-out js-setup-ai-out" id="setup-ai-out-{{ setup.pk }}" hidden></div>
             <div class="product-setup-spec-group">
@@ -491,6 +435,27 @@
             </div>
           </div>
           <div class="product-setup-tools-col">
+            <div
+              class="product-setup-status-bar"
+              data-setup-id="{{ setup.pk }}"
+              data-status="{{ setup.readiness_status|default:'not_ready' }}"
+              aria-label="Статус наладки"
+            >
+              <div class="product-setup-status-bar__track" role="group" aria-label="Выбор статуса наладки">
+                <button type="button" class="product-setup-status-bar__opt{% if setup.readiness_status == 'not_ready' or not setup.readiness_status %} is-active{% endif %}" data-status="not_ready" aria-pressed="{% if setup.readiness_status == 'not_ready' or not setup.readiness_status %}true{% else %}false{% endif %}" disabled>
+                  <span class="product-setup-status-bar__dot" aria-hidden="true"></span>
+                  <span class="product-setup-status-bar__text">Наладка не готова</span>
+                </button>
+                <button type="button" class="product-setup-status-bar__opt{% if setup.readiness_status == 'ready' %} is-active{% endif %}" data-status="ready" aria-pressed="{% if setup.readiness_status == 'ready' %}true{% else %}false{% endif %}" disabled>
+                  <span class="product-setup-status-bar__dot" aria-hidden="true"></span>
+                  <span class="product-setup-status-bar__text">Наладка готова</span>
+                </button>
+                <button type="button" class="product-setup-status-bar__opt{% if setup.readiness_status == 'worked' %} is-active{% endif %}" data-status="worked" aria-pressed="{% if setup.readiness_status == 'worked' %}true{% else %}false{% endif %}" disabled>
+                  <span class="product-setup-status-bar__dot" aria-hidden="true"></span>
+                  <span class="product-setup-status-bar__text">Наладка отработана</span>
+                </button>
+              </div>
+            </div>
             <div class="table-wrap setup-tools-table-wrap" style="padding:0;margin:0;">
               <div class="setup-tools-table-layout">
                 <div class="setup-tools-table-main">
@@ -701,8 +666,8 @@
   </aside>
 
   <div class="product-detail-side" id="product-detail-side">
-    <div id="product-detail-side-inner">
-    <div class="product-side-preview">
+    <div id="product-detail-side-inner" class="product-side-card">
+    <section class="product-side-preview product-side-section" aria-label="Превью изделия">
     <header class="product-side-preview__head">
       <div class="product-side-cad-name" id="product-side-name">{{ product.name }}</div>
       <div
@@ -759,7 +724,7 @@
     {% else %}
     <p class="product-side-preview__empty muted">3D не загружен.</p>
     {% endif %}
-    </div>
+    </section>
     {% include "shifts/_product_detail_side_meta.html" %}
     </div>
   </div>

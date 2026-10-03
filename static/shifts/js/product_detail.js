@@ -6731,8 +6731,8 @@ function saveSetupToolNoteEditor() {
     });
 
     (function initSetupReadinessStatusBar() {
-      var bar = document.getElementById("setup-status-bar");
-      if (!bar) return;
+      var bars = document.querySelectorAll(".product-setup-status-bar");
+      if (!bars.length) return;
       var VALID = { not_ready: 1, ready: 1, worked: 1 };
 
       function currentTab() {
@@ -6754,6 +6754,10 @@ function saveSetupToolNoteEditor() {
         return document.querySelector('#setup-tab-select option[value="setup-' + setupId + '"]');
       }
 
+      function barForSetup(setupId) {
+        return document.querySelector('.product-setup-status-bar[data-setup-id="' + setupId + '"]');
+      }
+
       function readStatus(setupId) {
         var panel = panelForSetup(setupId);
         var fromPanel = panel ? (panel.getAttribute("data-readiness-status") || "") : "";
@@ -6771,8 +6775,9 @@ function saveSetupToolNoteEditor() {
       }
 
       function applyBarUi(setupId, status, editMode) {
+        var bar = barForSetup(setupId);
+        if (!bar) return;
         var st = VALID[status] ? status : "not_ready";
-        bar.setAttribute("data-setup-id", setupId || "");
         bar.setAttribute("data-status", st);
         bar.querySelectorAll(".product-setup-status-bar__opt").forEach(function (btn) {
           var on = btn.getAttribute("data-status") === st;
@@ -6782,20 +6787,29 @@ function saveSetupToolNoteEditor() {
         });
       }
 
-      function syncFromTab(tabName) {
-        var setupId = setupIdFromTab(tabName);
-        if (!setupId) {
-          bar.setAttribute("hidden", "hidden");
-          bar.setAttribute("data-setup-id", "");
-          return;
-        }
-        bar.removeAttribute("hidden");
-        applyBarUi(setupId, readStatus(setupId), document.body.classList.contains("setup-inline-edit-enabled"));
+      function syncAllBars() {
+        var editOn = document.body.classList.contains("setup-inline-edit-enabled");
+        bars.forEach(function (bar) {
+          var setupId = bar.getAttribute("data-setup-id") || "";
+          if (!setupId) return;
+          applyBarUi(setupId, readStatus(setupId), editOn);
+        });
       }
 
-      bar.addEventListener("click", function (e) {
+      function syncFromTab(tabName) {
+        var setupId = setupIdFromTab(tabName);
+        if (!setupId) return;
+        applyBarUi(
+          setupId,
+          readStatus(setupId),
+          document.body.classList.contains("setup-inline-edit-enabled")
+        );
+      }
+
+      document.addEventListener("click", function (e) {
         var btn = e.target && e.target.closest ? e.target.closest(".product-setup-status-bar__opt") : null;
-        if (!btn || btn.disabled || !document.body.classList.contains("setup-inline-edit-enabled")) return;
+        var bar = btn && btn.closest ? btn.closest(".product-setup-status-bar") : null;
+        if (!btn || !bar || btn.disabled || !document.body.classList.contains("setup-inline-edit-enabled")) return;
         e.preventDefault();
         e.stopPropagation();
         var setupId = bar.getAttribute("data-setup-id") || "";
@@ -6865,9 +6879,9 @@ function saveSetupToolNoteEditor() {
         syncFromTab((ev && ev.detail && ev.detail.tab) || currentTab());
       });
       window.addEventListener("setup-inline-edit-mode", function () {
-        syncFromTab(currentTab());
+        syncAllBars();
       });
-      syncFromTab(currentTab());
+      syncAllBars();
     })();
 
     initProductOsnastkaCombo();

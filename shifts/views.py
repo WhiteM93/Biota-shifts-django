@@ -753,6 +753,7 @@ def calculator_view(request):
         k_raw = (request.POST.get("k_parts") or "1").strip()
         k_parts = int(k_raw) if k_raw.isdigit() and int(k_raw) >= 1 else 1
         prev = setup.piece_norms.order_by("-created_at", "-id").first()
+        u = biota_user(request)
         entry = ProductSetupPieceNorm.objects.create(
             setup=setup,
             tsht_norm=tsht_norm,

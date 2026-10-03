@@ -14,6 +14,8 @@ html[data-theme="dawn"] {
   --pd-glass-bg: var(--bio-surface-item);
   --pd-glass-border: var(--bio-input-border);
   --pd-input-bg: var(--bio-input-bg);
+  /* Как у .product-side-preview */
+  --pd-card-radius: 8px;
 }
 
 /* ── Блоки плана (вне вложенных панелей setup-specs / meta) ── */
@@ -21,7 +23,7 @@ html[data-theme="dawn"] {
 .setup-plan-summary-wrap {
   background: var(--bio-surface-item) !important;
   border: 1px solid var(--bio-input-border) !important;
-  border-radius: 5px !important;
+  border-radius: var(--pd-card-radius) !important;
   padding: 12px !important;
   transition: border-color 0.16s ease, background-color 0.16s ease;
 }
@@ -83,7 +85,7 @@ html[data-theme="dawn"] {
 .plan-unified-specs-card {
   background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%) !important;
   border: 1px solid var(--bio-filter-border) !important;
-  border-radius: 5px !important;
+  border-radius: var(--pd-card-radius) !important;
   padding: 10px !important;
   box-shadow: var(--bio-filter-shadow);
   margin-bottom: 16px;
@@ -160,7 +162,7 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     justify-content: flex-start;
     gap: 6px;
     border: 1px solid var(--bio-filter-border);
-    border-radius: 5px;
+    border-radius: var(--pd-card-radius);
     padding: 8px;
     background: var(--bio-surface-item);
     transition: background 0.22s ease, border-color 0.22s ease;
@@ -287,7 +289,7 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     display: grid;
     grid-template-columns: 1fr;
     gap: 0;
-    border-radius: 8px;
+    border-radius: var(--pd-card-radius);
     overflow: hidden;
     border: 1px solid rgba(0, 0, 0, 0.18);
     min-height: 28px;
@@ -840,7 +842,7 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     gap: 12px 20px;
     padding: 10px;
     border: 1px solid var(--bio-filter-border);
-    border-radius: 5px;
+    border-radius: var(--pd-card-radius);
     background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
     box-shadow: var(--bio-filter-shadow);
     font-size: 15px;
@@ -856,7 +858,7 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   }
   .product-setup-spec-group {
     border: 1px solid var(--bio-input-border);
-    border-radius: 4px;
+    border-radius: var(--pd-card-radius);
     padding: 8px 10px;
     background: var(--bio-surface-item);
     display: grid;
@@ -864,11 +866,6 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     line-height: 1.55;
     min-width: 0;
     color: var(--bio-body-fg);
-    transition:
-      transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
-      box-shadow 0.28s ease,
-      background 0.22s ease,
-      border-color 0.22s ease;
   }
   .product-setup-panel-title {
     display: flex;
@@ -1176,7 +1173,7 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   }
   .setup-spec-box {
     border: 1px solid var(--bio-input-border);
-    border-radius: 4px;
+    border-radius: var(--pd-card-radius);
     padding: 7px 8px;
     background: var(--bio-surface-item);
     min-width: 0;
@@ -1350,10 +1347,6 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     animation: setupNaladkaReveal 0.52s cubic-bezier(0.22, 1, 0.36, 1) backwards;
     animation-delay: 0.16s;
   }
-  .product-tab-panel[data-panel^="setup-"] .product-setup-spec-group:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 28px var(--bio-shadow-card);
-  }
   .product-tab-panel[data-panel^="setup-"] .product-setup-photos figure.setup-photo-figure {
     transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
   }
@@ -1424,7 +1417,7 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   }
   .setup-spec-col-meta .setup-meta-col {
     border: 1px solid rgba(58, 74, 106, 0.6);
-    border-radius: 5px;
+    border-radius: var(--pd-card-radius);
     background: var(--bio-surface-item);
     padding: 6px 8px;
     gap: 6px;
@@ -1948,14 +1941,14 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     line-height: 0;
     margin: 0;
     flex: 0 0 26px !important;
-    border: 0 !important;
-    box-shadow: none !important;
-    color: #fff;
     white-space: nowrap;
     overflow: hidden;
   }
   .setup-program-preview-btn.btn.btn-ghost {
+    border: 0 !important;
+    box-shadow: none !important;
     background: transparent !important;
+    color: #fff;
   }
   .setup-program-preview-btn.btn.btn-ghost:hover,
   .setup-program-preview-btn.btn.btn-ghost:focus {
@@ -1981,14 +1974,6 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   .setup-inline-edit-enabled .product-side-program-files .setup-side-program-download {
     padding-right: 58px;
   }
-  .setup-program-file-item-side .setup-program-file-delete {
-    background: rgba(0, 0, 0, 0.35) !important;
-  }
-  .setup-program-file-item-side .setup-program-file-delete:hover,
-  .setup-program-file-item-side .setup-program-file-delete:focus {
-    background: rgba(0, 0, 0, 0.5) !important;
-    color: #fff;
-  }
   .product-side-program-files .setup-program-upload-wrap {
     display: none;
     flex: 0 0 100%;
@@ -2003,7 +1988,7 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   .product-side-drawings {
     margin-top: 10px;
     padding-top: 10px;
-    border-top: 1px solid var(--bio-surface-item-border, var(--bio-input-border));
+    border-top: 1px solid color-mix(in srgb, var(--bio-filter-border) 70%, transparent);
     min-width: 0;
     width: 100%;
   }
@@ -2378,7 +2363,7 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     white-space: pre-wrap;
     line-height: 1.55;
     border: 1px solid var(--bio-filter-border);
-    border-radius: 5px;
+    border-radius: var(--pd-card-radius);
     background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
     box-shadow: var(--bio-filter-shadow);
     padding: 10px;
@@ -2502,11 +2487,9 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     .product-setup-notes.is-inline-edit.is-photo-drop-target {
       animation: none !important;
     }
-    .product-tab-panel[data-panel^="setup-"] .product-setup-spec-group:hover,
     .product-tab-panel[data-panel^="setup-"] .product-setup-photos figure.setup-photo-figure:hover {
       transform: none !important;
     }
-    .product-tab-panel[data-panel^="setup-"] .product-setup-spec-group,
     .product-tab-panel[data-panel^="setup-"] .product-setup-photos figure.setup-photo-figure,
     .product-setup-notes a.setup-notes-photo-ref {
       transition-duration: 0.01ms !important;
@@ -2968,6 +2951,14 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     max-width: 100%;
     overflow: hidden;
     justify-self: stretch;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .product-setup-tools-col > .product-setup-status-bar {
+    flex: 0 0 auto;
+    width: 100%;
+    margin: 0;
   }
   .product-setup-tools-col .setup-tools-table-wrap,
   .product-setup-tools-col .setup-tools-table-layout,
@@ -3163,7 +3154,7 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   .product-detail-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
-    grid-template-rows: auto auto 1fr;
+    grid-template-rows: auto 1fr;
     gap: 18px;
     margin-top: 0;
     align-items: start;
@@ -3183,17 +3174,9 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     min-width: 0;
     width: 100%;
   }
-  .product-setup-status-bar {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    min-width: 0;
-    width: 100%;
-    margin: -10px 0 0;
-    align-self: stretch;
-  }
   .product-tab-panels {
     grid-column: 1;
-    grid-row: 3;
+    grid-row: 2;
     min-width: 0;
   }
   .product-detail-grid.has-meta-column .product-tab-panels {
@@ -3201,7 +3184,7 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   }
   .product-detail-meta {
     grid-column: 1;
-    grid-row: 3;
+    grid-row: 2;
     min-width: 0;
     width: 100%;
     align-self: start;
@@ -3235,7 +3218,7 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     box-sizing: border-box;
     padding: 16px 18px;
     border: 1px solid color-mix(in srgb, var(--bio-filter-border) 70%, transparent);
-    border-radius: 14px;
+    border-radius: var(--pd-card-radius);
     background: #101520;
     background-image: none;
     isolation: isolate;
@@ -3583,14 +3566,14 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   }
   .product-detail-grid.has-meta-column .product-detail-side {
     grid-column: 2;
-    grid-row: 3;
+    grid-row: 2;
   }
   .product-tab-panel--drawing-placeholder {
     display: none !important;
   }
   .product-detail-side {
     grid-column: 2;
-    grid-row: 3;
+    grid-row: 2;
     min-width: 0;
     width: 100%;
     background: transparent;
@@ -3747,9 +3730,6 @@ html[data-theme="dawn"] .plan-unified-specs-card {
   }
   #product-detail-side-inner {
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
   }
   .product-detail-grid.is-drawing-only {
     grid-template-columns: minmax(0, 1fr);
@@ -5300,7 +5280,7 @@ body.setup-inline-edit-enabled #product-detail-meta .product-detail-name.is-inli
   padding: 10px;
   background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
   border: 1px solid var(--bio-filter-border);
-  border-radius: 5px;
+  border-radius: var(--pd-card-radius);
   box-shadow: var(--bio-filter-shadow);
   margin-bottom: 0;
   min-height: 200px;
@@ -5319,7 +5299,7 @@ html[data-theme="dawn"] .product-detail-description-block {
 #product-detail-meta .product-detail-meta-card {
   padding: 16px 18px;
   border: 1px solid color-mix(in srgb, var(--bio-filter-border) 70%, transparent);
-  border-radius: 14px;
+  border-radius: var(--pd-card-radius);
   background: #101520;
   background-image: none;
   box-shadow: none;
@@ -5610,76 +5590,78 @@ body.setup-inline-edit-enabled #product-detail-meta .product-drawing-description
   box-shadow: none;
 }
 
-#product-detail-side #product-cad-block,
-#product-detail-side #product-downloads-block,
-#product-detail-side #product-osnastka-block,
-#product-detail-side .product-side-program-files,
-#product-detail-side .product-side-notes-panel {
-  background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
-  border: 1px solid var(--bio-filter-border);
-  border-radius: 5px;
-  padding: 10px;
-  box-shadow: var(--bio-filter-shadow);
+#product-detail-side #product-detail-side-inner.product-side-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
   box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid var(--bio-filter-border);
+  border-radius: var(--pd-card-radius);
+  background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
+  box-shadow: var(--bio-filter-shadow);
   transition: border-color 0.22s ease, background 0.28s ease, box-shadow 0.25s ease;
+}
+
+html[data-theme="dawn"] #product-detail-side #product-detail-side-inner.product-side-card {
+  background: linear-gradient(180deg, #fffefb 0%, #f4ebe0 100%);
+}
+
+#product-detail-side #product-detail-side-inner.product-side-card:hover {
+  border-color: var(--bio-input-hover-border);
+}
+
+#product-detail-side .product-side-section {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+#product-detail-side .product-side-section + .product-side-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--bio-filter-border) 80%, transparent);
 }
 
 #product-detail-side .product-side-preview {
-  background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%);
-  border: 1px solid var(--bio-filter-border);
-  border-radius: 8px;
-  padding: 12px;
-  box-shadow: var(--bio-filter-shadow);
-  box-sizing: border-box;
-  transition: border-color 0.22s ease, background 0.28s ease, box-shadow 0.25s ease;
+  background: transparent;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin: 0 0 12px;
+  margin: 0;
 }
 
-#product-detail-side #product-cad-block {
+#product-detail-side #product-cad-block,
+#product-detail-side .product-side-program-files,
+#product-detail-side .product-side-notes-panel {
   background: transparent;
   border: none;
   border-radius: 0;
   padding: 0;
   box-shadow: none;
+  box-sizing: border-box;
+}
+
+#product-detail-side #product-downloads-block,
+#product-detail-side #product-osnastka-block,
+#product-detail-side #product-side-programs,
+#product-detail-side #product-side-notes-stack {
+  background: transparent;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+
+#product-detail-side #product-cad-block {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-html[data-theme="dawn"] #product-detail-side #product-cad-block,
-html[data-theme="dawn"] #product-detail-side #product-downloads-block,
-html[data-theme="dawn"] #product-detail-side #product-osnastka-block,
-html[data-theme="dawn"] #product-detail-side .product-side-program-files,
-html[data-theme="dawn"] #product-detail-side .product-side-notes-panel {
-  background: linear-gradient(180deg, #fffefb 0%, #f4ebe0 100%);
-}
-
-html[data-theme="dawn"] #product-detail-side .product-side-preview {
-  background: linear-gradient(180deg, #fffefb 0%, #f4ebe0 100%);
-}
-
-html[data-theme="dawn"] #product-detail-side #product-cad-block {
-  background: transparent;
-}
-
 #product-detail-side #product-cad-block:hover,
-#product-detail-side #product-downloads-block:hover,
-#product-detail-side #product-osnastka-block:hover,
 #product-detail-side .product-side-program-files:hover,
 #product-detail-side .product-side-notes-panel:hover {
-  border-color: var(--bio-input-hover-border);
-  box-shadow: var(--bio-filter-shadow);
-}
-
-#product-detail-side .product-side-preview:hover {
-  border-color: var(--bio-input-hover-border);
-}
-
-#product-detail-side #product-cad-block:hover {
-  border-color: transparent;
   box-shadow: none;
 }
 
@@ -5814,26 +5796,24 @@ html[data-theme="dawn"] #product-detail-side #product-cad-block {
   background: color-mix(in srgb, var(--bio-input-bg, #fff) 55%, transparent);
 }
 
-#product-detail-side #product-downloads-block::before {
+#product-detail-side #product-downloads-block::before,
+#product-detail-side #product-osnastka-block::before,
+#product-detail-side .product-side-program-files::before {
   display: block;
-  content: "Файлы";
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 650;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--bio-field-label);
+  letter-spacing: 0.1em;
+  color: var(--bio-field-label, var(--bio-muted));
   margin: 0 0 10px;
 }
 
+#product-detail-side #product-downloads-block::before {
+  content: "Файлы";
+}
+
 #product-detail-side #product-osnastka-block::before {
-  display: block;
   content: "Оснастка";
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--bio-field-label);
-  margin: 0 0 10px;
 }
 
 #product-detail-side .product-osnastka-list {
@@ -6011,24 +5991,17 @@ body:not(.setup-inline-edit-enabled) #product-detail-side .product-osnastka-add 
 }
 
 #product-detail-side .product-side-program-files::before {
-  display: block;
   content: "Программы";
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--bio-field-label);
-  margin: 0 0 10px;
 }
 
 #product-detail-side .product-drawing-notes__title {
   margin: 0 0 10px;
   padding: 0;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 650;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--bio-field-label);
+  letter-spacing: 0.1em;
+  color: var(--bio-field-label, var(--bio-muted));
 }
 
 #product-detail-side .product-side-notes-panel.product-drawing-notes {
@@ -6038,7 +6011,7 @@ body:not(.setup-inline-edit-enabled) #product-detail-side .product-osnastka-add 
 #product-detail-side .product-side-notes-stack {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
   margin-top: 0;
 }
 
@@ -6158,15 +6131,16 @@ body:not(.setup-inline-edit-enabled) #product-detail-side .product-osnastka-add 
 #product-detail-side .product-drawing-notes.filter-panel,
 #product-detail-side .product-side-notes-panel.filter-panel {
   margin: 0 !important;
-  background: linear-gradient(180deg, var(--bio-filter-bg1) 0%, var(--bio-filter-bg2) 100%) !important;
-  border: 1px solid var(--bio-filter-border) !important;
-  border-radius: 5px !important;
-  box-shadow: var(--bio-filter-shadow) !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
 html[data-theme="dawn"] #product-detail-side .product-drawing-notes.filter-panel,
 html[data-theme="dawn"] #product-detail-side .product-side-notes-panel.filter-panel {
-  background: linear-gradient(180deg, #fffefb 0%, #f4ebe0 100%) !important;
+  background: transparent !important;
 }
 
 /* ── Уведомления сохранения (план / наладка) ── */

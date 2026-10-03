@@ -1,5 +1,5 @@
 {% load biota_icons %}
-<div class="product-downloads" id="product-downloads-block">
+<section class="product-downloads product-side-section" id="product-downloads-block" aria-label="Файлы">
   {% if product.cad_model %}
   <div class="product-download-row" data-product-asset-row="cad_model">
     <a href="{{ product.cad_model.url }}" download class="btn product-download-main-btn">Скачать 3D-модель{% if cad_ext %} (.{{ cad_ext }}){% endif %}</a>
@@ -98,9 +98,9 @@
       {% endif %}
     </div>
   </div>
-</div>
+</section>
 {% if not product.is_osnastka %}
-<div class="product-side-osnastka" id="product-osnastka-block" aria-label="Используемая оснастка">
+<section class="product-side-osnastka product-side-section" id="product-osnastka-block" aria-label="Используемая оснастка">
   <ul class="product-osnastka-list" id="product-osnastka-list">
     {% for link in product_osnastka_links %}
     <li class="product-osnastka-item" data-link-id="{{ link.pk }}" data-osnastka-id="{{ link.osnastka_id }}">
@@ -129,10 +129,10 @@
     </button>
   </div>
   {% endif %}
-</div>
+</section>
 {% endif %}
 {% if setups %}
-<div class="product-side-programs" id="product-side-programs" aria-label="Программы установок">
+<section class="product-side-programs product-side-section" id="product-side-programs" aria-label="Программы установок">
   {% for setup in setups %}
   <div class="setup-program-files-inline product-side-program-files" data-setup-id="{{ setup.pk }}" data-setup-tab="{{ setup.tab_slug }}" {% if tab_default != setup.tab_slug %}hidden{% endif %}>
     <div class="setup-program-meta-row">
@@ -168,9 +168,9 @@
     </div>
   </div>
   {% endfor %}
-</div>
+</section>
 {% endif %}
-<div id="product-side-notes-stack" class="product-side-notes-stack">
+<section id="product-side-notes-stack" class="product-side-notes-stack product-side-section" aria-label="Заметки">
   {% if tab_default == "drawing" %}
   {% include "shifts/includes/product_side_notes_panel.html" with notes_panel_tab="drawing" notes_list=product_notes notes_setup_id="" notes_title="Заметки (изделие)" notes_hidden=False %}
   {% else %}
@@ -183,4 +183,4 @@
   {% include "shifts/includes/product_side_notes_panel.html" with notes_panel_tab=setup.tab_slug notes_list=setup.side_notes notes_setup_id=setup.pk|stringformat:"s" notes_title="Заметки: "|add:setup.name notes_hidden=True %}
   {% endif %}
   {% endfor %}
-</div>
+</section>

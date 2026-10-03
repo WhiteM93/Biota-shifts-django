@@ -1,0 +1,32 @@
+<div class="product-setup-run-toggles">
+  <button
+    type="button"
+    class="product-setup-inwork-toggle{% if setup.in_work %} is-on{% endif %}{% if not biota_can_edit %} is-readonly{% endif %}"
+    data-setup-id="{{ setup.pk }}"
+    data-tab-slug="{{ setup.tab_slug }}"
+    data-run-status="in_work"
+    aria-pressed="{% if setup.in_work %}true{% else %}false{% endif %}"
+    {% if not biota_can_edit %}disabled{% endif %}
+    title="{% if not biota_can_edit %}Только руководитель может менять статус{% elif setup.in_work %}В работе — нажмите, чтобы снять{% else %}Не в работе — нажмите, чтобы включить{% endif %}"
+  >
+    <span class="product-setup-inwork-toggle__track" aria-hidden="true">
+      <span class="product-setup-inwork-toggle__thumb"></span>
+    </span>
+    <span class="product-setup-inwork-toggle__label">В работе</span>
+  </button>
+  <button
+    type="button"
+    class="product-setup-inwork-toggle is-launch{% if setup.needs_start %} is-on{% endif %}{% if not biota_can_edit %} is-readonly{% endif %}"
+    data-setup-id="{{ setup.pk }}"
+    data-tab-slug="{{ setup.tab_slug }}"
+    data-run-status="needs_start"
+    aria-pressed="{% if setup.needs_start %}true{% else %}false{% endif %}"
+    {% if not biota_can_edit %}disabled{% endif %}
+    title="{% if not biota_can_edit %}Только руководитель может менять статус{% elif setup.needs_start %}Надо запускать — нажмите, чтобы снять{% else %}Не в очереди запуска — нажмите, чтобы включить{% endif %}"
+  >
+    <span class="product-setup-inwork-toggle__track" aria-hidden="true">
+      <span class="product-setup-inwork-toggle__thumb"></span>
+    </span>
+    <span class="product-setup-inwork-toggle__label">Надо запускать</span>
+  </button>
+</div>
