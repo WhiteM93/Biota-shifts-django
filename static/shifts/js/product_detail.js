@@ -918,11 +918,7 @@ function saveSetupToolNoteEditor() {
       if (gotoSetup) {
         e.preventDefault();
         var tab = gotoSetup.getAttribute("data-tab") || "";
-        var setupSelect = document.getElementById("setup-tab-select");
-        if (tab && setupSelect) {
-          setupSelect.value = tab;
-          setupSelect.dispatchEvent(new Event("change", { bubbles: true }));
-        }
+        if (tab) activate(tab);
         return;
       }
       var histBtn = e.target && e.target.closest && e.target.closest("#setup-norm-history-btn");
@@ -1011,8 +1007,6 @@ function saveSetupToolNoteEditor() {
       window.requestAnimationFrame(function () {
         resizeAllProductNoteTextareas();
       });
-      var setupSelect = document.getElementById("setup-tab-select");
-      if (setupSelect) setupSelect.value = tabName;
       try {
         document.dispatchEvent(new CustomEvent("biota:setup-tab-changed", { detail: { tab: tabName } }));
       } catch (_) {}
@@ -1210,18 +1204,16 @@ function saveSetupToolNoteEditor() {
     }
     initProductNoteDeletes();
 
-    var setupSelect = document.getElementById("setup-tab-select");
-    if (setupSelect) {
-      setupSelect.addEventListener("change", function () {
-        var tab = setupSelect.value || "";
-        if (tab) activate(tab);
-      });
-      var initialTab = setupSelect.value || "drawing";
-      activate(initialTab);
-      return;
+    var initialTab = root.getAttribute("data-initial-tab") || "";
+    if (!initialTab) {
+      var activeBtn = root.querySelector(".product-tab.is-active");
+      initialTab = activeBtn ? (activeBtn.getAttribute("data-tab") || "") : "";
     }
-    if (tabButtons.length) {
-      activate(tabButtons[0].getAttribute("data-tab") || "");
+    if (!initialTab && tabButtons.length) {
+      initialTab = tabButtons[0].getAttribute("data-tab") || "drawing";
+    }
+    if (initialTab) {
+      activate(initialTab);
     } else {
       root.setAttribute("data-current-tab", "drawing");
       setProgramDownloadByTab("drawing");
@@ -1552,18 +1544,6 @@ function saveSetupToolNoteEditor() {
     var notesSelection = null;
     var TOOL_TYPE_OPTIONS = (PD.tool_type_choices || []);
 
-    function syncInlineDeleteSetupBtn() {
-      var btn = document.getElementById("setup-inline-delete-setup-btn");
-      if (!btn) return;
-      var sel = document.getElementById("setup-tab-select");
-      var val = sel ? sel.value : "";
-      var isSetup = /^setup-\d+$/.test(val || "");
-      if (isSetup) btn.removeAttribute("hidden");
-      else btn.setAttribute("hidden", "hidden");
-    }
-    document.addEventListener("biota:setup-tab-changed", syncInlineDeleteSetupBtn);
-    syncInlineDeleteSetupBtn();
-
     function getCookie(name) {
       var m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));
       return m ? decodeURIComponent(m[2]) : "";
@@ -1645,11 +1625,21 @@ function saveSetupToolNoteEditor() {
     window.biotaApplyPlanInlineStateToQuickEdits = applyPlanInlineStateToQuickEdits;
 
     function getCurrentTabName() {
-      var sel = document.getElementById("setup-tab-select");
-      if (sel && sel.value) return sel.value;
+      var fromRoot = root.getAttribute("data-current-tab") || "";
+      if (fromRoot) return fromRoot;
       var activeTab = root.querySelector(".product-tab.is-active");
       return activeTab ? (activeTab.getAttribute("data-tab") || "") : "";
     }
+
+    function syncInlineDeleteSetupBtn() {
+      var btn = document.getElementById("setup-inline-delete-setup-btn");
+      if (!btn) return;
+      var isSetup = /^setup-\d+$/.test(getCurrentTabName() || "");
+      if (isSetup) btn.removeAttribute("hidden");
+      else btn.setAttribute("hidden", "hidden");
+    }
+    document.addEventListener("biota:setup-tab-changed", syncInlineDeleteSetupBtn);
+    syncInlineDeleteSetupBtn();
 
     function activeSetupPanel() {
       var tabName = getCurrentTabName();
@@ -3482,21 +3472,17 @@ function saveSetupToolNoteEditor() {
 
     function updateSetupTabLabelFromResponse(setupTab, data) {
       if (!setupTab || !data || !data.setup) return;
-      var tabName = setupTab.getAttribute("data-tab") || "";
       var setupIndex = setupTab.getAttribute("data-setup-index") || "";
       var setupName = (data.setup.name ? data.setup.name : "").trim();
       if (setupName) {
         setupTab.setAttribute("data-setup-name", setupName);
         if (setupIndex) setupTab.textContent = "Уст. " + setupIndex;
-        var setupOption = document.querySelector('#setup-tab-select option[value="' + tabName + '"]');
-        if (setupOption) {
-          // Только название (и ● / ▶ если статус) — без «Уст. N», иначе номер расходится с именем/порядком
-          setupOption.textContent =
-            setupRunPrefix({
-              in_work: setupOption.getAttribute("data-setup-in-work") === "1",
-              needs_start: setupOption.getAttribute("data-setup-needs-start") === "1",
-            }) + setupName;
-        }
+        var orderRow = document.querySelector(
+          '#setup-order-list .product-setup-order-item[data-setup-id="' +
+            (setupTab.id || "").replace("tab-setup-", "") +
+            '"] .product-setup-order-item__name'
+        );
+        if (orderRow) orderRow.textContent = setupName;
       }
     }
 
@@ -3627,14 +3613,13 @@ function saveSetupToolNoteEditor() {
     if (deleteSetupBtn) {
       deleteSetupBtn.addEventListener("click", async function () {
         if (deleteSetupBtn.disabled) return;
-        var sel = document.getElementById("setup-tab-select");
-        var val = sel ? sel.value : "";
+        var val = getCurrentTabName();
         var m = /^setup-(\d+)$/.exec(val || "");
         if (!m) return;
-        var setupLabel = "";
-        if (sel && sel.selectedOptions && sel.selectedOptions[0]) {
-          setupLabel = (sel.selectedOptions[0].textContent || "").replace(/^[●▶]\s*/, "").trim();
-        }
+        var setupTab = document.getElementById("tab-setup-" + m[1]);
+        var setupLabel = setupTab
+          ? (setupTab.getAttribute("data-setup-name") || "").trim()
+          : "";
         var confirmText = setupLabel
           ? "Удалить установку «" + setupLabel + "»? Фото, инструмент и заметки по ней удалятся безвозвратно."
           : "Удалить эту установку? Фото, инструмент и заметки по ней удалятся безвозвратно.";
@@ -6409,80 +6394,189 @@ function saveSetupToolNoteEditor() {
       });
     }
 
-    function syncSetupTabIndexesFromSelectOrder() {
-      var select = document.getElementById("setup-tab-select");
-      if (!select) return;
-      var idx = 0;
-      Array.prototype.forEach.call(select.options, function (opt) {
-        var m = /^setup-(\d+)$/.exec(opt.value || "");
-        if (!m) return;
-        idx += 1;
-        var tab = document.getElementById("tab-setup-" + m[1]);
-        if (!tab) return;
-        tab.setAttribute("data-setup-index", String(idx));
-        tab.textContent = "Уст. " + idx;
-      });
-    }
-
-    function reorderSetupSelectInWork(setupOrder) {
-      var select = document.getElementById("setup-tab-select");
-      if (!select || !setupOrder || !setupOrder.length) return;
-
+    function applySetupOrderToUi(setupOrder) {
+      if (!setupOrder || !setupOrder.length) return;
       var nextIds = setupOrder.map(function (s) { return String(s.pk); }).join(",");
       var tabsRoot = document.getElementById("product-tabs");
       if (tabsRoot) tabsRoot.setAttribute("data-inline-setup-ids", nextIds);
 
-      setupOrder.forEach(function (item) {
-        var opt = select.querySelector('option[value="' + item.tab_slug + '"]');
-        if (!opt) return;
-        opt.textContent = setupRunPrefix(item) + item.name;
-        opt.setAttribute("data-setup-in-work", item.in_work ? "1" : "0");
-        opt.setAttribute("data-setup-needs-start", item.needs_start ? "1" : "0");
-        select.appendChild(opt);
+      var navMain = document.querySelector(".product-tabs-nav__main");
+      var anchor = document.getElementById("setup-norm-badge");
+      var sorted = setupOrder.slice().sort(function (a, b) {
+        return (Number(a.sort_index) || 0) - (Number(b.sort_index) || 0);
       });
-      select.setAttribute("data-setup-order-ids", nextIds);
-      syncSetupTabIndexesFromSelectOrder();
+      sorted.forEach(function (item) {
+        var tab = document.getElementById("tab-setup-" + item.pk);
+        if (!tab) return;
+        var idx = Number(item.sort_index) || 0;
+        tab.setAttribute("data-setup-index", String(idx));
+        tab.setAttribute("data-setup-sort-index", String(idx));
+        tab.setAttribute("data-setup-in-work", item.in_work ? "1" : "0");
+        tab.setAttribute("data-setup-needs-start", item.needs_start ? "1" : "0");
+        if (item.readiness_status) tab.setAttribute("data-setup-readiness", item.readiness_status);
+        if (item.name) tab.setAttribute("data-setup-name", item.name);
+        tab.textContent = "Уст. " + idx;
+        if (navMain) {
+          if (anchor) navMain.insertBefore(tab, anchor);
+          else navMain.appendChild(tab);
+        }
+      });
+
+      var orderList = document.getElementById("setup-order-list");
+      if (orderList) {
+        sorted.forEach(function (item, i) {
+          var row = orderList.querySelector(
+            '.product-setup-order-item[data-setup-id="' + item.pk + '"]'
+          );
+          if (!row) return;
+          row.setAttribute("data-setup-sort-index", String(item.sort_index || i + 1));
+          var idxEl = row.querySelector(".product-setup-order-item__idx");
+          var nameEl = row.querySelector(".product-setup-order-item__name");
+          if (idxEl) idxEl.textContent = String(item.sort_index || i + 1);
+          if (nameEl) nameEl.textContent = item.name || "без названия";
+          orderList.appendChild(row);
+          var up = row.querySelector('.product-setup-order-move[data-direction="up"]');
+          var down = row.querySelector('.product-setup-order-move[data-direction="down"]');
+          if (up) up.disabled = i === 0;
+          if (down) down.disabled = i >= sorted.length - 1;
+        });
+      }
+
+      var normsList = document.getElementById("product-setup-norms-list");
+      if (normsList) {
+        sorted.forEach(function (item) {
+          var row = normsList.querySelector('[data-setup-id="' + item.pk + '"]');
+          if (row) normsList.appendChild(row);
+        });
+      }
     }
 
-    function initSetupSelectInWorkOrder() {
-      var select = document.getElementById("setup-tab-select");
-      if (!select) return;
-      var setupOpts = Array.prototype.slice.call(
-        select.querySelectorAll('option[value^="setup-"]')
-      );
-      if (!setupOpts.length) return;
-      setupOpts.sort(function (a, b) {
-        function rank(opt) {
-          if (opt.getAttribute("data-setup-in-work") === "1") return 2;
-          if (opt.getAttribute("data-setup-needs-start") === "1") return 1;
-          return 0;
-        }
-        return rank(b) - rank(a);
-      });
-      setupOpts.forEach(function (opt) {
-        // Сбрасываем возможный устаревший «Уст. N — …» после прошлого сохранения
-        var raw = (opt.textContent || "").replace(/^\s*[●▶]\s*/, "").trim();
-        var stripped = raw.replace(/^Уст\.\s*\d+\s*[—\-–]\s*/i, "").trim();
-        opt.textContent =
-          setupRunPrefix({
-            in_work: opt.getAttribute("data-setup-in-work") === "1",
-            needs_start: opt.getAttribute("data-setup-needs-start") === "1",
-          }) + (stripped || raw || "без названия");
-        select.appendChild(opt);
-      });
-      select.setAttribute(
-        "data-setup-order-ids",
-        setupOpts
-          .map(function (o) {
-            var m = /^setup-(\d+)$/.exec(o.value || "");
-            return m ? m[1] : "";
-          })
-          .filter(Boolean)
-          .join(",")
-      );
-      syncSetupTabIndexesFromSelectOrder();
+    // совместимость со старым именем в обработчиках статусов
+    function reorderSetupSelectInWork(setupOrder) {
+      applySetupOrderToUi(setupOrder);
     }
-    initSetupSelectInWorkOrder();
+
+    (function initSetupOrderPopover() {
+      var wrap = document.getElementById("setup-order-wrap");
+      var gear = document.getElementById("setup-order-gear-btn");
+      var pop = document.getElementById("setup-order-popover");
+      var list = document.getElementById("setup-order-list");
+      if (!wrap || !gear || !pop || !list) return;
+      if (document.body.getAttribute("data-biota-can-edit") !== "1") return;
+      var busy = false;
+
+      function setOpen(on) {
+        if (on) {
+          pop.removeAttribute("hidden");
+          gear.setAttribute("aria-expanded", "true");
+        } else {
+          pop.setAttribute("hidden", "hidden");
+          gear.setAttribute("aria-expanded", "false");
+        }
+      }
+
+      function collectIds() {
+        return Array.prototype.slice
+          .call(list.querySelectorAll(".product-setup-order-item"))
+          .map(function (row) {
+            return row.getAttribute("data-setup-id") || "";
+          })
+          .filter(Boolean);
+      }
+
+      function persistOrder() {
+        var ids = collectIds();
+        if (ids.length < 2 || busy) return;
+        busy = true;
+        wrap.classList.add("is-busy");
+        var fd = new FormData();
+        fd.append("action", "inline_reorder_setups");
+        fd.append("setup_ids", ids.join(","));
+        var cur = getCurrentTabName();
+        var m = /^setup-(\d+)$/.exec(cur || "");
+        if (m) fd.append("setup_id", m[1]);
+        var csrf = getCookie("csrftoken");
+        if (csrf) fd.append("csrfmiddlewaretoken", csrf);
+        fetch(window.location.href, {
+          method: "POST",
+          body: fd,
+          headers: { "X-CSRFToken": csrf, "X-Requested-With": "XMLHttpRequest" },
+          credentials: "same-origin",
+        })
+          .then(function (res) {
+            return res.text().then(function (text) {
+              var data = null;
+              try {
+                data = JSON.parse(text);
+              } catch (parseErr) {
+                throw new Error(
+                  res.ok
+                    ? "Некорректный ответ сервера."
+                    : "Ошибка сервера (" + res.status + "). Обновите страницу."
+                );
+              }
+              if (!res.ok || !data.ok) {
+                throw new Error((data && data.error) || "Не удалось изменить порядок.");
+              }
+              return data;
+            });
+          })
+          .then(function (data) {
+            if (data.setup_order) applySetupOrderToUi(data.setup_order);
+          })
+          .catch(function (err) {
+            alert(err && err.message ? err.message : "Ошибка сети при смене порядка.");
+            window.location.reload();
+          })
+          .finally(function () {
+            busy = false;
+            wrap.classList.remove("is-busy");
+          });
+      }
+
+      gear.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(pop.hasAttribute("hidden"));
+      });
+
+      document.addEventListener("click", function (e) {
+        if (pop.hasAttribute("hidden")) return;
+        if (wrap.contains(e.target)) return;
+        setOpen(false);
+      });
+
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && !pop.hasAttribute("hidden")) setOpen(false);
+      });
+
+      list.addEventListener("click", function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest(".product-setup-order-move") : null;
+        if (!btn || btn.disabled || busy) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var row = btn.closest(".product-setup-order-item");
+        if (!row) return;
+        var dir = btn.getAttribute("data-direction") || "";
+        var rows = Array.prototype.slice.call(list.querySelectorAll(".product-setup-order-item"));
+        var idx = rows.indexOf(row);
+        var swap = dir === "up" ? idx - 1 : idx + 1;
+        if (idx < 0 || swap < 0 || swap >= rows.length) return;
+        if (dir === "up") list.insertBefore(row, rows[swap]);
+        else list.insertBefore(rows[swap], row);
+        rows = Array.prototype.slice.call(list.querySelectorAll(".product-setup-order-item"));
+        rows.forEach(function (r, i) {
+          r.setAttribute("data-setup-sort-index", String(i + 1));
+          var idxEl = r.querySelector(".product-setup-order-item__idx");
+          if (idxEl) idxEl.textContent = String(i + 1);
+          var up = r.querySelector('.product-setup-order-move[data-direction="up"]');
+          var down = r.querySelector('.product-setup-order-move[data-direction="down"]');
+          if (up) up.disabled = i === 0;
+          if (down) down.disabled = i >= rows.length - 1;
+        });
+        persistOrder();
+      });
+    })();
 
     document.addEventListener("click", function (e) {
       var btn = e.target && e.target.closest ? e.target.closest(".product-setup-inwork-toggle") : null;
@@ -6570,9 +6664,7 @@ function saveSetupToolNoteEditor() {
       var VALID = { not_ready: 1, ready: 1, worked: 1 };
 
       function currentTab() {
-        var sel = document.getElementById("setup-tab-select");
-        if (sel && sel.value) return sel.value;
-        return root.getAttribute("data-current-tab") || "";
+        return root.getAttribute("data-current-tab") || getCurrentTabName() || "";
       }
 
       function setupIdFromTab(tabName) {
@@ -6584,8 +6676,8 @@ function saveSetupToolNoteEditor() {
         return document.getElementById("panel-setup-" + setupId);
       }
 
-      function optionForSetup(setupId) {
-        return document.querySelector('#setup-tab-select option[value="setup-' + setupId + '"]');
+      function tabForSetup(setupId) {
+        return document.getElementById("tab-setup-" + setupId);
       }
 
       function barForSetup(setupId) {
@@ -6596,16 +6688,16 @@ function saveSetupToolNoteEditor() {
         var panel = panelForSetup(setupId);
         var fromPanel = panel ? (panel.getAttribute("data-readiness-status") || "") : "";
         if (VALID[fromPanel]) return fromPanel;
-        var opt = optionForSetup(setupId);
-        var fromOpt = opt ? (opt.getAttribute("data-setup-readiness") || "") : "";
-        return VALID[fromOpt] ? fromOpt : "not_ready";
+        var tab = tabForSetup(setupId);
+        var fromTab = tab ? (tab.getAttribute("data-setup-readiness") || "") : "";
+        return VALID[fromTab] ? fromTab : "not_ready";
       }
 
       function writeStatusLocal(setupId, status) {
         var panel = panelForSetup(setupId);
         if (panel) panel.setAttribute("data-readiness-status", status);
-        var opt = optionForSetup(setupId);
-        if (opt) opt.setAttribute("data-setup-readiness", status);
+        var tab = tabForSetup(setupId);
+        if (tab) tab.setAttribute("data-setup-readiness", status);
       }
 
       function applyBarUi(setupId, status, editMode) {

@@ -89,6 +89,12 @@ DEFAULT_ICON_REGISTRY: dict[str, dict] = {
         "kind": "flaticon",
         "value": "fi fi-br-plus",
     },
+    "action.settings": {
+        "label": "Настройки / порядок",
+        "group": "Действия",
+        "kind": "emoji",
+        "value": "⚙",
+    },
     "action.calendar": {
         "label": "Календарь",
         "group": "Действия",

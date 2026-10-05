@@ -95,6 +95,45 @@ class ProductInlineSaveTests(TestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.name, "Наладка после переименования")
 
+    def test_inline_reorder_setups_swaps_sort_order(self):
+        first = self.setup
+        first.sort_order = 0
+        first.name = "Установка 1"
+        first.save(update_fields=["sort_order", "name"])
+        second = ProductSetup.objects.create(
+            product=self.product,
+            name="Установка 2",
+            sort_order=1,
+        )
+        res = self.client.post(
+            f"/products/{self.product.pk}/",
+            {
+                "action": "inline_reorder_setups",
+                "setup_ids": f"{second.pk},{first.pk}",
+                "setup_id": str(second.pk),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(res.status_code, 200, res.content[:500])
+        body = res.json()
+        self.assertTrue(body.get("ok"), body)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(second.sort_order, 0)
+        self.assertEqual(first.sort_order, 1)
+        by_pk = {row["pk"]: row["sort_index"] for row in body.get("setup_order") or []}
+        self.assertEqual(by_pk[second.pk], 1)
+        self.assertEqual(by_pk[first.pk], 2)
+        page = self.client.get(f"/products/{self.product.pk}/?tab=setup-{second.pk}")
+        self.assertEqual(page.status_code, 200)
+        html = page.content.decode()
+        self.assertIn(f'id="tab-setup-{second.pk}"', html)
+        self.assertRegex(html, rf'id="tab-setup-{second.pk}"[^>]*>\s*Уст\.\s*1\s*<')
+        self.assertIn("setup-order-gear-btn", html)
+        self.assertIn("Порядок установок", html)
+        self.assertIn('id="tab-drawing"', html)
+        self.assertNotIn("setup-tab-select", html)
+
     def test_toggle_setup_in_work_reorders_list(self):
         second = ProductSetup.objects.create(
             product=self.product,
@@ -165,7 +204,7 @@ class ProductInlineSaveTests(TestCase):
         self.assertTrue(setup.in_work)
         self.assertFalse(setup.needs_start)
 
-    def test_product_detail_renders_in_work_setups_first(self):
+    def test_product_detail_marks_in_work_setup_on_tab(self):
         second = ProductSetup.objects.create(
             product=self.product,
             name="Установка 2",
@@ -175,8 +214,13 @@ class ProductInlineSaveTests(TestCase):
         res = self.client.get(f"/products/{self.product.pk}/")
         self.assertEqual(res.status_code, 200, res.content[:500])
         html = res.content.decode()
-        first_setup_opt = html.split('option value="setup-')[1].split('"')[0]
-        self.assertEqual(first_setup_opt, str(second.pk))
+        self.assertIn(f'id="tab-setup-{second.pk}"', html)
+        self.assertRegex(
+            html,
+            rf'id="tab-setup-{second.pk}"[^>]*data-setup-in-work="1"',
+        )
+        self.assertIn('id="tab-drawing"', html)
+        self.assertIn("Изделие", html)
 
     def test_products_list_puts_in_work_products_first(self):
         other = create_product_with_defaults()

@@ -490,9 +490,8 @@ const PD = (function () {
     var sideEl = document.getElementById("product-detail-side");
     var activeTab = tabsRoot.querySelector(".product-tab.is-active");
     var tabName = activeTab ? (activeTab.getAttribute("data-tab") || "") : "";
-    if (!tabName) {
-      var setupSelect = document.getElementById("setup-tab-select");
-      tabName = setupSelect ? (setupSelect.value || "") : "";
+    if (!tabName && tabsRoot) {
+      tabName = tabsRoot.getAttribute("data-current-tab") || "";
     }
     if (sideEl) sideEl.setAttribute("data-current-tab", tabName || "");
     var isSetupTab = tabName.indexOf("setup-") === 0;
@@ -506,7 +505,7 @@ const PD = (function () {
     refreshSetupCadButton();
   });
   document.addEventListener("click", function (ev) {
-    var btn = ev.target && ev.target.closest ? ev.target.closest(".product-tab, #setup-tab-select") : null;
+    var btn = ev.target && ev.target.closest ? ev.target.closest(".product-tab") : null;
     if (btn) setTimeout(refreshSetupCadButton, 0);
   });
   if (setupStlBtn && setupStlInput) {

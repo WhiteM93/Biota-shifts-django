@@ -154,6 +154,28 @@ def _resolve_product_setup_from_post(product: Product, post) -> ProductSetup | N
 def _product_setups_qs(product: Product):
     return product.setups.order_by(*SETUP_LIST_ORDER)
 
+
+def _setup_sort_index_map(product: Product) -> dict[int, int]:
+    """Постоянный номер «Уст. N» по sort_order (без приоритета «в работе»)."""
+    rows = product.setups.order_by("sort_order", "id").values_list("pk", flat=True)
+    return {pk: idx for idx, pk in enumerate(rows, start=1)}
+
+
+def _setup_order_payload(product: Product) -> list[dict]:
+    sort_index = _setup_sort_index_map(product)
+    return [
+        {
+            "pk": s.pk,
+            "tab_slug": f"setup-{s.pk}",
+            "name": (s.name or "").strip() or "без названия",
+            "in_work": s.in_work,
+            "needs_start": s.needs_start,
+            "readiness_status": s.readiness_status,
+            "sort_index": sort_index.get(s.pk, 0),
+        }
+        for s in _product_setups_qs(product)
+    ]
+
 # Ограничение вывода ПП в карточке (страница)
 MAX_PROGRAM_DISPLAY_BYTES = 800_000
 NAME_SUGGESTION_STOP_WORDS = {
@@ -2139,24 +2161,71 @@ def product_detail_view(request, pk: int):
                 if want_on:
                     setup.in_work = False
             setup.save(update_fields=["in_work", "needs_start", "updated_at"])
-            setups = list(_product_setups_qs(product))
             return JsonResponse(
                 {
                     "ok": True,
                     "setup_id": setup.pk,
                     "in_work": setup.in_work,
                     "needs_start": setup.needs_start,
-                    "setup_order": [
-                        {
-                            "pk": s.pk,
-                            "tab_slug": f"setup-{s.pk}",
-                            "name": (s.name or "").strip() or "без названия",
-                            "in_work": s.in_work,
-                            "needs_start": s.needs_start,
-                            "readiness_status": s.readiness_status,
-                        }
-                        for s in setups
-                    ],
+                    "setup_order": _setup_order_payload(product),
+                }
+            )
+
+        if action == "inline_reorder_setups":
+            if not request_can_edit(request):
+                return JsonResponse(
+                    {"ok": False, "error": "Порядок установок может менять только руководитель."},
+                    status=403,
+                )
+            ordered = list(product.setups.order_by("sort_order", "id"))
+            by_pk = {s.pk: s for s in ordered}
+            ids_raw = (request.POST.get("setup_ids") or "").strip()
+            setup_id_raw = (request.POST.get("setup_id") or "").strip()
+            setup_id = int(setup_id_raw) if setup_id_raw.isdigit() else 0
+            direction = (request.POST.get("direction") or "").strip().lower()
+            new_order = None
+            if ids_raw:
+                seen: list[int] = []
+                for part in ids_raw.split(","):
+                    part = part.strip()
+                    if not part.isdigit():
+                        continue
+                    pk = int(part)
+                    if pk in by_pk and pk not in seen:
+                        seen.append(pk)
+                if len(seen) != len(ordered):
+                    return JsonResponse(
+                        {"ok": False, "error": "Неполный список установок для порядка."},
+                        status=400,
+                    )
+                new_order = [by_pk[pk] for pk in seen]
+                if not setup_id and seen:
+                    setup_id = seen[0]
+            elif direction in ("up", "down") and setup_id:
+                idx = next((i for i, s in enumerate(ordered) if s.pk == setup_id), -1)
+                if idx < 0:
+                    return JsonResponse({"ok": False, "error": "Установка не найдена."}, status=404)
+                swap_with = idx - 1 if direction == "up" else idx + 1
+                if 0 <= swap_with < len(ordered):
+                    ordered[idx], ordered[swap_with] = ordered[swap_with], ordered[idx]
+                    new_order = ordered
+            else:
+                return JsonResponse(
+                    {"ok": False, "error": "Укажите новый порядок установок."},
+                    status=400,
+                )
+            if new_order is not None:
+                with transaction.atomic():
+                    for n, s in enumerate(new_order):
+                        if s.sort_order != n:
+                            s.sort_order = n
+                            s.save(update_fields=["sort_order", "updated_at"])
+                record_product_editor(product, biota_user(request))
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "setup_id": setup_id,
+                    "setup_order": _setup_order_payload(product),
                 }
             )
 
@@ -2260,8 +2329,10 @@ def product_detail_view(request, pk: int):
     product.drawing_file_list = list(_product_drawing_files_qs(product))
     product.has_any_drawing = bool(product.drawing_file_list)
     setups = list(_product_setups_qs(product).prefetch_related("tools", "program_files"))
+    sort_index_by_pk = _setup_sort_index_map(product)
     for setup in setups:
         setup.tab_slug = f"setup-{setup.pk}"
+        setup.sort_index = sort_index_by_pk.get(setup.pk, 0)
         setup.side_notes = list(
             ProductNote.objects.filter(product=product, setup=setup).order_by("created_at", "id")
         )

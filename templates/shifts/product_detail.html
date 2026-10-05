@@ -104,27 +104,38 @@
 <div class="product-detail-grid{% if tab_default == 'drawing' %} has-meta-column{% endif %}"{% if setups %} data-product-has-setups="1"{% endif %}>
   <div class="product-detail-main">
 
-  <div class="product-tabs" id="product-tabs" {% if setups %}data-inline-setup-ids="{% for setup in setups %}{{ setup.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"{% endif %} {% if product.program_file %}data-product-program-url="{{ product.program_file.url }}" data-product-program-filename="{{ product.program_filename|escape }}"{% endif %}>
+  <div class="product-tabs" id="product-tabs" data-initial-tab="{{ tab_default }}" {% if setups %}data-inline-setup-ids="{% for setup in setups %}{{ setup.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"{% endif %} {% if product.program_file %}data-product-program-url="{{ product.program_file.url }}" data-product-program-filename="{{ product.program_filename|escape }}"{% endif %}>
     <div class="product-tabs-nav" role="tablist" aria-label="Документация и наладка">
       <div class="product-tabs-nav__main">
       {% if setups %}
       {% if biota_can_edit %}
+      <div class="product-setup-order-wrap" id="setup-order-wrap">
+        <button type="button" class="btn btn-ghost product-setup-order-gear" id="setup-order-gear-btn" aria-expanded="false" aria-controls="setup-order-popover" title="Порядок установок" aria-label="Порядок установок">
+          {% biota_icon "action.settings" "ui-icon" %}
+        </button>
+        <div class="product-setup-order-popover" id="setup-order-popover" hidden role="dialog" aria-label="Порядок установок">
+          <div class="product-setup-order-popover__title">Порядок установок</div>
+          <ul class="product-setup-order-list" id="setup-order-list">
+            {% for setup in setups|dictsort:"sort_index" %}
+            <li class="product-setup-order-item" data-setup-id="{{ setup.pk }}" data-setup-sort-index="{{ setup.sort_index }}">
+              <span class="product-setup-order-item__idx">{{ setup.sort_index }}</span>
+              <span class="product-setup-order-item__name">{% if setup.name %}{{ setup.name }}{% else %}без названия{% endif %}</span>
+              <span class="product-setup-order-item__actions">
+                <button type="button" class="btn btn-ghost product-setup-order-move" data-direction="up" title="Выше" aria-label="Выше" {% if forloop.first %}disabled{% endif %}>↑</button>
+                <button type="button" class="btn btn-ghost product-setup-order-move" data-direction="down" title="Ниже" aria-label="Ниже" {% if forloop.last %}disabled{% endif %}>↓</button>
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
       <form method="post" action="{{ product_self_url }}" class="product-add-setup-inline" style="display:inline;">
         {% csrf_token %}
         <input type="hidden" name="action" value="create_setup" />
         <button type="submit" class="btn btn-ghost product-add-setup-btn" title="Новая установка" aria-label="Новая установка">{% biota_icon "action.plus" "ui-icon" %}</button>
       </form>
       {% endif %}
-      <div class="product-setup-select-inline">
-      <label class="field product-setup-select-wrap">
-        <select id="setup-tab-select" data-setup-order-ids="{% for setup in setups %}{{ setup.pk }}{% if not forloop.last %},{% endif %}{% endfor %}">
-          <option value="drawing" {% if tab_default == 'drawing' %}selected{% endif %}>Изделие</option>
-          {% for setup in setups %}
-          <option value="{{ setup.tab_slug }}" data-setup-option-for="{{ setup.tab_slug }}" data-setup-in-work="{% if setup.in_work %}1{% else %}0{% endif %}" data-setup-needs-start="{% if setup.needs_start %}1{% else %}0{% endif %}" data-setup-readiness="{{ setup.readiness_status }}" {% if tab_default == setup.tab_slug %}selected{% endif %}>{% if setup.in_work %}● {% elif setup.needs_start %}▶ {% endif %}{% if setup.name %}{{ setup.name }}{% else %}без названия{% endif %}</option>
-          {% endfor %}
-        </select>
-      </label>
-      </div>
+      <button type="button" class="product-tab{% if tab_default == 'drawing' %} is-active{% endif %}" role="tab" data-tab="drawing" id="tab-drawing" aria-selected="{% if tab_default == 'drawing' %}true{% else %}false{% endif %}">Изделие</button>
       {% elif biota_can_edit %}
       <form method="post" action="{{ product_self_url }}" class="product-add-setup-first" style="display:inline;">
         {% csrf_token %}
@@ -134,9 +145,11 @@
           <span>Установка</span>
         </button>
       </form>
+      {% else %}
+      <button type="button" class="product-tab{% if tab_default == 'drawing' %} is-active{% endif %}" role="tab" data-tab="drawing" id="tab-drawing" aria-selected="{% if tab_default == 'drawing' %}true{% else %}false{% endif %}">Изделие</button>
       {% endif %}
-      {% for setup in setups %}
-      <button type="button" class="product-tab{% if tab_default == setup.tab_slug %} is-active{% endif %}" role="tab" data-tab="{{ setup.tab_slug }}" data-setup-index="{{ forloop.counter }}" id="tab-setup-{{ setup.pk }}" aria-controls="panel-setup-{{ setup.pk }}" aria-selected="{% if tab_default == setup.tab_slug %}true{% else %}false{% endif %}" {% if setup.has_any_program %}data-program-url="{{ setup.primary_program_url }}" data-program-filename="{{ setup.primary_program_filename|escape }}"{% endif %} data-setup-name="{{ setup.name|escape }}" data-setup-edit-url="{% url 'product_setup_edit' product.pk setup.pk %}" hidden>Уст. {{ forloop.counter }}</button>
+      {% for setup in setups|dictsort:"sort_index" %}
+      <button type="button" class="product-tab{% if tab_default == setup.tab_slug %} is-active{% endif %}" role="tab" data-tab="{{ setup.tab_slug }}" data-setup-index="{{ setup.sort_index }}" id="tab-setup-{{ setup.pk }}" aria-controls="panel-setup-{{ setup.pk }}" aria-selected="{% if tab_default == setup.tab_slug %}true{% else %}false{% endif %}" {% if setup.has_any_program %}data-program-url="{{ setup.primary_program_url }}" data-program-filename="{{ setup.primary_program_filename|escape }}"{% endif %} data-setup-name="{{ setup.name|escape }}" data-setup-edit-url="{% url 'product_setup_edit' product.pk setup.pk %}" data-setup-in-work="{% if setup.in_work %}1{% else %}0{% endif %}" data-setup-needs-start="{% if setup.needs_start %}1{% else %}0{% endif %}" data-setup-readiness="{{ setup.readiness_status }}" data-setup-sort-index="{{ setup.sort_index }}">Уст. {{ setup.sort_index }}</button>
       {% endfor %}
       <div class="product-setup-norm-badge" id="setup-norm-badge" hidden title="">
         <span class="product-setup-norm-badge__label">Т<sub>шт</sub></span>
@@ -638,7 +651,7 @@
           {% for setup in setups %}
           <div class="product-setup-norms-row{% if not setup.latest_piece_norm %} is-empty{% endif %}" data-setup-id="{{ setup.pk }}">
             <button type="button" class="product-setup-norms-row__name js-goto-setup-tab" data-tab="{{ setup.tab_slug }}" title="Открыть установку">
-              {% if setup.name %}{{ setup.name }}{% else %}Установка {{ forloop.counter }}{% endif %}
+              {% if setup.name %}{{ setup.name }}{% else %}Установка {{ setup.sort_index }}{% endif %}
             </button>
             {% if setup.latest_piece_norm %}
             <span class="product-setup-norms-row__norm" title="{{ setup.latest_piece_norm.comment|default:''|escape }}">Т<sub>шт</sub> {{ setup.latest_piece_norm.tsht_norm|floatformat:3 }}</span>

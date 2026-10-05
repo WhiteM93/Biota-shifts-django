@@ -32,6 +32,7 @@ HUGICONS_STROKE_ROUNDED: dict[str, str] = {
     "action.camera": "camera-01",
     "action.copy": "copy-01",
     "action.plus": "plus-sign-circle",
+    "action.settings": "settings-01",
     "action.calendar": "calendar-03",
     "action.picture": "image-01",
     "nav.inventory": "package-01",
