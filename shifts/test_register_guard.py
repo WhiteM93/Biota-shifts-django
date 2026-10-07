@@ -53,19 +53,23 @@ class RegisterGuardUnitTests(SimpleTestCase):
         rf = RequestFactory()
         req = rf.post("/accounts/register/", {"website": "http://spam"})
         req.session = {SESSION_ISSUED_AT: time.time() - 10}
-        self.assertEqual(check_bot_traps(req), GENERIC_FAIL)
+        msg, reason = check_bot_traps(req)
+        self.assertEqual(msg, GENERIC_FAIL)
+        self.assertEqual(reason, "honeypot")
 
     def test_too_fast_blocks(self):
         rf = RequestFactory()
         req = rf.post("/accounts/register/", {})
         req.session = {SESSION_ISSUED_AT: time.time()}
-        self.assertEqual(check_bot_traps(req), GENERIC_FAIL)
+        msg, reason = check_bot_traps(req)
+        self.assertEqual(msg, GENERIC_FAIL)
+        self.assertEqual(reason, "timing")
 
     def test_valid_timing_ok(self):
         rf = RequestFactory()
         req = rf.post("/accounts/register/", {})
         req.session = {SESSION_ISSUED_AT: time.time() - 5}
-        self.assertIsNone(check_bot_traps(req))
+        self.assertEqual(check_bot_traps(req), (None, None))
 
     def test_validate_register_post_invite_and_disposable(self):
         rf = RequestFactory()

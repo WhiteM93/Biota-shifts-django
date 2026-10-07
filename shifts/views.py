@@ -110,7 +110,9 @@ def _register_form_context(*, err: str, form_values: dict | None = None) -> dict
 
 @require_http_methods(["GET", "HEAD", "POST"])
 def register_view(request):
-    from .register_guard import mark_form_issued, registration_is_open, validate_register_post
+    from .rate_limit import get_client_ip
+    from .register_guard import mark_form_issued, registration_is_open, validate_register_post_detailed
+    from .register_security_log import append_register_event
 
     err = ""
     form_values: dict[str, str] = {}
@@ -121,14 +123,39 @@ def register_view(request):
         p1 = request.POST.get("password") or ""
         p2 = request.POST.get("password2") or ""
         form_values = {"username": username, "email": email, "invite": invite}
-        guard_err = validate_register_post(request, invite_posted=invite, email=email)
+        ip = get_client_ip(request)
+        ua = (request.META.get("HTTP_USER_AGENT") or "")[:160]
+        guard_err, guard_reason = validate_register_post_detailed(
+            request, invite_posted=invite, email=email
+        )
         if guard_err:
             err = guard_err
+            append_register_event(
+                reason=guard_reason or "closed",
+                ip=ip,
+                username=username,
+                email=email,
+                user_agent=ua,
+            )
         elif p1 != p2:
             err = "Пароли не совпадают"
+            append_register_event(
+                reason="password_mismatch",
+                ip=ip,
+                username=username,
+                email=email,
+                user_agent=ua,
+            )
         else:
             ok, msg = _register_user(username, p1, email=email, require_email=True)
             if ok:
+                append_register_event(
+                    reason="success",
+                    ip=ip,
+                    username=username,
+                    email=email,
+                    user_agent=ua,
+                )
                 sent_ok, send_err, _debug_link = send_verification_email(username, request=request)
                 request.session["register_pending_user"] = username
                 request.session["register_email_sent"] = sent_ok
@@ -137,6 +164,14 @@ def register_view(request):
                 request.session.pop("register_form_issued_at", None)
                 return redirect("register_pending")
             err = msg
+            append_register_event(
+                reason="register_fail",
+                ip=ip,
+                username=username,
+                email=email,
+                detail=msg,
+                user_agent=ua,
+            )
     if registration_is_open() and (request.method != "POST" or err):
         mark_form_issued(request)
     return render(

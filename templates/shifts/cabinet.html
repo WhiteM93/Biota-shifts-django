@@ -35,6 +35,94 @@
   </div>
   {% endif %}
 
+  {% if register_attack %}
+  <section class="cabinet-section cabinet-bot-watch{% if register_attack.alert %} cabinet-bot-watch--alert{% endif %}" id="cabinet-bot-watch">
+    <div class="cabinet-section__head">
+      <h2>Атаки на регистрацию</h2>
+      <p class="cabinet-section__lead">Журнал отказов и созданных заявок: honeypot, неверный invite, rate limit, одноразовые email.</p>
+    </div>
+    <div class="cabinet-section__body">
+      {% if register_attack.alert %}
+      <p class="cabinet-bot-watch__alert" role="alert">{{ register_attack.alert_text }}</p>
+      {% endif %}
+      <div class="cabinet-bot-watch__stats">
+        <div class="cabinet-bot-stat">
+          <span class="cabinet-bot-stat__label">1 час</span>
+          <strong>{{ register_attack.stats_1h.blocked }}</strong>
+          <span class="muted">блок / {{ register_attack.stats_1h.success }} создано</span>
+        </div>
+        <div class="cabinet-bot-stat">
+          <span class="cabinet-bot-stat__label">24 часа</span>
+          <strong>{{ register_attack.stats_24h.blocked }}</strong>
+          <span class="muted">блок / {{ register_attack.stats_24h.success }} создано</span>
+        </div>
+        <div class="cabinet-bot-stat">
+          <span class="cabinet-bot-stat__label">7 дней</span>
+          <strong>{{ register_attack.stats_7d.blocked }}</strong>
+          <span class="muted">блок / {{ register_attack.stats_7d.success }} создано</span>
+        </div>
+      </div>
+
+      {% if register_attack.stats_24h.by_reason %}
+      <h3 class="cabinet-bot-watch__sub">Причины за 24 часа</h3>
+      <ul class="cabinet-bot-reasons">
+        {% for row in register_attack.stats_24h.by_reason %}
+        <li><span>{{ row.label }}</span><strong>{{ row.count }}</strong></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if register_attack.stats_24h.top_ips %}
+      <h3 class="cabinet-bot-watch__sub">Топ IP за 24 часа (блокировки)</h3>
+      <ul class="cabinet-bot-ips">
+        {% for row in register_attack.stats_24h.top_ips %}
+        <li><code>{{ row.ip }}</code><strong>{{ row.count }}</strong></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if register_attack.recent %}
+      <h3 class="cabinet-bot-watch__sub">Последние события</h3>
+      <div class="table-wrap cabinet-bot-table-wrap">
+        <table class="data-grid cabinet-bot-table">
+          <thead>
+            <tr>
+              <th>Время</th>
+              <th>IP</th>
+              <th>Событие</th>
+              <th>Логин</th>
+              <th>Домен email</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ev in register_attack.recent %}
+            <tr class="{% if ev.is_blocked %}is-blocked{% else %}is-ok{% endif %}">
+              <td>{{ ev.ts }}</td>
+              <td><code>{{ ev.ip }}</code></td>
+              <td>{{ ev.label }}</td>
+              <td>{% if ev.username %}<code>{{ ev.username }}</code>{% else %}—{% endif %}</td>
+              <td>{% if ev.email_domain %}{{ ev.email_domain }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="muted">Пока нет записей — появятся при попытках регистрации и срабатывании лимитов.</p>
+      {% endif %}
+
+      {% if register_attack.log_exists %}
+      <form method="post" action="" class="cabinet-bot-watch__clear"
+            onsubmit="return confirm('Очистить журнал атак на регистрацию?');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="admin_clear_register_security_log">
+        <button type="submit" class="btn btn-danger">Очистить журнал</button>
+      </form>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
   <nav class="cabinet-quick-grid" aria-label="Быстрые действия">
     <a class="cabinet-quick-card cabinet-quick-card--django" href="/admin/">
       <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "cabinet.django_admin" %}</span>
@@ -230,6 +318,10 @@
       {% if not priv_users %}
       <p class="muted">Нет пользователей.</p>
       {% else %}
+      <form method="post" action="" id="cab-priv-bulk-delete" class="cab-priv-bulk-delete" hidden>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="admin_delete_users">
+      </form>
       <form method="post" action="" id="cab-priv-form" class="cab-priv" data-priv-saved="{% if request.GET.priv_saved == '1' %}1{% else %}0{% endif %}">
         {% csrf_token %}
         <input type="hidden" name="action" value="admin_privileges">
@@ -239,21 +331,45 @@
 
         <aside class="cab-priv__rail" aria-label="Пользователи">
           <div class="cab-priv__rail-head">Аккаунты</div>
-          <nav class="cab-priv__users" id="cab-priv-user-jump">
+          <div class="cab-priv__bulk-bar">
+            <label class="cab-priv__select-all">
+              <input type="checkbox" class="js-priv-select-all" form="cab-priv-bulk-delete">
+              <span>Все</span>
+            </label>
+            <button
+              type="submit"
+              form="cab-priv-bulk-delete"
+              class="btn btn-danger btn-sm js-priv-delete-selected"
+              disabled
+              onclick="return confirm('Удалить выбранные аккаунты с доступом? Восстановить будет нельзя.');"
+            >Удалить выбранные</button>
+          </div>
+          <nav class="cab-priv__users js-priv-user-list" id="cab-priv-user-jump">
             {% for row in priv_user_rows %}
-            <a
-              class="cab-priv__user{% if row.login == priv_selected %} is-active{% endif %}"
-              href="?priv_user={{ row.login|urlencode }}#cabinet-privileges"
-              data-user="{{ row.login }}"
-              title="{{ row.title }}"
-            >
-              {% if row.label %}
-              <span class="cab-priv__user-name">{{ row.label }}</span>
-              <span class="cab-priv__user-login">{{ row.login }}</span>
-              {% else %}
-              <span class="cab-priv__user-login cab-priv__user-login--only">{{ row.login }}</span>
-              {% endif %}
-            </a>
+            <div class="cab-priv__user-row{% if row.login == priv_selected %} is-active{% endif %}">
+              <label class="cab-priv__check" title="Выбрать для удаления">
+                <input
+                  type="checkbox"
+                  class="js-priv-check"
+                  form="cab-priv-bulk-delete"
+                  name="delete_login"
+                  value="{{ row.login }}"
+                >
+              </label>
+              <a
+                class="cab-priv__user"
+                href="?priv_user={{ row.login|urlencode }}#cabinet-privileges"
+                data-user="{{ row.login }}"
+                title="{{ row.title }}"
+              >
+                {% if row.label %}
+                <span class="cab-priv__user-name">{{ row.label }}</span>
+                <span class="cab-priv__user-login">{{ row.login }}</span>
+                {% else %}
+                <span class="cab-priv__user-login cab-priv__user-login--only">{{ row.login }}</span>
+                {% endif %}
+              </a>
+            </div>
             {% endfor %}
           </nav>
         </aside>
@@ -623,6 +739,31 @@
           window.history.replaceState({}, "", next);
         }
       }
+    })();
+
+    (function () {
+      var list = document.querySelector(".js-priv-user-list");
+      var all = document.querySelector(".js-priv-select-all");
+      var btn = document.querySelector(".js-priv-delete-selected");
+      if (!list || !all || !btn) return;
+      function checks() { return list.querySelectorAll(".js-priv-check"); }
+      function sync() {
+        var nodes = checks();
+        var n = 0;
+        nodes.forEach(function (c) { if (c.checked) n += 1; });
+        btn.disabled = n === 0;
+        btn.textContent = n ? ("Удалить выбранные (" + n + ")") : "Удалить выбранные";
+        all.checked = nodes.length > 0 && n === nodes.length;
+        all.indeterminate = n > 0 && n < nodes.length;
+      }
+      all.addEventListener("change", function () {
+        checks().forEach(function (c) { c.checked = all.checked; });
+        sync();
+      });
+      list.addEventListener("change", function (e) {
+        if (e.target && e.target.classList.contains("js-priv-check")) sync();
+      });
+      sync();
     })();
   </script>
 {% else %}

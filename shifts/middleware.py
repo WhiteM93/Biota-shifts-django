@@ -43,6 +43,26 @@ class AuthRateLimitMiddleware:
                 global_day_window=getattr(settings, "BIOTA_REGISTER_RATELIMIT_GLOBAL_DAY_WINDOW", 86400),
             )
             if result.exceeded:
+                try:
+                    from shifts.register_security_log import append_register_event
+
+                    reason = "rate_limit"
+                    key = (result.limit_key or "").strip()
+                    if key == "register_burst":
+                        reason = "rate_limit_burst"
+                    elif key == "register_post":
+                        reason = "rate_limit_post"
+                    elif key == "register_global_day":
+                        reason = "rate_limit_global"
+                    append_register_event(
+                        reason=reason,
+                        ip=client_id,
+                        detail=key,
+                        user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:160],
+                        method=request.method or "GET",
+                    )
+                except Exception:
+                    pass
                 return _rate_limit_response(
                     "Слишком много запросов к странице регистрации. Попробуйте позже.",
                     result.retry_after,

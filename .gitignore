@@ -15,6 +15,7 @@ secrets/
 .biota_account_prefs.json
 .biota_notification_settings.json
 .biota_visual_warehouse_settings.json
+.biota_register_security.jsonl
 # Локальное демо графика (manage.py create_graph_demo_local)
 local/
 FETCH_HEAD

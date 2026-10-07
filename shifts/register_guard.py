@@ -128,37 +128,46 @@ def invite_code_ok(posted: str) -> bool:
         return False
 
 
-def check_bot_traps(request) -> str | None:
+def check_bot_traps(request) -> tuple[str | None, str | None]:
     """
-    None — ок; иначе сообщение об ошибке (нейтральное для honeypot/тайминга).
+    (сообщение, reason) — None/None если ок.
+    reason: honeypot | timing
     """
     if (request.POST.get(HONEYPOT_FIELD) or "").strip():
-        return GENERIC_FAIL
+        return GENERIC_FAIL, "honeypot"
 
     issued = request.session.get(SESSION_ISSUED_AT)
     try:
         issued_f = float(issued)
     except (TypeError, ValueError):
-        return GENERIC_FAIL
+        return GENERIC_FAIL, "timing"
 
     elapsed = time.time() - issued_f
     if elapsed < MIN_FILL_SECONDS or elapsed > MAX_FILL_SECONDS:
-        return GENERIC_FAIL
-    return None
+        return GENERIC_FAIL, "timing"
+    return None, None
 
 
 def validate_register_post(request, *, invite_posted: str, email: str) -> str | None:
     """Проверки до _register_user. None — можно продолжать."""
+    msg, _reason = validate_register_post_detailed(request, invite_posted=invite_posted, email=email)
+    return msg
+
+
+def validate_register_post_detailed(
+    request, *, invite_posted: str, email: str
+) -> tuple[str | None, str | None]:
+    """(сообщение|None, reason|None). reason для журнала безопасности."""
     if not registration_is_open():
-        return CLOSED_MSG
-    trap = check_bot_traps(request)
-    if trap:
-        return trap
+        return CLOSED_MSG, "closed"
+    trap_msg, trap_reason = check_bot_traps(request)
+    if trap_msg:
+        return trap_msg, trap_reason
     if not invite_code_ok(invite_posted):
-        return INVITE_FAIL
+        return INVITE_FAIL, "invite"
     if is_disposable_email(email):
-        return DISPOSABLE_FAIL
-    return None
+        return DISPOSABLE_FAIL, "disposable"
+    return None, None
 
 
 def register_page_context_extra() -> dict[str, Any]:

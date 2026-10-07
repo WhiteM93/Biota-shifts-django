@@ -149,6 +149,14 @@ def cabinet_view(request):
                 else:
                     messages.info(request, "Нет учётных записей, ожидающих подтверждения.")
                 return redirect("cabinet")
+            if action == "admin_clear_register_security_log":
+                from shifts.register_security_log import clear_register_security_log
+
+                if clear_register_security_log():
+                    messages.success(request, "Журнал атак на регистрацию очищен.")
+                else:
+                    messages.error(request, "Не удалось очистить журнал.")
+                return redirect(f"{reverse('cabinet')}#cabinet-bot-watch")
             if action == "admin_user_names":
                 target = (request.POST.get("names_login") or "").strip()
                 first = (request.POST.get("first_name") or "").strip()
@@ -184,7 +192,7 @@ def cabinet_view(request):
                     messages.error(request, "; ".join(errs[:5]))
                 elif not n:
                     messages.warning(request, "Не выбран ни один пользователь.")
-                return redirect("cabinet")
+                return redirect(f"{reverse('cabinet')}#cabinet-privileges")
         else:
             if action == "profile":
                 first = (request.POST.get("first_name") or "").strip()
@@ -232,6 +240,9 @@ def cabinet_view(request):
             _purge_pending_registrations(all_pending=False, max_age_days=max_age)
 
         ctx["system_health"] = collect_system_health()
+        from shifts.register_security_log import build_register_attack_dashboard
+
+        ctx["register_attack"] = build_register_attack_dashboard()
         priv_store = _load_users_store()
         ctx["pending_registrations"] = sorted(
             [
