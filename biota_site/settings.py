@@ -201,7 +201,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # Увеличивайте после правок CSS/JS, чтобы браузер и nginx не отдавали старые файлы.
-STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "560").strip() or "560"
+STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "561").strip() or "561"
 
 # YandexGPT (чат склада / анализ наладок). Ключи — в .env.secrets.
 # Модели: yandexgpt-5-lite (дешевле), yandexgpt-5.1 / yandexgpt-5-pro (дороже).

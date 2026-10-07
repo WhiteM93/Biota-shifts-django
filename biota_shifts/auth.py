@@ -391,6 +391,41 @@ def _delete_registered_user(username: str) -> tuple[bool, str]:
     return True, ""
 
 
+def _delete_registered_users(usernames: list[str] | tuple[str, ...] | None) -> tuple[int, list[str], list[str]]:
+    """Массовое удаление. Возвращает (удалено, логины_ok, ошибки)."""
+    raw = usernames or []
+    wanted: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        u = str(item or "").strip()
+        if not u:
+            continue
+        key = u.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        wanted.append(u)
+    if not wanted:
+        return 0, [], ["Не выбран ни один пользователь."]
+
+    store = _load_users_store()
+    removed: list[str] = []
+    errors: list[str] = []
+    for u in wanted:
+        if _is_admin(u):
+            errors.append(f"{u}: нельзя удалить admin")
+            continue
+        key = _store_key_for_username(u, store)
+        if not key:
+            errors.append(f"{u}: не найден")
+            continue
+        del store[key]
+        removed.append(key)
+    if removed:
+        _save_users_store(store)
+    return len(removed), removed, errors
+
+
 def _pending_created_at(rec: dict) -> datetime | None:
     raw = (rec.get("created_at") or "").strip()
     if not raw:

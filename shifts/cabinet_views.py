@@ -26,6 +26,7 @@ from biota_shifts.auth import (
     _approve_registration,
     _change_password_registered,
     _delete_registered_user,
+    _delete_registered_users,
     _purge_pending_registrations,
     _distinct_area_tokens,
     _is_admin,
@@ -171,6 +172,18 @@ def cabinet_view(request):
                     messages.success(request, f"Учётная запись удалена: {target}")
                 else:
                     messages.error(request, err)
+                return redirect("cabinet")
+            if action == "admin_delete_users":
+                targets = request.POST.getlist("delete_login")
+                n, removed, errs = _delete_registered_users(targets)
+                if n:
+                    preview = ", ".join(removed[:8])
+                    more = f" и ещё {n - 8}" if n > 8 else ""
+                    messages.success(request, f"Удалено учёток: {n} ({preview}{more}).")
+                if errs:
+                    messages.error(request, "; ".join(errs[:5]))
+                elif not n:
+                    messages.warning(request, "Не выбран ни один пользователь.")
                 return redirect("cabinet")
         else:
             if action == "profile":

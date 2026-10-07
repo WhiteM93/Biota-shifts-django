@@ -265,8 +265,40 @@ a.cabinet-quick-card:hover {
 }
 
 /* Ожидающие регистрации */
-.pending-reg-purge {
+.pending-reg-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
   margin: 0 0 12px;
+}
+
+.pending-reg-purge {
+  margin: 0;
+  display: inline-flex;
+}
+
+.pending-reg-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+}
+
+.pending-reg-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 220px;
+  cursor: pointer;
+}
+
+.pending-reg-check input {
+  margin-top: 4px;
+  flex: 0 0 auto;
 }
 
 .pending-reg-list {

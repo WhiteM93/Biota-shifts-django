@@ -167,6 +167,30 @@ class PurgePendingTests(SimpleTestCase):
                 self.assertNotIn("freshbot", store2)
                 self.assertIn("okuser", store2)
 
+    def test_delete_registered_users_batch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "users.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "users": {
+                            "a1": {"approved": False},
+                            "a2": {"approved": False},
+                            "keep": {"approved": True},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.object(biota_auth, "USERS_STORE_PATH", path):
+                biota_auth.invalidate_users_store_cache()
+                n, removed, errs = biota_auth._delete_registered_users(["a1", "a2", "missing"])
+                self.assertEqual(n, 2)
+                self.assertEqual(sorted(removed), ["a1", "a2"])
+                self.assertTrue(any("missing" in e for e in errs))
+                store = biota_auth._load_users_store()
+                self.assertEqual(set(store.keys()), {"keep"})
+
 
 @override_settings(
     BIOTA_REGISTER_INVITE_CODE="",

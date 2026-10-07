@@ -124,28 +124,54 @@
     </div>
     <div class="cabinet-section__body">
       {% if pending_registrations %}
-      <form method="post" action="" class="pending-reg-purge"
-            onsubmit="return confirm('Удалить все ожидающие регистрации? Восстановить будет нельзя.');">
+      <form method="post" action="" id="pending-bulk-delete" class="pending-reg-bulk" hidden>
         {% csrf_token %}
-        <input type="hidden" name="action" value="admin_purge_pending_registrations">
-        <button type="submit" class="btn btn-danger">Удалить все ожидающие</button>
+        <input type="hidden" name="action" value="admin_delete_users">
       </form>
-      <ul class="pending-reg-list">
+      <div class="pending-reg-toolbar">
+        <label class="pending-reg-select-all">
+          <input type="checkbox" class="js-pending-select-all" form="pending-bulk-delete">
+          <span>Выбрать все</span>
+        </label>
+        <button
+          type="submit"
+          form="pending-bulk-delete"
+          class="btn btn-danger js-pending-delete-selected"
+          disabled
+          onclick="return confirm('Удалить выбранные учётные записи? Восстановить будет нельзя.');"
+        >Удалить выбранные</button>
+        <form method="post" action="" class="pending-reg-purge"
+              onsubmit="return confirm('Удалить все ожидающие регистрации? Восстановить будет нельзя.');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="admin_purge_pending_registrations">
+          <button type="submit" class="btn btn-danger">Удалить все</button>
+        </form>
+      </div>
+      <ul class="pending-reg-list js-pending-reg-list">
         {% for item in pending_registrations %}
         <li class="pending-reg-item">
-          <span class="pending-reg-item__who">
-            <code>{{ item.login }}</code>
-            {% if item.label and item.label != item.login %}
-            <span class="pending-reg-item__name">{{ item.label }}</span>
-            {% endif %}
-            {% if item.email %}<span class="muted pending-reg-item__email">{{ item.email }}</span>{% endif %}
-            {% if item.email and not item.email_verified %}
-            <span class="pending-reg-badge pending-reg-badge--warn">email не подтверждён</span>
-            {% elif item.email and item.email_verified %}
-            <span class="pending-reg-badge pending-reg-badge--ok">email подтверждён</span>
-            {% endif %}
-            <span class="pending-reg-badge">ожидает одобрения админа</span>
-          </span>
+          <label class="pending-reg-check">
+            <input
+              type="checkbox"
+              class="js-pending-check"
+              form="pending-bulk-delete"
+              name="delete_login"
+              value="{{ item.login }}"
+            >
+            <span class="pending-reg-item__who">
+              <code>{{ item.login }}</code>
+              {% if item.label and item.label != item.login %}
+              <span class="pending-reg-item__name">{{ item.label }}</span>
+              {% endif %}
+              {% if item.email %}<span class="muted pending-reg-item__email">{{ item.email }}</span>{% endif %}
+              {% if item.email and not item.email_verified %}
+              <span class="pending-reg-badge pending-reg-badge--warn">email не подтверждён</span>
+              {% elif item.email and item.email_verified %}
+              <span class="pending-reg-badge pending-reg-badge--ok">email подтверждён</span>
+              {% endif %}
+              <span class="pending-reg-badge">ожидает одобрения админа</span>
+            </span>
+          </label>
           <div class="pending-reg-actions">
             <form method="post" action="" class="pending-reg-form">
               {% csrf_token %}
@@ -164,6 +190,32 @@
         </li>
         {% endfor %}
       </ul>
+      <script>
+      (function () {
+        var list = document.querySelector(".js-pending-reg-list");
+        var all = document.querySelector(".js-pending-select-all");
+        var btn = document.querySelector(".js-pending-delete-selected");
+        if (!list || !all || !btn) return;
+        function checks() { return list.querySelectorAll(".js-pending-check"); }
+        function sync() {
+          var nodes = checks();
+          var n = 0;
+          nodes.forEach(function (c) { if (c.checked) n += 1; });
+          btn.disabled = n === 0;
+          btn.textContent = n ? ("Удалить выбранные (" + n + ")") : "Удалить выбранные";
+          all.checked = nodes.length > 0 && n === nodes.length;
+          all.indeterminate = n > 0 && n < nodes.length;
+        }
+        all.addEventListener("change", function () {
+          checks().forEach(function (c) { c.checked = all.checked; });
+          sync();
+        });
+        list.addEventListener("change", function (e) {
+          if (e.target && e.target.classList.contains("js-pending-check")) sync();
+        });
+        sync();
+      })();
+      </script>
       {% else %}
       <p class="pending-reg-empty">Нет учётных записей, ожидающих подтверждения.</p>
       {% endif %}
