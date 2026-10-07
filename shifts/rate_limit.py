@@ -67,8 +67,10 @@ def registration_rate_limits(
     burst_window: int,
     post_max: int,
     post_window: int,
+    global_day_max: int = 0,
+    global_day_window: int = 86400,
 ) -> RateLimitResult:
-    """Общий лимит на /accounts/register/* и отдельный — на POST."""
+    """Общий лимит на /accounts/register/*, POST по IP и дневной потолок на весь сайт."""
     burst = check_rate_limit(
         scope="register_burst",
         client_id=client_id,
@@ -78,15 +80,25 @@ def registration_rate_limits(
     if burst.exceeded:
         return burst
 
-    if (method or "").upper() == "POST" and post_max > 0:
-        post = check_rate_limit(
-            scope="register_post",
-            client_id=client_id,
-            max_requests=post_max,
-            window_seconds=post_window,
-        )
-        if post.exceeded:
-            return post
+    if (method or "").upper() == "POST":
+        if global_day_max > 0:
+            global_day = check_rate_limit(
+                scope="register_global_day",
+                client_id="global",
+                max_requests=global_day_max,
+                window_seconds=global_day_window if global_day_window > 0 else 86400,
+            )
+            if global_day.exceeded:
+                return global_day
+        if post_max > 0:
+            post = check_rate_limit(
+                scope="register_post",
+                client_id=client_id,
+                max_requests=post_max,
+                window_seconds=post_window,
+            )
+            if post.exceeded:
+                return post
 
     return RateLimitResult(False, 0, "")
 

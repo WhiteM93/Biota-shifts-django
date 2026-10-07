@@ -38,8 +38,6 @@ from .email_verification import (
 
 @require_http_methods(["GET", "HEAD", "POST"])
 def login_view(request):
-    from .qr_login import create_qr_login_token
-
     u0 = biota_user(request)
     if u0:
         return redirect(post_login_redirect(u0))
@@ -81,7 +79,6 @@ def login_view(request):
                 return redirect(post_login_redirect(ADMIN_USERNAME, next_url))
         if not err:
             err = "Неверный логин или пароль"
-    qr = create_qr_login_token(request, next_url=next_url)
     return render(
         request,
         "shifts/login.html",
@@ -91,170 +88,43 @@ def login_view(request):
             "remember_me": remember_me,
             "hide_nav": True,
             "auth_page": True,
-            "qr_token": qr.get("token") or "",
-            "qr_svg": qr.get("qr_svg") or "",
-            "qr_url": qr.get("url") or "",
-            "qr_is_localhost": bool(qr.get("is_localhost")),
-            "qr_status_url": reverse("qr_login_status"),
-        },
-    )
-
-
-@require_http_methods(["GET"])
-def qr_login_status_view(request):
-    """Polling с компьютера: ждёт подтверждения с телефона."""
-    from .qr_login import claim_qr_login, create_qr_login_token, get_qr_login
-
-    if biota_user(request):
-        return JsonResponse({"ok": True, "status": "logged_in", "redirect": post_login_redirect(biota_user(request))})
-
-    token = (request.GET.get("token") or "").strip()
-    if not token:
-        return JsonResponse({"ok": False, "error": "Нет токена"}, status=400)
-    data = get_qr_login(token)
-    if not data:
-        fresh = create_qr_login_token(request, next_url=request.GET.get("next") or "")
-        return JsonResponse(
-            {
-                "ok": True,
-                "status": "expired",
-                "token": fresh.get("token") or "",
-                "qr_svg": fresh.get("qr_svg") or "",
-                "url": fresh.get("url") or "",
-                "is_localhost": bool(fresh.get("is_localhost")),
-            }
-        )
-    status = (data.get("status") or "pending").strip()
-    if status == "pending":
-        return JsonResponse({"ok": True, "status": "pending"})
-    if status == "approved":
-        ok, err, redirect_to = claim_qr_login(request, token)
-        if ok:
-            return JsonResponse({"ok": True, "status": "ready", "redirect": redirect_to or "/"})
-        if not err:
-            return JsonResponse({"ok": True, "status": "pending"})
-        return JsonResponse({"ok": False, "status": "error", "error": err})
-    return JsonResponse({"ok": True, "status": status})
-
-
-@require_http_methods(["GET", "HEAD", "POST"])
-def qr_login_confirm_view(request, token: str):
-    """Страница на телефоне после сканирования QR."""
-    from .qr_login import approve_qr_login, get_qr_login
-
-    tok = (token or "").strip()
-    data = get_qr_login(tok)
-    if not data:
-        return render(
-            request,
-            "shifts/qr_login_confirm.html",
-            {
-                "hide_nav": True,
-                "auth_page": True,
-                "expired": True,
-                "error": "Код устарел или не найден. Обновите QR на компьютере и отсканируйте снова.",
-            },
-        )
-
-    status = (data.get("status") or "").strip()
-    if status in ("approved", "consumed"):
-        return render(
-            request,
-            "shifts/qr_login_confirm.html",
-            {
-                "hide_nav": True,
-                "auth_page": True,
-                "done": True,
-                "message": "Вход подтверждён. Можно вернуться к компьютеру.",
-            },
-        )
-
-    err = ""
-    phone_user = biota_user(request)
-
-    if request.method == "POST":
-        action = (request.POST.get("action") or "confirm").strip()
-        if action == "login":
-            username = (request.POST.get("username") or "").strip()
-            password = request.POST.get("password") or ""
-            if not _credentials_match(username, password):
-                err = "Неверный логин или пароль"
-            else:
-                ok, msg = approve_qr_login(tok, username)
-                if ok:
-                    # заодно войти на телефоне
-                    if _is_admin(username):
-                        request.session["biota_username"] = ADMIN_USERNAME
-                    else:
-                        request.session["biota_username"] = username
-                    request.session.set_expiry(0)
-                    return render(
-                        request,
-                        "shifts/qr_login_confirm.html",
-                        {
-                            "hide_nav": True,
-                            "auth_page": True,
-                            "done": True,
-                            "message": msg,
-                        },
-                    )
-                err = msg
-        else:
-            # confirm as already logged-in phone user
-            if not phone_user:
-                err = "Сначала войдите на телефоне."
-            else:
-                ok, msg = approve_qr_login(tok, phone_user)
-                if ok:
-                    return render(
-                        request,
-                        "shifts/qr_login_confirm.html",
-                        {
-                            "hide_nav": True,
-                            "auth_page": True,
-                            "done": True,
-                            "message": msg,
-                        },
-                    )
-                err = msg
-
-    return render(
-        request,
-        "shifts/qr_login_confirm.html",
-        {
-            "hide_nav": True,
-            "auth_page": True,
-            "token": tok,
-            "error": err,
-            "phone_user": phone_user,
-            "expired": False,
-            "done": False,
         },
     )
 
 
 def _register_form_context(*, err: str, form_values: dict | None = None) -> dict:
+    from .register_guard import register_page_context_extra
+
     vals = form_values or {}
-    return {
+    ctx = {
         "error": err,
         "hide_nav": True,
         "auth_page": True,
         "form_username": vals.get("username", ""),
         "form_email": vals.get("email", ""),
+        "form_invite": vals.get("invite", ""),
     }
+    ctx.update(register_page_context_extra())
+    return ctx
 
 
 @require_http_methods(["GET", "HEAD", "POST"])
 def register_view(request):
+    from .register_guard import mark_form_issued, registration_is_open, validate_register_post
+
     err = ""
     form_values: dict[str, str] = {}
     if request.method == "POST":
         username = (request.POST.get("username") or "").strip()
         email = (request.POST.get("email") or "").strip()
+        invite = (request.POST.get("invite_code") or "").strip()
         p1 = request.POST.get("password") or ""
         p2 = request.POST.get("password2") or ""
-        form_values = {"username": username, "email": email}
-        if p1 != p2:
+        form_values = {"username": username, "email": email, "invite": invite}
+        guard_err = validate_register_post(request, invite_posted=invite, email=email)
+        if guard_err:
+            err = guard_err
+        elif p1 != p2:
             err = "Пароли не совпадают"
         else:
             ok, msg = _register_user(username, p1, email=email, require_email=True)
@@ -264,8 +134,11 @@ def register_view(request):
                 request.session["register_email_sent"] = sent_ok
                 request.session["register_email_error"] = "" if sent_ok else send_err
                 request.session.pop("register_verify_debug_link", None)
+                request.session.pop("register_form_issued_at", None)
                 return redirect("register_pending")
             err = msg
+    if registration_is_open() and (request.method != "POST" or err):
+        mark_form_issued(request)
     return render(
         request,
         "shifts/register.html",

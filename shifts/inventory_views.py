@@ -91,6 +91,8 @@ from .collet_constants import (
 from .inventory_analysis import (
     analysis_context,
     watch_context,
+    watch_keys_from_tool,
+    watch_keys_from_arrival_row,
     aggregate_queryset_by_group,
     group_field_choices,
     normalize_group_field,
@@ -2899,22 +2901,161 @@ def inventory_view(request):
         messages.warning(request, "У вас нет доступа к разделу «История».")
         return redirect(f"{reverse('inventory')}?panel=stock")
 
+    if action == "save_watch_from_arrival_rows":
+        try:
+            rows = json.loads(request.POST.get("rows_json") or "[]")
+        except Exception:
+            rows = None
+        if not isinstance(rows, list) or not rows:
+            messages.error(request, "Добавьте хотя бы одну строку контроля.")
+            return _watch_panel_redirect(request)
+
+        created = 0
+        updated = 0
+        skipped = 0
+        last_category = ""
+        last_group_field = ""
+        for row in rows:
+            if not isinstance(row, dict):
+                skipped += 1
+                continue
+            keys = watch_keys_from_arrival_row(row)
+            if not keys:
+                skipped += 1
+                continue
+            category = keys["category"]
+            group_field = keys["group_field"]
+            group_value = keys["group_value"]
+            min_qty = max(1, min(9999, _to_int(row.get("quantity"), 5)))
+            notes = (row.get("notes") or "").strip()[:255]
+            name = f"{keys['category_label']} · {keys['group_label']}: {group_value}"[:120]
+            last_category = category
+            last_group_field = group_field
+
+            existing = InventoryWatchTemplate.objects.filter(
+                username=username,
+                is_active=True,
+                category=category,
+                group_field=group_field,
+                group_value=group_value,
+            ).first()
+            if existing:
+                existing.min_qty = min_qty
+                if notes:
+                    existing.notes = notes
+                existing.name = name
+                existing.save(update_fields=["min_qty", "notes", "name", "updated_at"])
+                updated += 1
+                continue
+
+            sort_order = (
+                InventoryWatchTemplate.objects.filter(username=username, is_active=True).count() + 1
+            )
+            InventoryWatchTemplate.objects.create(
+                username=username,
+                name=name,
+                category=category,
+                group_field=group_field,
+                group_value=group_value,
+                min_qty=min_qty,
+                sort_order=sort_order,
+                notes=notes,
+            )
+            created += 1
+
+        if created or updated:
+            parts = []
+            if created:
+                parts.append(f"добавлено {created}")
+            if updated:
+                parts.append(f"обновлено {updated}")
+            if skipped:
+                parts.append(f"пропущено {skipped}")
+            messages.success(request, "Контроль: " + ", ".join(parts) + ".")
+            return _watch_panel_redirect(
+                request, watch_category=last_category, watch_group_field=last_group_field
+            )
+        messages.error(
+            request,
+            "Не удалось определить параметр контроля. Заполните главный размер/тип в строках.",
+        )
+        return _watch_panel_redirect(request)
+
     if action == "save_watch_template":
         name = (request.POST.get("watch_name") or "").strip()[:120]
-        category = (request.POST.get("watch_category") or "").strip()
-        group_field = normalize_group_field(category, (request.POST.get("watch_group_field") or "").strip())
-        group_value = (request.POST.get("watch_group_value") or "").strip()[:80]
-        if group_field == "size_label":
-            group_value = (normalize_cutting_size_label(group_value) or group_value)[:80]
-        min_qty = max(1, min(9999, _to_int(request.POST.get("watch_min_qty"), 5)))
         notes = (request.POST.get("watch_notes") or "").strip()[:255]
-        if not name:
-            # Автоимя: «Фреза · 2» и т.п.
-            cat_label = dict(ToolItem._meta.get_field("category").choices).get(category, category)
-            name = f"{cat_label} · {group_value}"[:120]
+        min_qty = max(1, min(9999, _to_int(request.POST.get("watch_min_qty"), 5)))
+        tool_id = _to_int(request.POST.get("watch_tool_id"), 0)
+        category = ""
+        group_field = ""
+        group_value = ""
+
+        if tool_id > 0:
+            tool = (
+                ToolItem.objects.select_related(
+                    "end_mill_spec",
+                    "body_tool_spec",
+                    "tap_spec",
+                    "center_drill_spec",
+                    "countersink_spec",
+                    "drill_spec",
+                    "reamer_spec",
+                    "insert_spec",
+                    "collet_spec",
+                    "tool_extension_spec",
+                    "measuring_tool_spec",
+                )
+                .filter(id=tool_id, is_deleted=False)
+                .first()
+            )
+            if not tool:
+                messages.error(request, "Инструмент не найден.")
+                return _watch_panel_redirect(request)
+            keys = watch_keys_from_tool(tool, (request.POST.get("watch_group_field") or "").strip())
+            if not keys:
+                messages.error(
+                    request,
+                    "Не удалось определить параметр контроля для этого инструмента.",
+                )
+                return _watch_panel_redirect(request)
+            category = keys["category"]
+            group_field = keys["group_field"]
+            group_value = keys["group_value"]
+            if not name:
+                name = f"{keys['category_label']} · {keys['group_label']}: {group_value}"[:120]
+        else:
+            category = (request.POST.get("watch_category") or "").strip()
+            group_field = normalize_group_field(
+                category, (request.POST.get("watch_group_field") or "").strip()
+            )
+            group_value = (request.POST.get("watch_group_value") or "").strip()[:80]
+            if group_field == "size_label":
+                group_value = (normalize_cutting_size_label(group_value) or group_value)[:80]
+            if not name:
+                cat_label = dict(ToolItem._meta.get_field("category").choices).get(category, category)
+                name = f"{cat_label} · {group_value}"[:120]
+
         if not name or category not in _INVENTORY_CATEGORIES or not group_value:
-            messages.error(request, "Укажите тип инструмента и значение для контроля.")
+            messages.error(request, "Укажите категорию и значение для контроля.")
             return _watch_panel_redirect(request)
+
+        existing = InventoryWatchTemplate.objects.filter(
+            username=username,
+            is_active=True,
+            category=category,
+            group_field=group_field,
+            group_value=group_value,
+        ).first()
+        if existing:
+            existing.min_qty = min_qty
+            if notes:
+                existing.notes = notes
+            if name:
+                existing.name = name
+            existing.save(update_fields=["min_qty", "notes", "name", "updated_at"])
+            messages.success(request, f"Контроль обновлён: {existing.name}")
+            return _watch_panel_redirect(request, watch_category=category, watch_group_field=group_field)
+
         sort_order = (
             InventoryWatchTemplate.objects.filter(username=username, is_active=True).count() + 1
         )

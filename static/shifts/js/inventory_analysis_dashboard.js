@@ -84,17 +84,22 @@
 
     var charts = [];
     var barEl = document.getElementById("inv-dash-bar");
-    if (barEl && data.nomenclature && data.nomenclature.labels.length) {
+    var watch = data.watch || data.nomenclature;
+    if (barEl && watch && watch.labels && watch.labels.length) {
+      var barColors = watch.colors && watch.colors.length === watch.labels.length
+        ? watch.colors
+        : palette(watch.labels.length);
+      var mins = watch.mins || [];
       charts.push(new Chart(barEl, {
         type: "bar",
         data: {
-          labels: data.nomenclature.labels,
+          labels: watch.labels,
           datasets: [
             {
-              label: "Количество",
-              data: data.nomenclature.values,
-              backgroundColor: "#5b9bd5",
-              borderColor: "#3b6ea5",
+              label: "Остаток",
+              data: watch.values,
+              backgroundColor: barColors,
+              borderColor: barColors,
               borderWidth: 1,
               borderRadius: 3,
               maxBarThickness: 42,
@@ -109,7 +114,12 @@
             tooltip: {
               callbacks: {
                 label: function (ctx) {
-                  return " " + (ctx.parsed.y || 0) + " шт.";
+                  var qty = ctx.parsed.y || 0;
+                  var minQty = mins[ctx.dataIndex];
+                  if (minQty != null && minQty !== "") {
+                    return " " + qty + " / мин. " + minQty + " шт.";
+                  }
+                  return " " + qty + " шт.";
                 },
               },
             },
@@ -157,11 +167,12 @@
           maintainAspectRatio: false,
           plugins: {
             legend: {
-              position: "right",
+              position: "bottom",
+              align: "start",
               labels: {
                 boxWidth: 12,
                 boxHeight: 12,
-                padding: 10,
+                padding: 12,
                 color: text,
                 font: { size: 12 },
                 usePointStyle: false,

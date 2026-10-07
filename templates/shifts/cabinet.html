@@ -120,10 +120,16 @@
   <section class="cabinet-section" id="cabinet-registrations">
     <div class="cabinet-section__head">
       <h2>Подтверждение регистраций</h2>
-      <p class="cabinet-section__lead">Пользователь не сможет войти, пока вы не подтвердите учётную запись.</p>
+      <p class="cabinet-section__lead">Пользователь не войдёт, пока вы не нажмёте «Подтвердить». «Email подтверждён» — только письмо, не доступ в систему.</p>
     </div>
     <div class="cabinet-section__body">
       {% if pending_registrations %}
+      <form method="post" action="" class="pending-reg-purge"
+            onsubmit="return confirm('Удалить все ожидающие регистрации? Восстановить будет нельзя.');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="admin_purge_pending_registrations">
+        <button type="submit" class="btn btn-danger">Удалить все ожидающие</button>
+      </form>
       <ul class="pending-reg-list">
         {% for item in pending_registrations %}
         <li class="pending-reg-item">
@@ -135,9 +141,10 @@
             {% if item.email %}<span class="muted pending-reg-item__email">{{ item.email }}</span>{% endif %}
             {% if item.email and not item.email_verified %}
             <span class="pending-reg-badge pending-reg-badge--warn">email не подтверждён</span>
-            {% elif item.email %}
+            {% elif item.email and item.email_verified %}
             <span class="pending-reg-badge pending-reg-badge--ok">email подтверждён</span>
             {% endif %}
+            <span class="pending-reg-badge">ожидает одобрения админа</span>
           </span>
           <div class="pending-reg-actions">
             <form method="post" action="" class="pending-reg-form">

@@ -26,6 +26,7 @@ from biota_shifts.auth import (
     _approve_registration,
     _change_password_registered,
     _delete_registered_user,
+    _purge_pending_registrations,
     _distinct_area_tokens,
     _is_admin,
     _load_users_store,
@@ -140,6 +141,13 @@ def cabinet_view(request):
                 else:
                     messages.error(request, err)
                 return redirect("cabinet")
+            if action == "admin_purge_pending_registrations":
+                n, _logins = _purge_pending_registrations(all_pending=True)
+                if n:
+                    messages.success(request, f"Удалено ожидающих регистраций: {n}.")
+                else:
+                    messages.info(request, "Нет учётных записей, ожидающих подтверждения.")
+                return redirect("cabinet")
             if action == "admin_user_names":
                 target = (request.POST.get("names_login") or "").strip()
                 first = (request.POST.get("first_name") or "").strip()
@@ -204,6 +212,12 @@ def cabinet_view(request):
     }
 
     if _is_admin(user):
+        from django.conf import settings as dj_settings
+
+        max_age = int(getattr(dj_settings, "BIOTA_PENDING_REG_MAX_AGE_DAYS", 7) or 0)
+        if max_age > 0:
+            _purge_pending_registrations(all_pending=False, max_age_days=max_age)
+
         ctx["system_health"] = collect_system_health()
         priv_store = _load_users_store()
         ctx["pending_registrations"] = sorted(
@@ -211,8 +225,8 @@ def cabinet_view(request):
                 {
                     "login": k,
                     "email": (v.get("email") or "").strip(),
-                    "email_verified": not (v.get("email") or "").strip()
-                    or bool(v.get("email_verified", True)),
+                    "email_verified": bool((v.get("email") or "").strip())
+                    and bool(v.get("email_verified", False)),
                     "label": account_label_for_username(k),
                 }
                 for k, v in priv_store.items()

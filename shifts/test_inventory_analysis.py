@@ -1,13 +1,19 @@
 """Тесты вкладки «Анализ» / «Контроль» склада."""
 
 from decimal import Decimal
+import json
 
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from biota_shifts.config import ADMIN_USERNAME
 
-from shifts.inventory_analysis import aggregate_by_group, group_total_qty, watch_status
+from shifts.inventory_analysis import (
+    aggregate_by_group,
+    group_total_qty,
+    watch_keys_from_arrival_row,
+    watch_status,
+)
 from shifts.models import EndMillSpec, InventoryWatchTemplate, TapSpec, ToolItem
 
 
@@ -80,7 +86,10 @@ class WatchPanelTests(TestCase):
         html = resp.content.decode("utf-8", errors="replace")
         self.assertIn("inv-watch", html)
         self.assertIn("Контроль остатков", html)
-        self.assertIn("save_watch_template", html)
+        self.assertIn("save_watch_from_arrival_rows", html)
+        self.assertIn("arrival-bulk-form", html)
+        self.assertIn('data-arrival-mode="watch"', html)
+        self.assertIn("inv-watch-block", html)
 
     def test_save_watch_template_from_panel(self):
         tool = ToolItem.objects.create(category="end_mill", name="F2", quantity=3)
@@ -106,6 +115,39 @@ class WatchPanelTests(TestCase):
         self.assertIn("2", tpl.name)
         html = resp.content.decode("utf-8", errors="replace")
         self.assertIn("inv-watch-badge--warn", html)
+
+    def test_save_watch_from_arrival_rows(self):
+        tool = ToolItem.objects.create(category="end_mill", name="Фреза 3", quantity=2)
+        EndMillSpec.objects.create(tool=tool, diameter_mm=Decimal("3"), mill_type="end", flutes_count=4)
+        keys = watch_keys_from_arrival_row(
+            {"category": "end_mill", "em_diameter_mm": "3", "quantity": 4, "notes": "тест"}
+        )
+        self.assertIsNotNone(keys)
+        self.assertEqual(keys["group_field"], "diameter_mm")
+        self.assertEqual(keys["group_value"], "3")
+        resp = self.client.post(
+            self.inv_url,
+            {
+                "action": "save_watch_from_arrival_rows",
+                "rows_json": json.dumps(
+                    [
+                        {
+                            "category": "end_mill",
+                            "em_diameter_mm": "3",
+                            "quantity": 4,
+                            "notes": "из прихода",
+                        }
+                    ]
+                ),
+            },
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        tpl = InventoryWatchTemplate.objects.get(username=ADMIN_USERNAME)
+        self.assertEqual(tpl.category, "end_mill")
+        self.assertEqual(tpl.group_value, "3")
+        self.assertEqual(tpl.min_qty, 4)
+        self.assertEqual(tpl.notes, "из прихода")
 
 
 class DashboardMonthStatsTests(TestCase):

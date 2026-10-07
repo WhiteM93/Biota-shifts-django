@@ -1,0 +1,50 @@
+{# Options for issue/watch tool combo. Expects movement_tool_options. #}
+{% load inventory_tags %}
+<option value="">Выбрать...</option>
+{% for t in movement_tool_options %}
+{% with card=t.issue_combo_card coat=t.coating_type|default:'none' m=t.issue_filter_metrics %}
+<option
+  value="{{ t.id }}"
+  data-category="{{ t.category }}"
+  data-issue-type="{{ card.tool_type|escape }}"
+  data-issue-specs="{{ card.specs|escape }}"
+  data-issue-material="{{ card.material|escape }}"
+  data-issue-qty="{{ card.qty|escape }}"
+  data-issue-coating-type="{{ coat|escape }}"
+  data-issue-coating-title="{{ coat|coating_hover_title|escape }}"
+  data-f-material="{{ m.material|escape }}"
+  data-f-coating="{{ m.coating|escape }}"
+  data-f-mill_type="{{ m.mill_type|escape }}"
+  data-f-diameter="{{ m.diameter }}"
+  data-f-radius="{{ m.radius }}"
+  data-f-length="{{ m.length }}"
+  data-f-cutting_length="{{ m.cutting_length }}"
+  data-f-flutes="{{ m.flutes }}"
+  data-f-tap_type="{{ m.tap_type|escape }}"
+  data-f-tap_size="{{ m.tap_size|escape }}"
+  data-f-tap_pitch="{{ m.tap_pitch }}"
+  data-f-tap_thread="{{ m.tap_thread|escape }}"
+  data-f-tap_hole="{{ m.tap_hole|escape }}"
+  data-f-angle="{{ m.angle|escape }}"
+  data-f-countersink_type="{{ m.countersink_type|escape }}"
+  data-f-size_label="{{ m.size_label|escape }}"
+  data-f-ins_iso="{{ m.ins_iso|escape }}"
+  data-f-ins_shape="{{ m.ins_shape|escape }}"
+  data-f-ins_family="{{ m.ins_family|escape }}"
+  data-f-ins_name="{{ m.ins_name|escape }}"
+  data-f-ins_brand="{{ m.ins_brand|escape }}"
+  data-f-collet_type="{{ m.collet_type|escape }}"
+  data-f-er_size="{{ m.er_size|escape }}"
+  data-f-clamp_range="{{ m.clamp_range|escape }}"
+  data-f-accuracy_class="{{ m.accuracy_class|escape }}"
+  data-f-body_cutter="{{ m.body_cutter|escape }}"
+  data-f-teeth="{{ m.teeth|escape }}"
+  data-f-shank_type="{{ m.shank_type|escape }}"
+  data-f-insert_compat="{{ m.insert_compat|escape }}"
+  data-f-mount_diameter="{{ m.mount_diameter|escape }}"
+  data-f-notes="{{ m.notes|escape }}"
+  data-issue-notes="{{ t.notes|default:''|escape }}"
+  data-issue-name="{{ t.name|default:''|escape }}"
+>{{ t.issue_select_label }}</option>
+{% endwith %}
+{% endfor %}

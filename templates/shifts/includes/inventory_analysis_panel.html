@@ -35,13 +35,13 @@
       </table>
     </section>
 
-    <section class="inv-dash-card inv-dash-card--chart" aria-label="Остатки по номенклатуре">
-      <h2 class="inv-dash-card__title">Остатки по номенклатуре</h2>
+    <section class="inv-dash-card inv-dash-card--chart" aria-label="Остатки по контролю">
+      <h2 class="inv-dash-card__title">Остатки по контролю</h2>
       <div class="inv-dash-chart-wrap">
-        {% if dash_nomenclature_bars %}
-        <canvas id="inv-dash-bar" height="220" aria-label="Столбчатая диаграмма остатков"></canvas>
+        {% if dash_watch_bars %}
+        <canvas id="inv-dash-bar" height="220" aria-label="Столбчатая диаграмма остатков по контролю"></canvas>
         {% else %}
-        <p class="inv-dash-empty">Нет позиций с положительным остатком</p>
+        <p class="inv-dash-empty">Нет позиций в контроле — добавьте на вкладке «Контроль»</p>
         {% endif %}
       </div>
     </section>

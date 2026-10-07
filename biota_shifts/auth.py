@@ -391,6 +391,53 @@ def _delete_registered_user(username: str) -> tuple[bool, str]:
     return True, ""
 
 
+def _pending_created_at(rec: dict) -> datetime | None:
+    raw = (rec.get("created_at") or "").strip()
+    if not raw:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _purge_pending_registrations(
+    *,
+    all_pending: bool = False,
+    max_age_days: int | None = None,
+) -> tuple[int, list[str]]:
+    """
+    Удаляет неутверждённые учётки.
+    all_pending=True — все с approved=False;
+    иначе только старше max_age_days (если задано и > 0).
+    """
+    store = _load_users_store()
+    now = datetime.now(MSK).replace(tzinfo=None)
+    removed: list[str] = []
+    for login, rec in list(store.items()):
+        if _is_admin(str(login)):
+            continue
+        if rec.get("approved", True):
+            continue
+        if all_pending:
+            del store[login]
+            removed.append(str(login))
+            continue
+        if max_age_days is None or max_age_days <= 0:
+            continue
+        created = _pending_created_at(rec)
+        if created is None:
+            continue
+        if (now - created).days >= max_age_days:
+            del store[login]
+            removed.append(str(login))
+    if removed:
+        _save_users_store(store)
+    return len(removed), removed
+
+
 def _person_name_parts(rec: dict | None) -> tuple[str, str]:
     """Имя и фамилия из записи; fallback на display_name (старые профили)."""
     data = rec or {}

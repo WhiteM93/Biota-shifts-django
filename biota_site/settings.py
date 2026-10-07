@@ -100,12 +100,21 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "biota_site.wsgi.application"
 
+# Пустой код — открытая регистрация закрыта (нужен BIOTA_REGISTER_INVITE_CODE).
+BIOTA_REGISTER_INVITE_CODE = (os.getenv("BIOTA_REGISTER_INVITE_CODE") or "").strip()
+BIOTA_DISPOSABLE_EMAIL_DOMAINS = (os.getenv("BIOTA_DISPOSABLE_EMAIL_DOMAINS") or "").strip()
+BIOTA_PENDING_REG_MAX_AGE_DAYS = int(os.getenv("BIOTA_PENDING_REG_MAX_AGE_DAYS", "7") or "7")
+
 _rl_disabled = (os.getenv("BIOTA_REGISTER_RATELIMIT") or "1").strip().lower() in ("0", "false", "no")
 BIOTA_REGISTER_RATELIMIT_ENABLED = not _rl_disabled
-BIOTA_REGISTER_RATELIMIT_BURST = int(os.getenv("BIOTA_REGISTER_RATELIMIT_BURST", "30") or "30")
+BIOTA_REGISTER_RATELIMIT_BURST = int(os.getenv("BIOTA_REGISTER_RATELIMIT_BURST", "10") or "10")
 BIOTA_REGISTER_RATELIMIT_BURST_WINDOW = int(os.getenv("BIOTA_REGISTER_RATELIMIT_BURST_WINDOW", "300") or "300")
-BIOTA_REGISTER_RATELIMIT_POST = int(os.getenv("BIOTA_REGISTER_RATELIMIT_POST", "5") or "5")
+BIOTA_REGISTER_RATELIMIT_POST = int(os.getenv("BIOTA_REGISTER_RATELIMIT_POST", "2") or "2")
 BIOTA_REGISTER_RATELIMIT_POST_WINDOW = int(os.getenv("BIOTA_REGISTER_RATELIMIT_POST_WINDOW", "3600") or "3600")
+BIOTA_REGISTER_RATELIMIT_GLOBAL_DAY = int(os.getenv("BIOTA_REGISTER_RATELIMIT_GLOBAL_DAY", "20") or "20")
+BIOTA_REGISTER_RATELIMIT_GLOBAL_DAY_WINDOW = int(
+    os.getenv("BIOTA_REGISTER_RATELIMIT_GLOBAL_DAY_WINDOW", "86400") or "86400"
+)
 
 _login_rl_disabled = (os.getenv("BIOTA_LOGIN_RATELIMIT") or "1").strip().lower() in ("0", "false", "no")
 BIOTA_LOGIN_RATELIMIT_ENABLED = not _login_rl_disabled
@@ -121,11 +130,6 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
         "LOCATION": BASE_DIR / ".cache" / "ratelimit",
         "OPTIONS": {"MAX_ENTRIES": 10000},
-    },
-    "qrlogin": {
-        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
-        "LOCATION": BASE_DIR / ".cache" / "qrlogin",
-        "OPTIONS": {"MAX_ENTRIES": 5000},
     },
 }
 
@@ -197,7 +201,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
 STATIC_ROOT = BASE_DIR / "staticfiles"
 # Увеличивайте после правок CSS/JS, чтобы браузер и nginx не отдавали старые файлы.
-STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "551").strip() or "551"
+STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "560").strip() or "560"
 
 # YandexGPT (чат склада / анализ наладок). Ключи — в .env.secrets.
 # Модели: yandexgpt-5-lite (дешевле), yandexgpt-5.1 / yandexgpt-5-pro (дороже).

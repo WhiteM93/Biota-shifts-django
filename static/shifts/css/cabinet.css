@@ -265,6 +265,10 @@ a.cabinet-quick-card:hover {
 }
 
 /* Ожидающие регистрации */
+.pending-reg-purge {
+  margin: 0 0 12px;
+}
+
 .pending-reg-list {
   list-style: none;
   margin: 12px 0 0;

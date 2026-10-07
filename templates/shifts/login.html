@@ -40,28 +40,9 @@
       <button class="auth-submit-btn" type="submit">Войти</button>
     </form>
 
-    {% if qr_token and qr_svg %}
-    <div
-      class="auth-qr js-auth-qr"
-      data-token="{{ qr_token }}"
-      data-status-url="{{ qr_status_url }}"
-      data-next="{{ next_url|default:'' }}"
-    >
-      <div class="auth-qr__divider"><span>или по QR с телефона</span></div>
-      <div class="auth-qr__frame js-auth-qr-frame" aria-hidden="true">{{ qr_svg|safe }}</div>
-      <p class="auth-qr__status js-auth-qr-status">Отсканируйте камерой телефона</p>
-      {% if qr_is_localhost %}
-      <p class="auth-qr__hint">С телефона в сети нужен адрес компьютера в LAN, не 127.0.0.1. Откройте сайт по IP (например http://192.168.x.x:8000) и снова отсканируйте QR.</p>
-      {% else %}
-      <p class="auth-qr__hint">На телефоне войдите в аккаунт и подтвердите вход — компьютер откроется сам.</p>
-      {% endif %}
-    </div>
-    {% endif %}
-
     <p class="auth-footer">
       Нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться</a>
     </p>
   </section>
 </div>
-<script src="{% static 'shifts/js/auth_qr_login.js' %}?v={{ static_asset_version }}" defer></script>
 {% endblock %}

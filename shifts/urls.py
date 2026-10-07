@@ -282,8 +282,6 @@ urlpatterns = [
     ),
     path("refresh-cache/", views.refresh_db_cache, name="refresh_cache"),
     path("accounts/login/", views.login_view, name="login"),
-    path("accounts/qr/status/", views.qr_login_status_view, name="qr_login_status"),
-    path("accounts/qr/<str:token>/", views.qr_login_confirm_view, name="qr_login_confirm"),
     path("accounts/register/", views.register_view, name="register"),
     path("accounts/register/pending/", views.register_pending_view, name="register_pending"),
     path("accounts/verify-email/<str:token>/", views.verify_email_view, name="verify_email"),

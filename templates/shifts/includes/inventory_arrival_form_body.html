@@ -1,0 +1,133 @@
+{# Shared arrival/watch bulk form. Expects form_mode: "arrival"|"watch". #}
+{% with mode=form_mode|default:"arrival" %}
+<form
+  method="post"
+  id="arrival-bulk-form"
+  class="inv-arrival-form js-arrival-bulk-root{% if mode == 'watch' %} inv-arrival-form--watch{% endif %}"
+  data-arrival-mode="{{ mode }}"
+>
+  {% csrf_token %}
+  <input type="hidden" name="action" value="{% if mode == 'watch' %}save_watch_from_arrival_rows{% else %}add_arrival_bulk{% endif %}">
+  <input type="hidden" name="rows_json" id="arrival-bulk-rows-json">
+
+  <section class="inv-arrival-glass-card inv-arrival-toolbar-card">
+    <div class="inv-arrival-card-header">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <rect x="3" y="3" width="14" height="14" rx="2"/>
+        <line x1="7" y1="8" x2="13" y2="8"/>
+        <line x1="7" y1="11" x2="11" y2="11"/>
+      </svg>
+      <span>{% if mode == "watch" %}Параметры контроля{% else %}Параметры прихода{% endif %}</span>
+    </div>
+    <div class="inv-arrival-toolbar">
+      <div class="inv-arrival-toolbar__fields">
+        <div class="inv-arrival-field">
+          <label class="inv-arrival-label" for="arrival-bulk-category">Категория инструмента</label>
+          <div class="inv-arrival-select-wrap">
+            <select class="inv-arrival-sel js-arrival-bulk-category" id="arrival-bulk-category">
+              <option value="">Выбрать...</option>
+              {% include "shifts/includes/stock_category_optgroups.html" with selected_category="" %}
+            </select>
+          </div>
+        </div>
+        <div class="inv-arrival-field inv-arrival-field--collet-type" id="arrival-collet-type-wrap" hidden>
+          <label class="inv-arrival-label" for="arrival-collet-type">Тип цанги</label>
+          <div class="inv-arrival-select-wrap">
+            <select class="inv-arrival-sel" id="arrival-collet-type" aria-label="Тип цанги">
+              <option value="">Выбрать...</option>
+              {% for item in collet_types_ui %}
+              <option value="{{ item.value }}" title="{{ item.tip }}">{{ item.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        {% if mode != "watch" %}
+        <div class="inv-arrival-field">
+          <label class="inv-arrival-label" for="arrival-bulk-date">Дата прихода</label>
+          <input type="date" class="inv-arrival-inp" id="arrival-bulk-date" value="{{ today }}">
+        </div>
+        {% else %}
+        <input type="hidden" id="arrival-bulk-date" value="{{ today }}">
+        {% endif %}
+      </div>
+      <div class="inv-arrival-toolbar__actions">
+        {% if mode != "watch" %}
+        <div class="inv-arrival-field inv-arrival-field--match-toggle">
+          <span class="inv-arrival-label" id="arrival-match-suggest-label">Поиск в базе</span>
+          <label class="inv-arrival-switch" title="Показывать похожие позиции из склада при заполнении строк">
+            <input type="checkbox" id="arrival-match-suggest" checked aria-labelledby="arrival-match-suggest-label">
+            <span class="inv-arrival-switch__track" aria-hidden="true"><span class="inv-arrival-switch__thumb"></span></span>
+            <span class="inv-arrival-switch__text js-arrival-match-suggest-text">Вкл</span>
+          </label>
+        </div>
+        {% endif %}
+        <div class="inv-arrival-field inv-arrival-field--add">
+          <span class="inv-arrival-label inv-arrival-label--ghost">Строка</span>
+          <div class="inv-arrival-add-wrap">
+            <button type="button" class="inv-arrival-add-btn" id="arrival-bulk-add-row" title="Добавить строку">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <line x1="10" y1="4" x2="10" y2="16"/>
+                <line x1="4" y1="10" x2="16" y2="10"/>
+              </svg>
+              <span>Добавить</span>
+            </button>
+            {% if mode != "watch" %}
+            <div class="inv-arrival-addr-hint">
+              <button type="button" class="inv-arrival-addr-hint__btn" aria-label="Подсказка по адресам" title="Адреса склада">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <circle cx="10" cy="10" r="7.5"/>
+                  <path d="M10 9v5" stroke-linecap="round"/>
+                  <circle cx="10" cy="6.2" r="1" fill="currentColor" stroke="none"/>
+                </svg>
+              </button>
+              <div class="inv-arrival-addr-hint__pop" role="tooltip">
+                <div class="inv-arrival-addr-hint__head">Адреса</div>
+                <div class="inv-arrival-addr-hint__list">
+                  {% for row in stock_address_hints %}
+                  <div class="inv-arrival-addr-hint__row">
+                    <code>{{ row.address }}</code>
+                    <span>{% if row.editable_label %}{{ row.editable_label }}{% elif row.name and row.name != "—" %}{{ row.name }}{% else %}—{% endif %}</span>
+                  </div>
+                  {% empty %}
+                  <div class="inv-arrival-addr-hint__empty">Пока нет адресов с подписями. Задайте их на складе в «Подсказка по адресам».</div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="inv-arrival-errors" id="arrival-bulk-errors" hidden role="alert"></div>
+
+  <datalist id="arrival-thread-tol-list">
+    {% for t in thread_gauge_tolerance_presets %}
+    <option value="{{ t }}"></option>
+    {% endfor %}
+  </datalist>
+  <datalist id="arrival-ms-brand-list">
+    {% for b in measuring_brands %}
+    <option value="{{ b }}"></option>
+    {% endfor %}
+  </datalist>
+  <datalist id="arrival-ms-thread-size-list">
+    {% for s in gauge_thread_sizes %}
+    <option value="{{ s }}"></option>
+    {% endfor %}
+  </datalist>
+
+  <div id="arrival-bulk-groups" class="inv-arrival-groups"></div>
+
+  <footer class="inv-arrival-submit-bar">
+    <button type="submit" class="inv-arrival-submit-btn">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M4 10l4 4 8-8"/>
+      </svg>
+      {% if mode == "watch" %}В контроль{% else %}Оприходовать на склад{% endif %}
+    </button>
+  </footer>
+</form>
+{% endwith %}

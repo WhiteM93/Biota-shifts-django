@@ -232,8 +232,9 @@
 }
 
 .inv-dash-chart-wrap--pie {
-  max-width: 420px;
-  margin: 0 auto;
+  min-height: 320px;
+  max-width: none;
+  margin: 0;
 }
 
 .inv-dash-empty {

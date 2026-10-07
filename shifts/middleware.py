@@ -35,10 +35,12 @@ class AuthRateLimitMiddleware:
             result = registration_rate_limits(
                 client_id=client_id,
                 method=request.method or "GET",
-                burst_max=getattr(settings, "BIOTA_REGISTER_RATELIMIT_BURST", 30),
+                burst_max=getattr(settings, "BIOTA_REGISTER_RATELIMIT_BURST", 10),
                 burst_window=getattr(settings, "BIOTA_REGISTER_RATELIMIT_BURST_WINDOW", 300),
-                post_max=getattr(settings, "BIOTA_REGISTER_RATELIMIT_POST", 5),
+                post_max=getattr(settings, "BIOTA_REGISTER_RATELIMIT_POST", 2),
                 post_window=getattr(settings, "BIOTA_REGISTER_RATELIMIT_POST_WINDOW", 3600),
+                global_day_max=getattr(settings, "BIOTA_REGISTER_RATELIMIT_GLOBAL_DAY", 20),
+                global_day_window=getattr(settings, "BIOTA_REGISTER_RATELIMIT_GLOBAL_DAY_WINDOW", 86400),
             )
             if result.exceeded:
                 return _rate_limit_response(

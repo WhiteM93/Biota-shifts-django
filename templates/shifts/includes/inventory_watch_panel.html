@@ -1,11 +1,10 @@
-{% load static %}
-{{ watch_group_fields_by_cat|json_script:"inv-watch-group-fields" }}
+{% load static inventory_tags %}
 
 <div class="inv-watch">
   <header class="inv-watch__hero">
     <div>
       <h1 class="inv-watch__title">Контроль остатков</h1>
-      <p class="inv-watch__lead">Добавляйте ходовые позиции и минимум — здесь видно, когда остаток просел.</p>
+      <p class="inv-watch__lead">Добавьте позиции как при приходе: категория, строка и параметры. В колонке «Кол-во» укажите минимум — следим за суммой подходящих остатков на складе.</p>
     </div>
     <div class="inv-watch__stats" aria-label="Сводка">
       <span class="inv-watch__stat">В списке: <strong>{{ watch_total }}</strong></span>
@@ -14,46 +13,13 @@
   </header>
 
   {% if biota_can_edit %}
-  <section class="filter-panel inv-watch-form-panel" aria-label="Добавить в контроль">
-    <h3>Добавить ходовую позицию</h3>
-    <form method="post" class="filter-grid inv-watch-form" id="inv-watch-form">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="save_watch_template">
-      <label class="field">
-        <span>Тип инструмента</span>
-        <select name="watch_category" id="inv-watch-category" required>
-          {% include "shifts/includes/stock_category_optgroups.html" with selected_category=watch_form_category %}
-        </select>
-      </label>
-      <label class="field">
-        <span>По чему следить</span>
-        <select name="watch_group_field" id="inv-watch-group-field" required>
-          {% for key, label in watch_form_group_fields %}
-          <option value="{{ key }}"{% if key == watch_form_group_field %} selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label class="field">
-        <span>Значение</span>
-        <input type="text" name="watch_group_value" id="inv-watch-group-value" required placeholder="например 2 или M6" maxlength="80" autocomplete="off">
-      </label>
-      <label class="field">
-        <span>Минимум, шт</span>
-        <input type="number" name="watch_min_qty" min="1" max="9999" value="5" required>
-      </label>
-      <label class="field">
-        <span>Название <span class="muted">(необяз.)</span></span>
-        <input type="text" name="watch_name" id="inv-watch-name" maxlength="120" placeholder="Авто: тип · значение" autocomplete="off">
-      </label>
-      <label class="field">
-        <span>Заметка</span>
-        <input type="text" name="watch_notes" maxlength="255" placeholder="Зачем следим" autocomplete="off">
-      </label>
-      <div class="filter-actions">
-        <button type="submit" class="btn">В контроль</button>
-      </div>
-    </form>
-  </section>
+  <div class="inv-arrival-page inv-watch-arrival" id="inv-watch-block">
+    <div class="inv-arrival-hint-card">
+      <div class="inv-arrival-hint-label">Как заполнить</div>
+      <p class="inv-arrival-hint-text">Выберите категорию, нажмите <strong>+</strong>, заполните параметры как при приходе и нажмите «В контроль». Минимум — в колонке «Кол-во».</p>
+    </div>
+    {% include "shifts/includes/inventory_arrival_form_body.html" with form_mode="watch" %}
+  </div>
   {% endif %}
 
   {% if watch_alerts %}
@@ -128,8 +94,7 @@
       </table>
     </div>
     {% else %}
-    <p class="muted inv-watch-empty">Пока пусто — добавьте ходовую позицию выше (тип, значение и минимум).</p>
+    <p class="muted inv-watch-empty">Пока пусто — добавьте позицию формой выше, как при приходе.</p>
     {% endif %}
   </section>
 </div>
-<script src="{% static 'shifts/js/inventory_watch.js' %}?v={{ static_asset_version }}" defer></script>

@@ -1276,7 +1276,10 @@ var INV = (function () {
   var groupsWrap = document.getElementById("arrival-bulk-groups");
   var form = document.getElementById("arrival-bulk-form");
   var rowsJsonInput = document.getElementById("arrival-bulk-rows-json");
-  if (!categorySelect || !arrivalDateInput || !addBtn || !groupsWrap || !form || !rowsJsonInput) return;
+  if (!categorySelect || !addBtn || !groupsWrap || !form || !rowsJsonInput) return;
+  var isWatchMode = (form.getAttribute("data-arrival-mode") || "") === "watch";
+  if (!isWatchMode && !arrivalDateInput) return;
+  var qtyColLabel = isWatchMode ? "Мин." : "Кол-во";
 
   function normalizeDecimalComma(raw) {
     return String(raw == null ? "" : raw).replace(/,/g, ".");
@@ -2286,6 +2289,7 @@ var INV = (function () {
   var arrivalMatchSuggestText = document.querySelector(".js-arrival-match-suggest-text");
 
   function isArrivalMatchSuggestOn() {
+    if (isWatchMode) return false;
     return !!(arrivalMatchSuggestEl && arrivalMatchSuggestEl.checked);
   }
 
@@ -2704,18 +2708,25 @@ var INV = (function () {
   }
 
   function arrivalHead(cols) {
-    var list = cols.slice();
-    var hasAddr = list.some(function (c) { return c.key === "warehouse_address"; });
-    if (!hasAddr) {
-      var qtyIdx = -1;
-      for (var i = 0; i < list.length; i++) {
-        if (list[i].key === "quantity") {
-          qtyIdx = i;
-          break;
+    var list = cols.slice().map(function (c) {
+      if (c.key === "quantity") return Object.assign({}, c, { label: qtyColLabel });
+      return c;
+    });
+    if (isWatchMode) {
+      list = list.filter(function (c) { return c.key !== "warehouse_address"; });
+    } else {
+      var hasAddr = list.some(function (c) { return c.key === "warehouse_address"; });
+      if (!hasAddr) {
+        var qtyIdx = -1;
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].key === "quantity") {
+            qtyIdx = i;
+            break;
+          }
         }
-      }
-      if (qtyIdx >= 0) {
-        list.splice(qtyIdx, 0, { key: "warehouse_address", label: "Адрес", cls: "address-col" });
+        if (qtyIdx >= 0) {
+          list.splice(qtyIdx, 0, { key: "warehouse_address", label: "Адрес", cls: "address-col" });
+        }
       }
     }
     return (
@@ -2732,6 +2743,9 @@ var INV = (function () {
   }
 
   function arrivalAddressCellHtml(addr) {
+    if (isWatchMode) {
+      return '<td class="address-col arrival-addr-cell" hidden><input type="hidden" data-k="warehouse_address" value=""></td>';
+    }
     var val = String(addr || "").trim().toUpperCase();
     var label = val || "—";
     return (
@@ -3242,8 +3256,8 @@ var INV = (function () {
       insertArrivalTh("item_name", "Наименование") +
       insertArrivalTh("coating", "Покрытие") +
       insertArrivalTh("notes", "Заметка") +
-      insertArrivalTh("warehouse_address", "Адрес", "address-col") +
-      insertArrivalTh("quantity", "Кол-во", "qty-col") +
+      (isWatchMode ? "" : insertArrivalTh("warehouse_address", "Адрес", "address-col")) +
+      insertArrivalTh("quantity", qtyColLabel, "qty-col") +
       insertArrivalTh("row_remove", "", "arrival-row-remove-cell") +
       "</tr>",
   };
@@ -3585,7 +3599,7 @@ var INV = (function () {
   });
   toggleArrivalCategoryExtras();
 
-  var arrivalBlock = document.getElementById("arrival-block");
+  var arrivalBlock = document.getElementById("arrival-block") || document.getElementById("inv-watch-block");
   if (arrivalBlock) {
     arrivalBlock.addEventListener("keydown", function (e) {
       if (e.key !== "Enter") return;
@@ -3783,12 +3797,18 @@ var INV = (function () {
     var rows = [];
     groupsWrap.querySelectorAll("tr[data-arrival-row]").forEach(function (tr) {
       var row = collectArrivalRowData(tr);
-      row.movement_date = (arrivalDateInput.value || "").trim();
+      if (!isWatchMode) {
+        row.movement_date = ((arrivalDateInput && arrivalDateInput.value) || "").trim();
+      }
       rows.push(row);
     });
     if (!rows.length) {
       e.preventDefault();
-      showArrivalBulkError("Добавьте хотя бы одну строку прихода.");
+      showArrivalBulkError(
+        isWatchMode
+          ? "Добавьте хотя бы одну строку контроля."
+          : "Добавьте хотя бы одну строку прихода."
+      );
       return;
     }
     rowsJsonInput.value = JSON.stringify(rows);

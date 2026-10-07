@@ -1434,11 +1434,12 @@ html[data-theme="dawn"] .inv-history-open-block {
 /* Склад: таблица слева, фильтр справа */
 .inv-stock-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 292px;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 292px);
   gap: 12px;
   align-items: stretch;
   width: 100%;
   min-width: 0;
+  overflow: hidden;
 }
 
 .inv-stock-main {
@@ -1449,6 +1450,8 @@ html[data-theme="dawn"] .inv-history-open-block {
   background: var(--bio-surface-panel);
   box-shadow: var(--bio-filter-shadow);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .inv-stock-sidebar {
@@ -1636,6 +1639,8 @@ html[data-theme="dawn"] .inv-history-open-block {
   border-radius: 0;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
   box-sizing: border-box;
   overflow-x: auto;
   overflow-y: visible;
@@ -1651,6 +1656,60 @@ html[data-theme="dawn"] .inv-history-open-block {
   border-collapse: collapse;
   font-size: 11px;
   box-sizing: border-box;
+}
+
+/* Режим «Все»: фиксированная ширина — длинные названия не выталкивают таблицу за экран */
+.inv-page--stock .inv-stock-grid--all.data-grid {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  table-layout: fixed;
+}
+
+.inv-page--stock .inv-stock-grid--all th,
+.inv-page--stock .inv-stock-grid--all td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inv-page--stock .inv-stock-grid--all .address-col {
+  width: 5.2rem;
+}
+
+.inv-page--stock .inv-stock-grid--all .inv-stock-cat-col {
+  width: 8.2rem;
+}
+
+.inv-page--stock .inv-stock-grid--all .inv-stock-name-col {
+  width: auto;
+  text-align: left;
+}
+
+.inv-page--stock .inv-stock-grid--all .inv-stock-mat-col {
+  width: 6.5rem;
+}
+
+.inv-page--stock .inv-stock-grid--all .inv-stock-coat-col {
+  width: 5.8rem;
+}
+
+.inv-page--stock .inv-stock-grid--all .inv-stock-qty-col {
+  width: 4rem;
+}
+
+.inv-page--stock .inv-stock-grid--all .inv-stock-col-delete {
+  width: 4.6rem;
+}
+
+.inv-page--stock .inv-stock-grid--all .coating-cell {
+  justify-content: center;
+  max-width: 100%;
+}
+
+.inv-page--stock .inv-stock-grid--all .coating-inline-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .inv-page--stock .inv-stock-grid.data-grid th,
@@ -2816,13 +2875,15 @@ html[data-theme="dawn"] .inv-addr-hint-table th {
   }
   /* Кастомный выбор инструмента (выдача): не нативный select */
   #issue-block .issue-filter-hint,
-  #issue-outcome-block .issue-filter-hint {
+  #issue-outcome-block .issue-filter-hint,
+  #inv-watch-block .issue-filter-hint {
     grid-column: 1 / -1;
     margin: 0;
     font-size: 12px;
   }
   #issue-block .issue-cat-panel,
-  #issue-outcome-block .issue-cat-panel {
+  #issue-outcome-block .issue-cat-panel,
+  #inv-watch-block .issue-cat-panel {
     grid-column: 1 / -1;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -2830,45 +2891,53 @@ html[data-theme="dawn"] .inv-addr-hint-table th {
     align-items: end;
   }
   #issue-block .issue-cat-panel[hidden],
-  #issue-outcome-block .issue-cat-panel[hidden] {
+  #issue-outcome-block .issue-cat-panel[hidden],
+  #inv-watch-block .issue-cat-panel[hidden] {
     display: none !important;
   }
   #issue-block .issue-filter-chips-field,
-  #issue-outcome-block .issue-filter-chips-field {
+  #issue-outcome-block .issue-filter-chips-field,
+  #inv-watch-block .issue-filter-chips-field {
     grid-column: 1 / -1;
   }
   #issue-block .issue-filter-chips-field[hidden],
-  #issue-outcome-block .issue-filter-chips-field[hidden] {
+  #issue-outcome-block .issue-filter-chips-field[hidden],
+  #inv-watch-block .issue-filter-chips-field[hidden] {
     display: none !important;
   }
   #issue-block .issue-filter-chips-field > span,
-  #issue-outcome-block .issue-filter-chips-field > span {
+  #issue-outcome-block .issue-filter-chips-field > span,
+  #inv-watch-block .issue-filter-chips-field > span {
     display: block;
     margin-bottom: 6px;
     font-size: 12px;
     color: var(--bio-caption-soft, var(--vw-muted, #9bb0d8));
   }
   #issue-block .issue-mat-picker,
-  #issue-outcome-block .issue-mat-picker {
+  #issue-outcome-block .issue-mat-picker,
+  #inv-watch-block .issue-mat-picker {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     align-items: center;
   }
   #issue-block .issue-mat-chip,
-  #issue-outcome-block .issue-mat-chip {
+  #issue-outcome-block .issue-mat-chip,
+  #inv-watch-block .issue-mat-chip {
     display: inline-flex;
     cursor: pointer;
     margin: 0;
   }
   #issue-block .issue-mat-chip input,
-  #issue-outcome-block .issue-mat-chip input {
+  #issue-outcome-block .issue-mat-chip input,
+  #inv-watch-block .issue-mat-chip input {
     position: absolute;
     opacity: 0;
     pointer-events: none;
   }
   #issue-block .issue-mat-chip-face,
-  #issue-outcome-block .issue-mat-chip-face {
+  #issue-outcome-block .issue-mat-chip-face,
+  #inv-watch-block .issue-mat-chip-face {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2884,28 +2953,33 @@ html[data-theme="dawn"] .inv-addr-hint-table th {
     user-select: none;
   }
   #issue-block .issue-mat-chip input:checked + .issue-mat-chip-face,
-  #issue-outcome-block .issue-mat-chip input:checked + .issue-mat-chip-face {
+  #issue-outcome-block .issue-mat-chip input:checked + .issue-mat-chip-face,
+  #inv-watch-block .issue-mat-chip input:checked + .issue-mat-chip-face {
     border-color: #9fb2ff;
     box-shadow: 0 0 0 2px rgba(120, 146, 255, 0.35);
     color: #fff;
   }
   html[data-theme="dawn"] #issue-block .issue-mat-chip-face,
-  html[data-theme="dawn"] #issue-outcome-block .issue-mat-chip-face {
+  html[data-theme="dawn"] #issue-outcome-block .issue-mat-chip-face,
+  html[data-theme="dawn"] #inv-watch-block .issue-mat-chip-face {
     background: #fffefb;
     border-color: #d6c9b8;
     color: #292524;
   }
   html[data-theme="dawn"] #issue-block .issue-mat-chip input:checked + .issue-mat-chip-face,
-  html[data-theme="dawn"] #issue-outcome-block .issue-mat-chip input:checked + .issue-mat-chip-face {
+  html[data-theme="dawn"] #issue-outcome-block .issue-mat-chip input:checked + .issue-mat-chip-face,
+  html[data-theme="dawn"] #inv-watch-block .issue-mat-chip input:checked + .issue-mat-chip-face {
     border-color: #0d9488;
     box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.28);
     color: #134e4a;
   }
   #issue-block .coating-picker,
-  #issue-outcome-block .coating-picker {
+  #issue-outcome-block .coating-picker,
+  #inv-watch-block .coating-picker {
     gap: 6px;
   }
-  #issue-block .issue-tool-field {
+  #issue-block .issue-tool-field,
+  #inv-watch-block .issue-tool-field {
     min-width: min(100%, 420px);
     max-width: 100%;
   }

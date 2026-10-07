@@ -594,6 +594,110 @@ def watch_status(total_qty: int, min_qty: int) -> str:
     return "warn"
 
 
+def _tool_attr_by_path(tool, path: str):
+    obj = tool
+    for part in (path or "").split("__"):
+        if not part:
+            return None
+        obj = getattr(obj, part, None)
+        if obj is None:
+            return None
+    return obj
+
+
+def watch_keys_from_tool(tool, group_field: str = "") -> dict[str, str] | None:
+    """Из складской позиции — category / group_field / group_value для контроля."""
+    category = (getattr(tool, "category", None) or "").strip()
+    if category not in GROUP_FIELD_PATHS:
+        return None
+    field = normalize_group_field(category, group_field)
+    path = GROUP_FIELD_PATHS[category].get(field)
+    if not path:
+        return None
+    raw = _tool_attr_by_path(tool, path)
+    value = fmt_group_value(raw, field)
+    if not value or value == "—":
+        return None
+    if field == "size_label":
+        from shifts.size_label_normalize import normalize_cutting_size_label
+
+        value = (normalize_cutting_size_label(value) or value)[:80]
+    else:
+        value = str(value)[:80]
+    return {
+        "category": category,
+        "group_field": field,
+        "group_value": value,
+        "group_label": GROUP_FIELD_LABELS.get(category, {}).get(field, field),
+        "category_label": dict(category_choices()).get(category, category),
+    }
+
+
+# category → (group_field, ключ в rows_json прихода)
+ARRIVAL_ROW_WATCH_KEY: dict[str, tuple[str, str]] = {
+    "end_mill": ("diameter_mm", "em_diameter_mm"),
+    "drill": ("diameter_mm", "dr_diameter_mm"),
+    "reamer": ("diameter_mm", "rm_diameter_mm"),
+    "center_drill": ("diameter_mm", "cd_diameter_mm"),
+    "countersink": ("diameter_mm", "cs_diameter_mm"),
+    "body_tool": ("diameter_mm", "bt_diameter_mm"),
+    "tap": ("size_label", "size_label"),
+    "collet": ("collet_type", "collet_type"),
+    "tool_extension": ("clamp_type", "ext_clamp_type"),
+    "insert": ("iso_designation", "ins_name"),
+    "gauge_smooth": ("brand", "ms_brand"),
+    "gauge_thread": ("thread_size_label", "ms_thread_size"),
+    "measure_univ": ("kind", "ms_kind"),
+    "measure_surf": ("kind", "ms_kind"),
+    "measure_check": ("kind", "ms_kind"),
+    "measure_mark": ("kind", "ms_kind"),
+}
+
+
+def watch_keys_from_arrival_row(row: dict) -> dict[str, str] | None:
+    """Из строки формы прихода — ключи контроля (главный параметр категории)."""
+    if not isinstance(row, dict):
+        return None
+    category = (row.get("category") or "").strip()
+    mapping = ARRIVAL_ROW_WATCH_KEY.get(category)
+    if not mapping or category not in GROUP_FIELD_PATHS:
+        return None
+    field, row_key = mapping
+    field = normalize_group_field(category, field)
+    if field not in GROUP_FIELD_PATHS.get(category, {}):
+        # body_tool: diameter_mm есть в GROUP_FIELD_PATHS
+        return None
+    raw = row.get(row_key)
+    if raw is None or str(raw).strip() == "":
+        # запасные ключи
+        if category == "collet" and row.get("collet_type"):
+            raw = row.get("collet_type")
+        elif category == "insert":
+            raw = row.get("ins_name") or row.get("ins_iso") or row.get("item_name")
+        elif category == "gauge_smooth":
+            raw = row.get("ms_brand") or row.get("brand")
+        else:
+            return None
+    value = fmt_group_value(raw, field)
+    if not value or value == "—":
+        return None
+    if field in ("size_label", "thread_size_label"):
+        from shifts.size_label_normalize import normalize_cutting_size_label
+
+        value = (normalize_cutting_size_label(value) or value)[:80]
+    else:
+        value = str(value).strip()[:80]
+    if not value:
+        return None
+    return {
+        "category": category,
+        "group_field": field,
+        "group_value": value,
+        "group_label": GROUP_FIELD_LABELS.get(category, {}).get(field, field),
+        "category_label": dict(category_choices()).get(category, category),
+    }
+
+
 def evaluate_watch_templates(templates) -> list[dict]:
     rows: list[dict] = []
     for tpl in templates:
@@ -928,19 +1032,22 @@ def analysis_context(request, username: str) -> dict:
         for row in by_cat_raw
     ]
 
-    top_items = list(
-        base_tools.filter(quantity__gt=0)
-        .order_by("-quantity", "name")
-        .values("id", "name", "quantity", "category")[:12]
-    )
-    nomenclature_bars = [
+    _watch_bar_colors = {
+        "ok": "#70ad47",
+        "warn": "#ed7d31",
+        "critical": "#c55a11",
+    }
+    watch_bars = [
         {
-            "id": row["id"],
-            "name": (row["name"] or "—")[:48],
-            "quantity": int(row["quantity"] or 0),
-            "category": row["category"],
+            "id": row["template"].id,
+            "name": (row["template"].name or "—")[:48],
+            "quantity": int(row["total_qty"] or 0),
+            "min_qty": int(row["template"].min_qty or 0),
+            "status": row["status"],
+            "color": _watch_bar_colors.get(row["status"], "#5b9bd5"),
+            "stock_url": row.get("stock_url") or "",
         }
-        for row in top_items
+        for row in watch_rows[:16]
     ]
 
     # Сохраняем старые ключи сводки (пустые), чтобы старые шаблоны/ссылки не падали
@@ -964,9 +1071,11 @@ def analysis_context(request, username: str) -> dict:
         pie_cats = [{"label": r["label"], "total_qty": 0} for r in by_category[:1]]
 
     chart_payload = {
-        "nomenclature": {
-            "labels": [r["name"] for r in nomenclature_bars],
-            "values": [r["quantity"] for r in nomenclature_bars],
+        "watch": {
+            "labels": [r["name"] for r in watch_bars],
+            "values": [r["quantity"] for r in watch_bars],
+            "mins": [r["min_qty"] for r in watch_bars],
+            "colors": [r["color"] for r in watch_bars],
         },
         "categories": {
             "labels": [r["label"] for r in pie_cats],
@@ -978,7 +1087,7 @@ def analysis_context(request, username: str) -> dict:
         "analysis_dashboard": True,
         "dash_kpi_rows": kpi_rows,
         "dash_by_category": by_category,
-        "dash_nomenclature_bars": nomenclature_bars,
+        "dash_watch_bars": watch_bars,
         "dash_chart_data": chart_payload,
         "dash_nomenclature": nomenclature,
         "dash_below_min": below_min,

@@ -13,7 +13,7 @@
     </div>
     <div>
       <h1 class="auth-title">Регистрация</h1>
-      <p class="auth-subtitle">Логин — для входа. На email придёт ссылка для подтверждения; затем администратор одобрит учётную запись.</p>
+      <p class="auth-subtitle">Нужен код приглашения. На email придёт ссылка для подтверждения; затем администратор одобрит учётную запись.</p>
     </div>
   </header>
 
@@ -22,8 +22,24 @@
     <p class="auth-alert" role="alert">{{ error }}</p>
     {% endif %}
 
-    <form method="post" action="" class="auth-form">
+    {% if not register_open %}
+    <p class="auth-alert" role="status">{{ register_closed_message }}</p>
+    <p class="auth-footer">
+      Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a>
+    </p>
+    {% else %}
+    <form method="post" action="" class="auth-form" autocomplete="off">
       {% csrf_token %}
+
+      <div class="auth-hp" aria-hidden="true">
+        <label for="id_website">Сайт</label>
+        <input type="text" name="{{ honeypot_field }}" id="id_website" value="" tabindex="-1" autocomplete="off">
+      </div>
+
+      <label class="auth-field">
+        <span class="auth-label">Код приглашения</span>
+        <input class="auth-input" name="invite_code" value="{{ form_invite }}" autocomplete="off" required maxlength="64">
+      </label>
 
       <label class="auth-field">
         <span class="auth-label">Логин</span>
@@ -51,6 +67,7 @@
     <p class="auth-footer">
       Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a>
     </p>
+    {% endif %}
 
     <div class="auth-theme-row">
       <button type="button" class="nav-theme-btn" id="biota-theme-toggle" aria-pressed="false" title="Тема «Рассвет» (светлая)">{% include "shifts/includes/m_logo_svg.html" %}</button>
