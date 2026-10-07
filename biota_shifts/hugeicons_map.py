@@ -57,6 +57,11 @@ HUGICONS_STROKE_ROUNDED: dict[str, str] = {
     "ui.lock": "square-lock-01",
     "ui.unlock": "square-unlock-01",
     "ui.refresh": "refresh-01",
+    "chat.notebook": "edit-01",
+    "chat.archive": "album-01",
+    "chat.clear": "delete-02",
+    "chat.close": "cancel-01",
+    "chat.send": "sent",
 }
 
 HUGICONS_SVG_SOURCE: dict[str, str] = {

@@ -22,14 +22,17 @@
 <link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}?v={{ static_asset_version }}">
 <link rel="stylesheet" href="{% static 'shifts/css/inventory_analysis.css' %}?v={{ static_asset_version }}">
 {% endif %}
+{% if panel == "watch" %}
+<link rel="stylesheet" href="{% static 'shifts/css/inventory_watch.css' %}?v={{ static_asset_version }}">
+{% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="inv-page{% if panel == 'stock' %} inv-page--stock{% endif %}{% if panel == 'arrival' %} inv-page--arrival{% endif %}{% if panel == 'issue_outcome' %} inv-page--issue-outcome{% endif %}{% if panel == 'payroll' %} inv-page--payroll{% endif %}{% if panel == 'purchases' %} inv-page--purchases calc-page{% endif %}{% if panel == 'analysis' %} inv-page--analysis calc-page{% endif %}{% if panel == 'history' %} inv-page--history{% endif %}">
+<div class="inv-page{% if panel == 'stock' %} inv-page--stock{% endif %}{% if panel == 'arrival' %} inv-page--arrival{% endif %}{% if panel == 'issue_outcome' %} inv-page--issue-outcome{% endif %}{% if panel == 'payroll' %} inv-page--payroll{% endif %}{% if panel == 'purchases' %} inv-page--purchases calc-page{% endif %}{% if panel == 'analysis' %} inv-page--analysis calc-page{% endif %}{% if panel == 'watch' %} inv-page--watch{% endif %}{% if panel == 'history' %} inv-page--history{% endif %}">
 {% if panel != "defects" and panel != "payroll" and panel != "employees" %}
 {% include "shifts/includes/inventory_tabs.html" with active_tab=panel %}
 {% endif %}
-{% if panel != "defects" and panel != "payroll" and panel != "employees" and panel != "stock" and panel != "arrival" and panel != "issue_outcome" and panel != "purchases" and panel != "history" and panel != "analysis" %}
+{% if panel != "defects" and panel != "payroll" and panel != "employees" and panel != "stock" and panel != "arrival" and panel != "issue_outcome" and panel != "purchases" and panel != "history" and panel != "analysis" and panel != "watch" %}
 <h2 style="margin-top:0;">Склад инструмента</h2>
 <p class="muted">Отображается один тип инструмента за раз (по умолчанию: фрезы), только с остатком больше 0.</p>
 {% endif %}
@@ -289,7 +292,7 @@
         <th class="sortable">Материал инструмента</th>
         <th class="sortable">Покрытие</th>
         <th class="sortable">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete"></th>{% endif %}
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -304,17 +307,8 @@
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
       </tr>
       {% empty %}
       <tr><td colspan="{% if can_manage_stock %}8{% else %}7{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
@@ -336,7 +330,7 @@
         <th class="sortable hint-cell" data-hint="Материал инструмента (HSS, HSS-E, HSS-Co, твердосплав и др.)">Материал инструмента</th>
         <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
         <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -358,17 +352,8 @@
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить: 0 из 5" title="Удалить: нажмите 5 раз">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
       </tr>
       {% empty %}
       <tr><td colspan="{% if can_manage_stock %}13{% else %}12{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
@@ -390,7 +375,7 @@
         <th class="sortable hint-cell" data-hint="Число зубьев / пластин">Z</th>
         <th class="sortable hint-cell" data-hint="Диаметр хвостовика или посадки">d, мм</th>
         <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -412,17 +397,8 @@
         <td data-sort="{{ t.body_tool_spec.mount_diameter_mm|default:'-1' }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="bt_mount_diameter_mm" data-type="number" data-value="{{ t.body_tool_spec.mount_diameter_mm|default:'' }}"{% endif %}>{% if t.body_tool_spec.mount_diameter_mm is not None %}{{ t.body_tool_spec.mount_diameter_mm|dotformat:"-2" }}{% else %}-{% endif %}</td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
       </tr>
       {% empty %}
       <tr><td colspan="{% if can_manage_stock %}12{% else %}11{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
@@ -447,7 +423,7 @@
         <th class="sortable hint-cell" data-hint="Материал инструмента (HSS, HSS-E, HSS-Co, твердосплав и др.)">Материал инструмента</th>
         <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
         <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -470,17 +446,8 @@
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить: 0 из 5" title="Удалить: нажмите 5 раз">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
       </tr>
       {% empty %}
       <tr><td colspan="{% if can_manage_stock %}16{% else %}15{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
@@ -498,7 +465,7 @@
         <th class="sortable hint-cell" data-hint="Материал инструмента (HSS, HSS-E, HSS-Co, твердосплав и др.)">Материал инструмента</th>
         <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
         <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -514,17 +481,8 @@
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить: 0 из 5" title="Удалить: нажмите 5 раз">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
       </tr>
       {% empty %}
       <tr><td colspan="{% if can_manage_stock %}8{% else %}7{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
@@ -546,7 +504,7 @@
         <th class="sortable hint-cell" data-hint="Материал инструмента (HSS, HSS-E, HSS-Co, твердосплав и др.)">Материал инструмента</th>
         <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
         <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -566,17 +524,8 @@
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить: 0 из 5" title="Удалить: нажмите 5 раз">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
       </tr>
       {% empty %}
       <tr><td colspan="{% if can_manage_stock %}13{% else %}12{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
@@ -594,7 +543,7 @@
         <th class="sortable" title="{{ tips.coating }}">Покрытие</th>
         <th class="sortable hint-cell inv-stock-notes-col" data-hint="Заметка — наведите на иконку в строке" aria-label="Заметка"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></th>
         <th class="sortable" title="{{ tips.stock_qty }}">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete" title="{{ tips.delete }}">Удалить</th>{% endif %}
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -609,17 +558,8 @@
         <td class="inv-stock-notes-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}><span class="inv-stock-notes-tip{% if not t.notes %} is-empty{% endif %}" {% if t.notes %}data-hint="{{ t.notes|escape }}"{% else %}title="Нет заметки"{% endif %} aria-label="{% if t.notes %}{{ t.notes|escape }}{% else %}Нет заметки{% endif %}"><svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span></td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить: 0 из 5" title="Удалить: нажмите 5 раз">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
       </tr>
       {% empty %}
       <tr><td colspan="{% if can_manage_stock %}7{% else %}6{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
@@ -640,7 +580,7 @@
         <th class="sortable hint-cell" data-hint="Материал инструмента (HSS, HSS-E, HSS-Co, твердосплав и др.)">Материал инструмента</th>
         <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
         <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -658,17 +598,8 @@
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить: 0 из 5" title="Удалить: нажмите 5 раз">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
       </tr>
       {% empty %}
       <tr><td colspan="{% if can_manage_stock %}10{% else %}9{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
@@ -689,7 +620,7 @@
         <th class="sortable hint-cell" data-hint="Материал инструмента (HSS, HSS-E, HSS-Co, твердосплав и др.)">Материал инструмента</th>
         <th class="sortable hint-cell" data-hint="Покрытие инструмента">Покрытие</th>
         <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -708,17 +639,8 @@
         </td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить: 0 из 5" title="Удалить: нажмите 5 раз">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
       </tr>
       {% empty %}
       <tr><td colspan="{% if can_manage_stock %}12{% else %}11{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
@@ -738,7 +660,7 @@
         <th class="sortable">Стандарт</th>
         <th class="sortable">AA</th>
         <th class="sortable">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete">Удалить</th>{% endif %}
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -756,17 +678,8 @@
         <td data-sort="{% if c and c.high_precision_aa %}1{% else %}0{% endif %}" {% if can_manage_stock and c %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="high_precision_aa" data-type="select" data-value="{% if c.high_precision_aa %}1{% else %}0{% endif %}"{% endif %}>{% if c and c.high_precision_aa %}AA{% else %}-{% endif %}</td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить: 0 из 5" title="Удалить: нажмите 5 раз">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
       </tr>
       {% endwith %}
       {% empty %}
@@ -788,7 +701,7 @@
         <th class="sortable hint-cell" data-hint="Подходящие цанги (для цангового) или винты (для боковой/термо)">Подходит</th>
         <th class="sortable hint-cell inv-stock-notes-text-col" data-hint="Описание позиции">Описание</th>
         <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -805,17 +718,8 @@
         <td class="inv-stock-notes-text-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}>{{ t.notes|default:"-" }}</td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
       </tr>
       {% endwith %}
       {% empty %}
@@ -853,7 +757,7 @@
         {% endif %}
         <th class="sortable hint-cell inv-stock-notes-text-col" data-hint="Описание позиции">Описание</th>
         <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
-        {% if can_manage_stock %}<th class="inv-stock-col-delete hint-cell" data-hint="Удалить позицию со склада">Удалить</th>{% endif %}
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -886,17 +790,8 @@
         <td class="inv-stock-notes-text-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}>{{ t.notes|default:"-" }}</td>
         <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
         {% if can_manage_stock %}
-        <td class="inv-stock-col-delete">
-          <form method="post" class="inv-stock-delete-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_tool_item">
-            <input type="hidden" name="tool_id" value="{{ t.id }}">
-            <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить">
-              <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-            </button>
-          </form>
-        </td>
-        {% endif %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
       </tr>
       {% endwith %}
       {% empty %}
@@ -1595,10 +1490,8 @@
 {% if biota_can_edit %}
 <div class="filter-panel" id="issue-block">
   <h3>Выдача инструмента</h3>
-  <form method="post" class="filter-grid">
-    {% csrf_token %}
-    <input type="hidden" name="action" value="move_stock">
-    <input type="hidden" name="movement_type" value="issue">
+  <p class="issue-draft-hint muted">Добавляйте позиции в список, затем выдайте всё сразу. Список сохраняется в браузере — после обновления страницы не пропадёт. Отметьте «Списать», если позицию нужно сразу списать (потребуется комментарий).</p>
+  <div class="filter-grid issue-picker-grid">
     <label class="field"><span>Тип инструмента</span>
       <select class="js-tool-category" data-target-select="issue-tool-select">
         <option value="">Все</option>
@@ -1612,7 +1505,7 @@
     {% include "shifts/includes/issue_tool_filters.html" with radio_prefix="issue_ui" target_select_id="issue-tool-select" %}
     <label class="field issue-tool-field"><span>Инструмент</span>
       <div class="issue-tool-combo js-issue-tool-combo">
-        <select id="issue-tool-select" name="tool_id" required class="issue-tool-combo-native" tabindex="-1" aria-hidden="true">
+        <select id="issue-tool-select" class="issue-tool-combo-native" tabindex="-1" aria-hidden="true">
           <option value="">Выбрать...</option>
           {% for t in movement_tool_options %}
           {% with card=t.issue_combo_card coat=t.coating_type|default:'none' m=t.issue_filter_metrics %}
@@ -1676,7 +1569,31 @@
         <div id="issue-tool-combo-listbox" class="issue-tool-combo-panel js-issue-tool-combo-panel" hidden role="listbox" aria-labelledby="issue-tool-combo-trigger"></div>
       </div>
     </label>
-    <label class="field"><span>Количество</span><input type="number" name="quantity" min="1" required></label>
+    <label class="field"><span>Количество</span><input type="number" id="issue-line-qty" min="1" value="1"></label>
+    <label class="field issue-writeoff-field">
+      <span class="issue-writeoff-label">
+        <input type="checkbox" id="issue-line-writeoff">
+        Списать сразу
+      </span>
+    </label>
+    <div class="filter-actions issue-picker-actions">
+      <button type="button" class="btn" id="issue-add-line">В список</button>
+    </div>
+  </div>
+
+  <section class="issue-draft" id="issue-draft" aria-label="Список к выдаче">
+    <div class="issue-draft-head">
+      <h4 class="issue-draft-title">Список к выдаче <span class="issue-draft-count" id="issue-draft-count">0</span></h4>
+      <button type="button" class="btn btn-ghost issue-draft-clear" id="issue-draft-clear" hidden>Очистить</button>
+    </div>
+    <p class="issue-draft-empty muted" id="issue-draft-empty">Пока пусто — выберите инструмент и нажмите «В список».</p>
+    <ul class="issue-draft-list" id="issue-draft-list" hidden></ul>
+  </section>
+
+  <form method="post" class="filter-grid issue-bulk-form" id="issue-bulk-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="issue_bulk">
+    <input type="hidden" name="rows_json" id="issue-bulk-rows-json" value="[]">
     <label class="field" style="position:relative;">
       <span>Сотрудник (СКУД)</span>
       <input type="hidden" name="employee_name" id="issue-employee-value" required>
@@ -1699,9 +1616,11 @@
         {% endif %}
       </div>
     </label>
-    <label class="field"><span>Дата</span><input type="date" name="movement_date" value="{{ today }}" required></label>
-    <label class="field"><span>Комментарий</span><input type="text" name="comment"></label>
-    <div class="filter-actions"><button type="submit" class="btn"{% if not employee_options %} disabled title="Нет сотрудников СКУД"{% endif %}>Сохранить операцию</button></div>
+    <label class="field"><span>Дата</span><input type="date" name="movement_date" id="issue-movement-date" value="{{ today }}" required></label>
+    <label class="field"><span id="issue-comment-label">Комментарий</span><input type="text" name="comment" id="issue-comment" placeholder="При списании — причина"></label>
+    <div class="filter-actions">
+      <button type="submit" class="btn" id="issue-bulk-submit"{% if not employee_options %} disabled title="Нет сотрудников СКУД"{% endif %}>Выдать список</button>
+    </div>
   </form>
 </div>
 <script>
@@ -1709,7 +1628,7 @@
   var empSearch = document.getElementById("issue-employee-search");
   var empValue = document.getElementById("issue-employee-value");
   var empList = document.getElementById("issue-employee-list");
-  var form = empSearch && empSearch.closest("form");
+  var form = document.getElementById("issue-bulk-form");
   if (!empSearch || !empList || !empValue) return;
 
   var empItems = Array.prototype.slice.call(empList.querySelectorAll(".defect-emp-item"));
@@ -1751,6 +1670,9 @@
     empSearch.value = v;
     empValue.value = v;
     hideList();
+    try {
+      document.dispatchEvent(new CustomEvent("biota:issue-draft-meta"));
+    } catch (_) {}
   }
 
   empSearch.addEventListener("focus", function () {
@@ -1763,6 +1685,9 @@
     var vis = filterItems(empSearch.value);
     activeIdx = -1;
     if (vis.length) showList(); else hideList();
+    try {
+      document.dispatchEvent(new CustomEvent("biota:issue-draft-meta"));
+    } catch (_) {}
   });
 
   empSearch.addEventListener("keydown", function (e) {
@@ -2506,6 +2431,10 @@
 {% include "shifts/includes/inventory_analysis_panel.html" %}
 {% endif %}
 
+{% if panel == "watch" %}
+{% include "shifts/includes/inventory_watch_panel.html" %}
+{% endif %}
+
 {% if panel == "purchases" %}
 <div class="inv-purchases-hero calc-header">
   <div class="calc-header-icon">
@@ -2743,7 +2672,7 @@
         </label>
         <label class="calc-field field">
           <span class="calc-label">Цена за 1 шт</span>
-          <input type="number" name="unit_price" min="0" step="0.01" value="0" required class="calc-inp calc-inp--plain">
+          <input type="number" name="unit_price" min="0" step="0.01" placeholder="необязательно" class="calc-inp calc-inp--plain">
         </label>
         <label class="calc-field field">
           <span class="calc-label">Комментарий</span>

@@ -913,7 +913,7 @@ def dead_stock(idle_days: Any = 90, limit: int = 15) -> dict[str, Any]:
 
 
 def watch_alerts(username: str = "", only_problems: Any = True) -> dict[str, Any]:
-    """Шаблоны контроля остатков текущего пользователя (вкладка «Анализ»)."""
+    """Шаблоны контроля остатков текущего пользователя (вкладка «Контроль»)."""
     from .inventory_analysis import evaluate_watch_templates, list_watch_templates
 
     user = _clip(username, 120)
@@ -921,7 +921,7 @@ def watch_alerts(username: str = "", only_problems: Any = True) -> dict[str, Any
         return {
             "error": "Нет имени пользователя для шаблонов контроля.",
             "rows": [],
-            "hint": "Контроль остатков личный — смотрите вкладку «Анализ».",
+            "hint": "Контроль остатков личный — смотрите вкладку «Контроль».",
         }
     if isinstance(only_problems, bool):
         problems_only = only_problems
@@ -950,7 +950,7 @@ def watch_alerts(username: str = "", only_problems: Any = True) -> dict[str, Any
             }
         )
     if not templates:
-        hint = "У вас нет активных шаблонов контроля (вкладка «Анализ» склада)."
+        hint = "У вас нет активных шаблонов контроля (вкладка «Контроль» склада)."
     elif problems_only and not rows:
         hint = f"Все шаблоны в норме ({ok_n} шт.)."
     else:
@@ -1258,7 +1258,7 @@ TOOL_SPECS: dict[str, dict[str, Any]] = {
     },
     "watch_alerts": {
         "description": (
-            "Личные шаблоны КОНТРОЛЯ остатков (вкладка Анализ): ниже минимума / ноль. "
+            "Личные шаблоны КОНТРОЛЯ остатков (вкладка Контроль): ниже минимума / ноль. "
             "Не топ остатков."
         ),
         "args": {

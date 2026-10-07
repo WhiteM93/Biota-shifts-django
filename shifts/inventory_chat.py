@@ -110,6 +110,10 @@ _NOTEBOOK_RE = re.compile(
     r"feature\s*request|сделай\s+(?:чтобы|чтоб)\s+(?:на\s+сайте|в\s+кабинет|в\s+складе)",
     re.IGNORECASE,
 )
+_NOTEBOOK_PREFIX_RE = re.compile(
+    r"^(?:запиши|добавь)\s+(?:в\s+)?блокнот\s*:?\s*",
+    re.IGNORECASE,
+)
 _NOTEBOOK_TARGET = "блокнот"
 _WORD_RE = re.compile(r"[A-Za-zА-Яа-яЁё]{4,14}")
 _QUERY_ARG_KEYS = ("query",)
@@ -267,6 +271,7 @@ _ALLOWED_PANELS = frozenset(
         "arrival",
         "purchases",
         "analysis",
+        "watch",
         "defects",
         "payroll",
         "employees",
@@ -279,7 +284,8 @@ _PANEL_LABELS = {
     "issue_outcome": "возврат/списание",
     "arrival": "приход",
     "purchases": "закупки",
-    "analysis": "анализ склада",
+    "analysis": "главная склада",
+    "watch": "контроль остатков",
     "defects": "брак",
     "payroll": "зарплата",
     "employees": "сотрудники",
@@ -361,7 +367,7 @@ def _extract_hold_employee(q: str) -> str:
 def _panel_summary_tool(page_context: dict[str, str] | None) -> dict[str, Any] | None:
     ctx = normalize_page_context(page_context or {})
     page, panel = ctx["page"], ctx["panel"]
-    if page == "inventory" and panel in {"analysis", "issue_outcome"}:
+    if page == "inventory" and panel in {"analysis", "watch", "issue_outcome"}:
         return {"tool": "overdue_open_issues", "args": {"min_days": 14, "limit": 20}}
     if page == "inventory" and panel == "issue":
         return {"tool": "open_issues", "args": {"limit": 20}}
@@ -403,7 +409,11 @@ def forced_tool_call(
     notebook = bool(_NOTEBOOK_RE.search(q))
 
     if notebook:
-        return {"tool": "add_site_note", "args": {"title": q_raw[:120], "body": q_raw[:2000]}}
+        note_text = _NOTEBOOK_PREFIX_RE.sub("", q).strip()
+        if not note_text:
+            # Только префикс «Добавь в блокнот:» — тело пустое, add_site_note вернёт ошибку.
+            note_text = ""
+        return {"tool": "add_site_note", "args": {"title": note_text[:120], "body": note_text[:2000]}}
     if who and not hold:
         src = q_norm if _WHO_RE.search(q) else normalize_inventory_chat_query(blob)
         tool_q = _strip_prefix(
@@ -525,6 +535,50 @@ def _pick_tool_call(
     return None
 
 
+def is_notebook_chat_question(question: str) -> bool:
+    """Заявка в блокнот — детерминированный маршрут без YandexGPT."""
+    q = fix_notebook_typos((question or "").strip())
+    return bool(q) and bool(_NOTEBOOK_RE.search(q))
+
+
+def _run_notebook_tool(
+    q_raw: str,
+    *,
+    history: list[dict[str, str]] | None,
+    page_ctx: dict[str, str],
+    username: str,
+) -> dict[str, Any]:
+    call = forced_tool_call(q_raw, history, page_ctx) or {
+        "tool": "add_site_note",
+        "args": {"title": q_raw[:120], "body": q_raw[:2000]},
+    }
+    if call.get("tool") != "add_site_note":
+        call = {"tool": "add_site_note", "args": {"title": q_raw[:120], "body": q_raw[:2000]}}
+    tool_result = run_tool(
+        "add_site_note",
+        call.get("args") or {},
+        context={
+            "username": username or "",
+            "source_question": q_raw,
+            "page_context": page_ctx,
+        },
+    )
+    used_tools = ["add_site_note"]
+    if tool_result.get("ok"):
+        return {
+            "ok": True,
+            "reply": tool_result.get("reply")
+            or "Записал в блокнот для администратора.",
+            "used_tools": used_tools,
+            "notebook_id": tool_result.get("id"),
+        }
+    return {
+        "ok": False,
+        "error": tool_result.get("error") or "Не удалось записать в блокнот.",
+        "used_tools": used_tools,
+    }
+
+
 def ask_inventory_chat(
     question: str,
     *,
@@ -537,6 +591,18 @@ def ask_inventory_chat(
         return {"ok": False, "error": "Пустой вопрос."}
     if len(q_raw) > 800:
         return {"ok": False, "error": "Слишком длинный вопрос."}
+
+    page_ctx = normalize_page_context(page_context)
+
+    # Блокнот / «предложить изменение» — без GPT и без снимка склада.
+    if is_notebook_chat_question(q_raw):
+        return _run_notebook_tool(
+            q_raw,
+            history=history,
+            page_ctx=page_ctx,
+            username=username,
+        )
+
     if not yandex_gpt_configured():
         return {
             "ok": False,
@@ -545,7 +611,6 @@ def ask_inventory_chat(
 
     # Модели отдаём канонику (⌀/M/точка, «блокнот»); в блокнот пишем исходный текст.
     q = normalize_inventory_chat_query(fix_notebook_typos(q_raw))
-    page_ctx = normalize_page_context(page_context)
     used_tools: list[str] = []
     try:
         snapshot = build_warehouse_context(username=username or "")

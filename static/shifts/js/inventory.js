@@ -932,6 +932,327 @@ var INV = (function () {
   var issueSel = document.getElementById("issue-tool-select");
   if (issueWrap && issueSel) comboBindUi(issueWrap, issueSel);
 
+  (function initIssueDraftList() {
+    var root = document.getElementById("issue-block");
+    if (!root) return;
+    var LS_KEY = "biota_issue_draft_v1";
+    var toolSel = document.getElementById("issue-tool-select");
+    var qtyInp = document.getElementById("issue-line-qty");
+    var writeoffInp = document.getElementById("issue-line-writeoff");
+    var addBtn = document.getElementById("issue-add-line");
+    var listEl = document.getElementById("issue-draft-list");
+    var emptyEl = document.getElementById("issue-draft-empty");
+    var countEl = document.getElementById("issue-draft-count");
+    var clearBtn = document.getElementById("issue-draft-clear");
+    var form = document.getElementById("issue-bulk-form");
+    var rowsJson = document.getElementById("issue-bulk-rows-json");
+    var empSearch = document.getElementById("issue-employee-search");
+    var empValue = document.getElementById("issue-employee-value");
+    var dateInp = document.getElementById("issue-movement-date");
+    var commentInp = document.getElementById("issue-comment");
+    var commentLabel = document.getElementById("issue-comment-label");
+    if (!toolSel || !qtyInp || !addBtn || !listEl || !form || !rowsJson) return;
+
+    var draft = { employee: "", date: "", comment: "", lines: [] };
+
+    function toolLabel(opt) {
+      if (!opt) return "";
+      return (
+        (opt.getAttribute("data-issue-name") || "").trim() ||
+        (opt.textContent || "").trim() ||
+        ("#" + (opt.value || ""))
+      );
+    }
+
+    function stockQty(opt) {
+      var n = parseInt(opt && opt.getAttribute("data-issue-qty"), 10);
+      return isNaN(n) ? null : n;
+    }
+
+    function hasWriteoff() {
+      return draft.lines.some(function (line) {
+        return !!line.writeoff;
+      });
+    }
+
+    function updateCommentLabel() {
+      if (!commentLabel) return;
+      commentLabel.textContent = hasWriteoff()
+        ? "Комментарий (обязателен при списании)"
+        : "Комментарий";
+    }
+
+    function persist() {
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(draft));
+      } catch (err) {}
+      rowsJson.value = JSON.stringify(
+        draft.lines.map(function (line) {
+          var row = { tool_id: line.tool_id, quantity: line.quantity };
+          if (line.writeoff) {
+            row.writeoff = true;
+            row.writeoff_qty = line.quantity;
+          }
+          return row;
+        })
+      );
+      render();
+    }
+
+    function readMetaFromForm() {
+      draft.employee = (empValue && empValue.value) || "";
+      draft.date = (dateInp && dateInp.value) || "";
+      draft.comment = (commentInp && commentInp.value) || "";
+    }
+
+    function applyMetaToForm() {
+      if (dateInp && draft.date) dateInp.value = draft.date;
+      if (commentInp) commentInp.value = draft.comment || "";
+      if (empSearch && empValue && draft.employee) {
+        empSearch.value = draft.employee;
+        empValue.value = draft.employee;
+      }
+    }
+
+    function load() {
+      var params = new URLSearchParams(window.location.search || "");
+      if (params.get("issued") === "1") {
+        try {
+          localStorage.removeItem(LS_KEY);
+        } catch (err) {}
+        draft = { employee: "", date: (dateInp && dateInp.value) || "", comment: "", lines: [] };
+        try {
+          history.replaceState({}, "", "?panel=issue");
+        } catch (err2) {}
+        persist();
+        return;
+      }
+      try {
+        var raw = localStorage.getItem(LS_KEY);
+        if (!raw) {
+          draft.date = (dateInp && dateInp.value) || "";
+          persist();
+          return;
+        }
+        var parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") throw new Error("bad");
+        draft.employee = String(parsed.employee || "");
+        draft.date = String(parsed.date || "") || ((dateInp && dateInp.value) || "");
+        draft.comment = String(parsed.comment || "");
+        draft.lines = Array.isArray(parsed.lines)
+          ? parsed.lines
+              .map(function (line) {
+                var id = parseInt(line && line.tool_id, 10);
+                var qty = parseInt(line && line.quantity, 10);
+                if (!id || !qty || qty < 1) return null;
+                var opt = toolSel.querySelector('option[value="' + id + '"]');
+                return {
+                  tool_id: id,
+                  quantity: qty,
+                  writeoff: !!(line && line.writeoff),
+                  label: (line && line.label) || toolLabel(opt) || "#" + id,
+                };
+              })
+              .filter(Boolean)
+          : [];
+      } catch (err) {
+        draft = { employee: "", date: (dateInp && dateInp.value) || "", comment: "", lines: [] };
+      }
+      applyMetaToForm();
+      persist();
+    }
+
+    function render() {
+      listEl.innerHTML = "";
+      var n = draft.lines.length;
+      if (countEl) countEl.textContent = String(n);
+      if (clearBtn) {
+        if (n) clearBtn.removeAttribute("hidden");
+        else clearBtn.setAttribute("hidden", "hidden");
+      }
+      updateCommentLabel();
+      if (!n) {
+        listEl.hidden = true;
+        if (emptyEl) emptyEl.hidden = false;
+        return;
+      }
+      if (emptyEl) emptyEl.hidden = true;
+      listEl.hidden = false;
+      draft.lines.forEach(function (line, idx) {
+        var li = document.createElement("li");
+        li.className = "issue-draft-item" + (line.writeoff ? " is-writeoff" : "");
+        li.setAttribute("data-idx", String(idx));
+        var opt = toolSel.querySelector('option[value="' + line.tool_id + '"]');
+        var stock = stockQty(opt);
+        var meta = stock == null ? "" : " · остаток " + stock;
+        li.innerHTML =
+          '<div class="issue-draft-item__main">' +
+          '<span class="issue-draft-item__name"></span>' +
+          '<span class="issue-draft-item__meta muted"></span>' +
+          "</div>" +
+          '<label class="issue-draft-item__writeoff">' +
+          '<input type="checkbox" class="issue-draft-item__writeoff-inp"' +
+          (line.writeoff ? " checked" : "") +
+          '> Списать' +
+          "</label>" +
+          '<div class="issue-draft-item__qty">' +
+          '<input type="number" min="1" class="issue-draft-item__qty-inp" value="' +
+          line.quantity +
+          '" aria-label="Количество">' +
+          "</div>" +
+          '<button type="button" class="btn btn-ghost issue-draft-item__remove" title="Убрать" aria-label="Убрать">×</button>';
+        li.querySelector(".issue-draft-item__name").textContent = line.label || "#" + line.tool_id;
+        li.querySelector(".issue-draft-item__meta").textContent = meta;
+        listEl.appendChild(li);
+      });
+    }
+
+    function addLine() {
+      var id = parseInt(toolSel.value, 10);
+      var qty = parseInt(qtyInp.value, 10);
+      var writeoff = !!(writeoffInp && writeoffInp.checked);
+      if (!id) {
+        alert("Выберите инструмент.");
+        return;
+      }
+      if (!qty || qty < 1) {
+        alert("Укажите количество.");
+        qtyInp.focus();
+        return;
+      }
+      var opt = toolSel.querySelector('option[value="' + id + '"]');
+      var stock = stockQty(opt);
+      var existing = draft.lines.find(function (line) {
+        return line.tool_id === id && !!line.writeoff === writeoff;
+      });
+      var totalForTool = draft.lines.reduce(function (sum, line) {
+        return line.tool_id === id ? sum + line.quantity : sum;
+      }, 0);
+      var nextQty = totalForTool + qty;
+      if (stock != null && nextQty > stock) {
+        if (
+          !window.confirm(
+            "В списке будет " +
+              nextQty +
+              ", а на складе сейчас " +
+              stock +
+              ". Всё равно добавить?"
+          )
+        ) {
+          return;
+        }
+      }
+      if (existing) {
+        existing.quantity = nextQty;
+        existing.label = toolLabel(opt) || existing.label;
+      } else {
+        draft.lines.push({
+          tool_id: id,
+          quantity: qty,
+          writeoff: writeoff,
+          label: toolLabel(opt),
+        });
+      }
+      readMetaFromForm();
+      persist();
+      qtyInp.value = "1";
+      if (writeoffInp) writeoffInp.checked = false;
+    }
+
+    addBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      addLine();
+    });
+    qtyInp.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addLine();
+      }
+    });
+
+    listEl.addEventListener("click", function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest(".issue-draft-item__remove") : null;
+      if (!btn) return;
+      var item = btn.closest(".issue-draft-item");
+      var idx = item ? parseInt(item.getAttribute("data-idx"), 10) : -1;
+      if (idx < 0 || idx >= draft.lines.length) return;
+      draft.lines.splice(idx, 1);
+      readMetaFromForm();
+      persist();
+    });
+
+    listEl.addEventListener("change", function (e) {
+      var target = e.target;
+      if (!target || !target.closest) return;
+      var item = target.closest(".issue-draft-item");
+      var idx = item ? parseInt(item.getAttribute("data-idx"), 10) : -1;
+      if (idx < 0 || idx >= draft.lines.length) return;
+
+      var writeoffCb = target.closest(".issue-draft-item__writeoff-inp");
+      if (writeoffCb) {
+        draft.lines[idx].writeoff = !!writeoffCb.checked;
+        readMetaFromForm();
+        persist();
+        return;
+      }
+
+      var inp = target.closest(".issue-draft-item__qty-inp");
+      if (!inp) return;
+      var qty = parseInt(inp.value, 10);
+      if (!qty || qty < 1) {
+        inp.value = String(draft.lines[idx].quantity);
+        return;
+      }
+      draft.lines[idx].quantity = qty;
+      readMetaFromForm();
+      persist();
+    });
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function () {
+        if (!draft.lines.length) return;
+        if (!window.confirm("Очистить список выдачи?")) return;
+        draft.lines = [];
+        readMetaFromForm();
+        persist();
+      });
+    }
+
+    function onMetaChange() {
+      readMetaFromForm();
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(draft));
+      } catch (err) {}
+    }
+    document.addEventListener("biota:issue-draft-meta", onMetaChange);
+    if (dateInp) dateInp.addEventListener("change", onMetaChange);
+    if (commentInp) {
+      commentInp.addEventListener("input", onMetaChange);
+      commentInp.addEventListener("change", onMetaChange);
+    }
+
+    form.addEventListener("submit", function (e) {
+      readMetaFromForm();
+      if (!draft.lines.length) {
+        e.preventDefault();
+        alert("Добавьте хотя бы одну позицию в список.");
+        return;
+      }
+      if (!(empValue && empValue.value.trim())) {
+        return;
+      }
+      if (hasWriteoff() && !(commentInp && commentInp.value.trim())) {
+        e.preventDefault();
+        alert("Укажите причину списания в комментарии.");
+        if (commentInp) commentInp.focus();
+        return;
+      }
+      persist();
+    });
+
+    load();
+  })();
+
   /* Initialize issue-outcome panel combo + filters */
   var outcomeWrap = document.querySelector("#issue-outcome-block .js-issue-tool-combo");
   var outcomeSel = document.getElementById("issue-id-select");
@@ -4137,40 +4458,29 @@ var INV = (function () {
     Место: 1,
   };
 
+  var PLACE_HOVER_EMPTY = "Нет информации";
+
   function placeHoverTitleFromCatalog(p) {
-    if (!p) return "";
+    if (!p) return PLACE_HOVER_EMPTY;
     var addr = String(p.address || "").trim().toUpperCase();
     var note = String(p.notes || "").trim();
     var label = String(p.label || "").trim();
     var labelUp = label.toUpperCase();
-    var customOk = label && !ADDR_KIND_FALLBACKS[label] && labelUp !== addr;
-    var base = "";
-    if (customOk) {
-      base = label;
-    } else {
-      var bits = [];
-      var fname = String(p.furniture_name || p.furniture_code || "").trim();
-      if (fname) bits.push(fname);
-      var shelf = String(p.shelf_label || "").trim();
-      if (shelf) {
-        bits.push((String(p.level_kind || "shelf") === "drawer" ? "ящик " : "полка ") + shelf);
-      }
-      var placeLab = String(p.place_label || "").trim();
-      if (placeLab) bits.push("место " + placeLab);
-      base = bits.join(" · ");
-    }
-    if (note) return base ? base + " · " + note : note;
-    return base;
+    var customOk = !!(label && !ADDR_KIND_FALLBACKS[label] && labelUp !== addr);
+    if (customOk && note) return label + " · " + note;
+    if (customOk) return label;
+    if (note) return note;
+    return PLACE_HOVER_EMPTY;
   }
 
   function syncWarehouseAddressTitlesFromCatalog(catalog) {
     ((catalog && catalog.places) || []).forEach(function (p) {
       var addr = String((p && p.address) || "").trim().toUpperCase();
       if (!addr) return;
-      // Не затирать наименование из справочника generic-подписью («На полке» / сам адрес).
-      if (warehouseAddressTitles[addr]) return;
-      var title = placeHoverTitleFromCatalog(p);
-      if (title) warehouseAddressTitles[addr] = title;
+      var existing = warehouseAddressTitles[addr];
+      // Не затирать реальное имя из справочника пустой/generic подписью.
+      if (existing && existing !== PLACE_HOVER_EMPTY && !ADDR_KIND_FALLBACKS[existing]) return;
+      warehouseAddressTitles[addr] = placeHoverTitleFromCatalog(p);
     });
   }
 
@@ -4181,12 +4491,11 @@ var INV = (function () {
       cell.removeAttribute("title");
       return;
     }
-    var title = warehouseAddressTitles[a] || "";
-    if (title && title.toUpperCase() !== a && !ADDR_KIND_FALLBACKS[title]) {
-      cell.setAttribute("title", title);
-    } else {
-      cell.removeAttribute("title");
+    var title = warehouseAddressTitles[a] || PLACE_HOVER_EMPTY;
+    if (title.toUpperCase() === a || ADDR_KIND_FALLBACKS[title]) {
+      title = PLACE_HOVER_EMPTY;
     }
+    cell.setAttribute("title", title || PLACE_HOVER_EMPTY);
   }
 
   function applyAddressCellTitles(root) {

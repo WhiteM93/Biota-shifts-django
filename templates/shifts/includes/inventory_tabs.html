@@ -1,6 +1,7 @@
-{# Вкладки разделов склада. active_tab: analysis|stock|history|issue|issue_outcome|arrival|purchases|visual_warehouse #}
+{# Вкладки разделов склада. active_tab: analysis|watch|stock|history|issue|issue_outcome|arrival|purchases|visual_warehouse #}
 <nav class="inv-tabs" aria-label="Разделы склада">
   <a class="inv-tab {% if active_tab == 'analysis' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=analysis">Главная</a>
+  <a class="inv-tab {% if active_tab == 'watch' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=watch">Контроль</a>
   <a class="inv-tab {% if active_tab == 'stock' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=stock">Склад</a>
   {% if not biota_is_executor %}
   <a class="inv-tab {% if active_tab == 'history' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=history">История</a>

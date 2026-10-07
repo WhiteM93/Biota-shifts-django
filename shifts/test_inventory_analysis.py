@@ -1,8 +1,11 @@
-"""Тесты вкладки «Анализ» склада."""
+"""Тесты вкладки «Анализ» / «Контроль» склада."""
 
 from decimal import Decimal
 
-from django.test import TestCase
+from django.test import Client, TestCase
+from django.urls import reverse
+
+from biota_shifts.config import ADMIN_USERNAME
 
 from shifts.inventory_analysis import aggregate_by_group, group_total_qty, watch_status
 from shifts.models import EndMillSpec, InventoryWatchTemplate, TapSpec, ToolItem
@@ -61,6 +64,48 @@ class InventoryAnalysisTests(TestCase):
             min_qty=5,
         )
         self.assertEqual(InventoryWatchTemplate.objects.count(), 1)
+
+
+class WatchPanelTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        session = self.client.session
+        session["biota_username"] = ADMIN_USERNAME
+        session.save()
+        self.inv_url = reverse("inventory")
+
+    def test_watch_panel_renders(self):
+        resp = self.client.get(self.inv_url + "?panel=watch")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode("utf-8", errors="replace")
+        self.assertIn("inv-watch", html)
+        self.assertIn("Контроль остатков", html)
+        self.assertIn("save_watch_template", html)
+
+    def test_save_watch_template_from_panel(self):
+        tool = ToolItem.objects.create(category="end_mill", name="F2", quantity=3)
+        EndMillSpec.objects.create(tool=tool, diameter_mm=Decimal("2"), mill_type="end", flutes_count=2)
+        resp = self.client.post(
+            self.inv_url,
+            {
+                "action": "save_watch_template",
+                "watch_category": "end_mill",
+                "watch_group_field": "diameter_mm",
+                "watch_group_value": "2",
+                "watch_min_qty": "5",
+                "watch_name": "",
+                "watch_notes": "ходовая",
+            },
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("panel=watch", resp.redirect_chain[0][0])
+        tpl = InventoryWatchTemplate.objects.get(username=ADMIN_USERNAME)
+        self.assertEqual(tpl.group_value, "2")
+        self.assertEqual(tpl.min_qty, 5)
+        self.assertIn("2", tpl.name)
+        html = resp.content.decode("utf-8", errors="replace")
+        self.assertIn("inv-watch-badge--warn", html)
 
 
 class DashboardMonthStatsTests(TestCase):

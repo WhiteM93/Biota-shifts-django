@@ -1,0 +1,24 @@
+<td class="inv-stock-col-delete">
+  <div class="inv-stock-row-actions">
+    <span
+      class="inv-stock-notes-tip inv-stock-added-tip{% if not t.stock_added_by_label %} is-empty{% endif %}"
+      data-hint="{{ t.stock_added_hint|default:'Кто добавил не зафиксирован'|escape }}"
+      role="img"
+      aria-label="{{ t.stock_added_hint|default:'Кто добавил не зафиксирован'|escape }}"
+      title="{% if t.stock_added_by_label %}{{ t.stock_added_by_label }}{% else %}Кто добавил не зафиксирован{% endif %}"
+    >
+      <svg class="inv-stock-notes-tip__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    </span>
+    <form method="post" class="inv-stock-delete-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="delete_tool_item">
+      <input type="hidden" name="tool_id" value="{{ t.id }}">
+      <button type="button" class="btn btn-inv-delete btn-inv-delete--s0" data-step="0" aria-label="Удалить: 0 из 5" title="Удалить: нажмите 5 раз">
+        <svg class="btn-inv-delete__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+      </button>
+    </form>
+  </div>
+</td>

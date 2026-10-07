@@ -2348,7 +2348,7 @@ class UserHomeLowStockPrefs(models.Model):
 
 
 class InventoryWatchTemplate(models.Model):
-    """Строка контроля ходового инструмента (вкладка «Анализ»)."""
+    """Строка контроля ходового инструмента (вкладка «Контроль»)."""
 
     username = models.CharField(max_length=200, db_index=True, verbose_name="Аккаунт")
     name = models.CharField(max_length=120, verbose_name="Название")

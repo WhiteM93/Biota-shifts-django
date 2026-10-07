@@ -109,12 +109,23 @@ class WarehouseAddressRegistryTests(TestCase):
             label="R-02-01",
             notes="Коробка метчиков",
         )
+        VisualContainer.objects.create(
+            cabinet=cab,
+            level=level,
+            kind=VisualContainer.KIND_SHELF_SLOT,
+            shelf=2,
+            stack=1,
+            column=2,
+            address="R-02-02",
+            label="На полке",
+            notes="",
+        )
         titles = address_container_titles()
         tip = titles.get("R-02-01") or ""
-        self.assertNotEqual(tip, "На полке")
-        self.assertNotEqual(tip.upper(), "R-02-01")
-        self.assertIn("полка", tip.lower())
-        self.assertIn("Коробка метчиков", tip)
+        # Без своего имени — только примечание, без автосборки «полка · место».
+        self.assertEqual(tip, "Коробка метчиков")
+        # Без имени и без примечания — явная заглушка.
+        self.assertEqual(titles.get("R-02-02"), "Нет информации")
 
         set_warehouse_address_label("R-02-01", "Метчики M6")
         titles2 = address_container_titles()

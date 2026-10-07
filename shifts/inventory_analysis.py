@@ -1,4 +1,4 @@
-"""Сводка и контроль остатков склада (вкладка «Анализ»)."""
+"""Сводка склада («Главная») и контроль ходовых позиций («Контроль»)."""
 
 from __future__ import annotations
 
@@ -806,8 +806,34 @@ def _top_tools_by_movement(
     ]
 
 
+def watch_context(request, username: str) -> dict:
+    """Контекст вкладки «Контроль»: ходовые позиции и минимумы."""
+    templates = list_watch_templates(username)
+    watch_rows = evaluate_watch_templates(templates)
+    alerts = [r for r in watch_rows if r["status"] != "ok"]
+    category = (request.GET.get("watch_category") or request.POST.get("watch_category") or "end_mill").strip()
+    if category not in GROUP_FIELD_PATHS:
+        category = "end_mill"
+    group_field = normalize_group_field(
+        category, (request.GET.get("watch_group_field") or request.POST.get("watch_group_field") or "").strip()
+    )
+    group_fields_by_cat = {cat: group_field_choices(cat) for cat in GROUP_FIELD_PATHS}
+    return {
+        "watch_rows": watch_rows,
+        "watch_alerts": alerts,
+        "watch_below_min": len(alerts),
+        "watch_total": len(watch_rows),
+        "watch_form_category": category,
+        "watch_form_group_field": group_field,
+        "watch_form_group_fields": group_field_choices(category),
+        "watch_categories": category_choices(),
+        "stock_category_groups": category_grouped_choices(),
+        "watch_group_fields_by_cat": group_fields_by_cat,
+    }
+
+
 def analysis_context(request, username: str) -> dict:
-    """Контекст вкладки «Анализ»: панель руководителя склада."""
+    """Контекст вкладки «Главная»: панель руководителя склада."""
     from django.db.models import F, IntegerField, Sum, Value
     from django.db.models.functions import Coalesce
 

@@ -1,4 +1,4 @@
-{% load static %}
+{% load static biota_icons %}
 <div
   id="inv-chat"
   class="inv-chat"
@@ -34,11 +34,11 @@
       <h3>MetaGPT</h3>
       <div class="inv-chat-head-actions">
         {% if biota_is_admin %}
-        <a class="inv-chat-icon-btn" href="{% url 'site_notebook' %}" title="Блокнот доработок">✎</a>
-        <a class="inv-chat-icon-btn" href="{% url 'inventory_ai_archive' %}" title="Архив диалогов">⧉</a>
+        <a class="inv-chat-icon-btn" href="{% url 'site_notebook' %}" title="Блокнот доработок" aria-label="Блокнот доработок">{% biota_icon "chat.notebook" %}</a>
+        <a class="inv-chat-icon-btn" href="{% url 'inventory_ai_archive' %}" title="Архив диалогов" aria-label="Архив диалогов">{% biota_icon "chat.archive" %}</a>
         {% endif %}
-        <button type="button" class="inv-chat-icon-btn js-inv-chat-clear" title="Очистить">⌫</button>
-        <button type="button" class="inv-chat-icon-btn js-inv-chat-close" title="Закрыть" aria-label="Закрыть">×</button>
+        <button type="button" class="inv-chat-icon-btn js-inv-chat-clear" title="Очистить" aria-label="Очистить">{% biota_icon "chat.clear" %}</button>
+        <button type="button" class="inv-chat-icon-btn js-inv-chat-close" title="Закрыть" aria-label="Закрыть">{% biota_icon "chat.close" %}</button>
       </div>
     </div>
     <p class="inv-chat-limit-hint">Не чаще 1 раза в минуту (админ — без лимита).</p>
@@ -47,7 +47,10 @@
     <div class="inv-chat-messages js-inv-chat-messages" aria-live="polite"></div>
     <form class="inv-chat-form js-inv-chat-form">
       <textarea class="js-inv-chat-input" rows="2" maxlength="1500" placeholder="Вопрос по складу или «Добавь в блокнот: …»"></textarea>
-      <button type="submit" class="js-inv-chat-send">Спросить</button>
+      <button type="submit" class="js-inv-chat-send inv-chat-send-btn" title="Спросить" aria-label="Спросить">
+        {% biota_icon "chat.send" %}
+        <span>Спросить</span>
+      </button>
     </form>
   </div>
 </div>

@@ -90,6 +90,7 @@ from .collet_constants import (
 )
 from .inventory_analysis import (
     analysis_context,
+    watch_context,
     aggregate_queryset_by_group,
     group_field_choices,
     normalize_group_field,
@@ -404,6 +405,27 @@ def _analysis_panel_redirect(request, **extra: str) -> redirect:
     return redirect(f"{request.path}?{urlencode(params)}")
 
 
+def _watch_panel_redirect(request, **extra: str) -> redirect:
+    params: dict[str, str] = {"panel": "watch"}
+    cat = (
+        extra.get("watch_category")
+        or request.POST.get("watch_category")
+        or request.GET.get("watch_category")
+        or ""
+    ).strip()
+    if cat in _INVENTORY_CATEGORIES:
+        params["watch_category"] = cat
+    group_field = (
+        extra.get("watch_group_field")
+        or request.POST.get("watch_group_field")
+        or request.GET.get("watch_group_field")
+        or ""
+    ).strip()
+    if group_field:
+        params["watch_group_field"] = group_field
+    return redirect(f"{request.path}?{urlencode(params)}")
+
+
 def _history_panel_redirect(request):
     params: dict[str, str] = {"panel": "history"}
     ht = (request.GET.get("history_movement_type") or request.POST.get("history_movement_type") or "").strip()
@@ -470,6 +492,54 @@ def _open_issue_movements_qs():
         .filter(remaining_qty__gt=0)
         .order_by("employee_name", "-movement_date", "-id")
     )
+
+
+def _attach_stock_added_info(tools):
+    """Кто впервые оприходовал позицию (первый restock без возврата)."""
+    tool_list = list(tools)
+    ids = [t.id for t in tool_list]
+    if not ids:
+        return tool_list
+
+    first_by_tool: dict[int, dict] = {}
+    rows = (
+        StockMovement.objects.filter(
+            tool_id__in=ids,
+            movement_type="restock",
+            parent_issue__isnull=True,
+            is_reverted=False,
+        )
+        .order_by("tool_id", "movement_date", "id")
+        .values("tool_id", "created_by_account", "movement_date")
+    )
+    for row in rows:
+        tid = row["tool_id"]
+        if tid not in first_by_tool:
+            first_by_tool[tid] = row
+
+    for tool in tool_list:
+        info = first_by_tool.get(tool.id)
+        account = ((info or {}).get("created_by_account") or "").strip()
+        if account:
+            label = account_label_for_username(account) or account
+            tool.stock_added_by_label = label
+            parts = [f"Добавил на склад: {label}"]
+            move_date = (info or {}).get("movement_date")
+            if move_date:
+                parts.append(move_date.strftime("%d.%m.%Y"))
+            tool.stock_added_hint = "\n".join(parts)
+            continue
+
+        tool.stock_added_by_label = ""
+        created = getattr(tool, "created_at", None)
+        if created:
+            local_created = timezone.localtime(created) if timezone.is_aware(created) else created
+            tool.stock_added_hint = (
+                f"Кто добавил не зафиксирован\nСоздано: {local_created.strftime('%d.%m.%Y')}"
+            )
+        else:
+            tool.stock_added_hint = "Кто добавил не зафиксирован"
+    return tool_list
 
 
 _ARRIVAL_REQUIRED_DIAMETER: dict[str, tuple[str, str]] = {
@@ -2789,7 +2859,19 @@ def _create_measuring_tool(category: str, quantity, spec_fields: dict) -> ToolIt
 def inventory_view(request):
     action = request.POST.get("action") if request.method == "POST" else ""
     panel = (request.GET.get("panel") or "stock").strip()
-    if panel not in {"stock", "history", "issue", "arrival", "issue_outcome", "purchases", "analysis", "defects", "payroll", "employees"}:
+    if panel not in {
+        "stock",
+        "history",
+        "issue",
+        "arrival",
+        "issue_outcome",
+        "purchases",
+        "analysis",
+        "watch",
+        "defects",
+        "payroll",
+        "employees",
+    }:
         panel = "stock"
 
     username = biota_user(request) or "Неизвестный пользователь"
@@ -2826,9 +2908,13 @@ def inventory_view(request):
             group_value = (normalize_cutting_size_label(group_value) or group_value)[:80]
         min_qty = max(1, min(9999, _to_int(request.POST.get("watch_min_qty"), 5)))
         notes = (request.POST.get("watch_notes") or "").strip()[:255]
+        if not name:
+            # Автоимя: «Фреза · 2» и т.п.
+            cat_label = dict(ToolItem._meta.get_field("category").choices).get(category, category)
+            name = f"{cat_label} · {group_value}"[:120]
         if not name or category not in _INVENTORY_CATEGORIES or not group_value:
-            messages.error(request, "Укажите название, тип инструмента и значение для контроля.")
-            return _analysis_panel_redirect(request)
+            messages.error(request, "Укажите тип инструмента и значение для контроля.")
+            return _watch_panel_redirect(request)
         sort_order = (
             InventoryWatchTemplate.objects.filter(username=username, is_active=True).count() + 1
         )
@@ -2843,20 +2929,20 @@ def inventory_view(request):
             notes=notes,
         )
         messages.success(request, f"Добавлено в контроль: {name}")
-        return _analysis_panel_redirect(request, analysis_category=category)
+        return _watch_panel_redirect(request, watch_category=category, watch_group_field=group_field)
 
     if action == "update_watch_template":
         tpl_id = _to_int(request.POST.get("watch_id"), 0)
         tpl = InventoryWatchTemplate.objects.filter(id=tpl_id, username=username, is_active=True).first()
         if not tpl:
             messages.error(request, "Строка контроля не найдена.")
-            return _analysis_panel_redirect(request)
+            return _watch_panel_redirect(request)
         tpl.min_qty = max(1, min(9999, _to_int(request.POST.get("watch_min_qty"), tpl.min_qty)))
         tpl.name = (request.POST.get("watch_name") or tpl.name).strip()[:120]
         tpl.notes = (request.POST.get("watch_notes") or tpl.notes).strip()[:255]
         tpl.save(update_fields=["min_qty", "name", "notes", "updated_at"])
         messages.success(request, "Контроль обновлён.")
-        return _analysis_panel_redirect(request, analysis_category=tpl.category)
+        return _watch_panel_redirect(request, watch_category=tpl.category, watch_group_field=tpl.group_field)
 
     if action == "delete_watch_template":
         tpl_id = _to_int(request.POST.get("watch_id"), 0)
@@ -2865,7 +2951,7 @@ def inventory_view(request):
             messages.success(request, "Строка контроля удалена.")
         else:
             messages.error(request, "Строка контроля не найдена.")
-        return _analysis_panel_redirect(request)
+        return _watch_panel_redirect(request)
 
     if action == "rollback_stock_movement":
         if not is_admin_user:
@@ -2889,6 +2975,7 @@ def inventory_view(request):
         "create_defect_record",
         "update_defect_record",
         "move_stock",
+        "issue_bulk",
         "process_issue_outcome",
     }:
         try:
@@ -3088,6 +3175,128 @@ def inventory_view(request):
             )
         messages.success(request, "Движение склада сохранено.")
         return redirect(f"{request.path}?panel=issue" if movement_type == "issue" else "inventory")
+
+    if action == "issue_bulk":
+        rows_json = (request.POST.get("rows_json") or "").strip()
+        employee_name = (request.POST.get("employee_name") or "").strip()
+        movement_date_raw = (request.POST.get("movement_date") or "").strip()
+        comment = (request.POST.get("comment") or "").strip()
+        try:
+            movement_date = date.fromisoformat(movement_date_raw)
+        except ValueError:
+            messages.error(request, "Введите корректную дату выдачи.")
+            return redirect(f"{request.path}?panel=issue")
+        if not employee_name:
+            messages.error(request, "Укажите сотрудника для выдачи.")
+            return redirect(f"{request.path}?panel=issue")
+        if employee_options:
+            matched = _match_skud_employee(employee_name, employee_options)
+            if not matched:
+                messages.error(request, "Выберите сотрудника из списка СКУД.")
+                return redirect(f"{request.path}?panel=issue")
+            employee_name = matched
+        else:
+            messages.warning(request, "Справочник СКУД недоступен — ФИО сохранено как введено.")
+        if not rows_json:
+            messages.error(request, "Добавьте хотя бы одну позицию в список выдачи.")
+            return redirect(f"{request.path}?panel=issue")
+        try:
+            rows = json.loads(rows_json)
+        except Exception:
+            messages.error(request, "Некорректные данные списка выдачи.")
+            return redirect(f"{request.path}?panel=issue")
+        if not isinstance(rows, list) or not rows:
+            messages.error(request, "Добавьте хотя бы одну позицию в список выдачи.")
+            return redirect(f"{request.path}?panel=issue")
+
+        parsed: list[tuple[int, int, int]] = []
+        need_by_tool: dict[int, int] = {}
+        any_writeoff = False
+        for idx, row in enumerate(rows, start=1):
+            if not isinstance(row, dict):
+                messages.error(request, f"Строка {idx}: некорректные данные.")
+                return redirect(f"{request.path}?panel=issue")
+            tool_id = _to_int(row.get("tool_id"), 0)
+            qty = _to_int(row.get("quantity"), 0)
+            writeoff_qty = _to_int(row.get("writeoff_qty"), 0)
+            if row.get("writeoff") in (True, 1, "1", "true", "True", "yes", "on"):
+                if writeoff_qty <= 0:
+                    writeoff_qty = qty
+            if tool_id <= 0 or qty <= 0:
+                messages.error(request, f"Строка {idx}: укажите инструмент и количество.")
+                return redirect(f"{request.path}?panel=issue")
+            if writeoff_qty < 0 or writeoff_qty > qty:
+                messages.error(
+                    request,
+                    f"Строка {idx}: списание не может быть больше количества выдачи.",
+                )
+                return redirect(f"{request.path}?panel=issue")
+            if writeoff_qty > 0:
+                any_writeoff = True
+            parsed.append((tool_id, qty, writeoff_qty))
+            need_by_tool[tool_id] = need_by_tool.get(tool_id, 0) + qty
+
+        if any_writeoff and not comment:
+            messages.error(request, "При списании укажите причину в комментарии.")
+            return redirect(f"{request.path}?panel=issue")
+
+        try:
+            with transaction.atomic():
+                tools = {
+                    t.id: t
+                    for t in ToolItem.objects.select_for_update().filter(id__in=need_by_tool.keys())
+                }
+                for tool_id, need in need_by_tool.items():
+                    tool = tools.get(tool_id)
+                    if not tool or tool.is_deleted:
+                        raise ValueError(f"Инструмент #{tool_id} не найден.")
+                    if tool.quantity < need:
+                        raise ValueError(
+                            f"Недостаточно остатков «{tool.name}»: нужно {need}, доступно {tool.quantity}."
+                        )
+                issued = 0
+                written_off = 0
+                for tool_id, qty, writeoff_qty in parsed:
+                    tool = tools[tool_id]
+                    tool.quantity -= qty
+                    tool.save(update_fields=["quantity", "updated_at"])
+                    issue = StockMovement.objects.create(
+                        movement_type="issue",
+                        tool=tool,
+                        quantity=qty,
+                        employee_name=employee_name,
+                        movement_date=movement_date,
+                        comment=comment,
+                        created_by_account=username,
+                    )
+                    issued += 1
+                    if writeoff_qty > 0:
+                        StockMovement.objects.create(
+                            movement_type="writeoff",
+                            tool=tool,
+                            parent_issue=issue,
+                            quantity=writeoff_qty,
+                            employee_name=employee_name,
+                            movement_date=movement_date,
+                            comment=f"Списание по выдаче #{issue.id}. {comment}",
+                            created_by_account=username,
+                        )
+                        written_off += 1
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect(f"{request.path}?panel=issue")
+        except Exception:
+            messages.error(request, "Не удалось сохранить выдачу списком.")
+            return redirect(f"{request.path}?panel=issue")
+
+        if written_off:
+            messages.success(
+                request,
+                f"Выдача сохранена: {issued} поз. для {employee_name}, сразу списано: {written_off}.",
+            )
+        else:
+            messages.success(request, f"Выдача сохранена: {issued} поз. для {employee_name}.")
+        return redirect(f"{request.path}?panel=issue&issued=1")
 
     if action == "delete_tool_item":
         if not can_manage_stock:
@@ -4803,9 +5012,6 @@ def inventory_view(request):
         if unit_price < 0:
             messages.error(request, "Цена за 1 шт не может быть отрицательной.")
             return redirect(f"{request.path}?panel=purchases")
-        if not store_link and not article:
-            messages.error(request, "Добавьте ссылку на магазин или артикул.")
-            return redirect(f"{request.path}?panel=purchases")
         if store_link and len(store_link) > 2048:
             messages.error(request, "Ссылка на магазин слишком длинная (максимум 2048 символов).")
             return redirect(f"{request.path}?panel=purchases")
@@ -5819,11 +6025,11 @@ def inventory_view(request):
     stock_address_hints = _stock_address_hint_rows(panel)
     stock_address_furniture = _stock_address_furniture_options(stock_address_hints)
 
-    ctx = {
-        "tool_items": (
-            []
-            if panel == "stock" and stock_view == "summary"
-            else qs.select_related(
+    if panel == "stock" and stock_view == "summary":
+        tool_items = []
+    else:
+        tool_items = _attach_stock_added_info(
+            qs.select_related(
                 "end_mill_spec",
                 "body_tool_spec",
                 "tap_spec",
@@ -5836,7 +6042,10 @@ def inventory_view(request):
                 "tool_extension_spec",
                 "measuring_tool_spec",
             ).order_by("category", "name")
-        ),
+        )
+
+    ctx = {
+        "tool_items": tool_items,
         "movements": mv_hist[:50],
         "inventory_history": inventory_history,
         "inventory_history_days": inventory_history_days,
@@ -6198,6 +6407,8 @@ def inventory_view(request):
     }
     if panel == "analysis":
         ctx.update(analysis_context(request, username))
+    if panel == "watch":
+        ctx.update(watch_context(request, username))
     return render(request, "shifts/inventory.html", ctx)
 
 

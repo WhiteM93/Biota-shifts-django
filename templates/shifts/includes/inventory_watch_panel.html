@@ -1,0 +1,135 @@
+{% load static %}
+{{ watch_group_fields_by_cat|json_script:"inv-watch-group-fields" }}
+
+<div class="inv-watch">
+  <header class="inv-watch__hero">
+    <div>
+      <h1 class="inv-watch__title">Контроль остатков</h1>
+      <p class="inv-watch__lead">Добавляйте ходовые позиции и минимум — здесь видно, когда остаток просел.</p>
+    </div>
+    <div class="inv-watch__stats" aria-label="Сводка">
+      <span class="inv-watch__stat">В списке: <strong>{{ watch_total }}</strong></span>
+      <span class="inv-watch__stat{% if watch_below_min %} is-warn{% endif %}">Ниже минимума: <strong>{{ watch_below_min }}</strong></span>
+    </div>
+  </header>
+
+  {% if biota_can_edit %}
+  <section class="filter-panel inv-watch-form-panel" aria-label="Добавить в контроль">
+    <h3>Добавить ходовую позицию</h3>
+    <form method="post" class="filter-grid inv-watch-form" id="inv-watch-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_watch_template">
+      <label class="field">
+        <span>Тип инструмента</span>
+        <select name="watch_category" id="inv-watch-category" required>
+          {% include "shifts/includes/stock_category_optgroups.html" with selected_category=watch_form_category %}
+        </select>
+      </label>
+      <label class="field">
+        <span>По чему следить</span>
+        <select name="watch_group_field" id="inv-watch-group-field" required>
+          {% for key, label in watch_form_group_fields %}
+          <option value="{{ key }}"{% if key == watch_form_group_field %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field">
+        <span>Значение</span>
+        <input type="text" name="watch_group_value" id="inv-watch-group-value" required placeholder="например 2 или M6" maxlength="80" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>Минимум, шт</span>
+        <input type="number" name="watch_min_qty" min="1" max="9999" value="5" required>
+      </label>
+      <label class="field">
+        <span>Название <span class="muted">(необяз.)</span></span>
+        <input type="text" name="watch_name" id="inv-watch-name" maxlength="120" placeholder="Авто: тип · значение" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>Заметка</span>
+        <input type="text" name="watch_notes" maxlength="255" placeholder="Зачем следим" autocomplete="off">
+      </label>
+      <div class="filter-actions">
+        <button type="submit" class="btn">В контроль</button>
+      </div>
+    </form>
+  </section>
+  {% endif %}
+
+  {% if watch_alerts %}
+  <section class="inv-watch-alerts" aria-label="Ниже минимума">
+    {% for row in watch_alerts %}
+    <a class="inv-watch-alert inv-watch-alert--{{ row.status }}" href="{{ row.stock_url }}">
+      <strong>{{ row.template.name }}</strong>
+      <span>{{ row.total_qty }} / {{ row.template.min_qty }} шт.</span>
+    </a>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <section class="inv-watch-list" aria-label="Список контроля">
+    {% if watch_rows %}
+    <div class="table-wrap">
+      <table class="data-grid inv-watch-grid">
+        <thead>
+          <tr>
+            <th>Статус</th>
+            <th>Название</th>
+            <th>Тип</th>
+            <th>Параметр</th>
+            <th>Сейчас</th>
+            <th>Минимум</th>
+            {% if biota_can_edit %}<th>Действия</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in watch_rows %}
+          <tr class="inv-watch-row inv-watch-row--{{ row.status }}">
+            <td>
+              {% if row.status == "ok" %}<span class="inv-watch-badge inv-watch-badge--ok">ОК</span>
+              {% elif row.status == "critical" %}<span class="inv-watch-badge inv-watch-badge--critical">Нет</span>
+              {% else %}<span class="inv-watch-badge inv-watch-badge--warn">Мало</span>{% endif %}
+            </td>
+            <td>
+              <a href="{{ row.stock_url }}">{{ row.template.name }}</a>
+              {% if row.template.notes %}<div class="muted inv-watch-notes">{{ row.template.notes }}</div>{% endif %}
+            </td>
+            <td>{{ row.category_label }}</td>
+            <td>{{ row.group_label }}: <strong>{{ row.template.group_value }}</strong></td>
+            <td><strong>{{ row.total_qty }}</strong></td>
+            <td>
+              {% if biota_can_edit %}
+              <form method="post" class="inv-watch-inline-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_watch_template">
+                <input type="hidden" name="watch_id" value="{{ row.template.id }}">
+                <input type="hidden" name="watch_name" value="{{ row.template.name }}">
+                <input type="hidden" name="watch_notes" value="{{ row.template.notes }}">
+                <input type="number" name="watch_min_qty" min="1" max="9999" value="{{ row.template.min_qty }}" class="inv-watch-min-inp" title="Минимум" aria-label="Минимум">
+                <button type="submit" class="btn btn-ghost inv-watch-save-min" title="Сохранить минимум">OK</button>
+              </form>
+              {% else %}
+              {{ row.template.min_qty }}
+              {% endif %}
+            </td>
+            {% if biota_can_edit %}
+            <td>
+              <form method="post" class="inv-watch-del-form" onsubmit="return confirm('Убрать из контроля?');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_watch_template">
+                <input type="hidden" name="watch_id" value="{{ row.template.id }}">
+                <button type="submit" class="btn btn-ghost">Убрать</button>
+              </form>
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted inv-watch-empty">Пока пусто — добавьте ходовую позицию выше (тип, значение и минимум).</p>
+    {% endif %}
+  </section>
+</div>
+<script src="{% static 'shifts/js/inventory_watch.js' %}?v={{ static_asset_version }}" defer></script>

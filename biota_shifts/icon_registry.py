@@ -248,6 +248,36 @@ DEFAULT_ICON_REGISTRY: dict[str, dict] = {
         "kind": "text",
         "value": "↻",
     },
+    "chat.notebook": {
+        "label": "Блокнот доработок",
+        "group": "Чат",
+        "kind": "hugeicons",
+        "value": "edit-01",
+    },
+    "chat.archive": {
+        "label": "Архив диалогов",
+        "group": "Чат",
+        "kind": "hugeicons",
+        "value": "album-01",
+    },
+    "chat.clear": {
+        "label": "Очистить чат",
+        "group": "Чат",
+        "kind": "hugeicons",
+        "value": "delete-02",
+    },
+    "chat.close": {
+        "label": "Закрыть чат",
+        "group": "Чат",
+        "kind": "hugeicons",
+        "value": "cancel-01",
+    },
+    "chat.send": {
+        "label": "Отправить",
+        "group": "Чат",
+        "kind": "hugeicons",
+        "value": "sent",
+    },
 }
 
 ICON_KINDS = ("emoji", "flaticon", "text", "partial", "svg_static", "hugeicons")

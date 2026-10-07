@@ -9,7 +9,7 @@ from django.views.decorators.http import require_http_methods
 from .auth_utils import biota_login_required, biota_user, inventory_route_nav_access_required
 from .gpt_rate_limit import gpt_rate_limit_allow
 from .inventory_ai_log import record_ai_turn
-from .inventory_chat import ask_inventory_chat, normalize_page_context
+from .inventory_chat import ask_inventory_chat, is_notebook_chat_question, normalize_page_context
 from .models import InventoryAiTurn
 from .yandex_gpt import yandex_gpt_configured
 
@@ -19,16 +19,6 @@ from .yandex_gpt import yandex_gpt_configured
 @require_http_methods(["POST"])
 def inventory_chat_api(request):
     username = biota_user(request) or ""
-    ok_rl, retry = gpt_rate_limit_allow(username, scope="inv_chat", cooldown_sec=60)
-    if not ok_rl:
-        return JsonResponse(
-            {
-                "ok": False,
-                "error": f"Не чаще 1 раза в минуту. Подождите ~{retry} сек.",
-                "retry_after": retry,
-            },
-            status=429,
-        )
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except Exception:
@@ -42,6 +32,19 @@ def inventory_chat_api(request):
         history = None
     session_key = str(payload.get("session_key") or "").strip()[:40]
     page_context = payload.get("page_context") or payload.get("context")
+
+    # Блокнот без GPT — лимит токенов/частоты ИИ не применяем.
+    if not is_notebook_chat_question(question):
+        ok_rl, retry = gpt_rate_limit_allow(username, scope="inv_chat", cooldown_sec=60)
+        if not ok_rl:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "error": f"Не чаще 1 раза в минуту. Подождите ~{retry} сек.",
+                    "retry_after": retry,
+                },
+                status=429,
+            )
 
     result = ask_inventory_chat(
         question,

@@ -714,29 +714,26 @@ def _is_generic_place_label(label: str, addr: str = "") -> bool:
     return False
 
 
+PLACE_HOVER_EMPTY = "Нет информации"
+
+
 def place_hover_title(place: dict) -> str:
-    """Подсказка при наведении на адрес: наименование / полка·место / примечание."""
+    """Подсказка при наведении на адрес: своё имя и/или примечание.
+
+    Без них — «Нет информации», без автосборки «полка · место».
+    """
     addr = normalize_address(place.get("address") or "")
     note = (place.get("notes") or "").strip()
     custom = (place.get("label") or "").strip()
-    if custom and not _is_generic_place_label(custom, addr):
-        base = custom
-    else:
-        fname = (place.get("furniture_name") or place.get("furniture_code") or "").strip()
-        shelf = (place.get("shelf_label") or "").strip()
-        place_lab = (place.get("place_label") or "").strip()
-        level_kind = (place.get("level_kind") or "shelf").strip()
-        bits: list[str] = []
-        if fname:
-            bits.append(fname)
-        if shelf:
-            bits.append(("ящик " if level_kind == "drawer" else "полка ") + shelf)
-        if place_lab:
-            bits.append("место " + place_lab)
-        base = " · ".join(bits)
+    if custom and _is_generic_place_label(custom, addr):
+        custom = ""
+    if custom and note:
+        return f"{custom} · {note}"
+    if custom:
+        return custom
     if note:
-        return f"{base} · {note}" if base else note
-    return base
+        return note
+    return PLACE_HOVER_EMPTY
 
 
 def build_location_catalog() -> dict:
@@ -839,8 +836,10 @@ def address_container_titles() -> dict[str, str]:
         if not addr or addr in out:
             continue
         title = place_hover_title(p)
-        if title and not _is_generic_place_label(title, addr):
+        if title and title != PLACE_HOVER_EMPTY and not _is_generic_place_label(title, addr):
             out[addr] = title
+        elif addr not in out:
+            out[addr] = PLACE_HOVER_EMPTY
     return out
 
 

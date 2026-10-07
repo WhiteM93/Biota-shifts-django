@@ -14,7 +14,7 @@ from django.urls import reverse
 
 from biota_shifts.config import ADMIN_USERNAME
 
-from shifts.inventory_views import _arrival_bulk_row_validation_errors
+from shifts.inventory_views import _arrival_bulk_row_validation_errors, _issue_remaining_qty
 from shifts.models import (
     DrillSpec,
     EndMillSpec,
@@ -453,3 +453,145 @@ class IssueOutcomePostTests(InventoryFlowClientMixin, TestCase):
         self.assertEqual(tool.quantity, qty_before)
         wo = StockMovement.objects.get(parent_issue=issue, movement_type="writeoff")
         self.assertEqual(wo.quantity, 1)
+
+
+class IssueBulkPostTests(InventoryFlowClientMixin, TestCase):
+    def _make_tool(self, *, name: str, qty: int) -> ToolItem:
+        return ToolItem.objects.create(
+            name=name,
+            category="drill",
+            quantity=qty,
+            tool_material="carbide",
+            coating_type="none",
+        )
+
+    def test_issue_panel_has_draft_list_ui(self):
+        resp = self.client.get(self.inv_url + "?panel=issue")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode("utf-8", errors="replace")
+        self.assertIn("issue-bulk-form", html)
+        self.assertIn("issue-add-line", html)
+        self.assertIn("issue-draft-list", html)
+        self.assertNotIn('name="tool_id"', html)
+
+    def test_issue_bulk_issues_multiple_tools(self):
+        a = self._make_tool(name="Сверло A", qty=10)
+        b = self._make_tool(name="Сверло B", qty=5)
+        resp = self.client.post(
+            self.inv_url,
+            {
+                "action": "issue_bulk",
+                "employee_name": "Тестов Т.",
+                "movement_date": self.today,
+                "comment": "список",
+                "rows_json": json.dumps(
+                    [
+                        {"tool_id": a.id, "quantity": 3},
+                        {"tool_id": b.id, "quantity": 2},
+                    ],
+                    ensure_ascii=False,
+                ),
+            },
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(any("Выдача сохранена" in m for m in self._messages(resp)))
+        self.assertIn("issued=1", resp.redirect_chain[0][0])
+        a.refresh_from_db()
+        b.refresh_from_db()
+        self.assertEqual(a.quantity, 7)
+        self.assertEqual(b.quantity, 3)
+        self.assertEqual(StockMovement.objects.filter(movement_type="issue", tool=a).count(), 1)
+        self.assertEqual(StockMovement.objects.filter(movement_type="issue", tool=b).count(), 1)
+
+    def test_issue_bulk_blocks_insufficient_stock(self):
+        a = self._make_tool(name="Сверло мало", qty=2)
+        resp = self.client.post(
+            self.inv_url,
+            {
+                "action": "issue_bulk",
+                "employee_name": "Тестов Т.",
+                "movement_date": self.today,
+                "comment": "",
+                "rows_json": json.dumps(
+                    [
+                        {"tool_id": a.id, "quantity": 1},
+                        {"tool_id": a.id, "quantity": 2},
+                    ],
+                    ensure_ascii=False,
+                ),
+            },
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(any("Недостаточно" in m for m in self._messages(resp)))
+        a.refresh_from_db()
+        self.assertEqual(a.quantity, 2)
+        self.assertEqual(StockMovement.objects.filter(tool=a, movement_type="issue").count(), 0)
+
+    def test_issue_bulk_immediate_writeoff(self):
+        a = self._make_tool(name="Фреза списать", qty=10)
+        b = self._make_tool(name="Фреза на руках", qty=5)
+        resp = self.client.post(
+            self.inv_url,
+            {
+                "action": "issue_bulk",
+                "employee_name": "Тестов Т.",
+                "movement_date": self.today,
+                "comment": "сломан при выдаче",
+                "rows_json": json.dumps(
+                    [
+                        {"tool_id": a.id, "quantity": 3, "writeoff": True},
+                        {"tool_id": b.id, "quantity": 2},
+                    ],
+                    ensure_ascii=False,
+                ),
+            },
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(any("сразу списано" in m for m in self._messages(resp)))
+        a.refresh_from_db()
+        b.refresh_from_db()
+        self.assertEqual(a.quantity, 7)
+        self.assertEqual(b.quantity, 3)
+        issue_a = StockMovement.objects.get(movement_type="issue", tool=a)
+        issue_b = StockMovement.objects.get(movement_type="issue", tool=b)
+        wo = StockMovement.objects.get(parent_issue=issue_a, movement_type="writeoff")
+        self.assertEqual(wo.quantity, 3)
+        self.assertIn("сломан при выдаче", wo.comment)
+        self.assertEqual(
+            StockMovement.objects.filter(parent_issue=issue_b, movement_type="writeoff").count(),
+            0,
+        )
+        self.assertEqual(_issue_remaining_qty(issue_a), 0)
+        self.assertEqual(_issue_remaining_qty(issue_b), 2)
+
+    def test_issue_bulk_writeoff_requires_comment(self):
+        a = self._make_tool(name="Без комментария", qty=4)
+        resp = self.client.post(
+            self.inv_url,
+            {
+                "action": "issue_bulk",
+                "employee_name": "Тестов Т.",
+                "movement_date": self.today,
+                "comment": "",
+                "rows_json": json.dumps(
+                    [{"tool_id": a.id, "quantity": 1, "writeoff": True}],
+                    ensure_ascii=False,
+                ),
+            },
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(any("списании" in m.lower() for m in self._messages(resp)))
+        a.refresh_from_db()
+        self.assertEqual(a.quantity, 4)
+        self.assertEqual(StockMovement.objects.filter(tool=a).count(), 0)
+
+    def test_issue_panel_has_writeoff_checkbox(self):
+        resp = self.client.get(self.inv_url + "?panel=issue")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode("utf-8", errors="replace")
+        self.assertIn("issue-line-writeoff", html)
+        self.assertIn("Списать сразу", html)

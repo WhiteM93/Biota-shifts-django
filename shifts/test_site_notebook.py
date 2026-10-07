@@ -3,7 +3,7 @@ from unittest.mock import patch
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from shifts.inventory_chat import forced_tool_call
+from shifts.inventory_chat import ask_inventory_chat, forced_tool_call, is_notebook_chat_question
 from shifts.inventory_chat_tools import add_site_note, run_tool
 from shifts.models import SiteNotebookTask
 
@@ -39,17 +39,40 @@ class SiteNotebookToolTests(TestCase):
         call = forced_tool_call("запиши в блокнот: добавь фильтр по диаметру на складе")
         self.assertIsNotNone(call)
         self.assertEqual(call["tool"], "add_site_note")
+        self.assertIn("фильтр по диаметру", (call["args"].get("body") or "").lower())
+        self.assertNotIn("блокнот", (call["args"].get("title") or "").lower())
 
     def test_forced_notebook_typos(self):
-        for phrase in (
-            "запиши в блокот: добавь кнопку экспорта",
-            "добавь в блокнт задачу про фильтр",
-            "запиши в блокнод: нужен вид сверло",
+        for phrase, needle in (
+            ("запиши в блокот: добавь кнопку экспорта", "кнопку экспорта"),
+            ("добавь в блокнт задачу про фильтр", "задачу про фильтр"),
+            ("запиши в блокнод: нужен вид сверло", "вид сверло"),
         ):
             call = forced_tool_call(phrase)
             self.assertIsNotNone(call, phrase)
             self.assertEqual(call["tool"], "add_site_note", phrase)
-            self.assertIn(phrase[:20], call["args"].get("body") or "")
+            self.assertIn(needle, (call["args"].get("body") or "").lower())
+
+    def test_notebook_chat_skips_gpt(self):
+        self.assertTrue(is_notebook_chat_question("Добавь в блокнот: фильтр по сверлу"))
+        with (
+            patch("shifts.inventory_chat.yandex_gpt_configured", return_value=False) as cfg,
+            patch("shifts.inventory_chat.build_warehouse_context") as snap,
+            patch("shifts.inventory_chat.complete") as gpt,
+        ):
+            result = ask_inventory_chat(
+                "Добавь в блокнот: фильтр по сверлу на остатках",
+                username="worker1",
+                page_context={"page": "inventory", "panel": "stock"},
+            )
+        self.assertTrue(result.get("ok"), result)
+        self.assertEqual(result.get("used_tools"), ["add_site_note"])
+        cfg.assert_not_called()
+        snap.assert_not_called()
+        gpt.assert_not_called()
+        row = SiteNotebookTask.objects.get(author_username="worker1")
+        self.assertIn("фильтр по сверлу", row.body.lower())
+        self.assertNotIn("добавь в блокнот", row.title.lower())
 
 
 class SiteNotebookViewTests(TestCase):

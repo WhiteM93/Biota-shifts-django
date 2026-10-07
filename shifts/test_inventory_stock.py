@@ -149,6 +149,29 @@ class InventoryViewTests(TestCase):
                 self.assertIn("CNMG120408", content)
                 self.assertIn("Sandvik", content)
 
+    def test_stock_row_shows_who_added(self):
+        tool = ToolItem.objects.create(
+            category="drill",
+            name="Сверло автор",
+            tool_material="carbide",
+            quantity=3,
+        )
+        DrillSpec.objects.create(tool=tool, diameter_mm=Decimal("5"))
+        StockMovement.objects.create(
+            movement_type="restock",
+            tool=tool,
+            quantity=3,
+            movement_date=date.today(),
+            created_by_account="admin",
+            comment="приход",
+        )
+        resp = self.client.get(reverse("inventory") + "?panel=stock&category=drill")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode("utf-8", errors="replace")
+        self.assertIn("inv-stock-added-tip", html)
+        self.assertIn("Добавил на склад:", html)
+        self.assertIn("inv-stock-row-actions", html)
+
     def test_arrival_page_has_inv_options(self):
         resp = self.client.get(reverse("inventory") + "?panel=arrival")
         self.assertEqual(resp.status_code, 200)
