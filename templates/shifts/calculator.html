@@ -57,6 +57,13 @@
       </svg>
       Выставление станков
     </button>
+    <button class="calc-tab" role="tab" aria-selected="false" data-tab="hexbind">
+      <svg class="calc-tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M10 2l6 3.5v7L10 16 4 12.5v-7L10 2z"/>
+        <circle cx="10" cy="9.5" r="2"/>
+      </svg>
+      Привязка Hexagon
+    </button>
     <div class="calc-tab-slider" id="calc-tab-slider"></div>
   </div>
 
@@ -736,13 +743,122 @@
     </div>
   </div><!-- /#calc-panel-leveling -->
 
+  <!-- ══════════════════════════════════════
+       ВКЛАДКА 5 — Привязка Hexagon (Fanuc)
+  ══════════════════════════════════════ -->
+  <div class="calc-panel" id="calc-panel-hexbind" hidden>
+    <div class="hb-app">
+      <div class="hb-intro">
+        <div class="hb-intro-top">
+          <div class="hb-intro-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2l7 4v8l-7 4-7-4V6l7-4z"/>
+              <circle cx="12" cy="11" r="2.4"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="hb-intro-title">HEX<span>BIND</span></h2>
+            <p class="hb-intro-sub">Hexagon m&amp;h · Fanuc · G65 P9103</p>
+          </div>
+        </div>
+        <p class="hb-intro-desc">
+          Точки: <code>X1 Y0</code>, <code>X-123 Y-345</code>.
+          Настройте шапку и конец — справа сразу готовая программа.
+        </p>
+      </div>
+
+      <div class="hb-layout">
+        <div class="hb-controls">
+          <section class="hb-card" aria-labelledby="hb-hdr-title">
+            <div class="hb-card-head" id="hb-hdr-title">Шапка программы</div>
+            <div class="hb-fields" id="hb-header-fields"></div>
+          </section>
+
+          <section class="hb-card" aria-labelledby="hb-tpl-title">
+            <div class="hb-card-head" id="hb-tpl-title">Сценарий привязки</div>
+            <div class="hb-fields">
+              <div class="hb-field wide">
+                <label for="hb-template-select">Шаблон</label>
+                <select id="hb-template-select"></select>
+              </div>
+            </div>
+            <div class="hb-fields" id="hb-template-fields"></div>
+          </section>
+
+          <section class="hb-card" aria-labelledby="hb-ftr-title">
+            <div class="hb-card-head" id="hb-ftr-title">Конец программы</div>
+            <p class="hb-hint hb-hint--tight">Отвод в дом (G28) — только нужные оси</p>
+            <div class="hb-chip-row" id="hb-footer-home" role="group" aria-label="Отвод в дом"></div>
+            <div class="hb-fields" id="hb-footer-fields"></div>
+          </section>
+        </div>
+
+        <aside class="hb-preview" aria-labelledby="hb-out-title">
+          <section class="hb-card hb-viz-card" id="hb-viz" aria-label="3D визуализация">
+            <div class="hb-card-head hb-card-head--row">
+              <span>3D заготовка</span>
+              <span class="hb-badge" id="hb-viz-badge">траектория</span>
+            </div>
+            <div class="hb-viz-stage">
+              <canvas id="hb-viz-canvas" width="640" height="360" aria-label="Визуализация заготовки и траектории"></canvas>
+            </div>
+            <div class="hb-viz-toolbar" role="toolbar" aria-label="Управление 3D">
+              <div class="hb-viz-tools">
+                <button type="button" class="hb-viz-btn" id="hb-viz-zoom-out" title="Отдалить">−</button>
+                <span class="hb-viz-zoom" id="hb-viz-zoom">100%</span>
+                <button type="button" class="hb-viz-btn" id="hb-viz-zoom-in" title="Приблизить">+</button>
+              </div>
+              <div class="hb-viz-tools">
+                <button type="button" class="hb-viz-btn" id="hb-viz-restart" title="В начало">⇤</button>
+                <button type="button" class="hb-viz-btn" id="hb-viz-prev" title="Кадр назад">‹</button>
+                <button type="button" class="hb-viz-btn hb-viz-btn--play" id="hb-viz-play" title="Пуск/пауза">❚❚</button>
+                <button type="button" class="hb-viz-btn" id="hb-viz-next" title="Кадр вперёд">›</button>
+              </div>
+              <div class="hb-viz-frame-meta">
+                <span id="hb-viz-frame">Кадр 0/0</span>
+                <span class="hb-viz-frame-detail" id="hb-viz-frame-detail"></span>
+              </div>
+            </div>
+            <div class="hb-viz-legend" aria-hidden="true">
+              <span class="hb-viz-leg hb-viz-leg--x">X</span>
+              <span class="hb-viz-leg hb-viz-leg--y">Y</span>
+              <span class="hb-viz-leg hb-viz-leg--z">Z</span>
+              <span class="hb-viz-leg hb-viz-leg--path">путь</span>
+              <span class="hb-viz-leg hb-viz-leg--probe">замер</span>
+              <span class="hb-viz-leg hb-viz-leg--from-home">из дома</span>
+              <span class="hb-viz-leg hb-viz-leg--to-home">в дом</span>
+            </div>
+          </section>
+
+          <section class="hb-card hb-output">
+            <div class="hb-card-head hb-card-head--row">
+              <span id="hb-out-title">Программа</span>
+              <span class="hb-badge" id="hb-line-count" aria-live="polite"></span>
+            </div>
+            <pre id="hb-code" tabindex="0"></pre>
+            <div class="hb-actions">
+              <button type="button" class="hb-btn hb-btn-secondary" id="hb-btn-reset">Сброс</button>
+              <button type="button" class="hb-btn hb-btn-secondary" id="hb-btn-copy">Копировать</button>
+              <button type="button" class="hb-btn hb-btn-primary" id="hb-btn-save">Сохранить</button>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <div class="hb-toast" id="hb-toast" role="status"></div>
+    </div>
+  </div><!-- /#calc-panel-hexbind -->
+
 </div><!-- /.calc-page -->
 
 <script type="application/json" id="calc-leveling-cards-json">{{ leveling_cards_json|default:"[]"|safe }}</script>
 
 <!-- ══════════════ СТИЛИ ══════════════ -->
 <link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% static 'shifts/css/calculator_hexbind.css' %}?v={{ static_asset_version }}">
 <script src="{% static 'shifts/js/calculator_leveling.js' %}?v={{ static_asset_version }}" defer></script>
+<script src="{% static 'shifts/js/calculator_hexbind_viz.js' %}?v={{ static_asset_version }}" defer></script>
+<script src="{% static 'shifts/js/calculator_hexbind.js' %}?v={{ static_asset_version }}" defer></script>
 
 
 <script>
@@ -756,14 +872,28 @@
   /* ════════════════════════════════
      ВКЛАДКИ — слайдер + запоминание
   ════════════════════════════════ */
+  var tabsEl = document.querySelector(".calc-tabs");
   var tabs   = document.querySelectorAll(".calc-tab");
   var slider = document.getElementById("calc-tab-slider");
   var TAB_STORE_KEY = "biota_calc_tab";
 
   function moveSlider(btn) {
-    if (!slider || !btn) return;
-    slider.style.left  = btn.offsetLeft + "px";
-    slider.style.width = btn.offsetWidth + "px";
+    if (!slider || !btn || !tabsEl) return;
+    var br = btn.getBoundingClientRect();
+    var tr = tabsEl.getBoundingClientRect();
+    if (!br.width || !tr.width) return;
+    var left = br.left - tr.left + tabsEl.scrollLeft;
+    var top = br.top - tr.top + tabsEl.scrollTop;
+    slider.style.left = Math.round(left) + "px";
+    slider.style.top = Math.round(top) + "px";
+    slider.style.width = Math.round(br.width) + "px";
+    slider.style.height = Math.round(br.height) + "px";
+    tabsEl.classList.add("is-slider-ready");
+  }
+
+  function syncActiveSlider() {
+    var a = document.querySelector(".calc-tab.active");
+    if (a) moveSlider(a);
   }
 
   function rememberTab(tabId) {
@@ -792,13 +922,24 @@
     btn.setAttribute("aria-selected", "true");
     var panel = document.getElementById("calc-panel-" + btn.dataset.tab);
     if (panel) panel.hidden = false;
+    try {
+      btn.scrollIntoView({ inline: "nearest", block: "nearest", behavior: opts.instant ? "auto" : "smooth" });
+    } catch (eScroll) {}
     moveSlider(btn);
     if (btn.dataset.tab === "batch" || btn.dataset.tab === "piece") {
       if (typeof calcTime === "function") calcTime();
     }
+    if (btn.dataset.tab === "hexbind") {
+      requestAnimationFrame(function () {
+        try {
+          window.dispatchEvent(new CustomEvent("hb-viz-refresh"));
+        } catch (eViz) {}
+      });
+    }
     if (!opts.skipRemember) rememberTab(btn.dataset.tab);
     requestAnimationFrame(function () {
       moveSlider(btn);
+      requestAnimationFrame(function () { moveSlider(btn); });
     });
   }
 
@@ -807,6 +948,16 @@
       activateTab(btn);
     });
   });
+
+  if (tabsEl) {
+    tabsEl.addEventListener("scroll", function () {
+      syncActiveSlider();
+    }, { passive: true });
+  }
+  window.addEventListener("resize", syncActiveSlider);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(syncActiveSlider).catch(function () {});
+  }
 
   /* Инит: ?tab=… → localStorage → активная по умолчанию */
   var activeTab = document.querySelector(".calc-tab.active");
@@ -820,7 +971,7 @@
     if (tabParam) {
       var want = document.querySelector('.calc-tab[data-tab="' + tabParam + '"]');
       if (want) {
-        activateTab(want, { skipRemember: false });
+        activateTab(want, { skipRemember: false, instant: true });
         activeTab = want;
       }
     } else if (activeTab) {
@@ -830,6 +981,7 @@
   if (activeTab) {
     requestAnimationFrame(function () {
       moveSlider(activeTab);
+      requestAnimationFrame(function () { moveSlider(activeTab); });
     });
   }
 
