@@ -2351,6 +2351,14 @@ def product_detail_view(request, pk: int):
     piece_norms_latest = _latest_piece_norms_by_setup([s.pk for s in setups])
     for setup in setups:
         setup.latest_piece_norm = piece_norms_latest.get(setup.pk)
+    all_tool_rows = []
+    for setup in setups:
+        first = True
+        for row in setup.tool_display_rows:
+            if not (row["tool_type"] or row["diameter"] or row["overhang"] or row["note"]):
+                continue
+            all_tool_rows.append({**row, "setup": setup, "first_in_setup": first})
+            first = False
     has_setup_preview_stl = any(bool(getattr(s, "preview_stl", None)) for s in setups)
     cad_name = (product.cad_model.name or "") if product.cad_model else ""
     cad_ext = _cad_ext(cad_name)
@@ -2383,6 +2391,7 @@ def product_detail_view(request, pk: int):
             **plan_form_context(product),
             "setup_photos": setup_photos,
             "setups": setups,
+            "all_tool_rows": all_tool_rows,
             "cad_ext": cad_ext,
             "cad_step_ext": cad_step_ext,
             "cad_is_stl": cad_ext == "stl",

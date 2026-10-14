@@ -3334,6 +3334,90 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     min-width: 0;
     padding: 0;
   }
+  .product-detail-meta-inner {
+    container-type: inline-size;
+  }
+  .product-detail-meta-split--3 {
+    grid-template-columns: minmax(260px, 1.15fr) minmax(220px, 1fr) minmax(0, 1.35fr);
+  }
+  @container (max-width: 900px) {
+    .product-detail-meta-split--3 {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    .product-detail-meta-split--3 .product-detail-description-block {
+      grid-column: 1 / -1;
+    }
+  }
+  @container (max-width: 560px) {
+    .product-detail-meta-split--3 {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .product-detail-meta-tools {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .product-all-tools-wrap {
+    padding: 0;
+    margin: 0;
+    overflow-x: auto;
+  }
+  .product-all-tools {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .product-all-tools th,
+  .product-all-tools td {
+    padding: 7px 10px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid color-mix(in srgb, var(--bio-input-border) 55%, transparent);
+  }
+  .product-all-tools th {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--bio-body-muted, #9ca3af);
+    white-space: nowrap;
+  }
+  .product-all-tools tbody tr:last-child td {
+    border-bottom: none;
+  }
+  .product-all-tools tr.is-setup-start td {
+    border-top: 2px solid color-mix(in srgb, var(--bio-filter-border) 90%, transparent);
+  }
+  .product-all-tools__num {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .product-all-tools__setup {
+    width: 1%;
+    white-space: nowrap;
+  }
+  .product-all-tools__setup-btn {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--bio-body-fg);
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+  .product-all-tools__setup-btn:hover,
+  .product-all-tools__setup-btn:focus-visible {
+    color: var(--bio-accent, #60a5fa);
+    outline: none;
+  }
+  .product-all-tools__note {
+    color: var(--bio-body-muted, #9ca3af);
+  }
+  .product-all-tools-empty {
+    margin: 0;
+    font-size: 13px;
+  }
   .product-detail-meta-plan,
   .product-detail-meta-split .product-detail-description-block {
     display: flex;

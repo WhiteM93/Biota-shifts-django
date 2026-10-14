@@ -608,11 +608,33 @@
           <span class="product-detail-name" data-field-text="product_name" spellcheck="false">{{ product.name }}</span>
         </div>
       </header>
-      <div class="product-detail-meta-split">
+      <div class="product-detail-meta-split{% if setups %} product-detail-meta-split--3{% endif %}">
         <section class="product-detail-meta-plan product-detail-meta-card" aria-label="Параметры изделия">
           <h3 class="product-detail-meta-section-title">Параметры</h3>
           {% include "shifts/includes/plan_card_specs_unified.html" with plan_specs_variant="product" %}
         </section>
+        {% if setups %}
+        <section class="product-detail-meta-norms product-detail-meta-card" aria-label="Нормы времени по установкам">
+          <h3 class="product-detail-meta-section-title">Нормы по установкам</h3>
+          <div class="product-setup-norms-list" id="product-setup-norms-list">
+            {% for setup in setups %}
+            <div class="product-setup-norms-row{% if not setup.latest_piece_norm %} is-empty{% endif %}" data-setup-id="{{ setup.pk }}">
+              <button type="button" class="product-setup-norms-row__name js-goto-setup-tab" data-tab="{{ setup.tab_slug }}" title="Открыть установку">
+                {% if setup.name %}{{ setup.name }}{% else %}Установка {{ setup.sort_index }}{% endif %}
+              </button>
+              {% if setup.latest_piece_norm %}
+              <span class="product-setup-norms-row__norm" title="{{ setup.latest_piece_norm.comment|default:''|escape }}">Т<sub>шт</sub> {{ setup.latest_piece_norm.tsht_norm|floatformat:3 }}</span>
+              <span class="product-setup-norms-row__min">{{ setup.latest_piece_norm.tsht_min|floatformat:1 }} мин</span>
+              {% else %}
+              <span class="product-setup-norms-row__norm is-muted">—</span>
+              <span class="product-setup-norms-row__min is-muted">нет нормы</span>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          <p class="product-setup-norms-hint muted">Нормы сохраняются из калькулятора («Нормы на изделие»).</p>
+        </section>
+        {% endif %}
         <section class="product-detail-description-block product-detail-meta-card" aria-label="Описание изделия">
           <h3 class="product-detail-meta-section-title">Описание</h3>
           <div class="form-field form-field--always-visible product-description-toolbar-field">
@@ -645,25 +667,44 @@
         </section>
       </div>
       {% if setups %}
-      <section class="product-detail-meta-norms product-detail-meta-card" aria-label="Нормы времени по установкам">
-        <h3 class="product-detail-meta-section-title">Нормы по установкам</h3>
-        <div class="product-setup-norms-list" id="product-setup-norms-list">
-          {% for setup in setups %}
-          <div class="product-setup-norms-row{% if not setup.latest_piece_norm %} is-empty{% endif %}" data-setup-id="{{ setup.pk }}">
-            <button type="button" class="product-setup-norms-row__name js-goto-setup-tab" data-tab="{{ setup.tab_slug }}" title="Открыть установку">
-              {% if setup.name %}{{ setup.name }}{% else %}Установка {{ setup.sort_index }}{% endif %}
-            </button>
-            {% if setup.latest_piece_norm %}
-            <span class="product-setup-norms-row__norm" title="{{ setup.latest_piece_norm.comment|default:''|escape }}">Т<sub>шт</sub> {{ setup.latest_piece_norm.tsht_norm|floatformat:3 }}</span>
-            <span class="product-setup-norms-row__min">{{ setup.latest_piece_norm.tsht_min|floatformat:1 }} мин</span>
-            {% else %}
-            <span class="product-setup-norms-row__norm is-muted">—</span>
-            <span class="product-setup-norms-row__min is-muted">нет нормы</span>
-            {% endif %}
-          </div>
-          {% endfor %}
+      <section class="product-detail-meta-tools product-detail-meta-card" aria-label="Инструмент всех установок">
+        <h3 class="product-detail-meta-section-title">Инструмент{% if all_tool_rows %} · {{ all_tool_rows|length }}{% endif %}</h3>
+        {% if all_tool_rows %}
+        <div class="table-wrap product-all-tools-wrap">
+          <table class="product-all-tools">
+            <thead>
+              <tr>
+                <th>Установка</th>
+                <th>№</th>
+                <th>Тип</th>
+                <th>⌀</th>
+                <th>Вылет</th>
+                <th>Примечание</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in all_tool_rows %}
+              <tr{% if row.first_in_setup and not forloop.first %} class="is-setup-start"{% endif %}>
+                <td class="product-all-tools__setup">
+                  {% if row.first_in_setup %}
+                  <button type="button" class="product-all-tools__setup-btn js-goto-setup-tab" data-tab="{{ row.setup.tab_slug }}" title="Открыть установку">
+                    {% if row.setup.name %}{{ row.setup.name }}{% else %}Установка {{ row.setup.sort_index }}{% endif %}
+                  </button>
+                  {% endif %}
+                </td>
+                <td class="product-all-tools__num">{{ row.tool_number }}</td>
+                <td>{{ row.tool_type }}</td>
+                <td class="product-all-tools__num">{{ row.diameter }}</td>
+                <td class="product-all-tools__num">{{ row.overhang }}</td>
+                <td class="product-all-tools__note">{{ row.note }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
-        <p class="product-setup-norms-hint muted">Нормы сохраняются из калькулятора («Нормы на изделие»).</p>
+        {% else %}
+        <p class="muted product-all-tools-empty">В установках пока нет заполненного инструмента.</p>
+        {% endif %}
       </section>
       {% endif %}
     </div>
