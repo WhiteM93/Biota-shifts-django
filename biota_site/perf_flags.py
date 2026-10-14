@@ -48,4 +48,7 @@ def load_perf_settings() -> dict:
         "BIOTA_PERF_DIAG_LOAD_MS": _int_env("BIOTA_PERF_DIAG_LOAD_MS", 5000),
         "BIOTA_PERF_DIAG_SERVER_MS": _int_env("BIOTA_PERF_DIAG_SERVER_MS", 2000),
         "BIOTA_PERF_DIAG_KEEP": _int_env("BIOTA_PERF_DIAG_KEEP", 1000),
+        "BIOTA_SITE_STATS": _truthy(os.getenv("BIOTA_SITE_STATS") or "1"),
+        "BIOTA_SITE_STATS_KEEP_DAYS": _int_env("BIOTA_SITE_STATS_KEEP_DAYS", 90),
+        "BIOTA_SITE_STATS_SLOW_MS": _int_env("BIOTA_SITE_STATS_SLOW_MS", 1000),
     }

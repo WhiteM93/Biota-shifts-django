@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <title>Нарушение дисциплины — {{ month_name }} {{ year }}{% if print_one and rows %} — {{ rows.0.label }}{% endif %}</title>
-  <link rel="stylesheet" href="{% static 'shifts/css/discipline_print.css' %}?v={{ static_asset_version }}">
+  <link rel="stylesheet" href="{% asset 'shifts/css/discipline_print.css' %}">
 </head>
 <body class="{% if print_all %}is-print-all{% endif %}{% if print_one %} is-print-one{% endif %}">
   <div class="disc-print-toolbar no-print">

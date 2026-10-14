@@ -1973,6 +1973,63 @@ class PageLoadDiagnostic(models.Model):
         return f"{self.source} · {self.page_path} · {self.diagnosis[:60]}"
 
 
+class SiteRequestLog(models.Model):
+    """Открытия страниц, действия и ошибочные ответы — для статистики использования сайта."""
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Когда")
+    req_id = models.CharField(max_length=32, blank=True, default="", db_index=True, verbose_name="ID запроса")
+    username = models.CharField(max_length=120, blank=True, default="", db_index=True, verbose_name="Пользователь")
+    method = models.CharField(max_length=8, default="GET", verbose_name="Метод")
+    path = models.CharField(max_length=300, verbose_name="Адрес")
+    route = models.CharField(max_length=200, db_index=True, verbose_name="Раздел")
+    is_page = models.BooleanField(default=False, verbose_name="Страница")
+    status = models.PositiveSmallIntegerField(db_index=True, verbose_name="Код ответа")
+    server_ms = models.PositiveIntegerField(verbose_name="Сервер, мс")
+    is_mobile = models.BooleanField(default=False, verbose_name="Мобильный")
+    ttfb_ms = models.PositiveIntegerField(null=True, blank=True, verbose_name="TTFB, мс")
+    dom_ms = models.PositiveIntegerField(null=True, blank=True, verbose_name="DOM, мс")
+    load_ms = models.PositiveIntegerField(null=True, blank=True, verbose_name="Загрузка, мс")
+    transfer_kb = models.PositiveIntegerField(null=True, blank=True, verbose_name="Скачано, КБ")
+    net = models.CharField(max_length=16, blank=True, default="", verbose_name="Сеть")
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = "Запрос к сайту"
+        verbose_name_plural = "Статистика запросов"
+
+    def __str__(self):
+        return f"{self.method} {self.path} · {self.status} · {self.server_ms} мс"
+
+
+class SiteErrorLog(models.Model):
+    """Ошибки сервера (исключения) и браузера (JS)."""
+
+    SOURCE_SERVER = "server"
+    SOURCE_JS = "js"
+    SOURCE_CHOICES = [
+        (SOURCE_SERVER, "Сервер"),
+        (SOURCE_JS, "Браузер"),
+    ]
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Когда")
+    source = models.CharField(max_length=8, choices=SOURCE_CHOICES, db_index=True, verbose_name="Источник")
+    username = models.CharField(max_length=120, blank=True, default="", verbose_name="Пользователь")
+    path = models.CharField(max_length=300, blank=True, default="", verbose_name="Адрес")
+    route = models.CharField(max_length=200, blank=True, default="", verbose_name="Раздел")
+    status = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Код ответа")
+    message = models.CharField(max_length=500, verbose_name="Сообщение")
+    detail = models.TextField(blank=True, default="", verbose_name="Подробности")
+    user_agent = models.CharField(max_length=300, blank=True, default="", verbose_name="User-Agent")
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = "Ошибка сайта"
+        verbose_name_plural = "Ошибки сайта"
+
+    def __str__(self):
+        return f"{self.source} · {self.message[:80]}"
+
+
 class InventoryAiTurn(models.Model):
     """Реплика диалога с ИИ (чат склада / анализ наладки) — архив для разбора."""
 

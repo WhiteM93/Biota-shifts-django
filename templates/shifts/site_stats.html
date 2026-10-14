@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% asset 'shifts/css/cabinet.css' %}">
+<link rel="stylesheet" href="{% asset 'shifts/css/site_stats.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="cabinet-page">
+  <header class="cabinet-hero">
+    <p class="cabinet-hero__eyebrow">Администрирование</p>
+    <h1>Статистика сайта</h1>
+    <p class="cabinet-hero__meta muted">Кто и какие страницы открывает, как быстро они грузятся и где возникают ошибки.</p>
+  </header>
+
+  {% if not enabled %}
+  <p class="home-alert home-alert--error" role="alert">
+    Сбор выключен: в <code>.env</code> стоит <code>BIOTA_SITE_STATS=0</code>.
+  </p>
+  {% else %}
+  <nav class="site-stats-filters" aria-label="Период">
+    {% for d, label in periods %}
+    <a href="?days={{ d }}{% if user_sel %}&user={{ user_sel|urlencode }}{% endif %}" class="{% if d == days_sel %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+    {% if user_sel %}
+    <span class="site-stats-filters__user">Пользователь: <b>{{ user_sel }}</b> · <a href="?days={{ days_sel }}">все</a></span>
+    {% endif %}
+    <span class="site-stats-filters__user">с {{ since|date:"d.m.Y" }}</span>
+  </nav>
+
+  <div class="site-stats-cards">
+    <div class="site-stats-card">
+      <div class="site-stats-card__label">Открытий страниц</div>
+      <div class="site-stats-card__value">{{ summary.views }}</div>
+      <div class="site-stats-card__sub">людей: {{ summary.users }} · с телефона {{ summary.mobile_pct }}%</div>
+    </div>
+    <div class="site-stats-card">
+      <div class="site-stats-card__label">Загрузка в браузере</div>
+      <div class="site-stats-card__value">{{ summary.load_med }}</div>
+      <div class="site-stats-card__sub">у 10% дольше {{ summary.load_p90 }} · замеров {{ summary.measured }}</div>
+    </div>
+    <div class="site-stats-card">
+      <div class="site-stats-card__label">Ответ сервера</div>
+      <div class="site-stats-card__value">{{ summary.server_med }}</div>
+      <div class="site-stats-card__sub">у 10% дольше {{ summary.server_p90 }}</div>
+    </div>
+    <div class="site-stats-card{% if summary.err5xx or summary.exceptions %} site-stats-card--bad{% endif %}">
+      <div class="site-stats-card__label">Ошибки сервера</div>
+      <div class="site-stats-card__value">{{ summary.err5xx }}</div>
+      <div class="site-stats-card__sub">прочие отказы (4xx): {{ summary.err4xx }}</div>
+    </div>
+    <div class="site-stats-card{% if summary.js_errors %} site-stats-card--bad{% endif %}">
+      <div class="site-stats-card__label">Ошибки в браузере</div>
+      <div class="site-stats-card__value">{{ summary.js_errors }}</div>
+      <div class="site-stats-card__sub">сбои скриптов на страницах</div>
+    </div>
+  </div>
+
+  <section class="cabinet-section">
+    <div class="cabinet-section__head">
+      <h2>По дням</h2>
+      <p class="cabinet-section__lead">Загрузка — время до полной готовности страницы у пользователя: медиана и «у 10% дольше».</p>
+    </div>
+    {% if days %}
+    <div class="table-wrap">
+      <table class="site-stats-table">
+        <thead><tr><th>День</th><th class="num">Открытий</th><th class="site-stats-bar-cell"></th><th class="num">Людей</th><th class="num">Загрузка</th><th class="num">10% дольше</th><th class="num">Ошибок</th></tr></thead>
+        <tbody>
+          {% for d in days %}
+          <tr>
+            <td>{{ d.date|date:"D d.m" }}</td>
+            <td class="num">{{ d.views }}</td>
+            <td class="site-stats-bar-cell"><div class="site-stats-bar" style="width: {{ d.bar_pct }}%"></div></td>
+            <td class="num">{{ d.users }}</td>
+            <td class="num">{{ d.load_med }}</td>
+            <td class="num">{{ d.load_p90 }}</td>
+            <td class="num{% if d.errors %} site-stats-bad{% endif %}">{{ d.errors }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted">За этот период данных нет.</p>
+    {% endif %}
+  </section>
+
+  <section class="cabinet-section">
+    <div class="cabinet-section__head">
+      <h2>Популярные страницы</h2>
+      <p class="cabinet-section__lead">Сервер — сколько сайт готовил ответ; загрузка — сколько ждал человек целиком (сеть, файлы, отрисовка).</p>
+    </div>
+    {% if popular %}
+    <div class="table-wrap">
+      <table class="site-stats-table">
+        <thead><tr><th>Страница</th><th class="num">Открытий</th><th class="num">Людей</th><th class="num">Сервер</th><th class="num">Загрузка</th><th class="num">10% дольше</th><th class="num">Ошибок</th></tr></thead>
+        <tbody>
+          {% for r in popular %}
+          <tr>
+            <td><code>{{ r.route }}</code></td>
+            <td class="num">{{ r.views }}</td>
+            <td class="num">{{ r.users }}</td>
+            <td class="num">{{ r.server_med }}</td>
+            <td class="num">{{ r.load_med }}</td>
+            <td class="num">{{ r.load_p90 }}</td>
+            <td class="num{% if r.errors %} site-stats-bad{% endif %}">{{ r.errors }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted">Пока нет открытий страниц.</p>
+    {% endif %}
+  </section>
+
+  <div class="site-stats-grid2">
+    <section class="cabinet-section">
+      <div class="cabinet-section__head">
+        <h2>Самые медленные страницы</h2>
+        <p class="cabinet-section__lead">По времени, дольше которого грузились 10% открытий (минимум 3 замера).</p>
+      </div>
+      {% if slowest %}
+      <div class="table-wrap">
+        <table class="site-stats-table">
+          <thead><tr><th>Страница</th><th class="num">10% дольше</th><th class="num">Медиана</th><th class="num">Сервер</th><th class="num">Замеров</th></tr></thead>
+          <tbody>
+            {% for r in slowest %}
+            <tr>
+              <td><code>{{ r.route }}</code></td>
+              <td class="num"><b>{{ r.load_p90 }}</b></td>
+              <td class="num">{{ r.load_med }}</td>
+              <td class="num">{{ r.server_med }}</td>
+              <td class="num">{{ r.measured }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="muted">Мало замеров.</p>
+      {% endif %}
+    </section>
+
+    <section class="cabinet-section">
+      <div class="cabinet-section__head">
+        <h2>Медленные действия</h2>
+        <p class="cabinet-section__lead">Сохранения, поиск и прочие запросы без перехода на страницу, если сервер отвечал дольше {{ slow_ms }} мс.</p>
+      </div>
+      {% if slow_actions %}
+      <div class="table-wrap">
+        <table class="site-stats-table">
+          <thead><tr><th>Адрес</th><th>Метод</th><th class="num">Раз</th><th class="num">Медиана</th><th class="num">Макс.</th></tr></thead>
+          <tbody>
+            {% for r in slow_actions %}
+            <tr>
+              <td><code>{{ r.route }}</code></td>
+              <td>{{ r.method }}</td>
+              <td class="num">{{ r.count }}</td>
+              <td class="num">{{ r.med }}</td>
+              <td class="num">{{ r.max }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="muted">Медленных действий не было.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="cabinet-section">
+    <div class="cabinet-section__head">
+      <h2>Пользователи</h2>
+      <p class="cabinet-section__lead">Нажмите на имя, чтобы посмотреть статистику одного человека.</p>
+    </div>
+    {% if users %}
+    <div class="table-wrap">
+      <table class="site-stats-table">
+        <thead><tr><th>Кто</th><th class="num">Открытий</th><th>Последний раз</th><th class="num">Загрузка</th><th class="num">10% дольше</th><th class="num">С телефона</th><th>Сеть</th><th class="num">Ошибок</th></tr></thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td><a href="?days={{ days_sel }}&user={{ u.username|urlencode }}">{{ u.username }}</a></td>
+            <td class="num">{{ u.views }}</td>
+            <td>{{ u.last|date:"d.m H:i" }}</td>
+            <td class="num">{{ u.load_med }}</td>
+            <td class="num">{{ u.load_p90 }}</td>
+            <td class="num">{{ u.mobile_pct }}%</td>
+            <td>{{ u.net|default:"—" }}</td>
+            <td class="num{% if u.errors %} site-stats-bad{% endif %}">{{ u.errors }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted">Нет данных.</p>
+    {% endif %}
+  </section>
+
+  <section class="cabinet-section">
+    <div class="cabinet-section__head">
+      <h2>Ошибки</h2>
+      <p class="cabinet-section__lead">Сбои сервера и скриптов в браузере, одинаковые объединены. Подробности — для разбора причины.</p>
+    </div>
+    {% if errors %}
+    <div class="table-wrap">
+      <table class="site-stats-table">
+        <thead><tr><th>Где</th><th>Сообщение</th><th class="num">Раз</th><th>Последний раз</th><th>Кто</th></tr></thead>
+        <tbody>
+          {% for e in errors %}
+          <tr>
+            <td>{{ e.source }}</td>
+            <td>
+              <span class="site-stats-bad">{{ e.message|truncatechars:160 }}</span>
+              <div class="site-stats-muted"><code>{{ e.path|truncatechars:80 }}</code></div>
+              {% if e.detail %}
+              <details class="site-stats-detail"><summary>подробности</summary><pre>{{ e.detail }}</pre></details>
+              {% endif %}
+            </td>
+            <td class="num">{{ e.count }}</td>
+            <td>{{ e.last|date:"d.m H:i" }}</td>
+            <td>{{ e.users|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted">Ошибок не было.</p>
+    {% endif %}
+
+    {% if bad_responses %}
+    <h3 style="margin:18px 0 8px;font-size:1rem;">Отказы и ошибки по адресам</h3>
+    <div class="table-wrap">
+      <table class="site-stats-table">
+        <thead><tr><th>Адрес</th><th>Метод</th><th class="num">Код</th><th class="num">Раз</th><th>Последний раз</th><th>Кто</th></tr></thead>
+        <tbody>
+          {% for r in bad_responses %}
+          <tr>
+            <td><code>{{ r.route }}</code></td>
+            <td>{{ r.method }}</td>
+            <td class="num{% if r.status >= 500 %} site-stats-bad{% endif %}">{{ r.status }}</td>
+            <td class="num">{{ r.count }}</td>
+            <td>{{ r.last|date:"d.m H:i" }}</td>
+            <td>{{ r.users|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <p style="margin-top:20px;"><a href="{% url 'perf_diagnostics' %}">Медленные загрузки (подробный журнал)</a> · <a href="{% url 'cabinet' %}">← Личный кабинет</a></p>
+</div>
+{% endblock %}

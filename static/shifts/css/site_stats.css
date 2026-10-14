@@ -1,0 +1,28 @@
+.site-stats-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+.site-stats-filters a { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--bio-filter-border); text-decoration: none; font-size: 12px; }
+.site-stats-filters a.active { background: var(--bio-tab-pill-active-bg); color: #fff; border-color: transparent; }
+.site-stats-filters__user { font-size: 12px; color: var(--bio-muted); }
+
+.site-stats-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.site-stats-card { padding: 12px 14px; border-radius: 8px; border: 1px solid var(--bio-filter-border); background: var(--bio-surface-panel); }
+.site-stats-card__label { font-size: 11px; color: var(--bio-muted); text-transform: uppercase; letter-spacing: .03em; }
+.site-stats-card__value { font-size: 1.35rem; font-weight: 700; margin-top: 4px; color: var(--bio-heading-accent); }
+.site-stats-card__sub { font-size: 11px; color: var(--bio-muted); margin-top: 2px; }
+.site-stats-card--bad .site-stats-card__value { color: #e5534b; }
+
+.site-stats-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.site-stats-table th, .site-stats-table td { padding: 7px 9px; border-bottom: 1px solid var(--bio-surface-item-border); vertical-align: top; text-align: left; }
+.site-stats-table th { font-weight: 600; color: var(--bio-muted); white-space: nowrap; }
+.site-stats-table td.num, .site-stats-table th.num { text-align: right; white-space: nowrap; }
+.site-stats-table tbody tr:hover { background: var(--bio-surface-item); }
+.site-stats-table code { font-size: 11px; word-break: break-all; }
+.site-stats-table a { text-decoration: none; }
+
+.site-stats-bar { height: 8px; min-width: 2px; border-radius: 4px; background: var(--bio-tab-pill-active-bg); }
+.site-stats-bar-cell { width: 35%; }
+.site-stats-bad { color: #e5534b; font-weight: 600; }
+.site-stats-muted { color: var(--bio-muted); font-size: 11px; }
+.site-stats-detail summary { cursor: pointer; color: var(--bio-muted); font-size: 11px; }
+.site-stats-detail pre { max-height: 260px; overflow: auto; font-size: 11px; white-space: pre-wrap; word-break: break-word; margin: 6px 0 0; padding: 8px; border-radius: 6px; background: var(--bio-surface-item); }
+.site-stats-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; }
+@media (max-width: 720px) { .site-stats-grid2 { grid-template-columns: 1fr; } }

@@ -4,26 +4,26 @@
 {% load l10n %}
 
 {% block extra_styles %}
-<link rel="stylesheet" href="{% static 'shifts/css/inventory.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/inventory.css' %}">
 {% if panel == "arrival" or panel == "watch" %}
-<link rel="stylesheet" href="{% static 'shifts/css/inventory_arrival.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/inventory_arrival.css' %}">
 {% endif %}
 {% if panel == "payroll" %}
-<link rel="stylesheet" href="{% static 'shifts/css/inventory_payroll.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/inventory_payroll.css' %}">
 {% endif %}
 {% if panel == "issue_outcome" %}
-<link rel="stylesheet" href="{% static 'shifts/css/inventory_outcome.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/inventory_outcome.css' %}">
 {% endif %}
 {% if panel == "purchases" %}
-<link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}?v={{ static_asset_version }}">
-<link rel="stylesheet" href="{% static 'shifts/css/inventory_purchases.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/calculator.css' %}">
+<link rel="stylesheet" href="{% asset 'shifts/css/inventory_purchases.css' %}">
 {% endif %}
 {% if panel == "analysis" %}
-<link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}?v={{ static_asset_version }}">
-<link rel="stylesheet" href="{% static 'shifts/css/inventory_analysis.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/calculator.css' %}">
+<link rel="stylesheet" href="{% asset 'shifts/css/inventory_analysis.css' %}">
 {% endif %}
 {% if panel == "watch" %}
-<link rel="stylesheet" href="{% static 'shifts/css/inventory_watch.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/inventory_watch.css' %}">
 {% endif %}
 {% endblock %}
 
@@ -2895,5 +2895,5 @@
   </div>
 </div>
 
-<script src="{% static 'shifts/js/inventory.js' %}?v={{ static_asset_version }}" defer></script>
+<script src="{% asset 'shifts/js/inventory.js' %}" defer></script>
 {% endblock %}

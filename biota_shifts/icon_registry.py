@@ -34,6 +34,12 @@ DEFAULT_ICON_REGISTRY: dict[str, dict] = {
         "kind": "emoji",
         "value": "⏱",
     },
+    "cabinet.site_stats": {
+        "label": "Статистика сайта",
+        "group": "Кабинет",
+        "kind": "emoji",
+        "value": "📊",
+    },
     "cabinet.notifications": {
         "label": "Уведомления",
         "group": "Кабинет",

@@ -4,7 +4,7 @@
 {% block extra_styles %}
 <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-regular-rounded/css/uicons-regular-rounded.css">
 <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/uicons-bold-rounded/css/uicons-bold-rounded.css">
-<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/cabinet.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -105,5 +105,5 @@
   </form>
 </div>
 
-<script src="{% static 'shifts/js/cabinet_icons.js' %}?v={{ static_asset_version }}"></script>
+<script src="{% asset 'shifts/js/cabinet_icons.js' %}"></script>
 {% endblock %}

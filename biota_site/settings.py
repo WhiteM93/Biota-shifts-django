@@ -77,6 +77,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "shifts.middleware.ExecutorReadOnlyMiddleware",
     "shifts.middleware.PerfDiagnosticMiddleware",
+    "shifts.middleware.SiteStatsMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -94,6 +95,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "shifts.context_processors.biota_session",
             ],
+            "builtins": ["shifts.templatetags.biota_assets"],
         },
     },
 ]
@@ -200,7 +202,7 @@ STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 # Куда копировать статику для продакшена: `manage.py collectstatic` → Nginx раздаёт этот каталог как /static/
 STATIC_ROOT = BASE_DIR / "staticfiles"
-# Увеличивайте после правок CSS/JS, чтобы браузер и nginx не отдавали старые файлы.
+# Запасная версия для {% asset %}, если файл статики не найден; обычно версия берётся из содержимого файла.
 STATIC_ASSET_VERSION = (os.getenv("STATIC_ASSET_VERSION") or "593").strip() or "593"
 
 # YandexGPT (чат склада / анализ наладок). Ключи — в .env.secrets.
@@ -246,6 +248,10 @@ BIOTA_PERF_DIAG_TTFB_MS = _perf["BIOTA_PERF_DIAG_TTFB_MS"]
 BIOTA_PERF_DIAG_LOAD_MS = _perf["BIOTA_PERF_DIAG_LOAD_MS"]
 BIOTA_PERF_DIAG_SERVER_MS = _perf["BIOTA_PERF_DIAG_SERVER_MS"]
 BIOTA_PERF_DIAG_KEEP = _perf["BIOTA_PERF_DIAG_KEEP"]
+# Статистика использования (скорость, ошибки): по умолчанию включена, BIOTA_SITE_STATS=0 — выключить.
+BIOTA_SITE_STATS = _perf["BIOTA_SITE_STATS"]
+BIOTA_SITE_STATS_KEEP_DAYS = _perf["BIOTA_SITE_STATS_KEEP_DAYS"]
+BIOTA_SITE_STATS_SLOW_MS = _perf["BIOTA_SITE_STATS_SLOW_MS"]
 
 # Загрузки изделий (чертежи, CAD). При DEBUG файлы отдаёт Django; в проде настройте раздачу /media/ через nginx.
 MEDIA_URL = "/media/"

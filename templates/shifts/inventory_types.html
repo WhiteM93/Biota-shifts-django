@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_styles %}
-<link rel="stylesheet" href="{% static 'shifts/css/inventory_types.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/inventory_types.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -155,5 +155,5 @@
 {% endif %}
 
 {{ field_kinds_json|json_script:"st-field-kinds" }}
-<script src="{% static 'shifts/js/inventory_types.js' %}?v={{ static_asset_version }}"></script>
+<script src="{% asset 'shifts/js/inventory_types.js' %}"></script>
 {% endblock %}

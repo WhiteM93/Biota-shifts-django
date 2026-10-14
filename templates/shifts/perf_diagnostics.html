@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_styles %}
-<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/cabinet.css' %}">
 <style>
 .perf-diag-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .perf-diag-table th, .perf-diag-table td { padding: 8px 10px; border-bottom: 1px solid var(--bio-surface-item-border); vertical-align: top; text-align: left; }

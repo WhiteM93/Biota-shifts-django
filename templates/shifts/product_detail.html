@@ -2,7 +2,7 @@
 {% load static biota_icons %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static "shifts/css/product_detail.css" %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/product_detail.css' %}">
 <style id="pd-meta-view-fix">
   #product-detail-meta {
     background: transparent !important;
@@ -753,8 +753,8 @@
   "save_list_preview_url": "{% url 'product_save_list_preview' product.pk %}",
   "tool_type_choices": [{% for v, lbl in tool_type_choices %}{"value":"{{ v|escapejs }}","label":"{{ lbl|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
 }</script>
-<script src="{% static 'shifts/js/plan-cascade-form.js' %}?v={{ static_asset_version }}" defer></script>
-<script src="{% static 'shifts/js/product_detail.js' %}?v={{ static_asset_version }}" defer></script>
+<script src="{% asset 'shifts/js/plan-cascade-form.js' %}" defer></script>
+<script src="{% asset 'shifts/js/product_detail.js' %}" defer></script>
 
 {% if cad_inline_preview or has_setup_preview_stl %}
 <script type="importmap">
@@ -765,6 +765,6 @@
   }
 }
 </script>
-<script type="module" src="{% static 'shifts/js/product_detail_module.js' %}?v={{ static_asset_version }}"></script>
+<script type="module" src="{% asset 'shifts/js/product_detail_module.js' %}"></script>
 {% endif %}
 {% endblock %}

@@ -23,6 +23,7 @@ HUGICONS_STROKE_ROUNDED: dict[str, str] = {
     "cabinet.inventory_backups": "package-01",
     "cabinet.regulations_backups": "clipboard-01",
     "cabinet.perf_diagnostics": "timer-01",
+    "cabinet.site_stats": "grid-view",
     "cabinet.notifications": "notification-01",
     "cabinet.icons": "paint-board",
     "action.upload": "upload-01",

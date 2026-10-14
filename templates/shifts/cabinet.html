@@ -2,7 +2,7 @@
 {% load static biota_icons %}
 
 {% block extra_styles %}
-<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/cabinet.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -163,6 +163,11 @@
       <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "nav.updates" %}</span>
       <span class="cabinet-quick-card__title">Обновления сайта</span>
       <p class="cabinet-quick-card__desc">Лента для всех: что изменилось и как пользоваться</p>
+    </a>
+    <a class="cabinet-quick-card" href="{% url 'site_stats' %}">
+      <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "cabinet.site_stats" %}</span>
+      <span class="cabinet-quick-card__title">Статистика сайта</span>
+      <p class="cabinet-quick-card__desc">Посещения, скорость загрузки и ошибки</p>
     </a>
     <a class="cabinet-quick-card" href="{% url 'perf_diagnostics' %}">
       <span class="cabinet-quick-card__icon" aria-hidden="true">{% biota_icon "cabinet.perf_diagnostics" %}</span>

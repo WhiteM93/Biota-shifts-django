@@ -1,6 +1,6 @@
 {% load static %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-<script src="{% static 'shifts/js/inventory_analysis_dashboard.js' %}?v={{ static_asset_version }}" defer></script>
+<script src="{% asset 'shifts/js/inventory_analysis_dashboard.js' %}" defer></script>
 {{ dash_chart_data|json_script:"inv-dash-charts-data" }}
 
 <div class="inv-dash">

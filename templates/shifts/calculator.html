@@ -854,11 +854,11 @@
 <script type="application/json" id="calc-leveling-cards-json">{{ leveling_cards_json|default:"[]"|safe }}</script>
 
 <!-- ══════════════ СТИЛИ ══════════════ -->
-<link rel="stylesheet" href="{% static 'shifts/css/calculator.css' %}?v={{ static_asset_version }}">
-<link rel="stylesheet" href="{% static 'shifts/css/calculator_hexbind.css' %}?v={{ static_asset_version }}">
-<script src="{% static 'shifts/js/calculator_leveling.js' %}?v={{ static_asset_version }}" defer></script>
-<script src="{% static 'shifts/js/calculator_hexbind_viz.js' %}?v={{ static_asset_version }}" defer></script>
-<script src="{% static 'shifts/js/calculator_hexbind.js' %}?v={{ static_asset_version }}" defer></script>
+<link rel="stylesheet" href="{% asset 'shifts/css/calculator.css' %}">
+<link rel="stylesheet" href="{% asset 'shifts/css/calculator_hexbind.css' %}">
+<script src="{% asset 'shifts/js/calculator_leveling.js' %}" defer></script>
+<script src="{% asset 'shifts/js/calculator_hexbind_viz.js' %}" defer></script>
+<script src="{% asset 'shifts/js/calculator_hexbind.js' %}" defer></script>
 
 
 <script>

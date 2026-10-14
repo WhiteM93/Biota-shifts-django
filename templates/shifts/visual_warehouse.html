@@ -2,8 +2,8 @@
 {% load static biota_icons %}
 
 {% block extra_styles %}
-<link rel="stylesheet" href="{% static 'shifts/css/inventory.css' %}?v={{ static_asset_version }}">
-<link rel="stylesheet" href="{% static 'shifts/css/visual_warehouse.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/inventory.css' %}">
+<link rel="stylesheet" href="{% asset 'shifts/css/visual_warehouse.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -428,5 +428,5 @@
   "collet": {"label": "Тип цанги", "options": [{% for ct in collet_types %}{"value": "{{ ct.value }}", "label": "{{ ct.label }}"}{% if not forloop.last %},{% endif %}{% endfor %}]}
 }
 </script>
-<script src="{% static 'shifts/js/visual_warehouse.js' %}?v={{ static_asset_version }}"></script>
+<script src="{% asset 'shifts/js/visual_warehouse.js' %}"></script>
 {% endblock %}

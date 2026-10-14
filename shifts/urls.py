@@ -7,6 +7,7 @@ from . import debug_log_views
 from . import graph_mobile_views
 from . import graph_views
 from . import perf_diagnostic_views
+from . import site_stats_views
 from . import discipline_views
 from . import hours_views
 from . import employee_payroll_views
@@ -256,6 +257,8 @@ urlpatterns = [
     path("debug-log/list/", debug_log_views.debug_log_list, name="debug_log_list"),
     path("perf-diagnostic/ingest/", perf_diagnostic_views.perf_diagnostic_ingest, name="perf_diagnostic_ingest"),
     path("cabinet/perf-diagnostics/", perf_diagnostic_views.perf_diagnostics_view, name="perf_diagnostics"),
+    path("site-stats/ingest/", site_stats_views.site_stats_ingest, name="site_stats_ingest"),
+    path("cabinet/site-stats/", site_stats_views.site_stats_view, name="site_stats"),
     path("api/notify/attendance/", notify_api_views.notify_attendance_trigger, name="notify_attendance_trigger"),
     path("cabinet/", cabinet_views.cabinet_view, name="cabinet"),
     path("cabinet/notifications/", cabinet_views.notifications_settings_view, name="cabinet_notifications"),

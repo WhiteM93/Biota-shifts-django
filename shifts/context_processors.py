@@ -168,6 +168,7 @@ def biota_session(request):
     payload["perf_diagnostics"] = perf_diagnostics
     payload["perf_diag_ttfb_ms"] = perf_diag_ttfb_ms
     payload["perf_diag_load_ms"] = perf_diag_load_ms
+    payload["site_stats_req_id"] = getattr(request, "biota_req_id", "")
     if real_admin and adn:
         display = adn
     else:

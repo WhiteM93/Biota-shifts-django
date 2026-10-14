@@ -2,8 +2,8 @@
 {% load static %}
 
 {% block extra_styles %}
-<link rel="stylesheet" href="{% static 'shifts/css/cabinet.css' %}?v={{ static_asset_version }}">
-<link rel="stylesheet" href="{% static 'shifts/css/site_updates.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/cabinet.css' %}">
+<link rel="stylesheet" href="{% asset 'shifts/css/site_updates.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -49,5 +49,5 @@
   <p class="muted">Пока нет опубликованных обновлений.</p>
   {% endif %}
 </div>
-<script src="{% static 'shifts/js/site_updates.js' %}?v={{ static_asset_version }}" defer></script>
+<script src="{% asset 'shifts/js/site_updates.js' %}" defer></script>
 {% endblock %}

@@ -149,3 +149,38 @@ class PerfDiagnosticMiddleware:
                 except Exception:
                     pass
         return response
+
+
+class SiteStatsMiddleware:
+    """Статистика использования: страницы, скорость ответа, ошибки (если BIOTA_SITE_STATS)."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from django.conf import settings
+
+        if not getattr(settings, "BIOTA_SITE_STATS", False):
+            return self.get_response(request)
+
+        import time
+
+        from shifts.site_stats import new_req_id, record_request
+
+        request.biota_req_id = new_req_id()
+        start = time.perf_counter()
+        response = self.get_response(request)
+        server_ms = int((time.perf_counter() - start) * 1000)
+        try:
+            record_request(request, response, server_ms, getattr(request, "_biota_exc_text", ""))
+        except Exception:
+            pass
+        return response
+
+    def process_exception(self, request, exception):
+        import traceback
+
+        request._biota_exc_text = "".join(
+            traceback.format_exception(type(exception), exception, exception.__traceback__)
+        )
+        return None

@@ -2,7 +2,7 @@
 {% load static biota_icons %}
 
 {% block extra_styles %}
-<link rel="stylesheet" href="{% static 'shifts/css/contracts.css' %}?v={{ static_asset_version }}">
+<link rel="stylesheet" href="{% asset 'shifts/css/contracts.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -157,5 +157,5 @@
 {% endif %}
 
 <script type="application/json" id="wc-bootstrap">{{ contracts_json|safe }}</script>
-<script src="{% static 'shifts/js/contracts.js' %}?v={{ static_asset_version }}"></script>
+<script src="{% asset 'shifts/js/contracts.js' %}"></script>
 {% endblock %}

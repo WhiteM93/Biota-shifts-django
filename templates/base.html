@@ -6,19 +6,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>MetaBase</title>
   <link rel="manifest" href="{% static 'site.webmanifest' %}">
-  <link rel="icon" href="{% static 'favicon.ico' %}?v={{ static_asset_version }}" sizes="any">
-  <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon-16x16.png' %}?v={{ static_asset_version }}">
-  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}?v={{ static_asset_version }}">
-  <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}?v={{ static_asset_version }}">
+  <link rel="icon" href="{% asset 'favicon.ico' %}" sizes="any">
+  <link rel="icon" type="image/png" sizes="16x16" href="{% asset 'favicon-16x16.png' %}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% asset 'favicon-32x32.png' %}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% asset 'apple-touch-icon.png' %}">
   <script>
     (function(){try{var k='biotaSiteTheme',l=localStorage.getItem('adminTestLabTheme');if(l&&!localStorage.getItem(k))localStorage.setItem(k,l);var v=localStorage.getItem(k);document.documentElement.setAttribute('data-theme',v==='dawn'?'dawn':'night');}catch(e){document.documentElement.setAttribute('data-theme','night');}})();
   </script>
-  <link rel="stylesheet" href="{% static 'css/biota_global.css' %}?v={{ static_asset_version }}">
-  <link rel="stylesheet" href="{% static 'shifts/css/biota_delete_btn.css' %}?v={{ static_asset_version }}">
-  <script src="{% static 'shifts/js/biota_delete_btn.js' %}?v={{ static_asset_version }}"></script>
+  {% if site_stats_req_id and biota_username %}
+  <script>
+    (function(){var q=window.__biotaErrQ=[];function add(m,s,l,c,st){m=String(m||"");if(!m||m==="Script error."||q.length>=20)return;q.push({message:m.slice(0,500),source:String(s||"").slice(0,300),line:l||0,col:c||0,stack:String(st||"").slice(0,4000)});if(window.__biotaErrFlush)window.__biotaErrFlush();}
+    window.addEventListener("error",function(e){if(e.target&&e.target!==window)return;add(e.message,e.filename,e.lineno,e.colno,e.error&&e.error.stack);});
+    window.addEventListener("unhandledrejection",function(e){var r=e.reason;add("Promise: "+((r&&r.message)||r),"",0,0,r&&r.stack);});})();
+  </script>
+  {% endif %}
+  <link rel="stylesheet" href="{% asset 'css/biota_global.css' %}">
+  <link rel="stylesheet" href="{% asset 'shifts/css/biota_delete_btn.css' %}">
+  <script src="{% asset 'shifts/js/biota_delete_btn.js' %}"></script>
   {% block extra_styles %}{% endblock %}
   {% if biota_username and not auth_page and biota_nav.inventory %}
-  <link rel="stylesheet" href="{% static 'shifts/css/inventory_chat.css' %}?v={{ static_asset_version }}">
+  <link rel="stylesheet" href="{% asset 'shifts/css/inventory_chat.css' %}">
   {% endif %}
 </head>
 <body class="{% if auth_page %}auth-page{% endif %}" data-biota-can-edit="{% if biota_can_edit %}1{% else %}0{% endif %}">
@@ -190,7 +197,7 @@
     })();
   </script>
   <script>window.__biotaIcons = {{ biota_icons_json|safe }};</script>
-  <script src="{% static 'shifts/js/biota_icons.js' %}?v={{ static_asset_version }}"></script>
+  <script src="{% asset 'shifts/js/biota_icons.js' %}"></script>
   {% if biota_username and not auth_page and biota_nav.inventory %}
   {% include "shifts/includes/inventory_chat_widget.html" %}
   {% endif %}
@@ -203,7 +210,17 @@
       isMobile: /android|webos|iphone|ipod|blackberry|iemobile|opera mini|mobile/i.test(navigator.userAgent || "")
     };
   </script>
-  <script src="{% static 'shifts/js/perf-diagnostic.js' %}?v={{ static_asset_version }}" defer></script>
+  <script src="{% asset 'shifts/js/perf-diagnostic.js' %}" defer></script>
+  {% endif %}
+  {% if site_stats_req_id and biota_username %}
+  <script>
+    window.__biotaSiteStats = {
+      ingestUrl: "{% url 'site_stats_ingest' %}",
+      reqId: "{{ site_stats_req_id }}",
+      csrf: "{{ csrf_token }}"
+    };
+  </script>
+  <script src="{% asset 'shifts/js/site-stats.js' %}" defer></script>
   {% endif %}
 </body>
 </html>
