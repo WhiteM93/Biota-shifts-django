@@ -16,8 +16,6 @@ from shifts.auth_utils import (
 from shifts.site_updates import effective_site_updates_seen_id, unread_site_updates_count
 from shifts.site_updates_views import SITE_UPDATES_SEEN_SESSION_KEY
 
-_NON_WAREHOUSE_PANELS = frozenset({"defects", "payroll", "employees"})
-
 
 def _site_updates_unread(request) -> int:
     try:
@@ -49,8 +47,6 @@ def _stock_addr_fab_context(request, *, username: str) -> dict:
         elif url_name == "inventory":
             if not panel:
                 panel = "stock"
-            if panel in _NON_WAREHOUSE_PANELS:
-                return empty
             show = True
             include_stock = panel != "arrival"
         else:

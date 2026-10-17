@@ -1839,6 +1839,26 @@ class PurchaseStore(models.Model):
         return self.name
 
 
+
+class WarehouseEmployee(models.Model):
+    """Справочник сотрудников склада (выдача / возврат). Без связи с внешней Biota/СКУД."""
+
+    name = models.CharField(max_length=120, unique=True, verbose_name="ФИО / подпись")
+    note = models.CharField(max_length=200, blank=True, default="", verbose_name="Заметка")
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name="Активен")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("name", "id")
+        verbose_name = "Сотрудник склада"
+        verbose_name_plural = "Сотрудники склада"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+
 class StockMovement(models.Model):
     movement_type = models.CharField(
         max_length=16,
@@ -2183,186 +2203,6 @@ class PurchaseRequest(models.Model):
         return self.unit_price * self.quantity
 
 
-DEFECT_RECORD_TYPE_SCOLD = "scold"
-DEFECT_RECORD_TYPE_PRAISE = "praise"
-DEFECT_RECORD_TYPE_CHOICES = [
-    (DEFECT_RECORD_TYPE_SCOLD, "Поругать"),
-    (DEFECT_RECORD_TYPE_PRAISE, "Похвалить"),
-]
-
-
-class EmployeeDefectRecord(models.Model):
-    record_type = models.CharField(
-        max_length=10,
-        choices=DEFECT_RECORD_TYPE_CHOICES,
-        default=DEFECT_RECORD_TYPE_SCOLD,
-        verbose_name="Тип записи",
-    )
-    defect_date = models.DateField(verbose_name="Дата")
-    responsible_name = models.CharField(max_length=120, verbose_name="Ответственный")
-    employee_name = models.CharField(max_length=120, db_index=True, verbose_name="Сотрудник")
-    department_name = models.CharField(max_length=200, blank=True, default="", db_index=True, verbose_name="Отдел")
-    defect_quantity = models.PositiveIntegerField(verbose_name="Кол-во брака")
-    good_quantity = models.PositiveIntegerField(default=0, verbose_name="Исправно")
-    bad_quantity = models.PositiveIntegerField(default=0, verbose_name="Неисправно")
-    potential_defect_quantity = models.PositiveIntegerField(
-        default=0,
-        verbose_name="Потенциальный брак",
-        help_text="Количество с потенциальным дефектом (учёт отдельно от подтверждённого брака).",
-    )
-    product_name = models.CharField(max_length=300, blank=True, default="", verbose_name="Изделие")
-    defect_reason = models.CharField(max_length=500, verbose_name="Причина брака")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
-
-    class Meta:
-        ordering = ("-defect_date", "-id")
-        verbose_name = "Запись учёта брака сотрудника"
-        verbose_name_plural = "Учёт брака сотрудников"
-
-    def __str__(self):
-        return f"{self.defect_date} / {self.employee_name} / {(self.defect_reason or '')[:60]}"
-
-
-EMPLOYEE_PAYROLL_SHIFT_HOURS = (
-    (8, "8 часов"),
-    (10, "10 часов"),
-    (12, "12 часов"),
-)
-
-
-class EmployeePayrollProfile(models.Model):
-    """Ставки и параметры смены для расчёта ЗП (привязка к коду сотрудника из Biota)."""
-
-    emp_code = models.CharField(max_length=128, unique=True, db_index=True, verbose_name="Код сотрудника (Biota)")
-    hourly_rate_day = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        verbose_name="Ставка дневная, ₽/ч",
-    )
-    hourly_rate_night = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        verbose_name="Ставка ночная, ₽/ч",
-    )
-    shift_hours = models.PositiveSmallIntegerField(
-        choices=EMPLOYEE_PAYROLL_SHIFT_HOURS,
-        default=8,
-        verbose_name="Длительность смены, ч",
-    )
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
-    updated_by = models.CharField(max_length=200, blank=True, default="", verbose_name="Кем обновлено")
-
-    class Meta:
-        verbose_name = "Параметры ЗП сотрудника"
-        verbose_name_plural = "Параметры ЗП сотрудников"
-
-    def __str__(self):
-        return f"{self.emp_code} (смена {self.shift_hours} ч)"
-
-
-class EmployeePayrollSettlement(models.Model):
-    """Расчёт ЗП за месяц: табель по дням, премии, доли от начисления (поля — выплачиваемый % по линиям)."""
-
-    emp_code = models.CharField(max_length=128, db_index=True, verbose_name="Код сотрудника")
-    year = models.PositiveSmallIntegerField(verbose_name="Год")
-    month = models.PositiveSmallIntegerField(verbose_name="Месяц")
-    tab_by_day = models.JSONField(default=dict, blank=True, verbose_name="Часы по табелю по дням (ISO дата → часы)")
-    bonus_percent = models.DecimalField(
-        max_digits=8,
-        decimal_places=2,
-        default=0,
-        verbose_name="Премия, % от начисления по табелю",
-    )
-    bonus_rub = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0,
-        verbose_name="Премия, ₽",
-    )
-    penalty_quality_pct = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=20,
-        verbose_name="Качество, % от начисления по табелю (макс. 20)",
-    )
-    penalty_result_pct = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=20,
-        verbose_name="Результат, % от начисления по табелю (макс. 20)",
-    )
-    penalty_mode_pct = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=10,
-        verbose_name="Режим, % от начисления по табелю (макс. 10)",
-    )
-    penalty_rub = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0,
-        verbose_name="Штраф, ₽",
-    )
-    advance_rub = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0,
-        verbose_name="Аванс, ₽",
-        help_text="Уже выплаченный или запланированный аванс за месяц — для сверки с расчётом «к выплате».",
-    )
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
-    updated_by = models.CharField(max_length=200, blank=True, default="", verbose_name="Кем обновлено")
-
-    class Meta:
-        verbose_name = "Расчёт ЗП за месяц"
-        verbose_name_plural = "Расчёты ЗП за месяц"
-        constraints = [
-            models.UniqueConstraint(
-                fields=("emp_code", "year", "month"),
-                name="uniq_employee_payroll_settlement_ym",
-            )
-        ]
-
-    def __str__(self):
-        return f"{self.emp_code} {self.year}-{self.month:02d}"
-
-
-class EmployeePayrollMonthStatus(models.Model):
-    """Отметки по сотруднику за календарный месяц (список ЗП и сверка с бухгалтерией)."""
-
-    emp_code = models.CharField(max_length=128, db_index=True, verbose_name="Код сотрудника")
-    year = models.PositiveSmallIntegerField(verbose_name="Год")
-    month = models.PositiveSmallIntegerField(verbose_name="Месяц")
-    advance_closed = models.BooleanField(
-        default=False,
-        verbose_name="Аванс учтён",
-        help_text="Отметка: аванс за период учтён / сверен.",
-    )
-    payroll_closed = models.BooleanField(
-        default=False,
-        verbose_name="Расчёт ЗП завершён",
-        help_text="Отметка: расчёт заработной платы за месяц по сотруднику закрыт.",
-    )
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
-    updated_by = models.CharField(max_length=200, blank=True, default="", verbose_name="Кем обновлено")
-
-    class Meta:
-        verbose_name = "Статус ЗП сотрудника за месяц"
-        verbose_name_plural = "Статусы ЗП по месяцам"
-        constraints = [
-            models.UniqueConstraint(
-                fields=("emp_code", "year", "month"),
-                name="uniq_employee_payroll_month_status_ym",
-            )
-        ]
-
-    def __str__(self):
-        return f"{self.emp_code} {self.year}-{self.month:02d}"
-
 
 class UserInventoryStockFilterPrefs(models.Model):
     """Последние GET-параметры фильтра «Фильтр наличия» (страница склада), на аккаунт Biota."""
@@ -2431,52 +2271,6 @@ class InventoryWatchTemplate(models.Model):
     def __str__(self) -> str:
         return f"{self.name} ({self.group_value})"
 
-
-DEFECT_PAYROLL_ADJUST_KIND_CHOICES = [
-    ("bonus_percent", "Премия — % (пункты)"),
-    ("bonus_rub", "Премия — ₽"),
-    ("penalty_quality_pct", "Качество — % (0…20)"),
-    ("penalty_result_pct", "Результат — % (0…20)"),
-    ("penalty_mode_pct", "Режим — % (0…10)"),
-    ("penalty_rub", "Штраф — ₽"),
-]
-
-
-class EmployeeDefectPayrollAdjustment(models.Model):
-    """Добавка к полям расчёта ЗП за месяц, привязанная к конкретной записи учёта брака."""
-
-    defect_record = models.ForeignKey(
-        EmployeeDefectRecord,
-        on_delete=models.CASCADE,
-        related_name="payroll_adjustments",
-        verbose_name="Запись брака",
-    )
-    adjust_kind = models.CharField(
-        max_length=40,
-        choices=DEFECT_PAYROLL_ADJUST_KIND_CHOICES,
-        verbose_name="Поле в карточке ЗП",
-    )
-    amount = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        verbose_name="Добавка",
-        help_text="Суммируется с соответствующим полем в расчёте; для процентов — п.п.; допускается «−».",
-    )
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
-    updated_by = models.CharField(max_length=200, blank=True, default="", verbose_name="Кем обновлено")
-
-    class Meta:
-        verbose_name = "Корректировка ЗП по записи брака"
-        verbose_name_plural = "Корректировки ЗП по браку"
-        constraints = [
-            models.UniqueConstraint(
-                fields=("defect_record", "adjust_kind"),
-                name="uniq_defect_payroll_adj_kind",
-            )
-        ]
-
-    def __str__(self):
-        return f"#{self.defect_record_id} {self.adjust_kind} {self.amount}"
 
 
 class Product(models.Model):

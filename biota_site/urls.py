@@ -24,7 +24,6 @@ from django.urls import include, path
 urlpatterns = [
     path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}favicon.ico", permanent=True)),
     path("admin/", admin.site.urls),
-    path("regulations/", include("regulations.urls")),
     path("", include("shifts.urls")),
 ]
 

@@ -24,8 +24,10 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 4px 0 40px;
+  width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  overflow-x: clip;
 }
 
 /* ——— История склада (карточки, адаптив) ——— */
@@ -1431,7 +1433,136 @@ html[data-theme="dawn"] .inv-history-open-block {
   line-height: 1.5;
 }
 
+/* ——— Сотрудники склада ——— */
+.inv-emp-panel {
+  margin: 0 auto;
+  max-width: 520px;
+  min-width: 0;
+}
+
+.inv-emp-panel__head {
+  margin: 0 0 12px;
+}
+
+.inv-emp-panel__title {
+  margin: 0 0 4px;
+  font-size: 1.2rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.inv-emp-panel__lead {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.inv-emp-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 8px;
+  border: 1px solid var(--bio-filter-border);
+  border-radius: 8px;
+  background: var(--bio-surface-panel);
+  box-shadow: var(--bio-filter-shadow);
+}
+
+.inv-emp-input {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--bio-filter-border, #2a3651);
+  border-radius: 6px;
+  background: var(--bio-input-bg, transparent);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.inv-emp-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--bio-filter-border);
+  border-radius: 8px;
+  background: var(--bio-surface-panel);
+  box-shadow: var(--bio-filter-shadow);
+}
+
+.inv-emp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 4px;
+  border-radius: 6px;
+}
+
+.inv-emp-row + .inv-emp-row {
+  border-top: 1px solid var(--bio-surface-item-border, rgba(127, 140, 160, 0.16));
+}
+
+.inv-emp-row:hover {
+  background: rgba(127, 140, 160, 0.08);
+}
+
+.inv-emp-row .inv-emp-input {
+  flex: 1 1 auto;
+  min-width: 8rem;
+}
+
+.inv-emp-name {
+  flex: 1 1 auto;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.inv-emp-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.inv-emp-inline-form {
+  display: inline;
+  margin: 0;
+}
+
+.inv-emp-empty {
+  margin: 0;
+  padding: 14px 10px;
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (max-width: 520px) {
+  .inv-emp-panel {
+    max-width: none;
+  }
+
+  .inv-emp-row {
+    flex-wrap: wrap;
+  }
+
+  .inv-emp-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
 /* Склад: таблица слева, фильтр справа */
+.inv-page--stock {
+  /* отступ под липкую шапку сайта */
+  --inv-sticky-top: 72px;
+}
+
 .inv-stock-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(240px, 292px);
@@ -1439,7 +1570,8 @@ html[data-theme="dawn"] .inv-history-open-block {
   align-items: stretch;
   width: 100%;
   min-width: 0;
-  overflow: hidden;
+  /* overflow:hidden ломает position:sticky у фильтра */
+  overflow: visible;
 }
 
 .inv-stock-main {
@@ -1467,9 +1599,9 @@ html[data-theme="dawn"] .inv-history-open-block {
   background: var(--bio-surface-panel);
   box-shadow: var(--bio-filter-shadow);
   position: sticky;
-  top: var(--inv-sticky-top, 64px);
+  top: var(--inv-sticky-top, 72px);
   z-index: 20;
-  max-height: calc(100vh - var(--inv-sticky-top, 64px) - 12px);
+  max-height: calc(100vh - var(--inv-sticky-top, 72px) - 12px);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;

@@ -94,15 +94,8 @@ class AdminPreviewRoleTests(TestCase):
         ), patch(
             "biota_shifts.auth.nav_permissions_for_user",
             return_value={
-                "graph": True,
-                "hours": True,
-                "skud": True,
                 "inventory": True,
                 "inventory_types": True,
-                "defects": True,
-                "payroll": True,
-                "employees": True,
-                "regulations": True,
                 "products": True,
                 "forms": True,
                 "calculator": True,
@@ -133,15 +126,8 @@ class AdminPreviewRoleTests(TestCase):
         ), patch(
             "biota_shifts.auth.nav_permissions_for_user",
             return_value={
-                "graph": True,
-                "hours": True,
-                "skud": True,
                 "inventory": True,
                 "inventory_types": True,
-                "defects": True,
-                "payroll": True,
-                "employees": True,
-                "regulations": True,
                 "products": True,
                 "forms": True,
                 "calculator": True,

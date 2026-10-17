@@ -12,6 +12,9 @@
   <a class="inv-tab {% if active_tab == 'arrival' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=arrival">Приход</a>
   {% endif %}
   <a class="inv-tab {% if active_tab == 'purchases' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=purchases">Закупки</a>
+  {% if biota_can_edit %}
+  <a class="inv-tab {% if active_tab == 'employees' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=employees">Сотрудники</a>
+  {% endif %}
   {% if biota_nav.visual_warehouse %}
   <a class="inv-tab {% if active_tab == 'visual_warehouse' %}is-active{% endif %}" href="{% url 'visual_warehouse' %}" title="Визуальный склад">Виз. склад</a>
   {% endif %}

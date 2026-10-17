@@ -7,7 +7,6 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
-from biota_shifts import db as biota_db
 from biota_shifts.auth import (
     ADMIN_USERNAME,
     USER_ROLE_CHOICES,
@@ -251,14 +250,6 @@ def preview_role_view(request):
 def home_view(request):
     """Старый адрес сводки: сразу в первый доступный раздел."""
     return redirect(post_login_redirect(biota_user(request)))
-
-
-@biota_login_required
-@write_permission_required
-@require_POST
-def refresh_db_cache(request):
-    biota_db.clear_biota_db_cache()
-    return redirect(request.META.get("HTTP_REFERER") or "/")
 
 
 def _normalize_cutting_mode_rows(raw) -> list[dict]:

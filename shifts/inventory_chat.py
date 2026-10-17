@@ -272,8 +272,6 @@ _ALLOWED_PANELS = frozenset(
         "purchases",
         "analysis",
         "watch",
-        "defects",
-        "payroll",
         "employees",
     }
 )
@@ -286,8 +284,6 @@ _PANEL_LABELS = {
     "purchases": "закупки",
     "analysis": "главная склада",
     "watch": "контроль остатков",
-    "defects": "брак",
-    "payroll": "зарплата",
     "employees": "сотрудники",
 }
 _FACT_REPLY_TOOLS = frozenset(

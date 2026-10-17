@@ -86,22 +86,10 @@ def _nav_key_for_url_name(url_name: str) -> str | None:
     n = (url_name or "").strip()
     if not n:
         return None
-    if n.startswith("graph"):
-        return "graph"
-    if n.startswith("hours"):
-        return "hours"
-    if n.startswith("skud") or n == "discipline" or n == "discipline_print":
-        return "skud"
     if n == "inventory":
         return "inventory"
     if n == "inventory_types" or n.startswith("inventory_types_api"):
         return "inventory_types"
-    if n == "employee_payroll_detail":
-        return "employees"
-    if n == "payroll_settlement":
-        return "payroll"
-    if n.startswith("regulations"):
-        return "regulations"
     if n.startswith("product"):
         return "products"
     if n == "calculator":
@@ -124,17 +112,6 @@ def _nav_key_for_internal_path(path: str, query: str) -> str | None:
     except Exception:
         return None
     key = _nav_key_for_url_name(match.url_name)
-    if key == "inventory":
-        q = parse_qs(query or "")
-        panel_vals = [x for x in (q.get("panel") or []) if x]
-        panel = (panel_vals[0] or "").strip() if panel_vals else ""
-        if panel == "defects":
-            return "defects"
-        if panel == "payroll":
-            return "payroll"
-        if panel == "employees":
-            return "employees"
-        return "inventory"
     return key
 
 
@@ -158,15 +135,8 @@ def post_login_redirect(username: str | None, next_path: str | None = None) -> s
                     return raw
             # next недоступен — ниже fallback по правам, не сразу кабинет
             order = (
-                "graph",
-                "hours",
-                "skud",
                 "inventory",
                 "inventory_types",
-                "defects",
-                "payroll",
-                "employees",
-                "regulations",
                 "products",
                 "forms",
                 "calculator",
@@ -177,12 +147,6 @@ def post_login_redirect(username: str | None, next_path: str | None = None) -> s
                 if not perms.get(k, True):
                     continue
                 try:
-                    if k == "defects":
-                        return f"{reverse('inventory')}?panel=defects"
-                    if k == "payroll":
-                        return f"{reverse('inventory')}?panel=payroll"
-                    if k == "employees":
-                        return f"{reverse('inventory')}?panel=employees"
                     return reverse(k)
                 except NoReverseMatch:
                     continue
@@ -232,7 +196,7 @@ def nav_permission_required(nav_key: str):
 
 
 def inventory_route_nav_access_required(view_func):
-    """Доступ к /inventory/: панели склад — nav.inventory; defects / payroll / employees — отдельные nav.*."""
+    """Доступ к /inventory/: право nav.inventory."""
 
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
@@ -240,24 +204,8 @@ def inventory_route_nav_access_required(view_func):
         if not u:
             next_url = quote(request.get_full_path(), safe="/")
             return redirect(f"{settings.LOGIN_URL}?next={next_url}")
-        action = (request.POST.get("action") or "").strip() if request.method == "POST" else ""
         perms = nav_permissions_for_user(u)
-        if action in {"create_defect_record", "update_defect_record", "delete_defect_record"}:
-            ok = perms.get("defects", True)
-        elif request.method == "POST" and action:
-            # Любые другие POST (склад, закупки и т.д.) — только при праве «Склад»
-            ok = perms.get("inventory", True)
-        else:
-            panel = (request.GET.get("panel") or request.POST.get("panel") or "stock").strip()
-            if panel == "defects":
-                ok = perms.get("defects", True)
-            elif panel == "payroll":
-                ok = perms.get("payroll", True)
-            elif panel == "employees":
-                ok = perms.get("employees", True)
-            else:
-                ok = perms.get("inventory", True)
-        if not ok:
+        if not perms.get("inventory", True):
             messages.warning(request, "У вас нет доступа к этому разделу.")
             return redirect(post_login_redirect(u))
         return view_func(request, *args, **kwargs)

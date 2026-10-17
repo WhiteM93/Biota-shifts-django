@@ -8,9 +8,6 @@
 {% if panel == "arrival" or panel == "watch" %}
 <link rel="stylesheet" href="{% asset 'shifts/css/inventory_arrival.css' %}">
 {% endif %}
-{% if panel == "payroll" %}
-<link rel="stylesheet" href="{% asset 'shifts/css/inventory_payroll.css' %}">
-{% endif %}
 {% if panel == "issue_outcome" %}
 <link rel="stylesheet" href="{% asset 'shifts/css/inventory_outcome.css' %}">
 {% endif %}
@@ -28,192 +25,57 @@
 {% endblock %}
 
 {% block content %}
-<div class="inv-page{% if panel == 'stock' %} inv-page--stock{% endif %}{% if panel == 'arrival' %} inv-page--arrival{% endif %}{% if panel == 'issue_outcome' %} inv-page--issue-outcome{% endif %}{% if panel == 'payroll' %} inv-page--payroll{% endif %}{% if panel == 'purchases' %} inv-page--purchases calc-page{% endif %}{% if panel == 'analysis' %} inv-page--analysis calc-page{% endif %}{% if panel == 'watch' %} inv-page--watch{% endif %}{% if panel == 'history' %} inv-page--history{% endif %}">
-{% if panel != "defects" and panel != "payroll" and panel != "employees" %}
+<div class="inv-page{% if panel == 'stock' %} inv-page--stock{% endif %}{% if panel == 'arrival' %} inv-page--arrival{% endif %}{% if panel == 'issue_outcome' %} inv-page--issue-outcome{% endif %}{% if panel == 'purchases' %} inv-page--purchases calc-page{% endif %}{% if panel == 'analysis' %} inv-page--analysis calc-page{% endif %}{% if panel == 'watch' %} inv-page--watch{% endif %}{% if panel == 'history' %} inv-page--history{% endif %}">
 {% include "shifts/includes/inventory_tabs.html" with active_tab=panel %}
-{% endif %}
-{% if panel != "defects" and panel != "payroll" and panel != "employees" and panel != "stock" and panel != "arrival" and panel != "issue_outcome" and panel != "purchases" and panel != "history" and panel != "analysis" and panel != "watch" %}
+{% if panel != "stock" and panel != "arrival" and panel != "issue_outcome" and panel != "purchases" and panel != "history" and panel != "analysis" and panel != "watch" and panel != "employees" and panel != "issue" %}
 <h2 style="margin-top:0;">Склад инструмента</h2>
 <p class="muted">Отображается один тип инструмента за раз (по умолчанию: фрезы), только с остатком больше 0.</p>
 {% endif %}
 
-{% if panel == "payroll" %}
-<section class="inv-payroll">
-  <header class="inv-payroll__head">
-    <h2>Расчёт заработной платы</h2>
-    <p class="inv-payroll__lead">Сотрудники по вашим правам «Расчёт ЗП». Клик по ФИО — табель и расчёт за {{ payroll_month_name }} {{ payroll_year }}. Отметки «Аванс» и «ЗП» — в карточке сотрудника.</p>
-    <form method="get" class="inv-payroll__toolbar" id="inv-payroll-filter-form">
-      <input type="hidden" name="panel" value="payroll">
-      <label class="field"><span>Год</span>
-        <select name="year">
-          {% for y in payroll_year_options %}
-          <option value="{{ y }}" {% if y == payroll_year %}selected{% endif %}>{{ y }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label class="field"><span>Месяц</span>
-        <select name="month">
-          {% for mm, mname in month_choices_payroll %}
-          <option value="{{ mm }}" {% if mm == payroll_month %}selected{% endif %}>{{ mname }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      {% if payroll_dept_options %}
-      <div class="inv-payroll-dd" id="inv-payroll-dep-dd">
-        <span class="inv-payroll-dd__caption">Отдел</span>
-        <button type="button" class="inv-payroll-dd__btn" id="inv-payroll-dep-btn" aria-expanded="false" aria-haspopup="listbox">
-          <span class="inv-payroll-dd__txt" id="inv-payroll-dep-txt">Все</span>
-          <svg class="inv-payroll-dd__arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 6 8 10 12 6"/></svg>
-        </button>
-        <div class="inv-payroll-dd__panel" id="inv-payroll-dep-panel" hidden>
-          <div class="inv-payroll-dd__actions">
-            <button type="button" class="inv-payroll-dd__all">Все</button>
-            <button type="button" class="inv-payroll-dd__none">Снять</button>
-          </div>
-          {% for d in payroll_dept_options %}
-          <label class="inv-payroll-dd__item">
-            <input type="checkbox" name="dep" value="{{ d }}" {% if d in payroll_depts_selected %}checked{% endif %}>
-            <span class="inv-payroll-dd__item-label">{{ d }}</span>
-          </label>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-      <button type="submit" class="btn">Показать</button>
-    </form>
-  </header>
-
-  {% if payroll_rows %}
-  <p class="inv-payroll__meta">В списке: {{ payroll_rows|length }} · {{ payroll_month_name }} {{ payroll_year }}{% if payroll_depts_selected %} · отделы: {{ payroll_depts_selected|join:", " }}{% endif %}</p>
-  {% endif %}
-
-  <div class="inv-payroll-table-wrap">
-    <table class="inv-payroll-table">
-      <thead>
-        <tr>
-          <th class="col-code">Код</th>
-          <th class="col-name">Сотрудник</th>
-          <th class="col-dept">Отдел</th>
-          <th class="col-hours" title="Часы по отметкам СКУД за {{ payroll_month_name }} {{ payroll_year }}">СКУД, ч</th>
-          <th class="col-st" title="Аванс учтён">Аванс</th>
-          <th class="col-st" title="Расчёт ЗП закрыт">ЗП</th>
-          <th class="col-action" aria-label="Действие"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in payroll_rows %}
-        <tr>
-          <td class="col-code" data-label="Код">{{ row.emp_code }}</td>
-          <td class="col-name" data-label="Сотрудник"><a href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">{{ row.label }}</a></td>
-          <td class="col-dept" data-label="Отдел">{{ row.department_name|default:"—" }}</td>
-          <td class="col-hours" data-label="СКУД, ч">{{ row.skud_hours }}</td>
-          <td class="col-st" data-label="Аванс">{% if row.payroll_advance_ok %}<span class="inv-payroll-ok" title="Аванс учтён">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-          <td class="col-st" data-label="ЗП">{% if row.payroll_month_ok %}<span class="inv-payroll-ok" title="Расчёт закрыт">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-          <td class="col-action" data-label="Расчёт"><a class="btn btn-sm" href="{% url 'payroll_settlement' row.emp_code %}?year={{ payroll_year }}&month={{ payroll_month }}">Расчёт</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="7" class="inv-payroll-table__empty muted">Нет сотрудников для расчёта (права по отделам, фильтр отделов или недоступна БД Biota).</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
-<script>
-(function () {
-  var dd = document.getElementById("inv-payroll-dep-dd");
-  if (!dd) return;
-  var btn = document.getElementById("inv-payroll-dep-btn");
-  var panel = document.getElementById("inv-payroll-dep-panel");
-  var txt = document.getElementById("inv-payroll-dep-txt");
-  if (!btn || !panel || !txt) return;
-  var cbs = Array.prototype.slice.call(panel.querySelectorAll("input[type='checkbox']"));
-
-  function updateLabel() {
-    var checked = cbs.filter(function (cb) { return cb.checked; });
-    if (!checked.length || checked.length === cbs.length) {
-      txt.textContent = "Все";
-    } else if (checked.length <= 2) {
-      txt.textContent = checked.map(function (cb) { return cb.value; }).join(", ");
-    } else {
-      txt.textContent = "Выбрано: " + checked.length;
-    }
-  }
-
-  function setOpen(open) {
-    panel.hidden = !open;
-    btn.setAttribute("aria-expanded", open ? "true" : "false");
-  }
-
-  btn.addEventListener("click", function (e) {
-    e.preventDefault();
-    setOpen(panel.hidden);
-  });
-  document.addEventListener("click", function (e) {
-    if (!dd.contains(e.target)) setOpen(false);
-  });
-  var allBtn = panel.querySelector(".inv-payroll-dd__all");
-  var noneBtn = panel.querySelector(".inv-payroll-dd__none");
-  if (allBtn) {
-    allBtn.addEventListener("click", function () {
-      cbs.forEach(function (cb) { cb.checked = true; });
-      updateLabel();
-    });
-  }
-  if (noneBtn) {
-    noneBtn.addEventListener("click", function () {
-      cbs.forEach(function (cb) { cb.checked = false; });
-      updateLabel();
-    });
-  }
-  cbs.forEach(function (cb) {
-    cb.addEventListener("change", updateLabel);
-  });
-  updateLabel();
-})();
-</script>
-{% endif %}
-
 {% if panel == "employees" %}
-<div class="filter-panel" style="margin-top:0;">
-  <h2 style="margin-top:0;">Сотрудники</h2>
-  <p class="muted" style="margin-bottom:0;">Список из PostgreSQL Biota (personnel_employee). В таблице только сотрудники отделов, разрешённых для этой учётной записи (видимость цехов/участков и отметки отделов в кабинете).</p>
-</div>
-<div class="table-wrap">
-  <table class="data-grid employees-directory-table">
-    <thead>
-      <tr>
-        <th class="emp-dir-code">Код</th>
-        <th class="emp-dir-label">ФИО (как в справочнике)</th>
-        <th>Фамилия</th>
-        <th>Имя</th>
-        <th>Отдел</th>
-        <th>Должность</th>
-        <th>Участок</th>
-        <th>Смена, ч</th>
-        <th>Ставка день, ₽/ч</th>
-        <th>Ставка ночь, ₽/ч</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for er in employee_table_rows %}
-      <tr>
-        <td class="emp-dir-code"><a href="{% url 'employee_payroll_detail' er.emp_code %}">{{ er.emp_code }}</a></td>
-        <td class="emp-dir-label"><a href="{% url 'employee_payroll_detail' er.emp_code %}">{{ er.label }}</a></td>
-        <td class="emp-dir-cell">{{ er.last_name|default:"—" }}</td>
-        <td class="emp-dir-cell">{{ er.first_name|default:"—" }}</td>
-        <td class="emp-dir-cell">{{ er.department_name|default:"—" }}</td>
-        <td class="emp-dir-cell">{{ er.position_name|default:"—" }}</td>
-        <td class="emp-dir-cell">{{ er.area_name|default:"—" }}</td>
-        <td class="emp-dir-cell">{{ er.shift_hours|default:"—" }}</td>
-        <td class="emp-dir-cell">{% if er.hourly_rate_day is not None %}{{ er.hourly_rate_day }}{% else %}—{% endif %}</td>
-        <td class="emp-dir-cell">{% if er.hourly_rate_night is not None %}{{ er.hourly_rate_night }}{% else %}—{% endif %}</td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="10" class="muted">Сотрудники не найдены (нет доступа по отделам, пустая выборка из БД или Biota недоступна).</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+<section class="inv-emp-panel">
+  <header class="inv-emp-panel__head">
+    <h2 class="inv-emp-panel__title">Сотрудники склада</h2>
+  </header>
+  {% if biota_can_edit %}
+  <form method="post" class="inv-emp-add">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create_warehouse_employee">
+    <input type="hidden" name="panel" value="employees">
+    <input type="text" class="inv-emp-input" name="employee_name" required maxlength="120" size="16" placeholder="Фамилия И.О." aria-label="Фамилия И.О.">
+    <button type="submit" class="btn btn-sm">Добавить</button>
+  </form>
+  {% endif %}
+  <ul class="inv-emp-list">
+    {% for er in employee_table_rows %}
+    <li class="inv-emp-row">
+      {% if biota_can_edit %}
+      <input form="emp-save-{{ er.id }}" type="text" class="inv-emp-input" name="employee_name" value="{{ er.name }}" required maxlength="120" size="16" aria-label="ФИО">
+      <div class="inv-emp-actions">
+        <form id="emp-save-{{ er.id }}" method="post" class="inv-emp-inline-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_warehouse_employee">
+          <input type="hidden" name="panel" value="employees">
+          <input type="hidden" name="employee_id" value="{{ er.id }}">
+          <button type="submit" class="btn btn-sm">Сохранить</button>
+        </form>
+        <form method="post" class="inv-emp-inline-form" onsubmit="return confirm('Удалить сотрудника «{{ er.name|escapejs }}»?');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="delete_warehouse_employee">
+          <input type="hidden" name="panel" value="employees">
+          <input type="hidden" name="employee_id" value="{{ er.id }}">
+          <button type="submit" class="btn btn-sm btn-ghost">Удалить</button>
+        </form>
+      </div>
+      {% else %}
+      <span class="inv-emp-name">{{ er.name }}</span>
+      {% endif %}
+    </li>
+    {% empty %}
+    <li class="inv-emp-empty muted">Пока никого нет — добавьте первого выше.</li>
+    {% endfor %}
+  </ul>
+</section>
 {% endif %}
 
 {% if panel == "stock" %}
@@ -1548,13 +1410,13 @@
     <input type="hidden" name="action" value="issue_bulk">
     <input type="hidden" name="rows_json" id="issue-bulk-rows-json" value="[]">
     <label class="field" style="position:relative;">
-      <span>Сотрудник (СКУД)</span>
+      <span>Сотрудник</span>
       <input type="hidden" name="employee_name" id="issue-employee-value" required>
       <input
         type="text"
         id="issue-employee-search"
         class="defect-emp-search"
-        placeholder="{% if employee_options %}Начните вводить ФИО…{% else %}Справочник СКУД недоступен{% endif %}"
+        placeholder="{% if employee_options %}Начните вводить ФИО…{% else %}Добавьте сотрудников на вкладке «Сотрудники»{% endif %}"
         autocomplete="off"
         aria-autocomplete="list"
         aria-controls="issue-employee-list"
@@ -1565,14 +1427,14 @@
         <div class="defect-emp-item" role="option" data-value="{{ employee }}">{{ employee }}</div>
         {% endfor %}
         {% if not employee_options %}
-        <div class="defect-emp-empty muted">Справочник СКУД пуст — выдача недоступна.</div>
+        <div class="defect-emp-empty muted">Список пуст — добавьте сотрудников на вкладке «Сотрудники».</div>
         {% endif %}
       </div>
     </label>
     <label class="field"><span>Дата</span><input type="date" name="movement_date" id="issue-movement-date" value="{{ today }}" required></label>
     <label class="field"><span id="issue-comment-label">Комментарий</span><input type="text" name="comment" id="issue-comment" placeholder="При списании — причина"></label>
     <div class="filter-actions">
-      <button type="submit" class="btn" id="issue-bulk-submit"{% if not employee_options %} disabled title="Нет сотрудников СКУД"{% endif %}>Выдать список</button>
+      <button type="submit" class="btn" id="issue-bulk-submit"{% if not employee_options %} disabled title="Нет сотрудников — добавьте на вкладке «Сотрудники»"{% endif %}>Выдать список</button>
     </div>
   </form>
 </div>
@@ -1691,7 +1553,7 @@
     form.addEventListener("submit", function (e) {
       if (!empValue.value.trim()) {
         e.preventDefault();
-        alert("Выберите сотрудника из списка СКУД.");
+        alert("Выберите сотрудника из списка.");
         empSearch.focus();
         showList();
         filterItems(empSearch.value);
@@ -1754,7 +1616,7 @@
 
   <div class="inv-outcome-hint-card">
     <div class="inv-outcome-hint-label">Как заполнить</div>
-    <p class="inv-outcome-hint-text">Выберите сотрудника из СКУД, чтобы увидеть все его активные выдачи. Укажите <strong>возврат</strong> на склад и/или <strong>списание</strong>, добавьте комментарий. Сумма не должна превышать остаток по выдаче.</p>
+    <p class="inv-outcome-hint-text">Выберите сотрудника, чтобы увидеть все его активные выдачи. Укажите <strong>возврат</strong> на склад и/или <strong>списание</strong>, добавьте комментарий. Сумма не должна превышать остаток по выдаче.</p>
   </div>
 
   <form method="get" class="inv-outcome-filter auto-submit-form" id="inventory-outcome-filter-form">
@@ -1925,14 +1787,14 @@
           <input type="number" class="inv-outcome-inp inv-outcome-inp--writeoff" id="outcome-writeoff-qty" name="writeoff_qty" min="0" value="0">
         </div>
         <div class="inv-outcome-field" style="position:relative;">
-          <label class="inv-outcome-label" for="outcome-employee-search">Сотрудник (СКУД)</label>
+          <label class="inv-outcome-label" for="outcome-employee-search">Сотрудник</label>
           <input type="hidden" name="employee_name" id="outcome-employee-value" value="{{ filters.outcome_employee }}">
           <input
             type="text"
             class="inv-outcome-inp"
             id="outcome-employee-search"
             value="{{ filters.outcome_employee }}"
-            placeholder="{% if employee_options %}Начните вводить ФИО…{% else %}СКУД недоступен{% endif %}"
+            placeholder="{% if employee_options %}Начните вводить ФИО…{% else %}Добавьте сотрудников на вкладке «Сотрудники»{% endif %}"
             autocomplete="off"
             aria-autocomplete="list"
             aria-controls="outcome-employee-list"
@@ -1943,7 +1805,7 @@
             <div class="defect-emp-item" role="option" data-value="{{ employee }}">{{ employee }}</div>
             {% endfor %}
             {% if not employee_options %}
-            <div class="defect-emp-empty muted">Справочник СКУД пуст.</div>
+            <div class="defect-emp-empty muted">Список сотрудников пуст.</div>
             {% endif %}
           </div>
         </div>
@@ -2173,7 +2035,7 @@
     });
   }
 
-  // Выбор сотрудника СКУД в форме операции
+  // Выбор сотрудника в форме операции
   var empSearch = document.getElementById("outcome-employee-search");
   var empValue = document.getElementById("outcome-employee-value");
   var empList = document.getElementById("outcome-employee-list");
@@ -2523,280 +2385,6 @@
 </div>
 {% endif %}
 
-{% if panel == "defects" %}
-{% if biota_can_edit %}
-<div class="filter-panel defect-add-panel" id="defect-add-panel">
-  <div class="defect-type-toggle" id="defect-type-toggle">
-    <button type="button" class="defect-type-btn defect-type-btn--scold is-active" data-type="scold">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3M8 11h.01"/></svg>
-      Поругать
-    </button>
-    <button type="button" class="defect-type-btn defect-type-btn--praise" data-type="praise">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2l1.5 3.5L13 6l-2.5 2.5.5 3.5L8 10.5 5 12l.5-3.5L3 6l3.5-.5z"/></svg>
-      Похвалить
-    </button>
-  </div>
-  <form method="post" class="filter-grid" id="defect-add-form">
-    {% csrf_token %}
-    <input type="hidden" name="panel" value="defects">
-    <input type="hidden" name="action" value="create_defect_record">
-    <input type="hidden" name="record_type" id="defect-record-type-input" value="scold">
-    <div class="field defect-add-date-field">
-      <span>Дата</span>
-      <div class="defect-cal-wrap" id="defect-add-date-wrap">
-        <input type="hidden" name="defect_date" id="defect-add-date-val" value="{{ today }}">
-        <button type="button" class="defect-cal-trigger" id="defect-add-cal-trigger" aria-expanded="false" aria-controls="defect-add-cal-popup" aria-haspopup="dialog">
-          {% biota_icon "action.calendar" "ui-icon defect-cal-trigger-icon" %}
-          <span id="defect-add-cal-trigger-text">{{ today }}</span>
-        </button>
-        <div class="defect-cal-popup" id="defect-add-cal-popup" hidden role="dialog" aria-label="Выбор даты записи">
-          <div class="defect-cal-header">
-            <button type="button" class="defect-cal-nav" data-dir="-1" aria-label="Предыдущий месяц">‹</button>
-            <span class="defect-cal-title" id="defect-add-cal-title"></span>
-            <button type="button" class="defect-cal-nav" data-dir="1" aria-label="Следующий месяц">›</button>
-          </div>
-          <div class="defect-cal-dow" aria-hidden="true">
-            <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span class="defect-cal-dow--we">сб</span><span class="defect-cal-dow--we">вс</span>
-          </div>
-          <div class="defect-cal-grid" id="defect-add-cal-grid" role="grid"></div>
-          <div class="defect-cal-foot">
-            <p class="defect-cal-hint muted">Нажмите на день</p>
-          </div>
-        </div>
-      </div>
-    </div>
-    <label class="field" style="position:relative;">
-      <span>Сотрудник</span>
-      <input type="hidden" name="employee_name" id="defect-employee-value" required>
-      <input type="text" id="defect-employee-search" class="defect-emp-search" placeholder="Поиск по ФИО..." autocomplete="off">
-      <div id="defect-employee-list" class="defect-emp-list" hidden>
-        {% for employee in employee_options %}
-        <div class="defect-emp-item" data-value="{{ employee }}">{{ employee }}</div>
-        {% endfor %}
-      </div>
-    </label>
-    <label class="field"><span id="defect-reason-label">Причина брака</span><input type="text" name="defect_reason" id="defect-reason-input" required placeholder="Опишите причину"></label>
-    <div class="filter-actions"><button type="submit" class="btn" id="defect-add-submit-btn">Добавить запись</button></div>
-  </form>
-</div>
-<script>
-(function(){
-  var toggle = document.getElementById("defect-type-toggle");
-  var typeInput = document.getElementById("defect-record-type-input");
-  var reasonLabel = document.getElementById("defect-reason-label");
-  var reasonInput = document.getElementById("defect-reason-input");
-  var submitBtn = document.getElementById("defect-add-submit-btn");
-  var panel = document.getElementById("defect-add-panel");
-
-  function setType(type) {
-    typeInput.value = type;
-    var isScold = type === "scold";
-    toggle.querySelectorAll(".defect-type-btn").forEach(function(btn){
-      btn.classList.toggle("is-active", btn.dataset.type === type);
-    });
-    reasonLabel.textContent = isScold ? "Причина брака" : "За что хвалим";
-    reasonInput.placeholder = isScold ? "Опишите причину" : "Опишите достижение";
-    submitBtn.textContent = isScold ? "Добавить запись" : "Похвалить";
-    panel.classList.toggle("defect-add-panel--scold", isScold);
-    panel.classList.toggle("defect-add-panel--praise", !isScold);
-  }
-
-  toggle.addEventListener("click", function(e){
-    var btn = e.target.closest(".defect-type-btn");
-    if (btn) setType(btn.dataset.type);
-  });
-
-  setType("scold");
-
-  // Employee autocomplete combobox
-  var empSearch = document.getElementById("defect-employee-search");
-  var empValue  = document.getElementById("defect-employee-value");
-  var empList   = document.getElementById("defect-employee-list");
-  var empItems  = empList ? Array.prototype.slice.call(empList.querySelectorAll(".defect-emp-item")) : [];
-  var activeIdx = -1;
-
-  function showList() { empList.hidden = false; }
-  function hideList() { empList.hidden = true; activeIdx = -1; }
-
-  function filterItems(q) {
-    var lower = q.toLowerCase();
-    var visible = [];
-    empItems.forEach(function(item) {
-      var match = !q || item.dataset.value.toLowerCase().indexOf(lower) !== -1;
-      item.hidden = !match;
-      if (match) visible.push(item);
-    });
-    return visible;
-  }
-
-  function setActive(items, idx) {
-    items.forEach(function(it, i) { it.classList.toggle("is-active", i === idx); });
-    if (items[idx]) items[idx].scrollIntoView({ block: "nearest" });
-  }
-
-  function selectItem(value) {
-    empSearch.value = value;
-    empValue.value  = value;
-    hideList();
-  }
-
-  empSearch.addEventListener("input", function() {
-    empValue.value = "";
-    var visible = filterItems(empSearch.value);
-    activeIdx = -1;
-    if (visible.length) showList(); else hideList();
-  });
-
-  empSearch.addEventListener("keydown", function(e) {
-    if (empList.hidden) return;
-    var visible = empItems.filter(function(it){ return !it.hidden; });
-    if (e.key === "ArrowDown") { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, visible.length - 1); setActive(visible, activeIdx); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); setActive(visible, activeIdx); }
-    else if (e.key === "Enter" && activeIdx >= 0) { e.preventDefault(); selectItem(visible[activeIdx].dataset.value); }
-    else if (e.key === "Escape") { hideList(); }
-  });
-
-  empList.addEventListener("mousedown", function(e) {
-    var item = e.target.closest(".defect-emp-item");
-    if (item) { e.preventDefault(); selectItem(item.dataset.value); }
-  });
-
-  document.addEventListener("mousedown", function(e) {
-    if (!empSearch.contains(e.target) && !empList.contains(e.target)) hideList();
-  });
-
-  empSearch.addEventListener("focus", function() {
-    filterItems(empSearch.value);
-    showList();
-  });
-})();
-</script>
-{% endif %}
-
-<form method="get" class="filter-panel auto-submit-form">
-  <input type="hidden" name="panel" value="defects">
-  <h3>Фильтр записей</h3>
-  <div class="filter-grid">
-    <div class="field defect-date-filter" id="defect-date-filter">
-      <span>Дата</span>
-      <div class="defect-cal-wrap">
-        <button type="button" class="defect-cal-trigger" id="defect-cal-trigger" aria-expanded="false" aria-controls="defect-cal-popup" aria-haspopup="dialog">
-          {% biota_icon "action.calendar" "ui-icon defect-cal-trigger-icon" %}
-          <span id="defect-cal-trigger-text">{% if defect_filters.date_from %}{% if defect_filters.date_from == defect_filters.date_to %}{{ defect_filters.date_from }}{% else %}{{ defect_filters.date_from }} — {{ defect_filters.date_to }}{% endif %}{% else %}Все даты{% endif %}</span>
-        </button>
-        <div class="defect-cal-popup" id="defect-cal-popup" hidden role="dialog" aria-label="Выбор даты">
-          <div class="defect-cal-header">
-            <button type="button" class="defect-cal-nav" data-dir="-1" aria-label="Предыдущий месяц">‹</button>
-            <span class="defect-cal-title" id="defect-cal-title"></span>
-            <button type="button" class="defect-cal-nav" data-dir="1" aria-label="Следующий месяц">›</button>
-          </div>
-          <div class="defect-cal-dow" aria-hidden="true">
-            <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span class="defect-cal-dow--we">сб</span><span class="defect-cal-dow--we">вс</span>
-          </div>
-          <div class="defect-cal-grid" id="defect-cal-grid" role="grid"></div>
-          <div class="defect-cal-foot">
-            <p class="defect-cal-hint muted">Два клика по одному дню — один день; по разным — период</p>
-            <button type="button" class="btn btn-ghost defect-cal-clear" id="defect-cal-clear">Сбросить</button>
-          </div>
-        </div>
-        <input type="hidden" name="defect_date_mode" id="defect-date-mode-val" value="{{ defect_filters.date_mode|default:'day' }}">
-        <input type="hidden" name="defect_date_from" id="defect-date-from-val" value="{{ defect_filters.date_from }}">
-        <input type="hidden" name="defect_date_to" id="defect-date-to-val" value="{{ defect_filters.date_to }}">
-      </div>
-    </div>
-    <label class="field"><span>Отдел</span>
-      <select name="defect_department">
-        <option value="">Все</option>
-        {% for dep in defect_department_options %}
-        <option value="{{ dep }}" {% if defect_filters.department == dep %}selected{% endif %}>{{ dep }}</option>
-        {% endfor %}
-      </select>
-    </label>
-  </div>
-</form>
-
-<div class="table-wrap">
-  <table class="data-grid defects-table">
-    <colgroup>
-      <col class="col-date">
-      <col class="col-employee">
-      <col class="col-reason">
-      {% if is_admin_user %}<col class="col-actions">{% endif %}
-    </colgroup>
-    <thead>
-      <tr>
-        <th class="defect-col-date">Дата</th>
-        <th class="defect-col-employee">Сотрудник</th>
-        <th class="defect-col-reason">Причина брака</th>
-        {% if is_admin_user %}<th class="defect-col-actions">Действия</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for rec in defect_records %}
-      <tr class="defect-row defect-row--{{ rec.record_type }}">
-        <td class="defect-col-date">
-          {% if biota_can_edit or is_admin_user %}
-          <input class="defect-cell-input" type="date" name="defect_date" value="{{ rec.defect_date|date:'Y-m-d' }}" form="defect-edit-form-{{ rec.id }}" readonly required>
-          {% else %}
-          {{ rec.defect_date }}
-          {% endif %}
-        </td>
-        <td class="defect-col-employee">
-          {% if biota_can_edit or is_admin_user %}
-          <select class="defect-cell-input" name="employee_name" form="defect-edit-form-{{ rec.id }}" disabled required>
-            {% if rec.employee_name and rec.employee_name not in employee_options %}
-            <option value="{{ rec.employee_name }}" selected>{{ rec.employee_name }}</option>
-            {% endif %}
-            {% for employee in employee_options %}
-            <option value="{{ employee }}" {% if employee == rec.employee_name %}selected{% endif %}>{{ employee }}</option>
-            {% endfor %}
-          </select>
-          {% else %}
-          {{ rec.employee_name }}
-          {% endif %}
-        </td>
-        <td class="defect-col-reason">
-          {% if biota_can_edit or is_admin_user %}
-          <input class="defect-cell-input" type="text" name="defect_reason" value="{{ rec.defect_reason }}" form="defect-edit-form-{{ rec.id }}" readonly required>
-          {% else %}
-          {{ rec.defect_reason }}
-          {% endif %}
-        </td>
-        {% if biota_can_edit or is_admin_user %}
-        <form method="post" id="defect-edit-form-{{ rec.id }}" style="display:none;">
-          {% csrf_token %}
-          <input type="hidden" name="panel" value="defects">
-          <input type="hidden" name="action" value="update_defect_record">
-          <input type="hidden" name="defect_id" value="{{ rec.id }}">
-        </form>
-        {% endif %}
-        {% if is_admin_user %}
-        <td class="defect-col-actions">
-          <button
-            type="button"
-            class="btn btn-ghost defects-row-edit-toggle"
-            data-defect-form-id="defect-edit-form-{{ rec.id }}"
-            title="Включить редактирование строки"
-            aria-label="Включить редактирование строки"
-            style="padding:4px 10px;font-size:14px;line-height:1;"
-          >{% biota_icon "ui.lock" "defects-row-lock-icon" %}</button>
-          <form method="post" style="margin-top:6px;" onsubmit="return confirm('Удалить эту запись учёта брака?');">
-            {% csrf_token %}
-            <input type="hidden" name="panel" value="defects">
-            <input type="hidden" name="action" value="delete_defect_record">
-            <input type="hidden" name="defect_id" value="{{ rec.id }}">
-            <button type="submit" class="btn" style="padding:4px 10px;font-size:12px;">Удалить</button>
-          </form>
-        </td>
-        {% endif %}
-      </tr>
-      {% empty %}
-      <tr><td colspan="{% if is_admin_user %}4{% else %}3{% endif %}" class="muted">Записей по браку пока нет.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
 
 {% if panel == "history" %}
 {% include "shifts/includes/inventory_history_panel.html" %}

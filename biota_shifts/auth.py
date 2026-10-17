@@ -717,8 +717,6 @@ def _filter_employees_for_user(full_df: pd.DataFrame, username: str) -> pd.DataF
 # Разделы меню Django (кроме личного кабинета): права в JSON users.*.nav
 # Разделы без привязки к отделам в кабинете (склад/станки/изделия не фильтруются по цехам).
 NAV_KEYS_NO_DEPT_FILTER = (
-    "graph",
-    "regulations",
     "inventory",
     "inventory_types",
     "visual_warehouse",
@@ -729,15 +727,8 @@ NAV_KEYS_NO_DEPT_FILTER = (
 )
 
 NAV_KEYS = (
-    "graph",
-    "hours",
-    "skud",
     "inventory",
     "inventory_types",
-    "defects",
-    "payroll",
-    "employees",
-    "regulations",
     "products",
     "calculator",
     "forms",
@@ -748,15 +739,8 @@ USER_ROLE_MANAGER = "manager"
 USER_ROLE_EXECUTOR = "executor"
 USER_ROLE_CHOICES = (USER_ROLE_MANAGER, USER_ROLE_EXECUTOR)
 NAV_LABELS_RU = {
-    "graph": "График",
-    "hours": "Часы по дням",
-    "skud": "СКУД",
     "inventory": "Склад",
     "inventory_types": "Типы склада",
-    "defects": "Учёт брака",
-    "payroll": "Расчёт ЗП",
-    "employees": "Сотрудники",
-    "regulations": "Регламенты",
     "products": "Изделия",
     "calculator": "Калькулятор",
     "forms": "Формы",
@@ -764,15 +748,8 @@ NAV_LABELS_RU = {
     "contracts": "Контракты",
 }
 NAV_LABELS_SHORT = {
-    "graph": "График",
-    "hours": "Часы",
-    "skud": "СКУД",
     "inventory": "Склад",
     "inventory_types": "Типы склада",
-    "defects": "Брак",
-    "payroll": "Зарплата",
-    "employees": "Сотрудники",
-    "regulations": "Регламенты",
     "products": "Наладки",
     "calculator": "Калькулятор",
     "forms": "Формы",
@@ -822,11 +799,6 @@ def nav_permissions_for_user(username: str | None) -> dict[str, bool]:
     for k in NAV_KEYS:
         if k in nav:
             out[k] = bool(nav[k])
-    # В store до split не было ключей payroll/employees — наследуем от defects
-    if "payroll" not in nav and "defects" in nav:
-        out["payroll"] = bool(nav["defects"])
-    if "employees" not in nav and "defects" in nav:
-        out["employees"] = bool(nav["defects"])
     return out
 
 
@@ -847,7 +819,7 @@ def user_is_executor(username: str | None) -> bool:
 
 
 def _nav_department_filters_map(rec: dict | None) -> dict[str, list[str]]:
-    """Пер-разделные ограничения по отделам: users.*.nav_dep_filters {graph:[...], ...}.
+    """Пер-разделные ограничения по отделам: users.*.nav_dep_filters {inventory:[...], ...}.
 
     Пустой список для ключа раздела означает «ни один отдел не разрешён» (пустой список сотрудников).
     Если ключа раздела в JSON нет — фильтр не задан (обратная совместимость: все отделы).
@@ -904,7 +876,7 @@ def _nav_dep_filters_union_departments(rec: dict) -> list[str] | None:
 
 
 def employees_df_for_nav(username: str | None, nav_key: str, employees_df: pd.DataFrame) -> pd.DataFrame:
-    """Список сотрудников для раздела: nav_dep_filters по разделу; для «Сотрудники» при access_scope «none» не обнуляем список до фильтра отделов из кабинета Django."""
+    """Список сотрудников для раздела с учётом nav_dep_filters (выдача/история склада)."""
     if employees_df is None or getattr(employees_df, "empty", True):
         return employees_df
     nk = (nav_key or "").strip()
@@ -917,17 +889,7 @@ def employees_df_for_nav(username: str | None, nav_key: str, employees_df: pd.Da
     if rec is None:
         return employees_df.iloc[0:0].copy()
     base = employees_df
-    if nk == "employees":
-        # access_scope "none" у новых регистраций — иначе _filter_employees_for_user даёт пустой df
-        # до применения nav_dep_filters, и список «Сотрудники» пустой при любых отделах в кабинете Django.
-        scope = _user_access_scope_value(rec or {})
-        if scope not in ("none", ""):
-            base = _filter_employees_for_user(employees_df, u)
-            if getattr(base, "empty", True):
-                return base
     filt = _nav_department_filters_map(rec).get(nk)
-    if (filt is None or filt == []) and nk == "payroll":
-        filt = _nav_department_filters_map(rec).get("defects")
     if filt is None:
         return base
     if not filt:

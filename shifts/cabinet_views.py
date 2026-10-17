@@ -307,8 +307,6 @@ def cabinet_view(request):
         ctx["priv_nav_rows"] = []
         for k in NAV_KEYS:
             sel_deps = [d for d in (_ndf.get(k) or []) if d in dep_opts]
-            if ctx["priv_selected"] and k == "payroll" and k not in raw_ndf:
-                sel_deps = [d for d in (_ndf.get("defects") or []) if d in dep_opts]
             has_dept_picker = bool(dep_opts and k not in NAV_KEYS_NO_DEPT_FILTER)
             extra_toggle = None
             if k == "inventory":
@@ -350,145 +348,19 @@ def cabinet_view(request):
     return render(request, "shifts/cabinet.html", ctx)
 
 
+
 @biota_login_required
 @require_http_methods(["GET", "POST"])
 def schedule_backups_view(request):
-    """Управление резервными копиями графиков."""
-    # Проверяем, что пользователь админ
-    if not _is_admin(biota_user(request)):
-        messages.error(request, "Доступ запрещен")
-        return redirect("/cabinet/")
-
-    backups_dir = SCHEDULE_DIR / "backups"
-    backups_dir.mkdir(parents=True, exist_ok=True)
-
-    if request.method == "POST":
-        action = request.POST.get("action", "").strip()
-
-        # Загрузить файл резервной копии
-        if action == "upload":
-            uploaded_file = request.FILES.get("backup_file")
-            if not uploaded_file:
-                messages.error(request, "Выберите файл для загрузки")
-                return redirect("/cabinet/backups/")
-
-            if not uploaded_file.name.endswith(".xlsx"):
-                messages.error(request, "Файл должен быть в формате .xlsx")
-                return redirect("/cabinet/backups/")
-
-            try:
-                # Сохраняем загруженный файл в папку бэкапов
-                backup_path = backups_dir / uploaded_file.name
-                with open(backup_path, "wb") as f:
-                    for chunk in uploaded_file.chunks():
-                        f.write(chunk)
-
-                messages.success(request, f"Резервная копия загружена: {uploaded_file.name}")
-            except Exception as exc:
-                messages.error(request, f"Ошибка при загрузке: {exc}")
-
-            return redirect("/cabinet/backups/")
-
-        # Создать резервную копию всех графиков
-        elif action == "backup_all":
-            try:
-                # Находим все файлы schedule_*.xlsx в основной папке
-                main_dir = SCHEDULE_DIR
-                backup_count = 0
-
-                for schedule_file in main_dir.glob("schedule_*.xlsx"):
-                    if schedule_file.is_file():
-                        # Создаем имя для бэкапа с временной меткой
-                        now = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        backup_name = f"{schedule_file.stem}_{now}.xlsx"
-                        backup_path = backups_dir / backup_name
-
-                        # Копируем файл
-                        shutil.copy2(schedule_file, backup_path)
-                        backup_count += 1
-
-                messages.success(request, f"Создано {backup_count} резервных копий графиков")
-            except Exception as exc:
-                messages.error(request, f"Ошибка при создании резервных копий: {exc}")
-
-            return redirect("/cabinet/backups/")
-
-        # Восстановить из резервной копии
-        elif action == "restore":
-            backup_filename = request.POST.get("backup_filename", "").strip()
-            if not backup_filename or ".." in backup_filename:
-                messages.error(request, "Некорректное имя файла")
-                return redirect("/cabinet/backups/")
-
-            backup_path = backups_dir / backup_filename
-            if not backup_path.exists() or not backup_path.is_file():
-                messages.error(request, "Резервная копия не найдена")
-                return redirect("/cabinet/backups/")
-
-            try:
-                # Извлекаем имя исходного файла (удаляем временную метку)
-                # schedule_2026_05_20260521_101450.xlsx -> schedule_2026_05.xlsx
-                parts = backup_filename.replace(".xlsx", "").split("_")
-                if len(parts) >= 4:  # schedule, year, month, и дата
-                    original_name = f"{parts[0]}_{parts[1]}_{parts[2]}.xlsx"
-                else:
-                    original_name = backup_filename
-
-                original_path = SCHEDULE_DIR / original_name
-
-                # Копируем бэкап обратно
-                shutil.copy2(backup_path, original_path)
-                messages.success(request, f"График восстановлен из резервной копии: {backup_filename}")
-            except Exception as exc:
-                messages.error(request, f"Ошибка при восстановлении: {exc}")
-
-            return redirect("/cabinet/backups/")
-
-    # Получить список резервных копий, отсортированный по дате (новые сверху)
-    backups = []
-    if backups_dir.exists():
-        for backup_file in sorted(backups_dir.glob("schedule_*.xlsx"),
-                                  key=lambda p: p.stat().st_mtime,
-                                  reverse=True):
-            stat = backup_file.stat()
-            backups.append({
-                "filename": backup_file.name,
-                "size": f"{stat.st_size / 1024:.1f} KB",
-                "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-            })
-
-    ctx = {
-        "backups": backups,
-        "backups_count": len(backups),
-    }
-
-    return render(request, "shifts/schedule_backups.html", ctx)
+    from django.http import Http404
+    raise Http404("Раздел удалён")
 
 
 @biota_login_required
 @require_http_methods(["GET"])
 def schedule_backup_download(request, filename: str):
-    """Скачать резервную копию графика."""
-    from biota_shifts.config import SCHEDULE_DIR
-
-    # Проверяем, что пользователь админ
-    if not _is_admin(biota_user(request)):
-        return HttpResponse("Доступ запрещен", status=403)
-
-    # Проверяем имя файла (защита от directory traversal)
-    if ".." in filename or "/" in filename or "\\" in filename:
-        return HttpResponse("Некорректное имя файла", status=400)
-
-    backup_path = SCHEDULE_DIR / "backups" / filename
-
-    if not backup_path.exists() or not backup_path.is_file():
-        return HttpResponse("Файл не найден", status=404)
-
-    # Отправляем файл
-    with open(backup_path, "rb") as f:
-        response = HttpResponse(f.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        response["Content-Disposition"] = f'attachment; filename="{filename}"'
-        return response
+    from django.http import Http404
+    raise Http404("Раздел удалён")
 
 
 @biota_login_required
@@ -615,164 +487,32 @@ def inventory_backup_download(request, filename: str):
         return response
 
 
+
 @biota_login_required
 @require_http_methods(["GET", "POST"])
 def regulations_backups_view(request):
-    """Управление резервными копиями регламентов (JSON)."""
-    from regulations.regulations_backup import (
-        RegulationsBackupError,
-        backup_filename_now,
-        export_regulations_payload,
-        is_safe_backup_filename,
-        list_backup_files,
-        parse_regulations_backup_bytes,
-        restore_regulations_from_payload,
-        write_backup_file,
-    )
-
-    if not _is_admin(biota_user(request)):
-        messages.error(request, "Доступ запрещен")
-        return redirect("/cabinet/")
-
-    backups_dir = REGULATIONS_BACKUP_DIR
-
-    if request.method == "POST":
-        action = request.POST.get("action", "").strip()
-
-        if action == "upload":
-            uploaded_file = request.FILES.get("backup_file")
-            if not uploaded_file:
-                messages.error(request, "Выберите файл для загрузки")
-                return redirect("/cabinet/regulations-backups/")
-
-            if not uploaded_file.name.endswith(".json"):
-                messages.error(request, "Файл должен быть в формате .json")
-                return redirect("/cabinet/regulations-backups/")
-
-            try:
-                raw = uploaded_file.read()
-                parse_regulations_backup_bytes(raw)
-                safe_name = uploaded_file.name
-                if not is_safe_backup_filename(safe_name):
-                    safe_name = backup_filename_now()
-                backup_path = backups_dir / safe_name
-                backup_path.write_bytes(raw)
-                messages.success(request, f"Резервная копия загружена: {safe_name}")
-            except RegulationsBackupError as exc:
-                messages.error(request, str(exc))
-            except Exception as exc:
-                messages.error(request, f"Ошибка при загрузке: {exc}")
-
-            return redirect("/cabinet/regulations-backups/")
-
-        if action == "backup_all":
-            try:
-                path = write_backup_file(backups_dir)
-                payload = export_regulations_payload()
-                plans_n = len(payload["regulation_plans"])
-                messages.success(
-                    request,
-                    f"Резервная копия регламентов создана: {path.name} ({plans_n} записей)",
-                )
-            except Exception as exc:
-                messages.error(request, f"Ошибка при создании резервных копий: {exc}")
-
-            return redirect("/cabinet/regulations-backups/")
-
-        if action == "restore":
-            backup_filename = request.POST.get("backup_filename", "").strip()
-            if not is_safe_backup_filename(backup_filename):
-                messages.error(request, "Некорректное имя файла")
-                return redirect("/cabinet/regulations-backups/")
-
-            backup_path = backups_dir / backup_filename
-            if not backup_path.exists() or not backup_path.is_file():
-                messages.error(request, "Резервная копия не найдена")
-                return redirect("/cabinet/regulations-backups/")
-
-            try:
-                write_backup_file(
-                    backups_dir,
-                    filename=f"regulations_before_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                )
-                raw = backup_path.read_bytes()
-                payload = parse_regulations_backup_bytes(raw)
-                stats = restore_regulations_from_payload(payload)
-                messages.success(
-                    request,
-                    f"Регламенты восстановлены из резервной копии: {stats['plans']} записей.",
-                )
-            except RegulationsBackupError as exc:
-                messages.error(request, str(exc))
-            except Exception as exc:
-                messages.error(request, f"Ошибка при восстановлении: {exc}")
-
-            return redirect("/cabinet/regulations-backups/")
-
-    backups = list_backup_files(backups_dir)
-    ctx = {
-        "backups": backups,
-        "backups_count": len(backups),
-        "backups_dir": str(backups_dir.resolve()),
-    }
-    return render(request, "shifts/regulations_backups.html", ctx)
+    from django.http import Http404
+    raise Http404("Раздел удалён")
 
 
 @biota_login_required
 @require_http_methods(["GET"])
 def regulations_backup_download(request, filename: str):
-    """Скачать резервную копию регламентов."""
-    from regulations.regulations_backup import is_safe_backup_filename
-
-    if not _is_admin(biota_user(request)):
-        return HttpResponse("Доступ запрещен", status=403)
-
-    if not is_safe_backup_filename(filename):
-        return HttpResponse("Некорректное имя файла", status=400)
-
-    backup_path = REGULATIONS_BACKUP_DIR / filename
-    if not backup_path.exists() or not backup_path.is_file():
-        return HttpResponse("Файл не найден", status=404)
-
-    with open(backup_path, "rb") as f:
-        response = HttpResponse(f.read(), content_type="application/json; charset=utf-8")
-        response["Content-Disposition"] = f'attachment; filename="{filename}"'
-        return response
+    from django.http import Http404
+    raise Http404("Раздел удалён")
 
 
-def _notify_cron_line(hm: str, slot: str) -> str:
-    parts = (hm or "08:20").strip().split(":")
-    h = int(parts[0]) if parts and parts[0].isdigit() else 8
-    mi = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 20
-    return (
-        f"{mi} {h} * * * cd $PROJECT && .venv/bin/python manage.py "
-        f"send_attendance_summaries --slot={slot}"
-    )
 
 
 @biota_login_required
 @require_http_methods(["GET", "POST"])
 def notifications_settings_view(request):
-    """Уведомления: сводки СКУД по расписанию и чёрный список сотрудников."""
+    """Уведомления склада (Telegram / relay). Сводки СКУД удалены."""
     user = biota_user(request)
     if not user or not _is_admin(user):
         messages.error(request, "Доступ запрещен")
         return redirect("cabinet")
 
-    cfg = biota_db.db_config()
-    try:
-        employees_full = biota_db.load_employees(cfg)
-    except Exception as exc:
-        return render(request, "shifts/error.html", {"title": "Ошибка БД", "message": str(exc)})
-
-    from biota_shifts.attendance_summary import (
-        SLOT_EVENING,
-        SLOT_MORNING,
-        format_summary_text,
-        load_attendance_summary_from_db,
-        send_summary_telegram,
-    )
-    from biota_shifts.emp_codes import normalize_emp_code
     from biota_shifts.notification_settings import (
         load_notification_settings,
         notify_outbound_enabled,
@@ -780,7 +520,6 @@ def notifications_settings_view(request):
         save_notification_settings,
         telegram_token_configured,
     )
-    from biota_shifts.schedule import employee_label_row
     from biota_shifts.notify_relay import (
         notify_delivery_configured,
         notify_relay_configured,
@@ -792,27 +531,23 @@ def notifications_settings_view(request):
     from biota_shifts.telegram_notify import telegram_notify_configured
 
     settings = load_notification_settings()
-    preview_text = None
-    preview_label = ""
 
     def _delivery_error() -> str:
         return "Настройте доставку: URL сервера бота и chat_id (или токен Telegram)."
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
-
         if action == "save":
-            blacklist = request.POST.getlist("blacklist_emp_codes")
             save_payload = {
                 "enabled": request.POST.get("enabled") == "1",
-                "morning_enabled": request.POST.get("morning_enabled") == "1",
-                "evening_enabled": request.POST.get("evening_enabled") == "1",
+                "morning_enabled": False,
+                "evening_enabled": False,
                 "morning_time": request.POST.get("morning_time") or "08:20",
                 "evening_time": request.POST.get("evening_time") or "20:20",
                 "relay_url": (request.POST.get("relay_url") or "").strip(),
                 "inventory_notify_enabled": request.POST.get("inventory_notify_enabled") == "1",
                 "telegram_chat_ids": parse_chat_ids_text(request.POST.get("telegram_chat_ids") or ""),
-                "blacklist_emp_codes": blacklist,
+                "blacklist_emp_codes": [],
             }
             relay_secret_in = (request.POST.get("relay_secret") or "").strip()
             if relay_secret_in:
@@ -823,7 +558,6 @@ def notifications_settings_view(request):
             settings = save_notification_settings(save_payload)
             messages.success(request, "Настройки уведомлений сохранены.")
             return redirect("cabinet_notifications")
-
         if action == "test_connection":
             if not notify_delivery_configured(settings):
                 messages.error(request, _delivery_error())
@@ -837,21 +571,6 @@ def notifications_settings_view(request):
                 except Exception as exc:
                     messages.error(request, f"Ошибка связи: {exc}")
             return redirect("cabinet_notifications")
-
-        if action in ("test_attendance_morning", "test_attendance_evening"):
-            slot = SLOT_MORNING if action.endswith("morning") else SLOT_EVENING
-            slot_label = "утренняя" if slot == SLOT_MORNING else "вечерняя"
-            if not notify_delivery_configured(settings):
-                messages.error(request, _delivery_error())
-                return redirect("cabinet_notifications")
-            try:
-                summary = load_attendance_summary_from_db(slot, settings=settings)
-                send_summary_telegram(summary, settings)
-                messages.success(request, f"{slot_label.capitalize()} сводка СКУД отправлена в Telegram.")
-            except Exception as exc:
-                messages.error(request, f"Не удалось отправить сводку: {exc}")
-            return redirect("cabinet_notifications")
-
         if action == "test_inventory":
             if not notify_delivery_configured(settings):
                 messages.error(request, _delivery_error())
@@ -860,62 +579,33 @@ def notifications_settings_view(request):
                 messages.error(request, "Уведомления склада выключены — включите галочку в настройках.")
                 return redirect("cabinet_notifications")
             try:
-                actor = user or "admin"
-                send_inventory_notify_test(settings, actor=actor)
+                send_inventory_notify_test(settings, actor=user or "admin")
                 messages.success(request, "Тестовое уведомление склада отправлено в Telegram.")
             except Exception as exc:
                 messages.error(request, f"Не удалось отправить: {exc}")
             return redirect("cabinet_notifications")
 
-        if action in ("preview_morning", "preview_evening"):
-            slot = SLOT_MORNING if "morning" in action else SLOT_EVENING
-            try:
-                summary = load_attendance_summary_from_db(slot, settings=settings)
-                preview_text = format_summary_text(summary)
-                preview_label = "Утренняя сводка СКУД" if slot == SLOT_MORNING else "Вечерняя сводка СКУД"
-            except Exception as exc:
-                messages.error(request, f"Не удалось сформировать сводку: {exc}")
-                return redirect("cabinet_notifications")
-
-    blacklist_codes = set(settings.get("blacklist_emp_codes") or [])
-    employee_rows = []
-    if not employees_full.empty:
-        for _, row in employees_full.iterrows():
-            code = normalize_emp_code(row.get("emp_code"))
-            if not code:
-                continue
-            employee_rows.append(
-                {
-                    "emp_code": code,
-                    "label": employee_label_row(row),
-                    "department_name": str(row.get("department_name") or "").strip() or "—",
-                    "blacklisted": code in blacklist_codes,
-                }
-            )
-        employee_rows.sort(key=lambda r: (r["department_name"].lower(), r["label"].lower()))
-
     chat_ids = settings.get("telegram_chat_ids") or []
-    relay_url = resolve_notify_relay_url(settings)
-    outbound_on = notify_outbound_enabled()
     ctx = {
         "settings": settings,
-        "employee_rows": employee_rows,
+        "employee_rows": [],
         "telegram_chat_ids_text": "\n".join(chat_ids),
-        "relay_url": relay_url,
+        "relay_url": resolve_notify_relay_url(settings),
         "relay_secret_configured": bool(settings.get("relay_secret") or resolve_notify_relay_secret(settings)),
         "notify_delivery_configured": notify_delivery_configured(settings),
         "notify_relay_configured": notify_relay_configured(settings),
         "telegram_configured": telegram_notify_configured(settings),
         "telegram_token_configured": telegram_token_configured(settings),
         "telegram_bot_username": "",
-        "notify_outbound_enabled": outbound_on,
+        "notify_outbound_enabled": notify_outbound_enabled(),
         "inventory_notify_on": inventory_notify_enabled(settings),
-        "preview_text": preview_text,
-        "preview_label": preview_label,
-        "cron_morning": _notify_cron_line(settings.get("morning_time"), "morning"),
-        "cron_evening": _notify_cron_line(settings.get("evening_time"), "evening"),
+        "preview_text": None,
+        "preview_label": "",
+        "cron_morning": "",
+        "cron_evening": "",
     }
     return render(request, "shifts/cabinet_notifications.html", ctx)
+
 
 
 def _icon_form_key(key: str) -> str:

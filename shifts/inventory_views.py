@@ -15,17 +15,13 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods
 from django.utils import timezone
 
-from biota_shifts import db as biota_db
 from biota_shifts import export as biota_export
 from biota_shifts.auth import (
     account_label_for_username,
-    employees_df_for_nav,
     inventory_stock_manage_for_user,
     nav_permissions_for_user,
 )
 from biota_shifts.constants import MONTH_NAMES_RU
-from biota_shifts.emp_codes import normalize_emp_code
-from biota_shifts.schedule import employee_label_row
 from .auth_utils import (
     biota_login_required,
     biota_user,
@@ -35,6 +31,7 @@ from .auth_utils import (
     request_is_executor,
     write_permission_required,
 )
+from .warehouse_employee_names import format_warehouse_employee_name
 from .drill_constants import (
     DRILL_SHANK_TYPES,
     drill_shank_copies_cutting_diameter,
@@ -182,15 +179,13 @@ from .models import (
     REAMER_ACCURACY_CLASSES,
     ReamerSpec,
     StockMovement,
+    WarehouseEmployee,
     TapSpec,
     ToolItem,
     ToolMaterialExtra,
     UserInventoryStockFilterPrefs,
     PurchaseRequest,
     PurchaseStore,
-    EmployeeDefectRecord,
-    EmployeePayrollProfile,
-    EmployeePayrollMonthStatus,
     TAP_HOLE_TYPES,
     TAP_TOOL_TYPES,
     THREAD_KINDS,
@@ -440,7 +435,7 @@ def _history_panel_redirect(request):
 
 
 def _match_skud_employee(name: str, options: list[str]) -> str:
-    """Возвращает каноническую подпись из списка СКУД или пустую строку."""
+    """Возвращает каноническую подпись из списка сотрудников склада или пустую строку."""
     raw = (name or "").strip()
     if not raw or not options:
         return ""
@@ -2870,8 +2865,6 @@ def inventory_view(request):
         "purchases",
         "analysis",
         "watch",
-        "defects",
-        "payroll",
         "employees",
     }:
         panel = "stock"
@@ -2882,20 +2875,6 @@ def inventory_view(request):
         inventory_stock_manage_for_user(username) and not is_real_admin(request)
     )
     perms = nav_permissions_for_user(username)
-    can_defects = perms.get("defects", True)
-    can_payroll = perms.get("payroll", True)
-    can_employees = perms.get("employees", True)
-    if is_admin_user:
-        can_defects = can_payroll = can_employees = True
-    if panel == "defects" and not can_defects:
-        messages.warning(request, "У вас нет доступа к разделу «Учёт брака».")
-        return redirect(reverse("inventory"))
-    if panel == "payroll" and not can_payroll:
-        messages.warning(request, "У вас нет доступа к разделу «Расчёт ЗП».")
-        return redirect(reverse("inventory"))
-    if panel == "employees" and not can_employees:
-        messages.warning(request, "У вас нет доступа к разделу «Сотрудники».")
-        return redirect(reverse("inventory"))
 
     if panel == "history" and request_is_executor(request):
         messages.warning(request, "У вас нет доступа к разделу «История».")
@@ -3109,88 +3088,85 @@ def inventory_view(request):
             messages.error(request, err_rb or "Не удалось выполнить откат.")
         return _history_panel_redirect(request)
 
+
+    if action == "create_warehouse_employee":
+        if request_is_executor(request):
+            messages.warning(request, "Недостаточно прав.")
+            return redirect(f"{reverse('inventory')}?panel=employees")
+        name = format_warehouse_employee_name(request.POST.get("employee_name") or "")
+        if not name:
+            messages.error(request, "Укажите ФИО сотрудника (Фамилия И.О.).")
+            return redirect(f"{reverse('inventory')}?panel=employees")
+        obj, created = WarehouseEmployee.objects.get_or_create(
+            name=name,
+            defaults={"is_active": True},
+        )
+        if not created:
+            if not obj.is_active:
+                obj.is_active = True
+                obj.save(update_fields=["is_active", "updated_at"])
+                messages.success(request, f"Сотрудник «{name}» снова активен.")
+            else:
+                messages.warning(request, f"Сотрудник «{name}» уже есть в списке.")
+        else:
+            messages.success(request, f"Добавлен сотрудник «{name}».")
+        return redirect(f"{reverse('inventory')}?panel=employees")
+
+    if action == "update_warehouse_employee":
+        if request_is_executor(request):
+            messages.warning(request, "Недостаточно прав.")
+            return redirect(f"{reverse('inventory')}?panel=employees")
+        try:
+            eid = int(request.POST.get("employee_id") or 0)
+        except (TypeError, ValueError):
+            eid = 0
+        emp = WarehouseEmployee.objects.filter(id=eid).first()
+        if not emp:
+            messages.error(request, "Сотрудник не найден.")
+            return redirect(f"{reverse('inventory')}?panel=employees")
+        name = format_warehouse_employee_name(request.POST.get("employee_name") or "")
+        if not name:
+            messages.error(request, "Укажите ФИО сотрудника (Фамилия И.О.).")
+            return redirect(f"{reverse('inventory')}?panel=employees")
+        if WarehouseEmployee.objects.exclude(id=emp.id).filter(name=name).exists():
+            messages.error(request, f"Имя «{name}» уже занято.")
+            return redirect(f"{reverse('inventory')}?panel=employees")
+        emp.name = name
+        emp.save(update_fields=["name", "updated_at"])
+        messages.success(request, "Сотрудник обновлён.")
+        return redirect(f"{reverse('inventory')}?panel=employees")
+
+    if action == "delete_warehouse_employee":
+        if request_is_executor(request):
+            messages.warning(request, "Недостаточно прав.")
+            return redirect(f"{reverse('inventory')}?panel=employees")
+        try:
+            eid = int(request.POST.get("employee_id") or 0)
+        except (TypeError, ValueError):
+            eid = 0
+        emp = WarehouseEmployee.objects.filter(id=eid).first()
+        if not emp:
+            messages.error(request, "Сотрудник не найден.")
+            return redirect(f"{reverse('inventory')}?panel=employees")
+        name = emp.name
+        emp.delete()
+        messages.success(request, f"Сотрудник «{name}» удалён.")
+        return redirect(f"{reverse('inventory')}?panel=employees")
+
     employee_options = []
     employee_department_map = {}
     employee_table_rows: list[dict] = []
-    if panel in {"defects", "history", "issue", "issue_outcome"} or action in {
-        "create_defect_record",
-        "update_defect_record",
-        "move_stock",
-        "issue_bulk",
-        "process_issue_outcome",
-    }:
-        try:
-            cfg = biota_db.db_config()
-            if panel == "defects" or action in {"create_defect_record", "update_defect_record"}:
-                emp_nav_key = "defects"
-            else:
-                emp_nav_key = "inventory"
-            employees_df = employees_df_for_nav(username, emp_nav_key, biota_db.load_employees(cfg))
-            if not employees_df.empty:
-                prepared: list[tuple[str, str, str, str]] = []
-                base_counts: dict[str, int] = {}
-                for _, row in employees_df.iterrows():
-                    base_label = employee_label_row(row)
-                    if not base_label or base_label == "Без имени":
-                        continue
-                    dept = str(row.get("department_name") or "").strip()
-                    last = str(row.get("last_name") or "").strip()
-                    first = str(row.get("first_name") or "").strip()
-                    full_name = " ".join(p for p in (last, first) if p)
-                    emp_code = str(row.get("emp_code") or "").strip()
-                    prepared.append((base_label, full_name, emp_code, dept))
-                    base_counts[base_label] = base_counts.get(base_label, 0) + 1
-
-                for base_label, full_name, emp_code, dept in prepared:
-                    label = base_label
-                    if base_counts.get(base_label, 0) > 1:
-                        if full_name and full_name != base_label:
-                            label = f"{base_label} ({full_name})"
-                        elif emp_code:
-                            label = f"{base_label} [{emp_code}]"
-                    # На случай редких коллизий (однофамильцы с одинаковым именем)
-                    if label in employee_department_map and emp_code:
-                        label = f"{label} [{emp_code}]"
-                    if label not in employee_department_map:
-                        employee_department_map[label] = dept
-                employee_options = sorted(employee_department_map.keys())
-        except Exception:
-            employee_options = []
-            employee_department_map = {}
-
+    warehouse_employees = list(
+        WarehouseEmployee.objects.filter(is_active=True).order_by("name", "id")
+    )
+    employee_options = [e.name for e in warehouse_employees]
+    employee_department_map = {name: "" for name in employee_options}
     if panel == "employees":
-        try:
-            cfg = biota_db.db_config()
-            emp_df = employees_df_for_nav(username, "employees", biota_db.load_employees(cfg))
-            if not emp_df.empty:
-                codes = [normalize_emp_code(str(x)) for x in emp_df["emp_code"].tolist() if normalize_emp_code(str(x))]
-                profile_by_code = {
-                    p.emp_code: p
-                    for p in EmployeePayrollProfile.objects.filter(emp_code__in=codes)
-                }
-                rows: list[dict] = []
-                for _, row in emp_df.iterrows():
-                    emp_code = normalize_emp_code(str(row.get("emp_code") or ""))
-                    if not emp_code:
-                        continue
-                    prof = profile_by_code.get(emp_code)
-                    rows.append(
-                        {
-                            "emp_code": emp_code,
-                            "label": (employee_label_row(row) or "").strip() or "—",
-                            "last_name": str(row.get("last_name") or "").strip(),
-                            "first_name": str(row.get("first_name") or "").strip(),
-                            "department_name": str(row.get("department_name") or "").strip(),
-                            "position_name": str(row.get("position_name") or "").strip(),
-                            "area_name": str(row.get("area_name") or "").strip(),
-                            "shift_hours": prof.shift_hours if prof else None,
-                            "hourly_rate_day": prof.hourly_rate_day if prof and prof.hourly_rate_day is not None else None,
-                            "hourly_rate_night": prof.hourly_rate_night if prof and prof.hourly_rate_night is not None else None,
-                        }
-                    )
-                employee_table_rows = sorted(rows, key=lambda r: (r["label"].lower(), r["emp_code"]))
-        except Exception:
-            employee_table_rows = []
+        employee_table_rows = [
+            {"id": e.id, "name": e.name}
+            for e in warehouse_employees
+        ]
+
 
     if action == "add_end_mill":
         diameter_mm = _to_decimal(request.POST.get("diameter_mm"), Decimal("0"))
@@ -3286,14 +3262,14 @@ def inventory_view(request):
             if not employee_name:
                 messages.error(request, "Укажите сотрудника для выдачи.")
                 return redirect(f"{request.path}?panel=issue")
-            if employee_options:
-                matched = _match_skud_employee(employee_name, employee_options)
-                if not matched:
-                    messages.error(request, "Выберите сотрудника из списка СКУД.")
-                    return redirect(f"{request.path}?panel=issue")
-                employee_name = matched
-            else:
-                messages.warning(request, "Справочник СКУД недоступен — ФИО сохранено как введено.")
+            if not employee_options:
+                messages.error(request, "Добавьте сотрудников на вкладке «Сотрудники».")
+                return redirect(f"{request.path}?panel=issue")
+            matched = _match_skud_employee(employee_name, employee_options)
+            if not matched:
+                messages.error(request, "Выберите сотрудника из списка.")
+                return redirect(f"{request.path}?panel=issue")
+            employee_name = matched
 
         with transaction.atomic():
             tool = ToolItem.objects.select_for_update().get(id=tool_id)
@@ -3330,14 +3306,14 @@ def inventory_view(request):
         if not employee_name:
             messages.error(request, "Укажите сотрудника для выдачи.")
             return redirect(f"{request.path}?panel=issue")
-        if employee_options:
-            matched = _match_skud_employee(employee_name, employee_options)
-            if not matched:
-                messages.error(request, "Выберите сотрудника из списка СКУД.")
-                return redirect(f"{request.path}?panel=issue")
-            employee_name = matched
-        else:
-            messages.warning(request, "Справочник СКУД недоступен — ФИО сохранено как введено.")
+        if not employee_options:
+            messages.error(request, "Добавьте сотрудников на вкладке «Сотрудники».")
+            return redirect(f"{request.path}?panel=issue")
+        matched = _match_skud_employee(employee_name, employee_options)
+        if not matched:
+            messages.error(request, "Выберите сотрудника из списка.")
+            return redirect(f"{request.path}?panel=issue")
+        employee_name = matched
         if not rows_json:
             messages.error(request, "Добавьте хотя бы одну позицию в список выдачи.")
             return redirect(f"{request.path}?panel=issue")
@@ -4344,7 +4320,7 @@ def inventory_view(request):
         if employee_name and employee_options:
             matched = _match_skud_employee(employee_name, employee_options)
             if not matched and not from_history:
-                messages.error(request, "Выберите сотрудника из списка СКУД.")
+                messages.error(request, "Выберите сотрудника из списка.")
                 return _outcome_redirect()
             if matched:
                 employee_name = matched
@@ -5206,132 +5182,9 @@ def inventory_view(request):
             messages.error(request, "Заявка не найдена.")
         return redirect(f"{request.path}?panel=purchases")
 
-    if action == "create_defect_record":
-        if not can_defects:
-            messages.warning(request, "У вас нет доступа к разделу «Учёт брака».")
-            return redirect(reverse("inventory"))
-        defect_date_raw = (request.POST.get("defect_date") or "").strip()
-        employee_name = (request.POST.get("employee_name") or "").strip()
-        responsible_selected = [str(x).strip() for x in request.POST.getlist("responsible_names") if str(x).strip()]
-        responsible_selected = list(dict.fromkeys(responsible_selected))
-        responsible_name = ", ".join(responsible_selected) if responsible_selected else employee_name
-        department_name = employee_department_map.get(employee_name, "")
-        record_type = (request.POST.get("record_type") or "scold").strip()
-        if record_type not in ("scold", "praise"):
-            record_type = "scold"
-        product_name = (request.POST.get("product_name") or "").strip()
-        defect_reason = (request.POST.get("defect_reason") or "").strip()
-        try:
-            defect_date = date.fromisoformat(defect_date_raw)
-        except ValueError:
-            messages.error(request, "Введите корректную дату.")
-            return redirect(f"{request.path}?panel=defects")
-        if not employee_name or not defect_reason:
-            messages.error(request, "Заполните сотрудника и причину.")
-            return redirect(f"{request.path}?panel=defects")
-        if employee_options and employee_name not in employee_options:
-            messages.error(request, "Выберите сотрудника из списка (нет доступа к этому сотруднику).")
-            return redirect(f"{request.path}?panel=defects")
-        if employee_name not in employee_department_map:
-            messages.error(request, "Не удалось определить отдел сотрудника — обновите страницу и выберите сотрудника заново.")
-            return redirect(f"{request.path}?panel=defects")
-        if responsible_selected:
-            bad_resp = [nm for nm in responsible_selected if employee_options and nm not in employee_options]
-            if bad_resp:
-                messages.error(request, "Выберите ответственных только из списка сотрудников.")
-                return redirect(f"{request.path}?panel=defects")
-        EmployeeDefectRecord.objects.create(
-            record_type=record_type,
-            defect_date=defect_date,
-            responsible_name=responsible_name,
-            employee_name=employee_name,
-            department_name=department_name,
-            defect_quantity=0,
-            good_quantity=0,
-            bad_quantity=0,
-            potential_defect_quantity=0,
-            product_name=product_name,
-            defect_reason=defect_reason,
-        )
-        messages.success(request, "Запись сохранена.")
-        return redirect(f"{request.path}?panel=defects")
-
-    if action == "update_defect_record":
-        if not can_defects:
-            messages.warning(request, "У вас нет доступа к разделу «Учёт брака».")
-            return redirect(reverse("inventory"))
-        rec_id = _to_int(request.POST.get("defect_id"), 0)
-        if rec_id <= 0:
-            messages.error(request, "Запись не найдена.")
-            return redirect(f"{request.path}?panel=defects")
-        rec = EmployeeDefectRecord.objects.filter(id=rec_id).first()
-        if not rec:
-            messages.error(request, "Запись не найдена.")
-            return redirect(f"{request.path}?panel=defects")
-
-        if not is_admin_user:
-            allowed_departments = {d for d in employee_department_map.values() if d}
-            has_access = (
-                (rec.department_name and rec.department_name in allowed_departments)
-                or (not rec.department_name and rec.employee_name in employee_options)
-            )
-            if not has_access:
-                messages.error(request, "Нет прав на редактирование этой записи.")
-                return redirect(f"{request.path}?panel=defects")
-
-        defect_date_raw = (request.POST.get("defect_date") or "").strip()
-        employee_name = (request.POST.get("employee_name") or "").strip()
-        product_name = (request.POST.get("product_name") or "").strip()
-        defect_reason = (request.POST.get("defect_reason") or "").strip()
-        try:
-            defect_date = date.fromisoformat(defect_date_raw)
-        except ValueError:
-            messages.error(request, "Введите корректную дату.")
-            return redirect(f"{request.path}?panel=defects")
-        if not employee_name or not defect_reason:
-            messages.error(request, "Заполните сотрудника и причину брака.")
-            return redirect(f"{request.path}?panel=defects")
-        if employee_options and employee_name not in employee_options:
-            messages.error(request, "Выберите сотрудника из списка (нет доступа к этому сотруднику).")
-            return redirect(f"{request.path}?panel=defects")
-        if employee_name not in employee_department_map:
-            messages.error(request, "Не удалось определить отдел сотрудника — обновите страницу и выберите сотрудника заново.")
-            return redirect(f"{request.path}?panel=defects")
-
-        rec.defect_date = defect_date
-        rec.employee_name = employee_name
-        # В таблице редактируется только основной сотрудник; список ответственных не перезаписываем.
-        rec.responsible_name = rec.responsible_name or employee_name
-        rec.department_name = employee_department_map.get(employee_name, "")
-        rec.product_name = product_name
-        rec.defect_reason = defect_reason
-        rec.save(
-            update_fields=[
-                "defect_date",
-                "employee_name",
-                "responsible_name",
-                "department_name",
-                "product_name",
-                "defect_reason",
-            ]
-        )
-        messages.success(request, "Запись учёта брака обновлена.")
-        return redirect(f"{request.path}?panel=defects")
-
-    if action == "delete_defect_record":
-        if not is_admin_user:
-            messages.error(request, "Удалять записи учёта брака может только администратор.")
-            return redirect(f"{request.path}?panel=defects")
-        rec_id = _to_int(request.POST.get("defect_id"), 0)
-        if rec_id <= 0:
-            messages.error(request, "Запись не найдена.")
-            return redirect(f"{request.path}?panel=defects")
-        deleted, _ = EmployeeDefectRecord.objects.filter(id=rec_id).delete()
-        if deleted:
-            messages.success(request, "Запись учёта брака удалена.")
-        else:
-            messages.error(request, "Запись не найдена.")
-        return redirect(f"{request.path}?panel=defects")
+    if action in {"create_defect_record", "update_defect_record", "delete_defect_record"}:
+        messages.warning(request, "Раздел учёта брака удалён.")
+        return redirect(reverse("inventory"))
 
     reset_stock_filters = panel == "stock" and (request.GET.get("reset_filters") or "").strip() == "1"
     if reset_stock_filters and username:
@@ -5851,39 +5704,12 @@ def inventory_view(request):
     if purchase_employee:
         purchase_qs = purchase_qs.filter(requested_by__icontains=purchase_employee)
 
-    defect_date_from = (request.GET.get("defect_date_from") or "").strip()
-    defect_date_to = (request.GET.get("defect_date_to") or "").strip()
-    defect_date_mode = (request.GET.get("defect_date_mode") or "day").strip()
-    if defect_date_mode not in ("day", "range"):
-        defect_date_mode = "day"
-    defect_department = (request.GET.get("defect_department") or "").strip()
-    defects_qs = EmployeeDefectRecord.objects.all()
-    if not is_admin_user:
-        allowed_departments = {d for d in employee_department_map.values() if d}
-        if allowed_departments:
-            defects_qs = defects_qs.filter(
-                Q(department_name__in=allowed_departments)
-                | Q(department_name="", employee_name__in=employee_options)
-            )
-        else:
-            defects_qs = defects_qs.none()
-    if defect_date_from:
-        defects_qs = defects_qs.filter(defect_date__gte=defect_date_from)
-    if defect_date_to:
-        defects_qs = defects_qs.filter(defect_date__lte=defect_date_to)
-    if defect_department:
-        defects_qs = defects_qs.filter(department_name=defect_department)
-    defect_department_options = sorted(
-        {
-            d
-            for d in list(employee_department_map.values()) + list(
-                EmployeeDefectRecord.objects.exclude(department_name="")
-                .values_list("department_name", flat=True)
-                .distinct()
-            )
-            if d
-        }
-    )
+    defect_date_from = ""
+    defect_date_to = ""
+    defect_date_mode = "day"
+    defect_department = ""
+    defects_qs = []
+    defect_department_options: list[str] = []
 
     payroll_rows: list[dict] = []
     payroll_year = date.today().year
@@ -5892,63 +5718,6 @@ def inventory_view(request):
     payroll_year_options: list[int] = []
     payroll_dept_options: list[str] = []
     payroll_depts_selected: list[str] = []
-    if panel == "payroll":
-        from .payroll_helpers import build_payroll_employee_rows, parse_payroll_year_month
-
-        payroll_year, payroll_month = parse_payroll_year_month(request)
-        payroll_month_name = MONTH_NAMES_RU[payroll_month]
-        payroll_depts_selected = [d.strip() for d in request.GET.getlist("dep") if str(d).strip()]
-        pay_df, skud_totals, payroll_year_options, payroll_dept_options = build_payroll_employee_rows(
-            username,
-            payroll_year,
-            payroll_month,
-            selected_departments=payroll_depts_selected or None,
-        )
-        # Оставляем в UI только реально существующие; полный набор = «все»
-        if payroll_depts_selected and payroll_dept_options:
-            allowed_deps = set(payroll_dept_options)
-            payroll_depts_selected = [d for d in payroll_depts_selected if d in allowed_deps]
-            if set(payroll_depts_selected) == allowed_deps:
-                payroll_depts_selected = []
-        if pay_df is not None and not getattr(pay_df, "empty", True):
-            for _, r in pay_df.iterrows():
-                ec = normalize_emp_code(str(r.get("emp_code") or ""))
-                if not ec:
-                    continue
-                payroll_rows.append(
-                    {
-                        "emp_code": ec,
-                        "label": employee_label_row(r),
-                        "department_name": str(r.get("department_name") or "").strip(),
-                        "skud_hours": round(float(skud_totals.get(ec, 0.0)), 2),
-                    }
-                )
-            codes = [row["emp_code"] for row in payroll_rows]
-            status_by_code = {
-                s.emp_code: s
-                for s in EmployeePayrollMonthStatus.objects.filter(
-                    year=payroll_year, month=payroll_month, emp_code__in=codes
-                )
-            }
-            for row in payroll_rows:
-                st = status_by_code.get(row["emp_code"])
-                row["payroll_advance_ok"] = bool(st and st.advance_closed)
-                row["payroll_month_ok"] = bool(st and st.payroll_closed)
-        if not payroll_year_options:
-            ny = date.today().year
-            payroll_year_options = [ny - 1, ny, ny + 1]
-
-    if request.method == "GET" and panel == "stock":
-        persist = dict(stock_req)
-        persist["category"] = filter_category
-        persist["show_all"] = "1" if show_all else "0"
-        for _dk in _STOCK_DECIMAL_PARAM_KEYS:
-            if _dk in persist:
-                persist[_dk] = _norm_stock_decimal_str(persist.get(_dk) or "")
-        for _ik in _STOCK_INT_PARAM_KEYS:
-            if _ik in persist:
-                persist[_ik] = _norm_stock_int_filter_str(persist.get(_ik) or "")
-        _save_inventory_stock_filter_prefs(username, persist, category=filter_category)
 
     history_movement_type = (request.GET.get("history_movement_type") or "").strip()
     if history_movement_type not in _HISTORY_FILTER_TYPES:
@@ -6537,6 +6306,7 @@ def inventory_view(request):
         },
         "defect_department_options": defect_department_options,
         "employee_table_rows": employee_table_rows,
+        "warehouse_employees": warehouse_employees,
         "payroll_rows": payroll_rows,
         "payroll_year": payroll_year,
         "payroll_month": payroll_month,

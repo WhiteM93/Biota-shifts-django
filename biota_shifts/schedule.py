@@ -228,24 +228,6 @@ def _read_schedule_dataframe(
     source: str = "local",
 ) -> pd.DataFrame:
     """Чтение и нормализация графика за месяц без подстановки хвоста из прошлого месяца."""
-    if source == "google":
-        from biota_shifts.schedule_google import (
-            GoogleScheduleError,
-            fetch_schedule_dataframe,
-            google_schedule_configured,
-        )
-
-        if google_schedule_configured():
-            try:
-                xl = fetch_schedule_dataframe(year, month)
-                if xl.empty:
-                    return empty_schedule_from_db(employees_df, year, month)
-                return normalize_schedule_excel(xl, employees_df, year, month)
-            except GoogleScheduleError:
-                raise
-            except Exception as exc:
-                raise GoogleScheduleError(str(exc)) from exc
-
     file_path = schedule_path(year, month)
     if file_path.exists():
         try:
@@ -333,19 +315,4 @@ def save_schedule_table(
     _rotate_schedule_backups(year, month)
     with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="График")
-    if source == "google":
-        from biota_shifts.schedule_google import (
-            GoogleScheduleError,
-            google_schedule_configured,
-            google_schedule_read_only,
-            save_schedule_dataframe_to_google,
-        )
-
-        if google_schedule_configured() and not google_schedule_read_only():
-            try:
-                save_schedule_dataframe_to_google(df, year, month)
-            except GoogleScheduleError:
-                raise
-            except Exception as exc:
-                raise GoogleScheduleError(str(exc)) from exc
     return file_path

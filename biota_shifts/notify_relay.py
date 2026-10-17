@@ -89,52 +89,6 @@ def post_notify_relay(payload: dict, settings: dict | None = None, *, timeout: f
         raise RuntimeError(f"Не удалось достучаться до сервера бота ({url}): {reason}") from exc
 
 
-def attendance_summary_relay_payload(
-    summary,
-    settings: dict | None = None,
-    *,
-    chat_ids: list[str] | None = None,
-) -> dict:
-    from biota_shifts.attendance_summary import format_summary_text
-
-    cfg = load_notification_settings() if settings is None else settings
-    target_chats = list(chat_ids) if chat_ids is not None else list(cfg.get("telegram_chat_ids") or [])
-    return {
-        "kind": "attendance_summary",
-        "text": format_summary_text(summary),
-        "chat_ids": target_chats,
-        "meta": {
-            "slot": summary.slot,
-            "shift_date": summary.shift_date.isoformat(),
-            "check_at": summary.check_at.isoformat(),
-            "shift_label": summary.shift_label,
-            "absent_count": summary.absent_count,
-            "absent": [
-                {
-                    "emp_code": item.emp_code,
-                    "label": item.label,
-                    "department_name": item.department_name,
-                    "shift_code": item.shift_code,
-                    "first_punch_at": item.first_punch_at.isoformat() if item.first_punch_at else None,
-                }
-                for item in summary.absent
-            ],
-        },
-    }
-
-
-def send_summary_relay(
-    summary,
-    settings: dict | None = None,
-    *,
-    chat_ids: list[str] | None = None,
-) -> int:
-    """Отправить сводку на сервер бота. Возвращает 1 при успехе."""
-    payload = attendance_summary_relay_payload(summary, settings, chat_ids=chat_ids)
-    post_notify_relay(payload, settings)
-    return 1
-
-
 def send_notify_test(settings: dict | None = None) -> int:
     """Тест доставки: через relay или напрямую в Telegram."""
     s = settings or load_notification_settings()

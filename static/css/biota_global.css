@@ -36,6 +36,8 @@
 
 html {
   color-scheme: dark;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
   --bio-font: Inter, "Segoe UI", Arial, sans-serif;
   --bio-body-bg: radial-gradient(circle at top right, #1a2337 0%, #0f1115 42%);
   --bio-body-fg: #eaf0ff;
@@ -373,6 +375,12 @@ body {
   transition: background 0.35s ease, color 0.28s ease;
   position: relative;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+  /* на краю вложенного скролла не тащить всю страницу как холст */
+  overscroll-behavior-y: contain;
 }
 
 .biota-site-bg {
@@ -1512,66 +1520,6 @@ html[data-theme="dawn"] .nav-dropdown-menu a:hover {
   flex-wrap: wrap;
 }
 
-.nav .nav-refresh-form {
-  margin: 0;
-}
-
-.nav .nav-refresh-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border-radius: 999px;
-  border: 1px solid var(--bio-nav-refresh-border);
-  background: linear-gradient(180deg, var(--bio-nav-refresh-bg1) 0%, var(--bio-nav-refresh-bg2) 100%);
-  color: #fff;
-  box-shadow: var(--bio-nav-refresh-shadow);
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 0;
-  transition:
-    filter 0.2s ease,
-    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.26s ease;
-}
-
-.nav .nav-refresh-btn:hover {
-  filter: brightness(1.08) saturate(1.05);
-  transform: translateY(-2px) scale(1.04);
-  box-shadow:
-    var(--bio-nav-refresh-shadow),
-    0 0 0 3px rgba(143, 156, 255, 0.22);
-}
-
-html[data-theme="dawn"] .nav .nav-refresh-btn:hover {
-  box-shadow:
-    var(--bio-nav-refresh-shadow),
-    0 0 0 3px rgba(45, 212, 191, 0.28);
-}
-
-.nav .nav-refresh-btn:active {
-  transform: translateY(0) scale(1);
-  transition-duration: 0.12s;
-}
-
-.nav .nav-refresh-btn.is-loading {
-  background: linear-gradient(180deg, #ff8d8d 0%, #e15353 100%);
-  border-color: #d85a5a;
-  box-shadow: 0 4px 12px rgba(210, 76, 76, 0.45);
-  animation: bio-nav-spin 0.9s linear infinite;
-  pointer-events: none;
-}
-
-.nav .nav-refresh-btn .nav-refresh-icon,
-.nav .nav-refresh-btn svg.biota-icon--hgi,
-.nav .nav-refresh-btn img.biota-icon--svg {
-  display: block;
-  width: 16px;
-  height: 16px;
-  color: inherit;
-}
 
 @keyframes bio-nav-spin {
   from {
@@ -1591,6 +1539,10 @@ html[data-theme="dawn"] .nav .nav-refresh-btn:hover {
 
 .container {
   padding: 16px 18px;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+  box-sizing: border-box;
 }
 
 .messages {
@@ -2437,18 +2389,6 @@ html[data-theme="dawn"] .chk {
     padding: 0;
   }
 
-  .nav-panel .nav-refresh-form {
-    align-self: stretch;
-    width: 100%;
-  }
-
-  .nav-panel .nav-refresh-btn {
-    width: 100%;
-    height: 44px;
-    border-radius: 10px;
-    font-size: 15px;
-    gap: 8px;
-  }
 
   .nav-panel .nav-theme-wrap {
     width: 100%;
@@ -2544,17 +2484,13 @@ html[data-theme="dawn"] .chk {
     animation: none !important;
   }
 
-  .nav .nav-refresh-btn {
-    transition: none !important;
-  }
 
   .nav a:hover,
   .nav a.active:hover,
   .nav-dropdown > summary:hover,
   .nav-dropdown[open] > summary,
   .nav-dropdown-menu a:hover,
-  .nav .nav-ctl:hover,
-  .nav .nav-refresh-btn:hover {
+  .nav .nav-ctl:hover {
     transform: none !important;
   }
 

@@ -45,11 +45,11 @@ class SiteUpdatesTests(TestCase):
     def test_nav_shows_unread_then_clears(self):
         latest = latest_site_update_id()
         self.assertGreater(latest, 0)
-        home = self.client.get(reverse("graph"))
+        home = self.client.get(reverse("cabinet"))
         self.assertEqual(home.status_code, 200)
         self.assertContains(home, "nav-updates-badge")
         self.client.get(reverse("site_updates"))
-        home2 = self.client.get(reverse("graph"))
+        home2 = self.client.get(reverse("cabinet"))
         self.assertNotContains(home2, "nav-updates-badge")
 
     def test_seen_persisted_for_account_after_new_session(self):
@@ -60,7 +60,7 @@ class SiteUpdatesTests(TestCase):
         session = other.session
         session["biota_username"] = "admin"
         session.save()
-        home = other.get(reverse("graph"))
+        home = other.get(reverse("cabinet"))
         self.assertEqual(home.status_code, 200)
         self.assertNotContains(home, "nav-updates-badge")
 

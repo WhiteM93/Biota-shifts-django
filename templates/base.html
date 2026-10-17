@@ -167,16 +167,6 @@
       });
     })();
     (function () {
-      var refreshForm = document.querySelector(".nav-refresh-form");
-      if (!refreshForm) return;
-      var btn = refreshForm.querySelector(".nav-refresh-btn");
-      if (!btn) return;
-      refreshForm.addEventListener("submit", function () {
-        btn.classList.add("is-loading");
-        btn.setAttribute("aria-label", "Обновление данных из БД...");
-      });
-    })();
-    (function () {
       var nav = document.querySelector(".nav");
       if (!nav) return;
       var drops = nav.querySelectorAll("details.nav-dropdown");
