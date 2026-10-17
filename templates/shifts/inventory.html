@@ -48,8 +48,11 @@
   {% endif %}
   <ul class="inv-emp-list">
     {% for er in employee_table_rows %}
-    <li class="inv-emp-row">
+    <li class="inv-emp-row" data-emp-id="{{ er.id }}" data-emp-name="{{ er.name }}">
       {% if biota_can_edit %}
+      <label class="inv-emp-check" title="Отметить для объединения">
+        <input type="checkbox" form="emp-merge-form" name="merge_ids" value="{{ er.id }}" class="inv-emp-check__input js-emp-merge-cb">
+      </label>
       <input form="emp-save-{{ er.id }}" type="text" class="inv-emp-input" name="employee_name" value="{{ er.name }}" required maxlength="120" size="16" aria-label="ФИО">
       <div class="inv-emp-actions">
         <form id="emp-save-{{ er.id }}" method="post" class="inv-emp-inline-form">
@@ -75,6 +78,84 @@
     <li class="inv-emp-empty muted">Пока никого нет — добавьте первого выше.</li>
     {% endfor %}
   </ul>
+  {% if biota_can_edit and employee_table_rows %}
+  <form method="post" id="emp-merge-form" class="inv-emp-merge">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="merge_warehouse_employees">
+    <input type="hidden" name="panel" value="employees">
+    <p class="inv-emp-merge__hint muted" id="emp-merge-hint">Отметьте галочками слева минимум двух сотрудников — дубли одного человека.</p>
+    <div class="inv-emp-merge__row" id="emp-merge-controls" hidden>
+      <label class="inv-emp-merge__label">
+        <span>Объединить в</span>
+        <select name="keep_id" id="emp-merge-keep" class="inv-emp-merge__select" required></select>
+      </label>
+      <button type="submit" class="btn btn-sm" id="emp-merge-submit">Объединить</button>
+    </div>
+  </form>
+  <script>
+  (function () {
+    var form = document.getElementById("emp-merge-form");
+    var keep = document.getElementById("emp-merge-keep");
+    var submit = document.getElementById("emp-merge-submit");
+    var controls = document.getElementById("emp-merge-controls");
+    var hint = document.getElementById("emp-merge-hint");
+    if (!form || !keep || !submit || !controls) return;
+    function selected() {
+      return Array.prototype.slice.call(document.querySelectorAll(".js-emp-merge-cb:checked")).map(function (cb) {
+        var row = cb.closest(".inv-emp-row");
+        return {
+          id: cb.value,
+          name: row ? (row.getAttribute("data-emp-name") || "") : "",
+        };
+      });
+    }
+    function refresh() {
+      var items = selected();
+      var prev = keep.value;
+      keep.innerHTML = "";
+      items.forEach(function (it) {
+        var opt = document.createElement("option");
+        opt.value = it.id;
+        opt.textContent = it.name;
+        keep.appendChild(opt);
+      });
+      if (items.some(function (it) { return it.id === prev; })) {
+        keep.value = prev;
+      } else if (items.length) {
+        items.sort(function (a, b) { return b.name.length - a.name.length; });
+        keep.value = items[0].id;
+      }
+      var ready = items.length >= 2;
+      controls.hidden = !ready;
+      submit.disabled = !ready;
+      if (hint) {
+        hint.hidden = ready;
+        hint.textContent = ready
+          ? ""
+          : (items.length === 1
+            ? "Отметьте ещё одного сотрудника для объединения."
+            : "Отметьте галочками слева минимум двух сотрудников — дубли одного человека.");
+      }
+    }
+    document.querySelectorAll(".js-emp-merge-cb").forEach(function (cb) {
+      cb.addEventListener("change", refresh);
+    });
+    form.addEventListener("submit", function (e) {
+      var items = selected();
+      if (items.length < 2) {
+        e.preventDefault();
+        return;
+      }
+      var keepOpt = keep.options[keep.selectedIndex];
+      var keepName = keepOpt ? keepOpt.textContent : "";
+      if (!confirm("Объединить " + items.length + " записей в «" + keepName + "»?\nИстория выдач и возвратов тоже обновится.")) {
+        e.preventDefault();
+      }
+    });
+    refresh();
+  })();
+  </script>
+  {% endif %}
 </section>
 {% endif %}
 

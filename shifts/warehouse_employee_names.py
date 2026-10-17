@@ -72,6 +72,14 @@ def prefer_warehouse_employee_name(a: str, b: str) -> str:
     return fa if len(ia) >= len(ib) else fb
 
 
+def pick_merge_keep_name(names: list[str] | tuple[str, ...]) -> str:
+    """Самое полное ФИО из списка для объединения дублей."""
+    keep = ""
+    for raw in names:
+        keep = prefer_warehouse_employee_name(keep, raw) if keep else format_warehouse_employee_name(raw)
+    return keep
+
+
 def resolve_warehouse_employee_names(raw_names: list[str] | tuple[str, ...]) -> dict[str, str]:
     """
     raw → каноническая «Фамилия И.О.».

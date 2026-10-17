@@ -2,6 +2,7 @@ from django.test import SimpleTestCase
 
 from shifts.warehouse_employee_names import (
     format_warehouse_employee_name,
+    pick_merge_keep_name,
     resolve_warehouse_employee_names,
 )
 
@@ -33,3 +34,9 @@ class FormatWarehouseEmployeeNameTests(SimpleTestCase):
         self.assertEqual(mapping["Павлов В."], "Павлов В.И.")
         # Фамилия без инициалов не подменяется.
         self.assertEqual(mapping["Павлов"], "Павлов")
+
+    def test_pick_merge_keep_name(self):
+        self.assertEqual(
+            pick_merge_keep_name(["Белянкин", "Белянкин А."]),
+            "Белянкин А.",
+        )

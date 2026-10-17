@@ -31,7 +31,7 @@ from .auth_utils import (
     request_is_executor,
     write_permission_required,
 )
-from .warehouse_employee_names import format_warehouse_employee_name
+from .warehouse_employee_names import format_warehouse_employee_name, pick_merge_keep_name
 from .drill_constants import (
     DRILL_SHANK_TYPES,
     drill_shank_copies_cutting_diameter,
@@ -3129,10 +3129,14 @@ def inventory_view(request):
             messages.error(request, "Укажите ФИО сотрудника (Фамилия И.О.).")
             return redirect(f"{reverse('inventory')}?panel=employees")
         if WarehouseEmployee.objects.exclude(id=emp.id).filter(name=name).exists():
-            messages.error(request, f"Имя «{name}» уже занято.")
+            messages.error(request, f"Имя «{name}» уже занято — объедините дубли.")
             return redirect(f"{reverse('inventory')}?panel=employees")
-        emp.name = name
-        emp.save(update_fields=["name", "updated_at"])
+        old_name = emp.name
+        with transaction.atomic():
+            if name != old_name:
+                StockMovement.objects.filter(employee_name=old_name).update(employee_name=name)
+            emp.name = name
+            emp.save(update_fields=["name", "updated_at"])
         messages.success(request, "Сотрудник обновлён.")
         return redirect(f"{reverse('inventory')}?panel=employees")
 
@@ -3151,6 +3155,73 @@ def inventory_view(request):
         name = emp.name
         emp.delete()
         messages.success(request, f"Сотрудник «{name}» удалён.")
+        return redirect(f"{reverse('inventory')}?panel=employees")
+
+    if action == "merge_warehouse_employees":
+        if request_is_executor(request):
+            messages.warning(request, "Недостаточно прав.")
+            return redirect(f"{reverse('inventory')}?panel=employees")
+        raw_ids = request.POST.getlist("merge_ids")
+        ids: list[int] = []
+        for raw in raw_ids:
+            try:
+                ids.append(int(raw))
+            except (TypeError, ValueError):
+                continue
+        ids = sorted(set(ids))
+        if len(ids) < 2:
+            messages.error(request, "Отметьте минимум двух сотрудников для объединения.")
+            return redirect(f"{reverse('inventory')}?panel=employees")
+        try:
+            keep_id = int(request.POST.get("keep_id") or 0)
+        except (TypeError, ValueError):
+            keep_id = 0
+        with transaction.atomic():
+            emps = list(
+                WarehouseEmployee.objects.select_for_update().filter(id__in=ids).order_by("id")
+            )
+            if len(emps) < 2:
+                messages.error(request, "Не удалось найти отмеченных сотрудников.")
+                return redirect(f"{reverse('inventory')}?panel=employees")
+            keep = next((e for e in emps if e.id == keep_id), None)
+            if keep is None:
+                keep_name_guess = pick_merge_keep_name([e.name for e in emps])
+                keep = next(
+                    (e for e in emps if e.name == keep_name_guess),
+                    emps[0],
+                )
+            keep_name = format_warehouse_employee_name(
+                request.POST.get("keep_name") or keep.name
+            ) or keep.name
+            old_names = sorted({e.name for e in emps} | {keep.name})
+            conflict = (
+                WarehouseEmployee.objects.exclude(id__in=[e.id for e in emps])
+                .filter(name=keep_name)
+                .first()
+            )
+            if conflict:
+                messages.error(
+                    request,
+                    f"Имя «{keep_name}» уже есть у другого сотрудника — сначала объедините и его.",
+                )
+                return redirect(f"{reverse('inventory')}?panel=employees")
+            moved = 0
+            for old in old_names:
+                if old == keep_name:
+                    continue
+                moved += StockMovement.objects.filter(employee_name=old).update(
+                    employee_name=keep_name
+                )
+            keep.name = keep_name
+            keep.is_active = True
+            keep.save(update_fields=["name", "is_active", "updated_at"])
+            WarehouseEmployee.objects.filter(id__in=[e.id for e in emps]).exclude(
+                id=keep.id
+            ).delete()
+        messages.success(
+            request,
+            f"Объединено в «{keep_name}»: {len(emps)} записей, обновлено движений: {moved}.",
+        )
         return redirect(f"{reverse('inventory')}?panel=employees")
 
     employee_options = []
