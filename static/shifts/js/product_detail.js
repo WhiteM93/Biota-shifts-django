@@ -5498,11 +5498,80 @@ function saveSetupToolNoteEditor() {
       return { html: html.join(""), truncated: truncated, lineCount: lines.length };
     }
 
+    function disposeSetupProgramToolpath() {
+      try {
+        if (window.BiotaGcodeToolpathView && typeof window.BiotaGcodeToolpathView.dispose === "function") {
+          window.BiotaGcodeToolpathView.dispose();
+        }
+      } catch (_e) {}
+    }
+
+    function waitForToolpathView(maxMs) {
+      var budget = typeof maxMs === "number" ? maxMs : 4000;
+      var started = Date.now();
+      return new Promise(function (resolve) {
+        function tick() {
+          if (window.BiotaGcodeToolpathView && typeof window.BiotaGcodeToolpathView.render === "function") {
+            resolve(window.BiotaGcodeToolpathView);
+            return;
+          }
+          if (Date.now() - started >= budget) {
+            resolve(null);
+            return;
+          }
+          setTimeout(tick, 40);
+        }
+        tick();
+      });
+    }
+
+    async function renderSetupProgramToolpath(text) {
+      var host = document.querySelector(".js-setup-program-toolpath-canvas");
+      var emptyEl = document.querySelector(".js-setup-program-toolpath-empty");
+      var noteEl = document.querySelector(".js-setup-program-toolpath-note");
+      if (!host) return;
+      var view = await waitForToolpathView(5000);
+      if (!view) {
+        if (emptyEl) {
+          emptyEl.hidden = false;
+          emptyEl.textContent = "Не удалось загрузить 3D-просмотр.";
+        }
+        return;
+      }
+      try {
+        view.render(host, text || "", { emptyEl: emptyEl, noteEl: noteEl });
+      } catch (_err) {
+        if (emptyEl) {
+          emptyEl.hidden = false;
+          emptyEl.textContent = "Ошибка построения траектории.";
+        }
+      }
+    }
+
+    function setSetupProgramToolpathVisible(show) {
+      var dialog = document.querySelector("#setup-program-preview-modal .setup-program-preview-modal-dialog");
+      var toggle = document.querySelector(".js-setup-program-toolpath-toggle");
+      if (dialog) dialog.classList.toggle("is-toolpath-hidden", !show);
+      if (toggle) {
+        toggle.setAttribute("aria-pressed", show ? "true" : "false");
+        toggle.textContent = show ? "Траектория" : "Траектория: выкл";
+      }
+      try {
+        if (show && window.BiotaGcodeToolpathView && window.BiotaGcodeToolpathView.resize) {
+          window.BiotaGcodeToolpathView.resize();
+        }
+        if (window.BiotaGcodeToolpathView && window.BiotaGcodeToolpathView.setVisible) {
+          window.BiotaGcodeToolpathView.setVisible(!!show);
+        }
+      } catch (_e) {}
+    }
+
     function closeSetupProgramPreviewModal() {
       var modal = document.getElementById("setup-program-preview-modal");
       if (!modal) return;
       resetSetupProgramPreviewSearch();
       setSetupProgramPreviewLoading(false);
+      disposeSetupProgramToolpath();
       modal.hidden = true;
       modal.setAttribute("aria-hidden", "true");
       var noteModal = document.getElementById("setup-tool-note-edit-modal");
@@ -5705,6 +5774,8 @@ function saveSetupToolNoteEditor() {
       }
       resetSetupProgramPreviewSearch();
       codeEl.innerHTML = "";
+      disposeSetupProgramToolpath();
+      setSetupProgramToolpathVisible(true);
       setSetupProgramPreviewStatus("", false);
       setSetupProgramPreviewLoading(true, "Загрузка программы…");
       modal.hidden = false;
@@ -5732,6 +5803,7 @@ function saveSetupToolNoteEditor() {
         }
         if (text.indexOf("\u0000") !== -1) {
           setSetupProgramPreviewLoading(false);
+          disposeSetupProgramToolpath();
           setSetupProgramPreviewStatus("Файл похож на бинарный — текстовый предпросмотр недоступен. Скачайте файл.", true);
           codeEl.textContent = "";
           return;
@@ -5740,6 +5812,14 @@ function saveSetupToolNoteEditor() {
         await yieldToUi();
         var highlighted = await highlightGcodeTextAsync(text);
         codeEl.innerHTML = highlighted.html;
+        var previewText = text;
+        if (highlighted.truncated && text.length > GCODE_PREVIEW_MAX_CHARS) {
+          previewText = text.slice(0, GCODE_PREVIEW_MAX_CHARS);
+        }
+        setSetupProgramPreviewLoading(true, "Построение траектории…");
+        await yieldToUi();
+        await renderSetupProgramToolpath(previewText);
+        setSetupProgramToolpathVisible(true);
         setSetupProgramPreviewLoading(false);
         if (highlighted.truncated) {
           setSetupProgramPreviewStatus(
@@ -5757,6 +5837,7 @@ function saveSetupToolNoteEditor() {
         }
       } catch (err) {
         setSetupProgramPreviewLoading(false);
+        disposeSetupProgramToolpath();
         setSetupProgramPreviewStatus("Не удалось загрузить программу для предпросмотра.", true);
         codeEl.textContent = "";
       }
@@ -5811,6 +5892,13 @@ function saveSetupToolNoteEditor() {
         }
       });
       document.addEventListener("click", function (e) {
+        var toggle = e.target && e.target.closest && e.target.closest(".js-setup-program-toolpath-toggle");
+        if (toggle) {
+          e.preventDefault();
+          var pressed = toggle.getAttribute("aria-pressed") !== "false";
+          setSetupProgramToolpathVisible(!pressed);
+          return;
+        }
         var btn = e.target && e.target.closest && e.target.closest(".js-setup-program-preview");
         if (!btn) return;
         e.preventDefault();

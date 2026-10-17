@@ -49,6 +49,12 @@
       <div class="setup-program-preview-modal-head-top">
         <h2 id="setup-program-preview-title" class="setup-program-preview-modal-title">Программа</h2>
         <div class="setup-program-preview-modal-head-actions">
+          <button
+            type="button"
+            class="btn btn-ghost js-setup-program-toolpath-toggle"
+            aria-pressed="true"
+            title="Скрыть или показать 3D-траекторию"
+          >Траектория</button>
           <a href="#" class="btn btn-ghost setup-program-preview-download js-setup-program-preview-download" download hidden>Скачать</a>
           <button type="button" class="btn btn-ghost" data-close-setup-program-preview="1" aria-label="Закрыть">×</button>
         </div>
@@ -72,7 +78,21 @@
       <div class="setup-program-preview-spinner" aria-hidden="true"></div>
       <p class="setup-program-preview-loading-text js-setup-program-preview-loading-text">Загрузка программы…</p>
     </div>
-    <pre class="setup-program-preview-code js-setup-program-preview-code" tabindex="0" aria-label="Текст программы"><code></code></pre>
+    <div class="setup-program-preview-body">
+      <pre class="setup-program-preview-code js-setup-program-preview-code" tabindex="0" aria-label="Текст программы"><code></code></pre>
+      <aside class="setup-program-toolpath js-setup-program-toolpath" aria-label="3D-траектория программы">
+        <div class="setup-program-toolpath__head">
+          <span class="setup-program-toolpath__title">Траектория</span>
+          <span class="setup-program-toolpath__legend">
+            <span class="setup-program-toolpath__swatch setup-program-toolpath__swatch--rapid"></span> быстрый
+            <span class="setup-program-toolpath__swatch setup-program-toolpath__swatch--feed"></span> рабочий
+          </span>
+        </div>
+        <div class="setup-program-toolpath__canvas js-setup-program-toolpath-canvas"></div>
+        <p class="setup-program-toolpath__empty muted js-setup-program-toolpath-empty" hidden>Нет перемещений для отрисовки.</p>
+        <p class="setup-program-toolpath__note muted js-setup-program-toolpath-note" hidden></p>
+      </aside>
+    </div>
   </div>
 </div>
 <div id="setup-tools-compare-modal" class="setup-tools-compare-modal" hidden aria-hidden="true">

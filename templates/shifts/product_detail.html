@@ -797,7 +797,6 @@
 <script src="{% asset 'shifts/js/plan-cascade-form.js' %}" defer></script>
 <script src="{% asset 'shifts/js/product_detail.js' %}" defer></script>
 
-{% if cad_inline_preview or has_setup_preview_stl %}
 <script type="importmap">
 {
   "imports": {
@@ -806,6 +805,8 @@
   }
 }
 </script>
+<script type="module" src="{% asset 'shifts/js/gcode_toolpath_view.js' %}"></script>
+{% if cad_inline_preview or has_setup_preview_stl %}
 <script type="module" src="{% asset 'shifts/js/product_detail_module.js' %}"></script>
 {% endif %}
 {% endblock %}
