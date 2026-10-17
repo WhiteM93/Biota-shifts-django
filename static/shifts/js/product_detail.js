@@ -5529,6 +5529,7 @@ function saveSetupToolNoteEditor() {
       var host = document.querySelector(".js-setup-program-toolpath-canvas");
       var emptyEl = document.querySelector(".js-setup-program-toolpath-empty");
       var noteEl = document.querySelector(".js-setup-program-toolpath-note");
+      var pickEl = document.querySelector(".js-setup-program-toolpath-pick");
       if (!host) return;
       var view = await waitForToolpathView(5000);
       if (!view) {
@@ -5539,7 +5540,7 @@ function saveSetupToolNoteEditor() {
         return;
       }
       try {
-        view.render(host, text || "", { emptyEl: emptyEl, noteEl: noteEl });
+        view.render(host, text || "", { emptyEl: emptyEl, noteEl: noteEl, pickEl: pickEl });
       } catch (_err) {
         if (emptyEl) {
           emptyEl.hidden = false;

@@ -1,6 +1,7 @@
 /**
  * 3D-отрисовка траектории G-кода (Three.js + OrbitControls).
  * API: window.BiotaGcodeToolpathView.render / dispose / setVisible / resize
+ * Клик по точке пути — координаты X/Y/Z (и номер строки).
  */
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -9,6 +10,9 @@ import { parseGcodeToolpath } from "./gcode_toolpath.js";
 const RAPID_COLOR = 0x64748b;
 const FEED_COLOR = 0x38bdf8;
 const GRID_COLOR = 0x334155;
+const PICK_COLOR = 0xfbbf24;
+const PICK_PX = 16;
+const CLICK_SLOP_PX = 6;
 
 let state = null;
 
@@ -69,6 +73,152 @@ function fitCamera(camera, controls, bbox) {
   controls.update();
 }
 
+function fmtCoord(n) {
+  if (!Number.isFinite(n)) return "—";
+  return (Math.round(n * 1000) / 1000).toString();
+}
+
+function collectPickPoints(parsed) {
+  const map = new Map();
+  function add(coords, lineNos, kind) {
+    if (!coords) return;
+    const nSeg = Math.floor(coords.length / 6);
+    for (let i = 0; i < nSeg; i++) {
+      const o = i * 6;
+      const lineNo = lineNos && lineNos[i] ? lineNos[i] : 0;
+      // оба конца сегмента; приоритет у feed при совпадении ключа
+      for (let end = 0; end < 2; end++) {
+        const x = coords[o + end * 3];
+        const y = coords[o + end * 3 + 1];
+        const z = coords[o + end * 3 + 2];
+        const key = x.toFixed(4) + "|" + y.toFixed(4) + "|" + z.toFixed(4);
+        const prev = map.get(key);
+        if (!prev || (prev.kind === "rapid" && kind === "feed")) {
+          map.set(key, { x, y, z, lineNo, kind });
+        } else if (prev && !prev.lineNo && lineNo) {
+          prev.lineNo = lineNo;
+        }
+      }
+    }
+  }
+  add(parsed.rapid, parsed.rapidLineNos, "rapid");
+  add(parsed.feed, parsed.feedLineNos, "feed");
+  return Array.from(map.values());
+}
+
+function clearPickUi() {
+  if (!state) return;
+  if (state.pickMarker) {
+    state.scene.remove(state.pickMarker);
+    disposeObject3d(state.pickMarker);
+    state.pickMarker = null;
+  }
+  if (state.pickEl) {
+    state.pickEl.hidden = true;
+    state.pickEl.textContent = "";
+  }
+}
+
+function showPick(pt) {
+  if (!state || !pt) return;
+  clearPickUi();
+  const span = state.pickSpan || 10;
+  const r = Math.max(span * 0.012, 0.15);
+  const geom = new THREE.SphereGeometry(r, 16, 12);
+  const mat = new THREE.MeshBasicMaterial({
+    color: PICK_COLOR,
+    depthTest: false,
+    transparent: true,
+    opacity: 0.95,
+  });
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.position.set(pt.x, pt.y, pt.z);
+  mesh.renderOrder = 10;
+  state.pickMarker = mesh;
+  state.scene.add(mesh);
+
+  const kindLabel = pt.kind === "rapid" ? "быстрый" : "рабочий";
+  let text = "X" + fmtCoord(pt.x) + "  Y" + fmtCoord(pt.y) + "  Z" + fmtCoord(pt.z) + "  ·  " + kindLabel;
+  if (pt.lineNo) text += "  ·  стр. " + pt.lineNo;
+  if (state.pickEl) {
+    state.pickEl.hidden = false;
+    state.pickEl.textContent = text;
+  }
+}
+
+function canvasPointerPos(ev) {
+  const rect = state.renderer.domElement.getBoundingClientRect();
+  return {
+    x: ev.clientX - rect.left,
+    y: ev.clientY - rect.top,
+    w: Math.max(1, rect.width),
+    h: Math.max(1, rect.height),
+  };
+}
+
+function findNearestPick(clientX, clientY) {
+  if (!state || !state.pickPoints || !state.pickPoints.length) return null;
+  const rect = state.renderer.domElement.getBoundingClientRect();
+  const sx = clientX - rect.left;
+  const sy = clientY - rect.top;
+  const w = Math.max(1, rect.width);
+  const h = Math.max(1, rect.height);
+  const v = new THREE.Vector3();
+  let best = null;
+  let bestD2 = PICK_PX * PICK_PX;
+  for (let i = 0; i < state.pickPoints.length; i++) {
+    const p = state.pickPoints[i];
+    v.set(p.x, p.y, p.z).project(state.camera);
+    if (v.z < -1 || v.z > 1) continue;
+    const px = (v.x * 0.5 + 0.5) * w;
+    const py = (-v.y * 0.5 + 0.5) * h;
+    const dx = px - sx;
+    const dy = py - sy;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      best = p;
+    }
+  }
+  return best;
+}
+
+function onPointerDown(ev) {
+  if (!state || ev.button !== 0) return;
+  const p = canvasPointerPos(ev);
+  state.ptrDown = { x: p.x, y: p.y, id: ev.pointerId };
+}
+
+function onPointerUp(ev) {
+  if (!state || !state.ptrDown || ev.button !== 0) return;
+  const down = state.ptrDown;
+  state.ptrDown = null;
+  const p = canvasPointerPos(ev);
+  const dx = p.x - down.x;
+  const dy = p.y - down.y;
+  if (dx * dx + dy * dy > CLICK_SLOP_PX * CLICK_SLOP_PX) return;
+  const hit = findNearestPick(ev.clientX, ev.clientY);
+  if (hit) showPick(hit);
+  else clearPickUi();
+}
+
+function bindPickEvents() {
+  if (!state || !state.renderer || state.pickBound) return;
+  const el = state.renderer.domElement;
+  el.addEventListener("pointerdown", onPointerDown);
+  el.addEventListener("pointerup", onPointerUp);
+  el.style.cursor = "crosshair";
+  state.pickBound = true;
+}
+
+function unbindPickEvents() {
+  if (!state || !state.renderer || !state.pickBound) return;
+  const el = state.renderer.domElement;
+  el.removeEventListener("pointerdown", onPointerDown);
+  el.removeEventListener("pointerup", onPointerUp);
+  state.pickBound = false;
+}
+
 function stopLoop() {
   if (!state) return;
   if (state.raf) {
@@ -86,6 +236,8 @@ function stopLoop() {
 function dispose() {
   stopLoop();
   if (!state) return;
+  unbindPickEvents();
+  clearPickUi();
   if (state.controls) state.controls.dispose();
   if (state.pathRoot) {
     state.scene.remove(state.pathRoot);
@@ -146,6 +298,12 @@ function ensureScene(host) {
     controls,
     pathRoot: null,
     helpers: null,
+    pickMarker: null,
+    pickPoints: [],
+    pickSpan: 10,
+    pickEl: null,
+    ptrDown: null,
+    pickBound: false,
     raf: 0,
     ro: null,
   };
@@ -154,6 +312,7 @@ function ensureScene(host) {
   });
   ro.observe(host);
   state.ro = ro;
+  bindPickEvents();
   animate();
   return state;
 }
@@ -193,14 +352,17 @@ function buildHelpers(bbox) {
 /**
  * @param {HTMLElement} host canvas container
  * @param {string} gcodeText
- * @param {{emptyEl?: HTMLElement, noteEl?: HTMLElement}|undefined} ui
+ * @param {{emptyEl?: HTMLElement, noteEl?: HTMLElement, pickEl?: HTMLElement}|undefined} ui
  */
 function render(host, gcodeText, ui) {
   const emptyEl = ui && ui.emptyEl;
   const noteEl = ui && ui.noteEl;
+  const pickEl = ui && ui.pickEl;
   if (!host) return null;
   const parsed = parseGcodeToolpath(gcodeText || "");
   const st = ensureScene(host);
+  st.pickEl = pickEl || null;
+  clearPickUi();
 
   if (st.pathRoot) {
     st.scene.remove(st.pathRoot);
@@ -212,6 +374,7 @@ function render(host, gcodeText, ui) {
     disposeObject3d(st.helpers);
     st.helpers = null;
   }
+  st.pickPoints = [];
 
   if (!parsed.pointCount) {
     if (emptyEl) {
@@ -229,15 +392,14 @@ function render(host, gcodeText, ui) {
   if (noteEl) {
     if (parsed.truncated) {
       noteEl.hidden = false;
-      noteEl.textContent = "Траектория упрощена (слишком много точек).";
+      noteEl.textContent = "Траектория упрощена (слишком много точек). Клик по точке — координаты.";
     } else {
-      noteEl.hidden = true;
-      noteEl.textContent = "";
+      noteEl.hidden = false;
+      noteEl.textContent = "Клик по точке траектории — координаты.";
     }
   }
 
   const root = new THREE.Group();
-  // CNC: X right, Y depth, Z up — Three already Z-up via camera.up
   const rapid = makeLineSegments(parsed.rapid, RAPID_COLOR);
   const feed = makeLineSegments(parsed.feed, FEED_COLOR);
   if (rapid) root.add(rapid);
@@ -247,6 +409,15 @@ function render(host, gcodeText, ui) {
 
   st.helpers = buildHelpers(parsed.bbox);
   st.scene.add(st.helpers);
+  st.pickPoints = collectPickPoints(parsed);
+  if (parsed.bbox) {
+    st.pickSpan = Math.max(
+      parsed.bbox.max[0] - parsed.bbox.min[0],
+      parsed.bbox.max[1] - parsed.bbox.min[1],
+      parsed.bbox.max[2] - parsed.bbox.min[2],
+      10
+    );
+  }
   fitCamera(st.camera, st.controls, parsed.bbox);
   resize();
   return parsed;

@@ -6405,6 +6405,31 @@ html[data-theme="dawn"] .setup-program-toolpath {
   width: 100% !important;
   height: 100% !important;
 }
+.setup-program-toolpath__pick {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  border-radius: 6px;
+  border: 1px solid var(--bio-surface-item-border, rgba(148, 163, 184, 0.35));
+  background: rgba(15, 23, 42, 0.88);
+  color: #e2e8f0;
+  pointer-events: none;
+  word-break: break-word;
+}
+html[data-theme="dawn"] .setup-program-toolpath__pick {
+  background: rgba(255, 252, 247, 0.94);
+  color: #1e293b;
+}
+.setup-program-toolpath__pick[hidden] {
+  display: none !important;
+}
 .setup-program-toolpath__empty,
 .setup-program-toolpath__note {
   margin: 0;
