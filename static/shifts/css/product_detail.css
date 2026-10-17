@@ -3357,6 +3357,8 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    position: relative;
+    z-index: 1;
   }
   .product-all-tools-wrap {
     padding: 0;
@@ -3431,6 +3433,10 @@ html[data-theme="dawn"] .plan-unified-specs-card {
     padding-right: 18px;
     margin-right: 0;
     border-right: none;
+    /* Карточки с isolation:isolate — без z-index выпадающий материал рисуется под «Инструмент» */
+    position: relative;
+    z-index: 5;
+    overflow: visible;
   }
   .product-detail-meta-split .product-detail-description-block {
     padding-left: 18px;
@@ -5341,6 +5347,7 @@ html[data-theme="dawn"] .product-detail-description-block {
   background-image: none;
   box-shadow: none;
   min-height: 0;
+  overflow: visible;
 }
 #product-detail-meta .product-detail-meta-header.product-detail-header {
   margin-bottom: 0;
@@ -5964,8 +5971,14 @@ html[data-theme="dawn"] #product-detail-side #product-detail-side-inner.product-
 }
 
 /* Подсказки материала (кастомный список вместо native datalist) */
+#product-detail-meta .form-field[data-field="material"] {
+  position: relative;
+  z-index: 6;
+  overflow: visible;
+}
 #product-detail-meta .plan-material-combo {
   position: relative;
+  z-index: 6;
   width: 100%;
   min-width: 0;
 }
@@ -5977,7 +5990,7 @@ html[data-theme="dawn"] #product-detail-side #product-detail-side-inner.product-
   left: 0;
   right: 0;
   top: calc(100% + 4px);
-  z-index: 40;
+  z-index: 80;
   margin: 0;
   padding: 4px;
   list-style: none;
