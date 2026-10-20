@@ -285,7 +285,7 @@ class InventoryViewTests(TestCase):
         self.assertNotIn(f'data-tool-id="{screw.id}"', nuts_html)
         self.assertNotIn(f'data-tool-id="{washer.id}"', nuts_html)
         self.assertNotIn('name="fast_length_mm"', nuts_html)
-        self.assertIn("Гайка шестигранная (ISO 4032 / DIN 934)", nuts_html)
+        self.assertIn("Гайка шестигранная (ISO 4032)", nuts_html)
         self.assertNotIn("Шайба плоская", nuts_html.split('name="fast_type"', 1)[1].split("</select>", 1)[0])
 
     def test_issue_panel_contains_fastener_filter_metrics(self):

@@ -377,7 +377,7 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         self.assertEqual(nut.quantity, 250)
         self.assertIsNone(nut.fastener_spec.length_mm)
         self.assertEqual(nut.fastener_spec.size_label, "M8")
-        self.assertTrue(nut.name.startswith("Гайка DIN 934 M8"))
+        self.assertTrue(nut.name.startswith("Гайка ISO 4032 M8"))
         washer = ToolItem.objects.get(category="fast_washer")
         self.assertEqual(washer.quantity, 300)
         self.assertEqual(washer.fastener_spec.size_label, "M8")
