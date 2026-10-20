@@ -1859,6 +1859,129 @@ class WarehouseEmployee(models.Model):
 
 
 
+class WarehouseFastenerType(models.Model):
+    """Тип метиза склада (расширяемый справочник: винты, гайки, шайбы и т.д.)."""
+
+    name = models.CharField(max_length=160, verbose_name="Название")
+    code = models.SlugField(max_length=64, unique=True, verbose_name="Код")
+    standard = models.CharField(max_length=64, blank=True, default="", verbose_name="Стандарт")
+    notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name="Активен")
+    sort_order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("sort_order", "name", "id")
+        verbose_name = "Тип метиза склада"
+        verbose_name_plural = "Типы метизов склада"
+
+    def __str__(self) -> str:
+        if self.standard:
+            return f"{self.name} ({self.standard})"
+        return self.name
+
+
+class WarehouseFastenerItem(models.Model):
+    """Позиция метиза на складе (остаток по размеру и характеристикам)."""
+
+    fastener_type = models.ForeignKey(
+        WarehouseFastenerType,
+        on_delete=models.PROTECT,
+        related_name="items",
+        verbose_name="Тип метиза",
+    )
+    thread_diameter_mm = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        verbose_name="Диаметр резьбы, мм",
+    )
+    length_mm = models.PositiveIntegerField(verbose_name="Длина, мм")
+    strength_class = models.CharField(max_length=40, blank=True, default="", verbose_name="Класс прочности")
+    material = models.CharField(max_length=80, blank=True, default="", verbose_name="Материал")
+    coating = models.CharField(max_length=80, blank=True, default="", verbose_name="Покрытие")
+    notes = models.CharField(max_length=300, blank=True, default="", verbose_name="Примечание")
+    warehouse_location = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        verbose_name="Место хранения",
+        help_text="Например A-01-02",
+    )
+    quantity = models.PositiveIntegerField(default=0, verbose_name="Количество")
+    is_deleted = models.BooleanField(default=False, db_index=True, verbose_name="Удалено")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("thread_diameter_mm", "length_mm", "fastener_type__sort_order", "id")
+        verbose_name = "Позиция метиза"
+        verbose_name_plural = "Позиции метизов"
+        constraints = [
+            models.UniqueConstraint(
+                fields=(
+                    "fastener_type",
+                    "thread_diameter_mm",
+                    "length_mm",
+                    "strength_class",
+                    "material",
+                    "coating",
+                    "warehouse_location",
+                ),
+                name="uniq_fastener_item_spec",
+            ),
+        ]
+
+    @property
+    def thread_label(self) -> str:
+        raw = format(self.thread_diameter_mm, "f").rstrip("0").rstrip(".")
+        return f"M{raw or '0'}"
+
+    @property
+    def size_label(self) -> str:
+        return f"{self.thread_label}x{self.length_mm}"
+
+    def __str__(self) -> str:
+        return f"{self.fastener_type.name} {self.size_label}"
+
+
+class WarehouseFastenerMovement(models.Model):
+    MOVE_ISSUE = "issue"
+    MOVE_RESTOCK = "restock"
+    MOVE_WRITEOFF = "writeoff"
+    MOVEMENT_TYPES = [
+        (MOVE_ISSUE, "Выдача"),
+        (MOVE_RESTOCK, "Пополнение"),
+        (MOVE_WRITEOFF, "Списание"),
+    ]
+
+    movement_type = models.CharField(
+        max_length=16,
+        choices=MOVEMENT_TYPES,
+        verbose_name="Тип операции",
+    )
+    item = models.ForeignKey(
+        WarehouseFastenerItem,
+        on_delete=models.PROTECT,
+        related_name="movements",
+        verbose_name="Позиция",
+    )
+    quantity = models.PositiveIntegerField(verbose_name="Количество")
+    employee_name = models.CharField(max_length=120, blank=True, default="", verbose_name="Сотрудник")
+    movement_date = models.DateField(verbose_name="Дата")
+    comment = models.CharField(max_length=300, blank=True, default="", verbose_name="Комментарий")
+    created_by_account = models.CharField(max_length=120, blank=True, default="", verbose_name="Кто выполнил")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+
+    class Meta:
+        ordering = ("-movement_date", "-id")
+        verbose_name = "Движение метизов"
+        verbose_name_plural = "Движения метизов"
+
+    def __str__(self) -> str:
+        return f"{self.get_movement_type_display()} {self.quantity} / {self.item_id}"
+
+
 class StockMovement(models.Model):
     movement_type = models.CharField(
         max_length=16,
