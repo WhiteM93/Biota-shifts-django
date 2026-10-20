@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 DEFAULT_FASTENER_TYPES = [
     # (подкатегория, код, название, краткое имя, порядок)
-    ("fast_screw", "iso7380", "Винт с полукруглой головкой и внутренним шестигранником (ISO 7380)", "Винт ISO 7380", 10),
     ("fast_screw", "iso10642", "Винт с потайной головкой (ISO 10642)", "Винт ISO 10642", 20),
     ("fast_screw", "iso4762", "Винт с цилиндрической головкой и внутренним шестигранником (ISO 4762)", "Винт ISO 4762", 30),
     ("fast_bolt", "iso4017", "Болт с шестигранной головкой (ISO 4017)", "Болт ISO 4017", 10),
@@ -40,7 +39,7 @@ class Migration(migrations.Migration):
                 ('category', models.CharField(choices=[('fast_screw', 'Винты'), ('fast_bolt', 'Болты'), ('fast_nut', 'Гайки'), ('fast_washer', 'Шайбы')], max_length=20, verbose_name='Подкатегория')),
                 ('code', models.SlugField(max_length=64, unique=True, verbose_name='Код')),
                 ('name', models.CharField(max_length=200, verbose_name='Название')),
-                ('short_name', models.CharField(blank=True, default='', help_text='Для названия позиции, например «Винт ISO 7380». Пусто = полное название.', max_length=80, verbose_name='Краткое имя')),
+                ('short_name', models.CharField(blank=True, default='', help_text='Для названия позиции, например «Винт ISO 4762». Пусто = полное название.', max_length=80, verbose_name='Краткое имя')),
                 ('sort_order', models.PositiveIntegerField(default=100, verbose_name='Порядок')),
                 ('is_active', models.BooleanField(default=True, verbose_name='Активен')),
             ],

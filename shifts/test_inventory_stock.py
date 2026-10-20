@@ -211,13 +211,13 @@ class InventoryViewTests(TestCase):
     def test_fastener_stock_filter_by_size(self):
         fast_m6 = ToolItem.objects.create(
             category="fast_screw",
-            name="Винт ISO 7380 M6x16",
+            name="Винт ISO 10642 M6x16",
             quantity=120,
             notes="Для наладки",
         )
         FastenerSpec.objects.create(
             tool=fast_m6,
-            fastener_type=FastenerType.objects.get(code="iso7380"),
+            fastener_type=FastenerType.objects.get(code="iso10642"),
             thread_diameter_mm=Decimal("6"),
             length_mm=16,
             strength_class="8.8",
@@ -226,7 +226,7 @@ class InventoryViewTests(TestCase):
         )
         fast_m8 = ToolItem.objects.create(
             category="fast_screw",
-            name="Винт ISO 7380 M8x20",
+            name="Винт ISO 4762 M8x20",
             quantity=70,
         )
         FastenerSpec.objects.create(
@@ -255,14 +255,14 @@ class InventoryViewTests(TestCase):
         self.assertIn("M6x16", thread_html)
         self.assertNotIn("M8x20", thread_html)
 
-        screw = FastenerType.objects.get(code="iso7380")
+        screw = FastenerType.objects.get(code="iso10642")
         by_type = self.client.get(
             reverse("inventory") + f"?panel=stock&category=fast_screw&fast_type={screw.id}&fast_size=M6x16"
         )
         type_html = by_type.content.decode("utf-8", errors="replace")
         self.assertIn(f'data-tool-id="{fast_m6.id}"', type_html)
         self.assertNotIn(f'data-tool-id="{fast_m8.id}"', type_html)
-        self.assertIn("Винт с полукруглой головкой", type_html)
+        self.assertIn("Винт с потайной головкой", type_html)
 
     def test_fastener_subcategories_are_separate_categories(self):
         def mk(cat, code, thread, length):
@@ -275,7 +275,7 @@ class InventoryViewTests(TestCase):
             )
             return tool
 
-        screw = mk("fast_screw", "iso7380", "6", 16)
+        screw = mk("fast_screw", "iso4762", "6", 16)
         nut = mk("fast_nut", "iso4032", "6", None)
         washer = mk("fast_washer", "iso7089", "6", None)
         nuts_html = self.client.get(

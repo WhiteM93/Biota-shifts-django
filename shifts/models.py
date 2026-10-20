@@ -1902,7 +1902,7 @@ class FastenerType(models.Model):
         blank=True,
         default="",
         verbose_name="Краткое имя",
-        help_text="Для названия позиции, например «Винт ISO 7380». Пусто = полное название.",
+        help_text="Для названия позиции, например «Винт ISO 4762». Пусто = полное название.",
     )
     sort_order = models.PositiveIntegerField(default=100, verbose_name="Порядок")
     is_active = models.BooleanField(default=True, verbose_name="Активен")

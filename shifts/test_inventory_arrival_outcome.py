@@ -135,7 +135,6 @@ def _insert_row(*, qty: int = 3, machining: str = "1,3") -> dict:
 
 
 _FASTENER_TYPE_CATEGORY = {
-    "iso7380": "fast_screw",
     "iso10642": "fast_screw",
     "iso4762": "fast_screw",
     "iso4017": "fast_bolt",
@@ -154,7 +153,7 @@ def _fastener_row(
     strength: str = "8.8",
     material: str = "Сталь",
     coating: str = "Цинк",
-    ftype: str = "iso7380",
+    ftype: str = "iso4762",
     category: str = "",
 ) -> dict:
     return {
@@ -348,7 +347,7 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         ).first()
         self.assertIsNotNone(tool)
         self.assertEqual(tool.quantity, 120)
-        self.assertTrue(tool.name.startswith("Винт ISO 7380 M6x16"))
+        self.assertTrue(tool.name.startswith("Винт ISO 4762 M6x16"))
         self.assertTrue(FastenerSpec.objects.filter(tool=tool).exists())
 
         mv = StockMovement.objects.filter(tool=tool, movement_type="restock").first()
@@ -356,7 +355,7 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         self.assertEqual(mv.quantity, 120)
 
     def test_bulk_fastener_other_types_are_separate_items(self):
-        self._post_arrival_bulk([_fastener_row(thread="M6", length=16, qty=10, ftype="iso7380")])
+        self._post_arrival_bulk([_fastener_row(thread="M6", length=16, qty=10, ftype="iso4762")])
         self._post_arrival_bulk([_fastener_row(thread="M6", length=16, qty=20, ftype="iso10642")])
         self._post_arrival_bulk([_fastener_row(thread="M6", length=16, qty=30, ftype="iso4017")])
         items = ToolItem.objects.filter(category__startswith="fast_").select_related("fastener_spec__fastener_type")
@@ -743,10 +742,10 @@ class FastenerSizeQueryParseTests(TestCase):
 
 class FastenerIssueTests(InventoryFlowClientMixin, TestCase):
     def test_issue_fastener_via_existing_form(self):
-        tool = ToolItem.objects.create(category="fast_screw", name="Винт ISO 7380 M6x16", quantity=100)
+        tool = ToolItem.objects.create(category="fast_screw", name="Винт ISO 4762 M6x16", quantity=100)
         FastenerSpec.objects.create(
             tool=tool,
-            fastener_type=FastenerType.objects.get(code="iso7380"),
+            fastener_type=FastenerType.objects.get(code="iso4762"),
             thread_diameter_mm=Decimal("6"),
             length_mm=16,
         )
