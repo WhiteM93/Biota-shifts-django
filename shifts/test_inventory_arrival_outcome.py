@@ -659,3 +659,38 @@ class IssueBulkPostTests(InventoryFlowClientMixin, TestCase):
         html = resp.content.decode("utf-8", errors="replace")
         self.assertIn("issue-line-writeoff", html)
         self.assertIn("Списать сразу", html)
+
+
+class FastenerSizeQueryParseTests(TestCase):
+    def test_parse_variants(self):
+        from shifts.inventory_views import _parse_fastener_size_query
+
+        cases = {
+            "M6x16": (Decimal("6"), 16),
+            "m6X16": (Decimal("6"), 16),
+            "М6х16": (Decimal("6"), 16),  # кириллица
+            "M6 x 16": (Decimal("6"), 16),
+            "M6*16": (Decimal("6"), 16),
+            "M6": (Decimal("6"), None),
+            "M2.5x6": (Decimal("2.5"), 6),
+            "": (None, None),
+            "abc": (None, None),
+        }
+        for raw, expected in cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(_parse_fastener_size_query(raw), expected)
+
+
+class FastenerIssueTests(InventoryFlowClientMixin, TestCase):
+    def test_issue_fastener_via_existing_form(self):
+        tool = ToolItem.objects.create(category="fastener", name="Винт ISO 7380 M6x16", quantity=100)
+        FastenerSpec.objects.create(
+            tool=tool,
+            fastener_kind="iso7380_button_hex_socket",
+            thread_diameter_mm=Decimal("6"),
+            length_mm=16,
+        )
+        self._post_move_stock(tool.id, "issue", 30, comment="выдача метизов")
+        tool.refresh_from_db()
+        self.assertEqual(tool.quantity, 70)
+        self.assertTrue(StockMovement.objects.filter(tool=tool, movement_type="issue", quantity=30).exists())
