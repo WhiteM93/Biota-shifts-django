@@ -747,8 +747,8 @@ var INV = (function () {
     });
     var common = root.querySelectorAll(".js-issue-common-filters");
     common.forEach(function (el) {
-      // материал/покрытие скрываем для цанг, как на складе
-      el.hidden = category === "collet";
+      // материал/покрытие скрываем для цанг и метизов, как на складе
+      el.hidden = category === "collet" || category === "fastener";
     });
     var search = root.querySelector(".js-tool-search");
     if (search) {
@@ -780,7 +780,7 @@ var INV = (function () {
 
     // материалы по типу
     var picker = root.querySelector(".js-tool-filter-material-picker");
-    if (picker && category !== "collet" && category !== "tool_extension") {
+    if (picker && category !== "collet" && category !== "tool_extension" && category !== "fastener") {
       var present = {};
       Array.prototype.forEach.call(toolSelect.options, function (opt, idx) {
         if (idx === 0) return;
@@ -829,10 +829,10 @@ var INV = (function () {
     var filters = readPanelFilters(panel);
     var searchInput = root.querySelector(".js-tool-search");
     var queryRaw = searchInput ? searchInput.value : "";
-    var wantMat = category === "collet"
+    var wantMat = category === "collet" || category === "fastener"
       ? ""
       : readRadioFilterIn(root, ".js-tool-filter-material");
-    var wantCoat = category === "collet"
+    var wantCoat = category === "collet" || category === "fastener"
       ? ""
       : readRadioFilterIn(root, ".js-tool-filter-coating");
 
@@ -2181,6 +2181,25 @@ var INV = (function () {
           }
         }
       }
+      if (cat === "fastener") {
+        var fastThreadEl = tr.querySelector('[data-k="fast_thread_mm"]');
+        if (!fastThreadEl || !(fastThreadEl.value || "").trim()) {
+          if (fastThreadEl) fastThreadEl.classList.add("is-invalid");
+          issues.push({
+            msg: "Строка " + (i + 1) + ": укажите размер резьбы (например M6).",
+            el: fastThreadEl,
+          });
+        }
+        var fastLenEl = tr.querySelector('[data-k="fast_length_mm"]');
+        var fastLenVal = parseInt((fastLenEl && fastLenEl.value) || "0", 10);
+        if (!fastLenEl || !fastLenVal || fastLenVal < 1) {
+          if (fastLenEl) fastLenEl.classList.add("is-invalid");
+          issues.push({
+            msg: "Строка " + (i + 1) + ": укажите длину метиза, мм.",
+            el: fastLenEl,
+          });
+        }
+      }
       if (cat === "drill") {
         var shankEl = tr.querySelector('[data-k="dr_shank_type"]');
         var shankVal = ((shankEl && shankEl.value) || "").trim();
@@ -2541,6 +2560,7 @@ var INV = (function () {
     collet: "Цанги",
     body_tool: "Корпусной инструмент",
     tool_extension: "Удлинители",
+    fastener: "Метизы",
     gauge_smooth: "Гладкие калибры",
     gauge_thread: "Резьбовые калибры",
     measure_univ: "Универсальный измерительный",
@@ -3139,6 +3159,16 @@ var INV = (function () {
       { key: "quantity", label: "Кол-во", cls: "qty-col" },
       { key: "row_remove", label: "" },
     ]),
+    fastener: arrivalHead([
+      { key: "fast_thread", label: "Резьба" },
+      { key: "L", label: "L", cls: "short-col" },
+      { key: "fast_strength", label: "Класс" },
+      { key: "fast_material", label: "Материал" },
+      { key: "fast_coating", label: "Покрытие" },
+      { key: "notes", label: "Описание" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
     tap: arrivalHead([
       { key: "tap_size", label: "Размер", cls: "tap-size-col" },
       { key: "tap_thread_kind", label: "Тип резьбы" },
@@ -3387,6 +3417,25 @@ var INV = (function () {
           '" title="Подходящие цанги или винты"></td>'
       );
       cells.push('<td><input type="text" data-k="notes" maxlength="300" placeholder="Описание" title="Описание"></td>');
+      cells.push(arrivalAddressCellHtml(""));
+      cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+    } else if (cat === "fastener") {
+      cells.push(
+        '<td><input type="text" data-k="fast_thread_mm" maxlength="16" placeholder="M6" required autocomplete="off" spellcheck="false" class="js-metric-size-input"></td>'
+      );
+      cells.push(
+        '<td class="short-col"><input type="number" data-k="fast_length_mm" min="1" placeholder="16" required></td>'
+      );
+      cells.push(
+        '<td><input type="text" data-k="fast_strength_class" maxlength="40" placeholder="8.8" autocomplete="off" spellcheck="false"></td>'
+      );
+      cells.push(
+        '<td><input type="text" data-k="fast_material" maxlength="80" placeholder="Сталь" autocomplete="off" spellcheck="false"></td>'
+      );
+      cells.push(
+        '<td><input type="text" data-k="fast_coating" maxlength="80" placeholder="Цинк" autocomplete="off" spellcheck="false"></td>'
+      );
+      cells.push('<td><input type="text" data-k="notes" maxlength="300" placeholder="Описание"></td>');
       cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "tap") {

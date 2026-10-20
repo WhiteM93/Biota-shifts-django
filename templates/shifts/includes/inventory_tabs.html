@@ -3,7 +3,6 @@
   <a class="inv-tab {% if active_tab == 'analysis' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=analysis">Главная</a>
   <a class="inv-tab {% if active_tab == 'watch' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=watch">Контроль</a>
   <a class="inv-tab {% if active_tab == 'stock' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=stock">Склад</a>
-  <a class="inv-tab {% if active_tab == 'fasteners' %}is-active{% endif %}" href="{% url 'inventory_fasteners' %}">Метизы</a>
   {% if not biota_is_executor %}
   <a class="inv-tab {% if active_tab == 'history' %}is-active{% endif %}" href="{% url 'inventory' %}?panel=history">История</a>
   {% endif %}

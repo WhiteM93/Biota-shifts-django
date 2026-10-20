@@ -6,7 +6,6 @@ from . import debug_log_views
 from . import perf_diagnostic_views
 from . import site_stats_views
 from . import inventory_views
-from . import inventory_fasteners_views
 from . import inventory_ai_archive_views
 from . import inventory_chat_views
 from . import inventory_types_views
@@ -23,7 +22,6 @@ urlpatterns = [
     path("", views.login_view, name="root"),
     path("home/", views.home_view, name="home"),
     path("inventory/", inventory_views.inventory_view, name="inventory"),
-    path("inventory/fasteners/", inventory_fasteners_views.inventory_fasteners_view, name="inventory_fasteners"),
     path(
         "inventory/chat/",
         inventory_chat_views.inventory_chat_api,

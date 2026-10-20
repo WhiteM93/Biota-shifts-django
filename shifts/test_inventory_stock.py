@@ -10,6 +10,7 @@ from shifts.inventory_views import _arrival_bulk_row_validation_errors, _insert_
 from shifts.models import (
     DrillSpec,
     EndMillSpec,
+    FastenerSpec,
     InsertSpec,
     StockMovement,
     ToolItem,
@@ -205,6 +206,73 @@ class InventoryViewTests(TestCase):
         self.assertNotIn("inv-history-card--writeoff", issue_html)
         self.assertIn("inv-hist-list", all_html)
         self.assertIn("Сегодня", all_html)
+
+    def test_fastener_stock_filter_by_size(self):
+        fast_m6 = ToolItem.objects.create(
+            category="fastener",
+            name="Винт ISO 7380 M6x16",
+            quantity=120,
+            notes="Для наладки",
+        )
+        FastenerSpec.objects.create(
+            tool=fast_m6,
+            thread_diameter_mm=Decimal("6"),
+            length_mm=16,
+            strength_class="8.8",
+            material="Сталь",
+            coating="Цинк",
+        )
+        fast_m8 = ToolItem.objects.create(
+            category="fastener",
+            name="Винт ISO 7380 M8x20",
+            quantity=70,
+        )
+        FastenerSpec.objects.create(
+            tool=fast_m8,
+            thread_diameter_mm=Decimal("8"),
+            length_mm=20,
+            strength_class="10.9",
+            material="Сталь",
+            coating="Оксид",
+        )
+
+        by_exact = self.client.get(
+            reverse("inventory") + "?panel=stock&category=fastener&fast_size=M6x16"
+        )
+        self.assertEqual(by_exact.status_code, 200)
+        exact_html = by_exact.content.decode("utf-8", errors="replace")
+        self.assertIn("M6x16", exact_html)
+        self.assertNotIn("M8x20", exact_html)
+
+        by_thread = self.client.get(
+            reverse("inventory") + "?panel=stock&category=fastener&fast_size=M6"
+        )
+        self.assertEqual(by_thread.status_code, 200)
+        thread_html = by_thread.content.decode("utf-8", errors="replace")
+        self.assertIn("M6x16", thread_html)
+        self.assertNotIn("M8x20", thread_html)
+
+    def test_issue_panel_contains_fastener_filter_metrics(self):
+        fast = ToolItem.objects.create(
+            category="fastener",
+            name="Винт ISO 7380 M10x30",
+            quantity=24,
+            notes="Пробная партия",
+        )
+        FastenerSpec.objects.create(
+            tool=fast,
+            thread_diameter_mm=Decimal("10"),
+            length_mm=30,
+            strength_class="10.9",
+            material="Нерж.",
+            coating="Без покрытия",
+        )
+        resp = self.client.get(reverse("inventory") + "?panel=issue")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode("utf-8", errors="replace")
+        self.assertIn('data-cat="fastener"', html)
+        self.assertIn('data-f-fast_size="M10x30"', html)
+        self.assertIn('data-f-fast_thread="10"', html)
 
 
 class HistoryDayGroupTests(TestCase):

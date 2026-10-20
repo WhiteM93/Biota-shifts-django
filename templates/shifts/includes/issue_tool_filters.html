@@ -149,6 +149,27 @@
   </label>
 </div>
 
+<div class="js-issue-cat-panel issue-cat-panel" data-cat="fastener" hidden>
+  <label class="field"><span>Размер</span>
+    <select class="js-issue-f" data-fkey="fast_size"></select>
+  </label>
+  <label class="field"><span>Резьба</span>
+    <select class="js-issue-f" data-fkey="fast_thread" data-num="1"></select>
+  </label>
+  <label class="field"><span>Длина, мм</span>
+    <select class="js-issue-f" data-fkey="fast_length" data-num="1"></select>
+  </label>
+  <label class="field"><span>Класс</span>
+    <select class="js-issue-f" data-fkey="fast_strength"></select>
+  </label>
+  <label class="field"><span>Материал</span>
+    <select class="js-issue-f" data-fkey="fast_material"></select>
+  </label>
+  <label class="field"><span>Покрытие</span>
+    <select class="js-issue-f" data-fkey="fast_coating"></select>
+  </label>
+</div>
+
 <div class="field issue-filter-chips-field js-issue-common-filters">
   <span>Материал инструмента</span>
   <div class="issue-mat-picker js-tool-filter-material-picker" data-target-select="{{ target_select_id }}" role="radiogroup" aria-label="Материал инструмента">

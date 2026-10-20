@@ -112,8 +112,8 @@
     · {% if setup.name %}{{ setup.name }}{% else %}Установка{% endif %}
   </p>
   <p class="setup-stock-meta" style="margin-top:-8px;">
-    Нужны винты/шайбы для установки? Откройте раздел
-    <a href="{% url 'inventory_fasteners' %}" class="link-like">«Метизы»</a>
+    Нужны винты/шайбы для установки? Откройте
+    <a href="{% url 'inventory' %}?panel=stock&amp;category=fastener" class="link-like">склад по категории «Метизы»</a>
     и подберите размер.
   </p>
 
