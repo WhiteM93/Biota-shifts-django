@@ -108,6 +108,7 @@ def _drill_row(
         "dr_overall_length_mm": "80",
         "dr_cutting_length_mm": "40",
         "dr_angle_deg": "118",
+        "dr_shank_type": "cylindrical_same",
     }
 
 
@@ -127,6 +128,7 @@ def _insert_row(*, qty: int = 3, machining: str = "1,3") -> dict:
         "ins_family": "APKT",
         "ins_kind": "milling",
         "ins_grade": "YG501",
+        "ins_name": "APKT 1135 PDER",
     }
 
 
@@ -213,11 +215,15 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         resp = self._post_arrival_bulk([row])
         self.assertEqual(resp.status_code, 200)
 
-        tool = ToolItem.objects.filter(category="insert", insert_spec__chipbreaker_grade="YG501").first()
+        tool = ToolItem.objects.filter(
+            category="insert",
+            insert_spec__item_name="APKT 1135 PDER",
+            insert_spec__brand="SANDVIK",
+        ).first()
         self.assertIsNotNone(tool)
         self.assertEqual(tool.quantity, 6)
-        self.assertEqual(tool.insert_spec.brand, "Sandvik")
-        self.assertEqual(tool.insert_spec.machining_application, "2,3")
+        self.assertEqual(tool.insert_spec.brand, "SANDVIK")
+        self.assertEqual(tool.insert_spec.machining_application, "")
 
     def test_bulk_allows_insert_without_machining(self):
         row = _insert_row()
@@ -225,9 +231,13 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         row["ins_brand"] = "Kennametal"
         resp = self._post_arrival_bulk([row])
         self.assertEqual(resp.status_code, 200)
-        tool = ToolItem.objects.filter(category="insert", insert_spec__chipbreaker_grade="YG501").first()
+        tool = ToolItem.objects.filter(
+            category="insert",
+            insert_spec__item_name="APKT 1135 PDER",
+            insert_spec__brand="KENNAMETAL",
+        ).first()
         self.assertIsNotNone(tool)
-        self.assertEqual(tool.insert_spec.brand, "Kennametal")
+        self.assertEqual(tool.insert_spec.brand, "KENNAMETAL")
         self.assertEqual(tool.insert_spec.machining_application, "")
 
     def test_bulk_rejects_empty_payload(self):

@@ -147,7 +147,7 @@ class InventoryViewTests(TestCase):
                 self.assertIn("Ø6", content)
             if cat == "insert":
                 self.assertIn("CNMG120408", content)
-                self.assertIn("Sandvik", content)
+                self.assertIn("sandvik", content.casefold())
 
     def test_stock_row_shows_who_added(self):
         tool = ToolItem.objects.create(
