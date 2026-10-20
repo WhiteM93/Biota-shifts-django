@@ -2182,6 +2182,14 @@ var INV = (function () {
         }
       }
       if (cat === "fastener") {
+        var fastTypeEl = tr.querySelector('[data-k="fastener_type"]');
+        if (!fastTypeEl || !(fastTypeEl.value || "").trim()) {
+          if (fastTypeEl) fastTypeEl.classList.add("is-invalid");
+          issues.push({
+            msg: "Строка " + (i + 1) + ": выберите тип метиза.",
+            el: fastTypeEl,
+          });
+        }
         var fastThreadEl = tr.querySelector('[data-k="fast_thread_mm"]');
         if (!fastThreadEl || !(fastThreadEl.value || "").trim()) {
           if (fastThreadEl) fastThreadEl.classList.add("is-invalid");
@@ -3160,6 +3168,7 @@ var INV = (function () {
       { key: "row_remove", label: "" },
     ]),
     fastener: arrivalHead([
+      { key: "fast_type", label: "Тип метиза" },
       { key: "fast_thread", label: "Резьба" },
       { key: "L", label: "L", cls: "short-col" },
       { key: "fast_strength", label: "Класс" },
@@ -3420,6 +3429,15 @@ var INV = (function () {
       cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "fastener") {
+      var fastTypeOpts = '<option value="">— выберите —</option>';
+      (INV.fastener_types_tree || []).forEach(function (g) {
+        fastTypeOpts += '<optgroup label="' + escapeHtml(g.label) + '">';
+        (g.types || []).forEach(function (t) {
+          fastTypeOpts += '<option value="' + String(t.id) + '">' + escapeHtml(t.label) + "</option>";
+        });
+        fastTypeOpts += "</optgroup>";
+      });
+      cells.push('<td><select data-k="fastener_type" required>' + fastTypeOpts + "</select></td>");
       cells.push(
         '<td><input type="text" data-k="fast_thread_mm" maxlength="16" placeholder="M6" required autocomplete="off" spellcheck="false" class="js-metric-size-input"></td>'
       );

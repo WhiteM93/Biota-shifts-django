@@ -11,6 +11,7 @@ from shifts.models import (
     DrillSpec,
     EndMillSpec,
     FastenerSpec,
+    FastenerType,
     InsertSpec,
     StockMovement,
     ToolItem,
@@ -216,6 +217,7 @@ class InventoryViewTests(TestCase):
         )
         FastenerSpec.objects.create(
             tool=fast_m6,
+            fastener_type=FastenerType.objects.get(code="iso7380"),
             thread_diameter_mm=Decimal("6"),
             length_mm=16,
             strength_class="8.8",
@@ -229,6 +231,7 @@ class InventoryViewTests(TestCase):
         )
         FastenerSpec.objects.create(
             tool=fast_m8,
+            fastener_type=FastenerType.objects.get(code="iso4014-4017"),
             thread_diameter_mm=Decimal("8"),
             length_mm=20,
             strength_class="10.9",
@@ -252,6 +255,23 @@ class InventoryViewTests(TestCase):
         self.assertIn("M6x16", thread_html)
         self.assertNotIn("M8x20", thread_html)
 
+        bolt = FastenerType.objects.get(code="iso4014-4017")
+        by_group = self.client.get(
+            reverse("inventory") + f"?panel=stock&category=fastener&fast_group={bolt.group_id}"
+        )
+        group_html = by_group.content.decode("utf-8", errors="replace")
+        self.assertIn(f'data-tool-id="{fast_m8.id}"', group_html)
+        self.assertNotIn(f'data-tool-id="{fast_m6.id}"', group_html)
+
+        screw = FastenerType.objects.get(code="iso7380")
+        by_type = self.client.get(
+            reverse("inventory") + f"?panel=stock&category=fastener&fast_type={screw.id}&fast_size=M6x16"
+        )
+        type_html = by_type.content.decode("utf-8", errors="replace")
+        self.assertIn(f'data-tool-id="{fast_m6.id}"', type_html)
+        self.assertNotIn(f'data-tool-id="{fast_m8.id}"', type_html)
+        self.assertIn("Винт с полукруглой головкой", type_html)
+
     def test_issue_panel_contains_fastener_filter_metrics(self):
         fast = ToolItem.objects.create(
             category="fastener",
@@ -261,6 +281,7 @@ class InventoryViewTests(TestCase):
         )
         FastenerSpec.objects.create(
             tool=fast,
+            fastener_type=FastenerType.objects.get(code="iso4762"),
             thread_diameter_mm=Decimal("10"),
             length_mm=30,
             strength_class="10.9",
@@ -273,6 +294,7 @@ class InventoryViewTests(TestCase):
         self.assertIn('data-cat="fastener"', html)
         self.assertIn('data-f-fast_size="M10x30"', html)
         self.assertIn('data-f-fast_thread="10"', html)
+        self.assertIn('data-f-fast_group="Винты"', html)
 
 
 class HistoryDayGroupTests(TestCase):

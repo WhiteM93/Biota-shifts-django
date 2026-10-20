@@ -16,6 +16,7 @@ from shifts.models import (
     DrillSpec,
     EndMillSpec,
     FastenerSpec,
+    FastenerType,
     InsertSpec,
     StockMovement,
     ToolItem,
@@ -141,12 +142,14 @@ def _fastener_row(
     strength: str = "8.8",
     material: str = "Сталь",
     coating: str = "Цинк",
+    ftype: str = "iso7380",
 ) -> dict:
     return {
         "category": "fastener",
         "quantity": qty,
         "movement_date": date.today().isoformat(),
         "supplier_name": "Тест-поставщик",
+        "fastener_type": ftype,
         "fast_thread_mm": thread,
         "fast_length_mm": str(length),
         "fast_strength_class": strength,
@@ -162,6 +165,11 @@ class ArrivalBulkValidationTests(TestCase):
         row.pop("dr_diameter_mm")
         errs = _arrival_bulk_row_validation_errors(row, 1)
         self.assertTrue(any("диаметр" in e.lower() for e in errs))
+
+    def test_fastener_requires_type(self):
+        row = _fastener_row(ftype="")
+        errs = _arrival_bulk_row_validation_errors(row, 1)
+        self.assertTrue(any("тип метиза" in e for e in errs))
 
     def test_fastener_requires_thread_and_length(self):
         row = _fastener_row()
@@ -321,6 +329,18 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         mv = StockMovement.objects.filter(tool=tool, movement_type="restock").first()
         self.assertIsNotNone(mv)
         self.assertEqual(mv.quantity, 120)
+
+    def test_bulk_fastener_other_types_are_separate_items(self):
+        self._post_arrival_bulk([_fastener_row(thread="M6", length=16, qty=10, ftype="iso7380")])
+        self._post_arrival_bulk([_fastener_row(thread="M6", length=16, qty=20, ftype="iso10642")])
+        self._post_arrival_bulk([_fastener_row(thread="M6", length=16, qty=30, ftype="iso4014-4017")])
+        items = ToolItem.objects.filter(category="fastener").select_related("fastener_spec__fastener_type__group")
+        self.assertEqual(items.count(), 3)
+        by_code = {t.fastener_spec.fastener_type.code: t for t in items}
+        self.assertEqual(by_code["iso10642"].quantity, 20)
+        self.assertEqual(by_code["iso10642"].fastener_spec.group_label, "Винты")
+        self.assertEqual(by_code["iso4014-4017"].fastener_spec.group_label, "Болты")
+        self.assertTrue(by_code["iso10642"].name.startswith("Винт ISO 10642 M6x16"))
 
     def test_bulk_fastener_merges_same_signature(self):
         self._post_arrival_bulk([_fastener_row(thread="M8", length=20, qty=40)])
@@ -686,7 +706,7 @@ class FastenerIssueTests(InventoryFlowClientMixin, TestCase):
         tool = ToolItem.objects.create(category="fastener", name="Винт ISO 7380 M6x16", quantity=100)
         FastenerSpec.objects.create(
             tool=tool,
-            fastener_kind="iso7380_button_hex_socket",
+            fastener_type=FastenerType.objects.get(code="iso7380"),
             thread_diameter_mm=Decimal("6"),
             length_mm=16,
         )

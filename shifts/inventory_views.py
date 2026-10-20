@@ -170,7 +170,9 @@ from .models import (
     BodyToolSpec,
     CenterDrillSpec,
     EndMillSpec,
+    FastenerGroup,
     FastenerSpec,
+    FastenerType,
     ColletSpec,
     InsertSpec,
     MeasuringToolSpec,
@@ -631,6 +633,8 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
                 errs.append(f"Строка {idx}: укажите длину, мм.")
         return errs
     if category == "fastener":
+        if _resolve_fastener_type(row.get("fastener_type")) is None:
+            errs.append(f"Строка {idx}: выберите тип метиза (группа → тип).")
         if _normalize_fastener_thread_mm(row.get("fast_thread_mm")) is None:
             errs.append(f"Строка {idx}: укажите размер резьбы метиза (например M6).")
         if _normalize_fastener_length(row.get("fast_length_mm")) is None:
@@ -1002,8 +1006,7 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
             qs = qs.filter(notes=notes)
     elif category == "fastener":
         qs = qs.select_related("fastener_spec")
-        kind = _normalize_fastener_kind((row.get("fastener_kind") or "").strip())
-        qs = qs.filter(fastener_spec__fastener_kind=kind)
+        qs = qs.filter(fastener_spec__fastener_type=_resolve_fastener_type(row.get("fastener_type")))
         thread_mm = _normalize_fastener_thread_mm(row.get("fast_thread_mm"))
         if thread_mm is not None:
             qs = qs.filter(fastener_spec__thread_diameter_mm=thread_mm)
@@ -1796,6 +1799,8 @@ _STOCK_FILTER_PARAM_KEYS = frozenset(
         "ext_main_diameter_mm",
         "ext_overall_length_mm",
         "ext_inner_diameter",
+        "fast_group",
+        "fast_type",
         "fast_size",
         "fast_thread_mm",
         "fast_length_mm",
@@ -1987,6 +1992,8 @@ _STOCK_KEYS_BY_CATEGORY = {
     ),
     "fastener": frozenset(
         {
+            "fast_group",
+            "fast_type",
             "fast_size",
             "fast_thread_mm",
             "fast_length_mm",
@@ -2350,7 +2357,13 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         if ext_inner:
             qs = qs.filter(tool_extension_spec__inner_diameter__iexact=ext_inner)
     elif category == "fastener":
-        qs = qs.select_related("fastener_spec")
+        qs = qs.select_related("fastener_spec", "fastener_spec__fastener_type__group")
+        fast_group = (g("fast_group") or "").strip()
+        if fast_group.isdigit():
+            qs = qs.filter(fastener_spec__fastener_type__group_id=int(fast_group))
+        fast_type = (g("fast_type") or "").strip()
+        if fast_type.isdigit():
+            qs = qs.filter(fastener_spec__fastener_type_id=int(fast_type))
         size_raw = g("fast_size")
         if size_raw:
             size_thread, size_length = _parse_fastener_size_query(size_raw)
@@ -2530,9 +2543,30 @@ def _normalize_fastener_text(raw, *, limit: int) -> str:
     return (str(raw or "").strip())[:limit]
 
 
-def _normalize_fastener_kind(raw: str) -> str:
-    kind = (raw or "").strip()
-    return kind if kind == "iso7380_button_hex_socket" else "iso7380_button_hex_socket"
+def _resolve_fastener_type(raw) -> "FastenerType | None":
+    """Тип метиза по id или коду (только активные)."""
+    txt = str(raw or "").strip()
+    if not txt:
+        return None
+    qs = FastenerType.objects.select_related("group").filter(is_active=True)
+    if txt.isdigit():
+        return qs.filter(pk=int(txt)).first()
+    return qs.filter(code=txt[:64]).first()
+
+
+def _fastener_types_tree() -> list[dict]:
+    """Группы → активные типы для форм прихода и фильтров склада."""
+    out = []
+    groups = FastenerGroup.objects.filter(is_active=True).prefetch_related("types")
+    for g in groups:
+        types = [
+            {"id": t.id, "code": t.code, "label": t.name}
+            for t in g.types.all()
+            if t.is_active
+        ]
+        if types:
+            out.append({"id": g.id, "label": g.name, "types": types})
+    return out
 
 
 def _fmt_fastener_thread_label(thread_mm: Decimal | None) -> str:
@@ -2546,13 +2580,13 @@ def _build_fastener_name(
     *,
     thread_mm: Decimal | None,
     length_mm: int | None,
-    kind: str,
+    fastener_type=None,
     strength_class: str = "",
     material: str = "",
     coating: str = "",
 ) -> str:
     size = f"{_fmt_fastener_thread_label(thread_mm)}x{length_mm or '?'}"
-    kind_label = "Винт ISO 7380" if kind == "iso7380_button_hex_socket" else "Метиз"
+    kind_label = fastener_type.item_label if fastener_type is not None else "Метиз"
     extras = [x for x in (strength_class, material, coating) if (x or "").strip()]
     tail = f" · {' / '.join(extras)}" if extras else ""
     return f"{kind_label} {size}{tail}"
@@ -5288,10 +5322,10 @@ def inventory_view(request):
                     else:
                         tool = _create_tool_extension_tool(quantity, spec_fields)
                 elif category == "fastener":
-                    kind = _normalize_fastener_kind((row.get("fastener_kind") or "").strip())
+                    ftype = _resolve_fastener_type(row.get("fastener_type"))
                     thread_mm = _normalize_fastener_thread_mm(row.get("fast_thread_mm"))
                     length_mm = _normalize_fastener_length(row.get("fast_length_mm"))
-                    if thread_mm is None or length_mm is None:
+                    if ftype is None or thread_mm is None or length_mm is None:
                         continue
                     strength_class = _normalize_fastener_text(row.get("fast_strength_class"), limit=40)
                     material = _normalize_fastener_text(row.get("fast_material"), limit=80)
@@ -5300,7 +5334,7 @@ def inventory_view(request):
                         ToolItem.objects.select_for_update()
                         .filter(
                             category="fastener",
-                            fastener_spec__fastener_kind=kind,
+                            fastener_spec__fastener_type=ftype,
                             fastener_spec__thread_diameter_mm=thread_mm,
                             fastener_spec__length_mm=length_mm,
                             fastener_spec__strength_class=strength_class,
@@ -5318,7 +5352,7 @@ def inventory_view(request):
                             name=_build_fastener_name(
                                 thread_mm=thread_mm,
                                 length_mm=length_mm,
-                                kind=kind,
+                                fastener_type=ftype,
                                 strength_class=strength_class,
                                 material=material,
                                 coating=coating,
@@ -5329,7 +5363,7 @@ def inventory_view(request):
                         )
                         FastenerSpec.objects.create(
                             tool=tool,
-                            fastener_kind=kind,
+                            fastener_type=ftype,
                             thread_diameter_mm=thread_mm,
                             length_mm=length_mm,
                             strength_class=strength_class,
@@ -5587,6 +5621,8 @@ def inventory_view(request):
     ext_overall_length_raw = _sq("ext_overall_length_mm")
     ext_inner_diameter_raw = _sq("ext_inner_diameter")
     fast_size_raw = _sq("fast_size")
+    fast_group_raw = _sq("fast_group")
+    fast_type_raw = _sq("fast_type")
     fast_thread_raw = _sq("fast_thread_mm")
     fast_length_raw = _sq("fast_length_mm")
     fast_strength_raw = _sq("fast_strength_class")
@@ -6253,6 +6289,7 @@ def inventory_view(request):
             ).order_by("category", "name")
         )
 
+    _fastener_types_tree_cached = _fastener_types_tree()
     ctx = {
         "tool_items": tool_items,
         "movements": mv_hist[:50],
@@ -6350,6 +6387,8 @@ def inventory_view(request):
             "ext_overall_length_mm": _norm_stock_decimal_str(ext_overall_length_raw),
             "ext_inner_diameter": normalize_tool_extension_inner_diameter(ext_inner_diameter_raw),
             "fast_size": fast_size_raw,
+            "fast_group": fast_group_raw,
+            "fast_type": fast_type_raw,
             "fast_thread_mm": _norm_stock_decimal_str(fast_thread_raw),
             "fast_length_mm": _norm_stock_int_filter_str(fast_length_raw),
             "fast_strength_class": fast_strength_raw,
@@ -6530,6 +6569,8 @@ def inventory_view(request):
             "overall_lengths": tool_extension_lengths,
             "inner_diameters": tool_extension_inner_diameters,
         },
+        "fastener_types_tree": _fastener_types_tree_cached,
+        "fastener_types_tree_json": json.dumps(_fastener_types_tree_cached, ensure_ascii=False).replace("<", "\\u003c"),
         "fastener_filter_options": {
             "threads": fastener_threads,
             "lengths": fastener_lengths,

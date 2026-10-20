@@ -216,3 +216,28 @@ class SiteUpdateAdmin(admin.ModelAdmin):
     search_fields = ("title", "body", "author_username")
     date_hierarchy = "created_at"
     readonly_fields = ("created_at",)
+
+
+
+from .models import FastenerGroup, FastenerType  # noqa: E402
+
+
+class FastenerTypeInline(admin.TabularInline):
+    model = FastenerType
+    extra = 1
+    fields = ("name", "short_name", "code", "sort_order", "is_active")
+    prepopulated_fields = {"code": ("short_name",)}
+
+
+@admin.register(FastenerGroup)
+class FastenerGroupAdmin(admin.ModelAdmin):
+    list_display = ("name", "sort_order", "is_active")
+    list_editable = ("sort_order", "is_active")
+    inlines = [FastenerTypeInline]
+
+
+@admin.register(FastenerType)
+class FastenerTypeAdmin(admin.ModelAdmin):
+    list_display = ("name", "group", "short_name", "code", "sort_order", "is_active")
+    list_filter = ("group", "is_active")
+    search_fields = ("name", "short_name", "code")

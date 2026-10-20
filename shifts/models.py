@@ -240,10 +240,6 @@ STOCK_CATEGORY_GROUPS = [
     ),
 ]
 
-# Метизы: стартовая номенклатура для ISO 7380, с расширением на будущие типы.
-FASTENER_KIND_CHOICES = [
-    ("iso7380_button_hex_socket", "Винт ISO 7380 (полукруглая головка, внутр. шестигранник)"),
-]
 
 # Типовые квалитеты / посадки для развёрток (поле допускает и свой текст).
 REAMER_ACCURACY_CLASSES = [
@@ -557,7 +553,7 @@ class ToolItem(models.Model):
             fs = getattr(self, "fastener_spec", None)
             segs = [
                 self.get_category_display(),
-                fs.get_fastener_kind_display() if fs else "—",
+                fs.type_label if fs else "—",
                 (fs.size_label if fs else "—"),
             ]
             if fs and (fs.strength_class or "").strip():
@@ -834,7 +830,7 @@ class ToolItem(models.Model):
             fs = getattr(self, "fastener_spec", None)
             tool_type = self.get_category_display()
             if fs:
-                tool_type = f"{self.get_category_display()} · {fs.get_fastener_kind_display()}"
+                tool_type = f"{self.get_category_display()} · {fs.type_label}"
                 specs_parts.append(fs.size_label)
                 if (fs.strength_class or "").strip():
                     specs_parts.append(f"класс {fs.strength_class.strip()}")
@@ -964,6 +960,8 @@ class ToolItem(models.Model):
             "fast_thread": "",
             "fast_length": "",
             "fast_strength": "",
+            "fast_group": "",
+            "fast_type": "",
             "fast_material": "",
             "fast_coating": "",
             "notes": "",
@@ -1069,6 +1067,8 @@ class ToolItem(models.Model):
             fs = getattr(self, "fastener_spec", None)
             if fs:
                 out["fast_size"] = fs.size_label
+                out["fast_group"] = fs.group_label
+                out["fast_type"] = fs.type_label
                 out["fast_thread"] = fmt_num(fs.thread_diameter_mm)
                 out["fast_length"] = str(int(fs.length_mm)) if fs.length_mm is not None else ""
                 out["fast_strength"] = (fs.strength_class or "").strip()
@@ -1866,14 +1866,61 @@ class BodyToolSpec(models.Model):
         super().save(*args, **kwargs)
 
 
+class FastenerGroup(models.Model):
+    """Подкатегория метизов (группа): «Винты», «Болты», «Гайки»…  Редактируется в админке."""
+
+    name = models.CharField(max_length=120, unique=True, verbose_name="Название")
+    sort_order = models.PositiveIntegerField(default=100, verbose_name="Порядок")
+    is_active = models.BooleanField(default=True, verbose_name="Активна")
+
+    class Meta:
+        ordering = ("sort_order", "name", "id")
+        verbose_name = "Группа метизов"
+        verbose_name_plural = "Группы метизов"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class FastenerType(models.Model):
+    """Тип метиза внутри группы, например «Винт с потайной головкой (ISO 10642 / DIN 7991)»."""
+
+    group = models.ForeignKey(
+        FastenerGroup, on_delete=models.PROTECT, related_name="types", verbose_name="Группа"
+    )
+    code = models.SlugField(max_length=64, unique=True, verbose_name="Код")
+    name = models.CharField(max_length=200, verbose_name="Название")
+    short_name = models.CharField(
+        max_length=80,
+        blank=True,
+        default="",
+        verbose_name="Краткое имя",
+        help_text="Для названия позиции, например «Винт ISO 7380». Пусто = полное название.",
+    )
+    sort_order = models.PositiveIntegerField(default=100, verbose_name="Порядок")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+
+    class Meta:
+        ordering = ("group__sort_order", "sort_order", "name", "id")
+        verbose_name = "Тип метиза"
+        verbose_name_plural = "Типы метизов"
+
+    def __str__(self) -> str:
+        return f"{self.group.name} / {self.name}"
+
+    @property
+    def item_label(self) -> str:
+        return (self.short_name or "").strip() or self.name
+
+
 class FastenerSpec(models.Model):
-    """Спецификация метиза на складе (сейчас: винт ISO 7380)."""
+    """Спецификация метиза на складе: тип (группа → тип) + размер и свойства."""
 
     tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="fastener_spec")
-    fastener_kind = models.CharField(
-        max_length=40,
-        choices=FASTENER_KIND_CHOICES,
-        default="iso7380_button_hex_socket",
+    fastener_type = models.ForeignKey(
+        FastenerType,
+        on_delete=models.PROTECT,
+        related_name="specs",
         verbose_name="Тип метиза",
     )
     thread_diameter_mm = models.DecimalField(
@@ -1892,7 +1939,7 @@ class FastenerSpec(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=(
-                    "fastener_kind",
+                    "fastener_type",
                     "thread_diameter_mm",
                     "length_mm",
                     "strength_class",
@@ -1913,7 +1960,15 @@ class FastenerSpec(models.Model):
         return f"{self.thread_label}x{self.length_mm}"
 
     def __str__(self) -> str:
-        return f"{self.get_fastener_kind_display()} {self.size_label}"
+        return f"{self.type_label} {self.size_label}"
+
+    @property
+    def group_label(self) -> str:
+        return self.fastener_type.group.name if self.fastener_type_id else ""
+
+    @property
+    def type_label(self) -> str:
+        return self.fastener_type.name if self.fastener_type_id else ""
 
     def save(self, *args, **kwargs):
         if self.thread_diameter_mm is not None and self.thread_diameter_mm <= 0:

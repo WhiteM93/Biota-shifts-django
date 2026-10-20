@@ -676,6 +676,7 @@
     <thead>
       <tr>
         <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
+        <th class="sortable hint-cell" data-hint="Группа метизов">Группа</th>
         <th class="sortable hint-cell" data-hint="Тип метиза">Тип</th>
         <th class="sortable hint-cell" data-hint="Размер, например M6x16">Размер</th>
         <th class="sortable hint-cell" data-hint="Диаметр резьбы, мм">Резьба</th>
@@ -693,7 +694,8 @@
       {% with f=t.fastener_spec %}
       <tr>
         <td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
-        <td data-sort="{% if f %}{{ f.get_fastener_kind_display }}{% else %}-{% endif %}">{% if f %}{{ f.get_fastener_kind_display }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if f %}{{ f.group_label }}{% else %}-{% endif %}">{% if f %}{{ f.group_label }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if f %}{{ f.type_label }}{% else %}-{% endif %}">{% if f %}{{ f.type_label }}{% else %}-{% endif %}</td>
         <td data-sort="{% if f %}{{ f.size_label|size_sort }}{% else %}-{% endif %}">{% if f %}{{ f.size_label }}{% else %}-{% endif %}</td>
         <td data-sort="{% if f and f.thread_diameter_mm is not None %}{{ f.thread_diameter_mm }}{% else %}-1{% endif %}">{% if f %}{{ f.thread_label }}{% else %}-{% endif %}</td>
         <td data-sort="{% if f and f.length_mm is not None %}{{ f.length_mm }}{% else %}-1{% endif %}">{% if f %}{{ f.length_mm }}{% else %}-{% endif %}</td>
@@ -1013,6 +1015,26 @@
       </select>
     </label>
     {% elif filters.category == "fastener" %}
+    <label class="field"><span>Группа</span>
+      <select name="fast_group">
+        <option value="">Все</option>
+        {% for g in fastener_types_tree %}
+        <option value="{{ g.id }}" {% if filters.fast_group == g.id|stringformat:"s" %}selected{% endif %}>{{ g.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Тип</span>
+      <select name="fast_type">
+        <option value="">Все</option>
+        {% for g in fastener_types_tree %}
+        <optgroup label="{{ g.label }}">
+          {% for t in g.types %}
+          <option value="{{ t.id }}" {% if filters.fast_type == t.id|stringformat:"s" %}selected{% endif %}>{{ t.label }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endfor %}
+      </select>
+    </label>
     <label class="field"><span>Размер (M6x16)</span>
       <input type="text" name="fast_size" value="{{ filters.fast_size }}" maxlength="24" placeholder="M6x16 или M6">
     </label>
@@ -1926,6 +1948,8 @@
                 data-f-insert_compat="{{ m.insert_compat|escape }}"
                 data-f-mount_diameter="{{ m.mount_diameter|escape }}"
                 data-f-fast_size="{{ m.fast_size|escape }}"
+                data-f-fast_group="{{ m.fast_group|escape }}"
+                data-f-fast_type="{{ m.fast_type|escape }}"
                 data-f-fast_thread="{{ m.fast_thread|escape }}"
                 data-f-fast_length="{{ m.fast_length|escape }}"
                 data-f-fast_strength="{{ m.fast_strength|escape }}"
@@ -2060,7 +2084,7 @@
               · Lc {{ iss.tool.reamer_spec.cutting_length_mm|default:"-"|dotformat:"-2" }}
               · Z {{ iss.tool.reamer_spec.flutes_count|default:"-" }}
             {% elif iss.tool.category == "fastener" and iss.tool.fastener_spec %}
-              · {{ iss.tool.fastener_spec.get_fastener_kind_display }}
+              · {{ iss.tool.fastener_spec.group_label }} · {{ iss.tool.fastener_spec.type_label }}
               · {{ iss.tool.fastener_spec.size_label }}
               {% if iss.tool.fastener_spec.strength_class %}· класс {{ iss.tool.fastener_spec.strength_class }}{% endif %}
               {% if iss.tool.fastener_spec.material %}· {{ iss.tool.fastener_spec.material }}{% endif %}
@@ -2587,6 +2611,7 @@
   "tool_extension_compat_placeholders": { {% for k, v in tool_extension_compat_placeholders.items %}"{{ k|escapejs }}":"{{ v|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %} },
   "tool_extension_compat_labels": { {% for k, v in tool_extension_compat_labels.items %}"{{ k|escapejs }}":"{{ v|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %} },
   "measuring_kinds_by_category": {{ measuring_kinds_by_category_json|default:"{}"|safe }},
+  "fastener_types_tree": {{ fastener_types_tree_json|default:"[]"|safe }},
   "measuring_category_keys": [{% for k in measuring_category_keys %}"{{ k|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
   "measuring_brands": [{% for b in measuring_brands %}"{{ b|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
   "gauge_thread_sizes": [{% for s in gauge_thread_sizes %}"{{ s|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
