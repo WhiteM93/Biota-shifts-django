@@ -193,6 +193,18 @@ from .insert_constants import (
 )
 
 
+# Метизы: каждая подкатегория — отдельная категория склада (ToolItem.category).
+FASTENER_CATEGORY_CHOICES = [
+    ("fast_screw", "Винты"),
+    ("fast_bolt", "Болты"),
+    ("fast_nut", "Гайки"),
+    ("fast_washer", "Шайбы"),
+]
+FASTENER_CATEGORIES = tuple(k for k, _ in FASTENER_CATEGORY_CHOICES)
+FASTENER_CATEGORY_SET = frozenset(FASTENER_CATEGORIES)
+# Гайки и шайбы: только номинальный диаметр (резьба), без длины.
+FASTENER_NO_LENGTH_CATEGORIES = frozenset({"fast_nut", "fast_washer"})
+
 # Ключи категорий склада (не менять без data-migration ToolItem).
 TOOL_ITEM_CATEGORY_CHOICES = [
     ("end_mill", "Фрезы"),
@@ -205,6 +217,7 @@ TOOL_ITEM_CATEGORY_CHOICES = [
     ("collet", "Цанги"),
     ("body_tool", "Корпусной инструмент"),
     ("tool_extension", "Удлинители"),
+    *FASTENER_CATEGORY_CHOICES,
     ("gauge_smooth", "Гладкие калибры"),
     ("gauge_thread", "Резьбовые калибры"),
     ("measure_univ", "Универсальный измерительный"),
@@ -226,6 +239,11 @@ STOCK_CATEGORY_GROUPS = [
         ("collet", "body_tool", "tool_extension"),
     ),
     (
+        "fasteners",
+        "Метизы",
+        FASTENER_CATEGORIES,
+    ),
+    (
         "measuring",
         "Измерительный инструмент",
         (
@@ -238,6 +256,7 @@ STOCK_CATEGORY_GROUPS = [
         ),
     ),
 ]
+
 
 # Типовые квалитеты / посадки для развёрток (поле допускает и свой текст).
 REAMER_ACCURACY_CLASSES = [
@@ -315,6 +334,10 @@ class ToolItem(models.Model):
         ordering = ("category", "name")
         verbose_name = "Инструмент"
         verbose_name_plural = "Инструмент"
+
+    @property
+    def is_fastener(self) -> bool:
+        return self.category in FASTENER_CATEGORY_SET
 
     def __str__(self):
         return f"{self.get_category_display()} / {self.name}"
@@ -547,6 +570,21 @@ class ToolItem(models.Model):
                 (ex.compatible_parts if ex and ex.compatible_parts else "—"),
                 f"ост {self.quantity}",
             ]
+        elif cat in FASTENER_CATEGORY_SET:
+            fs = getattr(self, "fastener_spec", None)
+            segs = [
+                self.get_category_display(),
+                fs.type_label if fs else "—",
+                (fs.size_label if fs else "—"),
+            ]
+            if fs and (fs.strength_class or "").strip():
+                segs.append(f"класс {fs.strength_class.strip()}")
+            if fs and (fs.material or "").strip():
+                segs.append(fs.material.strip())
+            if fs and (fs.coating or "").strip():
+                segs.append(fs.coating.strip())
+            segs.append(((self.notes or "").strip() or ""))
+            segs.append(f"ост {self.quantity}")
         elif cat in (
             "gauge_smooth",
             "gauge_thread",
@@ -809,6 +847,21 @@ class ToolItem(models.Model):
                     specs_parts.append(f"Dвн={ex.inner_diameter.strip()}")
                 if (ex.compatible_parts or "").strip():
                     specs_parts.append(ex.compatible_parts.strip())
+        elif cat in FASTENER_CATEGORY_SET:
+            fs = getattr(self, "fastener_spec", None)
+            tool_type = self.get_category_display()
+            if fs:
+                tool_type = f"{self.get_category_display()} · {fs.type_label}"
+                specs_parts.append(fs.size_label)
+                if (fs.strength_class or "").strip():
+                    specs_parts.append(f"класс {fs.strength_class.strip()}")
+                if (fs.material or "").strip():
+                    specs_parts.append(fs.material.strip())
+                if (fs.coating or "").strip():
+                    specs_parts.append(fs.coating.strip())
+            notes = (self.notes or "").strip()
+            if notes:
+                specs_parts.append(notes)
         elif cat in (
             "gauge_smooth",
             "gauge_thread",
@@ -857,6 +910,10 @@ class ToolItem(models.Model):
 
         material = self.get_tool_material_display() or "—"
         coating = coating_display()
+        if cat in FASTENER_CATEGORY_SET:
+            fs = getattr(self, "fastener_spec", None)
+            material = ((fs.material or "").strip() if fs else "") or "—"
+            coating = ((fs.coating or "").strip() if fs else "") or "—"
         qty = str(int(self.quantity))
 
         return {
@@ -920,6 +977,14 @@ class ToolItem(models.Model):
             "insert_compat": "",
             "mount_diameter": "",
             "ap_max": "",
+            "fast_size": "",
+            "fast_thread": "",
+            "fast_length": "",
+            "fast_strength": "",
+            "fast_group": "",
+            "fast_type": "",
+            "fast_material": "",
+            "fast_coating": "",
             "notes": "",
         }
         cat = self.category
@@ -1019,6 +1084,19 @@ class ToolItem(models.Model):
             out["diameter"] = fmt_num(self.main_diameter_mm)
             if ex:
                 out["length"] = fmt_num(ex.overall_length_mm)
+        elif cat in FASTENER_CATEGORY_SET:
+            fs = getattr(self, "fastener_spec", None)
+            if fs:
+                out["fast_size"] = fs.size_label
+                out["fast_group"] = fs.group_label
+                out["fast_type"] = fs.type_label
+                out["fast_thread"] = fmt_num(fs.thread_diameter_mm)
+                out["fast_length"] = str(int(fs.length_mm)) if fs.length_mm is not None else ""
+                out["fast_strength"] = (fs.strength_class or "").strip()
+                out["fast_material"] = (fs.material or "").strip()
+                out["fast_coating"] = (fs.coating or "").strip()
+                out["size_label"] = fs.size_label
+            out["notes"] = (self.notes or "").strip()
         if not out.get("notes"):
             out["notes"] = (self.notes or "").strip()
         return out
@@ -1806,6 +1884,111 @@ class BodyToolSpec(models.Model):
         self.brand = (self.brand or "").strip()[:80]
         self.size_label = (self.size_label or "").strip()[:64]
         self.insert_compat = (self.insert_compat or "").strip()[:80]
+        super().save(*args, **kwargs)
+
+
+class FastenerType(models.Model):
+    """Тип метиза внутри подкатегории (Винты/Болты/Гайки/Шайбы). Добавляется в админке."""
+
+    category = models.CharField(
+        max_length=20,
+        choices=FASTENER_CATEGORY_CHOICES,
+        verbose_name="Подкатегория",
+    )
+    code = models.SlugField(max_length=64, unique=True, verbose_name="Код")
+    name = models.CharField(max_length=200, verbose_name="Название")
+    short_name = models.CharField(
+        max_length=80,
+        blank=True,
+        default="",
+        verbose_name="Краткое имя",
+        help_text="Для названия позиции, например «Винт ISO 4762». Пусто = полное название.",
+    )
+    sort_order = models.PositiveIntegerField(default=100, verbose_name="Порядок")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+
+    class Meta:
+        ordering = ("category", "sort_order", "name", "id")
+        verbose_name = "Тип метиза"
+        verbose_name_plural = "Типы метизов"
+
+    def __str__(self) -> str:
+        return f"{self.get_category_display()} / {self.name}"
+
+    @property
+    def item_label(self) -> str:
+        return (self.short_name or "").strip() or self.name
+
+
+class FastenerSpec(models.Model):
+    """Спецификация метиза: тип + номинальный диаметр, длина (для винтов/болтов) и свойства."""
+
+    tool = models.OneToOneField(ToolItem, on_delete=models.CASCADE, related_name="fastener_spec")
+    fastener_type = models.ForeignKey(
+        FastenerType,
+        on_delete=models.PROTECT,
+        related_name="specs",
+        verbose_name="Тип метиза",
+    )
+    thread_diameter_mm = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        verbose_name="Диаметр резьбы, мм",
+    )
+    length_mm = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name="Длина, мм", help_text="Пусто для гаек и шайб"
+    )
+    strength_class = models.CharField(max_length=40, blank=True, default="", verbose_name="Класс прочности")
+    material = models.CharField(max_length=80, blank=True, default="", verbose_name="Материал")
+    coating = models.CharField(max_length=80, blank=True, default="", verbose_name="Покрытие")
+
+    class Meta:
+        verbose_name = "Параметры метиза"
+        verbose_name_plural = "Параметры метизов"
+        constraints = [
+            models.UniqueConstraint(
+                fields=(
+                    "fastener_type",
+                    "thread_diameter_mm",
+                    "length_mm",
+                    "strength_class",
+                    "material",
+                    "coating",
+                ),
+                name="uniq_fastener_spec_signature",
+            ),
+        ]
+
+    @property
+    def thread_label(self) -> str:
+        raw = format(self.thread_diameter_mm, "f").rstrip("0").rstrip(".")
+        return f"M{raw or '0'}"
+
+    @property
+    def size_label(self) -> str:
+        if not self.length_mm:
+            return self.thread_label
+        return f"{self.thread_label}x{self.length_mm}"
+
+    def __str__(self) -> str:
+        return f"{self.type_label} {self.size_label}"
+
+    @property
+    def group_label(self) -> str:
+        return self.fastener_type.get_category_display() if self.fastener_type_id else ""
+
+    @property
+    def type_label(self) -> str:
+        return self.fastener_type.name if self.fastener_type_id else ""
+
+    def save(self, *args, **kwargs):
+        if self.thread_diameter_mm is not None and self.thread_diameter_mm <= 0:
+            self.thread_diameter_mm = Decimal("0.01")
+        if self.length_mm is not None:
+            self.length_mm = int(self.length_mm) if int(self.length_mm) > 0 else None
+        self.strength_class = (self.strength_class or "").strip()[:40]
+        self.material = (self.material or "").strip()[:80]
+        self.coating = (self.coating or "").strip()[:80]
         super().save(*args, **kwargs)
 
 

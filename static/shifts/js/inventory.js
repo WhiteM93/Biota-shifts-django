@@ -1,4 +1,9 @@
 /* inventory.js — extracted from inventory.html, uses data island #inv-options */
+/* Метизы: каждая подкатегория — отдельная категория склада. */
+var BIOTA_FASTENER_CATS = ["fast_screw", "fast_bolt", "fast_nut", "fast_washer"];
+var BIOTA_FASTENER_NO_LENGTH = ["fast_nut", "fast_washer"];
+function biotaIsFastenerCat(c) { return BIOTA_FASTENER_CATS.indexOf(c) >= 0; }
+function biotaFastenerHasLength(c) { return BIOTA_FASTENER_NO_LENGTH.indexOf(c) < 0; }
 var INV = (function () {
   try {
     var el = document.getElementById("inv-options");
@@ -742,13 +747,13 @@ var INV = (function () {
 
   function syncIssueCatPanel(root, toolSelect, category, clearValues) {
     root.querySelectorAll(".js-issue-cat-panel").forEach(function (p) {
-      var show = category && p.getAttribute("data-cat") === category;
+      var show = category && (" " + (p.getAttribute("data-cat") || "") + " ").indexOf(" " + category + " ") >= 0;
       p.hidden = !show;
     });
     var common = root.querySelectorAll(".js-issue-common-filters");
     common.forEach(function (el) {
-      // материал/покрытие скрываем для цанг, как на складе
-      el.hidden = category === "collet";
+      // материал/покрытие скрываем для цанг и метизов, как на складе
+      el.hidden = category === "collet" || biotaIsFastenerCat(category);
     });
     var search = root.querySelector(".js-tool-search");
     if (search) {
@@ -757,7 +762,7 @@ var INV = (function () {
         : "Например: 1, 1.0, M6, D1";
     }
     if (!category) return;
-    var panel = root.querySelector('.js-issue-cat-panel[data-cat="' + category + '"]');
+    var panel = root.querySelector('.js-issue-cat-panel[data-cat~="' + category + '"]');
     if (!panel) return;
     if (clearValues) {
       panel.querySelectorAll("select.js-issue-f").forEach(function (sel) { sel.value = ""; });
@@ -780,7 +785,7 @@ var INV = (function () {
 
     // материалы по типу
     var picker = root.querySelector(".js-tool-filter-material-picker");
-    if (picker && category !== "collet" && category !== "tool_extension") {
+    if (picker && category !== "collet" && category !== "tool_extension" && !biotaIsFastenerCat(category)) {
       var present = {};
       Array.prototype.forEach.call(toolSelect.options, function (opt, idx) {
         if (idx === 0) return;
@@ -824,15 +829,15 @@ var INV = (function () {
     }
 
     var panel = category
-      ? root.querySelector('.js-issue-cat-panel[data-cat="' + category + '"]')
+      ? root.querySelector('.js-issue-cat-panel[data-cat~="' + category + '"]')
       : null;
     var filters = readPanelFilters(panel);
     var searchInput = root.querySelector(".js-tool-search");
     var queryRaw = searchInput ? searchInput.value : "";
-    var wantMat = category === "collet"
+    var wantMat = category === "collet" || biotaIsFastenerCat(category)
       ? ""
       : readRadioFilterIn(root, ".js-tool-filter-material");
-    var wantCoat = category === "collet"
+    var wantCoat = category === "collet" || biotaIsFastenerCat(category)
       ? ""
       : readRadioFilterIn(root, ".js-tool-filter-coating");
 
@@ -2181,6 +2186,33 @@ var INV = (function () {
           }
         }
       }
+      if (biotaIsFastenerCat(cat)) {
+        var fastTypeEl = tr.querySelector('[data-k="fastener_type"]');
+        if (!fastTypeEl || !(fastTypeEl.value || "").trim()) {
+          if (fastTypeEl) fastTypeEl.classList.add("is-invalid");
+          issues.push({
+            msg: "Строка " + (i + 1) + ": выберите тип метиза.",
+            el: fastTypeEl,
+          });
+        }
+        var fastThreadEl = tr.querySelector('[data-k="fast_thread_mm"]');
+        if (!fastThreadEl || !(fastThreadEl.value || "").trim()) {
+          if (fastThreadEl) fastThreadEl.classList.add("is-invalid");
+          issues.push({
+            msg: "Строка " + (i + 1) + ": укажите размер резьбы (например M6).",
+            el: fastThreadEl,
+          });
+        }
+        var fastLenEl = tr.querySelector('[data-k="fast_length_mm"]');
+        var fastLenVal = parseInt((fastLenEl && fastLenEl.value) || "0", 10);
+        if (biotaFastenerHasLength(cat) && (!fastLenEl || !fastLenVal || fastLenVal < 1)) {
+          if (fastLenEl) fastLenEl.classList.add("is-invalid");
+          issues.push({
+            msg: "Строка " + (i + 1) + ": укажите длину метиза, мм.",
+            el: fastLenEl,
+          });
+        }
+      }
       if (cat === "drill") {
         var shankEl = tr.querySelector('[data-k="dr_shank_type"]');
         var shankVal = ((shankEl && shankEl.value) || "").trim();
@@ -2541,6 +2573,10 @@ var INV = (function () {
     collet: "Цанги",
     body_tool: "Корпусной инструмент",
     tool_extension: "Удлинители",
+    fast_screw: "Винты",
+    fast_bolt: "Болты",
+    fast_nut: "Гайки",
+    fast_washer: "Шайбы",
     gauge_smooth: "Гладкие калибры",
     gauge_thread: "Резьбовые калибры",
     measure_univ: "Универсальный измерительный",
@@ -3139,6 +3175,17 @@ var INV = (function () {
       { key: "quantity", label: "Кол-во", cls: "qty-col" },
       { key: "row_remove", label: "" },
     ]),
+    fast_screw: arrivalHead([
+      { key: "fast_type", label: "Тип метиза" },
+      { key: "fast_thread", label: "Резьба" },
+      { key: "L", label: "L", cls: "short-col" },
+      { key: "fast_strength", label: "Класс" },
+      { key: "fast_material", label: "Материал" },
+      { key: "fast_coating", label: "Покрытие" },
+      { key: "notes", label: "Описание" },
+      { key: "quantity", label: "Кол-во", cls: "qty-col" },
+      { key: "row_remove", label: "" },
+    ]),
     tap: arrivalHead([
       { key: "tap_size", label: "Размер", cls: "tap-size-col" },
       { key: "tap_thread_kind", label: "Тип резьбы" },
@@ -3261,6 +3308,17 @@ var INV = (function () {
       insertArrivalTh("row_remove", "", "arrival-row-remove-cell") +
       "</tr>",
   };
+  arrivalGroupHeadHtml.fast_bolt = arrivalGroupHeadHtml.fast_screw;
+  arrivalGroupHeadHtml.fast_nut = arrivalGroupHeadHtml.fast_washer = arrivalHead([
+    { key: "fast_type", label: "Тип метиза" },
+    { key: "fast_thread", label: "Резьба (номинал)" },
+    { key: "fast_strength", label: "Класс" },
+    { key: "fast_material", label: "Материал" },
+    { key: "fast_coating", label: "Покрытие" },
+    { key: "notes", label: "Описание" },
+    { key: "quantity", label: "Кол-во", cls: "qty-col" },
+    { key: "row_remove", label: "" },
+  ]);
 
   function ensureGroup(groupKey) {
     var groupId = "arrival-group-" + groupKey;
@@ -3387,6 +3445,33 @@ var INV = (function () {
           '" title="Подходящие цанги или винты"></td>'
       );
       cells.push('<td><input type="text" data-k="notes" maxlength="300" placeholder="Описание" title="Описание"></td>');
+      cells.push(arrivalAddressCellHtml(""));
+      cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
+    } else if (biotaIsFastenerCat(cat)) {
+      var fastTypeOpts = '<option value="">— выберите —</option>';
+      var fastTypes = (INV.fastener_types_by_cat && INV.fastener_types_by_cat[cat]) || [];
+      fastTypes.forEach(function (t) {
+        fastTypeOpts += '<option value="' + String(t.id) + '"' + (fastTypes.length === 1 ? " selected" : "") + ">" + escapeHtml(t.label) + "</option>";
+      });
+      cells.push('<td><select data-k="fastener_type" required>' + fastTypeOpts + "</select></td>");
+      cells.push(
+        '<td><input type="text" data-k="fast_thread_mm" maxlength="16" placeholder="M6" required autocomplete="off" spellcheck="false" class="js-metric-size-input"></td>'
+      );
+      if (biotaFastenerHasLength(cat)) {
+        cells.push(
+          '<td class="short-col"><input type="number" data-k="fast_length_mm" min="1" placeholder="16" required></td>'
+        );
+      }
+      cells.push(
+        '<td><input type="text" data-k="fast_strength_class" maxlength="40" placeholder="8.8" autocomplete="off" spellcheck="false"></td>'
+      );
+      cells.push(
+        '<td><input type="text" data-k="fast_material" maxlength="80" placeholder="Сталь" autocomplete="off" spellcheck="false"></td>'
+      );
+      cells.push(
+        '<td><input type="text" data-k="fast_coating" maxlength="80" placeholder="Цинк" autocomplete="off" spellcheck="false"></td>'
+      );
+      cells.push('<td><input type="text" data-k="notes" maxlength="300" placeholder="Описание"></td>');
       cells.push(arrivalAddressCellHtml(""));
       cells.push('<td class="qty-col"><input type="number" min="1" value="1" data-k="quantity"></td>');
     } else if (cat === "tap") {

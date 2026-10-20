@@ -10,6 +10,8 @@ from shifts.inventory_views import _arrival_bulk_row_validation_errors, _insert_
 from shifts.models import (
     DrillSpec,
     EndMillSpec,
+    FastenerSpec,
+    FastenerType,
     InsertSpec,
     StockMovement,
     ToolItem,
@@ -147,7 +149,7 @@ class InventoryViewTests(TestCase):
                 self.assertIn("Ø6", content)
             if cat == "insert":
                 self.assertIn("CNMG120408", content)
-                self.assertIn("Sandvik", content)
+                self.assertIn("sandvik", content.casefold())
 
     def test_stock_row_shows_who_added(self):
         tool = ToolItem.objects.create(
@@ -205,6 +207,110 @@ class InventoryViewTests(TestCase):
         self.assertNotIn("inv-history-card--writeoff", issue_html)
         self.assertIn("inv-hist-list", all_html)
         self.assertIn("Сегодня", all_html)
+
+    def test_fastener_stock_filter_by_size(self):
+        fast_m6 = ToolItem.objects.create(
+            category="fast_screw",
+            name="Винт ISO 10642 M6x16",
+            quantity=120,
+            notes="Для наладки",
+        )
+        FastenerSpec.objects.create(
+            tool=fast_m6,
+            fastener_type=FastenerType.objects.get(code="iso10642"),
+            thread_diameter_mm=Decimal("6"),
+            length_mm=16,
+            strength_class="8.8",
+            material="Сталь",
+            coating="Цинк",
+        )
+        fast_m8 = ToolItem.objects.create(
+            category="fast_screw",
+            name="Винт ISO 4762 M8x20",
+            quantity=70,
+        )
+        FastenerSpec.objects.create(
+            tool=fast_m8,
+            fastener_type=FastenerType.objects.get(code="iso4762"),
+            thread_diameter_mm=Decimal("8"),
+            length_mm=20,
+            strength_class="10.9",
+            material="Сталь",
+            coating="Оксид",
+        )
+
+        by_exact = self.client.get(
+            reverse("inventory") + "?panel=stock&category=fast_screw&fast_size=M6x16"
+        )
+        self.assertEqual(by_exact.status_code, 200)
+        exact_html = by_exact.content.decode("utf-8", errors="replace")
+        self.assertIn("M6x16", exact_html)
+        self.assertNotIn("M8x20", exact_html)
+
+        by_thread = self.client.get(
+            reverse("inventory") + "?panel=stock&category=fast_screw&fast_size=M6"
+        )
+        self.assertEqual(by_thread.status_code, 200)
+        thread_html = by_thread.content.decode("utf-8", errors="replace")
+        self.assertIn("M6x16", thread_html)
+        self.assertNotIn("M8x20", thread_html)
+
+        screw = FastenerType.objects.get(code="iso10642")
+        by_type = self.client.get(
+            reverse("inventory") + f"?panel=stock&category=fast_screw&fast_type={screw.id}&fast_size=M6x16"
+        )
+        type_html = by_type.content.decode("utf-8", errors="replace")
+        self.assertIn(f'data-tool-id="{fast_m6.id}"', type_html)
+        self.assertNotIn(f'data-tool-id="{fast_m8.id}"', type_html)
+        self.assertIn("Винт с потайной головкой", type_html)
+
+    def test_fastener_subcategories_are_separate_categories(self):
+        def mk(cat, code, thread, length):
+            tool = ToolItem.objects.create(category=cat, name=f"{code} M{thread}", quantity=10)
+            FastenerSpec.objects.create(
+                tool=tool,
+                fastener_type=FastenerType.objects.get(code=code),
+                thread_diameter_mm=Decimal(thread),
+                length_mm=length,
+            )
+            return tool
+
+        screw = mk("fast_screw", "iso4762", "6", 16)
+        nut = mk("fast_nut", "iso4032", "6", None)
+        washer = mk("fast_washer", "iso7089", "6", None)
+        nuts_html = self.client.get(
+            reverse("inventory") + "?panel=stock&category=fast_nut&fast_size=M6"
+        ).content.decode("utf-8", errors="replace")
+        self.assertIn(f'data-tool-id="{nut.id}"', nuts_html)
+        self.assertNotIn(f'data-tool-id="{screw.id}"', nuts_html)
+        self.assertNotIn(f'data-tool-id="{washer.id}"', nuts_html)
+        self.assertNotIn('name="fast_length_mm"', nuts_html)
+        self.assertIn("Гайка шестигранная (ISO 4032)", nuts_html)
+        self.assertNotIn("Шайба плоская", nuts_html.split('name="fast_type"', 1)[1].split("</select>", 1)[0])
+
+    def test_issue_panel_contains_fastener_filter_metrics(self):
+        fast = ToolItem.objects.create(
+            category="fast_screw",
+            name="Винт ISO 4762 M10x30",
+            quantity=24,
+            notes="Пробная партия",
+        )
+        FastenerSpec.objects.create(
+            tool=fast,
+            fastener_type=FastenerType.objects.get(code="iso4762"),
+            thread_diameter_mm=Decimal("10"),
+            length_mm=30,
+            strength_class="10.9",
+            material="Нерж.",
+            coating="Без покрытия",
+        )
+        resp = self.client.get(reverse("inventory") + "?panel=issue")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode("utf-8", errors="replace")
+        self.assertIn('data-cat="fast_screw fast_bolt fast_nut fast_washer"', html)
+        self.assertIn('data-f-fast_size="M10x30"', html)
+        self.assertIn('data-f-fast_thread="10"', html)
+        self.assertIn('data-f-fast_group="Винты"', html)
 
 
 class HistoryDayGroupTests(TestCase):
@@ -286,3 +392,33 @@ class HistoryDayGroupTests(TestCase):
         self.assertEqual(row["kind_label_full"], "Редактирование позиции")
         self.assertEqual(row["line_note"], "Адрес: A-01-01")
         self.assertFalse(row["has_more"])
+
+
+class FastenerTopCategoryTests(TestCase):
+    def test_fasteners_is_own_top_level_group(self):
+        from shifts.models import stock_category_grouped_choices
+
+        groups = {code: (title, items) for code, title, items in stock_category_grouped_choices()}
+        self.assertFalse([k for k, _ in groups["tooling"][1] if k.startswith("fast")])
+        title, items = groups["fasteners"]
+        self.assertEqual(title, "Метизы")
+        self.assertEqual(
+            items,
+            [("fast_screw", "Винты"), ("fast_bolt", "Болты"), ("fast_nut", "Гайки"), ("fast_washer", "Шайбы")],
+        )
+
+    def test_inventory_dropdown_has_metizy_optgroup(self):
+        from shifts.models import stock_category_grouped_choices
+        from django.template.loader import render_to_string
+
+        html = render_to_string(
+            "shifts/includes/stock_category_optgroups.html",
+            {"stock_category_groups": stock_category_grouped_choices(), "selected_category": ""},
+        )
+        self.assertIn('<optgroup label="Метизы">', html)
+        tooling = html.split('<optgroup label="Оснастка">', 1)[1].split("</optgroup>", 1)[0]
+        self.assertNotIn('value="fast_', tooling)
+        metizy = html.split('<optgroup label="Метизы">', 1)[1].split("</optgroup>", 1)[0]
+        for key, label in (("fast_screw", "Винты"), ("fast_bolt", "Болты"), ("fast_nut", "Гайки"), ("fast_washer", "Шайбы")):
+            self.assertIn(f'value="{key}"', metizy)
+            self.assertIn(label, metizy)

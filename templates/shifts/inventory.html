@@ -671,6 +671,48 @@
     </tbody>
   </table>
 
+  {% elif is_fastener_category %}
+  <table class="data-grid inv-stock-grid js-sortable-table">
+    <thead>
+      <tr>
+        <th class="sortable address-col" title="Буква мебели-полка-место, например A-01-02">Адрес</th>
+        <th class="sortable hint-cell" data-hint="Тип метиза">Тип</th>
+        <th class="sortable hint-cell" data-hint="Размер, например M6x16">Размер</th>
+        <th class="sortable hint-cell" data-hint="Диаметр резьбы, мм">Резьба</th>
+        <th class="sortable hint-cell" data-hint="Длина винта, мм">Длина, мм</th>
+        <th class="sortable hint-cell" data-hint="Класс прочности">Класс</th>
+        <th class="sortable hint-cell" data-hint="Материал">Материал</th>
+        <th class="sortable hint-cell" data-hint="Покрытие">Покрытие</th>
+        <th class="sortable hint-cell inv-stock-notes-text-col" data-hint="Описание позиции">Описание</th>
+        <th class="sortable hint-cell" data-hint="Количество на складе, шт.">Остаток</th>
+        {% if can_manage_stock %}{% include "shifts/includes/inv_stock_actions_th.html" %}{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tool_items %}
+      {% with f=t.fastener_spec %}
+      <tr>
+        <td class="address-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.warehouse_address|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="warehouse_address" data-type="address" data-value="{{ t.warehouse_address|default:'' }}"{% endif %}>{{ t.warehouse_address|default:"-" }}</td>
+        <td data-sort="{% if f %}{{ f.type_label }}{% else %}-{% endif %}">{% if f %}{{ f.type_label }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if f %}{{ f.size_label|size_sort }}{% else %}-{% endif %}">{% if f %}{{ f.size_label }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if f and f.thread_diameter_mm is not None %}{{ f.thread_diameter_mm }}{% else %}-1{% endif %}">{% if f %}{{ f.thread_label }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if f and f.length_mm is not None %}{{ f.length_mm }}{% else %}-1{% endif %}">{% if f and f.length_mm %}{{ f.length_mm }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if f %}{{ f.strength_class|default:'-' }}{% else %}-{% endif %}">{% if f and f.strength_class %}{{ f.strength_class }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if f %}{{ f.material|default:'-' }}{% else %}-{% endif %}">{% if f and f.material %}{{ f.material }}{% else %}-{% endif %}</td>
+        <td data-sort="{% if f %}{{ f.coating|default:'-' }}{% else %}-{% endif %}">{% if f and f.coating %}{{ f.coating }}{% else %}-{% endif %}</td>
+        <td class="inv-stock-notes-text-col{% if can_manage_stock %} stock-inline-edit{% endif %}" data-sort="{{ t.notes|default:'' }}" {% if can_manage_stock %}data-tool-id="{{ t.id }}" data-field="notes" data-type="text" data-value="{{ t.notes|default:'' }}"{% endif %}>{{ t.notes|default:"-" }}</td>
+        <td data-sort="{{ t.quantity }}" {% if can_manage_stock %}class="stock-inline-edit" data-tool-id="{{ t.id }}" data-field="quantity" data-type="int" data-value="{{ t.quantity }}"{% endif %}><strong>{{ t.quantity }}</strong></td>
+        {% if can_manage_stock %}
+        {% include "shifts/includes/inv_stock_row_actions.html" with t=t %}
+{% endif %}
+      </tr>
+      {% endwith %}
+      {% empty %}
+      <tr><td colspan="{% if can_manage_stock %}11{% else %}10{% endif %}" class="muted">Нет инструмента по текущему фильтру.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
   {% elif is_measuring_category %}
   <table class="data-grid inv-stock-grid js-sortable-table">
     <thead>
@@ -970,6 +1012,36 @@
         {% endfor %}
       </select>
     </label>
+    {% elif is_fastener_category %}
+    <label class="field"><span>Тип</span>
+      <select name="fast_type">
+        <option value="">Все</option>
+        {% for t in fastener_types_for_category %}
+        <option value="{{ t.id }}" {% if filters.fast_type == t.id|stringformat:"s" %}selected{% endif %}>{{ t.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Размер{% if fastener_category_has_length %} (M6x16){% else %} (M6){% endif %}</span>
+      <input type="text" name="fast_size" value="{{ filters.fast_size }}" maxlength="24" placeholder="{% if fastener_category_has_length %}M6x16 или M6{% else %}M6{% endif %}">
+    </label>
+    <label class="field"><span>Резьба, мм</span>
+      <select name="fast_thread_mm">
+        <option value="">Все</option>
+        {% for v in fastener_filter_options.threads %}
+        <option value="{{ v }}" {% if filters.fast_thread_mm == v %}selected{% endif %}>M{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if fastener_category_has_length %}
+    <label class="field"><span>Длина, мм</span>
+      <select name="fast_length_mm">
+        <option value="">Все</option>
+        {% for v in fastener_filter_options.lengths %}
+        <option value="{{ v }}" {% if filters.fast_length_mm == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
     {% elif is_measuring_category %}
     {% if measuring_kind_choices %}
     <label class="field"><span>Вид</span>
@@ -1340,6 +1412,31 @@
         {% endfor %}
       </select>
     </label>
+    {% elif is_fastener_category %}
+    <label class="field"><span>Класс</span>
+      <select name="fast_strength_class">
+        <option value="">Все</option>
+        {% for v in fastener_filter_options.strength_classes %}
+        <option value="{{ v }}" {% if filters.fast_strength_class == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Материал</span>
+      <select name="fast_material">
+        <option value="">Все</option>
+        {% for v in fastener_filter_options.materials %}
+        <option value="{{ v }}" {% if filters.fast_material == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>Покрытие</span>
+      <select name="fast_coating">
+        <option value="">Все</option>
+        {% for v in fastener_filter_options.coatings %}
+        <option value="{{ v }}" {% if filters.fast_coating == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
     {% elif filters.category == "gauge_thread" %}
     <label class="field"><span>П/НП</span>
       <select name="ms_go_nogo">
@@ -1386,7 +1483,7 @@
       </select>
     </label>
     {% endif %}
-    {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "insert" and filters.category != "tool_extension" and not is_measuring_category %}
+    {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "insert" and filters.category != "tool_extension" and not is_fastener_category and not is_measuring_category %}
     <label class="field"><span>Материал инструмента</span>
       <select name="tool_material" class="js-stock-filter-tool-material">
         <option value="">Все</option>
@@ -1401,7 +1498,7 @@
       <input type="text" name="tool_material_custom" maxlength="80" class="js-stock-filter-tool-material-custom" placeholder="Свой вариант, до 80 символов" value="{{ filters.tool_material_custom }}" autocomplete="off" {% if filters.tool_material_select != tool_material_filter_other %}style="display:none;margin-top:6px;max-width:100%;"{% else %}style="margin-top:6px;max-width:100%;"{% endif %} />
     </label>
     {% endif %}
-    {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "tool_extension" and not is_measuring_category %}
+    {% if filters.category != "collet" and filters.category != "body_tool" and filters.category != "tool_extension" and not is_fastener_category and not is_measuring_category %}
     <div class="field">
       <span{% if filters.category == "insert" %} title="{{ insert_column_tooltips.coating }}"{% endif %}>Материал покрытия</span>
       <div class="coating-picker"{% if filters.category == "insert" %} title="{{ insert_column_tooltips.coating }}"{% endif %}>
@@ -1838,6 +1935,14 @@
                 data-f-shank_type="{{ m.shank_type|escape }}"
                 data-f-insert_compat="{{ m.insert_compat|escape }}"
                 data-f-mount_diameter="{{ m.mount_diameter|escape }}"
+                data-f-fast_size="{{ m.fast_size|escape }}"
+                data-f-fast_group="{{ m.fast_group|escape }}"
+                data-f-fast_type="{{ m.fast_type|escape }}"
+                data-f-fast_thread="{{ m.fast_thread|escape }}"
+                data-f-fast_length="{{ m.fast_length|escape }}"
+                data-f-fast_strength="{{ m.fast_strength|escape }}"
+                data-f-fast_material="{{ m.fast_material|escape }}"
+                data-f-fast_coating="{{ m.fast_coating|escape }}"
                 data-f-notes="{{ m.notes|escape }}"
                 data-issue-notes="{{ iss.tool.notes|default:''|escape }}"
                 data-issue-name="{{ iss.tool.name|default:''|escape }}"
@@ -1966,8 +2071,14 @@
               · L {{ iss.tool.reamer_spec.overall_length_mm|default:"-"|dotformat:"-2" }}
               · Lc {{ iss.tool.reamer_spec.cutting_length_mm|default:"-"|dotformat:"-2" }}
               · Z {{ iss.tool.reamer_spec.flutes_count|default:"-" }}
+            {% elif iss.tool.is_fastener and iss.tool.fastener_spec %}
+              · {{ iss.tool.fastener_spec.group_label }} · {{ iss.tool.fastener_spec.type_label }}
+              · {{ iss.tool.fastener_spec.size_label }}
+              {% if iss.tool.fastener_spec.strength_class %}· класс {{ iss.tool.fastener_spec.strength_class }}{% endif %}
+              {% if iss.tool.fastener_spec.material %}· {{ iss.tool.fastener_spec.material }}{% endif %}
+              {% if iss.tool.fastener_spec.coating %}· {{ iss.tool.fastener_spec.coating }}{% endif %}
             {% endif %}
-            · D осн {{ iss.tool.main_diameter_mm|default:"-"|dotformat:"-2" }}
+            {% if not iss.tool.is_fastener %}· D осн {{ iss.tool.main_diameter_mm|default:"-"|dotformat:"-2" }}{% endif %}
           </p>
           <div class="inv-outcome-card__chips">
             <span class="inv-outcome-chip-mat" title="Материал инструмента: {{ iss.tool.get_tool_material_display|default:'—' }}">{{ iss.tool.get_tool_material_display|default:"—" }}</span>
@@ -2488,6 +2599,7 @@
   "tool_extension_compat_placeholders": { {% for k, v in tool_extension_compat_placeholders.items %}"{{ k|escapejs }}":"{{ v|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %} },
   "tool_extension_compat_labels": { {% for k, v in tool_extension_compat_labels.items %}"{{ k|escapejs }}":"{{ v|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %} },
   "measuring_kinds_by_category": {{ measuring_kinds_by_category_json|default:"{}"|safe }},
+  "fastener_types_by_cat": {{ fastener_types_by_cat_json|default:"{}"|safe }},
   "measuring_category_keys": [{% for k in measuring_category_keys %}"{{ k|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
   "measuring_brands": [{% for b in measuring_brands %}"{{ b|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
   "gauge_thread_sizes": [{% for s in gauge_thread_sizes %}"{{ s|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],

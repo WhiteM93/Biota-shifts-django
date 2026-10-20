@@ -15,6 +15,8 @@ from shifts.inventory_views import _arrival_bulk_row_validation_errors, _issue_r
 from shifts.models import (
     DrillSpec,
     EndMillSpec,
+    FastenerSpec,
+    FastenerType,
     InsertSpec,
     StockMovement,
     ToolItem,
@@ -108,6 +110,7 @@ def _drill_row(
         "dr_overall_length_mm": "80",
         "dr_cutting_length_mm": "40",
         "dr_angle_deg": "118",
+        "dr_shank_type": "cylindrical_same",
     }
 
 
@@ -127,6 +130,44 @@ def _insert_row(*, qty: int = 3, machining: str = "1,3") -> dict:
         "ins_family": "APKT",
         "ins_kind": "milling",
         "ins_grade": "YG501",
+        "ins_name": "APKT 1135 PDER",
+    }
+
+
+_FASTENER_TYPE_CATEGORY = {
+    "iso10642": "fast_screw",
+    "iso4762": "fast_screw",
+    "iso4017": "fast_bolt",
+    "iso4032": "fast_nut",
+    "din985": "fast_nut",
+    "iso7089": "fast_washer",
+    "din127": "fast_washer",
+}
+
+
+def _fastener_row(
+    *,
+    thread: str = "M6",
+    length: int = 16,
+    qty: int = 50,
+    strength: str = "8.8",
+    material: str = "Сталь",
+    coating: str = "Цинк",
+    ftype: str = "iso4762",
+    category: str = "",
+) -> dict:
+    return {
+        "category": category or _FASTENER_TYPE_CATEGORY.get(ftype, "fast_screw"),
+        "quantity": qty,
+        "movement_date": date.today().isoformat(),
+        "supplier_name": "Тест-поставщик",
+        "fastener_type": ftype,
+        "fast_thread_mm": thread,
+        "fast_length_mm": str(length),
+        "fast_strength_class": strength,
+        "fast_material": material,
+        "fast_coating": coating,
+        "notes": "Для наладки",
     }
 
 
@@ -136,6 +177,31 @@ class ArrivalBulkValidationTests(TestCase):
         row.pop("dr_diameter_mm")
         errs = _arrival_bulk_row_validation_errors(row, 1)
         self.assertTrue(any("диаметр" in e.lower() for e in errs))
+
+    def test_fastener_requires_type(self):
+        row = _fastener_row(ftype="")
+        errs = _arrival_bulk_row_validation_errors(row, 1)
+        self.assertTrue(any("тип метиза" in e for e in errs))
+
+    def test_fastener_requires_thread_and_length(self):
+        row = _fastener_row()
+        row["fast_thread_mm"] = ""
+        row["fast_length_mm"] = ""
+        errs = _arrival_bulk_row_validation_errors(row, 1)
+        self.assertTrue(any("резьбы метиза" in e for e in errs))
+        self.assertTrue(any("длину метиза" in e for e in errs))
+
+    def test_nut_and_washer_do_not_require_length(self):
+        for ftype in ("iso4032", "iso7089"):
+            row = _fastener_row(ftype=ftype)
+            row["fast_length_mm"] = ""
+            with self.subTest(ftype=ftype):
+                self.assertEqual(_arrival_bulk_row_validation_errors(row, 1), [])
+
+    def test_type_must_belong_to_subcategory(self):
+        row = _fastener_row(ftype="iso4032", category="fast_screw")
+        errs = _arrival_bulk_row_validation_errors(row, 1)
+        self.assertTrue(any("тип метиза" in e for e in errs))
 
 
 class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
@@ -213,11 +279,15 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         resp = self._post_arrival_bulk([row])
         self.assertEqual(resp.status_code, 200)
 
-        tool = ToolItem.objects.filter(category="insert", insert_spec__chipbreaker_grade="YG501").first()
+        tool = ToolItem.objects.filter(
+            category="insert",
+            insert_spec__item_name="APKT 1135 PDER",
+            insert_spec__brand="SANDVIK",
+        ).first()
         self.assertIsNotNone(tool)
         self.assertEqual(tool.quantity, 6)
-        self.assertEqual(tool.insert_spec.brand, "Sandvik")
-        self.assertEqual(tool.insert_spec.machining_application, "2,3")
+        self.assertEqual(tool.insert_spec.brand, "SANDVIK")
+        self.assertEqual(tool.insert_spec.machining_application, "")
 
     def test_bulk_allows_insert_without_machining(self):
         row = _insert_row()
@@ -225,9 +295,13 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         row["ins_brand"] = "Kennametal"
         resp = self._post_arrival_bulk([row])
         self.assertEqual(resp.status_code, 200)
-        tool = ToolItem.objects.filter(category="insert", insert_spec__chipbreaker_grade="YG501").first()
+        tool = ToolItem.objects.filter(
+            category="insert",
+            insert_spec__item_name="APKT 1135 PDER",
+            insert_spec__brand="KENNAMETAL",
+        ).first()
         self.assertIsNotNone(tool)
-        self.assertEqual(tool.insert_spec.brand, "Kennametal")
+        self.assertEqual(tool.insert_spec.brand, "KENNAMETAL")
         self.assertEqual(tool.insert_spec.machining_application, "")
 
     def test_bulk_rejects_empty_payload(self):
@@ -257,6 +331,69 @@ class ArrivalBulkPostTests(InventoryFlowClientMixin, TestCase):
         tool = ToolItem.objects.filter(category="end_mill", end_mill_spec__diameter_mm=Decimal("12")).first()
         self.assertIsNotNone(tool)
         self.assertEqual(tool.quantity, 2)
+
+    def test_bulk_fastener_creates_spec_and_movement(self):
+        resp = self._post_arrival_bulk([_fastener_row(thread="M6", length=16, qty=120)])
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(any("Оприходовано" in m for m in self._messages(resp)))
+
+        tool = ToolItem.objects.filter(
+            category="fast_screw",
+            fastener_spec__thread_diameter_mm=Decimal("6"),
+            fastener_spec__length_mm=16,
+            fastener_spec__strength_class="8.8",
+            fastener_spec__material="Сталь",
+            fastener_spec__coating="Цинк",
+        ).first()
+        self.assertIsNotNone(tool)
+        self.assertEqual(tool.quantity, 120)
+        self.assertTrue(tool.name.startswith("Винт ISO 4762 M6x16"))
+        self.assertTrue(FastenerSpec.objects.filter(tool=tool).exists())
+
+        mv = StockMovement.objects.filter(tool=tool, movement_type="restock").first()
+        self.assertIsNotNone(mv)
+        self.assertEqual(mv.quantity, 120)
+
+    def test_bulk_fastener_other_types_are_separate_items(self):
+        self._post_arrival_bulk([_fastener_row(thread="M6", length=16, qty=10, ftype="iso4762")])
+        self._post_arrival_bulk([_fastener_row(thread="M6", length=16, qty=20, ftype="iso10642")])
+        self._post_arrival_bulk([_fastener_row(thread="M6", length=16, qty=30, ftype="iso4017")])
+        items = ToolItem.objects.filter(category__startswith="fast_").select_related("fastener_spec__fastener_type")
+        self.assertEqual(items.count(), 3)
+        by_code = {t.fastener_spec.fastener_type.code: t for t in items}
+        self.assertEqual(by_code["iso10642"].quantity, 20)
+        self.assertEqual(by_code["iso10642"].fastener_spec.group_label, "Винты")
+        self.assertEqual(by_code["iso4017"].fastener_spec.group_label, "Болты")
+        self.assertEqual(by_code["iso4017"].category, "fast_bolt")
+        self.assertEqual(by_code["iso10642"].category, "fast_screw")
+        self.assertTrue(by_code["iso10642"].name.startswith("Винт ISO 10642 M6x16"))
+
+    def test_bulk_nuts_and_washers_without_length(self):
+        self._post_arrival_bulk([_fastener_row(thread="M8", length=0, qty=200, ftype="iso4032")])
+        self._post_arrival_bulk([_fastener_row(thread="M8", length=0, qty=50, ftype="iso4032")])
+        self._post_arrival_bulk([_fastener_row(thread="M8", length=0, qty=300, ftype="iso7089")])
+        nut = ToolItem.objects.get(category="fast_nut")
+        self.assertEqual(nut.quantity, 250)
+        self.assertIsNone(nut.fastener_spec.length_mm)
+        self.assertEqual(nut.fastener_spec.size_label, "M8")
+        self.assertTrue(nut.name.startswith("Гайка ISO 4032 M8"))
+        washer = ToolItem.objects.get(category="fast_washer")
+        self.assertEqual(washer.quantity, 300)
+        self.assertEqual(washer.fastener_spec.size_label, "M8")
+
+    def test_bulk_fastener_merges_same_signature(self):
+        self._post_arrival_bulk([_fastener_row(thread="M8", length=20, qty=40)])
+        self._post_arrival_bulk([_fastener_row(thread="M8", length=20, qty=35)])
+        tools = ToolItem.objects.filter(
+            category="fast_screw",
+            fastener_spec__thread_diameter_mm=Decimal("8"),
+            fastener_spec__length_mm=20,
+            fastener_spec__strength_class="8.8",
+            fastener_spec__material="Сталь",
+            fastener_spec__coating="Цинк",
+        )
+        self.assertEqual(tools.count(), 1)
+        self.assertEqual(tools.first().quantity, 75)
 
 
 class IssueOutcomePostTests(InventoryFlowClientMixin, TestCase):
@@ -581,3 +718,38 @@ class IssueBulkPostTests(InventoryFlowClientMixin, TestCase):
         html = resp.content.decode("utf-8", errors="replace")
         self.assertIn("issue-line-writeoff", html)
         self.assertIn("Списать сразу", html)
+
+
+class FastenerSizeQueryParseTests(TestCase):
+    def test_parse_variants(self):
+        from shifts.inventory_views import _parse_fastener_size_query
+
+        cases = {
+            "M6x16": (Decimal("6"), 16),
+            "m6X16": (Decimal("6"), 16),
+            "М6х16": (Decimal("6"), 16),  # кириллица
+            "M6 x 16": (Decimal("6"), 16),
+            "M6*16": (Decimal("6"), 16),
+            "M6": (Decimal("6"), None),
+            "M2.5x6": (Decimal("2.5"), 6),
+            "": (None, None),
+            "abc": (None, None),
+        }
+        for raw, expected in cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(_parse_fastener_size_query(raw), expected)
+
+
+class FastenerIssueTests(InventoryFlowClientMixin, TestCase):
+    def test_issue_fastener_via_existing_form(self):
+        tool = ToolItem.objects.create(category="fast_screw", name="Винт ISO 4762 M6x16", quantity=100)
+        FastenerSpec.objects.create(
+            tool=tool,
+            fastener_type=FastenerType.objects.get(code="iso4762"),
+            thread_diameter_mm=Decimal("6"),
+            length_mm=16,
+        )
+        self._post_move_stock(tool.id, "issue", 30, comment="выдача метизов")
+        tool.refresh_from_db()
+        self.assertEqual(tool.quantity, 70)
+        self.assertTrue(StockMovement.objects.filter(tool=tool, movement_type="issue", quantity=30).exists())

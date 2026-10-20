@@ -216,3 +216,19 @@ class SiteUpdateAdmin(admin.ModelAdmin):
     search_fields = ("title", "body", "author_username")
     date_hierarchy = "created_at"
     readonly_fields = ("created_at",)
+
+
+
+
+from .models import FastenerType  # noqa: E402
+
+
+@admin.register(FastenerType)
+class FastenerTypeAdmin(admin.ModelAdmin):
+    """Типы метизов: подкатегория (Винты/Болты/Гайки/Шайбы) → тип (стандарт)."""
+
+    list_display = ("name", "category", "short_name", "code", "sort_order", "is_active")
+    list_editable = ("sort_order", "is_active")
+    list_filter = ("category", "is_active")
+    search_fields = ("name", "short_name", "code")
+    prepopulated_fields = {"code": ("short_name",)}

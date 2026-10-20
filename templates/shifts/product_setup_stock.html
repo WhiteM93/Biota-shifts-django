@@ -111,6 +111,11 @@
     {{ product.name }}
     · {% if setup.name %}{{ setup.name }}{% else %}Установка{% endif %}
   </p>
+  <p class="setup-stock-meta" style="margin-top:-8px;">
+    Нужны винты/шайбы для установки? Откройте
+    <a href="{% url 'inventory' %}?panel=stock&amp;category=fast_screw" class="link-like">склад по категории «Метизы»</a>
+    и подберите размер.
+  </p>
 
   <section class="setup-ai-box" id="setup-ai"
     data-url="{% url 'product_setup_ai_analyze' product.pk setup.pk %}"
