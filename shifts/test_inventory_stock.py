@@ -376,3 +376,27 @@ class HistoryDayGroupTests(TestCase):
         self.assertEqual(row["kind_label_full"], "Редактирование позиции")
         self.assertEqual(row["line_note"], "Адрес: A-01-01")
         self.assertFalse(row["has_more"])
+
+
+class FastenerTopCategoryTests(TestCase):
+    def test_fasteners_is_own_top_level_group(self):
+        from shifts.models import stock_category_grouped_choices
+
+        groups = {code: (title, items) for code, title, items in stock_category_grouped_choices()}
+        self.assertNotIn("fastener", [k for k, _ in groups["tooling"][1]])
+        title, items = groups["fasteners"]
+        self.assertEqual(title, "Метизы")
+        self.assertEqual([k for k, _ in items], ["fastener"])
+        self.assertEqual(items[0][1], "Винты, Болты")
+
+    def test_inventory_dropdown_has_metizy_optgroup(self):
+        from shifts.models import stock_category_grouped_choices
+        from django.template.loader import render_to_string
+
+        html = render_to_string(
+            "shifts/includes/stock_category_optgroups.html",
+            {"stock_category_groups": stock_category_grouped_choices(), "selected_category": ""},
+        )
+        self.assertIn('<optgroup label="Метизы">', html)
+        tooling = html.split('<optgroup label="Оснастка">', 1)[1].split("</optgroup>", 1)[0]
+        self.assertNotIn('value="fastener"', tooling)

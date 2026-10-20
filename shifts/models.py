@@ -224,7 +224,12 @@ STOCK_CATEGORY_GROUPS = [
     (
         "tooling",
         "Оснастка",
-        ("collet", "body_tool", "tool_extension", "fastener"),
+        ("collet", "body_tool", "tool_extension"),
+    ),
+    (
+        "fasteners",
+        "Метизы",
+        ("fastener",),
     ),
     (
         "measuring",
@@ -263,11 +268,27 @@ def stock_category_labels() -> dict[str, str]:
     return dict(TOOL_ITEM_CATEGORY_CHOICES)
 
 
+def fastener_category_option_label() -> str:
+    """Подпись пункта «Метизы» в списках категорий: перечень активных групп (Винты, Болты…)."""
+    try:
+        names = list(
+            FastenerGroup.objects.filter(is_active=True, types__is_active=True)
+            .distinct()
+            .order_by("sort_order", "name")
+            .values_list("name", flat=True)
+        )
+    except Exception:  # таблицы ещё нет (до миграции)
+        names = []
+    return ", ".join(names) if names else "Метизы"
+
+
 def stock_category_grouped_choices() -> list[tuple[str, str, list[tuple[str, str]]]]:
     labels = stock_category_labels()
     groups: list[tuple[str, str, list[tuple[str, str]]]] = []
     for code, title, keys in STOCK_CATEGORY_GROUPS:
         items = [(k, labels[k]) for k in keys if k in labels]
+        if code == "fasteners":
+            items = [("fastener", fastener_category_option_label())]
         groups.append((code, title, items))
     return groups
 
