@@ -210,7 +210,7 @@ class InventoryViewTests(TestCase):
 
     def test_fastener_stock_filter_by_size(self):
         fast_m6 = ToolItem.objects.create(
-            category="fastener",
+            category="fast_screw",
             name="Винт ISO 7380 M6x16",
             quantity=120,
             notes="Для наладки",
@@ -225,13 +225,13 @@ class InventoryViewTests(TestCase):
             coating="Цинк",
         )
         fast_m8 = ToolItem.objects.create(
-            category="fastener",
+            category="fast_screw",
             name="Винт ISO 7380 M8x20",
             quantity=70,
         )
         FastenerSpec.objects.create(
             tool=fast_m8,
-            fastener_type=FastenerType.objects.get(code="iso4014-4017"),
+            fastener_type=FastenerType.objects.get(code="iso4762"),
             thread_diameter_mm=Decimal("8"),
             length_mm=20,
             strength_class="10.9",
@@ -240,7 +240,7 @@ class InventoryViewTests(TestCase):
         )
 
         by_exact = self.client.get(
-            reverse("inventory") + "?panel=stock&category=fastener&fast_size=M6x16"
+            reverse("inventory") + "?panel=stock&category=fast_screw&fast_size=M6x16"
         )
         self.assertEqual(by_exact.status_code, 200)
         exact_html = by_exact.content.decode("utf-8", errors="replace")
@@ -248,34 +248,50 @@ class InventoryViewTests(TestCase):
         self.assertNotIn("M8x20", exact_html)
 
         by_thread = self.client.get(
-            reverse("inventory") + "?panel=stock&category=fastener&fast_size=M6"
+            reverse("inventory") + "?panel=stock&category=fast_screw&fast_size=M6"
         )
         self.assertEqual(by_thread.status_code, 200)
         thread_html = by_thread.content.decode("utf-8", errors="replace")
         self.assertIn("M6x16", thread_html)
         self.assertNotIn("M8x20", thread_html)
 
-        bolt = FastenerType.objects.get(code="iso4014-4017")
-        by_group = self.client.get(
-            reverse("inventory") + f"?panel=stock&category=fastener&fast_group={bolt.group_id}"
-        )
-        group_html = by_group.content.decode("utf-8", errors="replace")
-        self.assertIn(f'data-tool-id="{fast_m8.id}"', group_html)
-        self.assertNotIn(f'data-tool-id="{fast_m6.id}"', group_html)
-
         screw = FastenerType.objects.get(code="iso7380")
         by_type = self.client.get(
-            reverse("inventory") + f"?panel=stock&category=fastener&fast_type={screw.id}&fast_size=M6x16"
+            reverse("inventory") + f"?panel=stock&category=fast_screw&fast_type={screw.id}&fast_size=M6x16"
         )
         type_html = by_type.content.decode("utf-8", errors="replace")
         self.assertIn(f'data-tool-id="{fast_m6.id}"', type_html)
         self.assertNotIn(f'data-tool-id="{fast_m8.id}"', type_html)
         self.assertIn("Винт с полукруглой головкой", type_html)
 
+    def test_fastener_subcategories_are_separate_categories(self):
+        def mk(cat, code, thread, length):
+            tool = ToolItem.objects.create(category=cat, name=f"{code} M{thread}", quantity=10)
+            FastenerSpec.objects.create(
+                tool=tool,
+                fastener_type=FastenerType.objects.get(code=code),
+                thread_diameter_mm=Decimal(thread),
+                length_mm=length,
+            )
+            return tool
+
+        screw = mk("fast_screw", "iso7380", "6", 16)
+        nut = mk("fast_nut", "iso4032", "6", None)
+        washer = mk("fast_washer", "iso7089", "6", None)
+        nuts_html = self.client.get(
+            reverse("inventory") + "?panel=stock&category=fast_nut&fast_size=M6"
+        ).content.decode("utf-8", errors="replace")
+        self.assertIn(f'data-tool-id="{nut.id}"', nuts_html)
+        self.assertNotIn(f'data-tool-id="{screw.id}"', nuts_html)
+        self.assertNotIn(f'data-tool-id="{washer.id}"', nuts_html)
+        self.assertNotIn('name="fast_length_mm"', nuts_html)
+        self.assertIn("Гайка шестигранная (ISO 4032 / DIN 934)", nuts_html)
+        self.assertNotIn("Шайба плоская", nuts_html.split('name="fast_type"', 1)[1].split("</select>", 1)[0])
+
     def test_issue_panel_contains_fastener_filter_metrics(self):
         fast = ToolItem.objects.create(
-            category="fastener",
-            name="Винт ISO 7380 M10x30",
+            category="fast_screw",
+            name="Винт ISO 4762 M10x30",
             quantity=24,
             notes="Пробная партия",
         )
@@ -291,7 +307,7 @@ class InventoryViewTests(TestCase):
         resp = self.client.get(reverse("inventory") + "?panel=issue")
         self.assertEqual(resp.status_code, 200)
         html = resp.content.decode("utf-8", errors="replace")
-        self.assertIn('data-cat="fastener"', html)
+        self.assertIn('data-cat="fast_screw fast_bolt fast_nut fast_washer"', html)
         self.assertIn('data-f-fast_size="M10x30"', html)
         self.assertIn('data-f-fast_thread="10"', html)
         self.assertIn('data-f-fast_group="Винты"', html)
@@ -383,11 +399,13 @@ class FastenerTopCategoryTests(TestCase):
         from shifts.models import stock_category_grouped_choices
 
         groups = {code: (title, items) for code, title, items in stock_category_grouped_choices()}
-        self.assertNotIn("fastener", [k for k, _ in groups["tooling"][1]])
+        self.assertFalse([k for k, _ in groups["tooling"][1] if k.startswith("fast")])
         title, items = groups["fasteners"]
         self.assertEqual(title, "Метизы")
-        self.assertEqual([k for k, _ in items], ["fastener"])
-        self.assertEqual(items[0][1], "Винты, Болты")
+        self.assertEqual(
+            items,
+            [("fast_screw", "Винты"), ("fast_bolt", "Болты"), ("fast_nut", "Гайки"), ("fast_washer", "Шайбы")],
+        )
 
     def test_inventory_dropdown_has_metizy_optgroup(self):
         from shifts.models import stock_category_grouped_choices
@@ -399,4 +417,8 @@ class FastenerTopCategoryTests(TestCase):
         )
         self.assertIn('<optgroup label="Метизы">', html)
         tooling = html.split('<optgroup label="Оснастка">', 1)[1].split("</optgroup>", 1)[0]
-        self.assertNotIn('value="fastener"', tooling)
+        self.assertNotIn('value="fast_', tooling)
+        metizy = html.split('<optgroup label="Метизы">', 1)[1].split("</optgroup>", 1)[0]
+        for key, label in (("fast_screw", "Винты"), ("fast_bolt", "Болты"), ("fast_nut", "Гайки"), ("fast_washer", "Шайбы")):
+            self.assertIn(f'value="{key}"', metizy)
+            self.assertIn(label, metizy)

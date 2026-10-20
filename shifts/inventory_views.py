@@ -170,7 +170,9 @@ from .models import (
     BodyToolSpec,
     CenterDrillSpec,
     EndMillSpec,
-    FastenerGroup,
+    FASTENER_CATEGORIES,
+    FASTENER_CATEGORY_SET,
+    FASTENER_NO_LENGTH_CATEGORIES,
     FastenerSpec,
     FastenerType,
     ColletSpec,
@@ -248,7 +250,7 @@ _INVENTORY_CATEGORIES = frozenset(
         "insert",
         "collet",
         "tool_extension",
-        "fastener",
+        *FASTENER_CATEGORIES,
         *MEASURING_CATEGORIES,
     }
 )
@@ -632,12 +634,12 @@ def _arrival_bulk_row_validation_errors(row: dict, idx: int) -> list[str]:
             if normalize_measuring_length(row.get("ms_length_mm")) is None:
                 errs.append(f"Строка {idx}: укажите длину, мм.")
         return errs
-    if category == "fastener":
-        if _resolve_fastener_type(row.get("fastener_type")) is None:
-            errs.append(f"Строка {idx}: выберите тип метиза (группа → тип).")
+    if category in FASTENER_CATEGORY_SET:
+        if _resolve_fastener_type(row.get("fastener_type"), category=category) is None:
+            errs.append(f"Строка {idx}: выберите тип метиза.")
         if _normalize_fastener_thread_mm(row.get("fast_thread_mm")) is None:
             errs.append(f"Строка {idx}: укажите размер резьбы метиза (например M6).")
-        if _normalize_fastener_length(row.get("fast_length_mm")) is None:
+        if category not in FASTENER_NO_LENGTH_CATEGORIES and _normalize_fastener_length(row.get("fast_length_mm")) is None:
             errs.append(f"Строка {idx}: укажите длину метиза, мм.")
         return errs
     if category == "drill":
@@ -711,10 +713,13 @@ def _arrival_search_ready(row: dict) -> bool:
         if category == "measure_mark":
             return normalize_measuring_length(row.get("ms_length_mm")) is not None
         return bool((row.get("ms_brand") or "").strip() or (row.get("notes") or "").strip())
-    if category == "fastener":
+    if category in FASTENER_CATEGORY_SET:
         return bool(
             _normalize_fastener_thread_mm(row.get("fast_thread_mm")) is not None
-            and _normalize_fastener_length(row.get("fast_length_mm")) is not None
+            and (
+                category in FASTENER_NO_LENGTH_CATEGORIES
+                or _normalize_fastener_length(row.get("fast_length_mm")) is not None
+            )
         )
     if category == "tap":
         return bool((row.get("size_label") or "").strip())
@@ -763,7 +768,7 @@ def _serialize_arrival_match(tool: ToolItem) -> dict:
     else:
         coating_label = str(tool.get_coating_type_display())
     tool_material_label = tool.get_tool_material_display() or (tool.tool_material or "")
-    if tool.category == "fastener":
+    if tool.category in FASTENER_CATEGORY_SET:
         fs = getattr(tool, "fastener_spec", None)
         if fs:
             tool_material_label = (fs.material or "").strip()
@@ -1004,9 +1009,11 @@ def _arrival_candidate_tools(row: dict, *, limit: int = 20) -> list[ToolItem]:
         notes = (row.get("notes") or "").strip()[:300]
         if notes:
             qs = qs.filter(notes=notes)
-    elif category == "fastener":
+    elif category in FASTENER_CATEGORY_SET:
         qs = qs.select_related("fastener_spec")
-        qs = qs.filter(fastener_spec__fastener_type=_resolve_fastener_type(row.get("fastener_type")))
+        qs = qs.filter(
+            fastener_spec__fastener_type=_resolve_fastener_type(row.get("fastener_type"), category=category)
+        )
         thread_mm = _normalize_fastener_thread_mm(row.get("fast_thread_mm"))
         if thread_mm is not None:
             qs = qs.filter(fastener_spec__thread_diameter_mm=thread_mm)
@@ -1990,9 +1997,8 @@ _STOCK_KEYS_BY_CATEGORY = {
             "ext_inner_diameter",
         }
     ),
-    "fastener": frozenset(
+    "fast_screw": frozenset(
         {
-            "fast_group",
             "fast_type",
             "fast_size",
             "fast_thread_mm",
@@ -2009,6 +2015,10 @@ _STOCK_KEYS_BY_CATEGORY = {
     "measure_check": frozenset({"ms_brand", "ms_kind", "ms_check_size", "ms_check_class"}),
     "measure_mark": frozenset({"ms_brand", "ms_kind", "ms_length_mm"}),
 }
+for _fast_cat in FASTENER_CATEGORIES:
+    _STOCK_KEYS_BY_CATEGORY[_fast_cat] = _STOCK_KEYS_BY_CATEGORY["fast_screw"] - (
+        {"fast_length_mm"} if _fast_cat in FASTENER_NO_LENGTH_CATEGORIES else set()
+    )
 _STOCK_DECIMAL_PARAM_KEYS = frozenset(
     {
         "diameter_mm",
@@ -2356,11 +2366,8 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
         ext_inner = normalize_tool_extension_inner_diameter(g("ext_inner_diameter"))
         if ext_inner:
             qs = qs.filter(tool_extension_spec__inner_diameter__iexact=ext_inner)
-    elif category == "fastener":
-        qs = qs.select_related("fastener_spec", "fastener_spec__fastener_type__group")
-        fast_group = (g("fast_group") or "").strip()
-        if fast_group.isdigit():
-            qs = qs.filter(fastener_spec__fastener_type__group_id=int(fast_group))
+    elif category in FASTENER_CATEGORY_SET:
+        qs = qs.select_related("fastener_spec", "fastener_spec__fastener_type")
         fast_type = (g("fast_type") or "").strip()
         if fast_type.isdigit():
             qs = qs.filter(fastener_spec__fastener_type_id=int(fast_type))
@@ -2433,12 +2440,12 @@ def _apply_stock_detail_filters(qs, *, category: str, params: dict, exclude: fro
             if length is not None:
                 qs = qs.filter(measuring_tool_spec__length_mm=length)
 
-    _no_material_cats = ("collet", "body_tool", "insert", "tool_extension", "fastener") + tuple(MEASURING_CATEGORIES)
+    _no_material_cats = ("collet", "body_tool", "insert", "tool_extension") + FASTENER_CATEGORIES + tuple(MEASURING_CATEGORIES)
     if category not in _no_material_cats and "tool_material" not in ex and "tool_material_custom" not in ex:
         tool_material = _resolve_stock_tool_material(params)
         if tool_material:
             qs = qs.filter(tool_material=tool_material)
-    _no_coating_cats = ("collet", "body_tool", "tool_extension", "fastener") + tuple(MEASURING_CATEGORIES)
+    _no_coating_cats = ("collet", "body_tool", "tool_extension") + FASTENER_CATEGORIES + tuple(MEASURING_CATEGORIES)
     if category not in _no_coating_cats and "coating_type" not in ex:
         coating_type = g("coating_type")
         if coating_type:
@@ -2543,29 +2550,24 @@ def _normalize_fastener_text(raw, *, limit: int) -> str:
     return (str(raw or "").strip())[:limit]
 
 
-def _resolve_fastener_type(raw) -> "FastenerType | None":
+def _resolve_fastener_type(raw, *, category: str | None = None) -> "FastenerType | None":
     """Тип метиза по id или коду (только активные)."""
     txt = str(raw or "").strip()
     if not txt:
         return None
-    qs = FastenerType.objects.select_related("group").filter(is_active=True)
+    qs = FastenerType.objects.filter(is_active=True)
+    if category:
+        qs = qs.filter(category=category)
     if txt.isdigit():
         return qs.filter(pk=int(txt)).first()
     return qs.filter(code=txt[:64]).first()
 
 
-def _fastener_types_tree() -> list[dict]:
-    """Группы → активные типы для форм прихода и фильтров склада."""
-    out = []
-    groups = FastenerGroup.objects.filter(is_active=True).prefetch_related("types")
-    for g in groups:
-        types = [
-            {"id": t.id, "code": t.code, "label": t.name}
-            for t in g.types.all()
-            if t.is_active
-        ]
-        if types:
-            out.append({"id": g.id, "label": g.name, "types": types})
+def _fastener_types_by_category() -> dict[str, list[dict]]:
+    """Подкатегория метизов → активные типы (для прихода и фильтров склада)."""
+    out: dict[str, list[dict]] = {c: [] for c in FASTENER_CATEGORIES}
+    for t in FastenerType.objects.filter(is_active=True):
+        out.setdefault(t.category, []).append({"id": t.id, "code": t.code, "label": t.name})
     return out
 
 
@@ -2585,7 +2587,9 @@ def _build_fastener_name(
     material: str = "",
     coating: str = "",
 ) -> str:
-    size = f"{_fmt_fastener_thread_label(thread_mm)}x{length_mm or '?'}"
+    size = _fmt_fastener_thread_label(thread_mm)
+    if length_mm:
+        size = f"{size}x{length_mm}"
     kind_label = fastener_type.item_label if fastener_type is not None else "Метиз"
     extras = [x for x in (strength_class, material, coating) if (x or "").strip()]
     tail = f" · {' / '.join(extras)}" if extras else ""
@@ -5321,11 +5325,16 @@ def inventory_view(request):
                         tool.save(update_fields=["quantity", "updated_at"])
                     else:
                         tool = _create_tool_extension_tool(quantity, spec_fields)
-                elif category == "fastener":
-                    ftype = _resolve_fastener_type(row.get("fastener_type"))
+                elif category in FASTENER_CATEGORY_SET:
+                    ftype = _resolve_fastener_type(row.get("fastener_type"), category=category)
                     thread_mm = _normalize_fastener_thread_mm(row.get("fast_thread_mm"))
-                    length_mm = _normalize_fastener_length(row.get("fast_length_mm"))
-                    if ftype is None or thread_mm is None or length_mm is None:
+                    if category in FASTENER_NO_LENGTH_CATEGORIES:
+                        length_mm = None
+                    else:
+                        length_mm = _normalize_fastener_length(row.get("fast_length_mm"))
+                    if ftype is None or thread_mm is None or (
+                        length_mm is None and category not in FASTENER_NO_LENGTH_CATEGORIES
+                    ):
                         continue
                     strength_class = _normalize_fastener_text(row.get("fast_strength_class"), limit=40)
                     material = _normalize_fastener_text(row.get("fast_material"), limit=80)
@@ -5333,7 +5342,7 @@ def inventory_view(request):
                     tool = (
                         ToolItem.objects.select_for_update()
                         .filter(
-                            category="fastener",
+                            category=category,
                             fastener_spec__fastener_type=ftype,
                             fastener_spec__thread_diameter_mm=thread_mm,
                             fastener_spec__length_mm=length_mm,
@@ -5348,7 +5357,7 @@ def inventory_view(request):
                         tool.save(update_fields=["quantity", "updated_at"])
                     else:
                         tool = ToolItem.objects.create(
-                            category="fastener",
+                            category=category,
                             name=_build_fastener_name(
                                 thread_mm=thread_mm,
                                 length_mm=length_mm,
@@ -5387,7 +5396,7 @@ def inventory_view(request):
                     tool.warehouse_address = addr
                     tool.save(update_fields=["warehouse_address", "updated_at"])
                     ensure_warehouse_address(addr)
-                if category in ("insert", "body_tool", "fastener") or category in MEASURING_CATEGORY_SET:
+                if category in ("insert", "body_tool") or category in FASTENER_CATEGORY_SET or category in MEASURING_CATEGORY_SET:
                     notes = (row.get("notes") or "").strip()[:300]
                     if notes and (tool.notes or "") != notes:
                         tool.notes = notes
@@ -6165,17 +6174,18 @@ def inventory_view(request):
     tool_extension_inner_diameters = _distinct_text_values(
         _opt_qs("tool_extension", "ext_inner_diameter"), "tool_extension_spec__inner_diameter"
     )
+    _fast_opt_cat = filter_category if filter_category in FASTENER_CATEGORY_SET else FASTENER_CATEGORIES[0]
     fastener_threads = _sorted_unique_decimal_strings(
-        _distinct_numeric_values(_opt_qs("fastener", "fast_thread_mm"), "fastener_spec__thread_diameter_mm")
+        _distinct_numeric_values(_opt_qs(_fast_opt_cat, "fast_thread_mm"), "fastener_spec__thread_diameter_mm")
     )
     fastener_lengths = _sorted_unique_int_strings(
-        _distinct_numeric_values(_opt_qs("fastener", "fast_length_mm"), "fastener_spec__length_mm")
+        _distinct_numeric_values(_opt_qs(_fast_opt_cat, "fast_length_mm"), "fastener_spec__length_mm")
     )
     fastener_strengths = _distinct_text_values(
-        _opt_qs("fastener", "fast_strength_class"), "fastener_spec__strength_class"
+        _opt_qs(_fast_opt_cat, "fast_strength_class"), "fastener_spec__strength_class"
     )
-    fastener_materials = _distinct_text_values(_opt_qs("fastener", "fast_material"), "fastener_spec__material")
-    fastener_coatings = _distinct_text_values(_opt_qs("fastener", "fast_coating"), "fastener_spec__coating")
+    fastener_materials = _distinct_text_values(_opt_qs(_fast_opt_cat, "fast_material"), "fastener_spec__material")
+    fastener_coatings = _distinct_text_values(_opt_qs(_fast_opt_cat, "fast_coating"), "fastener_spec__coating")
     measuring_brands = sorted(
         {
             (b or "").strip().upper()
@@ -6289,7 +6299,7 @@ def inventory_view(request):
             ).order_by("category", "name")
         )
 
-    _fastener_types_tree_cached = _fastener_types_tree()
+    _fastener_types_by_cat = _fastener_types_by_category()
     ctx = {
         "tool_items": tool_items,
         "movements": mv_hist[:50],
@@ -6569,8 +6579,10 @@ def inventory_view(request):
             "overall_lengths": tool_extension_lengths,
             "inner_diameters": tool_extension_inner_diameters,
         },
-        "fastener_types_tree": _fastener_types_tree_cached,
-        "fastener_types_tree_json": json.dumps(_fastener_types_tree_cached, ensure_ascii=False).replace("<", "\\u003c"),
+        "is_fastener_category": filter_category in FASTENER_CATEGORY_SET,
+        "fastener_category_has_length": filter_category not in FASTENER_NO_LENGTH_CATEGORIES,
+        "fastener_types_for_category": _fastener_types_by_cat.get(filter_category, []),
+        "fastener_types_by_cat_json": json.dumps(_fastener_types_by_cat, ensure_ascii=False).replace("<", "\\u003c"),
         "fastener_filter_options": {
             "threads": fastener_threads,
             "lengths": fastener_lengths,

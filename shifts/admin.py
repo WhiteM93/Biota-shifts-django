@@ -219,25 +219,16 @@ class SiteUpdateAdmin(admin.ModelAdmin):
 
 
 
-from .models import FastenerGroup, FastenerType  # noqa: E402
 
-
-class FastenerTypeInline(admin.TabularInline):
-    model = FastenerType
-    extra = 1
-    fields = ("name", "short_name", "code", "sort_order", "is_active")
-    prepopulated_fields = {"code": ("short_name",)}
-
-
-@admin.register(FastenerGroup)
-class FastenerGroupAdmin(admin.ModelAdmin):
-    list_display = ("name", "sort_order", "is_active")
-    list_editable = ("sort_order", "is_active")
-    inlines = [FastenerTypeInline]
+from .models import FastenerType  # noqa: E402
 
 
 @admin.register(FastenerType)
 class FastenerTypeAdmin(admin.ModelAdmin):
-    list_display = ("name", "group", "short_name", "code", "sort_order", "is_active")
-    list_filter = ("group", "is_active")
+    """Типы метизов: подкатегория (Винты/Болты/Гайки/Шайбы) → тип (стандарт)."""
+
+    list_display = ("name", "category", "short_name", "code", "sort_order", "is_active")
+    list_editable = ("sort_order", "is_active")
+    list_filter = ("category", "is_active")
     search_fields = ("name", "short_name", "code")
+    prepopulated_fields = {"code": ("short_name",)}
