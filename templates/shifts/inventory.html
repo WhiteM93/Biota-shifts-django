@@ -1021,9 +1021,6 @@
         {% endfor %}
       </select>
     </label>
-    <label class="field"><span>Размер{% if fastener_category_has_length %} (M6x16){% else %} (M6){% endif %}</span>
-      <input type="text" name="fast_size" value="{{ filters.fast_size }}" maxlength="24" placeholder="{% if fastener_category_has_length %}M6x16 или M6{% else %}M6{% endif %}">
-    </label>
     <label class="field"><span>Резьба, мм</span>
       <select name="fast_thread_mm">
         <option value="">Все</option>

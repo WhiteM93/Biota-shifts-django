@@ -240,15 +240,16 @@ class InventoryViewTests(TestCase):
         )
 
         by_exact = self.client.get(
-            reverse("inventory") + "?panel=stock&category=fast_screw&fast_size=M6x16"
+            reverse("inventory") + "?panel=stock&category=fast_screw&fast_thread_mm=6&fast_length_mm=16"
         )
         self.assertEqual(by_exact.status_code, 200)
         exact_html = by_exact.content.decode("utf-8", errors="replace")
         self.assertIn("M6x16", exact_html)
         self.assertNotIn("M8x20", exact_html)
+        self.assertNotIn('name="fast_size"', exact_html)
 
         by_thread = self.client.get(
-            reverse("inventory") + "?panel=stock&category=fast_screw&fast_size=M6"
+            reverse("inventory") + "?panel=stock&category=fast_screw&fast_thread_mm=6"
         )
         self.assertEqual(by_thread.status_code, 200)
         thread_html = by_thread.content.decode("utf-8", errors="replace")
@@ -257,7 +258,8 @@ class InventoryViewTests(TestCase):
 
         screw = FastenerType.objects.get(code="iso10642")
         by_type = self.client.get(
-            reverse("inventory") + f"?panel=stock&category=fast_screw&fast_type={screw.id}&fast_size=M6x16"
+            reverse("inventory")
+            + f"?panel=stock&category=fast_screw&fast_type={screw.id}&fast_thread_mm=6&fast_length_mm=16"
         )
         type_html = by_type.content.decode("utf-8", errors="replace")
         self.assertIn(f'data-tool-id="{fast_m6.id}"', type_html)
@@ -279,7 +281,7 @@ class InventoryViewTests(TestCase):
         nut = mk("fast_nut", "iso4032", "6", None)
         washer = mk("fast_washer", "iso7089", "6", None)
         nuts_html = self.client.get(
-            reverse("inventory") + "?panel=stock&category=fast_nut&fast_size=M6"
+            reverse("inventory") + "?panel=stock&category=fast_nut&fast_thread_mm=6"
         ).content.decode("utf-8", errors="replace")
         self.assertIn(f'data-tool-id="{nut.id}"', nuts_html)
         self.assertNotIn(f'data-tool-id="{screw.id}"', nuts_html)
